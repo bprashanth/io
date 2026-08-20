@@ -492,9 +492,8 @@ def make_critic_prompt(messages: list[str], data_profile: dict[str, Any], previo
     """Build the value-redacted, domain-neutral semantic-review request."""
     def without_values(source_profile: dict[str, Any]) -> dict[str, Any]:
         redacted = {
-            "row_count": source_profile["row_count"],
             "columns": [
-                {key: column[key] for key in ("name", "type", "null_count", "distinct_count")}
+                {key: column[key] for key in ("name", "type")}
                 for column in source_profile["columns"]
             ],
         }
@@ -880,6 +879,14 @@ def normalize_mechanical_invariants(plan: dict[str, Any], frame: pd.DataFrame) -
 
 def check_mechanical_invariants(plan: dict[str, Any], result: pd.DataFrame) -> None:
     """Reject executable contradictions without parsing participant language."""
+    chart_keys = [plan["view"]["x"]]
+    if plan["view"].get("series"):
+        chart_keys.append(plan["view"]["series"])
+    if result.duplicated(subset=chart_keys).any():
+        raise PlanError(
+            "chart x/series fields do not uniquely identify result rows; "
+            "add the remaining comparison dimension as series, filter it, or aggregate explicitly"
+        )
     fingerprints = [json.dumps(item, sort_keys=True) for item in plan["insights"]]
     if len(fingerprints) != len(set(fingerprints)):
         raise PlanError("duplicate insight specifications would repeat the same answer on the page")
@@ -909,6 +916,7 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
     arbitrary language; it protects the benchmark's declared year-only/range
     phrasing. More constraint extractors must be frozen before additional cases.
     """
+    check_mechanical_invariants(plan, result)
     text = "\n".join(messages).lower()
     for words, kind in ((("lowest", "smallest"), "lowest"), (("highest", "largest"), "highest")):
         requested_word = next((word for word in words if re.search(rf"\b{word}\b", text)), None)
@@ -1062,11 +1070,21 @@ def main() -> int:
             try:
                 candidate, api = call_model(args.model, args.effort, attempt_prompt, schema, args.model_timeout_seconds)
             except (TimeoutError, ModelRequestError) as error:
+                failure = {"attempt": attempt, "request_error": f"{type(error).__name__}: {error}"}
+                attempts.append(failure)
+                dump(turn_dir / f"plan-attempt-{attempt}.json", failure)
+                dump(turn_dir / "plan-error.json", {
+                    "status": "model_request_failed", "attempts": attempts,
+                    "note": "Operational planner failures do not trigger semantic rewrites.",
+                })
+                raise
+            except (TimeoutError, ModelRequestError) as error:
                 record.setdefault("plan", candidate)
-                record["validation_error"] = f"{type(error).__name__}: {error}"; attempts.append(record)
+                record["validation_error"] = f"{type(error).__name__}: {error}"
+                attempts.append(record)
                 dump(turn_dir / f"plan-attempt-{attempt}.json", record)
                 dump(turn_dir / "plan-error.json", {
-                    "status": "semantic_critic_timeout", "attempts": attempts,
+                    "status": "semantic_critic_failed", "attempts": attempts,
                     "note": "Operational critic failures do not trigger semantic planner rewrites.",
                 })
                 raise

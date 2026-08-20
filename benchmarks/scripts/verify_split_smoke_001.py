@@ -9,11 +9,20 @@ import json
 from pathlib import Path
 
 
-def percentage(row: dict[str, object]) -> float:
-    for name in ("coverage_percent", "coverage", "immunisation_rate"):
-        if name in row:
-            return round(float(row[name]), 1)
-    raise AssertionError("no coverage metric in result row")
+def derived_percent_name(plan: dict[str, object]) -> str:
+    steps = plan.get("steps", [])
+    matches = [
+        step["name"]
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("op") == "derive"
+        and step.get("kind") == "percent"
+        and step.get("numerator") == "children_fully_immunised"
+        and step.get("denominator") == "children_due"
+    ]
+    if len(matches) != 1:
+        raise AssertionError("plan does not contain exactly one expected derived percentage")
+    return str(matches[0])
 
 
 def main() -> int:
@@ -27,9 +36,14 @@ def main() -> int:
 
     reports = {turn: json.loads((args.run_dir / f"turn-{turn}/insight-report.json").read_text()) for turn in (1, 2, 3)}
     for turn, expected_years in ((1, {2022, 2023}), (2, {2023}), (3, {2023})):
+        plan = json.loads((args.run_dir / f"turn-{turn}/validated-plan.json").read_text())
+        percentage_name = derived_percent_name(plan)
         rows = reports[turn]["rows"]
         years = {int(row["year"]) for row in rows}
-        values = {(int(row["year"]), str(row["district"])): percentage(row) for row in rows}
+        values = {
+            (int(row["year"]), str(row["district"])): round(float(row[percentage_name]), 1)
+            for row in rows
+        }
         expected = {(int(year), district): float(value) for year, districts in oracle["expected_percentages"].items() if int(year) in expected_years for district, value in districts.items()}
         passed = years == expected_years and values == expected
         checks.append({"name": f"turn-{turn}-rows-and-values", "passed": passed})
