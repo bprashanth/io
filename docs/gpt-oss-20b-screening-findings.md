@@ -2,7 +2,7 @@
 
 ## Outcome so far
 
-`openai/gpt-oss-20b` at low reasoning effort is the first sub-27B candidate to pass the split pipeline's smoke, five-turn ANC and safety-sensitive programme journeys. It is not yet the winner: clean XLSX, PDF, web discovery, irregular workbooks, local inference and concurrency remain untested.
+`openai/gpt-oss-20b` at low reasoning effort is the first sub-27B candidate to pass the split pipeline's smoke, five-turn ANC, safety-sensitive programme, clean-XLSX and narrow digital-PDF journeys. It is not yet the winner: web discovery, irregular workbooks, local inference and concurrency remain untested.
 
 The useful result is architectural. A 20B model can plan these bounded analyses when a trusted layer owns filtering, arithmetic, safety checks, HTML, charts and downloads. It should not be asked to calculate values or write an unconstrained application.
 
@@ -13,6 +13,8 @@ The useful result is architectural. A 20B model can plan these bounded analyses 
 | three-turn CSV smoke | 4 / 1 | 30.694 s | $0.00027114 | all deterministic and browser checks pass; visual 8.8/10 | IDE default: 80.5/100, 594.967 s |
 | five-turn ANC CSV | 9 / 4 | 57.782 s | $0.00079874 | all critical checks pass; omits a separate visible 6 pp 2023 gap | CLI default: 84/100, 301.29 s |
 | four-turn programme CSV | 6 / 2 | 41.424 s | $0.00064762 | full oracle passes after trusted safety-note rendering | CLI default: 10/100, 238.545 s |
+| four-turn clean XLSX | 4 / 0 | 31.870 s | $0.00039448 | all critical checks pass; omits separate visible 7 pp 2023 gap | CLI default: 89/100, 428.938 s |
+| four-turn digital PDF | 5 / 1 | 22.670 s | $0.00037850 | full oracle passes | counted PDF run: 0/100 after Google permission failure |
 
 The Antigravity scores are preserved references, not a perfect-answer target. The ANC baseline itself lost durable follow-up details and had a broken control; the programme baseline fabricated data and advice. GPT-OSS is judged against those observed pages while still failing closed on errors that would harm a nontechnical participant.
 
@@ -35,6 +37,7 @@ The fixes are model-independent:
 - require a structured causal-limit flag for causal questions;
 - let the trusted renderer turn that flag into a standard visible refusal of unsupported causes and interventions;
 - make table content follow the selected indicator and make the browser checker verify the selected header.
+- compile explicit durable year ranges and named two-entity comparisons into filters before execution, while preserving the model's raw plan and every normalization for audit.
 
 These checks are part of the product architecture, not benchmark answer keys. They prevent plausible-looking bad outputs and allow the user to retry without debugging.
 
@@ -55,9 +58,8 @@ None of these results establishes arbitrary Excel or PDF ingestion. The current 
 
 ## Next gates
 
-1. Run GPT-OSS 20B through the existing clean XLSX and digital PDF journeys, preserving Antigravity pairwise scores.
-2. Add adversarial but ordinary workbook cases: multi-tab, merged headings, stacked subtables and a correction turn.
+1. Add adversarial but ordinary workbook cases: multi-tab, merged headings, stacked subtables and a correction turn.
+2. Run the connector-backed web case without confusing bounded discovery with open-web research.
 3. Test a smaller locally runnable candidate only after the 20B boundary is established.
 4. Run the winning remote configuration locally and measure wall time, memory and bounded-retry rate.
 5. Only then estimate laptop versus DGX Spark capacity for 20 event users.
-

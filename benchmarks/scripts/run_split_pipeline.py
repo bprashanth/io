@@ -217,7 +217,7 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
 def repair_prompt(prompt: str, plan: Any, error: Exception) -> str:
     return prompt + "\n\nREJECTED_PLAN:\n" + json.dumps(plan, ensure_ascii=False) + \
         "\nVALIDATOR_ERROR:\n" + str(error) + \
-        "\nReturn a complete corrected plan. Do not explain the correction."
+        "\nReturn a complete corrected plan. Audit the whole corrected plan against every rule above, not only the reported error. Recheck durable filters, named-entity scope, insight kind and unit, and that view series differs from view x. Do not explain the correction."
 
 
 def call_model(model: str, effort: str, prompt: str, schema: dict[str, Any], timeout_seconds: int) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -382,6 +382,83 @@ def execute(frame: pd.DataFrame, plan: dict[str, Any]) -> pd.DataFrame:
     return result
 
 
+def explicit_year_constraint(messages: list[str]) -> tuple[set[int] | None, str]:
+    allowed: set[int] | None = None
+    constraint_kind = ""
+    for message in messages:
+        lowered = message.lower()
+        ranges = re.findall(r"only\s+((?:19|20)\d{2})\s+(?:to|through|-)\s+((?:19|20)\d{2})", lowered)
+        explicit_sets = re.findall(
+            r"only\s+((?:19|20)\d{2}(?:\s*(?:,|and)\s*(?:19|20)\d{2})+)", lowered
+        )
+        singles = re.findall(
+            r"only\s+((?:19|20)\d{2})(?!\s*(?:to|through|-|,|and))", lowered
+        )
+        if ranges:
+            start, end = map(int, ranges[-1]); allowed = set(range(start, end + 1)); constraint_kind = "range"
+        elif explicit_sets:
+            allowed = {int(year) for year in re.findall(r"(?:19|20)\d{2}", explicit_sets[-1])}; constraint_kind = "set"
+        elif singles:
+            allowed = {int(singles[-1])}; constraint_kind = "single"
+        else:
+            direct = re.findall(r"\b(?:show|filter)\s+(?:only\s+)?((?:19|20)\d{2})\b", lowered)
+            comparison_year = re.findall(
+                r"(?:\bfor\s+|\bin\s+)((?:19|20)\d{2})\b", lowered
+            ) if "compar" in lowered else []
+            if direct:
+                allowed = {int(direct[-1])}; constraint_kind = "direct"
+            elif comparison_year and allowed is None:
+                allowed = {int(comparison_year[-1])}; constraint_kind = "comparison"
+    return allowed, constraint_kind
+
+
+def normalize_explicit_constraints(messages: list[str], plan: dict[str, Any], frame: pd.DataFrame) -> list[str]:
+    """Compile literal user scope into filters before semantic validation."""
+    required: dict[str, list[Any]] = {}
+    allowed_years, _ = explicit_year_constraint(messages)
+    year_columns = [str(column) for column in frame.columns if "year" in str(column).lower()]
+    if allowed_years is not None and year_columns:
+        required[year_columns[0]] = sorted(allowed_years)
+
+    ranking = any(item["kind"] in ("highest", "lowest") for item in plan["insights"])
+    comparison_message = next(
+        (message.lower() for message in reversed(messages)
+         if re.search(r"\bcompar(?:e|ing|ison)\b|\bvs\.?\b|\bversus\b", message, re.I)),
+        None,
+    )
+    if comparison_message and not ranking:
+        for column in frame.columns:
+            if pd.api.types.is_numeric_dtype(frame[column]):
+                continue
+            admitted = [str(value) for value in frame[column].dropna().unique()]
+            named = [value for value in admitted if re.search(
+                rf"(?<![\w]){re.escape(value.lower())}(?![\w])", comparison_message
+            )]
+            if len(named) == 2:
+                required[str(column)] = named
+
+    changes: list[str] = []
+    for column, values in required.items():
+        expected = {str(value) for value in values}
+        current = [step for step in plan["steps"] if step["op"] == "filter" and step["column"] == column]
+        current_values = set()
+        for step in current:
+            value = step["value"]
+            current_values |= {str(item) for item in value} if isinstance(value, list) else {str(value)}
+        if current_values != expected or len(current) != 1 or current[0]["cmp"] != "in":
+            changes.append(f"enforced {column} in {values}")
+    if required:
+        remaining = [
+            step for step in plan["steps"]
+            if not (step["op"] == "filter" and step["column"] in required)
+        ]
+        plan["steps"] = [
+            {"op": "filter", "column": column, "cmp": "in", "value": values}
+            for column, values in required.items()
+        ] + remaining
+    return changes
+
+
 def check_conversation_constraints(messages: list[str], plan: dict[str, Any], result: pd.DataFrame) -> None:
     """Reject executable plans that silently ignore explicit durable filters.
 
@@ -438,32 +515,7 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
     if not year_columns:
         return
     years = {int(value) for value in result[year_columns[0]].dropna()}
-    allowed: set[int] | None = None
-    constraint_kind = ""
-    for message in messages:
-        lowered = message.lower()
-        ranges = re.findall(r"only\s+((?:19|20)\d{2})\s+(?:to|through|-)\s+((?:19|20)\d{2})", lowered)
-        explicit_sets = re.findall(
-            r"only\s+((?:19|20)\d{2}(?:\s*(?:,|and)\s*(?:19|20)\d{2})+)", lowered
-        )
-        singles = re.findall(
-            r"only\s+((?:19|20)\d{2})(?!\s*(?:to|through|-|,|and))", lowered
-        )
-        if ranges:
-            start, end = map(int, ranges[-1]); allowed = set(range(start, end + 1)); constraint_kind = "range"
-        elif explicit_sets:
-            allowed = {int(year) for year in re.findall(r"(?:19|20)\d{2}", explicit_sets[-1])}; constraint_kind = "set"
-        elif singles:
-            allowed = {int(singles[-1])}; constraint_kind = "single"
-        else:
-            direct = re.findall(r"\b(?:show|filter)\s+(?:only\s+)?((?:19|20)\d{2})\b", lowered)
-            comparison_year = re.findall(
-                r"(?:\bfor\s+|\bin\s+)((?:19|20)\d{2})\b", lowered
-            ) if "compar" in lowered else []
-            if direct:
-                allowed = {int(direct[-1])}; constraint_kind = "direct"
-            elif comparison_year and allowed is None:
-                allowed = {int(comparison_year[-1])}; constraint_kind = "comparison"
+    allowed, constraint_kind = explicit_year_constraint(messages)
     if allowed is not None and years != allowed:
         raise PlanError(
             f"durable year-{constraint_kind} constraint ignored: expected {sorted(allowed)}, got {sorted(years)}"
@@ -552,11 +604,16 @@ def main() -> int:
                 attempts.append(failure); dump(turn_dir / f"plan-attempt-{attempt}.json", failure)
                 dump(turn_dir / "plan-error.json", {"status": "model_request_failed", "attempts": attempts})
                 raise
-            record = {"attempt": attempt, "plan": candidate, "api": api}
+            model_plan = json.loads(json.dumps(candidate))
+            record = {"attempt": attempt, "model_plan": model_plan, "api": api}
             try:
+                jsonschema.validate(candidate, schema)
+                normalizations = normalize_explicit_constraints(messages, candidate, frame)
                 jsonschema.validate(candidate, schema); bind(candidate, frame); candidate_result = execute(frame, candidate)
+                record["plan"] = candidate; record["normalizations"] = normalizations
                 check_conversation_constraints(messages, candidate, candidate_result)
             except Exception as error:
+                record.setdefault("plan", candidate)
                 record["validation_error"] = f"{type(error).__name__}: {error}"; attempts.append(record)
                 dump(turn_dir / f"plan-attempt-{attempt}.json", record)
                 if attempt == 3: raise
