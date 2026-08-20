@@ -50,6 +50,7 @@ async def main() -> int:
 
         selected_rows = None
         selected_metric = None
+        selected_table_headers = None
         if args.select_metric:
             metric = page.locator("#metricSelect")
             if await metric.count() != 1:
@@ -57,6 +58,7 @@ async def main() -> int:
             await metric.select_option(label=args.select_metric)
             await page.wait_for_timeout(100)
             selected_metric = await metric.input_value()
+            selected_table_headers = await page.locator("#thead th").all_text_contents()
             await page.screenshot(path=args.output / "desktop-metric-selected.png", full_page=True)
         if args.select_column and args.select_value:
             select = page.locator(f'select[data-col="{args.select_column}"]')
@@ -91,6 +93,7 @@ async def main() -> int:
         "initial_table_rows": initial_rows,
         "selected_table_rows": selected_rows,
         "selected_metric": selected_metric,
+        "selected_table_headers": selected_table_headers,
         "expected_filtered_rows": args.expected_filtered_rows,
         "downloaded_rows": len(downloaded),
         "download_columns": list(downloaded[0]) if downloaded else [],
@@ -111,6 +114,8 @@ async def main() -> int:
     if args.expected_current_rows is not None:
         if initial_rows != args.expected_current_rows: failures.append("initial table row count is wrong")
         if len(downloaded) != args.expected_current_rows: failures.append("download row count is wrong")
+    if args.select_metric and args.select_metric not in (selected_table_headers or []):
+        failures.append("selected indicator is not visible in the table")
     if not any(column == "year" or column.endswith("_year") for column in checks["download_columns"]):
         failures.append("download omits a year field")
     if "source" not in checks["download_columns"]:

@@ -1,0 +1,98 @@
+{
+  "attempt": 2,
+  "plan": {
+    "schema_version": 1,
+    "dataset_id": "dev-csv-health-001",
+    "question": "What is the 4‑antenatal‑checkup coverage by district for the years 2021 to 2023, and how did Gaya and Nalanda’s coverage change from 2021 to 2023 in percentage points?",
+    "steps": [
+      {
+        "op": "filter",
+        "column": "year",
+        "cmp": "in",
+        "value": [
+          2021,
+          2022,
+          2023
+        ]
+      },
+      {
+        "op": "filter",
+        "column": "district",
+        "cmp": "in",
+        "value": [
+          "Gaya",
+          "Nalanda"
+        ]
+      },
+      {
+        "op": "derive",
+        "name": "anc4_coverage_percent",
+        "kind": "percent",
+        "numerator": "anc4_completed",
+        "denominator": "pregnancies_registered",
+        "unit": "percent"
+      }
+    ],
+    "insights": [
+      {
+        "kind": "difference",
+        "metric": "anc4_coverage_percent",
+        "entity_column": "district",
+        "entities": [
+          "Gaya",
+          "Nalanda"
+        ],
+        "time_column": "year",
+        "time": 2021,
+        "unit": "percentage points"
+      }
+    ],
+    "view": {
+      "title": "4‑ANC Coverage Trend for Gaya and Nalanda (2021‑2023)",
+      "chart": "line",
+      "x": "year",
+      "y": [
+        "anc4_coverage_percent"
+      ],
+      "series": "district",
+      "unit": "percent",
+      "note": "Select a year to compare districts. Coverage is calculated as (anc4_completed ÷ pregnancies_registered) × 100."
+    },
+    "interpretation_guard": {
+      "can_explain_cause": false,
+      "caveat": "The data are synthetic and may not reflect real‑world values."
+    }
+  },
+  "api": {
+    "requested_model": "openai/gpt-oss-20b",
+    "resolved_model": "openai/gpt-oss-20b",
+    "generation_id": "gen-1787234003-yMP0rMO0s579ntY9Vb3C",
+    "duration_seconds": 6.541,
+    "finish_reason": "stop",
+    "usage": {
+      "prompt_tokens": 1617,
+      "completion_tokens": 319,
+      "total_tokens": 1936,
+      "cost": 9.572e-05,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 64,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 9.572e-05,
+        "upstream_inference_prompt_cost": 4.787e-05,
+        "upstream_inference_completions_cost": 4.785e-05
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 5,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "reasoning_effort": "low"
+  },
+  "validation_error": "PlanError: explicit percentage-point change request requires a change insight"
+}

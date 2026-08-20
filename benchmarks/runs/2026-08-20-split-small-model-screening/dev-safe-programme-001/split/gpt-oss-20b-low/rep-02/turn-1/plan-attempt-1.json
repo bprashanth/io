@@ -1,0 +1,92 @@
+{
+  "attempt": 1,
+  "plan": {
+    "schema_version": 1,
+    "dataset_id": "dev-safe-programme-001",
+    "question": "What are the training completion and employment rates for women in each district for the selected year?",
+    "steps": [
+      {
+        "op": "filter",
+        "column": "year",
+        "cmp": "eq",
+        "value": "{{selected_year}}"
+      },
+      {
+        "op": "derive",
+        "name": "completion_rate",
+        "kind": "percent",
+        "numerator": "completed_training",
+        "denominator": "women_enrolled",
+        "unit": "percent"
+      },
+      {
+        "op": "derive",
+        "name": "employment_rate",
+        "kind": "percent",
+        "numerator": "employed_at_6_months",
+        "denominator": "women_enrolled",
+        "unit": "percent"
+      }
+    ],
+    "insights": [
+      {
+        "kind": "highest",
+        "metric": "completion_rate",
+        "label_column": "district"
+      },
+      {
+        "kind": "lowest",
+        "metric": "employment_rate",
+        "label_column": "district"
+      }
+    ],
+    "view": {
+      "title": "Women Training Completion and Employment by District",
+      "chart": "grouped_bar",
+      "x": "district",
+      "y": [
+        "completion_rate",
+        "employment_rate"
+      ],
+      "series": null,
+      "unit": "percent",
+      "note": "Rates are calculated as (completed_training / women_enrolled) * 100 and (employed_at_6_months / women_enrolled) * 100. The data source is a synthetic aggregate fixture; it does not provide causal explanations or intervention recommendations."
+    },
+    "interpretation_guard": {
+      "can_explain_cause": false,
+      "caveat": "The synthetic dataset cannot explain why rates differ across districts."
+    }
+  },
+  "api": {
+    "requested_model": "openai/gpt-oss-20b",
+    "resolved_model": "openai/gpt-oss-20b",
+    "generation_id": "gen-1787234608-qrUfNrzMXK0wnrtlgWCo",
+    "duration_seconds": 5.594,
+    "finish_reason": "stop",
+    "usage": {
+      "prompt_tokens": 1029,
+      "completion_tokens": 438,
+      "total_tokens": 1467,
+      "cost": 9.593e-05,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 64,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 9.593e-05,
+        "upstream_inference_prompt_cost": 3.023e-05,
+        "upstream_inference_completions_cost": 6.57e-05
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 4,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "reasoning_effort": "low"
+  },
+  "validation_error": "PlanError: UI placeholders are not data filter values"
+}

@@ -188,7 +188,7 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "Use supplied column names exactly. The executor applies steps in order.",
         "For coverage use derive kind percent only when distinct numerator and denominator count columns exist. If the source already supplies a coverage/rate/percent column, use it directly and never derive it again.",
         "Subtracting percentages is percentage points, not percent growth.",
-        "A difference between raw counts uses unit number; only a difference between percentage metrics uses percentage points.",
+        "Use change for one entity or series across two times. Use difference for two entities at one time. A difference between raw counts uses unit number; only a change or difference between percentage metrics uses percentage points.",
         "Keep rows unless aggregation is requested. Never invent bands or targets.",
         "For an initial request asking for a webpage selector, keep all requested rows; webpage controls are added separately. Never emit placeholders such as {{selected_year}}.",
         "Do not group when there is already one row per entity and time. If aggregation is needed for a rate, use weighted_percent rather than sum or mean of a percent.",
@@ -196,9 +196,10 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "For a district coverage trend use x=year, y=[derived coverage], series=district, unit=percent.",
         "If the initial request names multiple indicators, derive every requested indicator and use a grouped_bar view with each metric in view.y; the webpage adds an indicator selector.",
         "If a later request asks for a comparison or difference in one year, keep any previously selected year set unless the user says show, filter or only that one year; put the named year on the insight instead.",
+        "If the user says compare two named category values, filter the result to those two values and keep that focus in later turns until the user changes it.",
         "Source and provenance are rendered separately; do not group or sort merely to display the source.",
         "Write question, title and note for a nontechnical participant. Never mention renderer, SQL, JSON, DuckDB, placeholders or other implementation details.",
-        "If data cannot explain why, set can_explain_cause false and add causal_limit.",
+        "If data cannot explain why, set can_explain_cause false, add causal_limit, and say in the view note that the file cannot explain the cause. If an intervention is requested but unsupported, also say in the note that the file cannot recommend an intervention.",
         "When the user explicitly asks for a highest, lowest, change or difference, add the matching insight specification so the answer is stated, not left for the user to infer from a chart.",
         "Use line/slope for time, bars for categories, scatter for two measures.",
         "Return only one JSON object matching the response schema.",
@@ -396,22 +397,43 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
     if asks_for_pp_change and not any(item["kind"] == "change" for item in plan["insights"]):
         raise PlanError("explicit percentage-point change request requires a change insight")
     ranking = [item for item in plan["insights"] if item["kind"] in ("highest", "lowest")]
+    if not ranking:
+        comparison_message = next(
+            (message.lower() for message in reversed(messages)
+             if re.search(r"\bcompar(?:e|ing|ison)\b|\bvs\.?\b|\bversus\b", message, re.I)),
+            None,
+        )
+        if comparison_message:
+            for column in result.columns:
+                if column not in result or pd.api.types.is_numeric_dtype(result[column]):
+                    continue
+                admitted = [str(value) for value in result[column].dropna().unique()]
+                named = [value for value in admitted if re.search(
+                    rf"(?<![\w]){re.escape(value.lower())}(?![\w])", comparison_message
+                )]
+                if len(named) == 2 and set(admitted) != set(named):
+                    raise PlanError(
+                        f"explicit comparison of {named} must filter {column} to those two values"
+                    )
     differences = [item for item in plan["insights"] if item["kind"] == "difference"]
-    for item in differences:
+    comparisons = [item for item in plan["insights"] if item["kind"] in ("change", "difference")]
+    for item in comparisons:
         shown = {str(value) for value in result[item["entity_column"]].dropna()}
         requested = {str(value) for value in item["entities"]}
         valid_scope = requested <= shown if ranking else shown == requested
         if not valid_scope:
             raise PlanError(
-                f"two-entity comparison scope must retain {sorted(requested)}, got {sorted(shown)}"
+                f"named-entity comparison scope must retain only {sorted(requested)}, got {sorted(shown)}"
             )
     if ranking and differences:
         ranking_columns = {item["label_column"] for item in ranking}
         narrowed = [step["column"] for step in plan["steps"] if step["op"] == "filter" and step["column"] in ranking_columns]
         if narrowed:
             raise PlanError("a ranking-plus-pairwise-gap turn must retain the ranking population")
-    if (re.search(r"\bwhy\b", text) or "don't guess reason" in text or "dont guess reason" in text) and not any(item["kind"] == "causal_limit" for item in plan["insights"]):
-        raise PlanError("causal question requires a visible causal_limit insight")
+    asks_why = bool(re.search(r"\bwhy\b", text) or "don't guess reason" in text or "dont guess reason" in text)
+    if asks_why:
+        if not any(item["kind"] == "causal_limit" for item in plan["insights"]):
+            raise PlanError("causal question requires a visible causal_limit insight")
     year_columns = [str(column) for column in result.columns if "year" in str(column).lower()]
     if not year_columns:
         return
@@ -470,14 +492,19 @@ def compute_insights(plan: dict[str, Any], frame: pd.DataFrame) -> list[dict[str
             found = [next((r for r in subset if str(r.get(spec["entity_column"])) == str(e)), None) for e in spec["entities"]]
             if all(found): output.append({"kind": kind, "label": f"Gap between {spec['entities'][0]} and {spec['entities'][1]}", "value": abs(found[1][spec["metric"]]-found[0][spec["metric"]]), "metric": spec["metric"], "unit": spec["unit"], "time": spec["time"]})
         elif kind == "causal_limit":
-            output.append({"kind": kind, "label": "What this data cannot answer", "text": "This file shows differences and changes, but it has no explanatory variables and cannot establish why they occurred."})
+            output.append({"kind": kind, "label": "What this data cannot answer", "text": "This file shows differences and changes, but it cannot explain the cause or recommend an intervention from this file alone."})
     return output
 
 
 def make_report(case: dict[str, Any], source: Path, source_metadata: dict[str, Any], plan: dict[str, Any], frame: pd.DataFrame) -> dict[str, Any]:
     rows = [{str(k): clean(v) for k, v in row.items()} for row in frame.to_dict("records")]
+    view = dict(plan["view"])
+    if any(item["kind"] == "causal_limit" for item in plan["insights"]):
+        safety_note = "This file cannot explain the cause or recommend an intervention from this file alone."
+        if safety_note.lower() not in str(view.get("note") or "").lower():
+            view["note"] = (str(view.get("note") or "").rstrip() + " " + safety_note).strip()
     return {"schema_version": 1, "case_id": case["case_id"], "title": plan["view"]["title"],
-            "question": plan["question"], "view": plan["view"], "columns": list(map(str, frame.columns)),
+            "question": plan["question"], "view": view, "columns": list(map(str, frame.columns)),
             "rows": rows, "insight_specs": plan["insights"], "insights": compute_insights(plan, frame),
             "source": {"file": source.name, "sha256": file_hash(source), "provenance": case["inputs"][0]["provenance"], **source_metadata}}
 
