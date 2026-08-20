@@ -309,7 +309,7 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "Source and provenance are rendered separately; do not group or sort merely to display the source.",
         "Write question, title and note for a nontechnical participant. Never mention renderer, SQL, JSON, DuckDB, placeholders or other implementation details.",
         "If data cannot explain why, set can_explain_cause false, add causal_limit, and say in the view note that the file cannot explain the cause. If an intervention is requested but unsupported, also say in the note that the file cannot recommend an intervention.",
-        "When the user explicitly asks for a highest, lowest, change or difference, add the matching insight specification so the answer is stated, not left for the user to infer from a chart.",
+        "When the user explicitly asks for a highest/largest, lowest/smallest, change or difference, add the matching insight specification so the answer is stated, not left for the user to infer from a chart.",
         "Use line/slope for time, bars for categories, scatter for two measures.",
         "Return only one JSON object matching the response schema.",
     ]
@@ -553,6 +553,70 @@ def normalize_explicit_constraints(messages: list[str], plan: dict[str, Any], fr
     if allowed_years is not None and year_columns:
         required[year_columns[0]] = sorted(allowed_years)
 
+    conversation = "\n".join(messages).lower()
+    if "lakh" in conversation:
+        lakh_metrics = [metric for metric in plan["view"]["y"] if metric.endswith("_lakh")]
+        paired_lakh = next(
+            (metric for metric in lakh_metrics
+             if metric.removesuffix("_lakh") in plan["view"]["y"]
+             and metric.removesuffix("_lakh") in frame.columns),
+            None,
+        )
+        if paired_lakh:
+            plan["view"]["y"] = [paired_lakh]
+            plan["view"]["unit"] = "lakh"
+            changes.append(
+                f"used {paired_lakh} for the scaled visual and kept "
+                f"{paired_lakh.removesuffix('_lakh')} as an exact table column"
+            )
+    insight_metric = plan["view"]["y"][0]
+    if "exact" in conversation and insight_metric.endswith("_lakh"):
+        raw_metric = insight_metric.removesuffix("_lakh")
+        if raw_metric in frame.columns:
+            insight_metric = raw_metric
+    ranking_kind = None
+    if re.search(r"\b(?:highest|largest)\b", conversation):
+        ranking_kind = "highest"
+    elif re.search(r"\b(?:lowest|smallest)\b", conversation):
+        ranking_kind = "lowest"
+    if ranking_kind and not any(item["kind"] == ranking_kind for item in plan["insights"]):
+        label_column = plan["view"]["x"]
+        metric = insight_metric
+        if label_column in frame.columns and not pd.api.types.is_numeric_dtype(frame[label_column]):
+            plan["insights"].append({
+                "kind": ranking_kind, "metric": metric, "label_column": label_column,
+            })
+            changes.append(f"compiled explicit {ranking_kind} request")
+
+    difference_message = next(
+        (message for message in reversed(messages) if re.search(
+            r"\b(?:exact\s+)?difference\s+between\b|\bgap\s+between\b", message, re.I
+        )),
+        None,
+    )
+    if difference_message and not any(item["kind"] == "difference" for item in plan["insights"]):
+        entity_match = None
+        for column in frame.columns:
+            if pd.api.types.is_numeric_dtype(frame[column]):
+                continue
+            admitted = [str(value) for value in frame[column].dropna().unique()]
+            named = [value for value in admitted if re.search(
+                rf"(?<![\w]){re.escape(value.lower())}(?![\w])", difference_message.lower()
+            )]
+            if len(named) == 2:
+                entity_match = (str(column), named)
+                break
+        time_columns = [str(column) for column in frame.columns if "year" in str(column).lower()]
+        years = [int(value) for value in re.findall(r"\b(?:19|20)\d{2}\b", difference_message)]
+        if entity_match and time_columns and (years or frame[time_columns[0]].nunique(dropna=True) == 1):
+            time_value = years[-1] if years else int(frame[time_columns[0]].dropna().iloc[0])
+            plan["insights"].append({
+                "kind": "difference", "metric": insight_metric,
+                "entity_column": entity_match[0], "entities": entity_match[1],
+                "time_column": time_columns[0], "time": time_value, "unit": "number",
+            })
+            changes.append("compiled explicit named-entity difference request")
+
     ranking = any(item["kind"] in ("highest", "lowest") for item in plan["insights"])
     comparison_message = next(
         (message.lower() for message in reversed(messages)
@@ -611,9 +675,19 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
     phrasing. More constraint extractors must be frozen before additional cases.
     """
     text = "\n".join(messages).lower()
-    for word, kind in (("lowest", "lowest"), ("highest", "highest")):
-        if re.search(rf"\b{word}\b", text) and not any(item["kind"] == kind for item in plan["insights"]):
-            raise PlanError(f"explicit {word} request requires a named {kind} insight")
+    for words, kind in ((("lowest", "smallest"), "lowest"), (("highest", "largest"), "highest")):
+        requested_word = next((word for word in words if re.search(rf"\b{word}\b", text)), None)
+        if requested_word and not any(item["kind"] == kind for item in plan["insights"]):
+            raise PlanError(f"explicit {requested_word} request requires a named {kind} insight")
+    insight_fingerprints = [json.dumps(item, sort_keys=True) for item in plan["insights"]]
+    if len(insight_fingerprints) != len(set(insight_fingerprints)):
+        raise PlanError("duplicate insight specifications would repeat the same answer on the page")
+    asks_for_difference = bool(
+        re.search(r"\b(?:exact\s+)?difference\s+between\b", text)
+        or re.search(r"\bgap\s+between\b", text)
+    )
+    if asks_for_difference and not any(item["kind"] == "difference" for item in plan["insights"]):
+        raise PlanError("explicit difference-between request requires a difference insight")
     asks_for_pp_change = ("percentage point" in text or re.search(r"\bpp\b", text)) and re.search(r"\bchange\b", text)
     if asks_for_pp_change and not any(item["kind"] == "change" for item in plan["insights"]):
         raise PlanError("explicit percentage-point change request requires a change insight")

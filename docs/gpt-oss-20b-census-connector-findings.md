@@ -1,0 +1,13 @@
+# GPT-OSS 20B on the bounded Census journey
+
+GPT-OSS 20B Low passed the four-turn Census journey after a trusted connector had retrieved and normalized the official Census A-01 workbook. The counted repetition used six model requests, including two automatic repairs, 17.064 model seconds and $0.00131031. It passed every value, provenance, browser and download check. Human inspection confirmed a complete desktop page with lakh bars, exact people in the table, the correct largest district, the exact Patna–Gaya gap, official links and no visible page overflow or runtime errors.
+
+This is faster and cheaper than the earlier Qwen 3.8 27B post-discovery run (95.797 seconds and $0.01495195), and scores 98.7/100 versus the observed Antigravity CLI page's 78/100. Antigravity had the right population values and a polished page but attached unrelated 1961 village-study citations to the district records. These scores compare observed products, including Antigravity's faults; they do not use an imaginary perfect baseline.
+
+The result is deliberately not described as open-web equivalence. The official URL was previously discovered, the connector downloaded the workbook and retained its hash, and only then did the measured split planner run. Unknown-source discovery still needs a bounded web-capable fallback.
+
+Four discarded repetitions are retained. The first silently omitted the requested Patna–Gaya difference and repeated the largest-district card. The second narrowed the dataset to two districts before answering which of all three was largest. The third exhausted its repair budget by alternating between the ranking and difference. The fourth answered both but initially treated raw population and lakh as two chart indicators, hiding the lakh values from the first table view.
+
+Those failures led to model-independent checks: reject duplicate insight cards; compile explicit largest/smallest and named difference requests from admitted values; preserve the ranking population when also showing a pairwise gap; and treat “show in lakh, keep exact” as one scaled chart measure plus an exact audit column. DuckDB, not the model, computes the maximum and gap. The raw plan and every normalization remain in the run record.
+
+Evidence: [counted result](../benchmarks/results/split-gpt-oss-20b-low-dev-web-census-v1-development.json), [counted run](../benchmarks/runs/2026-08-20-gpt-oss-web-census/dev-web-census-001/split/gpt-oss-20b-low/rep-05), [desktop screenshot](../benchmarks/runs/2026-08-20-gpt-oss-web-census/dev-web-census-001/split/gpt-oss-20b-low/rep-05/turn-4/browser/desktop-initial.png), and [oracle checks](../benchmarks/runs/2026-08-20-gpt-oss-web-census/dev-web-census-001/split/gpt-oss-20b-low/rep-05/grading/oracle-check.json).

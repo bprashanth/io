@@ -2,7 +2,7 @@
 
 ## Outcome so far
 
-`openai/gpt-oss-20b` at low reasoning effort is the first sub-27B candidate to pass the split pipeline's smoke, five-turn ANC, safety-sensitive programme, clean-XLSX and narrow digital-PDF journeys. It is not yet the winner: web discovery, irregular workbooks, local inference and concurrency remain untested.
+`openai/gpt-oss-20b` at low reasoning effort is the first sub-27B candidate to pass the split pipeline's smoke, five-turn ANC, safety-sensitive programme, clean-XLSX, narrow digital-PDF, bounded Census-connector and one structured irregular-workbook journey. It is not yet the winner: unrestricted web discovery, diverse irregular files, local inference and concurrency remain untested.
 
 The useful result is architectural. A 20B model can plan these bounded analyses when a trusted layer owns filtering, arithmetic, safety checks, HTML, charts and downloads. It should not be asked to calculate values or write an unconstrained application.
 
@@ -15,6 +15,8 @@ The useful result is architectural. A 20B model can plan these bounded analyses 
 | four-turn programme CSV | 6 / 2 | 41.424 s | $0.00064762 | full oracle passes after trusted safety-note rendering | CLI default: 10/100, 238.545 s |
 | four-turn clean XLSX | 4 / 0 | 31.870 s | $0.00039448 | all critical checks pass; omits separate visible 7 pp 2023 gap | CLI default: 89/100, 428.938 s |
 | four-turn digital PDF | 5 / 1 | 22.670 s | $0.00037850 | full oracle passes | counted PDF run: 0/100 after Google permission failure |
+| four-turn bounded Census connector | 6 / 2 | 17.064 s | $0.00131031 | full oracle passes; connector starts after source discovery | CLI default: 78/100; exact values but unrelated citations |
+| four-turn merged/stacked XLSX | 5 / 1 | 26.872 s | $0.00047230 | full oracle passes; bounded attendance-layout adapter | CLI default: 57.3/100 counted journey; rescued visual 9.3/10 |
 
 The Antigravity scores are preserved references, not a perfect-answer target. The ANC baseline itself lost durable follow-up details and had a broken control; the programme baseline fabricated data and advice. GPT-OSS is judged against those observed pages while still failing closed on errors that would harm a nontechnical participant.
 
@@ -54,12 +56,12 @@ The early-stop rule was applied because these candidates were already materially
 
 ## Scope warning: files are not flat tables
 
-None of these results establishes arbitrary Excel or PDF ingestion. The current clean-XLSX adapter chooses one rectangular data sheet. Real NGO files may use merged multi-row headers, several tabs, blank separators, stacked subtables, repeated headings, footnotes and layout as meaning. The next ingest work must preserve sheet, cell range, merged ranges, page, table region and bounding-box provenance; it must also support a plain follow-up such as “there is another table below” without asking the participant to debug parsing.
+These results do not establish arbitrary Excel or PDF ingestion. One added workbook case now covers merged two-row headings, several tabs, blank separators, stacked compatible subtables and the correction “there is another table below.” Its current adapter is intentionally labelled bounded and is still tailored to that layout family. Real NGO files can also have horizontal subtables, deeper or inconsistent headings, formulas, hidden rows, footnotes, cross-tab joins, scanned pages and layout as meaning. Ingestion must preserve sheet, cell range, merged ranges, page, table region and bounding-box provenance before choosing a table; a user correction must be able to add or switch regions without requiring coordinates.
 
 ## Next gates
 
-1. Add adversarial but ordinary workbook cases: multi-tab, merged headings, stacked subtables and a correction turn.
-2. Run the connector-backed web case without confusing bounded discovery with open-web research.
-3. Test a smaller locally runnable candidate only after the 20B boundary is established.
+1. Add several structurally different but ordinary workbook/PDF cases; do not tune ingestion to the single attendance workbook.
+2. Test a smaller locally runnable candidate now that the 20B boundary is established.
+3. Add bounded official connectors without confusing them with open-web research.
 4. Run the winning remote configuration locally and measure wall time, memory and bounded-retry rate.
 5. Only then estimate laptop versus DGX Spark capacity for 20 event users.
