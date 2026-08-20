@@ -1,0 +1,76 @@
+{
+  "id": "derived-rate-ranking-p01",
+  "task_id": "derived-rate-ranking",
+  "pattern": "filter, derive a comparable percentage, rank",
+  "question": "2023 only show full immunisation percent district wise highest first",
+  "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+  "expected_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, (children_fully_immunised * 100.0) / NULLIF(children_due, 0) AS full_immunisation_percent FROM immunisation WHERE year = 2023 ORDER BY full_immunisation_percent DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2023 only show full immunisation percent district wise highest first\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2023 only show full immunisation percent district wise highest first\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Step-by-Step Breakdown\n\n1. **Filter Data for the Year 2023**:\n   - The user wants data only for the year 2023. This means we need to filter the records in the `immunisation` table where the `year` column equals 2023.\n\n2. **Calculate Full Immunization Percentage**:\n   - The full immunization percentage is calculated as `(children_fully_immunised * 100.0) / children_due`. This formula gives us the percentage of children who are fully immunized out of those who are due for immunization.\n\n3. **Group Data by District**:\n   - Since the user wants the results district-wise, we need to group the data by the `district` column.\n\n4. **Order Results by Full Immunization Percentage in Descending Order**:\n   - The user wants the districts ordered by the highest full immunization percentage first. This means we need to order the results by the calculated full immunization percentage in descending order.\n\n### Constructing the SQL Query\n\nBased on the above steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    district, \n    (children_fully_immunised * 100.0) / children_due AS full_immunisation_percent\nFROM \n    immunisation\nWHERE \n    year = 2023\nORDER BY \n    full_immunisation_percent DESC;\n```\n\n### Explanation\n\n- **SELECT Clause**: We select the `district` and calculate the `full_immunisation_percent` using the formula `(children_fully_immunised * 100.0) / children_due`.\n- **FROM Clause**: The data is fetched from the `immunisation` table.\n- **WHERE Clause**: Filters the records to include only those from the year 2023.\n- **ORDER BY Clause**: Orders the results by `full_immunisation_percent` in descending order to show the districts with the highest full immunization percentage first.\n\nThis query directly addresses the user's requirements without unnecessary complexity or additional joins, ensuring it is both efficient and easy to understand.",
+      "api": {
+        "id": "chatcmpl-ez9ux6rS6T1Trx0Nv7aQXLg14zPptq6f",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 473,
+          "prompt_tokens": 200,
+          "total_tokens": 673,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "duration_seconds": 13.261
+      },
+      "duration_seconds": 13.274,
+      "sql_duckdb": "SELECT district, (children_fully_immunised * 100.0) / NULLIF(children_due, 0) AS full_immunisation_percent FROM immunisation WHERE year = 2023 ORDER BY full_immunisation_percent DESC",
+      "rows": [
+        [
+          "Nalanda",
+          90.0
+        ],
+        [
+          "Gaya",
+          85.0
+        ],
+        [
+          "Purnia",
+          76.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

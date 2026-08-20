@@ -1,0 +1,121 @@
+{
+  "id": "cross-table-join-p03",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "for 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT a.district, (CAST(a.anc4_completed AS REAL) / NULLIF(NULLIF(a.pregnancies_registered, 0), 0)) * 100.0 AS anc_coverage, (CAST(l.employed_at_6_months AS REAL) / NULLIF(NULLIF(l.women_enrolled, 0), 0)) * 100.0 AS employed_out_of_enrolled FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same district-year grain and can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator.\n[User Question]\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the relevant tables and columns**: We need data from both the `anc_visits` and `livelihoods` tables for the year 2023. Specifically, we need the `district`, `pregnancies_registered`, `anc4_completed`, `women_enrolled`, and `employed_at_6_months` columns.\n\n2. **Join the tables**: Since the data is aligned by `district` and `year`, we can join the tables on these columns.\n\n3. **Filter for the year 2023**: We only want data for the year 2023.\n\n4. **Calculate ANC coverage**: ANC coverage is calculated as the percentage of pregnancies that have completed ANC4 visits. This is done by dividing the number of ANC4 visits by the number of pregnancies registered and multiplying by 100.\n\n5. **Calculate employed out of enrolled percentage**: This is the percentage of women who are employed at 6 months post-training out of those who were enrolled. This is done by dividing the number of women employed at 6 months by the number of women enrolled and multiplying by 100.\n\n6. **Group by district**: We need to calculate these metrics for each district.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nSELECT \n  a.district,\n  (CAST(a.anc4_completed AS REAL) / a.pregnancies_registered) * 100 AS anc_coverage,\n  (CAST(l.employed_at_6_months AS REAL) / l.women_enrolled) * 100 AS employed_out_of_enrolled\nFROM \n  anc_visits a\nINNER JOIN \n  livelihoods l ON a.district = l.district AND a.year = l.year\nWHERE \n  a.year = 2023\nGROUP BY \n  a.district;\n```\n\n### Explanation:\n- **SELECT Clause**: We select the district, calculate ANC coverage, and calculate the employed out of enrolled percentage.\n- **FROM Clause**: We specify the `anc_visits` table as the primary table.\n- **INNER JOIN Clause**: We join the `livelihoods` table on the `district` and `year` columns.\n- **WHERE Clause**: We filter the records to only include those from the year 2023.\n- **GROUP BY Clause**: We group the results by district to calculate the metrics for each district.\n\nThis query ensures that we correctly calculate the required metrics for each district in the year 2023.",
+      "api": {
+        "id": "chatcmpl-8nORcYVIAttPODxDq5uR0rKUNGiC3ols",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 538,
+          "prompt_tokens": 279,
+          "total_tokens": 817,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 15.113
+      },
+      "duration_seconds": 15.115,
+      "error": "BinderException: Binder Error: column \"anc4_completed\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(anc4_completed)\" if the exact value of \"anc4_completed\" is not important.\n\nLINE 1: EXPLAIN SELECT a.district, (CAST(a.anc4_completed AS REAL) / NULLIF(a.pregnancies_registered...\n                                         ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same district-year grain and can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator.\n[Previous Query Error]\nBinderException: Binder Error: column \"anc4_completed\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(anc4_completed)\" if the exact value of \"anc4_completed\" is not important.\n\nLINE 1: EXPLAIN SELECT a.district, (CAST(a.anc4_completed AS REAL) / NULLIF(a.pregnancies_registered...\n                                         ^\nReturn one corrected read-only query.\n[User Question]\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the relevant tables and columns**: We need data from both the `anc_visits` and `livelihoods` tables for the year 2023. Specifically, we need `district`, `pregnancies_registered`, `anc4_completed`, `women_enrolled`, and `employed_at_6_months`.\n\n2. **Join the tables**: Since the data is aligned by `district` and `year`, we can join the tables on these columns.\n\n3. **Filter for the year 2023**: We only want data for the year 2023.\n\n4. **Calculate the required percentages**: \n   - ANC coverage is calculated as `(anc4_completed / pregnancies_registered) * 100`.\n   - Employed out of enrolled percentage is calculated as `(employed_at_6_months / women_enrolled) * 100`.\n\n5. **Group by district**: Since we want these calculations per district, we group by `district`.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nSELECT \n  a.district,\n  (CAST(a.anc4_completed AS REAL) / NULLIF(a.pregnancies_registered, 0)) * 100.0 AS anc_coverage,\n  (CAST(l.employed_at_6_months AS REAL) / NULLIF(l.women_enrolled, 0)) * 100.0 AS employed_out_of_enrolled\nFROM \n  anc_visits a\nINNER JOIN \n  livelihoods l ON a.district = l.district AND a.year = l.year\nWHERE \n  a.year = 2023;\n```\n\n### Explanation:\n- **Tables and Columns**: We select from `anc_visits` and `livelihoods` tables, focusing on the columns relevant to the calculations.\n- **Join Condition**: We join on `district` and `year` to ensure we are comparing the same districts and years.\n- **Filtering**: We filter for the year 2023 using `WHERE a.year = 2023`.\n- **Calculations**: We calculate the ANC coverage and employed out of enrolled percentage using the appropriate columns and ensuring division by zero is handled with `NULLIF`.\n\nThis query directly addresses the user's request without unnecessary complexity or incorrect assumptions.",
+      "api": {
+        "id": "chatcmpl-2ynlXBhppIWGCmhSZxg1e8EzscyAL0x3",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 494,
+          "prompt_tokens": 384,
+          "total_tokens": 878,
+          "prompt_tokens_details": {
+            "cached_tokens": 246
+          }
+        },
+        "duration_seconds": 13.977
+      },
+      "duration_seconds": 13.98,
+      "sql_duckdb": "SELECT a.district, (CAST(a.anc4_completed AS REAL) / NULLIF(NULLIF(a.pregnancies_registered, 0), 0)) * 100.0 AS anc_coverage, (CAST(l.employed_at_6_months AS REAL) / NULLIF(NULLIF(l.women_enrolled, 0), 0)) * 100.0 AS employed_out_of_enrolled FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023",
+      "rows": [
+        [
+          "Gaya",
+          74.0,
+          56.0
+        ],
+        [
+          "Nalanda",
+          80.0,
+          65.0
+        ],
+        [
+          "Purnia",
+          67.0,
+          46.0
+        ],
+        [
+          "Kishanganj",
+          61.0,
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

@@ -1,0 +1,88 @@
+{
+  "id": "derived-rate-lowest-first-p05",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "district wise 2023 employed at 6 months over enrolled rate, worst first",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda",
+      65.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Kishanganj",
+      38.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, (CAST(employed_at_6_months AS REAL) / NULLIF(women_enrolled, 0)) * 100 AS employed_at_6_months_over_enrolled_rate FROM livelihoods WHERE year = 2023 ORDER BY employed_at_6_months_over_enrolled_rate DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ndistrict wise 2023 employed at 6 months over enrolled rate, worst first\n[Database Schema]\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ndistrict wise 2023 employed at 6 months over enrolled rate, worst first\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to focus on calculating the percentage of women who were employed at 6 months post-enrollment over those who were initially enrolled in 2023. The results should be ordered from the worst (highest percentage) to the best (lowest percentage).\n\n### Step-by-Step Solution:\n\n1. **Filter Data for 2023**: We need to filter the records to only include data from the year 2023.\n2. **Calculate the Ratio**: For each district, calculate the ratio of women employed at 6 months post-enrollment to those initially enrolled.\n3. **Compute the Percentage**: Convert the ratio to a percentage by multiplying by 100.\n4. **Order the Results**: Order the results in descending order to show the worst (highest percentage) first.\n\n### SQL Query:\n\n```sql\nSELECT \n  district,\n  (CAST(employed_at_6_months AS REAL) / women_enrolled) * 100 AS employed_at_6_months_over_enrolled_rate\nFROM \n  livelihoods\nWHERE \n  year = 2023\nORDER BY \n  employed_at_6_months_over_enrolled_rate DESC;\n```\n\n### Explanation:\n\n- **SELECT Clause**: We select the `district` and calculate the percentage of women who were employed at 6 months post-enrollment over those who were initially enrolled.\n- **FROM Clause**: We specify the `livelihoods` table.\n- **WHERE Clause**: We filter the records to only include those from the year 2023.\n- **ORDER BY Clause**: We order the results by the calculated percentage in descending order to show the worst (highest percentage) first.\n\nThis query directly addresses the user's request without unnecessary complexity or additional calculations that do not align with the question.",
+      "api": {
+        "id": "chatcmpl-UB3GVYByjfDqfFIcd34RFCDGjLev3ob2",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 378,
+          "prompt_tokens": 216,
+          "total_tokens": 594,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 10.592
+      },
+      "duration_seconds": 10.594,
+      "sql_duckdb": "SELECT district, (CAST(employed_at_6_months AS REAL) / NULLIF(women_enrolled, 0)) * 100 AS employed_at_6_months_over_enrolled_rate FROM livelihoods WHERE year = 2023 ORDER BY employed_at_6_months_over_enrolled_rate DESC",
+      "rows": [
+        [
+          "Nalanda",
+          65.0
+        ],
+        [
+          "Gaya",
+          56.0
+        ],
+        [
+          "Purnia",
+          46.0
+        ],
+        [
+          "Kishanganj",
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

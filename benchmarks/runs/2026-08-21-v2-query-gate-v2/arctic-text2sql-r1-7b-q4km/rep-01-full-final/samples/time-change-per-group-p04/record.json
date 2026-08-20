@@ -1,0 +1,64 @@
+{
+  "id": "time-change-per-group-p04",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda",
+      7.0
+    ],
+    [
+      "Gaya",
+      8.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH YearlyANCData AS (SELECT district, year, SUM(anc4_completed) AS total_anc4_completed, SUM(pregnancies_registered) AS total_pregnancies_registered FROM anc_visits WHERE year IN (2021, 2022, 2023) AND district IN ('Gaya', 'Nalanda') GROUP BY district, year), ANC4Coverage AS (SELECT district, year, CASE WHEN total_pregnancies_registered = 0 THEN 0 ELSE (total_anc4_completed * 100.0 / NULLIF(total_pregnancies_registered, 0)) END AS coverage_percentage FROM YearlyANCData) SELECT c1.district, (c2.coverage_percentage - c1.coverage_percentage) AS coverage_change FROM ANC4Coverage AS c1 JOIN ANC4Coverage AS c2 ON c1.district = c2.district WHERE c1.year = 2021 AND c2.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Requirements Breakdown:\n1. **Data Source**: The data is stored in the `anc_visits` table.\n2. **Time Frame**: We need data for the years 2021, 2022, and 2023.\n3. **Districts**: We are interested in the districts 'Gaya' and 'Nalanda'.\n4. **Metric**: We need to calculate the ANC (Antenatal Care) coverage, which is the percentage of pregnancies that had at least 4 ANC visits (`anc4_completed`).\n5. **Calculation**: We need to compute the percentage-point change in ANC coverage from 2021 to 2023 for each district.\n\n### Step-by-Step Solution:\n1. **Filter Data**: Select data for the years 2021, 2022, and 2023 for the districts 'Gaya' and 'Nalanda'.\n2. **Aggregate Data**: Calculate the total number of pregnancies registered and the total number of ANC4 visits for each district and year.\n3. **Calculate Coverage**: Compute the ANC coverage percentage for each district and year.\n4. **Compute Change**: Calculate the percentage-point change in ANC coverage from 2021 to 2023 for each district.\n\n### SQL Query Construction:\n1. **Filter and Aggregate**:\n   - Use a `WHERE` clause to filter the data for the specified years and districts.\n   - Use `SUM` to aggregate the number of pregnancies registered and ANC4 visits.\n   - Use `GROUP BY` to group the data by district and year.\n\n2. **Calculate Coverage**:\n   - Use a `CASE` statement to handle division by zero.\n   - Calculate the coverage percentage as `(total_anc4_completed * 100.0 / total_pregnancies_registered)`.\n\n3. **Compute Change**:\n   - Use a `JOIN` to combine the coverage data for 2021 and 2023.\n   - Calculate the percentage-point change as `(coverage_2023 - coverage_2021)`.\n\n### Final SQL Query:\n```sql\nWITH YearlyANCData AS (\n    SELECT \n        district,\n        year,\n        SUM(anc4_completed) AS total_anc4_completed,\n        SUM(pregnancies_registered) AS total_pregnancies_registered\n    FROM \n        anc_visits\n    WHERE \n        year IN (2021, 2022, 2023)\n        AND district IN ('Gaya', 'Nalanda')\n    GROUP BY \n        district, year\n),\nANC4Coverage AS (\n    SELECT \n        district,\n        year,\n        CASE \n            WHEN total_pregnancies_registered = 0 THEN 0\n            ELSE (total_anc4_completed * 100.0 / total_pregnancies_registered)\n        END AS coverage_percentage\n    FROM \n        YearlyANCData\n)\nSELECT \n    c1.district,\n    (c2.coverage_percentage - c1.coverage_percentage) AS coverage_change\nFROM \n    ANC4Coverage c1\nJOIN \n    ANC4Coverage c2 ON c1.district = c2.district\nWHERE \n    c1.year = 2021\n    AND c2.year = 2023;\n```\n\n### Explanation:\n- **YearlyANCData CTE**: Aggregates the total ANC4 visits and pregnancies registered for each district and year.\n- **ANC4Coverage CTE**: Computes the ANC coverage percentage for each district and year.\n- **Final SELECT**: Joins the coverage data for 2021 and 2023 to compute the percentage-point change in coverage for each district.",
+      "api": {
+        "id": "chatcmpl-0fy7kTDyIp4PWTpNz0TA1P4savmNiDLe",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 809,
+          "prompt_tokens": 217,
+          "total_tokens": 1026,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 22.802
+      },
+      "duration_seconds": 22.81,
+      "sql_duckdb": "WITH YearlyANCData AS (SELECT district, year, SUM(anc4_completed) AS total_anc4_completed, SUM(pregnancies_registered) AS total_pregnancies_registered FROM anc_visits WHERE year IN (2021, 2022, 2023) AND district IN ('Gaya', 'Nalanda') GROUP BY district, year), ANC4Coverage AS (SELECT district, year, CASE WHEN total_pregnancies_registered = 0 THEN 0 ELSE (total_anc4_completed * 100.0 / NULLIF(total_pregnancies_registered, 0)) END AS coverage_percentage FROM YearlyANCData) SELECT c1.district, (c2.coverage_percentage - c1.coverage_percentage) AS coverage_change FROM ANC4Coverage AS c1 JOIN ANC4Coverage AS c2 ON c1.district = c2.district WHERE c1.year = 2021 AND c2.year = 2023",
+      "rows": [
+        [
+          "Nalanda",
+          7.0
+        ],
+        [
+          "Gaya",
+          8.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}
