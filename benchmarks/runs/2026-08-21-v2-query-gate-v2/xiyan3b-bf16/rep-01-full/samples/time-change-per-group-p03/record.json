@@ -1,0 +1,61 @@
+{
+  "id": "time-change-per-group-p03",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "give district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      7.999998092651367
+    ],
+    [
+      "Nalanda",
+      13.999998092651367
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0) - (SELECT CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0) FROM anc_visits WHERE district = 'Gaya' AND year = 2021)) * 100 AS percentage_point_increase FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ngive district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ngive district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda\n```sql",
+      "response": "SELECT district, (CAST(anc4_completed AS REAL) / pregnancies_registered - (SELECT CAST(anc4_completed AS REAL) / pregnancies_registered FROM anc_visits WHERE district = 'Gaya' AND year = 2021)) * 100 AS percentage_point_increase FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2023",
+      "api": {
+        "id": "chatcmpl-b670ae395c40dfe2",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 223,
+          "total_tokens": 306,
+          "completion_tokens": 83,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 2.874
+      },
+      "sql_duckdb": "SELECT district, (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0) - (SELECT CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0) FROM anc_visits WHERE district = 'Gaya' AND year = 2021)) * 100 AS percentage_point_increase FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2023",
+      "rows": [
+        [
+          "Gaya",
+          7.999998092651367
+        ],
+        [
+          "Nalanda",
+          13.999998092651367
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

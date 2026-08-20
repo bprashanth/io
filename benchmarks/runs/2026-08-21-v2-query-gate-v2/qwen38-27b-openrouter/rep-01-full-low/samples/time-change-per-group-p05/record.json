@@ -1,0 +1,78 @@
+{
+  "id": "time-change-per-group-p05",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "calculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, (100.0 * SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END) / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END), 0)) - (100.0 * SUM(CASE WHEN year = 2021 THEN anc4_completed ELSE 0 END) / NULLIF(SUM(CASE WHEN year = 2021 THEN pregnancies_registered ELSE 0 END), 0)) AS pp_change FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023) GROUP BY district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda\n```sql",
+      "response": "\n\n```sql\nSELECT\n  district,\n  (100.0 * SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END)\n   / SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END))\n  -\n  (100.0 * SUM(CASE WHEN year = 2021 THEN anc4_completed ELSE 0 END)\n   / SUM(CASE WHEN year = 2021 THEN pregnancies_registered ELSE 0 END))\n  AS pp_change\nFROM anc_visits\nWHERE district IN ('Gaya', 'Nalanda')\n  AND year IN (2021, 2023)\nGROUP BY district;\n```",
+      "api": {
+        "id": "gen-1787250887-pHeDW3M89sTe1upfQ3vT",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 245,
+          "completion_tokens": 533,
+          "total_tokens": 778,
+          "cost": 0.00181585,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00181585,
+            "upstream_inference_prompt_cost": 0.00011025,
+            "upstream_inference_completions_cost": 0.0017056
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 293,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 5.904
+      },
+      "sql_duckdb": "SELECT district, (100.0 * SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END) / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END), 0)) - (100.0 * SUM(CASE WHEN year = 2021 THEN anc4_completed ELSE 0 END) / NULLIF(SUM(CASE WHEN year = 2021 THEN pregnancies_registered ELSE 0 END), 0)) AS pp_change FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023) GROUP BY district",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

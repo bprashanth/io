@@ -1,0 +1,85 @@
+{
+  "id": "derived-rate-lowest-first-p01",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "2023 employment after 6 months as percent of enrolled, lowest district first",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, CAST(employed_at_6_months AS REAL) * 100 / NULLIF(women_enrolled, 0) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY district ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2023 employment after 6 months as percent of enrolled, lowest district first\n[Database Schema]\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2023 employment after 6 months as percent of enrolled, lowest district first\n```sql",
+      "response": "SELECT district, CAST(employed_at_6_months AS REAL) * 100 / women_enrolled AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY district ASC",
+      "api": {
+        "id": "chatcmpl-bd650f8c7a35bb83",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 214,
+          "total_tokens": 255,
+          "completion_tokens": 41,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 1.368
+      },
+      "sql_duckdb": "SELECT district, CAST(employed_at_6_months AS REAL) * 100 / NULLIF(women_enrolled, 0) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY district ASC NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          56.0
+        ],
+        [
+          "Kishanganj",
+          38.0
+        ],
+        [
+          "Nalanda",
+          65.0
+        ],
+        [
+          "Purnia",
+          46.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

@@ -1,0 +1,72 @@
+{
+  "id": "missing-value-scope-p01",
+  "task_id": "missing-value-scope",
+  "pattern": "null detection without treating missing as zero",
+  "question": "show region and period where quality score is missing, don't treat blank as zero",
+  "gold_sql": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL ORDER BY region, period",
+  "expected_rows": [
+    [
+      "East",
+      2023
+    ],
+    [
+      "South",
+      2022
+    ],
+    [
+      "West",
+      2022
+    ]
+  ],
+  "actual_rows": [
+    [
+      "South",
+      2022
+    ],
+    [
+      "West",
+      2022
+    ],
+    [
+      "East",
+      2023
+    ]
+  ],
+  "sql_duckdb": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nshow region and period where quality score is missing, don't treat blank as zero\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nshow region and period where quality score is missing, don't treat blank as zero\n```sql",
+      "response": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+      "api": {
+        "id": "chatcmpl-a73b93549a51baf3",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 426,
+          "total_tokens": 440,
+          "completion_tokens": 14,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 0.5
+      },
+      "sql_duckdb": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+      "rows": [
+        [
+          "South",
+          2022
+        ],
+        [
+          "West",
+          2022
+        ],
+        [
+          "East",
+          2023
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

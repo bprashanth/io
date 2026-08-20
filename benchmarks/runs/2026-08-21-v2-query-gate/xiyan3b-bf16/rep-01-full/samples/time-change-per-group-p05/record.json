@@ -1,0 +1,53 @@
+{
+  "id": "time-change-per-group-p05",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "calculate 2023 rate minus 2021 rate in percentage points for Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      8.0,
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT (SELECT (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0)) * 100 FROM anc_visits WHERE district = 'Gaya' AND year = 2023) - (SELECT (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0)) * 100 FROM anc_visits WHERE district = 'Gaya' AND year = 2021) AS gaya_rate_change, (SELECT (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0)) * 100 FROM anc_visits WHERE district = 'Nalanda' AND year = 2023) - (SELECT (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0)) * 100 FROM anc_visits WHERE district = 'Nalanda' AND year = 2021) AS nalanda_rate_change",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncalculate 2023 rate minus 2021 rate in percentage points for Gaya and Nalanda\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncalculate 2023 rate minus 2021 rate in percentage points for Gaya and Nalanda\n```sql",
+      "response": "SELECT ( SELECT (CAST(anc4_completed AS REAL) / pregnancies_registered) * 100 FROM anc_visits WHERE district = 'Gaya' AND year = 2023 ) - ( SELECT (CAST(anc4_completed AS REAL) / pregnancies_registered) * 100 FROM anc_visits WHERE district = 'Gaya' AND year = 2021 ) AS gaya_rate_change, ( SELECT (CAST(anc4_completed AS REAL) / pregnancies_registered) * 100 FROM anc_visits WHERE district = 'Nalanda' AND year = 2023 ) - ( SELECT (CAST(anc4_completed AS REAL) / pregnancies_registered) * 100 FROM anc_visits WHERE district = 'Nalanda' AND year = 2021 ) AS nalanda_rate_change",
+      "api": {
+        "id": "chatcmpl-8ef70085bcbb0b12",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 442,
+          "total_tokens": 619,
+          "completion_tokens": 177,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 5.875
+      },
+      "sql_duckdb": "SELECT (SELECT (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0)) * 100 FROM anc_visits WHERE district = 'Gaya' AND year = 2023) - (SELECT (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0)) * 100 FROM anc_visits WHERE district = 'Gaya' AND year = 2021) AS gaya_rate_change, (SELECT (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0)) * 100 FROM anc_visits WHERE district = 'Nalanda' AND year = 2023) - (SELECT (CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0)) * 100 FROM anc_visits WHERE district = 'Nalanda' AND year = 2021) AS nalanda_rate_change",
+      "rows": [
+        [
+          8.0,
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

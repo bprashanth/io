@@ -1,0 +1,43 @@
+{
+  "id": "time-change-per-group-p03",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "give district wise pp increase between 2021 and 2023 only Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT T1.district, (T2.anc4_completed - T3.anc4_completed) * 100.0 / NULLIF(T3.anc4_completed, 0) AS percentage_increase FROM anc_visits AS T1 INNER JOIN (SELECT district, year, anc4_completed FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2023) AS T2 ON T1.district = T2.district AND T1.year = 2023 INNER JOIN (SELECT district, year, anc4_completed FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2021) AS T3 ON T1.district = T3.district AND T1.year = 2021",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ngive district wise pp increase between 2021 and 2023 only Gaya and Nalanda\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ngive district wise pp increase between 2021 and 2023 only Gaya and Nalanda\n```sql",
+      "response": "SELECT T1.district, (T2.anc4_completed - T3.anc4_completed) * 100.0 / T3.anc4_completed AS percentage_increase FROM anc_visits AS T1 INNER JOIN ( SELECT district, year, anc4_completed FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2023 ) AS T2 ON T1.district = T2.district AND T1.year = 2023 INNER JOIN ( SELECT district, year, anc4_completed FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2021 ) AS T3 ON T1.district = T3.district AND T1.year = 2021",
+      "api": {
+        "id": "chatcmpl-b1433a8725566b1c",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 442,
+          "total_tokens": 606,
+          "completion_tokens": 164,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 5.424
+      },
+      "sql_duckdb": "SELECT T1.district, (T2.anc4_completed - T3.anc4_completed) * 100.0 / NULLIF(T3.anc4_completed, 0) AS percentage_increase FROM anc_visits AS T1 INNER JOIN (SELECT district, year, anc4_completed FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2023) AS T2 ON T1.district = T2.district AND T1.year = 2023 INNER JOIN (SELECT district, year, anc4_completed FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year = 2021) AS T3 ON T1.district = T3.district AND T1.year = 2021",
+      "rows": []
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

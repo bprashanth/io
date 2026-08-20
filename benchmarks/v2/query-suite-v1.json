@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "status": "frozen-development",
-  "purpose": "Generic isolated query-slot gate; subjects are fixtures, while tasks measure reusable relational operations.",
+  "status": "retired-after-diagnostic-run",
+  "purpose": "Preserved diagnostic gate. Retired because it exposed all unrelated tables and some paraphrases omitted scope that the gold answer silently required; use query-suite-v2.json.",
   "dialect_requested_from_model": "sqlite",
   "execution_dialect": "duckdb",
   "comparison": {
     "numeric_tolerance": 0.000001,
     "column_names_required": false,
-    "row_order_required_when_gold_has_order_by": true
+    "row_order_required_only_for_ranking_tasks": true
   },
   "tables": [
     {
@@ -41,6 +41,7 @@
     {
       "id": "derived-rate-ranking",
       "pattern": "filter, derive a comparable percentage, rank",
+      "order_matters": true,
       "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
       "phrasings": [
         "2023 only show full immunisation percent district wise highest first",
@@ -65,6 +66,7 @@
     {
       "id": "derived-rate-lowest-first",
       "pattern": "filter, derive percentage, ascending rank",
+      "order_matters": true,
       "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
       "phrasings": [
         "2023 employment after 6 months as percent of enrolled, lowest district first",

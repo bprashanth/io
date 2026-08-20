@@ -1,0 +1,169 @@
+{
+  "id": "two-derived-measures-p04",
+  "task_id": "two-derived-measures",
+  "pattern": "filter two periods and groups, derive two percentages",
+  "question": "give two percentages by district and year: institutional deliveries and 48 hour checks over registrations",
+  "gold_sql": "SELECT district, year, ROUND(100.0 * institutional_deliveries / pregnancies_registered, 1) AS delivery_percent, ROUND(100.0 * postnatal_check_48h / pregnancies_registered, 1) AS postnatal_percent FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) ORDER BY district, year",
+  "expected_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2021,
+      54.400001525878906,
+      48.0
+    ],
+    [
+      "Gaya",
+      2022,
+      60.92307662963867,
+      53.30769348144531
+    ],
+    [
+      "Gaya",
+      2023,
+      66.66666412353516,
+      60.44444274902344
+    ],
+    [
+      "Nalanda",
+      2021,
+      61.3636360168457,
+      57.272727966308594
+    ],
+    [
+      "Nalanda",
+      2022,
+      65.0,
+      60.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      70.4000015258789,
+      66.0
+    ],
+    [
+      "Purnia",
+      2021,
+      48.0,
+      44.0
+    ],
+    [
+      "Purnia",
+      2022,
+      52.83871078491211,
+      46.967742919921875
+    ],
+    [
+      "Purnia",
+      2023,
+      57.75,
+      50.75
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT T1.district, T1.year, CAST(T1.institutional_deliveries AS REAL) * 100 / NULLIF(NULLIF(T2.pregnancies_registered, 0), 0) AS institutional_deliveries_percentage, CAST(T1.postnatal_check_48h AS REAL) * 100 / NULLIF(NULLIF(T2.pregnancies_registered, 0), 0) AS postnatal_check_48h_percentage FROM maternal_services AS T1 INNER JOIN anc_visits AS T2 ON T1.district = T2.district AND T1.year = T2.year",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ngive two percentages by district and year: institutional deliveries and 48 hour checks over registrations\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ngive two percentages by district and year: institutional deliveries and 48 hour checks over registrations\n```sql",
+      "response": "SELECT T1.district, T1.year, CAST(T1.institutional_deliveries AS REAL) * 100 / NULLIF(T2.pregnancies_registered, 0) AS institutional_deliveries_percentage, CAST(T1.postnatal_check_48h AS REAL) * 100 / NULLIF(T2.pregnancies_registered, 0) AS postnatal_check_48h_percentage FROM maternal_services AS T1 INNER JOIN anc_visits AS T2 ON T1.district = T2.district AND T1.year = T2.year",
+      "api": {
+        "id": "chatcmpl-9796af8081b92656",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 430,
+          "total_tokens": 550,
+          "completion_tokens": 120,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 3.992
+      },
+      "sql_duckdb": "SELECT T1.district, T1.year, CAST(T1.institutional_deliveries AS REAL) * 100 / NULLIF(NULLIF(T2.pregnancies_registered, 0), 0) AS institutional_deliveries_percentage, CAST(T1.postnatal_check_48h AS REAL) * 100 / NULLIF(NULLIF(T2.pregnancies_registered, 0), 0) AS postnatal_check_48h_percentage FROM maternal_services AS T1 INNER JOIN anc_visits AS T2 ON T1.district = T2.district AND T1.year = T2.year",
+      "rows": [
+        [
+          "Gaya",
+          2021,
+          54.400001525878906,
+          48.0
+        ],
+        [
+          "Gaya",
+          2022,
+          60.92307662963867,
+          53.30769348144531
+        ],
+        [
+          "Gaya",
+          2023,
+          66.66666412353516,
+          60.44444274902344
+        ],
+        [
+          "Nalanda",
+          2021,
+          61.3636360168457,
+          57.272727966308594
+        ],
+        [
+          "Nalanda",
+          2022,
+          65.0,
+          60.0
+        ],
+        [
+          "Nalanda",
+          2023,
+          70.4000015258789,
+          66.0
+        ],
+        [
+          "Purnia",
+          2021,
+          48.0,
+          44.0
+        ],
+        [
+          "Purnia",
+          2022,
+          52.83871078491211,
+          46.967742919921875
+        ],
+        [
+          "Purnia",
+          2023,
+          57.75,
+          50.75
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

@@ -1,0 +1,69 @@
+{
+  "id": "two-derived-measures-p02",
+  "task_id": "two-derived-measures",
+  "pattern": "filter two periods and groups, derive two percentages",
+  "question": "compare two districts gaya nalanda for both years 2022 and 2023, both service rates",
+  "gold_sql": "SELECT district, year, ROUND(100.0 * institutional_deliveries / pregnancies_registered, 1) AS delivery_percent, ROUND(100.0 * postnatal_check_48h / pregnancies_registered, 1) AS postnatal_percent FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) ORDER BY district, year",
+  "expected_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      null,
+      null
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT (SELECT CAST(SUM(CASE WHEN year = 2022 THEN anc4_completed ELSE 0 END) AS REAL) / NULLIF(SUM(CASE WHEN year = 2022 THEN pregnancies_registered ELSE 0 END), 0) FROM anc_visits WHERE district = 'gaya') AS service_rate_2022, (SELECT CAST(SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END) AS REAL) / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END), 0) FROM anc_visits WHERE district = 'gaya') AS service_rate_2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncompare two districts gaya nalanda for both years 2022 and 2023, both service rates\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncompare two districts gaya nalanda for both years 2022 and 2023, both service rates\n```sql",
+      "response": "SELECT ( SELECT CAST(SUM(CASE WHEN year = 2022 THEN anc4_completed ELSE 0 END) AS REAL) / SUM(CASE WHEN year = 2022 THEN pregnancies_registered ELSE 0 END) FROM anc_visits WHERE district = 'gaya' ) AS service_rate_2022, ( SELECT CAST(SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END) AS REAL) / SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END) FROM anc_visits WHERE district = 'gaya' ) AS service_rate_2023",
+      "api": {
+        "id": "chatcmpl-895c47b392b432c9",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 444,
+          "total_tokens": 581,
+          "completion_tokens": 137,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 4.566
+      },
+      "sql_duckdb": "SELECT (SELECT CAST(SUM(CASE WHEN year = 2022 THEN anc4_completed ELSE 0 END) AS REAL) / NULLIF(SUM(CASE WHEN year = 2022 THEN pregnancies_registered ELSE 0 END), 0) FROM anc_visits WHERE district = 'gaya') AS service_rate_2022, (SELECT CAST(SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END) AS REAL) / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END), 0) FROM anc_visits WHERE district = 'gaya') AS service_rate_2023",
+      "rows": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

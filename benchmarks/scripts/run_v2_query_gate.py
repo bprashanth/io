@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import math
 import re
+import signal
 import time
 import urllib.request
 from pathlib import Path
@@ -77,7 +79,7 @@ def ddl(db: duckdb.DuckDBPyConnection, manifest: dict[str, Any]) -> str:
     return "\n\n".join(statements)
 
 
-def make_prompt(question: str, schema: str, repair: str | None = None) -> str:
+def make_prompt(question: str, schema: str, reference: str, repair: str | None = None) -> str:
     parts = [
         "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.",
         "Do not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.",
@@ -86,7 +88,7 @@ def make_prompt(question: str, schema: str, repair: str | None = None) -> str:
         "[Database Schema]",
         schema,
         "[Reference Information]",
-        "anc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.",
+        reference,
     ]
     if repair:
         parts.extend(["[Previous Query Error]", repair, "Return one corrected read-only query."])
@@ -94,31 +96,58 @@ def make_prompt(question: str, schema: str, repair: str | None = None) -> str:
     return "\n".join(parts)
 
 
-def endpoint_json(url: str, body: dict[str, Any], timeout: int) -> dict[str, Any]:
+def endpoint_json(url: str, body: dict[str, Any], timeout: int, api_key: str | None = None) -> dict[str, Any]:
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     request = urllib.request.Request(
         url,
         data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.load(response)
+    def timed_out(_signum: int, _frame: Any) -> None:
+        raise TimeoutError(f"model response exceeded {timeout} seconds")
+
+    previous_handler = signal.signal(signal.SIGALRM, timed_out)
+    signal.setitimer(signal.ITIMER_REAL, timeout)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.load(response)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
 
 
-def call_model(endpoint: str, model: str, prompt: str, timeout: int) -> tuple[str, dict[str, Any]]:
+def call_model(
+    endpoint: str,
+    model: str,
+    prompt: str,
+    timeout: int,
+    api_key: str | None,
+    max_tokens: int,
+    reasoning_effort: str | None,
+    temperature: float,
+) -> tuple[str, dict[str, Any]]:
     started = time.monotonic()
+    body: dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if reasoning_effort:
+        body["reasoning"] = {"effort": reasoning_effort}
     raw = endpoint_json(
         endpoint.rstrip("/") + "/chat/completions",
-        {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1,
-            "max_tokens": 1024,
-        },
+        body,
         timeout,
+        api_key,
     )
     duration = round(time.monotonic() - started, 3)
-    text = raw["choices"][0]["message"]["content"]
+    text = raw["choices"][0]["message"].get("content")
+    if not text:
+        raise ValueError("model returned no answer content")
     return text, {
         "id": raw.get("id"),
         "model": raw.get("model"),
@@ -165,32 +194,77 @@ def equal_value(left: Any, right: Any, tolerance: float) -> bool:
     return left == right
 
 
-def equal_rows(actual: list[list[Any]], expected: list[list[Any]], tolerance: float) -> bool:
-    return len(actual) == len(expected) and all(
-        len(left) == len(right) and all(equal_value(a, b, tolerance) for a, b in zip(left, right))
-        for left, right in zip(actual, expected)
-    )
+def equal_row(left: list[Any], right: list[Any], tolerance: float) -> bool:
+    return len(left) == len(right) and all(equal_value(a, b, tolerance) for a, b in zip(left, right))
+
+
+def equal_rows(
+    actual: list[list[Any]],
+    expected: list[list[Any]],
+    tolerance: float,
+    order_matters: bool,
+) -> bool:
+    if len(actual) != len(expected):
+        return False
+    if not expected:
+        return True
+    actual_widths = {len(row) for row in actual}
+    expected_widths = {len(row) for row in expected}
+    if len(actual_widths) != 1 or len(expected_widths) != 1:
+        return False
+    actual_width = next(iter(actual_widths))
+    expected_width = next(iter(expected_widths))
+    if actual_width < expected_width:
+        return False
+    for indices in itertools.combinations(range(actual_width), expected_width):
+        projected = [[row[index] for index in indices] for row in actual]
+        if order_matters:
+            if all(equal_row(left, right, tolerance) for left, right in zip(projected, expected)):
+                return True
+            continue
+        unmatched = list(expected)
+        for row in projected:
+            match = next(
+                (index for index, candidate in enumerate(unmatched) if equal_row(row, candidate, tolerance)),
+                None,
+            )
+            if match is None:
+                break
+            unmatched.pop(match)
+        else:
+            if not unmatched:
+                return True
+    return False
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--manifest", type=Path, default=Path("benchmarks/v2/query-suite-v1.json"))
+    parser.add_argument("--manifest", type=Path, default=Path("benchmarks/v2/query-suite-v2.json"))
     parser.add_argument("--endpoint", default="http://127.0.0.1:8020/v1")
     parser.add_argument("--model", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=int, default=120)
+    parser.add_argument("--api-key-file", type=Path)
+    parser.add_argument("--max-tokens", type=int, default=1024)
+    parser.add_argument("--reasoning-effort", choices=("low", "medium", "high", "xhigh"))
+    parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--only-task", action="append", default=[])
+    parser.add_argument("--only-sample", action="append", default=[])
     parser.add_argument("--max-samples", type=int)
     args = parser.parse_args()
+    api_key = None
+    if args.api_key_file:
+        api_key = json.loads(args.api_key_file.expanduser().read_text())["api_key"]
 
     manifest = json.loads(args.manifest.read_text())
     db, data_evidence = create_database(manifest)
-    schema = ddl(db, manifest)
+    table_specs = {table["name"]: table for table in manifest["tables"]}
     samples = [
         {"id": f"{task['id']}-p{index + 1:02d}", "task": task, "question": question}
         for task in manifest["tasks"]
         if not args.only_task or task["id"] in args.only_task
         for index, question in enumerate(task["phrasings"])
+        if not args.only_sample or f"{task['id']}-p{index + 1:02d}" in args.only_sample
     ]
     if args.max_samples:
         samples = samples[:args.max_samples]
@@ -202,7 +276,11 @@ def main() -> int:
         "manifest_sha256": sha256(args.manifest),
         "endpoint": args.endpoint,
         "requested_model": args.model,
+        "credential_source": str(args.api_key_file) if args.api_key_file else None,
         "timeout_seconds": args.timeout_seconds,
+        "max_tokens": args.max_tokens,
+        "reasoning_effort": args.reasoning_effort,
+        "temperature": args.temperature,
         "samples": len(samples),
         "data": data_evidence,
     })
@@ -211,14 +289,29 @@ def main() -> int:
     for sample in samples:
         sample_dir = args.output / "samples" / sample["id"]
         expected = rows(db, sample["task"]["gold_sql"])
-        prompt = make_prompt(sample["question"], schema)
+        scoped_manifest = {"tables": [table_specs[name] for name in sample["task"]["tables"]]}
+        schema = ddl(db, scoped_manifest)
+        reference = sample["task"].get(
+            "reference",
+            "Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.",
+        )
+        prompt = make_prompt(sample["question"], schema, reference)
         attempts = []
         actual: list[list[Any]] | None = None
         final_sql = None
         for attempt in range(1, 3):
             request_record = {"attempt": attempt, "prompt": prompt}
             try:
-                response, api = call_model(args.endpoint, args.model, prompt, args.timeout_seconds)
+                response, api = call_model(
+                    args.endpoint,
+                    args.model,
+                    prompt,
+                    args.timeout_seconds,
+                    api_key,
+                    args.max_tokens,
+                    args.reasoning_effort,
+                    args.temperature,
+                )
                 request_record.update({"response": response, "api": api})
                 final_sql = extract_sql(response)
                 actual = rows(db, final_sql)
@@ -230,8 +323,10 @@ def main() -> int:
                 attempts.append(request_record)
                 if attempt == 2:
                     break
-                prompt = make_prompt(sample["question"], schema, request_record["error"])
-        passed = actual is not None and equal_rows(actual, expected, tolerance)
+                if not isinstance(error, TimeoutError):
+                    prompt = make_prompt(sample["question"], schema, reference, request_record["error"])
+        order_matters = bool(sample["task"].get("order_matters", False))
+        passed = actual is not None and equal_rows(actual, expected, tolerance, order_matters)
         record = {
             "id": sample["id"],
             "task_id": sample["task"]["id"],
@@ -240,6 +335,7 @@ def main() -> int:
             "gold_sql": sample["task"]["gold_sql"],
             "expected_rows": expected,
             "actual_rows": actual,
+            "row_order_required": order_matters,
             "sql_duckdb": final_sql,
             "attempts": attempts,
             "passed": passed,
