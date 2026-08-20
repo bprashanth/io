@@ -99,15 +99,19 @@ def load_digital_pdf(source: Path, include_values: bool) -> tuple[pd.DataFrame, 
     for page_number, page in enumerate(pages, start=1):
         lines = [line.rstrip() for line in page.splitlines()]
         for index, line in enumerate(lines):
-            header_years = [int(year) for year in re.findall(r"((?:19|20)\d{2})\s*\(%\)", line)]
-            if len(header_years) < 2 or "district" not in line.lower():
+            year_matches = list(re.finditer(r"((?:19|20)\d{2})(?:\s*\(%\))?", line))
+            header_years = [int(match.group(1)) for match in year_matches]
+            if len(header_years) < 2:
                 continue
+            dimension_name = safe_column_name(line[:year_matches[0].start()].strip()) or "category"
             title = next((prior.strip() for prior in reversed(lines[:index]) if prior.strip()), "Table")
             table_match = re.match(r"(Table\s+[^.]+)\.\s*(.+)", title, re.I)
             table_label = table_match.group(1) if table_match else "Table"
             metric_label = table_match.group(2) if table_match else title
-            metric_label = re.sub(r"\s+by\s+district.*$", "", metric_label, flags=re.I)
-            metric_name = safe_column_name(metric_label) + "_percent"
+            metric_label = re.sub(rf"\s+by\s+{re.escape(dimension_name.replace('_', ' '))}.*$", "", metric_label, flags=re.I)
+            metric_name = safe_column_name(metric_label)
+            if "%" in line or any(token in metric_label.lower() for token in ("percent", "percentage", "coverage", "rate")):
+                metric_name = re.sub(r"_(?:pct|percentage|percent)$", "", metric_name) + "_percent"
             value_pattern = r"^\s*([^\d]+?)\s+((?:-?\d+(?:\.\d+)?\s+){%d}-?\d+(?:\.\d+)?)\s*$" % (len(header_years) - 1)
             for data_line in lines[index + 1:]:
                 stripped = data_line.strip()
@@ -123,7 +127,7 @@ def load_digital_pdf(source: Path, include_values: bool) -> tuple[pd.DataFrame, 
                     continue
                 for year, value in zip(header_years, values):
                     rows.append({
-                        "district": match.group(1).strip(), "year": year, metric_name: value,
+                        dimension_name: match.group(1).strip(), "year": year, metric_name: value,
                         "source_page": page_number, "source_table": table_label,
                         "source": source_label,
                     })
@@ -135,7 +139,7 @@ def load_digital_pdf(source: Path, include_values: bool) -> tuple[pd.DataFrame, 
     metadata = {
         "format": "pdf", "pages": len([page for page in pages if page.strip()]),
         "extracted_pages": sorted(table_pages), "tables": sorted(table_labels),
-        "adapter_scope": "digital PDF with one district-by-year percentage table",
+        "adapter_scope": "digital PDF with one categorical row label and repeated year columns",
     }
     data_profile = profile(frame, include_values)
     data_profile["document"] = {**metadata, "notes": document_notes[:5000] if include_values else None}
@@ -143,22 +147,20 @@ def load_digital_pdf(source: Path, include_values: bool) -> tuple[pd.DataFrame, 
 
 
 def load_structured_xlsx_regions(source: Path, include_values: bool) -> tuple[pd.DataFrame, dict[str, Any], dict[str, Any]] | None:
-    """Extract stacked tables with merged group headings into one audited wide table.
+    """Extract compatible merged-heading regions without dataset-name rules.
 
-    This adapter is intentionally bounded but structure-preserving: it records
-    every candidate table's sheet, header/data range and merged ranges before
-    pivoting compatible attendance observations by block and year.
+    Region discovery uses workbook geometry and value types: a merged title,
+    a two-row header with year leaves, a categorical first column and numeric
+    measure cells. It supports vertical and horizontal regions, records exact
+    coordinates, and refuses incompatible region families. No case id, topic,
+    expected answer or dataset-specific column name participates in parsing.
     """
     workbook = load_workbook(source, data_only=True)
     merged_ranges = {sheet.title: [str(item) for item in sheet.merged_cells.ranges] for sheet in workbook.worksheets}
     if not any(merged_ranges.values()):
         return None
 
-    observations: dict[tuple[str, int], dict[str, Any]] = {}
-    regions: list[dict[str, Any]] = []
-    tables: list[str] = []
-    ranges: list[str] = []
-    definitions: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
     for sheet in workbook.worksheets:
         expanded: dict[tuple[int, int], Any] = {}
         for merged in sheet.merged_cells.ranges:
@@ -170,66 +172,146 @@ def load_structured_xlsx_regions(source: Path, include_values: bool) -> tuple[pd
         def cell(row: int, column: int) -> Any:
             return expanded.get((row, column), sheet.cell(row, column).value)
 
-        for title_row in range(1, sheet.max_row + 1):
-            title = next((str(cell(title_row, column)).strip() for column in range(1, sheet.max_column + 1)
-                          if cell(title_row, column) not in (None, "")), "")
-            table_match = re.match(r"(Table\s+\d+)[.:\s-]+(.+)", title, re.I)
-            if not table_match:
+        for title_range in sheet.merged_cells.ranges:
+            if title_range.min_row != title_range.max_row or title_range.max_col <= title_range.min_col:
                 continue
-            table_label, table_title = table_match.group(1).title(), table_match.group(2).strip()
-            header_row = next((row for row in range(title_row + 1, min(sheet.max_row, title_row + 5) + 1)
-                               if sum(cell(row, column) not in (None, "") for column in range(1, sheet.max_column + 1)) >= 2), None)
+            title_row = title_range.min_row
+            start_column, end_column = title_range.min_col, title_range.max_col
+            title = str(sheet.cell(title_row, start_column).value or "").strip()
+            if not title:
+                continue
+            header_row = next((
+                row for row in range(title_row + 1, min(sheet.max_row, title_row + 5) + 1)
+                if sum(cell(row, column) not in (None, "") for column in range(start_column, end_column + 1)) >= 2
+            ), None)
             if header_row is None or header_row + 1 > sheet.max_row:
                 continue
-            measures: list[tuple[int, str, int]] = []
-            for column in range(2, sheet.max_column + 1):
+            dimension_merge = next((merged for merged in sheet.merged_cells.ranges
+                                    if merged.min_row == header_row and merged.min_col == start_column
+                                    and merged.max_row >= header_row + 1), None)
+            if dimension_merge is None:
+                continue
+            dimension_label = str(cell(header_row, start_column) or "category").strip()
+            dimension_name = safe_column_name(dimension_label) or "category"
+            measures: list[dict[str, Any]] = []
+            for column in range(start_column + 1, end_column + 1):
                 group = str(cell(header_row, column) or "").strip()
                 leaf = str(cell(header_row + 1, column) or "").strip()
-                year_match = re.search(r"(?:19|20)\d{2}", leaf)
-                if "attendance" not in group.lower() or not year_match:
+                year_match = re.search(r"(?:19|20)\d{2}", f"{group} {leaf}")
+                if not year_match:
                     continue
-                sex = "boys" if "boy" in group.lower() else "girls" if "girl" in group.lower() else safe_column_name(group)
-                measures.append((column, sex, int(year_match.group())))
+                metric_label = group if not re.fullmatch(r"(?:19|20)\d{2}", group) else title
+                metric = safe_column_name(metric_label)
+                if any(token in metric_label.lower() for token in ("%", "percent", "percentage", "coverage", "rate")):
+                    metric = re.sub(r"_(?:pct|percentage|percent)$", "", metric) + "_percent"
+                if metric:
+                    measures.append({
+                        "column": column, "base_metric": metric,
+                        "label": metric_label, "year": int(year_match.group()),
+                    })
             if not measures:
                 continue
-            level = "primary" if "primary" in table_title.lower() else "secondary" if "secondary" in table_title.lower() else safe_column_name(table_title)
             data_start = header_row + 2
             data_end = data_start - 1
+            data: list[dict[str, Any]] = []
             for row in range(data_start, sheet.max_row + 1):
-                block = cell(row, 1)
-                if block in (None, ""):
+                category = cell(row, start_column)
+                if category in (None, ""):
                     break
-                if re.match(r"Table\s+\d+", str(block), re.I):
+                row_values = []
+                for measure in measures:
+                    value = cell(row, measure["column"])
+                    if not isinstance(value, (int, float)) or isinstance(value, bool):
+                        continue
+                    row_values.append({
+                        "base_metric": measure["base_metric"], "label": measure["label"],
+                        "year": measure["year"], "value": float(value),
+                    })
+                if not row_values:
                     break
                 data_end = row
-                for column, sex, year in measures:
-                    value = cell(row, column)
-                    if value in (None, ""):
-                        continue
-                    metric = f"{level}_{sex}_attendance_percent"
-                    item = observations.setdefault((str(block).strip(), year), {"block": str(block).strip(), "year": year})
-                    item[metric] = float(value)
+                data.append({"category": str(category).strip(), "values": row_values})
             if data_end < data_start:
                 continue
-            region_range = f"{sheet.title}!A{title_row}:{get_column_letter(max(column for column, _, _ in measures))}{data_end}"
-            tables.append(table_label); ranges.append(region_range)
-            region = {
+            table_match = re.match(r"(Table\s+\d+)[.:\s-]+(.+)", title, re.I)
+            table_label = table_match.group(1).title() if table_match else title
+            table_title = table_match.group(2).strip() if table_match else title
+            region_range = (
+                f"{sheet.title}!{get_column_letter(start_column)}{title_row}:"
+                f"{get_column_letter(end_column)}{data_end}"
+            )
+            candidates.append({
                 "sheet": sheet.title, "table": table_label, "title": table_title,
                 "title_row": title_row, "header_rows": [header_row, header_row + 1],
                 "data_rows": [data_start, data_end], "range": region_range,
-            }
-            regions.append(region)
-            for _column, sex, _year in measures:
-                indicator = f"{level}_{sex}_attendance_percent"
-                if not any(item["indicator"] == indicator for item in definitions):
-                    definitions.append({
-                        "indicator": indicator, "definition": f"Reported {level} {sex} attendance percentage",
-                        "formula": "reported percentage; no recomputation", "unit": "percent",
-                        "sheet": sheet.title, "table": table_label, "range": region_range,
-                    })
-    if not observations or not regions:
+                "dimension_name": dimension_name, "data": data,
+                "measures": measures,
+            })
+    if not candidates:
         return None
-    frame = pd.DataFrame(observations.values()).sort_values(["block", "year"]).reset_index(drop=True)
+
+    dimension_names = {candidate["dimension_name"] for candidate in candidates}
+    if len(dimension_names) != 1:
+        raise PlanError(
+            f"ambiguous merged-table families use different row dimensions: {sorted(dimension_names)}"
+        )
+    dimension_name = next(iter(dimension_names))
+    category_sets = [{row["category"] for row in candidate["data"]} for candidate in candidates]
+    for left_index, left in enumerate(category_sets):
+        for right in category_sets[left_index + 1:]:
+            overlap = len(left & right) / max(1, min(len(left), len(right)))
+            if overlap < 0.5:
+                raise PlanError("ambiguous merged-table families have incompatible category values")
+
+    metric_regions: dict[str, list[int]] = {}
+    for index, candidate in enumerate(candidates):
+        for metric in {measure["base_metric"] for measure in candidate["measures"]}:
+            metric_regions.setdefault(metric, []).append(index)
+
+    title_tokens = [set(re.findall(r"[a-z]+", candidate["title"].lower())) for candidate in candidates]
+    common_title_tokens = set.intersection(*title_tokens) if title_tokens else set()
+    generic_tokens = {
+        "table", "by", "and", "of", "the", "year", "report",
+        *re.findall(r"[a-z]+", dimension_name.lower()),
+    }
+
+    def qualified_metric(base: str, candidate_index: int) -> str:
+        if len(set(metric_regions.get(base, []))) <= 1:
+            return base
+        measure_tokens = set(base.split("_"))
+        distinctive = [token for token in re.findall(r"[a-z]+", candidates[candidate_index]["title"].lower())
+                       if token not in common_title_tokens | generic_tokens | measure_tokens]
+        if not distinctive:
+            raise PlanError(f"cannot distinguish repeated metric {base} across merged regions")
+        return f"{distinctive[0]}_{base}"
+
+    observations: dict[tuple[str, int], dict[str, Any]] = {}
+    definitions: list[dict[str, Any]] = []
+    for candidate_index, candidate in enumerate(candidates):
+        for row in candidate["data"]:
+            for value in row["values"]:
+                metric = qualified_metric(value["base_metric"], candidate_index)
+                item = observations.setdefault(
+                    (row["category"], value["year"]),
+                    {dimension_name: row["category"], "year": value["year"]},
+                )
+                if metric in item and item[metric] != value["value"]:
+                    raise PlanError(f"conflicting values for {metric}, {row['category']}, {value['year']}")
+                item[metric] = value["value"]
+                if not any(definition["indicator"] == metric for definition in definitions):
+                    definitions.append({
+                        "indicator": metric, "definition": value["label"],
+                        "formula": "reported value; no recomputation",
+                        "unit": "percent" if metric.endswith("_percent") else "number",
+                        "sheet": candidate["sheet"], "table": candidate["table"],
+                        "range": candidate["range"],
+                    })
+
+    regions = [{key: value for key, value in candidate.items() if key not in ("data", "measures")}
+               for candidate in candidates]
+    tables = list(dict.fromkeys(candidate["table"] for candidate in candidates))
+    ranges = list(dict.fromkeys(candidate["range"] for candidate in candidates))
+    frame = pd.DataFrame(observations.values()).sort_values([dimension_name, "year"]).reset_index(drop=True)
     frame["source_sheet"] = "; ".join(dict.fromkeys(region["sheet"] for region in regions))
     frame["source_table"] = "; ".join(dict.fromkeys(tables))
     frame["source_range"] = "; ".join(dict.fromkeys(ranges))
@@ -239,7 +321,7 @@ def load_structured_xlsx_regions(source: Path, include_values: bool) -> tuple[pd
         "definition_sheets": [], "definitions": definitions,
         "tables": list(dict.fromkeys(tables)), "ranges": list(dict.fromkeys(ranges)),
         "candidate_regions": regions, "merged_ranges": merged_ranges,
-        "adapter_scope": "merged two-row headings with compatible vertically stacked attendance tables",
+        "adapter_scope": "compatible vertical or horizontal regions with merged titles, two-row year headers and numeric bodies",
     }
     data_profile = profile(frame, include_values)
     data_profile["workbook"] = metadata
@@ -258,18 +340,32 @@ def load_source(source: Path, include_values: bool) -> tuple[pd.DataFrame, dict[
     structured = load_structured_xlsx_regions(source, include_values)
     if structured is not None:
         return structured
+    workbook = load_workbook(source, data_only=True)
+    if any(sheet.merged_cells.ranges for sheet in workbook.worksheets):
+        raise PlanError(
+            "workbook has merged layout not covered by the structural adapter; route to the general layout extraction fallback"
+        )
     sheets = pd.read_excel(source, sheet_name=None)
     if not sheets:
         raise PlanError("workbook contains no readable sheets")
 
     def observation_score(item: tuple[str, pd.DataFrame]) -> tuple[int, int, int]:
         _name, candidate = item
-        names = {str(column).lower() for column in candidate.columns}
-        dimensions = sum(any(token in name for token in ("district", "block", "state", "year", "date", "month")) for name in names)
         numeric = sum(pd.api.types.is_numeric_dtype(candidate[column]) for column in candidate.columns)
-        return dimensions, numeric, len(candidate)
+        non_numeric = sum(not pd.api.types.is_numeric_dtype(candidate[column]) for column in candidate.columns)
+        return int(numeric > 0 and non_numeric > 0), numeric, len(candidate)
 
-    selected_sheet, frame = max(sheets.items(), key=observation_score)
+    plausible = [item for item in sheets.items()
+                 if len(item[1]) >= 1 and observation_score(item)[0] == 1]
+    if len(plausible) > 1:
+        raise PlanError(
+            f"workbook has multiple plausible rectangular data sheets {[name for name, _ in plausible]}; route to the general sheet-selection fallback"
+        )
+    if not plausible:
+        raise PlanError(
+            "workbook has no unambiguous rectangular observation table; route to the general sheet-selection fallback"
+        )
+    selected_sheet, frame = plausible[0]
     frame = frame.copy()
     definitions: list[dict[str, Any]] = []
     source_labels: list[str] = []
@@ -295,21 +391,19 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
     rules = [
         "Plan a safe analysis of one local table. Never calculate or invent values.",
         "Use supplied column names exactly. The executor applies steps in order.",
-        "For coverage use derive kind percent only when distinct numerator and denominator count columns exist. If the source already supplies a coverage/rate/percent column, use it directly and never derive it again.",
-        "Subtracting percentages is percentage points, not percent growth.",
-        "Use change for one entity or series across two times. Use difference for two entities at one time. A difference between raw counts uses unit number; only a change or difference between percentage metrics uses percentage points.",
-        "Keep rows unless aggregation is requested. Never invent bands or targets.",
-        "For an initial request asking for a webpage selector, keep all requested rows; webpage controls are added separately. Never emit placeholders such as {{selected_year}}.",
+        "Use a supplied measure directly. Derive a percent only from distinct numerator and denominator count columns, never from a supplied rate or percentage.",
+        "A subtraction of percentage measures is percentage points; a subtraction of counts is a number.",
+        "Use change for one entity across two times and difference for two entities at one time.",
+        "Keep rows unless aggregation is requested. Never invent bands, targets or domain facts.",
+        "For a requested webpage selector, retain the selectable rows; the webpage adds controls. Never emit UI placeholders as data values.",
         "Do not group when there is already one row per entity and time. If aggregation is needed for a rate, use weighted_percent rather than sum or mean of a percent.",
-        "The view series is a category such as district, never a numeric metric. Put metrics only in view y.",
-        "For a district coverage trend use x=year, y=[derived coverage], series=district, unit=percent.",
-        "If the initial request names multiple indicators, derive every requested indicator and use a grouped_bar view with each metric in view.y; the webpage adds an indicator selector.",
-        "If a later request asks for a comparison or difference in one year, keep any previously selected year set unless the user says show, filter or only that one year; put the named year on the insight instead.",
-        "If the user says compare two named category values, filter the result to those two values and keep that focus in later turns until the user changes it.",
+        "The view series is a categorical grouping, never a numeric metric. Put measures only in view y. For time trends use time on x and an entity category as series.",
+        "When several measures are requested, retain them in view y and use grouped_bar; the webpage presents one measure at a time through its indicator selector, so unlike units never share an axis.",
+        "Preserve relevant earlier requests and scope across follow-ups until the participant changes them.",
         "Source and provenance are rendered separately; do not group or sort merely to display the source.",
         "Write question, title and note for a nontechnical participant. Never mention renderer, SQL, JSON, DuckDB, placeholders or other implementation details.",
         "If data cannot explain why, set can_explain_cause false, add causal_limit, and say in the view note that the file cannot explain the cause. If an intervention is requested but unsupported, also say in the note that the file cannot recommend an intervention.",
-        "When the user explicitly asks for a highest/largest, lowest/smallest, change or difference, add the matching insight specification so the answer is stated, not left for the user to infer from a chart.",
+        "When the participant asks a direct analytical question, add the corresponding insight so the answer is stated rather than left for them to infer.",
         "Use line/slope for time, bars for categories, scatter for two measures.",
         "Return only one JSON object matching the response schema.",
     ]
@@ -329,18 +423,19 @@ def repair_prompt(prompt: str, plan: Any, error: Exception) -> str:
         "\nReturn a complete corrected plan. Audit the whole corrected plan against every rule above, not only the reported error. Recheck durable filters, named-entity scope, insight kind and unit, and that view series differs from view x. Do not explain the correction."
 
 
-def call_model(model: str, effort: str, prompt: str, schema: dict[str, Any], timeout_seconds: int) -> tuple[dict[str, Any], dict[str, Any]]:
+def call_openrouter_json(model: str, effort: str, prompt: str, schema: dict[str, Any],
+                         timeout_seconds: int, system: str, schema_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
     credential = json.loads(KEY_PATH.read_text())["api_key"]
     document = {
         "model": model,
         "messages": [
-            {"role": "system", "content": "You are a constrained tabular analysis-plan compiler."},
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0,
         "reasoning": {"effort": effort},
         "response_format": {"type": "json_schema", "json_schema": {
-            "name": "analysis_plan", "strict": True, "schema": schema,
+            "name": schema_name, "strict": True, "schema": schema,
         }},
     }
     request = urllib.request.Request(
@@ -372,6 +467,63 @@ def call_model(model: str, effort: str, prompt: str, schema: dict[str, Any], tim
         "finish_reason": raw["choices"][0].get("finish_reason"),
         "usage": raw.get("usage"), "reasoning_effort": effort,
     }
+
+
+def call_model(model: str, effort: str, prompt: str, schema: dict[str, Any], timeout_seconds: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    return call_openrouter_json(
+        model, effort, prompt, schema, timeout_seconds,
+        "You are a constrained tabular analysis-plan compiler.", "analysis_plan",
+    )
+
+
+def call_critic(model: str, effort: str, messages: list[str], data_profile: dict[str, Any],
+                previous: Any, candidate: dict[str, Any], result: pd.DataFrame,
+                timeout_seconds: int) -> tuple[dict[str, Any], dict[str, Any], str]:
+    """Ask a separate general-language pass whether the executable plan is complete."""
+    def without_values(source_profile: dict[str, Any]) -> dict[str, Any]:
+        redacted = {
+            "row_count": source_profile["row_count"],
+            "columns": [
+                {key: column[key] for key in ("name", "type", "null_count", "distinct_count")}
+                for column in source_profile["columns"]
+            ],
+        }
+        for structural_key in ("workbook", "document"):
+            if structural_key in source_profile:
+                structural = json.loads(json.dumps(source_profile[structural_key]))
+                structural.pop("notes", None)
+                redacted[structural_key] = structural
+        return redacted
+
+    schema = {
+        "type": "object", "additionalProperties": False,
+        "required": ["accepted", "feedback"],
+        "properties": {
+            "accepted": {"type": "boolean"},
+            "feedback": {"type": "string"},
+        },
+    }
+    prompt = "\n".join([
+        "Review the candidate analysis plan against the whole conversation.",
+        "Judge meaning, not exact wording. This must work across sectors and datasets.",
+        "Accept only if the executable plan preserves relevant earlier requests and fully answers the newest request.",
+        "Check requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.",
+        "The trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.",
+        "A filter step changes the durable data scope; UI placeholder values are invalid data values.",
+        "Do not calculate or propose data values. Do not demand anything the participant did not ask for.",
+        "If rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.",
+        f"CONVERSATION:\n{json.dumps(messages, ensure_ascii=False)}",
+        f"DATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{json.dumps(without_values(data_profile), ensure_ascii=False)}",
+        f"PREVIOUS_VALID_PLAN:\n{json.dumps(previous, ensure_ascii=False)}",
+        f"CANDIDATE_PLAN:\n{json.dumps(candidate, ensure_ascii=False)}",
+        f"EXECUTED_RESULT_SCHEMA_NO_VALUES:\n{json.dumps(without_values(profile(result, False)), ensure_ascii=False)}",
+    ])
+    review, api = call_openrouter_json(
+        model, effort, prompt, schema, timeout_seconds,
+        "You are an independent, domain-neutral reviewer of a structured data-analysis plan.",
+        "plan_review",
+    )
+    return review, api, prompt
 
 
 def quoted(name: str) -> str:
@@ -540,7 +692,7 @@ def normalize_explicit_constraints(messages: list[str], plan: dict[str, Any], fr
         value = step.get("value")
         values = value if isinstance(value, list) else [value]
         placeholder = step["op"] == "filter" and any(
-            isinstance(item, str) and re.search(r"(?:^user_selected_|^selected_(?:year|block|district)|placeholder|\{\{)", item, re.I)
+            isinstance(item, str) and re.search(r"(?:^user_selected_|^selected_|placeholder|\{\{)", item, re.I)
             for item in values
         )
         if placeholder:
@@ -665,6 +817,62 @@ def normalize_explicit_constraints(messages: list[str], plan: dict[str, Any], fr
             for column, values in required.items()
         ] + remaining
     return changes
+
+
+def normalize_mechanical_invariants(plan: dict[str, Any], frame: pd.DataFrame) -> list[str]:
+    """Normalize representation hazards without interpreting the user's domain or prose."""
+    changes: list[str] = []
+    cleaned_steps = []
+    for step in plan["steps"]:
+        value = step.get("value")
+        values = value if isinstance(value, list) else [value]
+        placeholder = step["op"] == "filter" and any(
+            isinstance(item, str) and re.search(
+                r"(?:^user_selected_|^selected_(?:year|category)|placeholder|\{\{)", item, re.I
+            ) for item in values
+        )
+        if placeholder:
+            changes.append(f"removed non-data placeholder filter on {step['column']}")
+        else:
+            cleaned_steps.append(step)
+    plan["steps"] = cleaned_steps
+
+    percent_columns = {
+        str(column) for column in frame.columns
+        if any(token in str(column).lower() for token in ("percent", "pct", "rate", "coverage"))
+    }
+    for insight in plan["insights"]:
+        if insight["kind"] not in ("change", "difference"):
+            continue
+        expected = "percentage points" if insight["metric"] in percent_columns else "number"
+        if insight["unit"] != expected:
+            insight["unit"] = expected
+            changes.append(f"normalized arithmetic unit for typed metric {insight['metric']} to {expected}")
+    return changes
+
+
+def check_mechanical_invariants(plan: dict[str, Any], result: pd.DataFrame) -> None:
+    """Reject executable contradictions without parsing participant language."""
+    fingerprints = [json.dumps(item, sort_keys=True) for item in plan["insights"]]
+    if len(fingerprints) != len(set(fingerprints)):
+        raise PlanError("duplicate insight specifications would repeat the same answer on the page")
+    ranking = [item for item in plan["insights"] if item["kind"] in ("highest", "lowest")]
+    comparisons = [item for item in plan["insights"] if item["kind"] in ("change", "difference")]
+    for item in comparisons:
+        shown = {str(value) for value in result[item["entity_column"]].dropna()}
+        requested = {str(value) for value in item["entities"]}
+        valid_scope = requested <= shown if ranking else shown == requested
+        if not valid_scope:
+            raise PlanError(
+                f"comparison operands contradict executable row scope: requested {sorted(requested)}, got {sorted(shown)}"
+            )
+    differences = [item for item in plan["insights"] if item["kind"] == "difference"]
+    if ranking and differences:
+        ranking_columns = {item["label_column"] for item in ranking}
+        narrowed = [step["column"] for step in plan["steps"]
+                    if step["op"] == "filter" and step["column"] in ranking_columns]
+        if narrowed:
+            raise PlanError("ranking population is narrowed by a pairwise-comparison filter")
 
 
 def check_conversation_constraints(messages: list[str], plan: dict[str, Any], result: pd.DataFrame) -> None:
@@ -803,12 +1011,21 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True); parser.add_argument("--effort", choices=("low","medium","high","xhigh"), default="medium")
     parser.add_argument("--through-turn", type=int); parser.add_argument("--schema-only", action="store_true")
     parser.add_argument("--model-timeout-seconds", type=int, default=300)
+    parser.add_argument("--semantic-mode", choices=("heuristic", "critic"), default="critic")
+    parser.add_argument("--critic-model")
+    parser.add_argument("--critic-effort", choices=("low", "medium", "high", "xhigh"), default="low")
     args = parser.parse_args()
     case = json.loads((args.case_dir / "case.json").read_text()); source = args.case_dir / case["inputs"][0]["path"]
     frame, data_profile, source_metadata = load_source(source, not args.schema_only)
     schema = json.loads(SCHEMA_PATH.read_text()); jsonschema.Draft202012Validator.check_schema(schema)
     dump(args.output / "dataset-profile.json", data_profile)
-    dump(args.output / "run-config.json", {"case_id": case["case_id"], "model": args.model, "effort": args.effort, "schema_only": args.schema_only, "source_sha256": file_hash(source)})
+    dump(args.output / "run-config.json", {
+        "case_id": case["case_id"], "model": args.model, "effort": args.effort,
+        "schema_only": args.schema_only, "source_sha256": file_hash(source),
+        "semantic_mode": args.semantic_mode,
+        "critic_model": (args.critic_model or args.model) if args.semantic_mode == "critic" else None,
+        "critic_effort": args.critic_effort if args.semantic_mode == "critic" else None,
+    })
     messages, previous = [], None
     for turn in case["messages"][:args.through_turn or len(case["messages"])]:
         messages.append(turn["text"]); turn_dir = args.output / f"turn-{turn['turn']}"
@@ -826,10 +1043,32 @@ def main() -> int:
             record = {"attempt": attempt, "model_plan": model_plan, "api": api}
             try:
                 jsonschema.validate(candidate, schema)
-                normalizations = normalize_explicit_constraints(messages, candidate, frame)
+                normalizations = (
+                    normalize_explicit_constraints(messages, candidate, frame)
+                    if args.semantic_mode == "heuristic"
+                    else normalize_mechanical_invariants(candidate, frame)
+                )
                 jsonschema.validate(candidate, schema); bind(candidate, frame); candidate_result = execute(frame, candidate)
                 record["plan"] = candidate; record["normalizations"] = normalizations
-                check_conversation_constraints(messages, candidate, candidate_result)
+                if args.semantic_mode == "heuristic":
+                    check_conversation_constraints(messages, candidate, candidate_result)
+                else:
+                    check_mechanical_invariants(candidate, candidate_result)
+                    review, critic_api, critic_prompt = call_critic(
+                        args.critic_model or args.model, args.critic_effort, messages,
+                        data_profile, previous, candidate, candidate_result,
+                        args.model_timeout_seconds,
+                    )
+                    record["critic"] = review; record["critic_api"] = critic_api
+                    record["critic_request"] = {
+                        "model": args.critic_model or args.model,
+                        "effort": args.critic_effort,
+                        "raw_rows_included": False,
+                        "min_max_or_admitted_values_included": False,
+                        "prompt": critic_prompt,
+                    }
+                    if not review["accepted"]:
+                        raise PlanError(f"independent semantic critic rejected plan: {review['feedback']}")
             except Exception as error:
                 record.setdefault("plan", candidate)
                 record["validation_error"] = f"{type(error).__name__}: {error}"; attempts.append(record)
@@ -843,7 +1082,17 @@ def main() -> int:
         dump(turn_dir / "validated-plan.json", plan)
         report = make_report(case, source, source_metadata, plan, result); dump(turn_dir / "insight-report.json", report)
         workspace = turn_dir / "workspace"; workspace.mkdir(parents=True, exist_ok=True); write_csv(workspace / "all-result-rows.csv", report); render(report, workspace / "index.html")
-        previous = plan; print(json.dumps({"turn": turn["turn"], "rows": len(result), "chart": plan["view"]["chart"], "attempts": len(attempts), "seconds": sum(a["api"]["duration_seconds"] for a in attempts), "workspace": str(workspace)}), flush=True)
+        previous = plan; print(json.dumps({
+            "turn": turn["turn"], "rows": len(result), "chart": plan["view"]["chart"],
+            "attempts": len(attempts),
+            "plan_requests": len(attempts),
+            "critic_requests": sum(1 for item in attempts if item.get("critic_api")),
+            "seconds": sum(
+                item["api"]["duration_seconds"] + (item.get("critic_api") or {}).get("duration_seconds", 0)
+                for item in attempts
+            ),
+            "workspace": str(workspace),
+        }), flush=True)
     return 0
 
 

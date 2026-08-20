@@ -51,6 +51,8 @@ async def main() -> int:
         selected_rows = None
         selected_metric = None
         selected_table_headers = None
+        selected_body_text = None
+        selected_chart_text = None
         if args.select_metric:
             metric = page.locator("#metricSelect")
             if await metric.count() != 1:
@@ -59,6 +61,8 @@ async def main() -> int:
             await page.wait_for_timeout(100)
             selected_metric = await metric.input_value()
             selected_table_headers = await page.locator("#thead th").all_text_contents()
+            selected_body_text = await page.locator("body").inner_text()
+            selected_chart_text = await page.locator("#chart").inner_text()
             await page.screenshot(path=args.output / "desktop-metric-selected.png", full_page=True)
         if args.select_column and args.select_value:
             select = page.locator(f'select[data-col="{args.select_column}"]')
@@ -94,6 +98,8 @@ async def main() -> int:
         "selected_table_rows": selected_rows,
         "selected_metric": selected_metric,
         "selected_table_headers": selected_table_headers,
+        "selected_body_text": selected_body_text,
+        "selected_chart_text": selected_chart_text,
         "expected_filtered_rows": args.expected_filtered_rows,
         "downloaded_rows": len(downloaded),
         "download_columns": list(downloaded[0]) if downloaded else [],

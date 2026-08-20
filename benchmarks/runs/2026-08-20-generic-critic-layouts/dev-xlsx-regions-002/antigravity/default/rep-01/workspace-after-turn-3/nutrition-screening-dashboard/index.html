@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nutrition Screening & Anaemia Referrals Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              200: '#a7f3d0',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b'
+            },
+            referral: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              200: '#bfdbfe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+  
+  <!-- Top Navigation Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-blue-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+          <i data-lucide="activity" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
+            Nutrition & Anaemia Review Dashboard
+            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+              Table 1: Screening (A1:C7)
+            </span>
+            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+              Table 2: Referrals (E1:G7)
+            </span>
+          </h1>
+          <p class="text-xs text-slate-500">
+            Block-Level Performance Monitoring • Sheet: <code class="font-mono font-medium text-slate-700">Quarterly Review</code>
+          </p>
+        </div>
+      </div>
+
+      <!-- Provenance Quick Badge & Actions -->
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <div class="hidden md:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+          <span>Source: <strong class="text-slate-900 font-mono">Quarterly Review!A1:G7</strong></span>
+        </div>
+        <button id="exportCsvBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg shadow-sm transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          Export CSV
+        </button>
+        <button id="printBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg shadow-sm transition">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+          Print
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Source Provenance Banner & Side-by-Side Range Callout -->
+    <section class="bg-gradient-to-r from-emerald-950 via-slate-900 to-blue-950 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
+      <div class="absolute -right-8 -bottom-8 w-60 h-60 bg-blue-500/10 rounded-full blur-3xl"></div>
+      <div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+        <div class="lg:col-span-8 space-y-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+              <i data-lucide="database" class="w-3 h-3"></i> Dual-Table Provenance
+            </span>
+            <span class="text-xs text-slate-300">Workbook: <code class="bg-slate-800/90 px-1.5 py-0.5 rounded text-emerald-300 font-mono">nutrition_review_side_by_side.xlsx</code></span>
+          </div>
+          <h2 class="text-lg sm:text-xl font-bold text-white tracking-tight">
+            Sheet <span class="text-emerald-300 font-mono">Quarterly Review</span>: Side-by-Side Review Tables
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">
+            Visualizing both <strong class="text-emerald-300">Table 1 (Nutrition Screening Coverage, Range A1:C7)</strong> and <strong class="text-blue-300">Table 2 (Completed Anaemia Referrals, Range E1:G7)</strong> across administrative blocks for years <strong>2022</strong> and <strong>2023</strong>.
+          </p>
+        </div>
+        <div class="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-2.5 justify-end">
+          <a href="#source-inspector-section" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-xs rounded-xl shadow-md transition">
+            <i data-lucide="eye" class="w-4 h-4"></i>
+            Inspect Source Grid (A1:G7)
+          </a>
+          <div class="text-[11px] text-slate-300 flex items-center gap-1.5 justify-center sm:justify-start lg:justify-center">
+            <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+            Ranges: Table 1 (A1:C7) & Table 2 (E1:G7)
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Control Toolbar (Year Selector, Table Focus & Filters) -->
+    <section class="bg-white rounded-xl p-4 border border-slate-200/90 shadow-sm space-y-4">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <!-- Year Selector Pill Buttons -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <i data-lucide="calendar" class="w-4 h-4 text-emerald-600"></i>
+            Select Year:
+          </span>
+          <div class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/80 gap-1" id="yearSelectorGroup">
+            <button data-year="2023" class="year-btn active px-4 py-1.5 rounded-lg text-xs font-semibold transition-all">
+              2023 <span class="ml-1 text-[10px] py-0.5 px-1.5 bg-emerald-500 text-white rounded-md">Latest</span>
+            </button>
+            <button data-year="2022" class="year-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+              2022
+            </button>
+            <button data-year="all" class="year-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+              Compare (2022 vs 2023)
+            </button>
+          </div>
+        </div>
+
+        <!-- Indicator Focus View Switcher -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <i data-lucide="layers" class="w-4 h-4 text-blue-600"></i>
+            Focus View:
+          </span>
+          <div class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/80 gap-1" id="focusViewGroup">
+            <button data-focus="all" class="focus-btn active px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+              🌟 Both Tables (Side-by-Side)
+            </button>
+            <button data-focus="table1" class="focus-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+              🟢 Table 1: Screening (%)
+            </button>
+            <button data-focus="table2" class="focus-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+              🔵 Table 2: Referrals
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Secondary Filters & Chart Options -->
+      <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex items-center gap-1.5">
+            <label for="blockFilter" class="font-medium text-slate-500">Block Filter:</label>
+            <select id="blockFilter" class="bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="all">All Blocks (3: Gaya, Nalanda, Purnia)</option>
+              <option value="gaya_vs_nalanda" selected>⚡ Compare: Gaya vs Nalanda</option>
+              <option value="Gaya">Gaya</option>
+              <option value="Nalanda">Nalanda</option>
+              <option value="Purnia">Purnia</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <label for="chartTypeSelect" class="font-medium text-slate-500">Chart Style:</label>
+            <select id="chartTypeSelect" class="bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="bar">Vertical Bar Chart</option>
+              <option value="horizontalBar">Horizontal Bar Chart</option>
+              <option value="line">Trend Line Chart</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="text-slate-500 text-[11px]">
+          Showing data for: <strong id="activeFilterLabel" class="text-slate-800">All Blocks • Year 2023</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI Stat Cards (Covering Both Table 1 and Table 2) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Card 1: Table 1 Screening Coverage -->
+      <div class="bg-white rounded-xl p-4 border border-emerald-200 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Table 1: Avg Screening
+          </span>
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <i data-lucide="percent" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpiAvgCoverage" class="text-2xl sm:text-3xl font-extrabold text-slate-900">68.3%</span>
+          <span id="kpiAvgGrowth" class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+            <i data-lucide="trending-up" class="w-3 h-3"></i> +6.0% YoY
+          </span>
+        </div>
+        <p id="kpiAvgSubtext" class="text-xs text-slate-400 mt-1">Source: <span class="font-mono text-emerald-700">Quarterly Review!A1:C7</span></p>
+      </div>
+
+      <!-- Card 2: Table 2 Referrals Completed -->
+      <div class="bg-white rounded-xl p-4 border border-blue-200 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-blue-800 uppercase tracking-wider flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span> Table 2: Total Referrals
+          </span>
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+            <i data-lucide="heart-pulse" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpiTotalReferrals" class="text-2xl sm:text-3xl font-extrabold text-slate-900">428</span>
+          <span id="kpiReferralsGrowth" class="text-xs font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+            <i data-lucide="trending-up" class="w-3 h-3"></i> +24.1% YoY
+          </span>
+        </div>
+        <p id="kpiRefSubtext" class="text-xs text-slate-400 mt-1">Source: <span class="font-mono text-blue-700">Quarterly Review!E1:G7</span></p>
+      </div>
+
+      <!-- Card 3: Top Screening Block -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Top Screening Block</span>
+          <div class="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
+            <i data-lucide="award" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpiTopScreeningName" class="text-2xl sm:text-3xl font-extrabold text-slate-900">Nalanda</span>
+          <span id="kpiTopScreeningVal" class="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">76.0%</span>
+        </div>
+        <p id="kpiTopScreeningSubtext" class="text-xs text-slate-400 mt-1">Leading coverage in 2023 (Cell: C6)</p>
+      </div>
+
+      <!-- Card 4: Top Referrals Block -->
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Top Referrals Block</span>
+          <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <i data-lucide="users" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpiTopReferralsName" class="text-2xl sm:text-3xl font-extrabold text-slate-900">Nalanda</span>
+          <span id="kpiTopReferralsVal" class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">160 children</span>
+        </div>
+        <p id="kpiTopReferralsSubtext" class="text-xs text-slate-400 mt-1">Most referrals in 2023 (Cell: G6)</p>
+      </div>
+    </section>
+
+    <!-- Visual Analytics Charts Section (Side-by-Side or Full View) -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="chartsSection">
+      <!-- Chart 1: Nutrition Screening Coverage (%) [Table 1: A1:C7] -->
+      <div id="chartContainer1" class="bg-white rounded-xl p-5 border border-emerald-200 shadow-sm flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 mb-1">
+                <i data-lucide="check-circle" class="w-3 h-3"></i> Table 1 (Range A1:C7)
+              </div>
+              <h3 class="text-base font-bold text-slate-900" id="chart1Title">
+                Nutrition Screening Coverage (%) by Block
+              </h3>
+              <p class="text-xs text-slate-500">Indicator: Share of eligible children screened</p>
+            </div>
+            <div class="text-right">
+              <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
+                Target: &ge;70%
+              </span>
+            </div>
+          </div>
+          <div class="relative h-64 w-full">
+            <canvas id="chartScreening"></canvas>
+          </div>
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <span>Excel Columns: <strong class="font-mono text-emerald-700">Col B (2022), Col C (2023)</strong></span>
+          <span>Units: <strong class="text-slate-700">Percentage (%)</strong></span>
+        </div>
+      </div>
+
+      <!-- Chart 2: Completed Anaemia Referrals [Table 2: E1:G7] -->
+      <div id="chartContainer2" class="bg-white rounded-xl p-5 border border-blue-200 shadow-sm flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 mb-1">
+                <i data-lucide="heart" class="w-3 h-3"></i> Table 2 (Range E1:G7)
+              </div>
+              <h3 class="text-base font-bold text-slate-900" id="chart2Title">
+                Completed Anaemia Referrals by Block
+              </h3>
+              <p class="text-xs text-slate-500">Indicator: Children completing an anaemia referral</p>
+            </div>
+            <div class="text-right">
+              <span class="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded">
+                Count of Children
+              </span>
+            </div>
+          </div>
+          <div class="relative h-64 w-full">
+            <canvas id="chartReferrals"></canvas>
+          </div>
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <span>Excel Columns: <strong class="font-mono text-blue-700">Col F (2022), Col G (2023)</strong></span>
+          <span>Units: <strong class="text-slate-700">Children (count)</strong></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Side-by-Side YoY Growth Breakdown Cards -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4" id="blockCardsContainer">
+      <!-- Dynamically generated block cards comparing screening & referrals -->
+    </section>
+
+    <!-- Source Data Tables Section (Table 1, Table 2 & Combined Side-by-Side) -->
+    <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden space-y-0">
+      <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="table" class="w-4 h-4 text-emerald-600"></i>
+            Data Tables Breakdown
+          </h3>
+          <p class="text-xs text-slate-500">
+            Switch between Table 1, Table 2, or view the complete side-by-side table exactly as structured in the Excel workbook.
+          </p>
+        </div>
+
+        <!-- Table View Tabs -->
+        <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs" id="tableTabGroup">
+          <button data-table="sideBySide" class="table-tab-btn active px-3 py-1.5 rounded-lg font-semibold transition">
+            📑 Combined Side-by-Side (A1:G7)
+          </button>
+          <button data-table="table1" class="table-tab-btn px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition">
+            🟢 Table 1: Screening (%) (A1:C7)
+          </button>
+          <button data-table="table2" class="table-tab-btn px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition">
+            🔵 Table 2: Referrals (E1:G7)
+          </button>
+        </div>
+      </div>
+
+      <!-- Search and Filter Bar for Table -->
+      <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4">
+        <div class="relative">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+          <input type="text" id="tableSearch" placeholder="Search block name..." class="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none w-52">
+        </div>
+        <div class="text-xs text-slate-500">
+          Source Sheet: <strong class="font-mono text-slate-800">Quarterly Review</strong>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto" id="tableContainer">
+        <!-- Dynamically rendered table based on selected tab -->
+      </div>
+    </section>
+
+    <!-- Source Sheet Table & Range Inspector Section (Core Provenance Visualizer) -->
+    <section id="source-inspector-section" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 mb-2">
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+            Excel Metadata & Range Provenance
+          </div>
+          <h3 class="text-lg font-bold text-slate-900">Source Sheet, Table Name, and Cell Ranges</h3>
+          <p class="text-xs text-slate-500">
+            Full structural mapping from workbook <code class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-800">nutrition_review_side_by_side.xlsx</code>
+          </p>
+        </div>
+
+        <!-- Sheet Switcher Tabs -->
+        <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs" id="sheetTabs">
+          <button data-sheet="Quarterly Review" class="sheet-tab-btn active px-3 py-1.5 rounded-lg font-semibold transition">
+            📑 Quarterly Review (Primary)
+          </button>
+          <button data-sheet="Definitions" class="sheet-tab-btn px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition">
+            📖 Definitions
+          </button>
+          <button data-sheet="Household Visits Raw" class="sheet-tab-btn px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition">
+            🏠 Household Visits Raw
+          </button>
+        </div>
+      </div>
+
+      <!-- Provenance Grid Details: Table 1 & Table 2 Side-by-Side Metadata -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Table 1 Metadata Card -->
+        <div class="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+              Table 1: Nutrition Screening Coverage
+            </span>
+            <span class="font-mono font-bold text-xs bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded">
+              Range A1:C7
+            </span>
+          </div>
+          <div class="text-xs space-y-1 text-slate-700">
+            <div><strong>Sheet:</strong> <code class="font-mono text-emerald-800">Quarterly Review</code></div>
+            <div><strong>Table Title (Merged A1:C1):</strong> "Table 1. Nutrition screening by block and year"</div>
+            <div><strong>Column Headers (A3:C4):</strong> <code>A3:A4</code> Block, <code>B3:C3</code> Screening coverage (%), <code>B4</code> 2022, <code>C4</code> 2023</div>
+            <div><strong>Data Cells (A5:C7):</strong> Gaya (62%, 68%), Nalanda (70%, 76%), Purnia (55%, 61%)</div>
+            <div><strong>Definition (Definitions!A2:D2):</strong> "Share of eligible children screened" (percent)</div>
+          </div>
+        </div>
+
+        <!-- Table 2 Metadata Card -->
+        <div class="p-4 bg-blue-50/70 rounded-xl border border-blue-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
+              Table 2: Completed Anaemia Referrals
+            </span>
+            <span class="font-mono font-bold text-xs bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded">
+              Range E1:G7
+            </span>
+          </div>
+          <div class="text-xs space-y-1 text-slate-700">
+            <div><strong>Sheet:</strong> <code class="font-mono text-blue-800">Quarterly Review</code></div>
+            <div><strong>Table Title (Merged E1:G1):</strong> "Table 2. Completed anaemia referrals by block and year"</div>
+            <div><strong>Column Headers (E3:G4):</strong> <code>E3:E4</code> Block, <code>F3:G3</code> Referrals completed, <code>F4</code> 2022, <code>G4</code> 2023</div>
+            <div><strong>Data Cells (E5:G7):</strong> Gaya (120, 150), Nalanda (135, 160), Purnia (90, 118)</div>
+            <div><strong>Definition (Definitions!A3:D3):</strong> "Children completing an anaemia referral" (children)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Spreadsheet Grid Visualizer -->
+      <div>
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="grid" class="w-4 h-4 text-emerald-600"></i>
+              Interactive Excel Spreadsheet Grid Visualizer
+            </h4>
+            <p class="text-xs text-slate-500" id="currentSheetDesc">
+              Viewing sheet: <strong class="text-emerald-700 font-mono">Quarterly Review</strong>. Showing Table 1 (<strong class="text-emerald-700 font-mono">A1:C7</strong>) and Table 2 (<strong class="text-blue-700 font-mono">E1:G7</strong>).
+            </p>
+          </div>
+          <div class="flex items-center gap-3 text-xs flex-wrap">
+            <div class="flex items-center gap-1.5">
+              <span class="w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600 inline-block"></span>
+              <span class="text-slate-700 font-medium">Table 1 Range (A1:C7)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3.5 h-3.5 rounded bg-blue-500 border border-blue-600 inline-block"></span>
+              <span class="text-slate-700 font-medium">Table 2 Range (E1:G7)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3.5 h-3.5 rounded bg-slate-200 border border-slate-300 inline-block"></span>
+              <span class="text-slate-500">Column D Separator</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Excel Spreadsheet Visual Layout -->
+        <div class="border border-slate-300 rounded-xl overflow-x-auto shadow-inner bg-slate-100 max-h-96">
+          <table class="w-full text-xs font-mono border-collapse" id="excelGridTable">
+            <!-- Populated dynamically with full grid formatting -->
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 space-y-1">
+      <p>Nutrition Screening Coverage & Completed Anaemia Referrals Dashboard</p>
+      <p class="text-[11px] text-slate-400">
+        Source: <code class="font-mono">nutrition_review_side_by_side.xlsx</code> • Sheet: <code class="font-mono">Quarterly Review</code> • Tables: <code class="font-mono">Table 1 (A1:C7)</code> &amp; <code class="font-mono">Table 2 (E1:G7)</code>
+      </p>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

@@ -8,7 +8,7 @@ The bank deliberately favours ordinary NGO work. Four cases are moderately
 messy because real spreadsheets and PDFs are messy; none is intended as a
 coding puzzle or adversarial trap.
 
-## Development set (12)
+## Development set (13)
 
 | ID | Screen | Input | Routine request and follow-ups | Level |
 | --- | :---: | --- | --- | --- |
@@ -19,6 +19,7 @@ coding puzzle or adversarial trap.
 | `dev-safe-programme-001` | yes | clean CSV | show programme outcomes; ask why one district is lower; do not invent a cause | routine |
 | `dev-csv-missing-001` | no | CSV with blanks/`NA` | nutrition coverage dashboard; show missing data honestly; compare years | routine |
 | `dev-xlsx-headers-001` | yes | three-tab Excel with merged headers, two vertically stacked subtables and a larger irrelevant rectangular tab | primary school-attendance dashboard; say “there is another table below” to add secondary; compare blocks; cite sheet/table/range; download | moderate |
+| `dev-xlsx-regions-002` | yes | three-tab Excel with two horizontally adjacent mixed-unit tables and a larger irrelevant rectangular tab | screening dashboard; say “there is one more table on the right”; compare two measures using a paraphrased gap request; cite ranges; download | moderate |
 | `dev-xlsx-formulas-001` | no | Excel with formulas | budget/spend dashboard; compare planned and spent; explain units | routine |
 | `dev-pdf-scan-001` | no | scanned PDF with repeated headings and two candidate tables | extract the water-access table; after an incomplete result say “use the second table”; cite page/region; flag unreadable cells | moderate |
 | `dev-join-health-pop-001` | no | two CSVs | join service counts with population; calculate per-1,000 rate; compare districts | moderate |

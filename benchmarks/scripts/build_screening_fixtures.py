@@ -193,6 +193,63 @@ def build_irregular_xlsx() -> None:
     normalize_zip(output)
 
 
+def build_horizontal_regions_xlsx() -> None:
+    """Build a second irregular family: side-by-side tables with mixed units."""
+    output = ROOT / "dev-xlsx-regions-002" / "inputs" / "nutrition_review_side_by_side.xlsx"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    workbook = Workbook()
+    fixed_time = datetime.datetime(2026, 8, 20, 0, 0, 0)
+    workbook.properties.created = fixed_time
+    workbook.properties.modified = fixed_time
+    report = workbook.active
+    report.title = "Quarterly Review"
+
+    def add_table(start_column: int, number: int, title: str, metric: str,
+                  rows: list[tuple[object, ...]], colour: str) -> None:
+        end_column = start_column + 2
+        report.merge_cells(start_row=1, start_column=start_column, end_row=1, end_column=end_column)
+        title_cell = report.cell(1, start_column, f"Table {number}. {title}")
+        title_cell.font = Font(bold=True, color="FFFFFF", size=12)
+        title_cell.fill = PatternFill("solid", fgColor=colour)
+        report.merge_cells(start_row=3, start_column=start_column, end_row=4, end_column=start_column)
+        report.cell(3, start_column, "Block")
+        report.merge_cells(start_row=3, start_column=start_column + 1, end_row=3, end_column=end_column)
+        report.cell(3, start_column + 1, metric)
+        report.cell(4, start_column + 1, "2022")
+        report.cell(4, start_column + 2, "2023")
+        for row in range(3, 5):
+            for column in range(start_column, end_column + 1):
+                cell = report.cell(row, column)
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = PatternFill("solid", fgColor="5B9BD5")
+        for row_index, values in enumerate(rows, start=5):
+            for offset, value in enumerate(values):
+                report.cell(row_index, start_column + offset, value)
+
+    add_table(1, 1, "Nutrition screening by block and year", "Screening coverage (%)", [
+        ("Gaya", 62, 68), ("Nalanda", 70, 76), ("Purnia", 55, 61),
+    ], "1F4E78")
+    add_table(5, 2, "Completed anaemia referrals by block and year", "Referrals completed", [
+        ("Gaya", 120, 150), ("Nalanda", 135, 160), ("Purnia", 90, 118),
+    ], "548235")
+    for column, width in {"A": 18, "B": 18, "C": 18, "D": 4, "E": 18, "F": 20, "G": 20}.items():
+        report.column_dimensions[column].width = width
+
+    notes = workbook.create_sheet("Definitions")
+    notes.append(["indicator", "definition", "unit", "source"])
+    notes.append(["Screening coverage", "Share of eligible children screened", "percent", "synthetic nutrition review fixture"])
+    notes.append(["Referrals completed", "Children completing an anaemia referral", "children", "synthetic nutrition review fixture"])
+    notes.append(["Warning", "Illustrative aggregate data; not official statistics", "", "synthetic nutrition review fixture"])
+
+    decoy = workbook.create_sheet("Household Visits Raw")
+    decoy.append(["visit_id", "block", "month", "completed"])
+    for index in range(1, 41):
+        decoy.append([f"V{index:03d}", ("Gaya", "Nalanda", "Purnia")[index % 3], f"2023-{(index % 12) + 1:02d}", index % 5 != 0])
+
+    workbook.save(output)
+    normalize_zip(output)
+
+
 def build_pdf() -> None:
     output = ROOT / "dev-pdf-health-001" / "inputs" / "facility_delivery_report.pdf"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -303,6 +360,7 @@ def build_safe_csv() -> None:
 def main() -> None:
     build_xlsx()
     build_irregular_xlsx()
+    build_horizontal_regions_xlsx()
     build_pdf()
     build_safe_csv()
 
