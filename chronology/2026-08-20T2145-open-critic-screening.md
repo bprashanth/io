@@ -1,0 +1,13 @@
+# Open critic screening and count-versus-rate failure
+
+After commit `8e02909`, semantic reviewer tests were separated from planner generation. The fixed replay bank began with 15 and grew to 17 decisions after it exposed two oracle mistakes and one real defect in an older “passing” PDF plan. The old plan retained 2022 rows while answering a 2023-only comparison. Gemini correctly rejected it, so the historical rule-assisted pass is no longer treated as perfect evidence.
+
+The simple critic results were Gemini 17/17 in 99.614 seconds and $0.0180165; Qwen 3.8 27B 15/17 in 392.879 seconds and $0.0568313; Qwen 3 8B 15/16 in 209.518 seconds and $0.008510619 before the seventeenth rate/count case was added; and Nemotron 3.5 Lightning 5/8 before early stop. Qwen 3.5 9B and Qwen 3.6 35B-A3B hit their time ceilings on their first relevant calls.
+
+The first full GPT-OSS 20B plus Qwen 8B smoke run failed after its critic demanded renderer features as plan steps. The critic contract was generalized to state that selectors, provenance, current-row tables and downloads are automatic. A later full run rendered and operated cleanly but failed the oracle: it used fully-immunised counts rather than coverage. Chromium confirmed a polished but semantically wrong page. Both Gemini and Qwen 8B initially accepted a replayed rate-to-count substitution.
+
+The failure was traced to authority inversion: the planner rewrote vague participant wording as an explicit count request, and the critic trusted that paraphrase. Production prompts now state that only the participant conversation is authoritative. The next critic schema first writes a conversation-only intent ledger, then audits the candidate. Both Gemini and Qwen 8B rejected the isolated misleading-count probe with that structure.
+
+In the full intent-ledger replay, Gemini scored 15/17 because of one invalid structured response and one inconsistent extra-year decision. Qwen 8B made no semantic mistakes through 10 calls; three subsequent calls received HTTP 429 while Gemini and Qwen banks were being run concurrently. This is recorded as provider throttling relevant to the 20-user event, not model incapability. A non-concurrent replay is required.
+
+No production branch was added for immunisation, health, districts, fixture names or expected answers. The only new semantic guidance is the cross-domain statistical principle that raw outcome counts should not be the sole basis for comparing differently sized groups when a plausible denominator exists, unless the participant explicitly asks for counts; ambiguity routes to a plain-language clarification.

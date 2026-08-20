@@ -37,6 +37,10 @@ class PlanError(ValueError):
     pass
 
 
+class ModelRequestError(RuntimeError):
+    pass
+
+
 def dump(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
@@ -392,6 +396,8 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "Plan a safe analysis of one local table. Never calculate or invent values.",
         "Use supplied column names exactly. The executor applies steps in order.",
         "Use a supplied measure directly. Derive a percent only from distinct numerator and denominator count columns, never from a supplied rate or percentage.",
+        "When comparing groups on an outcome count and the schema offers a plausible eligible/base count, do not compare raw outcome counts alone unless the participant explicitly asks for counts. Derive the comparable rate and retain its underlying counts; if the numerator/denominator pairing is genuinely ambiguous, use clarification instead of silently choosing.",
+        "The participant's actual words are authoritative. Do not strengthen or rewrite ambiguous wording in question, title or note to pretend that the participant explicitly chose one measure.",
         "A subtraction of percentage measures is percentage points; a subtraction of counts is a number.",
         "Use change for one entity across two times and difference for two entities at one time.",
         "Keep rows unless aggregation is requested. Never invent bands, targets or domain facts.",
@@ -434,6 +440,7 @@ def call_openrouter_json(model: str, effort: str, prompt: str, schema: dict[str,
         ],
         "temperature": 0,
         "reasoning": {"effort": effort},
+        "temperature": 0,
         "response_format": {"type": "json_schema", "json_schema": {
             "name": schema_name, "strict": True, "schema": schema,
         }},
@@ -457,7 +464,11 @@ def call_openrouter_json(model: str, effort: str, prompt: str, schema: dict[str,
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous_handler)
     duration = round(time.monotonic() - started, 3)
-    content = raw["choices"][0]["message"].get("content") or ""
+    choices = raw.get("choices")
+    if not choices:
+        error = raw.get("error") or {"message": "response contained no choices"}
+        raise ModelRequestError(json.dumps(error, ensure_ascii=False))
+    content = choices[0]["message"].get("content") or ""
     match = re.search(r"\{.*\}", content, flags=re.DOTALL)
     if not match:
         raise PlanError("model returned no JSON object")
@@ -465,7 +476,7 @@ def call_openrouter_json(model: str, effort: str, prompt: str, schema: dict[str,
         "requested_model": model, "resolved_model": raw.get("model"),
         "generation_id": raw.get("id"), "duration_seconds": duration,
         "finish_reason": raw["choices"][0].get("finish_reason"),
-        "usage": raw.get("usage"), "reasoning_effort": effort,
+        "usage": raw.get("usage"), "reasoning_effort": effort, "temperature": 0,
     }
 
 
@@ -476,10 +487,9 @@ def call_model(model: str, effort: str, prompt: str, schema: dict[str, Any], tim
     )
 
 
-def call_critic(model: str, effort: str, messages: list[str], data_profile: dict[str, Any],
-                previous: Any, candidate: dict[str, Any], result: pd.DataFrame,
-                timeout_seconds: int) -> tuple[dict[str, Any], dict[str, Any], str]:
-    """Ask a separate general-language pass whether the executable plan is complete."""
+def make_critic_prompt(messages: list[str], data_profile: dict[str, Any], previous: Any,
+                       candidate: dict[str, Any], result: pd.DataFrame) -> str:
+    """Build the value-redacted, domain-neutral semantic-review request."""
     def without_values(source_profile: dict[str, Any]) -> dict[str, Any]:
         redacted = {
             "row_count": source_profile["row_count"],
@@ -495,20 +505,17 @@ def call_critic(model: str, effort: str, messages: list[str], data_profile: dict
                 redacted[structural_key] = structural
         return redacted
 
-    schema = {
-        "type": "object", "additionalProperties": False,
-        "required": ["accepted", "feedback"],
-        "properties": {
-            "accepted": {"type": "boolean"},
-            "feedback": {"type": "string"},
-        },
-    }
-    prompt = "\n".join([
+    return "\n".join([
         "Review the candidate analysis plan against the whole conversation.",
         "Judge meaning, not exact wording. This must work across sectors and datasets.",
+        "The participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.",
+        "Before deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.",
         "Accept only if the executable plan preserves relevant earlier requests and fully answers the newest request.",
         "Check requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.",
+        "For group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.",
         "The trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.",
+        "The trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.",
+        "A grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.",
         "A filter step changes the durable data scope; UI placeholder values are invalid data values.",
         "Do not calculate or propose data values. Do not demand anything the participant did not ask for.",
         "If rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.",
@@ -518,11 +525,31 @@ def call_critic(model: str, effort: str, messages: list[str], data_profile: dict
         f"CANDIDATE_PLAN:\n{json.dumps(candidate, ensure_ascii=False)}",
         f"EXECUTED_RESULT_SCHEMA_NO_VALUES:\n{json.dumps(without_values(profile(result, False)), ensure_ascii=False)}",
     ])
-    review, api = call_openrouter_json(
-        model, effort, prompt, schema, timeout_seconds,
-        "You are an independent, domain-neutral reviewer of a structured data-analysis plan.",
-        "plan_review",
-    )
+
+
+def call_critic(model: str, effort: str, messages: list[str], data_profile: dict[str, Any],
+                previous: Any, candidate: dict[str, Any], result: pd.DataFrame,
+                timeout_seconds: int) -> tuple[dict[str, Any], dict[str, Any], str]:
+    """Ask a separate general-language pass whether the executable plan is complete."""
+    schema = {
+        "type": "object", "additionalProperties": False,
+        "required": ["conversation_intent", "candidate_audit", "accepted", "feedback"],
+        "properties": {
+            "conversation_intent": {"type": "string"},
+            "candidate_audit": {"type": "string"},
+            "accepted": {"type": "boolean"},
+            "feedback": {"type": "string"},
+        },
+    }
+    prompt = make_critic_prompt(messages, data_profile, previous, candidate, result)
+    try:
+        review, api = call_openrouter_json(
+            model, effort, prompt, schema, timeout_seconds,
+            "You are an independent, domain-neutral reviewer of a structured data-analysis plan.",
+            "plan_review",
+        )
+    except PlanError as error:
+        raise ModelRequestError(f"critic returned invalid structured output: {error}") from error
     return review, api, prompt
 
 
@@ -1034,6 +1061,15 @@ def main() -> int:
         for attempt in range(1, 4):
             try:
                 candidate, api = call_model(args.model, args.effort, attempt_prompt, schema, args.model_timeout_seconds)
+            except (TimeoutError, ModelRequestError) as error:
+                record.setdefault("plan", candidate)
+                record["validation_error"] = f"{type(error).__name__}: {error}"; attempts.append(record)
+                dump(turn_dir / f"plan-attempt-{attempt}.json", record)
+                dump(turn_dir / "plan-error.json", {
+                    "status": "semantic_critic_timeout", "attempts": attempts,
+                    "note": "Operational critic failures do not trigger semantic planner rewrites.",
+                })
+                raise
             except Exception as error:
                 failure = {"attempt": attempt, "request_error": f"{type(error).__name__}: {error}"}
                 attempts.append(failure); dump(turn_dir / f"plan-attempt-{attempt}.json", failure)

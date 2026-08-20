@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "model": "qwen/qwen3-8b",
+  "effort": "low",
+  "manifest": "benchmarks/critic-replay-v1/manifest.json",
+  "samples_planned": 1,
+  "samples_run": 1,
+  "passed": 1,
+  "mistakes": 0,
+  "early_stopped": false,
+  "duration_seconds": 9.594,
+  "cost_usd": 0.000414713,
+  "records": [
+    {
+      "id": "smoke-derived-rate-replaced-by-count",
+      "case_id": "smoke-001",
+      "turn": 1,
+      "mutation": "replace_first_derived_rate_with_numerator",
+      "expected_accept": false,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "smoke-001",
+        "question": "Compare the number of children fully immunised across the requested groups and times.",
+        "steps": [],
+        "insights": [
+          {
+            "kind": "highest",
+            "metric": "children_fully_immunised",
+            "label_column": "district",
+            "unit": "number"
+          },
+          {
+            "kind": "lowest",
+            "metric": "children_fully_immunised",
+            "label_column": "district",
+            "unit": "number"
+          }
+        ],
+        "view": {
+          "title": "Children Fully Immunised by Group and Time",
+          "chart": "grouped_bar",
+          "x": "year",
+          "y": [
+            "children_fully_immunised"
+          ],
+          "series": "district",
+          "unit": "number",
+          "note": "Select a year to compare coverage across districts. The source of the data is shown below."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The data is synthetic and may not reflect real-world patterns."
+        }
+      },
+      "review": {
+        "accepted": false,
+        "candidate_audit": "The candidate plan fails to implement critical requirements from the conversation. The plan lacks a filter step for year selection, which is explicitly requested. The grouped_bar chart shows all years instead of allowing user selection. The insights about highest/lowest values are not requested in the conversation. The source column is mentioned in the note but no explicit step ensures its display. The plan also omits the required year filter parameter that would enable the 'select year' functionality.",
+        "conversation_intent": "The participant requested a website showing district immunisation by year with year selection and district comparison, including source display. The plan must allow filtering by year, compare districts across selected years, and show source information. No explicit request for top/bottom districts or rates was made.",
+        "feedback": "Add a filter step for year selection and remove the highest/lowest insights. Ensure the source column is included in the output. The grouped_bar chart is acceptable but must be filtered by year."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242806-tjHgrVzJVZv2IIk8fJ3q",
+        "duration_seconds": 9.594,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 974,
+          "completion_tokens": 661,
+          "total_tokens": 1635,
+          "cost": 0.000414713,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000414713,
+            "upstream_inference_prompt_cost": 0.000113958,
+            "upstream_inference_completions_cost": 0.000300755
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 454,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"one csv is there. make a simple website showing district immunisation by year. i should select year and compare districts. show the source also\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\nnull\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"smoke-001\", \"question\": \"Compare the number of children fully immunised across the requested groups and times.\", \"steps\": [], \"insights\": [{\"kind\": \"highest\", \"metric\": \"children_fully_immunised\", \"label_column\": \"district\", \"unit\": \"number\"}, {\"kind\": \"lowest\", \"metric\": \"children_fully_immunised\", \"label_column\": \"district\", \"unit\": \"number\"}], \"view\": {\"title\": \"Children Fully Immunised by Group and Time\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"children_fully_immunised\"], \"series\": \"district\", \"unit\": \"number\", \"note\": \"Select a year to compare coverage across districts. The source of the data is shown below.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data is synthetic and may not reflect real-world patterns.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}"
+      },
+      "passed": true
+    }
+  ]
+}

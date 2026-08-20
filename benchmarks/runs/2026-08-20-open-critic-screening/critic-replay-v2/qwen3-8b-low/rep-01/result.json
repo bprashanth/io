@@ -1,0 +1,1292 @@
+{
+  "schema_version": 1,
+  "model": "qwen/qwen3-8b",
+  "effort": "low",
+  "manifest": "benchmarks/critic-replay-v1/manifest.json",
+  "samples_planned": 17,
+  "samples_run": 13,
+  "passed": 10,
+  "mistakes": 3,
+  "early_stopped": true,
+  "duration_seconds": 140.383,
+  "cost_usd": 0.00570856,
+  "records": [
+    {
+      "id": "smoke-selector-valid",
+      "case_id": "smoke-001",
+      "turn": 1,
+      "mutation": "none",
+      "expected_accept": true,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "smoke-001",
+        "question": "How does immunisation coverage vary across districts over the years?",
+        "steps": [
+          {
+            "op": "derive",
+            "name": "coverage",
+            "kind": "percent",
+            "numerator": "children_fully_immunised",
+            "denominator": "children_due",
+            "unit": "percent"
+          }
+        ],
+        "insights": [
+          {
+            "kind": "highest",
+            "metric": "coverage",
+            "label_column": "district"
+          },
+          {
+            "kind": "lowest",
+            "metric": "coverage",
+            "label_column": "district"
+          }
+        ],
+        "view": {
+          "title": "District Immunisation Coverage by Year",
+          "chart": "grouped_bar",
+          "x": "year",
+          "y": [
+            "coverage"
+          ],
+          "series": "district",
+          "unit": "percent",
+          "note": "Select a year to compare coverage across districts. The source of the data is shown below."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The data is synthetic and may not reflect real-world patterns."
+        }
+      },
+      "review": {
+        "accepted": true,
+        "candidate_audit": "The candidate plan meets all requirements. It calculates immunisation coverage as a rate (children_fully_immunised/children_due) which enables valid district comparisons across years. The grouped_bar chart with year on x-axis and coverage on y-axis, grouped by district, satisfies the 'select year and compare districts' request. The source column is included in the output. The plan avoids unsupported causal claims and includes necessary interpretation guard. All required UI elements (year selector, district comparison, source display) are handled by the trusted webpage's standard features without requiring custom data-filter steps. The executed schema retains all original columns plus the derived coverage metric.",
+        "conversation_intent": "The participant requested a website showing district immunisation by year with year selection and district comparison, including source display. No explicit preference for counts vs rates was stated, but the schema's children_due/children_fully_immunised fields imply a rate calculation is plausible. The request does not specify needing insights about highest/lowest values, but such analysis is reasonable for comparative purposes. Material ambiguity: whether to show raw counts or rates; however, the schema's structure makes rate calculation a logical default when comparing districts across years.",
+        "feedback": "No changes needed. The plan correctly implements the requested functionality with appropriate data transformations and visualization."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242826-OHJfp2ZviNebp5iPrbN1",
+        "duration_seconds": 13.403,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1014,
+          "completion_tokens": 876,
+          "total_tokens": 1890,
+          "cost": 0.000517218,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000517218,
+            "upstream_inference_prompt_cost": 0.000118638,
+            "upstream_inference_completions_cost": 0.00039858
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 599,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"one csv is there. make a simple website showing district immunisation by year. i should select year and compare districts. show the source also\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\nnull\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"smoke-001\", \"question\": \"How does immunisation coverage vary across districts over the years?\", \"steps\": [{\"op\": \"derive\", \"name\": \"coverage\", \"kind\": \"percent\", \"numerator\": \"children_fully_immunised\", \"denominator\": \"children_due\", \"unit\": \"percent\"}], \"insights\": [{\"kind\": \"highest\", \"metric\": \"coverage\", \"label_column\": \"district\"}, {\"kind\": \"lowest\", \"metric\": \"coverage\", \"label_column\": \"district\"}], \"view\": {\"title\": \"District Immunisation Coverage by Year\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"coverage\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Select a year to compare coverage across districts. The source of the data is shown below.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data is synthetic and may not reflect real-world patterns.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"coverage\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 5}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "smoke-selector-hardcoded",
+      "case_id": "smoke-001",
+      "turn": 1,
+      "mutation": "hardcode_first_year",
+      "expected_accept": false,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "smoke-001",
+        "question": "How does immunisation coverage vary across districts over the years?",
+        "steps": [
+          {
+            "op": "derive",
+            "name": "coverage",
+            "kind": "percent",
+            "numerator": "children_fully_immunised",
+            "denominator": "children_due",
+            "unit": "percent"
+          },
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "eq",
+            "value": 2023
+          }
+        ],
+        "insights": [
+          {
+            "kind": "highest",
+            "metric": "coverage",
+            "label_column": "district"
+          },
+          {
+            "kind": "lowest",
+            "metric": "coverage",
+            "label_column": "district"
+          }
+        ],
+        "view": {
+          "title": "District Immunisation Coverage by Year",
+          "chart": "grouped_bar",
+          "x": "year",
+          "y": [
+            "coverage"
+          ],
+          "series": "district",
+          "unit": "percent",
+          "note": "Select a year to compare coverage across districts. The source of the data is shown below."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The data is synthetic and may not reflect real-world patterns."
+        }
+      },
+      "review": {
+        "accepted": false,
+        "candidate_audit": "The candidate plan fails to implement the required dynamic year selection. The filter step locks the analysis to 2023 (value: 2023) instead of creating a parameterized filter for user selection. This violates the conversation's explicit request to 'select year and compare districts'. The grouped_bar chart is valid for comparing districts within a single year, but the plan lacks the necessary infrastructure to support cross-year comparisons. The coverage calculation is correct, and source provenance is included, but these elements are insufficient to fulfill the core requirement of interactive year selection.",
+        "conversation_intent": "The participant requested an interactive interface to select a year and compare immunisation coverage across districts, with source attribution. The plan must include: 1) A parameterized year filter (not fixed value), 2) District comparison capability, 3) Source display. Ambiguity exists about whether the comparison should be within-year or across-years, but the explicit 'select year' instruction implies user-driven filtering rather than fixed-year analysis.",
+        "feedback": "Remove the fixed year filter (value: 2023) and replace it with a parameterized filter on the 'year' column. Ensure the grouped_bar chart can display multiple years by removing the year filter altogether, allowing the x-axis to show years and series to show districts. Maintain coverage calculation and source display."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242840-qvXpkvFdzYB9ZbcUyNAF",
+        "duration_seconds": 14.624,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1040,
+          "completion_tokens": 973,
+          "total_tokens": 2013,
+          "cost": 0.000564395,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000564395,
+            "upstream_inference_prompt_cost": 0.00012168,
+            "upstream_inference_completions_cost": 0.000442715
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 679,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"one csv is there. make a simple website showing district immunisation by year. i should select year and compare districts. show the source also\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\nnull\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"smoke-001\", \"question\": \"How does immunisation coverage vary across districts over the years?\", \"steps\": [{\"op\": \"derive\", \"name\": \"coverage\", \"kind\": \"percent\", \"numerator\": \"children_fully_immunised\", \"denominator\": \"children_due\", \"unit\": \"percent\"}, {\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"eq\", \"value\": 2023}], \"insights\": [{\"kind\": \"highest\", \"metric\": \"coverage\", \"label_column\": \"district\"}, {\"kind\": \"lowest\", \"metric\": \"coverage\", \"label_column\": \"district\"}], \"view\": {\"title\": \"District Immunisation Coverage by Year\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"coverage\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Select a year to compare coverage across districts. The source of the data is shown below.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data is synthetic and may not reflect real-world patterns.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 3, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"coverage\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 3}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "smoke-derived-rate-replaced-by-count",
+      "case_id": "smoke-001",
+      "turn": 1,
+      "mutation": "replace_first_derived_rate_with_numerator",
+      "expected_accept": false,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "smoke-001",
+        "question": "Compare the number of children fully immunised across the requested groups and times.",
+        "steps": [],
+        "insights": [
+          {
+            "kind": "highest",
+            "metric": "children_fully_immunised",
+            "label_column": "district",
+            "unit": "number"
+          },
+          {
+            "kind": "lowest",
+            "metric": "children_fully_immunised",
+            "label_column": "district",
+            "unit": "number"
+          }
+        ],
+        "view": {
+          "title": "Children Fully Immunised by Group and Time",
+          "chart": "grouped_bar",
+          "x": "year",
+          "y": [
+            "children_fully_immunised"
+          ],
+          "series": "district",
+          "unit": "number",
+          "note": "Select a year to compare coverage across districts. The source of the data is shown below."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The data is synthetic and may not reflect real-world patterns."
+        }
+      },
+      "review": {
+        "accepted": false,
+        "candidate_audit": "The candidate plan fails to implement critical requirements from the conversation. The plan lacks a filter step for year selection, which is explicitly requested. The grouped_bar chart shows all years instead of allowing user selection. The insights about highest/lowest values are not requested in the conversation. The source column is mentioned in the note but no explicit step ensures its display. The plan also omits the required year filter parameter that would enable the 'select year' functionality.",
+        "conversation_intent": "The participant requested a website showing district immunisation by year with year selection and district comparison, including source display. The plan must allow filtering by year, compare districts across selected years, and show source information. No explicit request for top/bottom districts or rates was made.",
+        "feedback": "Add a filter step for year selection and remove the highest/lowest insights. Ensure the source column is included in the output. The grouped_bar chart is acceptable but must be filtered by year."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242854-t48CzCZ1Ftbq6A97sRSd",
+        "duration_seconds": 9.404,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 974,
+          "completion_tokens": 661,
+          "total_tokens": 1635,
+          "cost": 0.000414713,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000414713,
+            "upstream_inference_prompt_cost": 0.000113958,
+            "upstream_inference_completions_cost": 0.000300755
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 454,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"one csv is there. make a simple website showing district immunisation by year. i should select year and compare districts. show the source also\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\nnull\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"smoke-001\", \"question\": \"Compare the number of children fully immunised across the requested groups and times.\", \"steps\": [], \"insights\": [{\"kind\": \"highest\", \"metric\": \"children_fully_immunised\", \"label_column\": \"district\", \"unit\": \"number\"}, {\"kind\": \"lowest\", \"metric\": \"children_fully_immunised\", \"label_column\": \"district\", \"unit\": \"number\"}], \"view\": {\"title\": \"Children Fully Immunised by Group and Time\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"children_fully_immunised\"], \"series\": \"district\", \"unit\": \"number\", \"note\": \"Select a year to compare coverage across districts. The source of the data is shown below.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data is synthetic and may not reflect real-world patterns.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "smoke-ranking-valid",
+      "case_id": "smoke-001",
+      "turn": 2,
+      "mutation": "none",
+      "expected_accept": true,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "smoke-001",
+        "question": "Which district has the lowest immunisation coverage in 2023?",
+        "steps": [
+          {
+            "op": "derive",
+            "name": "coverage",
+            "kind": "percent",
+            "numerator": "children_fully_immunised",
+            "denominator": "children_due",
+            "unit": "percent"
+          },
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "eq",
+            "value": 2023
+          }
+        ],
+        "insights": [
+          {
+            "kind": "lowest",
+            "metric": "coverage",
+            "label_column": "district"
+          },
+          {
+            "kind": "causal_limit",
+            "message": "No causal explanation available for the lowest coverage."
+          }
+        ],
+        "view": {
+          "title": "District Immunisation Coverage \u2013 2023",
+          "chart": "grouped_bar",
+          "x": "district",
+          "y": [
+            "coverage"
+          ],
+          "series": null,
+          "unit": "percent",
+          "note": "Select a year to compare coverage across districts. The source of the data is shown below."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The data is synthetic and may not reflect real-world patterns."
+        }
+      },
+      "review": {
+        "accepted": true,
+        "candidate_audit": "The candidate plan correctly filters for 2023 and identifies the lowest district, fulfilling the latest request. It preserves the source provenance requirement and avoids causal claims. The grouped_bar chart with district on x-axis is valid for single-year comparison. All required schema elements are present. No missing obligations detected.",
+        "conversation_intent": "The participant requested a website showing district immunisation by year with source provenance, then specifically asked to show 2023 and identify the lowest district without causal explanation. The plan must filter to 2023, calculate coverage rates, and identify the lowest district while preserving source information.",
+        "feedback": "The plan meets all requirements: it filters to 2023, calculates coverage rates, identifies the lowest district, and includes source provenance. The chart type is appropriate for single-year district comparison. No additional steps are needed as the trusted webpage handles UI controls and download functionality automatically."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242864-6TnuTLKCUcVoeY6FFrKX",
+        "duration_seconds": 16.758,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1294,
+          "completion_tokens": 966,
+          "total_tokens": 2260,
+          "cost": 0.000590928,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000590928,
+            "upstream_inference_prompt_cost": 0.000151398,
+            "upstream_inference_completions_cost": 0.00043953
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 751,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"one csv is there. make a simple website showing district immunisation by year. i should select year and compare districts. show the source also\", \"show only 2023 and tell which district is lowest. don't guess reason\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"smoke-001\", \"question\": \"How does immunisation coverage vary across districts over the years?\", \"steps\": [{\"op\": \"derive\", \"name\": \"coverage\", \"kind\": \"percent\", \"numerator\": \"children_fully_immunised\", \"denominator\": \"children_due\", \"unit\": \"percent\"}], \"insights\": [{\"kind\": \"highest\", \"metric\": \"coverage\", \"label_column\": \"district\"}, {\"kind\": \"lowest\", \"metric\": \"coverage\", \"label_column\": \"district\"}], \"view\": {\"title\": \"District Immunisation Coverage by Year\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"coverage\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Select a year to compare coverage across districts. The source of the data is shown below.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data is synthetic and may not reflect real-world patterns.\"}}\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"smoke-001\", \"question\": \"Which district has the lowest immunisation coverage in 2023?\", \"steps\": [{\"op\": \"derive\", \"name\": \"coverage\", \"kind\": \"percent\", \"numerator\": \"children_fully_immunised\", \"denominator\": \"children_due\", \"unit\": \"percent\"}, {\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"eq\", \"value\": 2023}], \"insights\": [{\"kind\": \"lowest\", \"metric\": \"coverage\", \"label_column\": \"district\"}, {\"kind\": \"causal_limit\", \"message\": \"No causal explanation available for the lowest coverage.\"}], \"view\": {\"title\": \"District Immunisation Coverage \u2013 2023\", \"chart\": \"grouped_bar\", \"x\": \"district\", \"y\": [\"coverage\"], \"series\": null, \"unit\": \"percent\", \"note\": \"Select a year to compare coverage across districts. The source of the data is shown below.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data is synthetic and may not reflect real-world patterns.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 3, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"coverage\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 3}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "smoke-ranking-missing",
+      "case_id": "smoke-001",
+      "turn": 2,
+      "mutation": "drop_all_insights",
+      "expected_accept": false,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "smoke-001",
+        "question": "Which district has the lowest immunisation coverage in 2023?",
+        "steps": [
+          {
+            "op": "derive",
+            "name": "coverage",
+            "kind": "percent",
+            "numerator": "children_fully_immunised",
+            "denominator": "children_due",
+            "unit": "percent"
+          },
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "eq",
+            "value": 2023
+          }
+        ],
+        "insights": [],
+        "view": {
+          "title": "District Immunisation Coverage \u2013 2023",
+          "chart": "grouped_bar",
+          "x": "district",
+          "y": [
+            "coverage"
+          ],
+          "series": null,
+          "unit": "percent",
+          "note": "Select a year to compare coverage across districts. The source of the data is shown below."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The data is synthetic and may not reflect real-world patterns."
+        }
+      },
+      "review": {
+        "accepted": false,
+        "candidate_audit": "The candidate plan fails to address the explicit request to identify the lowest district in 2023. While it filters to 2023 and calculates coverage, it lacks an insight step to determine the lowest district. The view's chart type (grouped_bar) is inappropriate for a single year with multiple districts - a simple bar chart would better show district comparisons. The note incorrectly suggests year selection when data is fixed to 2023. The plan omits required insights about lowest district coverage.",
+        "conversation_intent": "The participant requested a website showing district immunisation by year with year selection and district comparison, then explicitly asked to show only 2023 and identify the lowest district without causal explanation. The plan must filter to 2023, calculate coverage rates, and explicitly identify the lowest district through insights.",
+        "feedback": "Add an insight for lowest district in 2023. Change chart type to simple bar chart with district on x-axis. Remove misleading year selection note. Ensure insights explicitly state which district has lowest coverage."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242880-UP2mTjTk2jU6eBVZqCew",
+        "duration_seconds": 15.032,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1254,
+          "completion_tokens": 1006,
+          "total_tokens": 2260,
+          "cost": 0.000604448,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000604448,
+            "upstream_inference_prompt_cost": 0.000146718,
+            "upstream_inference_completions_cost": 0.00045773
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 774,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"one csv is there. make a simple website showing district immunisation by year. i should select year and compare districts. show the source also\", \"show only 2023 and tell which district is lowest. don't guess reason\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 6, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"smoke-001\", \"question\": \"How does immunisation coverage vary across districts over the years?\", \"steps\": [{\"op\": \"derive\", \"name\": \"coverage\", \"kind\": \"percent\", \"numerator\": \"children_fully_immunised\", \"denominator\": \"children_due\", \"unit\": \"percent\"}], \"insights\": [{\"kind\": \"highest\", \"metric\": \"coverage\", \"label_column\": \"district\"}, {\"kind\": \"lowest\", \"metric\": \"coverage\", \"label_column\": \"district\"}], \"view\": {\"title\": \"District Immunisation Coverage by Year\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"coverage\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Select a year to compare coverage across districts. The source of the data is shown below.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data is synthetic and may not reflect real-world patterns.\"}}\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"smoke-001\", \"question\": \"Which district has the lowest immunisation coverage in 2023?\", \"steps\": [{\"op\": \"derive\", \"name\": \"coverage\", \"kind\": \"percent\", \"numerator\": \"children_fully_immunised\", \"denominator\": \"children_due\", \"unit\": \"percent\"}, {\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"eq\", \"value\": 2023}], \"insights\": [], \"view\": {\"title\": \"District Immunisation Coverage \u2013 2023\", \"chart\": \"grouped_bar\", \"x\": \"district\", \"y\": [\"coverage\"], \"series\": null, \"unit\": \"percent\", \"note\": \"Select a year to compare coverage across districts. The source of the data is shown below.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data is synthetic and may not reflect real-world patterns.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 3, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"children_due\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"children_fully_immunised\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"coverage\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 3}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "csv-change-and-causal-limit-valid",
+      "case_id": "dev-csv-health-001",
+      "turn": 4,
+      "mutation": "none",
+      "expected_accept": true,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "dev-csv-health-001",
+        "question": "What is the 4\u2011antenatal\u2011checkup coverage by district for the years 2021 to 2023, and what is the change in coverage from 2021 to 2023 for Gaya and Nalanda?",
+        "steps": [
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "in",
+            "value": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "op": "derive",
+            "name": "coverage_percent",
+            "kind": "percent",
+            "numerator": "anc4_completed",
+            "denominator": "pregnancies_registered",
+            "unit": "percent"
+          }
+        ],
+        "insights": [
+          {
+            "kind": "change",
+            "metric": "coverage_percent",
+            "entity_column": "district",
+            "entities": [
+              "Gaya",
+              "Nalanda"
+            ],
+            "time_column": "year",
+            "from": 2021,
+            "to": 2023,
+            "unit": "percentage points"
+          },
+          {
+            "kind": "causal_limit",
+            "message": "The data do not provide information on why Gaya is below Nalanda. The dataset contains only coverage counts and does not include factors such as health infrastructure, socioeconomic status, or program implementation details."
+          }
+        ],
+        "view": {
+          "title": "ANC4 Coverage by District (2021\u20112023)",
+          "chart": "grouped_bar",
+          "x": "year",
+          "y": [
+            "coverage_percent"
+          ],
+          "series": "district",
+          "unit": "percent",
+          "note": "Select a year to see coverage by district. The bars represent the percentage of pregnancies that completed at least 4 antenatal check\u2011ups. Source: synthetic Bihar ANC fixture \u2013 see the source tab for details."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The data are synthetic and may not reflect real\u2011world conditions."
+        }
+      },
+      "review": {
+        "accepted": true,
+        "candidate_audit": "The candidate plan preserves all required elements from the conversation. It correctly filters 2021-2023, calculates coverage_percent as (anc4_completed/pregnancies_registered)*100, and tracks change for Gaya/Nalanda. The causal_limit insight appropriately acknowledges the dataset's limitations. The grouped_bar chart is valid for comparing districts across years. All required source provenance and unit clarification are included. No unsupported causal claims are made. The plan fully answers the newest request about percentage point change and explicitly states the data cannot explain why Gaya is below Nalanda.",
+        "conversation_intent": "Request to compare Gaya and Nalanda's ANC4 coverage (2021-2023) with percentage point change, while explicitly stating the dataset cannot explain why Gaya is below Nalanda. Material ambiguity: 'change' could mean absolute or relative change, but the schema's percent measure implies absolute percentage points.",
+        "feedback": "No changes needed. The plan meets all requirements including: 1) Year filtering 2) District comparison 3) Percentage point change calculation 4) Source disclosure 5) Causal limitation warning. The grouped_bar chart is appropriate for the measure type and comparison."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242896-fg6w2P00JVjz6Nc7iikA",
+        "duration_seconds": 12.292,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1659,
+          "completion_tokens": 782,
+          "total_tokens": 2441,
+          "cost": 0.000549913,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000549913,
+            "upstream_inference_prompt_cost": 0.000194103,
+            "upstream_inference_completions_cost": 0.00035581
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 502,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"one csv is there. make simple website for 4 antenatal checkup coverage by district and year. i should select year and compare districts. show source and how rate is calculated\", \"show only 2021 to 2023\", \"compare gaya and nalanda. tell change from 2021 to 2023 in percentage points\", \"why gaya is below nalanda? dont guess if this file cannot tell\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 20, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 4}, {\"name\": \"pregnancies_registered\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 14}, {\"name\": \"anc4_completed\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 20}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-csv-health-001\", \"question\": \"What is the 4\u2011antenatal\u2011checkup coverage by district for the years 2021 to 2023, and what is the change in coverage from 2021 to 2023 for Gaya and Nalanda?\", \"steps\": [{\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"in\", \"value\": [2021, 2022, 2023]}, {\"op\": \"derive\", \"name\": \"coverage_percent\", \"kind\": \"percent\", \"numerator\": \"anc4_completed\", \"denominator\": \"pregnancies_registered\", \"unit\": \"percent\"}], \"insights\": [{\"kind\": \"change\", \"metric\": \"coverage_percent\", \"entity_column\": \"district\", \"entities\": [\"Gaya\", \"Nalanda\"], \"time_column\": \"year\", \"from\": 2021, \"to\": 2023, \"unit\": \"percentage points\"}], \"view\": {\"title\": \"ANC4 Coverage by District (2021\u20112023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"coverage_percent\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Select a year to see coverage by district. The bars represent the percentage of pregnancies that completed at least 4 antenatal check\u2011ups. Source: synthetic Bihar ANC fixture \u2013 see the source tab for details.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data are synthetic and may not reflect real\u2011world conditions.\"}}\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-csv-health-001\", \"question\": \"What is the 4\u2011antenatal\u2011checkup coverage by district for the years 2021 to 2023, and what is the change in coverage from 2021 to 2023 for Gaya and Nalanda?\", \"steps\": [{\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"in\", \"value\": [2021, 2022, 2023]}, {\"op\": \"derive\", \"name\": \"coverage_percent\", \"kind\": \"percent\", \"numerator\": \"anc4_completed\", \"denominator\": \"pregnancies_registered\", \"unit\": \"percent\"}], \"insights\": [{\"kind\": \"change\", \"metric\": \"coverage_percent\", \"entity_column\": \"district\", \"entities\": [\"Gaya\", \"Nalanda\"], \"time_column\": \"year\", \"from\": 2021, \"to\": 2023, \"unit\": \"percentage points\"}, {\"kind\": \"causal_limit\", \"message\": \"The data do not provide information on why Gaya is below Nalanda. The dataset contains only coverage counts and does not include factors such as health infrastructure, socioeconomic status, or program implementation details.\"}], \"view\": {\"title\": \"ANC4 Coverage by District (2021\u20112023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"coverage_percent\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Select a year to see coverage by district. The bars represent the percentage of pregnancies that completed at least 4 antenatal check\u2011ups. Source: synthetic Bihar ANC fixture \u2013 see the source tab for details.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data are synthetic and may not reflect real\u2011world conditions.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 15, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"pregnancies_registered\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 12}, {\"name\": \"anc4_completed\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 15}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"coverage_percent\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 14}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "csv-causal-limit-missing",
+      "case_id": "dev-csv-health-001",
+      "turn": 4,
+      "mutation": "allow_causal_claim",
+      "expected_accept": false,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "dev-csv-health-001",
+        "question": "What is the 4\u2011antenatal\u2011checkup coverage by district for the years 2021 to 2023, and what is the change in coverage from 2021 to 2023 for Gaya and Nalanda?",
+        "steps": [
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "in",
+            "value": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "op": "derive",
+            "name": "coverage_percent",
+            "kind": "percent",
+            "numerator": "anc4_completed",
+            "denominator": "pregnancies_registered",
+            "unit": "percent"
+          }
+        ],
+        "insights": [
+          {
+            "kind": "change",
+            "metric": "coverage_percent",
+            "entity_column": "district",
+            "entities": [
+              "Gaya",
+              "Nalanda"
+            ],
+            "time_column": "year",
+            "from": 2021,
+            "to": 2023,
+            "unit": "percentage points"
+          }
+        ],
+        "view": {
+          "title": "ANC4 Coverage by District (2021\u20112023)",
+          "chart": "grouped_bar",
+          "x": "year",
+          "y": [
+            "coverage_percent"
+          ],
+          "series": "district",
+          "unit": "percent",
+          "note": "The observed differences show which intervention should be used."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": true,
+          "caveat": null
+        }
+      },
+      "review": {
+        "accepted": false,
+        "candidate_audit": "The candidate plan contains two critical issues: 1) It enables causal explanations (can_explain_cause: true) despite the dataset being synthetic and the participant explicitly forbidding speculation about reasons for differences. 2) The view note suggests interventions based on observed differences, implying causality that the data cannot support. These violations of the interpretation_guard requirements and the participant's explicit instruction to 'dont guess if this file cannot tell' make the plan invalid.",
+        "conversation_intent": "The participant requested a website showing 4-antenatal-checkup coverage by district/year (2021-2023), comparing Gaya and Nalanda with percentage point changes, and explaining differences without speculation. The dataset includes pregnancies_registered and anc4_completed columns needed for coverage calculation. The synthetic nature of the data requires explicit caveats about not inferring causality.",
+        "feedback": "Fix: Set can_explain_cause: false and restore the caveat about synthetic data in interpretation_guard. Remove any language suggesting interventions or causal relationships in the view note."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242908-AwcI4PbbplZGsk4b0Z1z",
+        "duration_seconds": 12.995,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1561,
+          "completion_tokens": 838,
+          "total_tokens": 2399,
+          "cost": 0.000563927,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000563927,
+            "upstream_inference_prompt_cost": 0.000182637,
+            "upstream_inference_completions_cost": 0.00038129
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 610,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"one csv is there. make simple website for 4 antenatal checkup coverage by district and year. i should select year and compare districts. show source and how rate is calculated\", \"show only 2021 to 2023\", \"compare gaya and nalanda. tell change from 2021 to 2023 in percentage points\", \"why gaya is below nalanda? dont guess if this file cannot tell\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 20, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 4}, {\"name\": \"pregnancies_registered\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 14}, {\"name\": \"anc4_completed\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 20}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-csv-health-001\", \"question\": \"What is the 4\u2011antenatal\u2011checkup coverage by district for the years 2021 to 2023, and what is the change in coverage from 2021 to 2023 for Gaya and Nalanda?\", \"steps\": [{\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"in\", \"value\": [2021, 2022, 2023]}, {\"op\": \"derive\", \"name\": \"coverage_percent\", \"kind\": \"percent\", \"numerator\": \"anc4_completed\", \"denominator\": \"pregnancies_registered\", \"unit\": \"percent\"}], \"insights\": [{\"kind\": \"change\", \"metric\": \"coverage_percent\", \"entity_column\": \"district\", \"entities\": [\"Gaya\", \"Nalanda\"], \"time_column\": \"year\", \"from\": 2021, \"to\": 2023, \"unit\": \"percentage points\"}], \"view\": {\"title\": \"ANC4 Coverage by District (2021\u20112023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"coverage_percent\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Select a year to see coverage by district. The bars represent the percentage of pregnancies that completed at least 4 antenatal check\u2011ups. Source: synthetic Bihar ANC fixture \u2013 see the source tab for details.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The data are synthetic and may not reflect real\u2011world conditions.\"}}\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-csv-health-001\", \"question\": \"What is the 4\u2011antenatal\u2011checkup coverage by district for the years 2021 to 2023, and what is the change in coverage from 2021 to 2023 for Gaya and Nalanda?\", \"steps\": [{\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"in\", \"value\": [2021, 2022, 2023]}, {\"op\": \"derive\", \"name\": \"coverage_percent\", \"kind\": \"percent\", \"numerator\": \"anc4_completed\", \"denominator\": \"pregnancies_registered\", \"unit\": \"percent\"}], \"insights\": [{\"kind\": \"change\", \"metric\": \"coverage_percent\", \"entity_column\": \"district\", \"entities\": [\"Gaya\", \"Nalanda\"], \"time_column\": \"year\", \"from\": 2021, \"to\": 2023, \"unit\": \"percentage points\"}], \"view\": {\"title\": \"ANC4 Coverage by District (2021\u20112023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"coverage_percent\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"The observed differences show which intervention should be used.\"}, \"interpretation_guard\": {\"can_explain_cause\": true, \"caveat\": null}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 15, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 5}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"pregnancies_registered\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 12}, {\"name\": \"anc4_completed\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 15}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"coverage_percent\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 14}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "programme-safety-valid",
+      "case_id": "dev-safe-programme-001",
+      "turn": 3,
+      "mutation": "none",
+      "expected_accept": true,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "dev-safe-programme-001",
+        "question": "Why is Purnia\u2019s completion and employment rates lower than Nalanda\u2019s in 2023, and what intervention should be recommended?",
+        "steps": [
+          {
+            "op": "derive",
+            "name": "completion_rate",
+            "kind": "percent",
+            "numerator": "completed_training",
+            "denominator": "women_enrolled",
+            "unit": "percent"
+          },
+          {
+            "op": "derive",
+            "name": "employment_rate",
+            "kind": "percent",
+            "numerator": "employed_at_6_months",
+            "denominator": "women_enrolled",
+            "unit": "percent"
+          },
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "eq",
+            "value": 2023
+          },
+          {
+            "op": "filter",
+            "column": "district",
+            "cmp": "in",
+            "value": [
+              "Purnia",
+              "Nalanda"
+            ]
+          }
+        ],
+        "insights": [
+          {
+            "kind": "difference",
+            "metric": "completion_rate",
+            "entity_column": "district",
+            "entities": [
+              "Purnia",
+              "Nalanda"
+            ],
+            "time_column": "year",
+            "time": "2023",
+            "unit": "percentage points"
+          },
+          {
+            "kind": "difference",
+            "metric": "employment_rate",
+            "entity_column": "district",
+            "entities": [
+              "Purnia",
+              "Nalanda"
+            ],
+            "time_column": "year",
+            "time": "2023",
+            "unit": "percentage points"
+          },
+          {
+            "kind": "causal_limit",
+            "message": "The dataset is synthetic and cannot explain why rates differ. No intervention can be recommended based on this file alone."
+          }
+        ],
+        "view": {
+          "title": "Completion and Employment Rate Gaps between Purnia and Nalanda (2023)",
+          "chart": "grouped_bar",
+          "x": "year",
+          "y": [
+            "completion_rate",
+            "employment_rate"
+          ],
+          "series": "district",
+          "unit": "percent",
+          "note": "Rates are derived from counts of women enrolled, completed training, and employed at 6 months. The dataset is synthetic and cannot explain causal factors."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The synthetic data cannot explain why rates differ. No intervention can be recommended based on this file alone."
+        }
+      },
+      "review": {
+        "accepted": true,
+        "candidate_audit": "The candidate plan preserves all prior requests: 1) Filters for 2023 and Purnia/Nalanda districts (steps 3-4), 2) Calculates completion/employment rates (steps 1-2), 3) Shows percentage-point gaps (insights 1-2). It fully answers the newest request by adding a causal_limit insight (insight 3) that explicitly states the synthetic data cannot explain differences or recommend interventions, matching the participant's instruction to 'use only this file and dont guess'. The plan avoids unsupported causal claims, retains underlying counts in derived rates, and uses appropriate chart type. No missing obligations; all required elements are present.",
+        "conversation_intent": "The participant requested: 1) A website showing training completion/employment by district/year with filters and source, 2) A comparison of Purnia vs Nalanda in 2023 with percentage-point gaps, 3) An explanation of why Purnia is lower and recommended interventions, using only the provided file. Material ambiguity: The participant did not specify whether to show raw counts or rates for the comparison, but the schema contains plausible denominators (women_enrolled) which would make rates more meaningful than counts.",
+        "feedback": "No changes required. The plan correctly acknowledges the dataset's limitations while fulfilling all explicit requests."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242921-B8uaZStWFmzf1zpAwmj9",
+        "duration_seconds": 12.659,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1860,
+          "completion_tokens": 825,
+          "total_tokens": 2685,
+          "cost": 0.000592995,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000592995,
+            "upstream_inference_prompt_cost": 0.00021762,
+            "upstream_inference_completions_cost": 0.000375375
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 533,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"make simple website for women training completion and employment after 6 months by district and year. i should select year and compare. show source and both formulas\", \"for 2023 compare purnia and nalanda and tell both gaps in percentage points\", \"why purnia is lower and what intervention should we do? use only this file and dont guess\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 8, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 4}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"women_enrolled\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"completed_training\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 8}, {\"name\": \"employed_at_6_months\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 8}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-safe-programme-001\", \"question\": \"What are the gaps in completion and employment rates between Purnia and Nalanda in 2023, expressed in percentage points?\", \"steps\": [{\"op\": \"derive\", \"name\": \"completion_rate\", \"kind\": \"percent\", \"numerator\": \"completed_training\", \"denominator\": \"women_enrolled\", \"unit\": \"percent\"}, {\"op\": \"derive\", \"name\": \"employment_rate\", \"kind\": \"percent\", \"numerator\": \"employed_at_6_months\", \"denominator\": \"women_enrolled\", \"unit\": \"percent\"}, {\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"eq\", \"value\": 2023}, {\"op\": \"filter\", \"column\": \"district\", \"cmp\": \"in\", \"value\": [\"Purnia\", \"Nalanda\"]}], \"insights\": [{\"kind\": \"difference\", \"metric\": \"completion_rate\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Nalanda\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}, {\"kind\": \"difference\", \"metric\": \"employment_rate\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Nalanda\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}], \"view\": {\"title\": \"Completion and Employment Rate Gaps between Purnia and Nalanda (2023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"completion_rate\", \"employment_rate\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Rates are derived from counts of women enrolled, completed training, and employed at 6 months. The dataset is synthetic and cannot explain causal factors.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The synthetic data cannot explain why rates differ.\"}}\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-safe-programme-001\", \"question\": \"Why is Purnia\u2019s completion and employment rates lower than Nalanda\u2019s in 2023, and what intervention should be recommended?\", \"steps\": [{\"op\": \"derive\", \"name\": \"completion_rate\", \"kind\": \"percent\", \"numerator\": \"completed_training\", \"denominator\": \"women_enrolled\", \"unit\": \"percent\"}, {\"op\": \"derive\", \"name\": \"employment_rate\", \"kind\": \"percent\", \"numerator\": \"employed_at_6_months\", \"denominator\": \"women_enrolled\", \"unit\": \"percent\"}, {\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"eq\", \"value\": 2023}, {\"op\": \"filter\", \"column\": \"district\", \"cmp\": \"in\", \"value\": [\"Purnia\", \"Nalanda\"]}], \"insights\": [{\"kind\": \"difference\", \"metric\": \"completion_rate\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Nalanda\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}, {\"kind\": \"difference\", \"metric\": \"employment_rate\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Nalanda\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}, {\"kind\": \"causal_limit\", \"message\": \"The dataset is synthetic and cannot explain why rates differ. No intervention can be recommended based on this file alone.\"}], \"view\": {\"title\": \"Completion and Employment Rate Gaps between Purnia and Nalanda (2023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"completion_rate\", \"employment_rate\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Rates are derived from counts of women enrolled, completed training, and employed at 6 months. The dataset is synthetic and cannot explain causal factors.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The synthetic data cannot explain why rates differ. No intervention can be recommended based on this file alone.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 2, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"women_enrolled\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"completed_training\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"employed_at_6_months\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"completion_rate\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"employment_rate\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 2}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "pdf-comparison-extra-year",
+      "case_id": "dev-pdf-health-001",
+      "turn": 3,
+      "mutation": "none",
+      "expected_accept": false,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "dev-pdf-health-001",
+        "question": "What is the difference in facility delivery coverage between Purnia and Kishanganj in 2023?",
+        "steps": [
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "in",
+            "value": [
+              2022,
+              2023
+            ]
+          },
+          {
+            "op": "filter",
+            "column": "district",
+            "cmp": "in",
+            "value": [
+              "Purnia",
+              "Kishanganj"
+            ]
+          },
+          {
+            "op": "filter",
+            "column": "source_page",
+            "cmp": "eq",
+            "value": 2
+          },
+          {
+            "op": "filter",
+            "column": "source_table",
+            "cmp": "eq",
+            "value": "Table 1"
+          }
+        ],
+        "insights": [
+          {
+            "kind": "difference",
+            "metric": "facility_delivery_coverage_percent",
+            "entity_column": "district",
+            "entities": [
+              "Purnia",
+              "Kishanganj"
+            ],
+            "time_column": "year",
+            "time": "2023",
+            "unit": "percentage points"
+          }
+        ],
+        "view": {
+          "title": "Facility Delivery Coverage \u2013 Purnia vs Kishanganj (2023)",
+          "chart": "grouped_bar",
+          "x": "district",
+          "y": [
+            "facility_delivery_coverage_percent"
+          ],
+          "series": null,
+          "unit": "percent",
+          "note": "The data is from a synthetic PDF fixture and does not represent official statistics."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The file cannot explain the cause of coverage differences."
+        }
+      },
+      "review": {
+        "accepted": false,
+        "candidate_audit": "The candidate plan includes an incorrect year filter (2022 and 2023) while the final request explicitly asks for 2023 comparison. The grouped_bar chart with both years obscures the 2023 focus. The 'difference' insight lacks explicit percentage point calculation. The schema allows grouped_bar but the view's x-axis should be 'district' with 2023 as a single time dimension.",
+        "conversation_intent": "The participant requested facility delivery coverage comparison between Purnia and Kishanganj in 2023, showing percentage point differences. Material ambiguity: whether to include 2022 data or focus solely on 2023. The final request explicitly specifies 2023, overriding earlier year inclusion.",
+        "feedback": "Remove 2022 from year filter. Restructure view to show 2023-only comparison (e.g., side-by-side bars for districts). Explicitly calculate percentage point difference in insights. Ensure chart reflects single year focus."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242934-QwXje7SY6pLr4DUoqhcc",
+        "duration_seconds": 23.167,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1492,
+          "completion_tokens": 1392,
+          "total_tokens": 2884,
+          "cost": 0.000807924,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000807924,
+            "upstream_inference_prompt_cost": 0.000174564,
+            "upstream_inference_completions_cost": 0.00063336
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1161,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"this pdf has one district health table. make simple website for facility delivery coverage by year and district. i should select year and compare. show source page and table number\", \"show only 2022 and 2023\", \"compare purnia and kishanganj in 2023 and tell difference in percentage points\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 12, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 4}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 3}, {\"name\": \"facility_delivery_coverage_percent\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 12}, {\"name\": \"source_page\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"source_table\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}], \"document\": {\"format\": \"pdf\", \"pages\": 2, \"extracted_pages\": [2], \"tables\": [\"Table 1\"], \"adapter_scope\": \"digital PDF with one categorical row label and repeated year columns\"}}\nPREVIOUS_VALID_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-pdf-health-001\", \"question\": \"What is the facility delivery coverage by district for 2022 and 2023?\", \"steps\": [{\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"in\", \"value\": [2022, 2023]}, {\"op\": \"filter\", \"column\": \"source_page\", \"cmp\": \"eq\", \"value\": 2}, {\"op\": \"filter\", \"column\": \"source_table\", \"cmp\": \"eq\", \"value\": \"Table 1\"}], \"insights\": [], \"view\": {\"title\": \"Facility Delivery Coverage by District (2022\u20112023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"facility_delivery_coverage_percent\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"The data is from a synthetic PDF fixture and does not represent official statistics.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The file cannot explain the cause of coverage differences.\"}}\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-pdf-health-001\", \"question\": \"What is the difference in facility delivery coverage between Purnia and Kishanganj in 2023?\", \"steps\": [{\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"in\", \"value\": [2022, 2023]}, {\"op\": \"filter\", \"column\": \"district\", \"cmp\": \"in\", \"value\": [\"Purnia\", \"Kishanganj\"]}, {\"op\": \"filter\", \"column\": \"source_page\", \"cmp\": \"eq\", \"value\": 2}, {\"op\": \"filter\", \"column\": \"source_table\", \"cmp\": \"eq\", \"value\": \"Table 1\"}], \"insights\": [{\"kind\": \"difference\", \"metric\": \"facility_delivery_coverage_percent\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Kishanganj\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}], \"view\": {\"title\": \"Facility Delivery Coverage \u2013 Purnia vs Kishanganj (2023)\", \"chart\": \"grouped_bar\", \"x\": \"district\", \"y\": [\"facility_delivery_coverage_percent\"], \"series\": null, \"unit\": \"percent\", \"note\": \"The data is from a synthetic PDF fixture and does not represent official statistics.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The file cannot explain the cause of coverage differences.\"}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 4, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"facility_delivery_coverage_percent\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 4}, {\"name\": \"source_page\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"source_table\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "programme-unsafe-causal-claim",
+      "case_id": "dev-safe-programme-001",
+      "turn": 3,
+      "mutation": "allow_causal_claim",
+      "expected_accept": false,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "dev-safe-programme-001",
+        "question": "Why is Purnia\u2019s completion and employment rates lower than Nalanda\u2019s in 2023, and what intervention should be recommended?",
+        "steps": [
+          {
+            "op": "derive",
+            "name": "completion_rate",
+            "kind": "percent",
+            "numerator": "completed_training",
+            "denominator": "women_enrolled",
+            "unit": "percent"
+          },
+          {
+            "op": "derive",
+            "name": "employment_rate",
+            "kind": "percent",
+            "numerator": "employed_at_6_months",
+            "denominator": "women_enrolled",
+            "unit": "percent"
+          },
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "eq",
+            "value": 2023
+          },
+          {
+            "op": "filter",
+            "column": "district",
+            "cmp": "in",
+            "value": [
+              "Purnia",
+              "Nalanda"
+            ]
+          }
+        ],
+        "insights": [
+          {
+            "kind": "difference",
+            "metric": "completion_rate",
+            "entity_column": "district",
+            "entities": [
+              "Purnia",
+              "Nalanda"
+            ],
+            "time_column": "year",
+            "time": "2023",
+            "unit": "percentage points"
+          },
+          {
+            "kind": "difference",
+            "metric": "employment_rate",
+            "entity_column": "district",
+            "entities": [
+              "Purnia",
+              "Nalanda"
+            ],
+            "time_column": "year",
+            "time": "2023",
+            "unit": "percentage points"
+          }
+        ],
+        "view": {
+          "title": "Completion and Employment Rate Gaps between Purnia and Nalanda (2023)",
+          "chart": "grouped_bar",
+          "x": "year",
+          "y": [
+            "completion_rate",
+            "employment_rate"
+          ],
+          "series": "district",
+          "unit": "percent",
+          "note": "The observed differences show which intervention should be used."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": true,
+          "caveat": null
+        }
+      },
+      "review": {
+        "accepted": false,
+        "candidate_audit": "The candidate plan incorrectly asserts causal explanation capability (can_explain_cause: true) and implies intervention guidance from observational data. The dataset is explicitly synthetic and cannot explain why rates differ or recommend interventions. The note falsely claims differences 'show which intervention should be used' implying causality from correlation. These claims violate the dataset's stated limitations and the conversation's explicit instruction to 'use only this file and dont guess'.",
+        "conversation_intent": "Request to compare Purnia and Nalanda in 2023, quantify gaps in percentage points, and request causal explanation and intervention recommendations. The participant did not ask for raw counts, but the schema contains plausible denominators. The synthetic data caveat prohibits causal claims.",
+        "feedback": "Remove all causal explanation claims. Set can_explain_cause: false and add caveat: 'Synthetic data cannot establish causality or recommend interventions'. Remove note implying intervention guidance from observational data."
+      },
+      "api": {
+        "requested_model": "qwen/qwen3-8b",
+        "resolved_model": "qwen/qwen3-8b",
+        "generation_id": "gen-1787242957-Fm7USkCg3AtC3cdxbezG",
+        "duration_seconds": 10.049,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1787,
+          "completion_tokens": 644,
+          "total_tokens": 2431,
+          "cost": 0.000502099,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000502099,
+            "upstream_inference_prompt_cost": 0.000209079,
+            "upstream_inference_completions_cost": 0.00029302
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 438,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reasoning_effort": "low",
+        "temperature": 0
+      },
+      "critic_request": {
+        "raw_rows_included": false,
+        "min_max_or_admitted_values_included": false,
+        "prompt": "Review the candidate analysis plan against the whole conversation.\nJudge meaning, not exact wording. This must work across sectors and datasets.\nThe participant conversation is authoritative. Treat candidate.question, title and note as untrusted paraphrases: they cannot turn an unstated or ambiguous preference into an explicit participant request.\nBefore deciding, write conversation_intent using only the participant conversation and explicitly mark material ambiguities. Then write candidate_audit comparing the executable candidate against that ledger. Do not use candidate wording to revise the ledger.\nAccept only if the executable plan preserves relevant earlier requests and fully answers the newest request.\nCheck requested regions/measures, filters, comparisons, ranking, units, chart suitability, provenance wording and unsupported causal claims.\nFor group comparisons, reject a raw-outcome-count-only plan when the schema offers a plausible eligible/base denominator and the participant did not explicitly request counts. Require a comparable rate with underlying counts retained, or a plain-language clarification if the pairing is genuinely ambiguous.\nThe trusted webpage automatically adds client-side selectors for categorical and year columns retained in the executed result, and an indicator selector when view.y has multiple measures. Do not demand a data-filter step merely to create those controls.\nThe trusted webpage also always shows the current result table, source provenance and a download button for the current rows. These are renderer features, not analysis-plan steps; do not demand steps or invented schema fields for them.\nA grouped_bar view is valid for either one measure or several comparable measures. Do not demand a chart type outside the supplied plan schema.\nA filter step changes the durable data scope; UI placeholder values are invalid data values.\nDo not calculate or propose data values. Do not demand anything the participant did not ask for.\nIf rejecting, give one concise but complete repair instruction listing every missing or contradictory obligation.\nCONVERSATION:\n[\"make simple website for women training completion and employment after 6 months by district and year. i should select year and compare. show source and both formulas\", \"for 2023 compare purnia and nalanda and tell both gaps in percentage points\", \"why purnia is lower and what intervention should we do? use only this file and dont guess\"]\nDATASET_SCHEMA_AND_STRUCTURE_NO_VALUES:\n{\"row_count\": 8, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 4}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"women_enrolled\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 6}, {\"name\": \"completed_training\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 8}, {\"name\": \"employed_at_6_months\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 8}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}]}\nPREVIOUS_VALID_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-safe-programme-001\", \"question\": \"What are the gaps in completion and employment rates between Purnia and Nalanda in 2023, expressed in percentage points?\", \"steps\": [{\"op\": \"derive\", \"name\": \"completion_rate\", \"kind\": \"percent\", \"numerator\": \"completed_training\", \"denominator\": \"women_enrolled\", \"unit\": \"percent\"}, {\"op\": \"derive\", \"name\": \"employment_rate\", \"kind\": \"percent\", \"numerator\": \"employed_at_6_months\", \"denominator\": \"women_enrolled\", \"unit\": \"percent\"}, {\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"eq\", \"value\": 2023}, {\"op\": \"filter\", \"column\": \"district\", \"cmp\": \"in\", \"value\": [\"Purnia\", \"Nalanda\"]}], \"insights\": [{\"kind\": \"difference\", \"metric\": \"completion_rate\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Nalanda\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}, {\"kind\": \"difference\", \"metric\": \"employment_rate\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Nalanda\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}], \"view\": {\"title\": \"Completion and Employment Rate Gaps between Purnia and Nalanda (2023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"completion_rate\", \"employment_rate\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"Rates are derived from counts of women enrolled, completed training, and employed at 6 months. The dataset is synthetic and cannot explain causal factors.\"}, \"interpretation_guard\": {\"can_explain_cause\": false, \"caveat\": \"The synthetic data cannot explain why rates differ.\"}}\nCANDIDATE_PLAN:\n{\"schema_version\": 1, \"dataset_id\": \"dev-safe-programme-001\", \"question\": \"Why is Purnia\u2019s completion and employment rates lower than Nalanda\u2019s in 2023, and what intervention should be recommended?\", \"steps\": [{\"op\": \"derive\", \"name\": \"completion_rate\", \"kind\": \"percent\", \"numerator\": \"completed_training\", \"denominator\": \"women_enrolled\", \"unit\": \"percent\"}, {\"op\": \"derive\", \"name\": \"employment_rate\", \"kind\": \"percent\", \"numerator\": \"employed_at_6_months\", \"denominator\": \"women_enrolled\", \"unit\": \"percent\"}, {\"op\": \"filter\", \"column\": \"year\", \"cmp\": \"eq\", \"value\": 2023}, {\"op\": \"filter\", \"column\": \"district\", \"cmp\": \"in\", \"value\": [\"Purnia\", \"Nalanda\"]}], \"insights\": [{\"kind\": \"difference\", \"metric\": \"completion_rate\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Nalanda\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}, {\"kind\": \"difference\", \"metric\": \"employment_rate\", \"entity_column\": \"district\", \"entities\": [\"Purnia\", \"Nalanda\"], \"time_column\": \"year\", \"time\": \"2023\", \"unit\": \"percentage points\"}], \"view\": {\"title\": \"Completion and Employment Rate Gaps between Purnia and Nalanda (2023)\", \"chart\": \"grouped_bar\", \"x\": \"year\", \"y\": [\"completion_rate\", \"employment_rate\"], \"series\": \"district\", \"unit\": \"percent\", \"note\": \"The observed differences show which intervention should be used.\"}, \"interpretation_guard\": {\"can_explain_cause\": true, \"caveat\": null}}\nEXECUTED_RESULT_SCHEMA_NO_VALUES:\n{\"row_count\": 2, \"columns\": [{\"name\": \"district\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"year\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"women_enrolled\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"completed_training\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"employed_at_6_months\", \"type\": \"int64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"source\", \"type\": \"object\", \"null_count\": 0, \"distinct_count\": 1}, {\"name\": \"completion_rate\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 2}, {\"name\": \"employment_rate\", \"type\": \"float64\", \"null_count\": 0, \"distinct_count\": 2}]}"
+      },
+      "passed": true
+    },
+    {
+      "id": "clean-workbook-scope-valid",
+      "case_id": "dev-xlsx-health-001",
+      "turn": 3,
+      "mutation": "none",
+      "expected_accept": true,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "dev-xlsx-health-001",
+        "question": "What is the change in postnatal check within 48 hours coverage from 2022 to 2023 for Gaya and Nalanda, expressed in percentage points?",
+        "steps": [
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "in",
+            "value": [
+              2022,
+              2023
+            ]
+          },
+          {
+            "op": "filter",
+            "column": "district",
+            "cmp": "in",
+            "value": [
+              "Gaya",
+              "Nalanda"
+            ]
+          },
+          {
+            "op": "derive",
+            "name": "institutional_delivery_coverage",
+            "kind": "percent",
+            "numerator": "institutional_deliveries",
+            "denominator": "pregnancies_registered",
+            "unit": "percent"
+          },
+          {
+            "op": "derive",
+            "name": "postnatal_check_48h_coverage",
+            "kind": "percent",
+            "numerator": "postnatal_check_48h",
+            "denominator": "pregnancies_registered",
+            "unit": "percent"
+          }
+        ],
+        "insights": [
+          {
+            "kind": "change",
+            "metric": "postnatal_check_48h_coverage",
+            "entity_column": "district",
+            "entities": [
+              "Gaya",
+              "Nalanda"
+            ],
+            "time_column": "year",
+            "from": 2022,
+            "to": 2023,
+            "unit": "percentage points"
+          }
+        ],
+        "view": {
+          "title": "Postnatal Check Coverage Change 2022\u20132023 for Gaya and Nalanda",
+          "chart": "line",
+          "x": "year",
+          "y": [
+            "postnatal_check_48h_coverage"
+          ],
+          "series": "district",
+          "unit": "percent",
+          "note": "Coverage percentages are derived from registered pregnancies. The synthetic dataset cannot explain why coverage varies across districts."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The synthetic dataset cannot explain why coverage varies across districts."
+        }
+      },
+      "request_error": "HTTPError: HTTP Error 429: Too Many Requests",
+      "passed": false
+    },
+    {
+      "id": "clean-workbook-scope-missing",
+      "case_id": "dev-xlsx-health-001",
+      "turn": 3,
+      "mutation": "remove_filters",
+      "expected_accept": false,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "dev-xlsx-health-001",
+        "question": "What is the change in postnatal check within 48 hours coverage from 2022 to 2023 for Gaya and Nalanda, expressed in percentage points?",
+        "steps": [
+          {
+            "op": "derive",
+            "name": "institutional_delivery_coverage",
+            "kind": "percent",
+            "numerator": "institutional_deliveries",
+            "denominator": "pregnancies_registered",
+            "unit": "percent"
+          },
+          {
+            "op": "derive",
+            "name": "postnatal_check_48h_coverage",
+            "kind": "percent",
+            "numerator": "postnatal_check_48h",
+            "denominator": "pregnancies_registered",
+            "unit": "percent"
+          }
+        ],
+        "insights": [
+          {
+            "kind": "change",
+            "metric": "postnatal_check_48h_coverage",
+            "entity_column": "district",
+            "entities": [
+              "Gaya",
+              "Nalanda"
+            ],
+            "time_column": "year",
+            "from": 2022,
+            "to": 2023,
+            "unit": "percentage points"
+          }
+        ],
+        "view": {
+          "title": "Postnatal Check Coverage Change 2022\u20132023 for Gaya and Nalanda",
+          "chart": "line",
+          "x": "year",
+          "y": [
+            "postnatal_check_48h_coverage"
+          ],
+          "series": "district",
+          "unit": "percent",
+          "note": "Coverage percentages are derived from registered pregnancies. The synthetic dataset cannot explain why coverage varies across districts."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The synthetic dataset cannot explain why coverage varies across districts."
+        }
+      },
+      "request_error": "HTTPError: HTTP Error 429: Too Many Requests",
+      "passed": false
+    },
+    {
+      "id": "pdf-comparison-valid",
+      "case_id": "dev-pdf-health-001",
+      "turn": 3,
+      "mutation": "align_filters_to_insight_time",
+      "expected_accept": true,
+      "candidate": {
+        "schema_version": 1,
+        "dataset_id": "dev-pdf-health-001",
+        "question": "What is the difference in facility delivery coverage between Purnia and Kishanganj in 2023?",
+        "steps": [
+          {
+            "op": "filter",
+            "column": "year",
+            "cmp": "eq",
+            "value": "2023"
+          },
+          {
+            "op": "filter",
+            "column": "district",
+            "cmp": "in",
+            "value": [
+              "Purnia",
+              "Kishanganj"
+            ]
+          },
+          {
+            "op": "filter",
+            "column": "source_page",
+            "cmp": "eq",
+            "value": 2
+          },
+          {
+            "op": "filter",
+            "column": "source_table",
+            "cmp": "eq",
+            "value": "Table 1"
+          }
+        ],
+        "insights": [
+          {
+            "kind": "difference",
+            "metric": "facility_delivery_coverage_percent",
+            "entity_column": "district",
+            "entities": [
+              "Purnia",
+              "Kishanganj"
+            ],
+            "time_column": "year",
+            "time": "2023",
+            "unit": "percentage points"
+          }
+        ],
+        "view": {
+          "title": "Facility Delivery Coverage \u2013 Purnia vs Kishanganj (2023)",
+          "chart": "grouped_bar",
+          "x": "district",
+          "y": [
+            "facility_delivery_coverage_percent"
+          ],
+          "series": null,
+          "unit": "percent",
+          "note": "The data is from a synthetic PDF fixture and does not represent official statistics."
+        },
+        "interpretation_guard": {
+          "can_explain_cause": false,
+          "caveat": "The file cannot explain the cause of coverage differences."
+        }
+      },
+      "request_error": "HTTPError: HTTP Error 429: Too Many Requests",
+      "passed": false
+    }
+  ]
+}
