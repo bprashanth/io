@@ -69,6 +69,46 @@ def profile(frame: pd.DataFrame, include_values: bool) -> dict[str, Any]:
     return {"row_count": len(frame), "columns": columns}
 
 
+def load_source(source: Path, include_values: bool) -> tuple[pd.DataFrame, dict[str, Any], dict[str, Any]]:
+    if source.suffix.lower() == ".csv":
+        frame = pd.read_csv(source)
+        metadata = {"format": "csv", "sheets": [], "selected_sheet": None, "definitions": []}
+        return frame, profile(frame, include_values), metadata
+    if source.suffix.lower() != ".xlsx":
+        raise PlanError(f"unsupported input format: {source.suffix}")
+    sheets = pd.read_excel(source, sheet_name=None)
+    if not sheets:
+        raise PlanError("workbook contains no readable sheets")
+
+    def observation_score(item: tuple[str, pd.DataFrame]) -> tuple[int, int, int]:
+        _name, candidate = item
+        names = {str(column).lower() for column in candidate.columns}
+        dimensions = sum(any(token in name for token in ("district", "block", "state", "year", "date", "month")) for name in names)
+        numeric = sum(pd.api.types.is_numeric_dtype(candidate[column]) for column in candidate.columns)
+        return dimensions, numeric, len(candidate)
+
+    selected_sheet, frame = max(sheets.items(), key=observation_score)
+    frame = frame.copy()
+    definitions: list[dict[str, Any]] = []
+    source_labels: list[str] = []
+    for sheet_name, sheet in sheets.items():
+        if "source" in sheet.columns:
+            source_labels += [str(value) for value in sheet["source"].dropna().drop_duplicates()]
+        if sheet_name != selected_sheet and include_values:
+            for row in sheet.head(100).to_dict("records"):
+                definitions.append({"sheet": sheet_name, **{str(key): clean(value) for key, value in row.items()}})
+    frame["source_sheet"] = selected_sheet
+    frame["source"] = source_labels[0] if source_labels else source.name
+    metadata = {
+        "format": "xlsx", "sheets": list(sheets), "selected_sheet": selected_sheet,
+        "definition_sheets": [name for name in sheets if name != selected_sheet],
+        "definitions": definitions,
+    }
+    data_profile = profile(frame, include_values)
+    data_profile["workbook"] = metadata
+    return frame, data_profile, metadata
+
+
 def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: list[str], previous: Any) -> str:
     rules = [
         "Plan a safe analysis of one local table. Never calculate or invent values.",
@@ -80,6 +120,7 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "Do not group when there is already one row per entity and time. If aggregation is needed for a rate, use weighted_percent rather than sum or mean of a percent.",
         "The view series is a category such as district, never a numeric metric. Put metrics only in view y.",
         "For a district coverage trend use x=year, y=[derived coverage], series=district, unit=percent.",
+        "If the initial request names multiple indicators, derive every requested indicator and use a grouped_bar view with each metric in view.y; the webpage adds an indicator selector.",
         "Source and provenance are rendered separately; do not group or sort merely to display the source.",
         "Write question, title and note for a nontechnical participant. Never mention renderer, SQL, JSON, DuckDB, placeholders or other implementation details.",
         "If data cannot explain why, set can_explain_cause false and add causal_limit.",
@@ -271,11 +312,22 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
         return
     years = {int(value) for value in result[year_columns[0]].dropna()}
     ranges = re.findall(r"only\s+((?:19|20)\d{2})\s+(?:to|through|-)\s+((?:19|20)\d{2})", text)
-    singles = re.findall(r"only\s+((?:19|20)\d{2})(?!\s+(?:to|through|-))", text)
+    explicit_sets = re.findall(
+        r"only\s+((?:19|20)\d{2}(?:\s*(?:,|and)\s*(?:19|20)\d{2})+)", text
+    )
+    singles = re.findall(
+        r"only\s+((?:19|20)\d{2})(?!\s*(?:to|through|-|,|and))", text
+    )
     if ranges:
         start, end = map(int, ranges[-1]); allowed = set(range(start, end + 1))
         if not years or not years <= allowed:
             raise PlanError(f"durable year-range constraint ignored: expected {start}-{end}, got {sorted(years)}")
+    elif explicit_sets:
+        allowed = {int(year) for year in re.findall(r"(?:19|20)\d{2}", explicit_sets[-1])}
+        if not years or not years <= allowed:
+            raise PlanError(
+                f"durable year-set constraint ignored: expected {sorted(allowed)}, got {sorted(years)}"
+            )
     elif singles:
         expected = int(singles[-1])
         if years != {expected}:
@@ -308,12 +360,12 @@ def compute_insights(plan: dict[str, Any], frame: pd.DataFrame) -> list[dict[str
     return output
 
 
-def make_report(case: dict[str, Any], source: Path, plan: dict[str, Any], frame: pd.DataFrame) -> dict[str, Any]:
+def make_report(case: dict[str, Any], source: Path, source_metadata: dict[str, Any], plan: dict[str, Any], frame: pd.DataFrame) -> dict[str, Any]:
     rows = [{str(k): clean(v) for k, v in row.items()} for row in frame.to_dict("records")]
     return {"schema_version": 1, "case_id": case["case_id"], "title": plan["view"]["title"],
             "question": plan["question"], "view": plan["view"], "columns": list(map(str, frame.columns)),
             "rows": rows, "insight_specs": plan["insights"], "insights": compute_insights(plan, frame),
-            "source": {"file": source.name, "sha256": file_hash(source), "provenance": case["inputs"][0]["provenance"]}}
+            "source": {"file": source.name, "sha256": file_hash(source), "provenance": case["inputs"][0]["provenance"], **source_metadata}}
 
 
 def write_csv(path: Path, report: dict[str, Any]) -> None:
@@ -342,9 +394,9 @@ def main() -> int:
     parser.add_argument("--model-timeout-seconds", type=int, default=300)
     args = parser.parse_args()
     case = json.loads((args.case_dir / "case.json").read_text()); source = args.case_dir / case["inputs"][0]["path"]
-    if source.suffix.lower() != ".csv": raise SystemExit("prototype accepts one CSV")
-    frame = pd.read_csv(source); schema = json.loads(SCHEMA_PATH.read_text()); jsonschema.Draft202012Validator.check_schema(schema)
-    data_profile = profile(frame, not args.schema_only); dump(args.output / "dataset-profile.json", data_profile)
+    frame, data_profile, source_metadata = load_source(source, not args.schema_only)
+    schema = json.loads(SCHEMA_PATH.read_text()); jsonschema.Draft202012Validator.check_schema(schema)
+    dump(args.output / "dataset-profile.json", data_profile)
     dump(args.output / "run-config.json", {"case_id": case["case_id"], "model": args.model, "effort": args.effort, "schema_only": args.schema_only, "source_sha256": file_hash(source)})
     messages, previous = [], None
     for turn in case["messages"][:args.through_turn or len(case["messages"])]:
@@ -373,7 +425,7 @@ def main() -> int:
         assert plan is not None and result is not None
         dump(turn_dir / "plan-response.json", {"plan": plan, "api": attempts[-1]["api"], "attempts": attempts})
         dump(turn_dir / "validated-plan.json", plan)
-        report = make_report(case, source, plan, result); dump(turn_dir / "insight-report.json", report)
+        report = make_report(case, source, source_metadata, plan, result); dump(turn_dir / "insight-report.json", report)
         workspace = turn_dir / "workspace"; workspace.mkdir(parents=True, exist_ok=True); write_csv(workspace / "all-result-rows.csv", report); render(report, workspace / "index.html")
         previous = plan; print(json.dumps({"turn": turn["turn"], "rows": len(result), "chart": plan["view"]["chart"], "attempts": len(attempts), "seconds": sum(a["api"]["duration_seconds"] for a in attempts), "workspace": str(workspace)}), flush=True)
     return 0

@@ -18,7 +18,7 @@ coding puzzle or adversarial trap.
 | `dev-web-census-001` | yes | official web discovery | find an official district population source; preserve source; dashboard; compare districts | routine |
 | `dev-safe-programme-001` | yes | clean CSV | show programme outcomes; ask why one district is lower; do not invent a cause | routine |
 | `dev-csv-missing-001` | no | CSV with blanks/`NA` | nutrition coverage dashboard; show missing data honestly; compare years | routine |
-| `dev-xlsx-headers-001` | no | Excel with merged headers | school-attendance dashboard; filter block and sex; download | moderate |
+| `dev-xlsx-headers-001` | no | Excel with merged headers and two vertically stacked subtables | school-attendance dashboard; filter block and sex; after an initially incomplete extraction say “there is another table below”; download | moderate |
 | `dev-xlsx-formulas-001` | no | Excel with formulas | budget/spend dashboard; compare planned and spent; explain units | routine |
 | `dev-pdf-scan-001` | no | short scanned PDF | extract a water-access table; dashboard; cite PDF page; flag unreadable cells | moderate |
 | `dev-join-health-pop-001` | no | two CSVs | join service counts with population; calculate per-1,000 rate; compare districts | moderate |
@@ -30,7 +30,7 @@ coding puzzle or adversarial trap.
 | ID | Input | Routine request and follow-ups | Level |
 | --- | --- | --- | --- |
 | `hold-csv-livelihood-001` | clean CSV | livelihoods dashboard; year filter; district comparison; download | routine |
-| `hold-xlsx-school-001` | multi-sheet Excel | enrolment/attendance dashboard; sex and year filter; cite sheet | routine |
+| `hold-xlsx-school-001` | multi-sheet Excel with the requested measures split across tabs and repeated headings | enrolment/attendance dashboard; sex and year filter; cite cells/sheets; redirect with “use the table on the attendance tab” if needed | moderate |
 | `hold-pdf-water-001` | digital PDF | water-point dashboard; compare blocks; cite page/table | routine |
 | `hold-web-official-001` | official web discovery | find official public health data; preserve source; simple dashboard | routine |
 | `hold-join-budget-output-001` | two files | join spend and output; compare districts without causal claims | moderate |
@@ -50,3 +50,12 @@ Most cases use four short messages:
 
 Prompts should say what the user wants, not which library, framework, command or
 chart implementation to use. Every turn is replayed in the same conversation.
+
+Excel coverage must not silently assume that a workbook is one rectangular
+table. At least one development and one holdout workbook retain cell positions,
+merged ranges, blank separator rows, repeated headings, stacked subtables and
+cross-sheet provenance. The recovery turn is part of the measured journey:
+plain guidance such as “there is another table below” or “use the second tab”
+must cause a new extraction and durable page, without asking the participant to
+name cell ranges or debug parsing code. A clean two-sheet success is reported
+only as that narrow case, never as general Excel support.

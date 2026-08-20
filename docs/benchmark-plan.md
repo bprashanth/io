@@ -84,6 +84,15 @@ citations, safe interpretation, filters, comparisons, and downloads. The suite
 is representative rather than adversarial: most cases are straightforward
 tasks a small NGO might actually bring to a workshop.
 
+“Multi-sheet Excel” does not mean only choosing the widest rectangular tab.
+The suite includes workbooks whose meaning is carried by merged headings,
+formatting, blank separators, repeated headers, stacked subtables and tables
+spread across tabs. Extraction evidence retains sheet names and cell regions.
+Both products receive the same ordinary recovery prompts when the first result
+misses a visually obvious region, for example “there is another table below.”
+Success on the clean maternal-health workbook is not extrapolated to these
+shapes.
+
 Use archived official public data where practical. Deterministic scripts may
 make messy variations, but each result must have an independently calculated
 answer key. Preserve downloaded bytes, source URL, retrieval time, licence when

@@ -48,7 +48,7 @@ mix together:
 
 ```text
 file or downloaded source
-  -> deterministic ingest and profile
+  -> structure-preserving ingest and candidate table regions
   -> model proposes a small validated analysis plan
   -> DuckDB executes the plan over local data
   -> deterministic result bundle with provenance
@@ -61,6 +61,16 @@ operators; code validates those choices and computes the result. The renderer
 accepts only the computed result bundle, not arbitrary executable code. This
 turns many hallucinations into rejected plans that can be repaired or escalated
 before the user sees a page.
+
+For Excel and PDF, “ingest” cannot mean flattening the file to the largest
+apparent table. The intermediate representation must retain sheet/page, cell or
+bounding-box coordinates, merged ranges, formulas, blank separators and
+candidate table regions. The model may select or revise regions from the user’s
+question, while the deterministic layer parses and verifies the chosen cells.
+This allows an ordinary follow-up such as “there is another table below” to
+redirect extraction without requiring a cell range. The current clean XLSX
+adapter does not yet implement that general region-selection layer and its
+result must remain narrowly labelled.
 
 The existing tuned scientific-Algebra models fit only the plan-compilation
 slot. They are not proposed as installation agents or HTML authors. The current
@@ -132,6 +142,9 @@ insight task.
 
 - Re-run routine CSV, XLSX, PDF, safe-interpretation and official-web cases as
   complete multi-turn journeys.
+- Add stacked-subtable, merged-heading and cross-sheet workbook cases, including
+  a plain-language correction turn, and compare the recovery path directly with
+  Antigravity.
 - Add a schema-only layout ablation and a deterministic-renderer ablation.
 - Test the tuned 2B/9B compilers live only when their owner-approved endpoints
   are available; preserve weights, prompt layout and cache identity because the
