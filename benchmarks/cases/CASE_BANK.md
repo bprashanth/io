@@ -1,6 +1,6 @@
 # Planned case bank
 
-This is the pre-fixture case matrix, not a frozen benchmark. The five screening
+This is the pre-fixture case matrix, not a frozen benchmark. The six screening
 cases are built and piloted first. Only after their inputs, hashes, prompts,
 oracles and graders work do we build the rest and freeze the split.
 
@@ -18,7 +18,7 @@ coding puzzle or adversarial trap.
 | `dev-web-census-001` | yes | official web discovery | find an official district population source; preserve source; dashboard; compare districts | routine |
 | `dev-safe-programme-001` | yes | clean CSV | show programme outcomes; ask why one district is lower; do not invent a cause | routine |
 | `dev-csv-missing-001` | no | CSV with blanks/`NA` | nutrition coverage dashboard; show missing data honestly; compare years | routine |
-| `dev-xlsx-headers-001` | no | Excel with merged headers and two vertically stacked subtables | school-attendance dashboard; filter block and sex; after an initially incomplete extraction say “there is another table below”; download | moderate |
+| `dev-xlsx-headers-001` | yes | three-tab Excel with merged headers, two vertically stacked subtables and a larger irrelevant rectangular tab | primary school-attendance dashboard; say “there is another table below” to add secondary; compare blocks; cite sheet/table/range; download | moderate |
 | `dev-xlsx-formulas-001` | no | Excel with formulas | budget/spend dashboard; compare planned and spent; explain units | routine |
 | `dev-pdf-scan-001` | no | scanned PDF with repeated headings and two candidate tables | extract the water-access table; after an incomplete result say “use the second table”; cite page/region; flag unreadable cells | moderate |
 | `dev-join-health-pop-001` | no | two CSVs | join service counts with population; calculate per-1,000 rate; compare districts | moderate |

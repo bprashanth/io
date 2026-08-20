@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "dataset_id": "dev-xlsx-headers-001",
+  "question": "Show primary school attendance by block, year and sex, with selectable indicator and year, and display source sheet and table.",
+  "steps": [
+    {
+      "op": "filter",
+      "column": "primary_boys_attendance_percent",
+      "cmp": "ne",
+      "value": null
+    },
+    {
+      "op": "filter",
+      "column": "primary_girls_attendance_percent",
+      "cmp": "ne",
+      "value": null
+    },
+    {
+      "op": "group",
+      "by": [
+        "block",
+        "year"
+      ],
+      "aggregates": [
+        {
+          "name": "primary_boys_attendance_percent",
+          "fn": "mean",
+          "column": "primary_boys_attendance_percent"
+        },
+        {
+          "name": "primary_girls_attendance_percent",
+          "fn": "mean",
+          "column": "primary_girls_attendance_percent"
+        }
+      ]
+    },
+    {
+      "op": "derive",
+      "name": "indicator",
+      "kind": "percent",
+      "numerator": "primary_boys_attendance_percent",
+      "denominator": "primary_girls_attendance_percent",
+      "unit": "percent"
+    }
+  ],
+  "insights": [
+    {
+      "kind": "highest",
+      "metric": "primary_boys_attendance_percent",
+      "label_column": "block"
+    }
+  ],
+  "view": {
+    "title": "Primary School Attendance by Block and Year",
+    "chart": "grouped_bar",
+    "x": "year",
+    "y": [
+      "primary_boys_attendance_percent",
+      "primary_girls_attendance_percent"
+    ],
+    "series": "block",
+    "unit": "percent",
+    "note": "Data sourced from Attendance Report!A1:E7; Table 1 in school_attendance_nested.xlsx. The file does not provide a causal explanation for differences."
+  },
+  "interpretation_guard": {
+    "can_explain_cause": false,
+    "caveat": "The dataset does not contain explanatory variables."
+  }
+}

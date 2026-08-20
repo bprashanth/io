@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Primary School Attendance Portal | Block, Year & Gender Analytics</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js for interactive analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="logo-area">
+          <div class="logo-icon">📊</div>
+          <div class="logo-text">
+            <h1>
+              Primary School Attendance Portal
+              <span class="badge-tag" id="active-file-badge">school_attendance_nested.xlsx</span>
+            </h1>
+            <p>Block-level Attendance Analytics by Sex, Year & Indicator</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn" id="btn-export-csv" title="Export current view to CSV">
+            📥 Export CSV
+          </button>
+          <button class="btn" id="btn-reload" title="Reload Excel file">
+            🔄 Refresh
+          </button>
+          <button class="btn btn-icon" id="btn-theme" title="Toggle Dark/Light Mode">
+            🌙
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs-bar">
+      <div class="nav-tabs">
+        <button class="tab-btn active" data-tab="dashboard">
+          📊 Attendance Dashboard
+        </button>
+        <button class="tab-btn" data-tab="source-sheet">
+          📑 Source Sheet & Table <span class="tab-count" id="sheet-count-badge">3 sheets</span>
+        </button>
+        <button class="tab-btn" data-tab="enrolment">
+          🏫 Enrolment Raw <span class="tab-count" id="school-count-badge">30 schools</span>
+        </button>
+        <button class="tab-btn" data-tab="readme">
+          ℹ️ Workbook Info & Metadata
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- TAB 1: ATTENDANCE DASHBOARD -->
+      <section id="tab-dashboard" class="tab-pane active">
+        
+        <!-- Filter Controls Panel -->
+        <div class="filter-panel">
+          <div class="filter-header">
+            <div class="filter-title">
+              <span>🎯</span> Filter by Indicator, Year & Block
+            </div>
+            <div class="panel-actions">
+              <button class="btn btn-sm" id="btn-reset-filters">Reset Filters</button>
+            </div>
+          </div>
+
+          <div class="filter-grid">
+            <!-- Indicator Selector -->
+            <div class="filter-group">
+              <label class="filter-label" for="select-indicator">
+                <span>📌</span> Select Indicator
+              </label>
+              <select id="select-indicator" class="select-custom">
+                <option value="all">🌟 All Indicators (Boys & Girls)</option>
+                <option value="boys">👦 Boys Attendance (%)</option>
+                <option value="girls">👧 Girls Attendance (%)</option>
+                <option value="both_compare">⚖️ Boys vs Girls Comparison</option>
+                <option value="avg">📈 Average Attendance ((Boys+Girls)/2)</option>
+                <option value="gap">🔍 Gender Attendance Gap (Boys - Girls %)</option>
+              </select>
+              <div class="filter-pills" id="indicator-pills">
+                <button class="pill-btn active" data-val="all">All</button>
+                <button class="pill-btn" data-val="boys">Boys</button>
+                <button class="pill-btn" data-val="girls">Girls</button>
+                <button class="pill-btn" data-val="avg">Avg</button>
+                <button class="pill-btn" data-val="gap">Gap</button>
+              </div>
+            </div>
+
+            <!-- Year Selector -->
+            <div class="filter-group">
+              <label class="filter-label" for="select-year">
+                <span>📅</span> Select Year
+              </label>
+              <select id="select-year" class="select-custom">
+                <option value="all">📅 All Years (2022 & 2023)</option>
+                <option value="2022">📅 2022</option>
+                <option value="2023">📅 2023</option>
+              </select>
+              <div class="filter-pills" id="year-pills">
+                <button class="pill-btn active" data-val="all">All Years</button>
+                <button class="pill-btn" data-val="2022">2022</button>
+                <button class="pill-btn" data-val="2023">2023</button>
+              </div>
+            </div>
+
+            <!-- School Level Selector -->
+            <div class="filter-group">
+              <label class="filter-label" for="select-level">
+                <span>🏫</span> School Level
+              </label>
+              <select id="select-level" class="select-custom">
+                <option value="primary" selected>🎒 Primary School (Table 1)</option>
+                <option value="secondary">🎓 Secondary School (Table 2)</option>
+                <option value="both">🏫 Both Primary & Secondary</option>
+              </select>
+            </div>
+
+            <!-- Block Selector -->
+            <div class="filter-group">
+              <label class="filter-label" for="select-block">
+                <span>📍</span> Block Selection
+              </label>
+              <select id="select-block" class="select-custom">
+                <option value="all">🌐 All Blocks (Tekari, Wazirganj, Atri)</option>
+                <option value="Tekari">Tekari</option>
+                <option value="Wazirganj">Wazirganj</option>
+                <option value="Atri">Atri</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Insight Callout -->
+        <div class="insight-box" id="dynamic-insight-box">
+          <div class="insight-icon">💡</div>
+          <div class="insight-content">
+            <h4 id="insight-title">Primary School Attendance Summary</h4>
+            <p id="insight-text">Loading attendance insights...</p>
+          </div>
+        </div>
+
+        <!-- KPI Metric Cards -->
+        <div class="kpi-grid" id="kpi-container">
+          <!-- Dynamic KPI Cards injected by app.js -->
+        </div>
+
+        <!-- Table & Visualizations Grid -->
+        <div class="grid-2col">
+          
+          <!-- Attendance Data Table -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <span>📋</span> <span id="table-panel-title">Primary School Attendance Table</span>
+                </div>
+                <div class="panel-subtitle" id="table-panel-subtitle">By Block, Sex and Year</div>
+              </div>
+              <div class="panel-actions">
+                <button class="btn btn-sm" id="btn-copy-table" title="Copy table to clipboard">📋 Copy</button>
+              </div>
+            </div>
+            <div class="panel-body table-container">
+              <table class="data-table" id="attendance-table">
+                <thead id="attendance-thead">
+                  <!-- Header dynamically populated -->
+                </thead>
+                <tbody id="attendance-tbody">
+                  <!-- Rows dynamically populated -->
+                </tbody>
+                <tfoot id="attendance-tfoot">
+                  <!-- Totals dynamically populated -->
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <!-- Chart Analytics Panel -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <span>📈</span> <span id="chart-panel-title">Attendance Visualization</span>
+                </div>
+                <div class="panel-subtitle" id="chart-panel-subtitle">Comparison by block and gender</div>
+              </div>
+              <div class="panel-actions">
+                <select id="select-chart-type" class="select-custom" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                  <option value="bar">Bar Chart (Block Comparison)</option>
+                  <option value="trend">YoY Growth Trend</option>
+                  <option value="gap">Gender Gap Analysis</option>
+                </select>
+              </div>
+            </div>
+            <div class="panel-body" style="min-height: 340px; display: flex; flex-direction: column; justify-content: center;">
+              <div id="chart-container-wrapper" style="position: relative; width: 100%; height: 300px;">
+                <canvas id="attendanceChart"></canvas>
+                <div id="svg-chart-fallback" style="display: none; width: 100%; height: 100%;"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- TAB 2: SOURCE SHEET & TABLES EXPLORER -->
+      <section id="tab-source-sheet" class="tab-pane" style="display: none;">
+        
+        <div class="panel-card" style="margin-bottom: 1.5rem;">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">
+                <span>📑</span> Source Excel Workbook Explorer
+              </div>
+              <div class="panel-subtitle">Inspect the source sheets, structure, and original Excel cell layout</div>
+            </div>
+            <div class="panel-actions">
+              <div class="pill-btn-group" style="display: flex; gap: 0.35rem;">
+                <button class="pill-btn active" id="btn-view-grid">Excel Grid View</button>
+                <button class="pill-btn" id="btn-view-parsed">Structured Tables</button>
+                <button class="pill-btn" id="btn-view-json">Raw JSON</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sheet Selector Bar -->
+          <div class="excel-sheet-tabs" id="source-sheet-tabs">
+            <!-- Sheet buttons injected dynamically -->
+          </div>
+
+          <div class="panel-body">
+            <!-- Mode 1: Excel Grid Replica -->
+            <div id="source-grid-container">
+              <div style="margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.85rem; color: var(--text-muted);" id="sheet-meta-info">
+                  Showing sheet: <strong>Attendance Report</strong> (17 rows, 5 columns, 8 merged ranges)
+                </div>
+                <span class="badge-tag">Exact Excel Cells</span>
+              </div>
+              <div class="excel-wrapper">
+                <table class="excel-grid" id="excel-replica-table">
+                  <!-- Excel grid rendered here -->
+                </table>
+              </div>
+            </div>
+
+            <!-- Mode 2: Structured Parsed Tables -->
+            <div id="source-parsed-container" style="display: none;">
+              
+              <!-- Table 1: Primary Attendance -->
+              <div style="margin-bottom: 2rem;">
+                <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
+                  <span>🎒</span> Table 1. Primary school attendance by block, sex and year
+                </h3>
+                <div class="table-container">
+                  <table class="data-table" id="parsed-primary-table">
+                    <thead>
+                      <tr>
+                        <th rowspan="2">Block</th>
+                        <th colspan="2" style="text-align: center; background: var(--boys-bg); color: var(--boys-color);">Boys attendance (%)</th>
+                        <th colspan="2" style="text-align: center; background: var(--girls-bg); color: var(--girls-color);">Girls attendance (%)</th>
+                        <th colspan="2" style="text-align: center;">YoY Change (2022-2023)</th>
+                      </tr>
+                      <tr>
+                        <th style="background: var(--boys-bg);">2022</th>
+                        <th style="background: var(--boys-bg);">2023</th>
+                        <th style="background: var(--girls-bg);">2022</th>
+                        <th style="background: var(--girls-bg);">2023</th>
+                        <th>Boys YoY</th>
+                        <th>Girls YoY</th>
+                      </tr>
+                    </thead>
+                    <tbody id="parsed-primary-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Table 2: Secondary Attendance -->
+              <div style="margin-bottom: 1.5rem;">
+                <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; color: #7c3aed; display: flex; align-items: center; gap: 0.5rem;">
+                  <span>🎓</span> Table 2. Secondary school attendance by block, sex and year
+                </h3>
+                <div class="table-container">
+                  <table class="data-table" id="parsed-secondary-table">
+                    <thead>
+                      <tr>
+                        <th rowspan="2">Block</th>
+                        <th colspan="2" style="text-align: center; background: var(--boys-bg); color: var(--boys-color);">Boys attendance (%)</th>
+                        <th colspan="2" style="text-align: center; background: var(--girls-bg); color: var(--girls-color);">Girls attendance (%)</th>
+                        <th colspan="2" style="text-align: center;">YoY Change (2022-2023)</th>
+                      </tr>
+                      <tr>
+                        <th style="background: var(--boys-bg);">2022</th>
+                        <th style="background: var(--boys-bg);">2023</th>
+                        <th style="background: var(--girls-bg);">2022</th>
+                        <th style="background: var(--girls-bg);">2023</th>
+                        <th>Boys YoY</th>
+                        <th>Girls YoY</th>
+                      </tr>
+                    </thead>
+                    <tbody id="parsed-secondary-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Mode 3: Raw JSON -->
+            <div id="source-json-container" style="display: none;">
+              <pre style="background: var(--bg-subtle); padding: 1rem; border-radius: var(--radius-sm); max-height: 480px; overflow: auto; font-family: var(--font-mono); font-size: 0.82rem;" id="json-viewer-content"></pre>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TAB 3: ENROLMENT RAW DATA -->
+      <section id="tab-enrolment" class="tab-pane" style="display: none;">
+        
+        <!-- Enrolment Aggregates -->
+        <div class="kpi-grid" id="enrolment-kpi-container">
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-title">Total Schools</span>
+              <span class="kpi-icon">🏫</span>
+            </div>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="enr-total-schools">30</span>
+            </div>
+            <div class="kpi-sub">Across 3 Blocks (Tekari, Atri, Wazirganj)</div>
+          </div>
+          <div class="kpi-card top">
+            <div class="kpi-header">
+              <span class="kpi-title">Total Enrolled</span>
+              <span class="kpi-icon">👥</span>
+            </div>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="enr-total-students">3,465</span>
+            </div>
+            <div class="kpi-sub">Students in Year 2023</div>
+          </div>
+          <div class="kpi-card boys">
+            <div class="kpi-header">
+              <span class="kpi-title">Average Per School</span>
+              <span class="kpi-icon">📊</span>
+            </div>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="enr-avg-school">115.5</span>
+            </div>
+            <div class="kpi-sub">Students per school</div>
+          </div>
+          <div class="kpi-card gap">
+            <div class="kpi-header">
+              <span class="kpi-title">Highest Block</span>
+              <span class="kpi-icon">🏆</span>
+            </div>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="enr-top-block">Tekari</span>
+            </div>
+            <div class="kpi-sub">1,165 Enrolled (10 Schools)</div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">
+                <span>🏫</span> School Enrolment Records (Raw Sheet: Enrolment Raw)
+              </div>
+              <div class="panel-subtitle">30 school-level records with block, year and enrolled students</div>
+            </div>
+            <div class="panel-actions">
+              <input type="text" id="input-search-enrolment" class="search-input" placeholder="🔍 Search school code or block...">
+              <select id="select-enrolment-block" class="select-custom" style="padding: 0.35rem 0.65rem; font-size: 0.82rem;">
+                <option value="all">All Blocks</option>
+                <option value="Tekari">Tekari</option>
+                <option value="Wazirganj">Wazirganj</option>
+                <option value="Atri">Atri</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body table-container">
+            <table class="data-table" id="enrolment-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>School Code</th>
+                  <th>Block</th>
+                  <th>Year</th>
+                  <th>Enrolled Students</th>
+                  <th>Enrolment Bar</th>
+                </tr>
+              </thead>
+              <tbody id="enrolment-tbody">
+                <!-- Records injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TAB 4: README & METADATA -->
+      <section id="tab-readme" class="tab-pane" style="display: none;">
+        <div class="panel-card" style="margin-bottom: 1.5rem;">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>ℹ️</span> Workbook Specification & Metadata (Sheet: Read Me)
+            </div>
+          </div>
+          <div class="panel-body">
+            <table class="data-table" style="max-width: 700px;">
+              <thead>
+                <tr>
+                  <th style="width: 180px;">Property</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody id="readme-tbody">
+                <!-- Read Me entries -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>📖</span> Data Dictionary & Indicator Definitions
+            </div>
+          </div>
+          <div class="panel-body" style="font-size: 0.9rem; line-height: 1.6;">
+            <ul style="padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+              <li><strong>Boys Attendance (%)</strong>: Average percentage of enrolled male primary school students present during the academic year.</li>
+              <li><strong>Girls Attendance (%)</strong>: Average percentage of enrolled female primary school students present during the academic year.</li>
+              <li><strong>Average Attendance (%)</strong>: Arithmetic mean of Boys and Girls attendance rates: <code>(Boys % + Girls %) / 2</code>.</li>
+              <li><strong>Gender Attendance Gap (%)</strong>: Difference in attendance rate between boys and girls: <code>Boys % - Girls %</code>. A positive gap indicates higher attendance for boys.</li>
+              <li><strong>Year-over-Year (YoY) Growth</strong>: Percentage point change between academic year 2022 and 2023: <code>Attendance (2023) - Attendance (2022)</code>.</li>
+              <li><strong>Nested Header Structure</strong>: The source Excel file uses a hierarchical header format where "Boys attendance (%)" and "Girls attendance (%)" span across two years ("2022" and "2023").</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div>
+        <strong>Primary School Attendance Portal</strong> &bull; Sourced from <code>school_attendance_nested.xlsx</code>
+      </div>
+      <div>
+        Interactive Multi-Indicator Dashboard &bull; Live Filter & Source Viewer
+      </div>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">Action completed successfully</div>
+  </div>
+
+  <!-- Fallback Embedded Data & Application JS -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

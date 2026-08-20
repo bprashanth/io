@@ -126,6 +126,73 @@ def build_xlsx() -> None:
     normalize_zip(output)
 
 
+def build_irregular_xlsx() -> None:
+    output = ROOT / "dev-xlsx-headers-001" / "inputs" / "school_attendance_nested.xlsx"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    workbook = Workbook()
+    fixed_time = datetime.datetime(2026, 8, 20, 0, 0, 0)
+    workbook.properties.created = fixed_time
+    workbook.properties.modified = fixed_time
+    report = workbook.active
+    report.title = "Attendance Report"
+
+    def add_table(title_row: int, number: int, level: str, rows: list[tuple[object, ...]]) -> None:
+        report.merge_cells(start_row=title_row, start_column=1, end_row=title_row, end_column=5)
+        title = report.cell(title_row, 1, f"Table {number}. {level} school attendance by block, sex and year")
+        title.font = Font(bold=True, color="FFFFFF", size=12)
+        title.fill = PatternFill("solid", fgColor="1F4E78" if level == "Primary" else "548235")
+        header = title_row + 2
+        report.merge_cells(start_row=header, start_column=1, end_row=header + 1, end_column=1)
+        report.cell(header, 1, "Block")
+        report.merge_cells(start_row=header, start_column=2, end_row=header, end_column=3)
+        report.cell(header, 2, "Boys attendance (%)")
+        report.merge_cells(start_row=header, start_column=4, end_row=header, end_column=5)
+        report.cell(header, 4, "Girls attendance (%)")
+        for column, value in enumerate(("2022", "2023", "2022", "2023"), start=2):
+            report.cell(header + 1, column, value)
+        for row in range(header, header + 2):
+            for column in range(1, 6):
+                cell = report.cell(row, column)
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = PatternFill("solid", fgColor="5B9BD5")
+        for values in rows:
+            report.append(values)
+
+    add_table(1, 1, "Primary", [
+        ("Tekari", 78, 82, 75, 80),
+        ("Wazirganj", 72, 76, 70, 74),
+        ("Atri", 68, 73, 66, 71),
+    ])
+    add_table(11, 2, "Secondary", [
+        ("Tekari", 70, 74, 68, 73),
+        ("Wazirganj", 64, 68, 62, 66),
+        ("Atri", 60, 65, 58, 63),
+    ])
+    report.freeze_panes = "B5"
+    for width, letter in zip((20, 18, 18, 18, 18), "ABCDE", strict=True):
+        report.column_dimensions[letter].width = width
+
+    notes = workbook.create_sheet("Read Me")
+    notes.merge_cells("A1:D1")
+    notes["A1"] = "About this workbook"
+    notes["A1"].font = Font(bold=True, color="FFFFFF")
+    notes["A1"].fill = PatternFill("solid", fgColor="7F6000")
+    notes.append(["source", "synthetic school-attendance nested workbook fixture", None, None])
+    notes.append(["unit", "percent", None, None])
+    notes.append(["warning", "Illustrative aggregate benchmark data; not official statistics", None, None])
+
+    decoy = workbook.create_sheet("Enrolment Raw")
+    decoy.append(["school_code", "block", "year", "enrolled"])
+    for index in range(1, 31):
+        decoy.append([f"S{index:03d}", ("Tekari", "Wazirganj", "Atri")[index % 3], 2023, 100 + index])
+    for cell in decoy[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="A5A5A5")
+
+    workbook.save(output)
+    normalize_zip(output)
+
+
 def build_pdf() -> None:
     output = ROOT / "dev-pdf-health-001" / "inputs" / "facility_delivery_report.pdf"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -235,6 +302,7 @@ def build_safe_csv() -> None:
 
 def main() -> None:
     build_xlsx()
+    build_irregular_xlsx()
     build_pdf()
     build_safe_csv()
 

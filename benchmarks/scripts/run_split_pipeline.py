@@ -24,6 +24,8 @@ from typing import Any
 import duckdb
 import jsonschema
 import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -140,6 +142,110 @@ def load_digital_pdf(source: Path, include_values: bool) -> tuple[pd.DataFrame, 
     return frame, data_profile, metadata
 
 
+def load_structured_xlsx_regions(source: Path, include_values: bool) -> tuple[pd.DataFrame, dict[str, Any], dict[str, Any]] | None:
+    """Extract stacked tables with merged group headings into one audited wide table.
+
+    This adapter is intentionally bounded but structure-preserving: it records
+    every candidate table's sheet, header/data range and merged ranges before
+    pivoting compatible attendance observations by block and year.
+    """
+    workbook = load_workbook(source, data_only=True)
+    merged_ranges = {sheet.title: [str(item) for item in sheet.merged_cells.ranges] for sheet in workbook.worksheets}
+    if not any(merged_ranges.values()):
+        return None
+
+    observations: dict[tuple[str, int], dict[str, Any]] = {}
+    regions: list[dict[str, Any]] = []
+    tables: list[str] = []
+    ranges: list[str] = []
+    definitions: list[dict[str, Any]] = []
+    for sheet in workbook.worksheets:
+        expanded: dict[tuple[int, int], Any] = {}
+        for merged in sheet.merged_cells.ranges:
+            value = sheet.cell(merged.min_row, merged.min_col).value
+            for row in range(merged.min_row, merged.max_row + 1):
+                for column in range(merged.min_col, merged.max_col + 1):
+                    expanded[(row, column)] = value
+
+        def cell(row: int, column: int) -> Any:
+            return expanded.get((row, column), sheet.cell(row, column).value)
+
+        for title_row in range(1, sheet.max_row + 1):
+            title = next((str(cell(title_row, column)).strip() for column in range(1, sheet.max_column + 1)
+                          if cell(title_row, column) not in (None, "")), "")
+            table_match = re.match(r"(Table\s+\d+)[.:\s-]+(.+)", title, re.I)
+            if not table_match:
+                continue
+            table_label, table_title = table_match.group(1).title(), table_match.group(2).strip()
+            header_row = next((row for row in range(title_row + 1, min(sheet.max_row, title_row + 5) + 1)
+                               if sum(cell(row, column) not in (None, "") for column in range(1, sheet.max_column + 1)) >= 2), None)
+            if header_row is None or header_row + 1 > sheet.max_row:
+                continue
+            measures: list[tuple[int, str, int]] = []
+            for column in range(2, sheet.max_column + 1):
+                group = str(cell(header_row, column) or "").strip()
+                leaf = str(cell(header_row + 1, column) or "").strip()
+                year_match = re.search(r"(?:19|20)\d{2}", leaf)
+                if "attendance" not in group.lower() or not year_match:
+                    continue
+                sex = "boys" if "boy" in group.lower() else "girls" if "girl" in group.lower() else safe_column_name(group)
+                measures.append((column, sex, int(year_match.group())))
+            if not measures:
+                continue
+            level = "primary" if "primary" in table_title.lower() else "secondary" if "secondary" in table_title.lower() else safe_column_name(table_title)
+            data_start = header_row + 2
+            data_end = data_start - 1
+            for row in range(data_start, sheet.max_row + 1):
+                block = cell(row, 1)
+                if block in (None, ""):
+                    break
+                if re.match(r"Table\s+\d+", str(block), re.I):
+                    break
+                data_end = row
+                for column, sex, year in measures:
+                    value = cell(row, column)
+                    if value in (None, ""):
+                        continue
+                    metric = f"{level}_{sex}_attendance_percent"
+                    item = observations.setdefault((str(block).strip(), year), {"block": str(block).strip(), "year": year})
+                    item[metric] = float(value)
+            if data_end < data_start:
+                continue
+            region_range = f"{sheet.title}!A{title_row}:{get_column_letter(max(column for column, _, _ in measures))}{data_end}"
+            tables.append(table_label); ranges.append(region_range)
+            region = {
+                "sheet": sheet.title, "table": table_label, "title": table_title,
+                "title_row": title_row, "header_rows": [header_row, header_row + 1],
+                "data_rows": [data_start, data_end], "range": region_range,
+            }
+            regions.append(region)
+            for _column, sex, _year in measures:
+                indicator = f"{level}_{sex}_attendance_percent"
+                if not any(item["indicator"] == indicator for item in definitions):
+                    definitions.append({
+                        "indicator": indicator, "definition": f"Reported {level} {sex} attendance percentage",
+                        "formula": "reported percentage; no recomputation", "unit": "percent",
+                        "sheet": sheet.title, "table": table_label, "range": region_range,
+                    })
+    if not observations or not regions:
+        return None
+    frame = pd.DataFrame(observations.values()).sort_values(["block", "year"]).reset_index(drop=True)
+    frame["source_sheet"] = "; ".join(dict.fromkeys(region["sheet"] for region in regions))
+    frame["source_table"] = "; ".join(dict.fromkeys(tables))
+    frame["source_range"] = "; ".join(dict.fromkeys(ranges))
+    frame["source"] = source.name
+    metadata = {
+        "format": "xlsx", "sheets": workbook.sheetnames, "selected_sheet": None,
+        "definition_sheets": [], "definitions": definitions,
+        "tables": list(dict.fromkeys(tables)), "ranges": list(dict.fromkeys(ranges)),
+        "candidate_regions": regions, "merged_ranges": merged_ranges,
+        "adapter_scope": "merged two-row headings with compatible vertically stacked attendance tables",
+    }
+    data_profile = profile(frame, include_values)
+    data_profile["workbook"] = metadata
+    return frame, data_profile, metadata
+
+
 def load_source(source: Path, include_values: bool) -> tuple[pd.DataFrame, dict[str, Any], dict[str, Any]]:
     if source.suffix.lower() == ".csv":
         frame = pd.read_csv(source)
@@ -149,6 +255,9 @@ def load_source(source: Path, include_values: bool) -> tuple[pd.DataFrame, dict[
         return load_digital_pdf(source, include_values)
     if source.suffix.lower() != ".xlsx":
         raise PlanError(f"unsupported input format: {source.suffix}")
+    structured = load_structured_xlsx_regions(source, include_values)
+    if structured is not None:
+        return structured
     sheets = pd.read_excel(source, sheet_name=None)
     if not sheets:
         raise PlanError("workbook contains no readable sheets")
@@ -292,9 +401,15 @@ def bind(plan: dict[str, Any], frame: pd.DataFrame) -> None:
             if step["name"] in available: raise PlanError("derived column already exists")
             if step["numerator"] == step["denominator"]:
                 raise PlanError("a percentage numerator and denominator must be different columns")
+            if step["kind"] == "percent" and (
+                units.get(step["numerator"]) == "percent" or units.get(step["denominator"]) == "percent"
+            ):
+                raise PlanError("cannot derive a percentage from an already-percent input; use the reported metric directly")
             available.add(step["name"])
             units[step["name"]] = step["unit"]
         elif op == "group":
+            if step["by"] and not frame.duplicated(subset=step["by"]).any():
+                raise PlanError("grouping keys are already unique; keep the observation rows and provenance")
             available = set(step["by"]) | {a["name"] for a in step["aggregates"]}
         if op == "filter" and isinstance(step["value"], str) and ("{{" in step["value"] or "}}" in step["value"]):
             raise PlanError("UI placeholders are not data filter values")
@@ -315,6 +430,8 @@ def bind(plan: dict[str, Any], frame: pd.DataFrame) -> None:
         plan["question"], plan["view"]["title"], plan["view"].get("note")))
     if re.search(r"\b(renderer|duckdb|sql|json|placeholder)\b", participant_text, flags=re.IGNORECASE):
         raise PlanError("participant-facing text contains implementation jargon")
+    if re.search(r"\b(?:x|xx|tbd|todo)\b", participant_text, flags=re.IGNORECASE):
+        raise PlanError("participant-facing text contains an unfinished placeholder")
     for insight in plan["insights"]:
         references += [insight[k] for k in ("metric", "label_column", "entity_column", "time_column") if insight.get(k)]
         if insight["kind"] in ("change", "difference"):
@@ -366,6 +483,8 @@ def execute(frame: pd.DataFrame, plan: dict[str, Any]) -> pd.DataFrame:
                 condition = f"{column} BETWEEN ? AND ?"; params += value
             elif cmp == "contains":
                 condition = f"LOWER(CAST({column} AS VARCHAR)) LIKE LOWER(?)"; params += [f"%{value}%"]
+            elif value is None and cmp in ("eq", "ne"):
+                condition = f"{column} IS {'NOT ' if cmp == 'ne' else ''}NULL"
             else:
                 operator = {"eq": "=", "ne": "!=", "lt": "<", "le": "<=", "gt": ">", "ge": ">="}[cmp]
                 condition = f"{column} {operator} ?"; params += [value]
@@ -415,6 +534,20 @@ def explicit_year_constraint(messages: list[str]) -> tuple[set[int] | None, str]
 def normalize_explicit_constraints(messages: list[str], plan: dict[str, Any], frame: pd.DataFrame) -> list[str]:
     """Compile literal user scope into filters before semantic validation."""
     required: dict[str, list[Any]] = {}
+    changes: list[str] = []
+    cleaned_steps = []
+    for step in plan["steps"]:
+        value = step.get("value")
+        values = value if isinstance(value, list) else [value]
+        placeholder = step["op"] == "filter" and any(
+            isinstance(item, str) and re.search(r"(?:^user_selected_|^selected_(?:year|block|district)|placeholder|\{\{)", item, re.I)
+            for item in values
+        )
+        if placeholder:
+            changes.append(f"removed placeholder filter on {step['column']}")
+        else:
+            cleaned_steps.append(step)
+    plan["steps"] = cleaned_steps
     allowed_years, _ = explicit_year_constraint(messages)
     year_columns = [str(column) for column in frame.columns if "year" in str(column).lower()]
     if allowed_years is not None and year_columns:
@@ -437,7 +570,18 @@ def normalize_explicit_constraints(messages: list[str], plan: dict[str, Any], fr
             if len(named) == 2:
                 required[str(column)] = named
 
-    changes: list[str] = []
+    percent_columns = {
+        str(column) for column in frame.columns
+        if any(token in str(column).lower() for token in ("percent", "pct", "rate", "coverage"))
+    }
+    for insight in plan["insights"]:
+        if insight["kind"] not in ("change", "difference"):
+            continue
+        expected_unit = "percentage points" if insight["metric"] in percent_columns else "number"
+        if insight["unit"] != expected_unit:
+            changes.append(f"normalized {insight['kind']} unit for {insight['metric']} to {expected_unit}")
+            insight["unit"] = expected_unit
+
     for column, values in required.items():
         expected = {str(value) for value in values}
         current = [step for step in plan["steps"] if step["op"] == "filter" and step["column"] == column]
