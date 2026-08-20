@@ -20,6 +20,7 @@ async def main() -> int:
     parser.add_argument("--select-column")
     parser.add_argument("--select-value")
     parser.add_argument("--expected-filtered-rows", type=int)
+    parser.add_argument("--expected-current-rows", type=int)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
@@ -91,6 +92,9 @@ async def main() -> int:
     if args.expected_filtered_rows is not None:
         if selected_rows != args.expected_filtered_rows: failures.append("filtered table row count is wrong")
         if len(downloaded) != args.expected_filtered_rows: failures.append("download row count is wrong")
+    if args.expected_current_rows is not None:
+        if initial_rows != args.expected_current_rows: failures.append("initial table row count is wrong")
+        if len(downloaded) != args.expected_current_rows: failures.append("download row count is wrong")
     for required in ("year", "source"):
         if required not in checks["download_columns"]: failures.append(f"download omits {required}")
     checks["failures"] = failures

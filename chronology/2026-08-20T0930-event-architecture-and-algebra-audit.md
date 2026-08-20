@@ -80,3 +80,25 @@ actions rather than a general analyst state machine. Its recommendation was a
 small compiler over deterministic DuckDB plus a separate renderer and bounded
 escalation. This supports the working architecture but is design corroboration,
 not new measured model evidence.
+
+A Qwen 3.8 27B low-reasoning replay then completed all three smoke turns. Turn
+1 took 30.461 seconds. Turn 2 first repeated the stale-year mistake; the new
+semantic gate rejected it, and the repaired attempt added `year = 2023`. The
+two attempts took 8.227 and 22.020 seconds. Turn 3 preserved the three-row state
+and took 41.318 seconds. The computed result correctly identified Purnia at
+76%, and all three pages passed load, console, offline-request, overflow, table
+and download assertions.
+
+That run still failed human visual review. Filtering the turn-1 time-series to
+one year left three district points on one x position while the precomputed
+change cards continued to show two-year changes. Turns 2 and 3 used a connected
+line across unordered district names. The browser checks had missed these
+semantic visual faults. The renderer was changed to compute insight cards from
+currently visible rows and to turn a one-period multi-district trend into bars.
+The plan validator now rejects categorical line axes and participant-facing
+implementation jargon. A read-only Cursor review corroborated the stale-card
+fault and also found that the schema advertised unimplemented chart types and
+that formula-leading text was unsafe in spreadsheet downloads. The prototype
+chart enum was narrowed to implemented modes and both CSV paths now neutralise
+formula-leading strings. A new replay is required; the preserved low-reasoning
+run remains a development failure.

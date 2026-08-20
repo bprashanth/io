@@ -14,6 +14,7 @@ import html
 import json
 import math
 import re
+import signal
 import time
 import urllib.request
 from pathlib import Path
@@ -75,11 +76,12 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "For coverage use derive kind percent, numerator/denominator, unit percent.",
         "Subtracting percentages is percentage points, not percent growth.",
         "Keep rows unless aggregation is requested. Never invent bands or targets.",
-        "A request to select/filter in the webpage is handled by the renderer: keep all requested rows and never emit UI placeholders such as {{selected_year}}.",
+        "For an initial request asking for a webpage selector, keep all requested rows; webpage controls are added separately. Never emit placeholders such as {{selected_year}}.",
         "Do not group when there is already one row per entity and time. If aggregation is needed for a rate, use weighted_percent rather than sum or mean of a percent.",
         "The view series is a category such as district, never a numeric metric. Put metrics only in view y.",
         "For a district coverage trend use x=year, y=[derived coverage], series=district, unit=percent.",
         "Source and provenance are rendered separately; do not group or sort merely to display the source.",
+        "Write question, title and note for a nontechnical participant. Never mention renderer, SQL, JSON, DuckDB, placeholders or other implementation details.",
         "If data cannot explain why, set can_explain_cause false and add causal_limit.",
         "Use line/slope for time, bars for categories, scatter for two measures.",
         "Return only one JSON object matching the response schema.",
@@ -100,7 +102,7 @@ def repair_prompt(prompt: str, plan: Any, error: Exception) -> str:
         "\nReturn a complete corrected plan. Do not explain the correction."
 
 
-def call_model(model: str, effort: str, prompt: str, schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def call_model(model: str, effort: str, prompt: str, schema: dict[str, Any], timeout_seconds: int) -> tuple[dict[str, Any], dict[str, Any]]:
     credential = json.loads(KEY_PATH.read_text())["api_key"]
     document = {
         "model": model,
@@ -122,8 +124,16 @@ def call_model(model: str, effort: str, prompt: str, schema: dict[str, Any]) -> 
                  "X-Title": "NGO split pipeline benchmark"},
     )
     started = time.monotonic()
-    with urllib.request.urlopen(request, timeout=600) as response:
-        raw = json.load(response)
+    def timed_out(_signum: int, _frame: Any) -> None:
+        raise TimeoutError(f"model response exceeded {timeout_seconds} seconds")
+    previous_handler = signal.signal(signal.SIGALRM, timed_out)
+    signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            raw = json.load(response)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
     duration = round(time.monotonic() - started, 3)
     content = raw["choices"][0]["message"].get("content") or ""
     match = re.search(r"\{.*\}", content, flags=re.DOTALL)
@@ -166,6 +176,19 @@ def bind(plan: dict[str, Any], frame: pd.DataFrame) -> None:
     if plan["view"].get("series"): references.append(plan["view"]["series"])
     if plan["view"].get("series") in plan["view"]["y"]:
         raise PlanError("view series must be a category column, not a y metric")
+    if plan["view"].get("series") == plan["view"]["x"]:
+        raise PlanError("view series must not duplicate the x column")
+    if plan["view"]["chart"] in ("line", "slope") and plan["view"]["x"] in frame.columns:
+        x_name = plan["view"]["x"]
+        time_named = any(token in x_name.lower() for token in ("year", "date", "time", "month", "quarter"))
+        if not time_named and not pd.api.types.is_numeric_dtype(frame[x_name]):
+            raise PlanError("line and slope charts require an ordered numeric or time x column")
+        if len(plan["view"]["y"]) != 1:
+            raise PlanError("line and slope charts currently require exactly one y metric")
+    participant_text = " ".join(str(value or "") for value in (
+        plan["question"], plan["view"]["title"], plan["view"].get("note")))
+    if re.search(r"\b(renderer|duckdb|sql|json|placeholder)\b", participant_text, flags=re.IGNORECASE):
+        raise PlanError("participant-facing text contains implementation jargon")
     for insight in plan["insights"]:
         references += [insight[k] for k in ("metric", "label_column", "entity_column", "time_column") if insight.get(k)]
     missing = [name for name in references if name not in available]
@@ -226,7 +249,7 @@ def execute(frame: pd.DataFrame, plan: dict[str, Any]) -> pd.DataFrame:
     return result
 
 
-def check_conversation_constraints(messages: list[str], result: pd.DataFrame) -> None:
+def check_conversation_constraints(messages: list[str], plan: dict[str, Any], result: pd.DataFrame) -> None:
     """Reject executable plans that silently ignore explicit durable filters.
 
     This is intentionally small and deterministic. It does not try to understand
@@ -234,6 +257,9 @@ def check_conversation_constraints(messages: list[str], result: pd.DataFrame) ->
     phrasing. More constraint extractors must be frozen before additional cases.
     """
     text = "\n".join(messages).lower()
+    for word, kind in (("lowest", "lowest"), ("highest", "highest")):
+        if re.search(rf"\b{word}\b", text) and not any(item["kind"] == kind for item in plan["insights"]):
+            raise PlanError(f"explicit {word} request requires a named {kind} insight")
     year_columns = [str(column) for column in result.columns if "year" in str(column).lower()]
     if not year_columns:
         return
@@ -280,13 +306,18 @@ def make_report(case: dict[str, Any], source: Path, plan: dict[str, Any], frame:
     rows = [{str(k): clean(v) for k, v in row.items()} for row in frame.to_dict("records")]
     return {"schema_version": 1, "case_id": case["case_id"], "title": plan["view"]["title"],
             "question": plan["question"], "view": plan["view"], "columns": list(map(str, frame.columns)),
-            "rows": rows, "insights": compute_insights(plan, frame),
+            "rows": rows, "insight_specs": plan["insights"], "insights": compute_insights(plan, frame),
             "source": {"file": source.name, "sha256": file_hash(source), "provenance": case["inputs"][0]["provenance"]}}
 
 
 def write_csv(path: Path, report: dict[str, Any]) -> None:
+    def safe(value: Any) -> Any:
+        if isinstance(value, str) and value.startswith(("=", "+", "-", "@")):
+            return "'" + value
+        return value
     with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=report["columns"]); writer.writeheader(); writer.writerows(report["rows"])
+        writer = csv.DictWriter(handle, fieldnames=report["columns"]); writer.writeheader()
+        writer.writerows({key: safe(value) for key, value in row.items()} for row in report["rows"])
 
 
 def render(report: dict[str, Any], output: Path) -> None:
@@ -302,6 +333,7 @@ def main() -> int:
     parser.add_argument("--case-dir", type=Path, required=True); parser.add_argument("--model", required=True)
     parser.add_argument("--output", type=Path, required=True); parser.add_argument("--effort", choices=("low","medium","high","xhigh"), default="medium")
     parser.add_argument("--through-turn", type=int); parser.add_argument("--schema-only", action="store_true")
+    parser.add_argument("--model-timeout-seconds", type=int, default=300)
     args = parser.parse_args()
     case = json.loads((args.case_dir / "case.json").read_text()); source = args.case_dir / case["inputs"][0]["path"]
     if source.suffix.lower() != ".csv": raise SystemExit("prototype accepts one CSV")
@@ -314,11 +346,17 @@ def main() -> int:
         prompt = make_prompt(case, data_profile, messages, previous); dump(turn_dir / "plan-request.json", {"model": args.model, "effort": args.effort, "prompt": prompt})
         attempts, attempt_prompt, plan, result = [], prompt, None, None
         for attempt in range(1, 4):
-            candidate, api = call_model(args.model, args.effort, attempt_prompt, schema)
+            try:
+                candidate, api = call_model(args.model, args.effort, attempt_prompt, schema, args.model_timeout_seconds)
+            except Exception as error:
+                failure = {"attempt": attempt, "request_error": f"{type(error).__name__}: {error}"}
+                attempts.append(failure); dump(turn_dir / f"plan-attempt-{attempt}.json", failure)
+                dump(turn_dir / "plan-error.json", {"status": "model_request_failed", "attempts": attempts})
+                raise
             record = {"attempt": attempt, "plan": candidate, "api": api}
             try:
                 jsonschema.validate(candidate, schema); bind(candidate, frame); candidate_result = execute(frame, candidate)
-                check_conversation_constraints(messages, candidate_result)
+                check_conversation_constraints(messages, candidate, candidate_result)
             except Exception as error:
                 record["validation_error"] = f"{type(error).__name__}: {error}"; attempts.append(record)
                 dump(turn_dir / f"plan-attempt-{attempt}.json", record)
