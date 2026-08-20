@@ -19,8 +19,8 @@ computer literate. They communicate in short, ordinary Indian English, may make
 spelling or grammar mistakes, and should not need to know programming terms.
 Their work starts with a CSV, Excel workbook, PDF, or request to find public data
 online. They ask the agent to make a simple website/dashboard, then refine it in
-the same conversation: filter years, compare districts, explain a chart, add a
-source, or download a filtered table.
+the same conversation: filter a time period, compare groups, explain a chart,
+add a source, or download a filtered table.
 
 Do not describe these users or prompts as "dumb" in benchmark material. Call
 them plain-language or natural-language prompts.
@@ -67,30 +67,44 @@ Build a small, high-quality suite before scaling it. Target roughly 20 cases,
 three repetitions per agent/model, divided into a development set for choosing
 the model and an untouched holdout set for the final comparison.
 
-Most cases must be routine NGO work, not adversarial puzzles. Include:
+Most cases must be routine NGO work, not adversarial puzzles. Choose several
+unrelated subject areas so that no one domain becomes an implicit product
+specification. Test these general data and interaction patterns:
 
-- clean and messy census/health CSVs;
-- multi-sheet Excel files, merged headers, formulas, missing cells, and district
-  spelling variations;
+- clean and messy CSVs with categorical, temporal and numeric columns;
+- multi-sheet Excel files, repeated subtables, merged or nested headers,
+  formulas, missing cells, and inconsistent category spelling;
 - digital and scanned/OCR PDFs with tables;
-- combining sources whose years, units, or district names do not line up;
+- combining sources whose periods, units, category labels or geographic levels
+  do not line up;
 - finding an official public dataset online and preserving its downloaded bytes;
 - percentages versus counts, suppressed values, changed boundaries, and other
   traps that should produce caveats rather than invented conclusions;
-- follow-ups for filtering, district comparison, explanation without causal
-  overclaiming, citation, and download.
+- follow-ups for filtering, comparison, explanation without causal overclaiming,
+  citation, and download.
+
+The subject matter and names inside fixtures belong only to those fixtures and
+their independent oracles. Production prompts, extraction, planning, routing
+and rendering must not contain sector vocabularies, known indicator pairings,
+named places, case IDs or question-bank phrases. They may reason from the
+participant's actual words, file structure, schema, units and values at run
+time. Deterministic code may handle generic mechanics such as workbook geometry,
+types, provenance, arithmetic, safe execution and browser behavior. It must not
+replace the model with an expanding catalogue of domain rules. Case-specific
+verifiers are expected, but they are evaluation code and must never be imported
+by the candidate pipeline.
 
 Prefer archived official public datasets plus deterministic scripted mutations.
 Every case needs a manifest, SHA-256 hashes, provenance, prompts in exact order,
 and a machine-readable oracle. Do not have an LLM invent all test data: numerical
 ground truth must be independently computable.
 
-Example conversation style:
+Example conversation style (illustrative only, not a production template):
 
-1. `one excel is there. make simple website showing district health position. i should select year and compare two districts. please show where each number came from`
+1. `one excel is there. make simple website showing what changed over time. i should select period and compare two groups. please show where each number came from`
 2. `only show 2021 to 2023`
-3. `compare gaya and nalanda`
-4. `why gaya is worse? don't guess if data cannot tell`
+3. `compare group a and group b`
+4. `why group a is worse? don't guess if data cannot tell`
 5. `give source and page number`
 6. `download this filtered table`
 
