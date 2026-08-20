@@ -204,37 +204,61 @@ def equal_rows(
     tolerance: float,
     order_matters: bool,
 ) -> bool:
-    if len(actual) != len(expected):
-        return False
     if not expected:
-        return True
+        return not actual
     actual_widths = {len(row) for row in actual}
     expected_widths = {len(row) for row in expected}
     if len(actual_widths) != 1 or len(expected_widths) != 1:
         return False
     actual_width = next(iter(actual_widths))
     expected_width = next(iter(expected_widths))
-    if actual_width < expected_width:
+    if len(actual) == len(expected) and actual_width >= expected_width:
+        for indices in itertools.combinations(range(actual_width), expected_width):
+            projected = [[row[index] for index in indices] for row in actual]
+            if order_matters:
+                if all(equal_row(left, right, tolerance) for left, right in zip(projected, expected)):
+                    return True
+                continue
+            unmatched = list(expected)
+            for row in projected:
+                match = next(
+                    (index for index, candidate in enumerate(unmatched) if equal_row(row, candidate, tolerance)),
+                    None,
+                )
+                if match is None:
+                    break
+                unmatched.pop(match)
+            else:
+                if not unmatched:
+                    return True
+    if order_matters:
         return False
-    for indices in itertools.combinations(range(actual_width), expected_width):
-        projected = [[row[index] for index in indices] for row in actual]
-        if order_matters:
-            if all(equal_row(left, right, tolerance) for left, right in zip(projected, expected)):
-                return True
-            continue
-        unmatched = list(expected)
-        for row in projected:
-            match = next(
-                (index for index, candidate in enumerate(unmatched) if equal_row(row, candidate, tolerance)),
-                None,
-            )
-            if match is None:
-                break
-            unmatched.pop(match)
-        else:
-            if not unmatched:
-                return True
-    return False
+
+    # A dashboard query may return the same obligations in a wide comparison:
+    # one row per leading group with repeated period/measure blocks. Accept that
+    # only when each expected long-form suffix occurs contiguously in the
+    # corresponding wide row and the group sets are identical.
+    groups: list[tuple[Any, list[list[Any]]]] = []
+    for expected_row in expected:
+        group = next((entry for entry in groups if equal_value(entry[0], expected_row[0], tolerance)), None)
+        if group is None:
+            group = (expected_row[0], [])
+            groups.append(group)
+        group[1].append(expected_row[1:])
+    if len(actual) != len(groups) or any(not row for row in actual):
+        return False
+    for key, suffixes in groups:
+        candidate = next((row for row in actual if equal_value(row[0], key, tolerance)), None)
+        if candidate is None:
+            return False
+        tail = candidate[1:]
+        for suffix in suffixes:
+            if not any(
+                all(equal_value(left, right, tolerance) for left, right in zip(tail[start:], suffix))
+                for start in range(len(tail) - len(suffix) + 1)
+            ):
+                return False
+    return True
 
 
 def main() -> int:
@@ -301,6 +325,7 @@ def main() -> int:
         final_sql = None
         for attempt in range(1, 3):
             request_record = {"attempt": attempt, "prompt": prompt}
+            attempt_started = time.monotonic()
             try:
                 response, api = call_model(
                     args.endpoint,
@@ -315,10 +340,12 @@ def main() -> int:
                 request_record.update({"response": response, "api": api})
                 final_sql = extract_sql(response)
                 actual = rows(db, final_sql)
+                request_record["duration_seconds"] = round(time.monotonic() - attempt_started, 3)
                 request_record.update({"sql_duckdb": final_sql, "rows": actual})
                 attempts.append(request_record)
                 break
             except Exception as error:
+                request_record["duration_seconds"] = round(time.monotonic() - attempt_started, 3)
                 request_record["error"] = f"{type(error).__name__}: {error}"
                 attempts.append(request_record)
                 if attempt == 2:
@@ -355,8 +382,23 @@ def main() -> int:
         "first_attempt_executable": sum(bool(record["attempts"] and record["attempts"][0].get("rows") is not None) for record in records),
         "semantic_mismatches": sum(record["failure_class"] == "semantic_result_mismatch" for record in records),
         "request_or_execution_failures": sum(record["failure_class"] == "request_or_execution" for record in records),
+        "successful_model_calls": sum(
+            bool(attempt.get("api")) for record in records for attempt in record["attempts"]
+        ),
+        "timeout_count": sum(
+            str(attempt.get("error", "")).startswith("TimeoutError:")
+            for record in records for attempt in record["attempts"]
+        ),
+        "total_tokens": sum(
+            int(attempt.get("api", {}).get("usage", {}).get("total_tokens") or 0)
+            for record in records for attempt in record["attempts"]
+        ),
+        "cost_usd": round(sum(
+            float(attempt.get("api", {}).get("usage", {}).get("cost") or 0)
+            for record in records for attempt in record["attempts"]
+        ), 8),
         "duration_seconds": round(sum(
-            attempt.get("api", {}).get("duration_seconds", 0)
+            attempt.get("duration_seconds", attempt.get("api", {}).get("duration_seconds", 0))
             for record in records for attempt in record["attempts"]
         ), 3),
         "records": [{key: record[key] for key in ("id", "task_id", "passed", "failure_class")} for record in records],

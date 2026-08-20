@@ -1,0 +1,78 @@
+{
+  "id": "derived-rate-lowest-first-p04",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "for 2023 calculate employment percentage using enrolled as base and sort smallest",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      38.0
+    ],
+    [
+      46.0
+    ],
+    [
+      56.0
+    ],
+    [
+      65.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT (CAST(employed_at_6_months AS REAL) * 100.0 / NULLIF(women_enrolled, 0)) AS employment_percentage FROM livelihoods WHERE year = 2023 ORDER BY employment_percentage ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor 2023 calculate employment percentage using enrolled as base and sort smallest\n[Database Schema]\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor 2023 calculate employment percentage using enrolled as base and sort smallest\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the relevant columns**: We need to calculate the employment percentage for the year 2023. The relevant columns are `women_enrolled` and `employed_at_6_months`.\n2. **Calculate the employment percentage**: The employment percentage is calculated as `(employed_at_6_months / women_enrolled) * 100.0`.\n3. **Filter for the year 2023**: We need to filter the records to only include those from the year 2023.\n4. **Sort the results**: The results should be sorted in ascending order based on the calculated employment percentage.\n\nGiven the steps above, the SQL query can be written as follows:\n\n```sql\nSELECT \n  (CAST(employed_at_6_months AS REAL) * 100.0 / women_enrolled) AS employment_percentage\nFROM \n  livelihoods\nWHERE \n  year = 2023\nORDER BY \n  employment_percentage ASC;\n```\n\n### Explanation:\n- **SELECT Clause**: We calculate the employment percentage using the formula `(employed_at_6_months / women_enrolled) * 100.0`. The `CAST` function is used to convert `employed_at_6_months` to a real number to ensure proper floating-point division.\n- **FROM Clause**: We specify the table `livelihoods` from which we are selecting the data.\n- **WHERE Clause**: We filter the records to only include those from the year 2023.\n- **ORDER BY Clause**: We sort the results in ascending order based on the calculated employment percentage.\n\nThis query directly addresses the user's request and ensures that the results are sorted from the smallest employment percentage to the largest.",
+      "api": {
+        "id": "chatcmpl-988873e8592cb482",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 212,
+          "total_tokens": 585,
+          "completion_tokens": 373,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 27.999
+      },
+      "duration_seconds": 28.004,
+      "sql_duckdb": "SELECT (CAST(employed_at_6_months AS REAL) * 100.0 / NULLIF(women_enrolled, 0)) AS employment_percentage FROM livelihoods WHERE year = 2023 ORDER BY employment_percentage ASC NULLS FIRST",
+      "rows": [
+        [
+          38.0
+        ],
+        [
+          46.0
+        ],
+        [
+          56.0
+        ],
+        [
+          65.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

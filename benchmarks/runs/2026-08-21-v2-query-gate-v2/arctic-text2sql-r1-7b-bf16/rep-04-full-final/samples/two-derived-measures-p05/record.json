@@ -1,0 +1,60 @@
+{
+  "id": "two-derived-measures-p05",
+  "task_id": "two-derived-measures",
+  "pattern": "filter two periods and groups, derive two percentages",
+  "question": "for Gaya Nalanda show registered pregnancy based rates for delivery and postnatal, 2022 to 2023",
+  "gold_sql": "SELECT district, year, ROUND(100.0 * institutional_deliveries / pregnancies_registered, 1) AS delivery_percent, ROUND(100.0 * postnatal_check_48h / pregnancies_registered, 1) AS postnatal_percent FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) ORDER BY district, year",
+  "expected_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "actual_rows": [],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, year, (CAST(institutional_deliveries AS REAL) * 100 / NULLIF(pregnancies_registered, 0)) AS delivery_rate, (CAST(postnatal_check_48h AS REAL) * 100 / NULLIF(pregnancies_registered, 0)) AS postnatal_rate FROM maternal_services WHERE district = 'Gaya Nalanda' AND year BETWEEN 2022 AND 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor Gaya Nalanda show registered pregnancy based rates for delivery and postnatal, 2022 to 2023\n[Database Schema]\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor Gaya Nalanda show registered pregnancy based rates for delivery and postnatal, 2022 to 2023\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to carefully consider the requirements and the structure of the provided database schema. The task is to calculate the registered pregnancy-based rates for institutional deliveries and postnatal care checks for the district of Gaya Nalanda over the years 2022 and 2023.\n\n### Step-by-Step Solution:\n\n1. **Identify Relevant Data**:\n   - The relevant table is `maternal_services`.\n   - We need data for the district 'Gaya Nalanda'.\n   - The years of interest are 2022 and 2023.\n\n2. **Calculate Rates**:\n   - **Institutional Delivery Rate**: This is calculated as `(institutional_deliveries / pregnancies_registered) * 100`.\n   - **Postnatal Check Rate**: This is calculated as `(postnatal_check_48h / pregnancies_registered) * 100`.\n\n3. **Filter Data**:\n   - Filter the data to include only records for 'Gaya Nalanda' and for the years 2022 and 2023.\n\n4. **Construct the Query**:\n   - Use a `SELECT` statement to fetch the required columns.\n   - Use a `WHERE` clause to filter the data based on the district and years.\n   - Use arithmetic operations to calculate the rates.\n\n### Final SQL Query\n\n```sql\nSELECT \n    district,\n    year,\n    (CAST(institutional_deliveries AS REAL) * 100 / pregnancies_registered) AS delivery_rate,\n    (CAST(postnatal_check_48h AS REAL) * 100 / pregnancies_registered) AS postnatal_rate\nFROM \n    maternal_services\nWHERE \n    district = 'Gaya Nalanda' \n    AND year BETWEEN 2022 AND 2023;\n```\n\n### Explanation:\n- **CAST Function**: The `CAST` function is used to convert the numerator to a `REAL` type to ensure that the division results in a decimal value, which is necessary for calculating percentages accurately.\n- **BETWEEN Clause**: The `BETWEEN` clause is used to filter the records for the years 2022 and 2023.\n- **SELECT Clause**: The `SELECT` clause specifies the columns to be retrieved, including the calculated rates.\n\nThis query directly addresses the user's request by providing the required rates for the specified district and time period.",
+      "api": {
+        "id": "chatcmpl-a83dbbe713c3ce5c",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 236,
+          "total_tokens": 752,
+          "completion_tokens": 516,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 38.686
+      },
+      "duration_seconds": 38.691,
+      "sql_duckdb": "SELECT district, year, (CAST(institutional_deliveries AS REAL) * 100 / NULLIF(pregnancies_registered, 0)) AS delivery_rate, (CAST(postnatal_check_48h AS REAL) * 100 / NULLIF(pregnancies_registered, 0)) AS postnatal_rate FROM maternal_services WHERE district = 'Gaya Nalanda' AND year BETWEEN 2022 AND 2023",
+      "rows": []
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

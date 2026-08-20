@@ -1,0 +1,98 @@
+{
+  "id": "cross-table-join-p04",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "district wise 2023: ANC completed over registered and employed over enrolled as percentages from both tables",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT av.district, (CAST(av.anc4_completed AS REAL) * 100 / NULLIF(av.pregnancies_registered, 0)) AS anc4_completion_rate, (CAST(l.employed_at_6_months AS REAL) * 100 / NULLIF(l.women_enrolled, 0)) AS employment_rate FROM anc_visits AS av INNER JOIN livelihoods AS l ON av.district = l.district AND av.year = l.year WHERE av.year = 2023 ORDER BY av.district NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ndistrict wise 2023: ANC completed over registered and employed over enrolled as percentages from both tables\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same district-year grain and can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator.\n[User Question]\ndistrict wise 2023: ANC completed over registered and employed over enrolled as percentages from both tables\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to focus on calculating two percentages for each district in the year 2023:\n1. The percentage of ANC4 visits completed over the number of pregnancies registered.\n2. The percentage of women employed at 6 months post-training over the number of women enrolled in the livelihoods program.\n\nThe query should join the `anc_visits` and `livelihoods` tables on the `district` and `year` columns, filter for the year 2023, and then calculate the required percentages.\n\nHere is the step-by-step SQL query:\n\n1. **Join the tables**: We need to join the `anc_visits` and `livelihoods` tables on `district` and `year`.\n2. **Filter for the year 2023**: We will filter the records to only include those from the year 2023.\n3. **Calculate the percentages**: We will calculate the percentages for ANC4 visits completed over pregnancies registered and women employed over women enrolled.\n4. **Select the required columns**: We will select the district, the calculated percentages, and ensure the results are ordered by district.\n\nHere is the SQL query:\n\n```sql\nSELECT \n  av.district,\n  (CAST(av.anc4_completed AS REAL) * 100 / av.pregnancies_registered) AS anc4_completion_rate,\n  (CAST(l.employed_at_6_months AS REAL) * 100 / l.women_enrolled) AS employment_rate\nFROM \n  anc_visits av\nINNER JOIN \n  livelihoods l ON av.district = l.district AND av.year = l.year\nWHERE \n  av.year = 2023\nORDER BY \n  av.district;\n```\n\nThis query directly addresses the user's request by calculating the required percentages and ordering the results by district. It avoids unnecessary complexity and ensures that the query is straightforward and efficient.",
+      "api": {
+        "id": "chatcmpl-a7da3b28ed87e552",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 277,
+          "total_tokens": 682,
+          "completion_tokens": 405,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 30.388
+      },
+      "duration_seconds": 30.396,
+      "sql_duckdb": "SELECT av.district, (CAST(av.anc4_completed AS REAL) * 100 / NULLIF(av.pregnancies_registered, 0)) AS anc4_completion_rate, (CAST(l.employed_at_6_months AS REAL) * 100 / NULLIF(l.women_enrolled, 0)) AS employment_rate FROM anc_visits AS av INNER JOIN livelihoods AS l ON av.district = l.district AND av.year = l.year WHERE av.year = 2023 ORDER BY av.district NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          74.0,
+          56.0
+        ],
+        [
+          "Kishanganj",
+          61.0,
+          38.0
+        ],
+        [
+          "Nalanda",
+          80.0,
+          65.0
+        ],
+        [
+          "Purnia",
+          67.0,
+          46.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}
