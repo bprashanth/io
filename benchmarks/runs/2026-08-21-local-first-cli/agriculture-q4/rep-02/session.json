@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "turns": [
+    {
+      "turn": 1,
+      "question": "one csv is there. make a 2024 Monsoon block wise crop yield dashboard, tonnes per hectare highest first. i should see source and download the table",
+      "route": "small",
+      "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+      "sql": "SELECT block, source, (harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0)) AS tonnes_per_hectare FROM field_harvest WHERE year = 2024 AND season = 'Monsoon' ORDER BY tonnes_per_hectare DESC",
+      "output_columns": [
+        "block",
+        "source",
+        "tonnes_per_hectare"
+      ],
+      "row_count": 3,
+      "workspace": "benchmarks/runs/2026-08-21-local-first-cli/agriculture-q4/rep-02/turn-1/workspace",
+      "data_hashes": {
+        "field_harvest.csv": "9288d2915366c6da864df8ea8200892c266708059fa1175d395ac0e6d3991bee"
+      }
+    },
+    {
+      "turn": 2,
+      "question": "now show 2023 and 2024 Monsoon tonnes per hectare trend for every block",
+      "route": "small",
+      "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+      "sql": "WITH YearlyData AS (SELECT block, year, (harvest_tonnes * 1.0 / NULLIF(NULLIF(cultivated_hectares, 0), 0)) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024)) SELECT y23.block, y23.tonnes_per_hectare AS tonnes_per_hectare_2023, y24.tonnes_per_hectare AS tonnes_per_hectare_2024, (y24.tonnes_per_hectare - y23.tonnes_per_hectare) AS percentage_point_change FROM YearlyData AS y23 JOIN YearlyData AS y24 ON y23.block = y24.block WHERE y23.year = 2023 AND y24.year = 2024 ORDER BY y23.block NULLS FIRST",
+      "output_columns": [
+        "block",
+        "tonnes_per_hectare_2023",
+        "tonnes_per_hectare_2024",
+        "percentage_point_change"
+      ],
+      "row_count": 3,
+      "workspace": "benchmarks/runs/2026-08-21-local-first-cli/agriculture-q4/rep-02/turn-2/workspace",
+      "data_hashes": {
+        "field_harvest.csv": "9288d2915366c6da864df8ea8200892c266708059fa1175d395ac0e6d3991bee"
+      }
+    },
+    {
+      "turn": 3,
+      "question": "only Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024. keep source and download",
+      "route": "small",
+      "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+      "sql": "WITH YearlyData AS (SELECT block, source, year, (harvest_tonnes * 1.0 / NULLIF(NULLIF(cultivated_hectares, 0), 0)) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND block IN ('Bhojpur', 'Wardha') AND year IN (2023, 2024)) SELECT y23.block, y23.source, y23.tonnes_per_hectare AS tonnes_per_hectare_2023, y24.tonnes_per_hectare AS tonnes_per_hectare_2024, (y24.tonnes_per_hectare - y23.tonnes_per_hectare) AS percentage_point_change FROM YearlyData AS y23 JOIN YearlyData AS y24 ON y23.block = y24.block WHERE y23.year = 2023 AND y24.year = 2024 ORDER BY y23.block NULLS FIRST",
+      "output_columns": [
+        "block",
+        "source",
+        "tonnes_per_hectare_2023",
+        "tonnes_per_hectare_2024",
+        "percentage_point_change"
+      ],
+      "row_count": 2,
+      "workspace": "benchmarks/runs/2026-08-21-local-first-cli/agriculture-q4/rep-02/turn-3/workspace",
+      "data_hashes": {
+        "field_harvest.csv": "9288d2915366c6da864df8ea8200892c266708059fa1175d395ac0e6d3991bee"
+      }
+    }
+  ]
+}

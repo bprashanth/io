@@ -1,0 +1,70 @@
+{
+  "id": "derived-rate-ranking-p04",
+  "task_id": "derived-rate-ranking",
+  "pattern": "filter, derive a comparable percentage, rank",
+  "question": "only year 2023. calculate fully immunised percentage for each district descending",
+  "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+  "expected_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, (CAST(children_fully_immunised AS REAL) / NULLIF(NULLIF(children_due, 0), 0)) * 100 AS fully_immunised_percentage FROM immunisation WHERE year = 2023 GROUP BY district ORDER BY fully_immunised_percentage DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nonly year 2023. calculate fully immunised percentage for each district descending\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nonly year 2023. calculate fully immunised percentage for each district descending\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to focus on calculating the fully immunized percentage for each district in the year 2023 and then sorting the results in descending order. Here's the step-by-step reasoning:\n\n1. **Identify the relevant table**: The `immunisation` table contains the necessary data for calculating the fully immunized percentage.\n2. **Filter for the year 2023**: We need to filter the records to only include those from the year 2023.\n3. **Calculate the fully immunized percentage**: The fully immunized percentage is calculated as `(children_fully_immunised / children_due) * 100.0`.\n4. **Group by district**: Since we need the percentage for each district, we will group the results by the `district` column.\n5. **Sort the results**: Finally, we sort the results in descending order based on the fully immunized percentage.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nSELECT \n  district,\n  (CAST(children_fully_immunised AS REAL) / children_due) * 100.0 AS fully_immunised_percentage\nFROM \n  immunisation\nWHERE \n  year = 2023\nGROUP BY \n  district\nORDER BY \n  fully_immunised_percentage DESC;\n```\n\nThis query directly addresses the user's request by filtering for the year 2023, calculating the fully immunized percentage for each district, and sorting the results in descending order.",
+      "api": {
+        "id": "chatcmpl-F80qeftP2rUEhK5vaxvxFow2yHP0jiOC",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 322,
+          "prompt_tokens": 206,
+          "total_tokens": 528,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 10.247
+      },
+      "duration_seconds": 10.249,
+      "error": "BinderException: Binder Error: column \"children_fully_immunised\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(children_fully_immunised)\" if the exact value of \"children_fully_immunised\" is not important.\n\nLINE 1: EXPLAIN SELECT district, (CAST(children_fully_immunised AS REAL) / NULLIF(children_due...\n                                       ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nonly year 2023. calculate fully immunised percentage for each district descending\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[Previous Query Error]\nBinderException: Binder Error: column \"children_fully_immunised\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(children_fully_immunised)\" if the exact value of \"children_fully_immunised\" is not important.\n\nLINE 1: EXPLAIN SELECT district, (CAST(children_fully_immunised AS REAL) / NULLIF(children_due...\n                                       ^\nReturn one corrected read-only query.\n[User Question]\nonly year 2023. calculate fully immunised percentage for each district descending\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to focus on calculating the fully immunized percentage for each district in the year 2023 and then ordering the results in descending order based on this percentage. Here's the step-by-step reasoning:\n\n1. **Filter by Year**: We need to filter the records to only include those from the year 2023.\n2. **Calculate Percentage**: For each district, we calculate the fully immunized percentage using the formula `(children_fully_immunised / children_due) * 100`.\n3. **Group by District**: Since we want the percentage for each district, we group the results by the `district` column.\n4. **Order by Percentage**: Finally, we order the results in descending order based on the calculated fully immunized percentage.\n\nGiven the schema and the requirements, the SQL query can be written as follows:\n\n```sql\nSELECT \n  district, \n  (CAST(children_fully_immunised AS REAL) / NULLIF(children_due, 0)) * 100 AS fully_immunised_percentage\nFROM \n  immunisation\nWHERE \n  year = 2023\nGROUP BY \n  district\nORDER BY \n  fully_immunised_percentage DESC;\n```\n\nThis query ensures that we correctly calculate the fully immunized percentage for each district in the year 2023 and order the results in descending order based on the calculated percentage. The use of `NULLIF` ensures that we avoid division by zero errors.",
+      "api": {
+        "id": "chatcmpl-X6BIfaI7uaNLEJMw2XgY2VR3liOp72sb",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 317,
+          "prompt_tokens": 315,
+          "total_tokens": 632,
+          "prompt_tokens_details": {
+            "cached_tokens": 178
+          }
+        },
+        "duration_seconds": 10.024
+      },
+      "duration_seconds": 10.025,
+      "error": "BinderException: Binder Error: column \"children_fully_immunised\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(children_fully_immunised)\" if the exact value of \"children_fully_immunised\" is not important.\n\nLINE 1: EXPLAIN SELECT district, (CAST(children_fully_immunised AS REAL) / NULLIF(NULLIF(children_due...\n                                       ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

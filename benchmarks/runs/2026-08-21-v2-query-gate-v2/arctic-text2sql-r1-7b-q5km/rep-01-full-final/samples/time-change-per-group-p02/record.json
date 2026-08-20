@@ -1,0 +1,64 @@
+{
+  "id": "time-change-per-group-p02",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "compare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH YearlyData AS (SELECT district, year, (anc4_completed * 100.0) / NULLIF(pregnancies_registered, 0) AS anc4_completion_rate FROM anc_visits WHERE year IN (2021, 2023) AND district IN ('Gaya', 'Nalanda')), ComparisonData AS (SELECT y1.district, y1.anc4_completion_rate AS rate_2021, y2.anc4_completion_rate AS rate_2023 FROM YearlyData AS y1 JOIN YearlyData AS y2 ON y1.district = y2.district WHERE y1.year = 2021 AND y2.year = 2023) SELECT district, (rate_2023 - rate_2021) AS percentage_point_change FROM ComparisonData",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: We need data from the `anc_visits` table for the years 2021 and 2023, specifically for the districts of Gaya and Nalanda.\n2. **Filter the Data**: Extract the relevant rows for the specified years and districts.\n3. **Calculate the Rates**: Compute the ANC4 completion rate for both years.\n4. **Compute the Percentage-Point Change**: Calculate the difference in the ANC4 completion rates between 2023 and 2021.\n5. **Format the Output**: Present the results in a clear and concise manner.\n\nLet's break down the SQL query step-by-step:\n\n### Step 1: Filter the Data\nWe need to filter the `anc_visits` table for the years 2021 and 2023 and the districts Gaya and Nalanda.\n\n### Step 2: Calculate the Rates\nFor each year, calculate the ANC4 completion rate as `(anc4_completed * 100.0) / pregnancies_registered`.\n\n### Step 3: Compute the Percentage-Point Change\nCalculate the difference in the ANC4 completion rates between 2023 and 2021.\n\n### Step 4: Format the Output\nPresent the results in a clear format.\n\nHere is the final SQL query:\n\n```sql\nWITH YearlyData AS (\n    SELECT \n        district,\n        year,\n        (anc4_completed * 100.0) / pregnancies_registered AS anc4_completion_rate\n    FROM \n        anc_visits\n    WHERE \n        year IN (2021, 2023)\n        AND district IN ('Gaya', 'Nalanda')\n),\nComparisonData AS (\n    SELECT \n        y1.district,\n        y1.anc4_completion_rate AS rate_2021,\n        y2.anc4_completion_rate AS rate_2023\n    FROM \n        YearlyData y1\n    JOIN \n        YearlyData y2 ON y1.district = y2.district\n    WHERE \n        y1.year = 2021\n        AND y2.year = 2023\n)\nSELECT \n    district,\n    (rate_2023 - rate_2021) AS percentage_point_change\nFROM \n    ComparisonData;\n```\n\n### Explanation:\n1. **YearlyData CTE**: This common table expression (CTE) filters the data for the years 2021 and 2023 and the districts Gaya and Nalanda. It calculates the ANC4 completion rate for each year.\n2. **ComparisonData CTE**: This CTE joins the `YearlyData` for 2021 and 2023 on the district to get the completion rates for both years.\n3. **Final SELECT**: The final query calculates the percentage-point change in the ANC4 completion rate from 2021 to 2023 and presents it alongside the district.\n\nThis query efficiently computes the required comparison and presents the results clearly.",
+      "api": {
+        "id": "chatcmpl-iGIKcdTq5MknYeFIEgwOSQz2M0msdHDe",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 668,
+          "prompt_tokens": 231,
+          "total_tokens": 899,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 21.198
+      },
+      "duration_seconds": 21.204,
+      "sql_duckdb": "WITH YearlyData AS (SELECT district, year, (anc4_completed * 100.0) / NULLIF(pregnancies_registered, 0) AS anc4_completion_rate FROM anc_visits WHERE year IN (2021, 2023) AND district IN ('Gaya', 'Nalanda')), ComparisonData AS (SELECT y1.district, y1.anc4_completion_rate AS rate_2021, y2.anc4_completion_rate AS rate_2023 FROM YearlyData AS y1 JOIN YearlyData AS y2 ON y1.district = y2.district WHERE y1.year = 2021 AND y2.year = 2023) SELECT district, (rate_2023 - rate_2021) AS percentage_point_change FROM ComparisonData",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

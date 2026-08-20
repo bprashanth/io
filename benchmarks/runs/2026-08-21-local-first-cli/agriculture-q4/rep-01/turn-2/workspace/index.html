@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>__DASHBOARD_TITLE__</title>
+  <title>Tonnes Per Hectare by Year</title>
   <style>
     :root { --ink:#17243b; --muted:#637087; --line:#dfe5ec; --paper:#fff;
       --wash:#f5f7fa; --blue:#176b87; --teal:#25a18e; --gold:#e3a72f; }
@@ -50,7 +50,7 @@
 <body>
   <main class="shell">
     <div class="eyebrow">Local data · checked calculation</div>
-    <h1>__DASHBOARD_TITLE__</h1>
+    <h1>Tonnes Per Hectare by Year</h1>
     <p class="lede" id="question"></p>
     <div class="toolbar" id="toolbar"><button id="download">Download current table</button></div>
     <section class="grid">
@@ -61,7 +61,7 @@
     <footer class="source" id="source"></footer>
   </main>
   <script>
-    const B=__DASHBOARD_DATA__, V=B.view;
+    const B={"schema_version": 1, "case_id": "rep-01", "title": "Tonnes Per Hectare by Year", "question": "now show 2023 and 2024 Monsoon tonnes per hectare trend for every block", "view": {"title": "Tonnes Per Hectare by Year", "chart": "line", "x": "year", "y": ["tonnes_per_hectare"], "series": "block", "unit": "number", "note": "Computed locally from the selected file data. The displayed values come from the executed read-only query."}, "columns": ["block", "year", "tonnes_per_hectare"], "rows": [{"block": "Bhojpur", "year": 2023, "tonnes_per_hectare": 2.4}, {"block": "Bhojpur", "year": 2024, "tonnes_per_hectare": 2.5}, {"block": "Dharwad", "year": 2023, "tonnes_per_hectare": 3.0}, {"block": "Dharwad", "year": 2024, "tonnes_per_hectare": 3.2}, {"block": "Wardha", "year": 2023, "tonnes_per_hectare": 2.5}, {"block": "Wardha", "year": 2024, "tonnes_per_hectare": 2.7}], "insight_specs": [{"kind": "change", "metric": "tonnes_per_hectare", "entity_column": "block", "entities": ["Bhojpur", "Dharwad", "Wardha"], "time_column": "year", "from": 2023, "to": 2024, "unit": "number"}], "insights": [], "source": {"file": "field_harvest.csv", "sha256": "7312fc36aa03ff6489414beb76ee54dd2968bb07d17534f590c30e665bd2b43f", "provenance": "User-supplied local file(s); no external factual claims were added.", "format": "csv", "tables": ["field_harvest"]}}, V=B.view;
     const colours=['#176b87','#25a18e','#e3a72f','#c8553d','#7259a5','#597a38'];
     const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const human=s=>String(s).replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()).replace(/ Percent$/,' (%)');
@@ -92,7 +92,7 @@
         const group=(W-p.l-p.r)/series.length,bar=Math.min(66,group*.55);
         series.forEach((s,si)=>{const row=rows.find(r=>String(r[V.series])===String(s)),value=row?Number(row[activeY[0]]):NaN;if(!Number.isFinite(value))return;const height=value/max*(H-p.t-p.b),xx=p.l+si*group+(group-bar)/2;parts.push(`<rect x="${xx}" y="${H-p.b-height}" width="${bar}" height="${height}" rx="5" fill="${colours[si%colours.length]}"/><text class="value" x="${xx+bar/2}" y="${H-p.b-height-7}" text-anchor="middle">${esc(fmt(value,activeUnit,activeY[0]))}</text>`)});
       } else if(lineChart){
-        series.forEach((s,si)=>{const points=xs.map((x,xi)=>{const row=rows.find(r=>String(r[V.x])===String(x)&&(!V.series||String(r[V.series])===String(s))),value=row?Number(row[activeY[0]]):NaN;return Number.isFinite(value)?[p.l+xi*(W-p.l-p.r)/Math.max(xs.length-1,1),p.t+(max-value)/max*(H-p.t-p.b),value]:null}).filter(Boolean),labelOffsets=[-10,16,-26,32],labelEveryPoint=series.length<=2&&points.length<=3;parts.push(`<polyline fill="none" stroke="${colours[si%colours.length]}" stroke-width="3" points="${points.map(q=>q[0]+','+q[1]).join(' ')}"/>`);points.forEach((q,qi)=>{parts.push(`<circle cx="${q[0]}" cy="${q[1]}" r="4" fill="${colours[si%colours.length]}"/>`);if(series.length<=2&&(labelEveryPoint||qi===points.length-1))parts.push(`<text class="value" x="${q[0]}" y="${q[1]+labelOffsets[si%labelOffsets.length]}" text-anchor="middle">${esc(fmt(q[2],activeUnit,activeY[0]))}</text>`)})})
+        series.forEach((s,si)=>{const points=xs.map((x,xi)=>{const row=rows.find(r=>String(r[V.x])===String(x)&&(!V.series||String(r[V.series])===String(s))),value=row?Number(row[activeY[0]]):NaN;return Number.isFinite(value)?[p.l+xi*(W-p.l-p.r)/Math.max(xs.length-1,1),p.t+(max-value)/max*(H-p.t-p.b),value]:null}).filter(Boolean),labelOffsets=[-10,16,-26,32];parts.push(`<polyline fill="none" stroke="${colours[si%colours.length]}" stroke-width="3" points="${points.map(q=>q[0]+','+q[1]).join(' ')}"/>`);points.forEach(q=>parts.push(`<circle cx="${q[0]}" cy="${q[1]}" r="4" fill="${colours[si%colours.length]}"/><text class="value" x="${q[0]}" y="${q[1]+labelOffsets[si%labelOffsets.length]}" text-anchor="middle">${esc(fmt(q[2],activeUnit,activeY[0]))}</text>`))})
       } else {
         const group=(W-p.l-p.r)/xs.length,bar=Math.min(50,group/(series.length+1));
         xs.forEach((x,xi)=>series.forEach((s,si)=>{const row=rows.find(r=>String(r[V.x])===String(x)&&(!V.series||String(r[V.series])===String(s))),metric=V.series?activeY[0]:s,value=row?Number(row[metric]):NaN;if(!Number.isFinite(value))return;const height=value/max*(H-p.t-p.b),xx=p.l+xi*group+(group-bar*series.length)/2+si*bar;parts.push(`<rect x="${xx}" y="${H-p.b-height}" width="${Math.max(8,bar-5)}" height="${height}" rx="4" fill="${colours[si%colours.length]}"/><text class="value" x="${xx+(bar-5)/2}" y="${H-p.b-height-7}" text-anchor="middle">${esc(fmt(value,unitFor(metric),metric))}</text>`)}))

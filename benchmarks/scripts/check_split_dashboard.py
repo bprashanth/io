@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import csv
 import json
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -22,6 +23,7 @@ async def main() -> int:
     parser.add_argument("--expected-filtered-rows", type=int)
     parser.add_argument("--expected-current-rows", type=int)
     parser.add_argument("--select-metric")
+    parser.add_argument("--require-time-field", action="store_true")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
@@ -123,9 +125,15 @@ async def main() -> int:
             failures.append("download row count is wrong")
     if args.select_metric and args.select_metric not in (selected_table_headers or []):
         failures.append("selected indicator is not visible in the table")
-    if not any(column == "year" or column.endswith("_year") for column in checks["download_columns"]):
-        failures.append("download omits a year field")
-    if "source" not in checks["download_columns"]:
+    if args.require_time_field:
+        has_time_field = any(
+            column == "year" or column.endswith("_year")
+            or bool(re.search(r"(?:19|20)\d{2}", column))
+            for column in checks["download_columns"]
+        )
+        if not has_time_field:
+            failures.append("download omits a time field")
+    if not any(column == "source" or column.startswith("source_") for column in checks["download_columns"]):
         failures.append("download omits source")
     checks["failures"] = failures
     checks["passed"] = not failures

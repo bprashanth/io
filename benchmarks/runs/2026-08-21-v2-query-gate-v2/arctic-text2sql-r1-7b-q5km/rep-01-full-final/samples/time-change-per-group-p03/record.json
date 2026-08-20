@@ -1,0 +1,64 @@
+{
+  "id": "time-change-per-group-p03",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "give district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH anc_2021 AS (SELECT district, (CAST(anc4_completed AS REAL) * 100.0 / NULLIF(pregnancies_registered, 0)) AS anc_2021_rate FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda')), anc_2023 AS (SELECT district, (CAST(anc4_completed AS REAL) * 100.0 / NULLIF(pregnancies_registered, 0)) AS anc_2023_rate FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda')) SELECT a21.district, (a23.anc_2023_rate - a21.anc_2021_rate) AS anc_increase FROM anc_2021 AS a21 JOIN anc_2023 AS a23 ON a21.district = a23.district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ngive district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ngive district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: We need data from the `anc_visits` table for the years 2021 and 2023, specifically for the districts of Gaya and Nalanda.\n2. **Calculate ANC Completion Rates**: For each district and year, calculate the ANC completion rate as a percentage.\n3. **Compute the Percentage-Point Increase**: Calculate the difference in ANC completion rates between 2023 and 2021 for each district.\n4. **Filter by Districts**: Ensure that only data for Gaya and Nalanda is included in the final result.\n\nLet's break down the SQL query step-by-step:\n\n### Step 1: Extract Relevant Data\nWe need to extract the `district`, `year`, `pregnancies_registered`, and `anc4_completed` columns from the `anc_visits` table for the years 2021 and 2023.\n\n### Step 2: Calculate ANC Completion Rates\nFor each district and year, calculate the ANC completion rate as a percentage. This is done by dividing `anc4_completed` by `pregnancies_registered` and multiplying by 100.0.\n\n### Step 3: Compute the Percentage-Point Increase\nWe need to join the data for 2021 and 2023 on the `district` column and then compute the difference in ANC completion rates.\n\n### Step 4: Filter by Districts\nFinally, filter the results to include only the districts of Gaya and Nalanda.\n\nHere is the SQL query that accomplishes these steps:\n\n```sql\nWITH anc_2021 AS (\n    SELECT \n        district,\n        (CAST(anc4_completed AS REAL) * 100.0 / pregnancies_registered) AS anc_2021_rate\n    FROM \n        anc_visits\n    WHERE \n        year = 2021 AND district IN ('Gaya', 'Nalanda')\n),\nanc_2023 AS (\n    SELECT \n        district,\n        (CAST(anc4_completed AS REAL) * 100.0 / pregnancies_registered) AS anc_2023_rate\n    FROM \n        anc_visits\n    WHERE \n        year = 2023 AND district IN ('Gaya', 'Nalanda')\n)\nSELECT \n    a21.district,\n    (a23.anc_2023_rate - a21.anc_2021_rate) AS anc_increase\nFROM \n    anc_2021 a21\nJOIN \n    anc_2023 a23 ON a21.district = a23.district;\n```\n\n### Explanation:\n- **anc_2021 CTE**: This Common Table Expression (CTE) calculates the ANC completion rate for the year 2021 for the specified districts.\n- **anc_2023 CTE**: This CTE calculates the ANC completion rate for the year 2023 for the specified districts.\n- **Final SELECT Statement**: This joins the two CTEs on the `district` column and calculates the percentage-point increase in ANC completion rates from 2021 to 2023.\n\nThis query efficiently computes the required information without unnecessary joins or columns, ensuring optimal performance.",
+      "api": {
+        "id": "chatcmpl-0V7b10kk45eVvrrJAPgSZWlW1DLrFk30",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 719,
+          "prompt_tokens": 223,
+          "total_tokens": 942,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 22.76
+      },
+      "duration_seconds": 22.765,
+      "sql_duckdb": "WITH anc_2021 AS (SELECT district, (CAST(anc4_completed AS REAL) * 100.0 / NULLIF(pregnancies_registered, 0)) AS anc_2021_rate FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda')), anc_2023 AS (SELECT district, (CAST(anc4_completed AS REAL) * 100.0 / NULLIF(pregnancies_registered, 0)) AS anc_2023_rate FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda')) SELECT a21.district, (a23.anc_2023_rate - a21.anc_2021_rate) AS anc_increase FROM anc_2021 AS a21 JOIN anc_2023 AS a23 ON a21.district = a23.district",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

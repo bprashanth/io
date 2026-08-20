@@ -1,0 +1,76 @@
+{
+  "id": "derived-rate-ranking-p01",
+  "task_id": "derived-rate-ranking",
+  "pattern": "filter, derive a comparable percentage, rank",
+  "question": "2023 only show full immunisation percent district wise highest first",
+  "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+  "expected_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, (children_fully_immunised * 100.0) / NULLIF(children_due, 0) AS full_immunisation_percent FROM immunisation WHERE year = 2023 ORDER BY full_immunisation_percent DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2023 only show full immunisation percent district wise highest first\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2023 only show full immunisation percent district wise highest first\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to focus on the following key points:\n\n1. **Filter by Year**: The data should only include records from the year 2023.\n2. **Calculate Full Immunization Percentage**: This is calculated as `(children_fully_immunised * 100.0) / children_due`.\n3. **Order by Percentage**: The results should be ordered in descending order based on the calculated full immunization percentage.\n4. **Select Relevant Columns**: We need to select the district and the calculated full immunization percentage.\n\nGiven these requirements, we can construct the SQL query as follows:\n\n1. **SELECT Clause**: We need to select the `district` and the calculated full immunization percentage.\n2. **FROM Clause**: The data comes from the `immunisation` table.\n3. **WHERE Clause**: We filter the records to include only those from the year 2023.\n4. **ORDER BY Clause**: We order the results by the calculated full immunization percentage in descending order.\n\nHere is the final SQL query:\n\n```sql\nSELECT \n  district, \n  (children_fully_immunised * 100.0) / children_due AS full_immunisation_percent\nFROM \n  immunisation\nWHERE \n  year = 2023\nORDER BY \n  full_immunisation_percent DESC;\n```\n\nThis query accurately reflects the user's request by filtering the data for the year 2023, calculating the full immunization percentage, and ordering the results from highest to lowest percentage.",
+      "api": {
+        "id": "chatcmpl-OPDK7wnWB13EHJDRGX7PRRl3jJDUL8tk",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 330,
+          "prompt_tokens": 200,
+          "total_tokens": 530,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "duration_seconds": 10.485
+      },
+      "duration_seconds": 10.498,
+      "sql_duckdb": "SELECT district, (children_fully_immunised * 100.0) / NULLIF(children_due, 0) AS full_immunisation_percent FROM immunisation WHERE year = 2023 ORDER BY full_immunisation_percent DESC",
+      "rows": [
+        [
+          "Nalanda",
+          90.0
+        ],
+        [
+          "Gaya",
+          85.0
+        ],
+        [
+          "Purnia",
+          76.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

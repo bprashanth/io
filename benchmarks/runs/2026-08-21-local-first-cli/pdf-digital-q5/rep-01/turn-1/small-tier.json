@@ -1,0 +1,237 @@
+{
+  "accepted": false,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"facility_delivery_report\" (\"district\" VARCHAR, \"year\" BIGINT, \"facility_delivery_coverage_percent\" DOUBLE, \"source_page\" BIGINT, \"source_table\" VARCHAR, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"facility_delivery_report\": {\"district\": [\"Gaya\", \"Nalanda\", \"Purnia\", \"Kishanganj\"], \"source_table\": [\"Table 1\"], \"source\": [\"synthetic facility-delivery PDF fixture\"]}}\n\nPRIOR TURNS:\n[]\n\nCURRENT QUESTION:\nthis pdf has one district health table. make simple website for facility delivery coverage by year and district. i should select year and compare. show source page and table number",
+      "response": "To translate the natural language question into an executable SQLite query, we need to carefully parse the requirements and map them to the appropriate SQL constructs. Here's a step-by-step breakdown of the process:\n\n1. **Identify the Required Columns**:\n   - The question asks for data related to `year`, `district`, `facility_delivery_coverage_percent`, `source_page`, and `source_table`.\n\n2. **Determine the Source Table**:\n   - The data is sourced from the `facility_delivery_report` table.\n\n3. **Filtering Criteria**:\n   - The question specifies that we should filter for certain districts: `Gaya`, `Nalanda`, `Purnia`, and `Kishanganj`. This can be achieved using the `IN` clause.\n\n4. **Grouping and Ordering**:\n   - The data needs to be grouped by `year` and `district` to calculate the average facility delivery coverage percentage for each combination.\n   - The results should be ordered by `year` and `district` for better readability.\n\n5. **Construct the SQL Query**:\n   - Use `SELECT` to specify the columns to retrieve.\n   - Use `FROM` to specify the source table.\n   - Use `WHERE` to apply the filtering criteria.\n   - Use `GROUP BY` to group the results by `year` and `district`.\n   - Use `ORDER BY` to sort the results by `year` and `district`.\n\nHere is the final SQL query:\n\n```sql\nSELECT \n  year, \n  district, \n  AVG(facility_delivery_coverage_percent) AS avg_facility_delivery_coverage_percent, \n  source_page, \n  source_table\nFROM \n  facility_delivery_report\nWHERE \n  district IN ('Gaya', 'Nalanda', 'Purnia', 'Kishanganj')\nGROUP BY \n  year, \n  district, \n  source_page, \n  source_table\nORDER BY \n  year, \n  district;\n```\n\n### Explanation:\n- **SELECT**: We select the `year`, `district`, the average of `facility_delivery_coverage_percent`, and the `source_page` and `source_table`.\n- **FROM**: The data is sourced from the `facility_delivery_report` table.\n- **WHERE**: We filter the records to include only those where the `district` is one of the specified values.\n- **GROUP BY**: We group the results by `year`, `district`, `source_page`, and `source_table` to ensure that the average is calculated correctly for each group.\n- **ORDER BY**: We order the results by `year` and `district` to make the output organized and easy to read.\n\nThis query aligns with the requirements specified in the natural language question and efficiently retrieves the necessary data.",
+      "api": {
+        "id": "chatcmpl-NcA8SxW0FV5Nvr6aWaYxkM0NRqjd9UYj",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 570,
+          "prompt_tokens": 348,
+          "total_tokens": 918,
+          "prompt_tokens_details": {
+            "cached_tokens": 192
+          }
+        },
+        "duration_seconds": 17.936
+      },
+      "sql": "SELECT year, district, AVG(facility_delivery_coverage_percent) AS avg_facility_delivery_coverage_percent, source_page, source_table FROM facility_delivery_report WHERE district IN ('Gaya', 'Nalanda', 'Purnia', 'Kishanganj') GROUP BY year, district, source_page, source_table ORDER BY year NULLS FIRST, district NULLS FIRST",
+      "output_columns": [
+        "year",
+        "district",
+        "avg_facility_delivery_coverage_percent",
+        "source_page",
+        "source_table"
+      ],
+      "rows": [
+        [
+          2021,
+          "Gaya",
+          62.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2021,
+          "Kishanganj",
+          50.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2021,
+          "Nalanda",
+          70.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2021,
+          "Purnia",
+          55.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2022,
+          "Gaya",
+          67.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2022,
+          "Kishanganj",
+          56.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2022,
+          "Nalanda",
+          74.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2022,
+          "Purnia",
+          61.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2023,
+          "Gaya",
+          72.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2023,
+          "Kishanganj",
+          60.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2023,
+          "Nalanda",
+          79.0,
+          2,
+          "Table 1"
+        ],
+        [
+          2023,
+          "Purnia",
+          66.0,
+          2,
+          "Table 1"
+        ]
+      ],
+      "obligation_errors": [
+        "output claims an unrequested percentage unit: avg_facility_delivery_coverage_percent"
+      ],
+      "duration_seconds": 17.972
+    }
+  ],
+  "attempt": 1,
+  "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"facility_delivery_report\" (\"district\" VARCHAR, \"year\" BIGINT, \"facility_delivery_coverage_percent\" DOUBLE, \"source_page\" BIGINT, \"source_table\" VARCHAR, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"facility_delivery_report\": {\"district\": [\"Gaya\", \"Nalanda\", \"Purnia\", \"Kishanganj\"], \"source_table\": [\"Table 1\"], \"source\": [\"synthetic facility-delivery PDF fixture\"]}}\n\nPRIOR TURNS:\n[]\n\nCURRENT QUESTION:\nthis pdf has one district health table. make simple website for facility delivery coverage by year and district. i should select year and compare. show source page and table number",
+  "response": "To translate the natural language question into an executable SQLite query, we need to carefully parse the requirements and map them to the appropriate SQL constructs. Here's a step-by-step breakdown of the process:\n\n1. **Identify the Required Columns**:\n   - The question asks for data related to `year`, `district`, `facility_delivery_coverage_percent`, `source_page`, and `source_table`.\n\n2. **Determine the Source Table**:\n   - The data is sourced from the `facility_delivery_report` table.\n\n3. **Filtering Criteria**:\n   - The question specifies that we should filter for certain districts: `Gaya`, `Nalanda`, `Purnia`, and `Kishanganj`. This can be achieved using the `IN` clause.\n\n4. **Grouping and Ordering**:\n   - The data needs to be grouped by `year` and `district` to calculate the average facility delivery coverage percentage for each combination.\n   - The results should be ordered by `year` and `district` for better readability.\n\n5. **Construct the SQL Query**:\n   - Use `SELECT` to specify the columns to retrieve.\n   - Use `FROM` to specify the source table.\n   - Use `WHERE` to apply the filtering criteria.\n   - Use `GROUP BY` to group the results by `year` and `district`.\n   - Use `ORDER BY` to sort the results by `year` and `district`.\n\nHere is the final SQL query:\n\n```sql\nSELECT \n  year, \n  district, \n  AVG(facility_delivery_coverage_percent) AS avg_facility_delivery_coverage_percent, \n  source_page, \n  source_table\nFROM \n  facility_delivery_report\nWHERE \n  district IN ('Gaya', 'Nalanda', 'Purnia', 'Kishanganj')\nGROUP BY \n  year, \n  district, \n  source_page, \n  source_table\nORDER BY \n  year, \n  district;\n```\n\n### Explanation:\n- **SELECT**: We select the `year`, `district`, the average of `facility_delivery_coverage_percent`, and the `source_page` and `source_table`.\n- **FROM**: The data is sourced from the `facility_delivery_report` table.\n- **WHERE**: We filter the records to include only those where the `district` is one of the specified values.\n- **GROUP BY**: We group the results by `year`, `district`, `source_page`, and `source_table` to ensure that the average is calculated correctly for each group.\n- **ORDER BY**: We order the results by `year` and `district` to make the output organized and easy to read.\n\nThis query aligns with the requirements specified in the natural language question and efficiently retrieves the necessary data.",
+  "api": {
+    "id": "chatcmpl-NcA8SxW0FV5Nvr6aWaYxkM0NRqjd9UYj",
+    "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+    "finish_reason": "stop",
+    "usage": {
+      "completion_tokens": 570,
+      "prompt_tokens": 348,
+      "total_tokens": 918,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      }
+    },
+    "duration_seconds": 17.936
+  },
+  "sql": "SELECT year, district, AVG(facility_delivery_coverage_percent) AS avg_facility_delivery_coverage_percent, source_page, source_table FROM facility_delivery_report WHERE district IN ('Gaya', 'Nalanda', 'Purnia', 'Kishanganj') GROUP BY year, district, source_page, source_table ORDER BY year NULLS FIRST, district NULLS FIRST",
+  "output_columns": [
+    "year",
+    "district",
+    "avg_facility_delivery_coverage_percent",
+    "source_page",
+    "source_table"
+  ],
+  "rows": [
+    [
+      2021,
+      "Gaya",
+      62.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2021,
+      "Kishanganj",
+      50.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2021,
+      "Nalanda",
+      70.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2021,
+      "Purnia",
+      55.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2022,
+      "Gaya",
+      67.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2022,
+      "Kishanganj",
+      56.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2022,
+      "Nalanda",
+      74.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2022,
+      "Purnia",
+      61.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2023,
+      "Gaya",
+      72.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2023,
+      "Kishanganj",
+      60.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2023,
+      "Nalanda",
+      79.0,
+      2,
+      "Table 1"
+    ],
+    [
+      2023,
+      "Purnia",
+      66.0,
+      2,
+      "Table 1"
+    ]
+  ],
+  "obligation_errors": [
+    "output claims an unrequested percentage unit: avg_facility_delivery_coverage_percent"
+  ],
+  "duration_seconds": 17.972
+}

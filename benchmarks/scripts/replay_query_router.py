@@ -78,7 +78,14 @@ def validate_obligations(
         "mean", "total", "sum", "change", "difference", "gap", "count",
     )
     requests_metric = not absence_query and any(term in lowered for term in metric_terms)
-    if requests_metric and all(is_plain_column(expression) for expression in select.expressions):
+    numeric_output = any(
+        any(isinstance(row[index], (int, float)) and not isinstance(row[index], bool) for row in output_rows)
+        and not any(token in name.casefold() for token in (
+            "year", "date", "period", "month", "quarter", "source", "page", "row", "rank",
+        ))
+        for index, name in enumerate(output_columns)
+    )
+    if requests_metric and all(is_plain_column(expression) for expression in select.expressions) and not numeric_output:
         errors.append("requested metric is not present in the SELECT output")
 
     output_names = {name.casefold() for name in output_columns}
@@ -161,16 +168,19 @@ def main() -> int:
         if not sql:
             errors = ["no executable SQL"]
         else:
-            cursor = db.execute(sql)
-            output_columns = [description[0] for description in cursor.description]
-            output_rows = [list(row) for row in cursor.fetchall()]
-            errors = validate_obligations(
-                record["question"],
-                sql,
-                output_columns,
-                output_rows,
-                known_text_values(db, task["tables"]),
-            )
+            try:
+                cursor = db.execute(sql)
+                output_columns = [description[0] for description in cursor.description]
+                output_rows = [list(row) for row in cursor.fetchall()]
+                errors = validate_obligations(
+                    record["question"],
+                    sql,
+                    output_columns,
+                    output_rows,
+                    known_text_values(db, task["tables"]),
+                )
+            except Exception as error:
+                errors = [f"saved query is not executable: {type(error).__name__}: {error}"]
         records.append({
             "id": record["id"],
             "task_id": record["task_id"],
