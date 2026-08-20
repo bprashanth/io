@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/io/analysis-plan.schema.json",
+  "title": "Validated tabular analysis plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dataset_id", "question", "steps", "insights", "view", "interpretation_guard"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "dataset_id": {"type": "string", "minLength": 1},
+    "question": {"type": "string", "minLength": 1},
+    "clarification": {"type": ["string", "null"]},
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "oneOf": [
+          {"$ref": "#/$defs/filter"},
+          {"$ref": "#/$defs/derive"},
+          {"$ref": "#/$defs/group"},
+          {"$ref": "#/$defs/sort"},
+          {"$ref": "#/$defs/limit"}
+        ]
+      }
+    },
+    "insights": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "oneOf": [
+          {"$ref": "#/$defs/extreme"},
+          {"$ref": "#/$defs/change"},
+          {"$ref": "#/$defs/difference"},
+          {"$ref": "#/$defs/causal_limit"}
+        ]
+      }
+    },
+    "view": {"$ref": "#/$defs/view"},
+    "interpretation_guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "can_explain_cause": {"type": "boolean"},
+        "caveat": {"type": ["string", "null"]}
+      },
+      "required": ["can_explain_cause", "caveat"]
+    }
+  },
+  "$defs": {
+    "column": {"type": "string", "minLength": 1},
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "column", "cmp", "value"],
+      "properties": {
+        "op": {"const": "filter"},
+        "column": {"$ref": "#/$defs/column"},
+        "cmp": {"enum": ["eq", "ne", "lt", "le", "gt", "ge", "in", "between", "contains"]},
+        "value": {
+          "oneOf": [
+            {"type": ["string", "number", "boolean", "null"]},
+            {"type": "array", "minItems": 1, "items": {"type": ["string", "number", "boolean", "null"]}}
+          ]
+        }
+      }
+    },
+    "derive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "name", "kind", "numerator", "denominator", "unit"],
+      "properties": {
+        "op": {"const": "derive"},
+        "name": {"$ref": "#/$defs/column"},
+        "kind": {"enum": ["ratio", "percent", "difference", "percentage_point_change"]},
+        "numerator": {"$ref": "#/$defs/column"},
+        "denominator": {"$ref": "#/$defs/column"},
+        "unit": {"enum": ["number", "ratio", "percent", "percentage points"]}
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "fn", "column"],
+      "properties": {
+        "name": {"$ref": "#/$defs/column"},
+        "fn": {"enum": ["sum", "mean", "min", "max", "count", "weighted_percent"]},
+        "column": {"$ref": "#/$defs/column"},
+        "weight_column": {"$ref": "#/$defs/column"},
+        "denominator_column": {"$ref": "#/$defs/column"}
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "by", "aggregates"],
+      "properties": {
+        "op": {"const": "group"},
+        "by": {"type": "array", "maxItems": 4, "items": {"$ref": "#/$defs/column"}},
+        "aggregates": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"$ref": "#/$defs/aggregate"}}
+      }
+    },
+    "sort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "column", "direction"],
+      "properties": {
+        "op": {"const": "sort"},
+        "column": {"$ref": "#/$defs/column"},
+        "direction": {"enum": ["asc", "desc"]}
+      }
+    },
+    "limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "rows"],
+      "properties": {
+        "op": {"const": "limit"},
+        "rows": {"type": "integer", "minimum": 1, "maximum": 1000}
+      }
+    },
+    "extreme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "metric", "label_column"],
+      "properties": {
+        "kind": {"enum": ["highest", "lowest"]},
+        "metric": {"$ref": "#/$defs/column"},
+        "label_column": {"$ref": "#/$defs/column"}
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "metric", "entity_column", "entities", "time_column", "from", "to", "unit"],
+      "properties": {
+        "kind": {"const": "change"},
+        "metric": {"$ref": "#/$defs/column"},
+        "entity_column": {"$ref": "#/$defs/column"},
+        "entities": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"type": "string"}},
+        "time_column": {"$ref": "#/$defs/column"},
+        "from": {"type": ["string", "number"]},
+        "to": {"type": ["string", "number"]},
+        "unit": {"enum": ["number", "percent", "percentage points"]}
+      }
+    },
+    "difference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "metric", "entity_column", "entities", "time_column", "time", "unit"],
+      "properties": {
+        "kind": {"const": "difference"},
+        "metric": {"$ref": "#/$defs/column"},
+        "entity_column": {"$ref": "#/$defs/column"},
+        "entities": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
+        "time_column": {"$ref": "#/$defs/column"},
+        "time": {"type": ["string", "number"]},
+        "unit": {"enum": ["number", "percent", "percentage points"]}
+      }
+    },
+    "causal_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": {"const": "causal_limit"},
+        "message": {"type": "string", "minLength": 1}
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "chart", "x", "y", "series", "unit", "note"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "chart": {"enum": ["horizontal_bar", "grouped_bar", "line", "slope", "scatter", "stacked_bar", "table"]},
+        "x": {"$ref": "#/$defs/column"},
+        "y": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/column"}},
+        "series": {"type": ["string", "null"]},
+        "unit": {"type": ["string", "null"]},
+        "note": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

@@ -31,3 +31,17 @@ runs/<batch>/<case>/<system>/<model>/<rep>/
 ```
 
 Secrets and browser/auth profiles never belong under `runs/`.
+
+## Split-pipeline development runner
+
+`scripts/run_split_pipeline.py` is a deliberately narrow runner for the event
+architecture study. It asks a model only for a JSON analysis plan, validates
+and binds that plan, executes it with DuckDB and fills a self-contained page
+from trusted computed rows. The model does not author SQL, values, HTML or
+JavaScript. The first prototype accepts one CSV; other inputs will use separate
+deterministic adapters.
+
+Use an isolated Python environment with DuckDB, pandas and jsonschema. The
+runner records the profile, exact planner request, response metadata, validated
+plan, result contract, page and complete-row CSV for each turn. Browser evidence
+is still mandatory; runner completion by itself is not a benchmark pass.

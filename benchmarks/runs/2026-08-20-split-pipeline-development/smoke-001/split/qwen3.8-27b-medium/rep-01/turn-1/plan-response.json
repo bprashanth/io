@@ -1,0 +1,81 @@
+{
+  "plan": {
+    "schema_version": 1,
+    "dataset_id": "smoke-001",
+    "question": "Show district immunisation by year with year selector and district comparison; display source.",
+    "steps": [
+      {
+        "op": "filter",
+        "column": "year",
+        "cmp": "eq",
+        "value": "{{selected_year}}|2022|2023|default:2023|type:int64|label:Year"
+      },
+      {
+        "op": "derive",
+        "name": "coverage_percent",
+        "kind": "percent",
+        "numerator": "children_fully_immunised",
+        "denominator": "children_due",
+        "unit": "percent"
+      },
+      {
+        "op": "sort",
+        "column": "district",
+        "direction": "asc"
+      }
+    ],
+    "insights": [
+      {
+        "kind": "causal_limit",
+        "message": "Synthetic fixture data; no causal variables available to explain differences between districts."
+      }
+    ],
+    "view": {
+      "title": "District Immunisation Coverage by Year",
+      "chart": "grouped_bar",
+      "x": "district",
+      "y": [
+        "children_fully_immunised",
+        "children_due"
+      ],
+      "series": "district",
+      "unit": "children",
+      "note": "coverage_percent shown as data label per bar (unit: percent). Subtracting two coverage_percent values yields percentage points, not percent growth."
+    },
+    "interpretation_guard": {
+      "can_explain_cause": false,
+      "caveat": "Data is a deterministic synthetic smoke fixture. No causal mechanism is encoded; differences across districts or years must not be attributed to policy, funding, or access."
+    }
+  },
+  "api": {
+    "requested_model": "qwen/qwen3.8-27b",
+    "resolved_model": "qwen/qwen3.8-27b",
+    "generation_id": "gen-1787226798-fOPYpQNlfsewLJ3LDy8Z",
+    "duration_seconds": 23.637,
+    "finish_reason": "stop",
+    "usage": {
+      "prompt_tokens": 561,
+      "completion_tokens": 1136,
+      "total_tokens": 1697,
+      "cost": 0.00388765,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.00388765,
+        "upstream_inference_prompt_cost": 0.00025245,
+        "upstream_inference_completions_cost": 0.0036352
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 719,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "reasoning_effort": "medium"
+  }
+}
