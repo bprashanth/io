@@ -29,12 +29,36 @@ def label(name: str) -> str:
     return name.replace("_", " ").strip().title()
 
 
+def reshape_wide_time(frame: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    groups: dict[str, list[tuple[str, int]]] = {}
+    for column in map(str, frame.columns):
+        match = re.fullmatch(r"(.+)_((?:19|20)\d{2})", column)
+        if match and pd.api.types.is_numeric_dtype(frame[column]):
+            groups.setdefault(match.group(1), []).append((column, int(match.group(2))))
+    candidate = next((item for item in groups.items() if len(item[1]) >= 2), None)
+    if candidate is None:
+        return frame, []
+    metric, columns = candidate
+    value_columns = [column for column, _year in sorted(columns, key=lambda item: item[1])]
+    id_columns = [column for column in frame.columns if str(column) not in value_columns]
+    reshaped = frame.melt(
+        id_vars=id_columns,
+        value_vars=value_columns,
+        var_name="_wide_metric_year",
+        value_name=metric,
+    )
+    reshaped["year"] = reshaped["_wide_metric_year"].str.extract(r"((?:19|20)\d{2})$").astype(int)
+    reshaped = reshaped.drop(columns=["_wide_metric_year"])
+    return reshaped, [f"reshaped year-suffixed metric columns into year + {metric}"]
+
+
 def build_report(
     manifest: dict[str, Any],
     record: dict[str, Any],
     frame: pd.DataFrame,
 ) -> dict[str, Any]:
     question = record["question"]
+    frame, normalizations = reshape_wide_time(frame)
     years = [int(value) for value in re.findall(r"\b(?:19|20)\d{2}\b", question)]
     if not any("year" in str(column).casefold() for column in frame.columns):
         if len(set(years)) == 1:
@@ -81,18 +105,37 @@ def build_report(
     title = f"{label(metric)} by {label(x)}"
     if series:
         title += f" and {label(series)}"
+    insight_specs = []
     insights = []
     valid = frame.dropna(subset=[metric])
     if not valid.empty:
-        direction = "lowest" if any(word in question.casefold() for word in ("lowest", "smallest", "worst")) else "highest"
-        chosen_index = valid[metric].idxmin() if direction == "lowest" else valid[metric].idxmax()
-        chosen = valid.loc[chosen_index]
-        insights.append({
-            "kind": direction,
-            "label": str(chosen[dimensions[0]]),
-            "value": clean(chosen[metric]),
-            "metric": metric,
-        })
+        if series and x in frame.columns:
+            entities = list(dict.fromkeys(map(str, valid[series].dropna())))
+            insight_specs.append({
+                "kind": "change",
+                "metric": metric,
+                "entity_column": series,
+                "entities": entities,
+                "time_column": x,
+                "from": clean(valid[x].min()),
+                "to": clean(valid[x].max()),
+                "unit": unit,
+            })
+        else:
+            direction = "lowest" if any(word in question.casefold() for word in ("lowest", "smallest", "worst")) else "highest"
+            chosen_index = valid[metric].idxmin() if direction == "lowest" else valid[metric].idxmax()
+            chosen = valid.loc[chosen_index]
+            insight_specs.append({
+                "kind": direction,
+                "metric": metric,
+                "label_column": dimensions[0],
+            })
+            insights.append({
+                "kind": direction,
+                "label": str(chosen[dimensions[0]]),
+                "value": clean(chosen[metric]),
+                "metric": metric,
+            })
 
     rows = [{str(key): clean(value) for key, value in row.items()} for row in frame.to_dict("records")]
     combined_hash = hashlib.sha256()
@@ -114,8 +157,9 @@ def build_report(
         },
         "columns": list(map(str, frame.columns)),
         "rows": rows,
-        "insight_specs": [],
+        "insight_specs": insight_specs,
         "insights": insights,
+        "normalizations": normalizations,
         "source": {
             "file": "; ".join(source_names),
             "sha256": combined_hash.hexdigest(),
@@ -130,15 +174,21 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--run", type=Path, required=True)
+    parser.add_argument("--router-replay", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text())
     tasks = {task["id"]: task for task in manifest["tasks"]}
+    routes = {
+        record["id"]: record
+        for record in json.loads(args.router_replay.read_text())["records"]
+    }
     db, _ = create_database(manifest)
     for turn, record_path in enumerate(sorted((args.run / "samples").glob("*/record.json")), 1):
         record = json.loads(record_path.read_text())
-        if not record["passed"]:
-            raise ValueError(f"cannot render failed query record {record['id']}")
+        route = routes.get(record["id"])
+        if route is None or route["route"] != "accept_local":
+            raise ValueError(f"query record {record['id']} was not accepted by the frozen local router")
         cursor = db.execute(record["sql_duckdb"])
         columns = [description[0] for description in cursor.description]
         frame = pd.DataFrame(cursor.fetchall(), columns=columns)

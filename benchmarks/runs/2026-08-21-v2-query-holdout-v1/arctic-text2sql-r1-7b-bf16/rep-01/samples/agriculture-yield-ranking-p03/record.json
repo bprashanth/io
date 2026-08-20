@@ -1,0 +1,74 @@
+{
+  "id": "agriculture-yield-ranking-p03",
+  "task_id": "agriculture-yield-ranking",
+  "pattern": "filter and rank a non-percentage derived measure",
+  "question": "show every block's 2024 Monsoon tonnes per hectare, top to bottom",
+  "gold_sql": "SELECT block, ROUND(1.0 * harvest_tonnes / cultivated_hectares, 1) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC, block",
+  "expected_rows": [
+    [
+      "Dharwad",
+      3.2
+    ],
+    [
+      "Wardha",
+      2.7
+    ],
+    [
+      "Bhojpur",
+      2.5
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dharwad",
+      3.200000047683716
+    ],
+    [
+      "Wardha",
+      2.700000047683716
+    ],
+    [
+      "Bhojpur",
+      2.5
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT block, CAST(harvest_tonnes AS REAL) / NULLIF(cultivated_hectares, 0) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nshow every block's 2024 Monsoon tonnes per hectare, top to bottom\n[Database Schema]\nCREATE TABLE \"field_harvest\" (\n  \"block\" VARCHAR,\n  \"season\" VARCHAR,\n  \"year\" BIGINT,\n  \"cultivated_hectares\" BIGINT,\n  \"harvest_tonnes\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nshow every block's 2024 Monsoon tonnes per hectare, top to bottom\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to focus on extracting the relevant data from the `field_harvest` table. The user wants to see the tonnes per hectare for the Monsoon season in the year 2024, ordered from top to bottom. Here's the step-by-step reasoning:\n\n1. **Identify the Relevant Table and Columns**: The `field_harvest` table contains all the necessary information. We need the `block`, `harvest_tonnes`, and `cultivated_hectares` columns.\n\n2. **Filter Data for the Specific Season and Year**: We need to filter the records to include only those from the 'Monsoon' season in the year 2024.\n\n3. **Calculate Tonnes per Hectare**: This is done by dividing `harvest_tonnes` by `cultivated_hectares`.\n\n4. **Order the Results**: The results should be ordered by the calculated tonnes per hectare in descending order to show the highest values first.\n\n5. **Select Only Necessary Columns**: We only need the `block` and the calculated tonnes per hectare.\n\nHere is the SQL query based on the above steps:\n\n```sql\nSELECT \n    block,\n    CAST(harvest_tonnes AS REAL) / cultivated_hectares AS tonnes_per_hectare\nFROM \n    field_harvest\nWHERE \n    season = 'Monsoon' AND year = 2024\nORDER BY \n    tonnes_per_hectare DESC;\n```\n\n### Explanation:\n- **CAST(harvest_tonnes AS REAL)**: This ensures that the division operation results in a floating-point number, which is necessary for accurate representation of tonnes per hectare.\n- **WHERE season = 'Monsoon' AND year = 2024**: Filters the records to only include those from the Monsoon season in 2024.\n- **ORDER BY tonnes_per_hectare DESC**: Orders the results in descending order based on the calculated tonnes per hectare, showing the highest values first.",
+      "api": {
+        "id": "chatcmpl-9ad7b425c91d2aba",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 219,
+          "total_tokens": 649,
+          "completion_tokens": 430,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 32.216
+      },
+      "duration_seconds": 32.22,
+      "sql_duckdb": "SELECT block, CAST(harvest_tonnes AS REAL) / NULLIF(cultivated_hectares, 0) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC",
+      "rows": [
+        [
+          "Dharwad",
+          3.200000047683716
+        ],
+        [
+          "Wardha",
+          2.700000047683716
+        ],
+        [
+          "Bhojpur",
+          2.5
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

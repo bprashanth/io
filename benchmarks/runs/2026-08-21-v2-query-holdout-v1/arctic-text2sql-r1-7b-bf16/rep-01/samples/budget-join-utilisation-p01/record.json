@@ -1,0 +1,80 @@
+{
+  "id": "budget-join-utilisation-p01",
+  "task_id": "budget-join-utilisation",
+  "pattern": "join a new key and rank a derived percentage",
+  "question": "join 2024 approved and spend by org unit and year, utilisation percentage lowest first",
+  "gold_sql": "SELECT b.org_unit, ROUND(100.0 * s.spent_lakh / b.approved_lakh, 1) AS utilisation_percent FROM approved_budget AS b JOIN actual_spend AS s ON b.org_unit = s.org_unit AND b.year = s.year WHERE b.year = 2024 ORDER BY utilisation_percent ASC, b.org_unit",
+  "expected_rows": [
+    [
+      "South",
+      75.0
+    ],
+    [
+      "North",
+      80.0
+    ],
+    [
+      "Central",
+      90.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "South",
+      2024,
+      75.0
+    ],
+    [
+      "North",
+      2024,
+      80.0
+    ],
+    [
+      "Central",
+      2024,
+      90.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT ab.org_unit, ab.year, (aspend.spent_lakh * 100.0 / NULLIF(ab.approved_lakh, 0)) AS utilization_percentage FROM approved_budget AS ab JOIN actual_spend AS aspend ON ab.org_unit = aspend.org_unit AND ab.year = aspend.year WHERE ab.year = 2024 ORDER BY utilization_percentage ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\njoin 2024 approved and spend by org unit and year, utilisation percentage lowest first\n[Database Schema]\nCREATE TABLE \"approved_budget\" (\n  \"org_unit\" VARCHAR,\n  \"year\" BIGINT,\n  \"approved_lakh\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"actual_spend\" (\n  \"org_unit\" VARCHAR,\n  \"year\" BIGINT,\n  \"spent_lakh\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same org_unit-year grain and can be matched on org_unit and year. Percent means 100.0 times numerator divided by the stated denominator.\n[User Question]\njoin 2024 approved and spend by org unit and year, utilisation percentage lowest first\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the relevant tables**: The user wants to join the `approved_budget` and `actual_spend` tables.\n2. **Filter by year**: The user specifically wants data for the year 2024.\n3. **Calculate the utilization percentage**: This is calculated as `(spent_lakh / approved_lakh) * 100.0`.\n4. **Order the results**: The results should be ordered by the utilization percentage in ascending order (lowest first).\n\nGiven the schema and the user's requirements, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    ab.org_unit, \n    ab.year, \n    (aspend.spent_lakh * 100.0 / ab.approved_lakh) AS utilization_percentage\nFROM \n    approved_budget ab\nJOIN \n    actual_spend aspend \nON \n    ab.org_unit = aspend.org_unit AND ab.year = aspend.year\nWHERE \n    ab.year = 2024\nORDER BY \n    utilization_percentage ASC;\n```\n\n### Explanation:\n- **SELECT Clause**: We select `org_unit`, `year`, and calculate the utilization percentage.\n- **FROM Clause**: We specify the `approved_budget` table as the primary table.\n- **JOIN Clause**: We join the `actual_spend` table on `org_unit` and `year` to match the corresponding records.\n- **WHERE Clause**: We filter the records to only include those from the year 2024.\n- **ORDER BY Clause**: We order the results by the calculated utilization percentage in ascending order to show the lowest utilization percentages first.\n\nThis query ensures that we only retrieve the necessary data and perform the required calculations efficiently.",
+      "api": {
+        "id": "chatcmpl-8d946fc7792b4f76",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 249,
+          "total_tokens": 622,
+          "completion_tokens": 373,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 27.987
+      },
+      "duration_seconds": 27.994,
+      "sql_duckdb": "SELECT ab.org_unit, ab.year, (aspend.spent_lakh * 100.0 / NULLIF(ab.approved_lakh, 0)) AS utilization_percentage FROM approved_budget AS ab JOIN actual_spend AS aspend ON ab.org_unit = aspend.org_unit AND ab.year = aspend.year WHERE ab.year = 2024 ORDER BY utilization_percentage ASC NULLS FIRST",
+      "rows": [
+        [
+          "South",
+          2024,
+          75.0
+        ],
+        [
+          "North",
+          2024,
+          80.0
+        ],
+        [
+          "Central",
+          2024,
+          90.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

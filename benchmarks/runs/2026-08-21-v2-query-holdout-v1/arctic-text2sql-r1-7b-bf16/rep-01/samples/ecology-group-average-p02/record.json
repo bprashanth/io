@@ -1,0 +1,74 @@
+{
+  "id": "ecology-group-average-p02",
+  "task_id": "ecology-group-average",
+  "pattern": "grouped average and ascending rank",
+  "question": "station wise mean nitrate in 2024 sort low to high",
+  "gold_sql": "SELECT station, ROUND(AVG(nitrate_mg_l), 1) AS average_nitrate_mg_l FROM river_samples WHERE year = 2024 GROUP BY station ORDER BY average_nitrate_mg_l ASC, station",
+  "expected_rows": [
+    [
+      "Narmada",
+      1.0
+    ],
+    [
+      "Kosi",
+      2.0
+    ],
+    [
+      "Periyar",
+      2.8
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Narmada",
+      1.0
+    ],
+    [
+      "Kosi",
+      2.0
+    ],
+    [
+      "Periyar",
+      2.8
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT station, AVG(nitrate_mg_l) AS mean_nitrate FROM river_samples WHERE year = 2024 GROUP BY station ORDER BY mean_nitrate ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nstation wise mean nitrate in 2024 sort low to high\n[Database Schema]\nCREATE TABLE \"river_samples\" (\n  \"station\" VARCHAR,\n  \"year\" BIGINT,\n  \"sample_no\" BIGINT,\n  \"dissolved_oxygen_mg_l\" DOUBLE,\n  \"nitrate_mg_l\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nstation wise mean nitrate in 2024 sort low to high\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to break down the requirements and map them to SQL operations:\n\n1. **Identify the Relevant Table and Columns**: The question is about the mean nitrate levels at different stations in the year 2024. Therefore, we need to use the `river_samples` table and focus on the `station`, `year`, and `nitrate_mg_l` columns.\n\n2. **Filter Data for the Year 2024**: We need to filter the records to include only those from the year 2024. This can be achieved using a `WHERE` clause.\n\n3. **Calculate the Mean Nitrate**: To find the mean nitrate level for each station, we use the `AVG()` function on the `nitrate_mg_l` column.\n\n4. **Group Data by Station**: Since we need the mean nitrate level for each station, we group the data by the `station` column using the `GROUP BY` clause.\n\n5. **Sort the Results**: Finally, we need to sort the results in ascending order based on the calculated mean nitrate levels. This is done using the `ORDER BY` clause.\n\nBy following these steps, we can construct the SQL query as follows:\n\n```sql\nSELECT station, AVG(nitrate_mg_l) AS mean_nitrate\nFROM river_samples\nWHERE year = 2024\nGROUP BY station\nORDER BY mean_nitrate ASC;\n```\n\nThis query accurately captures the requirements of the user's question, filtering the data for the year 2024, calculating the mean nitrate level for each station, and sorting the results from the lowest to the highest mean nitrate level.",
+      "api": {
+        "id": "chatcmpl-8bd37a893aa3889f",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 212,
+          "total_tokens": 572,
+          "completion_tokens": 360,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 27.018
+      },
+      "duration_seconds": 27.022,
+      "sql_duckdb": "SELECT station, AVG(nitrate_mg_l) AS mean_nitrate FROM river_samples WHERE year = 2024 GROUP BY station ORDER BY mean_nitrate ASC NULLS FIRST",
+      "rows": [
+        [
+          "Narmada",
+          1.0
+        ],
+        [
+          "Kosi",
+          2.0
+        ],
+        [
+          "Periyar",
+          2.8
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

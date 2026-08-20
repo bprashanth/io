@@ -1,0 +1,74 @@
+{
+  "id": "agriculture-yield-ranking-p02",
+  "task_id": "agriculture-yield-ranking",
+  "pattern": "filter and rank a non-percentage derived measure",
+  "question": "for Monsoon 2024 divide harvest tonnes by cultivated hectares for each block and rank best first",
+  "gold_sql": "SELECT block, ROUND(1.0 * harvest_tonnes / cultivated_hectares, 1) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC, block",
+  "expected_rows": [
+    [
+      "Dharwad",
+      3.2
+    ],
+    [
+      "Wardha",
+      2.7
+    ],
+    [
+      "Bhojpur",
+      2.5
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dharwad",
+      3.2
+    ],
+    [
+      "Wardha",
+      2.7
+    ],
+    [
+      "Bhojpur",
+      2.5
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT block, (harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0)) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor Monsoon 2024 divide harvest tonnes by cultivated hectares for each block and rank best first\n[Database Schema]\nCREATE TABLE \"field_harvest\" (\n  \"block\" VARCHAR,\n  \"season\" VARCHAR,\n  \"year\" BIGINT,\n  \"cultivated_hectares\" BIGINT,\n  \"harvest_tonnes\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor Monsoon 2024 divide harvest tonnes by cultivated hectares for each block and rank best first\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Filter the Data**: We need to filter the records to only include those from the \"Monsoon\" season in the year 2024.\n2. **Calculate the Ratio**: For each block, we need to calculate the ratio of \"harvest_tonnes\" to \"cultivated_hectares\".\n3. **Rank the Results**: Finally, we need to order the results in descending order based on the calculated ratio to rank the blocks from best to worst.\n\nGiven the schema and the user's request, the SQL query can be written as follows:\n\n```sql\nSELECT \n  block,\n  (harvest_tonnes * 1.0 / cultivated_hectares) AS tonnes_per_hectare\nFROM \n  field_harvest\nWHERE \n  season = 'Monsoon' AND year = 2024\nORDER BY \n  tonnes_per_hectare DESC;\n```\n\n### Reasoning Trace:\n1. **Filtering**: The `WHERE` clause filters the records to only include those from the \"Monsoon\" season in the year 2024.\n2. **Calculation**: The expression `(harvest_tonnes * 1.0 / cultivated_hectares)` calculates the ratio of harvest tonnes per hectare. Multiplying by `1.0` ensures that the division is done in floating-point arithmetic, which is necessary for accurate ratio calculation.\n3. **Ordering**: The `ORDER BY` clause sorts the results in descending order based on the calculated ratio, ensuring that the blocks with the highest ratio (best performance) are listed first.\n\nThis query directly addresses the user's request without unnecessary complexity or additional joins, making it straightforward and efficient.",
+      "api": {
+        "id": "chatcmpl-94f68e02f7d1c613",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 223,
+          "total_tokens": 593,
+          "completion_tokens": 370,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 27.634
+      },
+      "duration_seconds": 27.638,
+      "sql_duckdb": "SELECT block, (harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0)) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC",
+      "rows": [
+        [
+          "Dharwad",
+          3.2
+        ],
+        [
+          "Wardha",
+          2.7
+        ],
+        [
+          "Bhojpur",
+          2.5
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

@@ -1,0 +1,62 @@
+{
+  "id": "turn-3-two-block-change-p01",
+  "task_id": "turn-3-two-block-change",
+  "pattern": "follow-up narrows entities and computes a time difference",
+  "question": "only Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024",
+  "gold_sql": "WITH yields AS (SELECT block, year, 1.0 * harvest_tonnes / cultivated_hectares AS yield_value FROM field_harvest WHERE season = 'Monsoon' AND block IN ('Bhojpur', 'Wardha') AND year IN (2023, 2024)) SELECT block, ROUND(MAX(CASE WHEN year = 2024 THEN yield_value END) - MAX(CASE WHEN year = 2023 THEN yield_value END), 1) AS change_tonnes_per_hectare FROM yields GROUP BY block ORDER BY block",
+  "expected_rows": [
+    [
+      "Bhojpur",
+      0.1
+    ],
+    [
+      "Wardha",
+      0.2
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Bhojpur",
+      0.10000000000000009
+    ],
+    [
+      "Wardha",
+      0.20000000000000018
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT fh.block, (SUM(CASE WHEN fh.year = 2024 THEN fh.harvest_tonnes ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN fh.year = 2024 THEN fh.cultivated_hectares ELSE 0 END), 0)) - (SUM(CASE WHEN fh.year = 2023 THEN fh.harvest_tonnes ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN fh.year = 2023 THEN fh.cultivated_hectares ELSE 0 END), 0)) AS change_in_tonnes_per_hectare FROM field_harvest AS fh WHERE fh.block IN ('Bhojpur', 'Wardha') AND fh.year IN (2023, 2024) GROUP BY fh.block",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nonly Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024\n[Database Schema]\nCREATE TABLE \"field_harvest\" (\n  \"block\" VARCHAR,\n  \"season\" VARCHAR,\n  \"year\" BIGINT,\n  \"cultivated_hectares\" BIGINT,\n  \"harvest_tonnes\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nonly Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to focus on the following key points:\n\n1. **Filter the data**: We need to filter the records for the blocks 'Bhojpur' and 'Wardha'.\n2. **Calculate the change in tonnes per hectare**: We need to calculate the difference in tonnes per hectare between the years 2023 and 2024.\n3. **Group by block**: We need to group the results by block to compare the change for each block separately.\n\nHere is the step-by-step process to achieve this:\n\n1. **Select the relevant columns**: We need to select the `block`, `year`, `cultivated_hectares`, and `harvest_tonnes` columns from the `field_harvest` table.\n2. **Filter the records**: We will filter the records for the blocks 'Bhojpur' and 'Wardha' and for the years 2023 and 2024.\n3. **Calculate the tonnes per hectare**: We will calculate the tonnes per hectare for each year.\n4. **Group by block and calculate the change**: We will group the results by block and calculate the difference in tonnes per hectare between 2024 and 2023.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nSELECT \n    fh.block,\n    (SUM(CASE WHEN fh.year = 2024 THEN fh.harvest_tonnes ELSE 0 END) * 1.0 / SUM(CASE WHEN fh.year = 2024 THEN fh.cultivated_hectares ELSE 0 END)) -\n    (SUM(CASE WHEN fh.year = 2023 THEN fh.harvest_tonnes ELSE 0 END) * 1.0 / SUM(CASE WHEN fh.year = 2023 THEN fh.cultivated_hectares ELSE 0 END)) AS change_in_tonnes_per_hectare\nFROM \n    field_harvest fh\nWHERE \n    fh.block IN ('Bhojpur', 'Wardha') AND\n    fh.year IN (2023, 2024)\nGROUP BY \n    fh.block;\n```\n\n### Explanation:\n- **Filtering**: The `WHERE` clause filters the records to include only the blocks 'Bhojpur' and 'Wardha' and the years 2023 and 2024.\n- **Aggregation**: The `SUM` function with `CASE` statements calculates the total `harvest_tonnes` and `cultivated_hectares` for each year.\n- **Calculation**: The `change_in_tonnes_per_hectare` is calculated by subtracting the tonnes per hectare in 2023 from that in 2024.\n- **Grouping**: The `GROUP BY` clause ensures that the calculation is done separately for each block.\n\nThis query provides the required comparison of the change in tonnes per hectare from 2023 to 2024 for the specified blocks.",
+      "api": {
+        "id": "chatcmpl-9b8b3c418a76de33",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 239,
+          "total_tokens": 891,
+          "completion_tokens": 652,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 48.914
+      },
+      "duration_seconds": 48.92,
+      "sql_duckdb": "SELECT fh.block, (SUM(CASE WHEN fh.year = 2024 THEN fh.harvest_tonnes ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN fh.year = 2024 THEN fh.cultivated_hectares ELSE 0 END), 0)) - (SUM(CASE WHEN fh.year = 2023 THEN fh.harvest_tonnes ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN fh.year = 2023 THEN fh.cultivated_hectares ELSE 0 END), 0)) AS change_in_tonnes_per_hectare FROM field_harvest AS fh WHERE fh.block IN ('Bhojpur', 'Wardha') AND fh.year IN (2023, 2024) GROUP BY fh.block",
+      "rows": [
+        [
+          "Bhojpur",
+          0.10000000000000009
+        ],
+        [
+          "Wardha",
+          0.20000000000000018
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

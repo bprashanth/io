@@ -119,7 +119,8 @@ async def main() -> int:
         if len(downloaded) != args.expected_filtered_rows: failures.append("download row count is wrong")
     if args.expected_current_rows is not None:
         if initial_rows != args.expected_current_rows: failures.append("initial table row count is wrong")
-        if len(downloaded) != args.expected_current_rows: failures.append("download row count is wrong")
+        if args.expected_filtered_rows is None and len(downloaded) != args.expected_current_rows:
+            failures.append("download row count is wrong")
     if args.select_metric and args.select_metric not in (selected_table_headers or []):
         failures.append("selected indicator is not visible in the table")
     if not any(column == "year" or column.endswith("_year") for column in checks["download_columns"]):
