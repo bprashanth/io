@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facility Delivery Coverage by District and Year</title>
+<style>
+  :root {
+    --bg: #f4f7fa;
+    --card: #ffffff;
+    --ink: #1f2a37;
+    --muted: #5b6b7b;
+    --accent: #0e7490;
+    --accent-soft: #e0f2f7;
+    --bar: #0e7490;
+    --bar-compare: #f59e0b;
+    --line: #dde6ee;
+    --up: #15803d;
+    --down: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { font-size: 1.45rem; margin: 0 0 4px; }
+  header p.sub { margin: 0 0 4px; color: var(--muted); font-size: 0.95rem; }
+  .source-chip {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.8rem;
+    border: 1px solid #bfe3ec;
+    border-radius: 999px;
+    padding: 3px 12px;
+    margin: 8px 0 0;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-top: 16px;
+    box-shadow: 0 1px 2px rgba(16, 42, 67, 0.05);
+  }
+  .card h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .card-head h2 { margin: 0; }
+  .dl-btn {
+    border: 1px solid var(--accent);
+    background: #fff;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.82rem;
+    border-radius: 8px;
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .dl-btn:hover { background: var(--accent-soft); }
+  .controls { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+  .control-group label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; color: var(--muted); }
+  .year-buttons { display: flex; gap: 6px; }
+  .year-btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    padding: 7px 18px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    color: var(--ink);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .year-btn:hover { border-color: var(--accent); }
+  .year-btn[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  select {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.95rem;
+    background: #fff;
+    color: var(--ink);
+    min-width: 150px;
+  }
+  .chart { margin-top: 6px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 64px; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .bar-row .name { font-weight: 600; text-align: right; font-size: 0.92rem; }
+  .track {
+    position: relative;
+    height: 26px;
+    background: #eef3f8;
+    border-radius: 6px;
+  }
+  .fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--bar);
+    border-radius: 6px;
+    transition: width 0.35s ease;
+  }
+  .tick {
+    position: absolute;
+    top: -4px; bottom: -4px;
+    width: 3px;
+    background: var(--bar-compare);
+    border-radius: 2px;
+    transition: left 0.35s ease;
+  }
+  .value { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.92rem; }
+  .delta {
+    grid-column: 2 / 4;
+    font-size: 0.78rem;
+    margin: -8px 0 12px;
+    color: var(--muted);
+  }
+  .delta b.up { color: var(--up); }
+  .delta b.down { color: var(--down); }
+  .axis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin: 2px 74px 0 120px;
+  }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+  .legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 600; }
+  th.sel, td.sel { background: var(--accent-soft); }
+  tfoot td, tfoot th { border-top: 2px solid var(--line); font-weight: 600; }
+  .delta-up { color: var(--up); font-weight: 600; }
+  .delta-down { color: var(--down); font-weight: 600; }
+  .source-box {
+    background: #fffbe8;
+    border: 1px solid #f0e2a6;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: #5b4a12;
+  }
+  .source-box strong { color: #7a6210; }
+  .source-box ul { margin: 8px 0 0; padding-left: 18px; }
+  .source-box li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Facility Delivery Coverage by District and Year</h1>
+    <p class="sub">Share of recorded deliveries that occurred in a health facility, by district. Showing years 2022&ndash;2023 (source report covers 2021&ndash;2023).</p>
+    <span class="source-chip">Source: Table 1 &middot; page 2 of facility_delivery_report.pdf</span>
+  </header>
+
+  <section class="card" aria-label="Year and comparison controls">
+    <div class="controls">
+      <div class="control-group">
+        <label id="year-label">Select year</label>
+        <div class="year-buttons" role="group" aria-labelledby="year-label" id="yearButtons"></div>
+      </div>
+      <div class="control-group">
+        <label for="compareSelect">Compare with year</label>
+        <select id="compareSelect"></select>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Bar chart">
+    <h2 id="chartTitle">Coverage by district</h2>
+    <div class="chart" id="chart"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="card" aria-label="Data table">
+    <div class="card-head">
+      <h2>Data</h2>
+      <button type="button" class="dl-btn" id="downloadCsv" title="Download the table currently shown, with source">Download CSV</button>
+    </div>
+    <table>
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+      <tfoot id="tfoot"></tfoot>
+    </table>
+  </section>
+
+  <aside class="source-box" aria-label="Source information">
+    <strong>Source:</strong> <em>facility_delivery_report.pdf</em> &mdash; <strong>Table 1, page 2</strong>: &ldquo;Facility delivery coverage by district and year&rdquo;.
+    <ul>
+      <li>Source label: synthetic facility-delivery PDF fixture. The data table is Table 1 on page 2.</li>
+      <li>Unit: percent. Values are illustrative and are <strong>not official statistics</strong>.</li>
+      <li>Indicator definition: facility delivery coverage is the percentage of recorded deliveries that occurred in a health facility. The report supplies percentages only (no counts, no causal explanations).</li>
+    </ul>
+  </aside>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  // Data transcribed from Table 1, page 2 of facility_delivery_report.pdf
+  var DATA = [
+    { district: "Gaya",       values: { 2022: 67.0, 2023: 72.0 } },
+    { district: "Nalanda",    values: { 2022: 74.0, 2023: 79.0 } },
+    { district: "Purnia",     values: { 2022: 61.0, 2023: 66.0 } },
+    { district: "Kishanganj", values: { 2022: 56.0, 2023: 60.0 } }
+  ];
+  var YEARS = [2022, 2023];
+
+  var state = { year: 2023, compare: null };
+
+  var yearButtonsEl = document.getElementById("yearButtons");
+  var compareSelect = document.getElementById("compareSelect");
+  var chartEl = document.getElementById("chart");
+  var chartTitle = document.getElementById("chartTitle");
+  var legendEl = document.getElementById("legend");
+  var theadEl = document.getElementById("thead");
+  var tbodyEl = document.getElementById("tbody");
+  var tfootEl = document.getElementById("tfoot");
+  var downloadBtn = document.getElementById("downloadCsv");
+
+  function fmt(v) { return v.toFixed(1); }
+
+  function fmtDelta(d) {
+    if (d > 0) return "+" + d.toFixed(1) + " pts";
+    if (d < 0) return d.toFixed(1) + " pts";
+    return "0.0 pts";
+  }
+
+  // Year buttons
+  YEARS.forEach(function (y) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "year-btn";
+    b.textContent = String(y);
+    b.addEventListener("click", function () {
+      state.year = y;
+      if (state.compare === y) state.compare = null;
+      render();
+    });
+    yearButtonsEl.appendChild(b);
+  });
+
+  compareSelect.addEventListener("change", function () {
+    state.compare = compareSelect.value === "" ? null : parseInt(compareSelect.value, 10);
+    render();
+  });
+
+  function buildCompareOptions() {
+    compareSelect.innerHTML = "";
+    var none = document.createElement("option");
+    none.value = "";
+    none.textContent = "\u2014 none \u2014";
+    compareSelect.appendChild(none);
+    YEARS.forEach(function (y) {
+      if (y === state.year) return;
+      var o = document.createElement("option");
+      o.value = String(y);
+      o.textContent = String(y);
+      if (state.compare === y) o.selected = true;
+      compareSelect.appendChild(o);
+    });
+  }
+
+  function render() {
+    // Year buttons active state
+    Array.prototype.forEach.call(yearButtonsEl.children, function (b) {
+      b.setAttribute("aria-pressed", String(parseInt(b.textContent, 10) === state.year));
+    });
+    buildCompareOptions();
+
+    var y = state.year;
+    var c = state.compare;
+
+    // --- Chart ---
+    chartTitle.textContent = "Coverage by district \u2014 " + y + (c ? " (vs " + c + ")" : "");
+    chartEl.innerHTML = "";
+
+    DATA.forEach(function (row) {
+      var v = row.values[y];
+
+      var barRow = document.createElement("div");
+      barRow.className = "bar-row";
+
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = row.district;
+      barRow.appendChild(name);
+
+      var track = document.createElement("div");
+      track.className = "track";
+      track.setAttribute("role", "img");
+      track.setAttribute("aria-label", row.district + ": " + fmt(v) + " percent in " + y +
+        (c ? ", " + fmt(row.values[c]) + " percent in " + c : ""));
+
+      var fill = document.createElement("div");
+      fill.className = "fill";
+      fill.style.width = v + "%";
+      track.appendChild(fill);
+
+      if (c) {
+        var tick = document.createElement("div");
+        tick.className = "tick";
+        tick.style.left = "calc(" + row.values[c] + "% - 1.5px)";
+        tick.title = c + ": " + fmt(row.values[c]) + "%";
+        track.appendChild(tick);
+      }
+      barRow.appendChild(track);
+
+      var val = document.createElement("div");
+      val.className = "value";
+      val.textContent = fmt(v) + "%";
+      barRow.appendChild(val);
+
+      if (c) {
+        var d = v - row.values[c];
+        var delta = document.createElement("div");
+        delta.className = "delta";
+        delta.innerHTML = "vs " + c + ": <b class=\"" +
+          (d >= 0 ? "up" : "down") + "\">" + fmtDelta(d) + "</b>";
+        barRow.appendChild(delta);
+      }
+      chartEl.appendChild(barRow);
+    });
+
+    // axis
+    var axis = document.createElement("div");
+    axis.className = "axis";
+    [0, 25, 50, 75, 100].forEach(function (t) {
+      var s = document.createElement("span");
+      s.textContent = t + "%";
+      axis.appendChild(s);
+    });
+    chartEl.appendChild(axis);
+
+    // Legend
+    legendEl.innerHTML = "";
+    var l1 = document.createElement("span");
+    l1.innerHTML = '<span class="swatch" style="background: var(--bar)"></span>' + y + " coverage (%)";
+    legendEl.appendChild(l1);
+    if (c) {
+      var l2 = document.createElement("span");
+      l2.innerHTML = '<span class="swatch" style="background: var(--bar-compare)"></span>' + c + " (comparison tick)";
+      legendEl.appendChild(l2);
+    }
+    // --- Table ---
+    theadEl.innerHTML = "";
+    var head = document.createElement("tr");
+    var thD = document.createElement("th");
+    thD.textContent = "District";
+    thD.scope = "col";
+    head.appendChild(thD);
+    YEARS.forEach(function (yy) {
+      var th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = yy + " (%)";
+      if (yy === y) th.className = "sel";
+      head.appendChild(th);
+    });
+    if (c) {
+      var thC = document.createElement("th");
+      thC.scope = "col";
+      thC.textContent = "Change (" + c + " \u2192 " + y + ")";
+      head.appendChild(thC);
+    }
+    theadEl.appendChild(head);
+
+    tbodyEl.innerHTML = "";
+    var sums = {};
+    YEARS.forEach(function (yy) { sums[yy] = 0; });
+    DATA.forEach(function (row) {
+      var tr = document.createElement("tr");
+      var td = document.createElement("td");
+      td.textContent = row.district;
+      tr.appendChild(td);
+      YEARS.forEach(function (yy) {
+        sums[yy] += row.values[yy];
+        var t = document.createElement("td");
+        t.textContent = fmt(row.values[yy]);
+        if (yy === y) t.className = "sel";
+        tr.appendChild(t);
+      });
+      if (c) {
+        var d = row.values[y] - row.values[c];
+        var tc = document.createElement("td");
+        tc.textContent = fmtDelta(d);
+        tc.className = d >= 0 ? "delta-up" : "delta-down";
+        tr.appendChild(tc);
+      }
+      tbodyEl.appendChild(tr);
+    });
+
+    tfootEl.innerHTML = "";
+    var trA = document.createElement("tr");
+    var thA = document.createElement("th");
+    thA.scope = "row";
+    thA.textContent = "Average";
+    trA.appendChild(thA);
+    YEARS.forEach(function (yy) {
+      var t = document.createElement("td");
+      t.textContent = fmt(sums[yy] / DATA.length);
+      if (yy === y) t.className = "sel";
+      trA.appendChild(t);
+    });
+    if (c) {
+      var dc = (sums[y] / DATA.length) - (sums[c] / DATA.length);
+      var tc2 = document.createElement("td");
+      tc2.textContent = fmtDelta(dc);
+      tc2.className = dc >= 0 ? "delta-up" : "delta-down";
+      trA.appendChild(tc2);
+    }
+    tfootEl.appendChild(trA);
+  }
+
+  // --- CSV download of the table currently shown, with source ---
+  function buildCsv() {
+    var lines = [];
+    var header = ["District"];
+    YEARS.forEach(function (yy) { header.push(yy + " (%)"); });
+    if (state.compare) header.push("Change (" + state.compare + " -> " + state.year + ")");
+    lines.push(header.join(","));
+    DATA.forEach(function (row) {
+      var cells = [row.district];
+      YEARS.forEach(function (yy) { cells.push(fmt(row.values[yy])); });
+      if (state.compare) cells.push(fmtDelta(row.values[state.year] - row.values[state.compare]));
+      lines.push(cells.join(","));
+    });
+    lines.push("");
+    lines.push("Source,\"Table 1, page 2 of facility_delivery_report.pdf\"");
+    lines.push("Unit,percent");
+    lines.push("Note,\"Values are illustrative and are not official statistics (synthetic facility-delivery PDF fixture)\"");
+    return lines.join("\r\n");
+  }
+
+  downloadBtn.addEventListener("click", function () {
+    var blob = new Blob([buildCsv()], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "facility_delivery_coverage_" + state.year +
+      (state.compare ? "_vs_" + state.compare : "") + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

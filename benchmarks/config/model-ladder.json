@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "status": "provisional",
+  "baseline": {
+    "agent": "antigravity",
+    "model_policy": "untouched-default",
+    "initial_smoke_resolved_model": "Gemini 3.7 Flash (High)",
+    "note": "Resolve and record the default model and effort again for every frozen batch."
+  },
+  "catalogue_incident": {
+    "model": "qwen/qwen3.8-27b",
+    "openrouter_endpoint_verified_at": "2026-08-19",
+    "openrouter_endpoint_count": 5,
+    "weights": "Qwen/Qwen3.8-27B",
+    "weights_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "licence": "Apache-2.0",
+    "reason": "The model exists on OpenRouter and Hugging Face but was absent from Cline 3.0.55's ACP model list. An early diagnostic silently selected Claude Sonnet 5; that run is invalid and exact selection is now mandatory."
+  },
+  "openrouter_routing": {
+    "screening_model_id": "qwen/qwen3.8-27b:nitro",
+    "resolved_underlying_model": "qwen/qwen3.8-27b",
+    "reason": "The default route hit an upstream idle timeout during the exact smoke. OpenRouter's :nitro suffix keeps the model fixed and prioritises throughput. Record the actual provider whenever exposed and repeat the local replay without this hosted routing layer.",
+    "status": "provisional-freeze-before-development-batch"
+  },
+  "start_candidates": [
+    "qwen/qwen3.8-27b"
+  ],
+  "candidates": [
+    {
+      "model": "qwen/qwen3.8-27b",
+      "direction": "start",
+      "architecture": "dense hybrid attention, multimodal conditional generation",
+      "total_parameters_billions": 27,
+      "active_parameters_billions": 27,
+      "context_length": 262144,
+      "local_artifact": "Qwen/Qwen3.8-27B",
+      "local_artifact_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "licence": "Apache-2.0",
+      "status": "openrouter-endpoints-and-official-weights-confirmed"
+    },
+    {
+      "model": "qwen/qwen3.6-27b",
+      "direction": "older-generation-diagnostic",
+      "architecture": "dense hybrid attention",
+      "total_parameters_billions": 27,
+      "active_parameters_billions": 27,
+      "local_artifact": "Qwen/Qwen3.6-27B",
+      "licence": "Apache-2.0",
+      "status": "catalog-and-official-weights-confirmed"
+    },
+    {
+      "model": "qwen/qwen3.5-27b",
+      "direction": "older-generation-diagnostic",
+      "architecture": "dense hybrid attention",
+      "total_parameters_billions": 27,
+      "active_parameters_billions": 27,
+      "local_artifact": "Qwen/Qwen3.5-27B",
+      "licence": "Apache-2.0",
+      "status": "catalog-and-official-weights-confirmed"
+    },
+    {
+      "model": "qwen/qwen3.5-9b",
+      "direction": "down-if-27b-passes",
+      "architecture": "dense hybrid attention",
+      "total_parameters_billions": 9,
+      "active_parameters_billions": 9,
+      "context_length": 262144,
+      "local_artifact": "Qwen/Qwen3.5-9B",
+      "local_artifact_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "licence": "Apache-2.0",
+      "openrouter_tool_capable_endpoints_verified_at": "2026-08-20",
+      "status": "openrouter-endpoints-and-official-weights-confirmed"
+    },
+    {
+      "model": "qwen/qwen3-14b",
+      "direction": "intermediate-size-diagnostic-after-9b-failure",
+      "architecture": "dense transformer, older Qwen3 generation",
+      "total_parameters_billions": 14,
+      "active_parameters_billions": 14,
+      "context_length": 131072,
+      "local_artifact": "Qwen/Qwen3-14B",
+      "local_artifact_revision": "40c069824f4251a91eefaf281ebe4c544efd3e18",
+      "licence": "Apache-2.0",
+      "openrouter_tool_capable_endpoints_verified_at": "2026-08-20",
+      "status": "rejected-in-deepseek-web-v2-after-turn-1-material-data-omission-and-fabricated-url"
+    },
+    {
+      "model": "qwen/qwen3.5-35b-a3b",
+      "direction": "alternative-if-dense-27b-fails",
+      "architecture": "mixture-of-experts hybrid attention",
+      "total_parameters_billions": 35,
+      "active_parameters_billions": 3,
+      "local_artifact": "Qwen/Qwen3.5-35B-A3B",
+      "licence": "Apache-2.0",
+      "status": "provisional-verify-before-run"
+    },
+    {
+      "model": "qwen/qwen3-next-80b-a3b-instruct",
+      "direction": "up-if-27b-fails",
+      "architecture": "mixture-of-experts",
+      "total_parameters_billions": 80,
+      "active_parameters_billions": 3,
+      "local_artifact": null,
+      "licence": null,
+      "status": "provisional-different-generation"
+    },
+    {
+      "model": "qwen/qwen3.5-122b-a10b",
+      "direction": "up-if-smaller-candidates-fail",
+      "architecture": "mixture-of-experts hybrid attention",
+      "total_parameters_billions": 122,
+      "active_parameters_billions": 10,
+      "local_artifact": "Qwen/Qwen3.5-122B-A10B",
+      "licence": "Apache-2.0",
+      "status": "provisional-verify-dgx-memory"
+    }
+  ],
+  "diagnostic_nonlocal_or_unverified": [
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "purpose": "Only test after downloadable weights, licence, DGX fit, and a user-facing harness path are verified."
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "purpose": "Upper-bound diagnostic; do not call it a local candidate without verified deployability."
+    }
+  ],
+  "freeze_requirements": [
+    "OpenRouter slug exists and exact selected model is asserted before prompting",
+    "tool-calling support rechecked",
+    "downloadable weights revision and licence verified",
+    "local runtime compatibility verified",
+    "context and output limits recorded",
+    "expected quantization and memory recorded",
+    "reasoning policy and provider route recorded"
+  ],
+  "current_size_bracket": {
+    "status": "tested-bracket-not-a-proof-about-untested-models",
+    "lower_rejected": "qwen/qwen3-14b",
+    "upper_viable": "qwen/qwen3.8-27b",
+    "harness": "DeepSeek Harness Web 0.1.0-rc.7 plus ngo-data-guardrail-v2",
+    "note": "9B also failed in Cline and DeepSeek Web. The 14B failure was correctness/citation, so the relaxed 15-point visual-only trade-off does not apply."
+  }
+}

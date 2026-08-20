@@ -1,0 +1,37 @@
+In the **Antigravity CLI (`agy`)**, the `--output-format` flag controls how responses and events are emitted when running in non-interactive print mode (`-p` / `--print`).
+
+---
+
+### Supported Formats
+
+| Format | Description | Common Use Case |
+| :--- | :--- | :--- |
+| **`text`** *(default)* | Outputs the final model response as plain text directly to `stdout`. | Terminal scripting, quick queries, and human reading. |
+| **`json`** | Emits a single JSON payload containing the complete agent response, execution metadata, and conversation info. Can be paired with `--json-schema` to enforce structured responses. | Automated scripts, CI/CD pipelines, structured data extraction. |
+| **`stream-json`** | Streams real-time newline-delimited JSON (NDJSON) events for token generation, tool calls, and lifecycle state changes. | IDE extensions, custom frontends, sidecar processes, or chaining with `--input-format stream-json`. |
+
+---
+
+### Examples
+
+#### 1. Plain Text (Default)
+```bash
+agy -p "Summarize README.md" --output-format text
+```
+
+#### 2. Full JSON Response
+```bash
+agy -p "List all exported functions in src/index.ts" --output-format json
+```
+
+#### 3. Structured Output with JSON Schema
+```bash
+agy -p "Extract user data from logs" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"users":{"type":"array","items":{"type":"string"}}}}'
+```
+
+#### 4. Streaming Real-Time Events (NDJSON)
+```bash
+agy -p "Refactor auth.py" --output-format stream-json
+```

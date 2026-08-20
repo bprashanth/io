@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4 Antenatal Checkup (ANC4) Coverage Dashboard (2021-2023)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .badge-tier-high {
+      background-color: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+    .badge-tier-medium {
+      background-color: #fef9c3;
+      color: #854d0e;
+      border: 1px solid #fef08a;
+    }
+    .badge-tier-low {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+      body {
+        background: white;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Navigation / Header -->
+  <header class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white border-b border-indigo-800 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-3">
+            <span class="inline-flex items-center justify-center p-2.5 bg-blue-500/20 border border-blue-400/30 rounded-xl text-blue-300">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </span>
+            <div>
+              <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                4 Antenatal Checkup (ANC4) Coverage Dashboard
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-700/80 border border-indigo-400/40 text-indigo-200">
+                  2021 – 2023
+                </span>
+              </h1>
+              <p class="text-xs sm:text-sm text-indigo-200 mt-0.5">
+                District-level Maternal Health Monitoring & Comparative Analysis (Filtered: 2021 to 2023)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick metadata tags & actions -->
+        <div class="flex flex-wrap items-center gap-2 no-print">
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-800/60 border border-indigo-700/50 text-xs text-indigo-200">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>Source: <strong id="header-source-name" class="text-white font-medium">anc4_coverage.csv</strong></span>
+          </div>
+
+          <label class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            <span>Upload CSV</span>
+            <input type="file" id="csv-file-input" accept=".csv" class="hidden">
+          </label>
+
+          <button id="reset-data-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>Reset</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Notification / Status Banner -->
+    <div id="status-banner" class="hidden rounded-lg p-3 text-sm flex items-center justify-between transition-all">
+      <span id="status-message"></span>
+      <button onclick="document.getElementById('status-banner').classList.add('hidden')" class="text-xs underline ml-2">Dismiss</button>
+    </div>
+
+    <!-- PRIMARY CONTROLS PANEL: Year Selection & District Comparison -->
+    <section class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        
+        <!-- Year Selector -->
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              1. Select Target Year (2021 – 2023)
+            </label>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">3 Years Active</span>
+          </div>
+          <div id="year-pill-container" class="flex flex-wrap items-center gap-2">
+            <!-- Year buttons generated via JS (2021, 2022, 2023) -->
+          </div>
+        </div>
+
+        <!-- Metric Mode / View Switcher -->
+        <div class="flex items-center gap-2">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 lg:mb-0 lg:mr-2">
+            Comparison View:
+          </label>
+          <div class="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
+            <button id="view-chart-btn" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-indigo-900 shadow-sm transition">
+              Charts & Comparison
+            </button>
+            <button id="view-table-btn" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">
+              Detailed Table
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- District Comparison Filter -->
+      <div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            2. Filter / Compare Districts (<span id="selected-district-count">0</span> selected)
+          </label>
+          <div class="flex items-center gap-2 text-xs">
+            <button id="select-all-districts" class="text-indigo-600 hover:text-indigo-800 font-medium hover:underline">Select All</button>
+            <span class="text-slate-300">•</span>
+            <button id="clear-all-districts" class="text-slate-500 hover:text-slate-700 font-medium hover:underline">Clear All</button>
+          </div>
+        </div>
+
+        <div id="district-chips-container" class="flex flex-wrap gap-2 pt-1">
+          <!-- District check chips rendered dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- KEY STATS / KPI SUMMARY CARDS -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Average Coverage -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
+        <div class="absolute top-0 right-0 h-1.5 w-full bg-blue-500"></div>
+        <div>
+          <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Average ANC4 Coverage</span>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="kpi-avg-coverage" class="text-3xl font-extrabold text-slate-900">--%</span>
+            <span id="kpi-avg-trend" class="text-xs font-medium text-slate-500"></span>
+          </div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">Across selected districts in <span class="selected-year-text font-semibold text-slate-700"></span></p>
+      </div>
+
+      <!-- Top District -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
+        <div class="absolute top-0 right-0 h-1.5 w-full bg-emerald-500"></div>
+        <div>
+          <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Highest Coverage District</span>
+          <div class="mt-2">
+            <span id="kpi-top-district" class="text-xl font-bold text-emerald-700 block truncate">--</span>
+            <span id="kpi-top-rate" class="text-2xl font-extrabold text-slate-900">--%</span>
+          </div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500"><span id="kpi-top-completed">--</span> of <span id="kpi-top-registered">--</span> completed</p>
+      </div>
+
+      <!-- Lowest District -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
+        <div class="absolute top-0 right-0 h-1.5 w-full bg-amber-500"></div>
+        <div>
+          <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Lowest Coverage District</span>
+          <div class="mt-2">
+            <span id="kpi-low-district" class="text-xl font-bold text-amber-700 block truncate">--</span>
+            <span id="kpi-low-rate" class="text-2xl font-extrabold text-slate-900">--%</span>
+          </div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500"><span id="kpi-low-completed">--</span> of <span id="kpi-low-registered">--</span> completed</p>
+      </div>
+
+      <!-- Total Pregnancies & Completed -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
+        <div class="absolute top-0 right-0 h-1.5 w-full bg-indigo-500"></div>
+        <div>
+          <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Pregnancies Registered</span>
+          <div class="mt-2">
+            <span id="kpi-total-registered" class="text-2xl font-extrabold text-slate-900">--</span>
+          </div>
+        </div>
+        <div class="mt-2 text-xs text-slate-600 flex justify-between items-center pt-2 border-t border-slate-100">
+          <span>ANC4 Completed:</span>
+          <span id="kpi-total-completed" class="font-bold text-indigo-700">--</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- CALCULATION METHODOLOGY & SOURCE CARD -->
+    <section class="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/60 rounded-2xl border border-indigo-200/80 p-5 shadow-sm">
+      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-indigo-100">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="p-1.5 bg-indigo-600 text-white rounded-lg">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+              </svg>
+            </span>
+            <h2 class="text-lg font-bold text-slate-900">How the ANC4 Rate is Calculated & Data Source</h2>
+          </div>
+          <p class="text-xs text-slate-600 mt-1">
+            Official maternal healthcare indicator definition, calculation formula, and transparent data attribution.
+          </p>
+        </div>
+
+        <!-- Data Source Disclosed -->
+        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-indigo-100 shadow-xs">
+          <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+          </svg>
+          <div class="text-xs">
+            <span class="text-slate-500 block">Dataset Source:</span>
+            <span id="data-source-badge" class="font-semibold text-indigo-950 font-mono-code">synthetic Bihar ANC fixture</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-xs">
+        
+        <!-- Formula Box -->
+        <div class="bg-white rounded-xl border border-indigo-100 p-4 shadow-xs flex flex-col justify-between">
+          <span class="font-semibold uppercase tracking-wider text-[11px] block mb-2 text-indigo-700">1. Mathematical Formula</span>
+          <div class="bg-slate-900 text-emerald-300 p-3 rounded-lg font-mono-code text-xs sm:text-sm text-center leading-relaxed">
+            Coverage Rate (%) = <br>
+            <span class="text-yellow-300">(&nbsp;ANC4 Completed&nbsp;)</span><br>
+            <div class="border-t border-slate-700 my-1 mx-4"></div>
+            <span class="text-blue-300">(&nbsp;Pregnancies Registered&nbsp;)</span> × 100
+          </div>
+          <div class="mt-2 text-[11px] text-slate-500">
+            Ratio of complete 4 antenatal visits relative to total registered pregnancies.
+          </div>
+        </div>
+
+        <!-- Dynamic Live Example -->
+        <div class="bg-white rounded-xl border border-indigo-100 p-4 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-semibold uppercase tracking-wider text-[11px] text-indigo-700">2. Live District Calculation</span>
+              <select id="calc-district-selector" class="text-xs border border-slate-200 rounded px-1.5 py-0.5 bg-slate-50 font-medium">
+                <!-- Filled dynamically -->
+              </select>
+            </div>
+            <div id="calc-example-box" class="bg-indigo-50/70 border border-indigo-100 p-2.5 rounded-lg text-slate-800 font-mono-code text-xs space-y-1">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+          <div class="mt-2 text-[11px] text-slate-500">
+            Updates dynamically when selecting different districts or years (2021–2023).
+          </div>
+        </div>
+
+        <!-- Clinical / Programmatic Definition -->
+        <div class="bg-white rounded-xl border border-indigo-100 p-4 shadow-xs flex flex-col justify-between">
+          <div>
+            <span class="font-semibold uppercase tracking-wider text-[11px] block mb-2 text-indigo-700">3. Indicator Definition</span>
+            <p class="text-slate-600 leading-relaxed">
+              <strong>4 Antenatal Checkups (ANC4):</strong> Measures the percentage of pregnant women who received at least four comprehensive checkups by skilled healthcare workers during pregnancy (vital for early detection of complications, iron-folic supplementation, tetanus immunization, and birth preparedness).
+            </p>
+          </div>
+          <div class="mt-2 text-[11px] text-slate-500 italic">
+            * Target benchmark &ge; 80% coverage.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CHARTS & VISUAL COMPARISON SECTION -->
+    <div id="charts-view-container" class="space-y-6">
+      
+      <!-- Primary Comparison Chart: Bar Chart for Selected Year -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Bar Chart (2 Cols) -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>District Comparison: ANC4 Coverage (%)</span>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium selected-year-text"></span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Ranked comparison of antenatal care coverage for selected districts</p>
+              </div>
+              <!-- Chart sort toggle -->
+              <div class="flex items-center gap-1.5 text-xs text-slate-600">
+                <span class="text-slate-400">Sort by:</span>
+                <select id="chart-sort-select" class="text-xs bg-slate-50 border border-slate-200 rounded-md px-2 py-1 focus:ring-1 focus:ring-indigo-500 font-medium">
+                  <option value="desc">Coverage (Highest first)</option>
+                  <option value="asc">Coverage (Lowest first)</option>
+                  <option value="alpha">District Name (A-Z)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="relative h-[320px] w-full">
+              <canvas id="districtComparisonChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Benchmark Legend -->
+          <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+            <div class="flex items-center gap-3">
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-emerald-500"></span> High (&ge; 75%)</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-amber-500"></span> Moderate (60-74%)</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-rose-500"></span> Low (&lt; 60%)</span>
+            </div>
+            <span class="text-indigo-600 font-medium">Target: &ge; 80%</span>
+          </div>
+        </div>
+
+        <!-- Side Leaderboard / Ranked List -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 class="text-base font-bold text-slate-900 mb-1">District Leaderboard</h3>
+            <p class="text-xs text-slate-500 mb-4">Rankings for <span class="selected-year-text font-semibold text-slate-700"></span></p>
+
+            <div id="district-leaderboard" class="space-y-3">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600">
+            <div class="flex justify-between items-center">
+              <span>Districts Selected:</span>
+              <span id="leaderboard-district-count" class="font-bold text-slate-800">5</span>
+            </div>
+            <div class="flex justify-between items-center mt-1">
+              <span>Coverage Range Spread:</span>
+              <span id="leaderboard-coverage-spread" class="font-bold text-indigo-700">--%</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Historical Multi-Year Trend Chart (2021-2023) -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>Multi-Year Coverage Trends (2021 – 2023)</span>
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">Historical trajectory of 4 Antenatal Checkup coverage across 2021, 2022, and 2023</p>
+          </div>
+          <div class="text-xs text-slate-500">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md font-medium text-slate-700">
+              Tip: Click any district in chart legend to hide/show
+            </span>
+          </div>
+        </div>
+
+        <div class="relative h-[300px] w-full">
+          <canvas id="districtTrendChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- DETAILED DATA TABLE VIEW (TOGGLEABLE) -->
+    <div id="table-view-container" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hidden">
+      
+      <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">ANC4 Coverage Dataset & Calculated Metrics (2021 – 2023)</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Filtered data showing years 2021 to 2023 with computed coverage percentages</p>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <input type="text" id="table-search-input" placeholder="Search district or source..." class="text-xs px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-40 sm:w-56 bg-white">
+          <button id="export-csv-btn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-200 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-600">
+          <thead class="bg-slate-100 text-slate-700 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200">
+            <tr>
+              <th scope="col" class="py-3 px-4 cursor-pointer hover:bg-slate-200/70" onclick="sortTable('district')">
+                District <span id="sort-icon-district" class="text-slate-400">↕</span>
+              </th>
+              <th scope="col" class="py-3 px-4 cursor-pointer hover:bg-slate-200/70" onclick="sortTable('year')">
+                Year <span id="sort-icon-year" class="text-slate-400">↕</span>
+              </th>
+              <th scope="col" class="py-3 px-4 text-right cursor-pointer hover:bg-slate-200/70" onclick="sortTable('pregnancies_registered')">
+                Pregnancies Registered <span id="sort-icon-pregnancies_registered" class="text-slate-400">↕</span>
+              </th>
+              <th scope="col" class="py-3 px-4 text-right cursor-pointer hover:bg-slate-200/70" onclick="sortTable('anc4_completed')">
+                ANC4 Completed <span id="sort-icon-anc4_completed" class="text-slate-400">↕</span>
+              </th>
+              <th scope="col" class="py-3 px-4 text-right cursor-pointer hover:bg-slate-200/70" onclick="sortTable('rate')">
+                Calculated Coverage (%) <span id="sort-icon-rate" class="text-slate-400">↕</span>
+              </th>
+              <th scope="col" class="py-3 px-4 text-center">Status</th>
+              <th scope="col" class="py-3 px-4">Data Source</th>
+            </tr>
+          </thead>
+          <tbody id="dataset-table-body" class="divide-y divide-slate-100">
+            <!-- Table rows populated via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex justify-between items-center">
+        <span>Showing <strong id="table-row-count" class="text-slate-700">0</strong> records (2021–2023)</span>
+        <span class="italic">Formula: (ANC4 Completed / Pregnancies Registered) * 100</span>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 mt-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div>
+        <p class="font-medium text-slate-300">4 Antenatal Checkup (ANC4) Coverage Monitoring Tool (2021 – 2023)</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Built for maternal health monitoring, district comparison, and data transparency.</p>
+      </div>
+      <div class="flex items-center gap-4 text-[11px]">
+        <span>Calculation: <code>(anc4_completed / pregnancies_registered) * 100</code></span>
+        <span>•</span>
+        <span id="footer-source">Source: synthetic Bihar ANC fixture</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    // --- DEFAULT INITIAL DATASET FROM anc4_coverage.csv ---
+    const DEFAULT_CSV_DATA = `district,year,pregnancies_registered,anc4_completed,source
+Gaya,2020,1200,744,synthetic Bihar ANC fixture
+Gaya,2021,1250,825,synthetic Bihar ANC fixture
+Gaya,2022,1300,897,synthetic Bihar ANC fixture
+Gaya,2023,1350,999,synthetic Bihar ANC fixture
+Nalanda,2020,1000,700,synthetic Bihar ANC fixture
+Nalanda,2021,1100,803,synthetic Bihar ANC fixture
+Nalanda,2022,1200,924,synthetic Bihar ANC fixture
+Nalanda,2023,1250,1000,synthetic Bihar ANC fixture
+Purnia,2020,1400,770,synthetic Bihar ANC fixture
+Purnia,2021,1500,870,synthetic Bihar ANC fixture
+Purnia,2022,1550,992,synthetic Bihar ANC fixture
+Purnia,2023,1600,1072,synthetic Bihar ANC fixture
+Kishanganj,2020,800,400,synthetic Bihar ANC fixture
+Kishanganj,2021,900,486,synthetic Bihar ANC fixture
+Kishanganj,2022,1000,570,synthetic Bihar ANC fixture
+Kishanganj,2023,1100,671,synthetic Bihar ANC fixture
+Patna,2020,1500,1170,synthetic Bihar ANC fixture
+Patna,2021,1600,1280,synthetic Bihar ANC fixture
+Patna,2022,1700,1411,synthetic Bihar ANC fixture
+Patna,2023,1800,1548,synthetic Bihar ANC fixture`;
+
+    // Active Year Range Filter: 2021 to 2023
+    const MIN_YEAR = 2021;
+    const MAX_YEAR = 2023;
+
+    // State
+    let rawRecords = [];
+    let availableYears = [];
+    let availableDistricts = [];
+    let selectedYear = '2023';
+    let selectedDistricts = new Set();
+    let currentSource = 'synthetic Bihar ANC fixture';
+    let chartSort = 'desc';
+    let tableSortColumn = 'rate';
+    let tableSortAsc = false;
+    let comparisonChartInstance = null;
+    let trendChartInstance = null;
+
+    // District Color Palette
+    const districtColorMap = {
+      'Patna': '#4f46e5',      // Indigo
+      'Nalanda': '#06b6d4',    // Cyan
+      'Gaya': '#10b981',       // Emerald
+      'Purnia': '#f59e0b',     // Amber
+      'Kishanganj': '#ec4899', // Pink
+    };
+
+    const fallbackColors = [
+      '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
+      '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6'
+    ];
+
+    function getDistrictColor(district, index = 0) {
+      if (districtColorMap[district]) return districtColorMap[district];
+      return fallbackColors[index % fallbackColors.length];
+    }
+
+    // CSV Parser with Year Filtering (2021 to 2023)
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/);
+      if (lines.length < 2) return [];
+      
+      const records = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        if (cols.length >= 4) {
+          const district = cols[0];
+          const yearStr = cols[1];
+          const yearNum = parseInt(yearStr, 10);
+          const reg = parseInt(cols[2], 10);
+          const comp = parseInt(cols[3], 10);
+          const src = cols[4] || 'Dataset';
+          
+          // Strict Filter: Only include 2021 to 2023
+          if (!isNaN(yearNum) && yearNum >= MIN_YEAR && yearNum <= MAX_YEAR) {
+            if (!isNaN(reg) && !isNaN(comp) && reg > 0) {
+              const rate = parseFloat(((comp / reg) * 100).toFixed(2));
+              records.push({
+                district,
+                year: yearStr,
+                pregnancies_registered: reg,
+                anc4_completed: comp,
+                rate: rate,
+                source: src
+              });
+            }
+          }
+        }
+      }
+      return records;
+    }
+
+    // Initialize Data
+    async function initData() {
+      try {
+        const resp = await fetch('anc4_coverage.csv');
+        if (resp.ok) {
+          const text = await resp.text();
+          rawRecords = parseCSV(text);
+          showBanner('Loaded live data from anc4_coverage.csv (Filtered: 2021–2023)', 'success');
+        } else {
+          rawRecords = parseCSV(DEFAULT_CSV_DATA);
+        }
+      } catch (err) {
+        rawRecords = parseCSV(DEFAULT_CSV_DATA);
+      }
+
+      if (rawRecords.length === 0) {
+        rawRecords = parseCSV(DEFAULT_CSV_DATA);
+      }
+
+      setupMetadataAndFilters();
+    }
+
+    function setupMetadataAndFilters() {
+      // Extract unique years in 2021-2023 (sorted ascending)
+      availableYears = Array.from(new Set(rawRecords.map(r => r.year))).sort();
+      // Extract unique districts (sorted alphabetically)
+      availableDistricts = Array.from(new Set(rawRecords.map(r => r.district))).sort();
+      
+      if (availableYears.length > 0) {
+        selectedYear = availableYears[availableYears.length - 1]; // Default to latest year (2023)
+      }
+      
+      // Default select all districts
+      selectedDistricts = new Set(availableDistricts);
+
+      // Extract primary source
+      if (rawRecords.length > 0 && rawRecords[0].source) {
+        currentSource = rawRecords[0].source;
+      }
+      document.getElementById('header-source-name').textContent = currentSource;
+      document.getElementById('data-source-badge').textContent = currentSource;
+      document.getElementById('footer-source').textContent = `Source: ${currentSource}`;
+
+      renderYearPills();
+      renderDistrictChips();
+      populateCalcSelector();
+      updateDashboard();
+    }
+
+    function renderYearPills() {
+      const container = document.getElementById('year-pill-container');
+      container.innerHTML = '';
+
+      availableYears.forEach(year => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = `Year ${year}`;
+        const isSelected = (year === selectedYear);
+        
+        btn.className = isSelected
+          ? 'px-4 py-2 text-xs sm:text-sm font-bold rounded-xl bg-indigo-600 text-white shadow-sm transition-all transform scale-105 ring-2 ring-indigo-300'
+          : 'px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-all';
+        
+        btn.addEventListener('click', () => {
+          selectedYear = year;
+          renderYearPills();
+          updateDashboard();
+        });
+        container.appendChild(btn);
+      });
+
+      document.querySelectorAll('.selected-year-text').forEach(el => {
+        el.textContent = `Year ${selectedYear}`;
+      });
+    }
+
+    function renderDistrictChips() {
+      const container = document.getElementById('district-chips-container');
+      container.innerHTML = '';
+
+      availableDistricts.forEach((district, idx) => {
+        const isChecked = selectedDistricts.has(district);
+        const color = getDistrictColor(district, idx);
+        
+        const label = document.createElement('label');
+        label.className = `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition border select-none ${
+          isChecked
+            ? 'bg-indigo-50 border-indigo-300 text-indigo-900 shadow-xs'
+            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 opacity-70'
+        }`;
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = isChecked;
+        input.className = 'rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-slate-300';
+        
+        input.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            selectedDistricts.add(district);
+          } else {
+            selectedDistricts.delete(district);
+          }
+          renderDistrictChips();
+          updateDashboard();
+        });
+
+        const dot = document.createElement('span');
+        dot.className = 'w-2.5 h-2.5 rounded-full';
+        dot.style.backgroundColor = isChecked ? color : '#cbd5e1';
+
+        const text = document.createElement('span');
+        text.textContent = district;
+
+        label.appendChild(input);
+        label.appendChild(dot);
+        label.appendChild(text);
+        container.appendChild(label);
+      });
+
+      document.getElementById('selected-district-count').textContent = selectedDistricts.size;
+    }
+
+    function populateCalcSelector() {
+      const select = document.getElementById('calc-district-selector');
+      select.innerHTML = '';
+      availableDistricts.forEach(district => {
+        const opt = document.createElement('option');
+        opt.value = district;
+        opt.textContent = district;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener('change', updateCalculationBox);
+    }
+
+    function updateCalculationBox() {
+      const select = document.getElementById('calc-district-selector');
+      const district = select.value || (availableDistricts.length > 0 ? availableDistricts[0] : '');
+      const box = document.getElementById('calc-example-box');
+
+      const rec = rawRecords.find(r => r.district === district && r.year === selectedYear);
+
+      if (rec) {
+        box.innerHTML = `
+          <div class="font-semibold text-slate-900 mb-1 flex items-center justify-between">
+            <span>${rec.district} (${rec.year})</span>
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold ${getBadgeClass(rec.rate)}">${rec.rate}%</span>
+          </div>
+          <div>• Pregnancies Registered = <strong>${rec.pregnancies_registered.toLocaleString()}</strong></div>
+          <div>• ANC4 Completed = <strong>${rec.anc4_completed.toLocaleString()}</strong></div>
+          <div class="mt-1 pt-1 border-t border-indigo-200/60 text-indigo-900 font-bold">
+            Calculation: (${rec.anc4_completed} / ${rec.pregnancies_registered}) × 100 = <span class="text-indigo-600 text-sm">${rec.rate}%</span>
+          </div>
+        `;
+      } else {
+        box.innerHTML = `<span class="text-slate-400 italic">No record found for ${district} in ${selectedYear}</span>`;
+      }
+    }
+
+    function getBadgeClass(rate) {
+      if (rate >= 75) return 'badge-tier-high';
+      if (rate >= 60) return 'badge-tier-medium';
+      return 'badge-tier-low';
+    }
+
+    function getStatusLabel(rate) {
+      if (rate >= 80) return 'Target Achieved (≥80%)';
+      if (rate >= 75) return 'High Coverage';
+      if (rate >= 60) return 'Moderate Coverage';
+      return 'Needs Attention (<60%)';
+    }
+
+    function updateDashboard() {
+      document.querySelectorAll('.selected-year-text').forEach(el => {
+        el.textContent = `Year ${selectedYear}`;
+      });
+
+      const filteredYearDistricts = rawRecords.filter(
+        r => r.year === selectedYear && selectedDistricts.has(r.district)
+      );
+
+      updateKPIs(filteredYearDistricts);
+      updateCalculationBox();
+      updateComparisonChart(filteredYearDistricts);
+      updateLeaderboard(filteredYearDistricts);
+      updateTrendChart();
+      renderTable();
+    }
+
+    function updateKPIs(records) {
+      if (records.length === 0) {
+        document.getElementById('kpi-avg-coverage').textContent = 'N/A';
+        document.getElementById('kpi-top-district').textContent = 'None';
+        document.getElementById('kpi-top-rate').textContent = '--%';
+        document.getElementById('kpi-low-district').textContent = 'None';
+        document.getElementById('kpi-low-rate').textContent = '--%';
+        document.getElementById('kpi-total-registered').textContent = '0';
+        document.getElementById('kpi-total-completed').textContent = '0';
+        return;
+      }
+
+      let totalReg = 0;
+      let totalComp = 0;
+      let highest = records[0];
+      let lowest = records[0];
+
+      records.forEach(r => {
+        totalReg += r.pregnancies_registered;
+        totalComp += r.anc4_completed;
+        if (r.rate > highest.rate) highest = r;
+        if (r.rate < lowest.rate) lowest = r;
+      });
+
+      const avgRate = totalReg > 0 ? ((totalComp / totalReg) * 100).toFixed(1) : 0;
+
+      document.getElementById('kpi-avg-coverage').textContent = `${avgRate}%`;
+      document.getElementById('kpi-top-district').textContent = highest.district;
+      document.getElementById('kpi-top-rate').textContent = `${highest.rate}%`;
+      document.getElementById('kpi-top-completed').textContent = highest.anc4_completed.toLocaleString();
+      document.getElementById('kpi-top-registered').textContent = highest.pregnancies_registered.toLocaleString();
+
+      document.getElementById('kpi-low-district').textContent = lowest.district;
+      document.getElementById('kpi-low-rate').textContent = `${lowest.rate}%`;
+      document.getElementById('kpi-low-completed').textContent = lowest.anc4_completed.toLocaleString();
+      document.getElementById('kpi-low-registered').textContent = lowest.pregnancies_registered.toLocaleString();
+
+      document.getElementById('kpi-total-registered').textContent = totalReg.toLocaleString();
+      document.getElementById('kpi-total-completed').textContent = `${totalComp.toLocaleString()} (${avgRate}%)`;
+
+      const prevYear = (parseInt(selectedYear, 10) - 1).toString();
+      const prevRecords = rawRecords.filter(r => r.year === prevYear && selectedDistricts.has(r.district));
+      if (prevRecords.length > 0) {
+        let pReg = 0, pComp = 0;
+        prevRecords.forEach(r => { pReg += r.pregnancies_registered; pComp += r.anc4_completed; });
+        const pAvg = pReg > 0 ? (pComp / pReg) * 100 : 0;
+        const diff = (avgRate - pAvg).toFixed(1);
+        const sign = diff >= 0 ? '+' : '';
+        const trendEl = document.getElementById('kpi-avg-trend');
+        trendEl.textContent = `${sign}${diff}% vs ${prevYear}`;
+        trendEl.className = diff >= 0 ? 'text-xs font-semibold text-emerald-600' : 'text-xs font-semibold text-rose-600';
+      } else {
+        document.getElementById('kpi-avg-trend').textContent = '';
+      }
+    }
+
+    function updateComparisonChart(records) {
+      if (records.length === 0) {
+        if (comparisonChartInstance) comparisonChartInstance.destroy();
+        return;
+      }
+
+      let sorted = [...records];
+      if (chartSort === 'desc') {
+        sorted.sort((a, b) => b.rate - a.rate);
+      } else if (chartSort === 'asc') {
+        sorted.sort((a, b) => a.rate - b.rate);
+      } else {
+        sorted.sort((a, b) => a.district.localeCompare(b.district));
+      }
+
+      const labels = sorted.map(r => r.district);
+      const data = sorted.map(r => r.rate);
+      const backgroundColors = sorted.map(r => {
+        if (r.rate >= 75) return '#10b981';
+        if (r.rate >= 60) return '#f59e0b';
+        return '#f43f5e';
+      });
+
+      const ctx = document.getElementById('districtComparisonChart').getContext('2d');
+
+      if (comparisonChartInstance) {
+        comparisonChartInstance.destroy();
+      }
+
+      comparisonChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: `ANC4 Coverage Rate (%) - ${selectedYear}`,
+              data: data,
+              backgroundColor: backgroundColors,
+              borderRadius: 6,
+              borderSkipped: false,
+              barPercentage: 0.6,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: function(items) {
+                  return `${items[0].label} (Year ${selectedYear})`;
+                },
+                label: function(item) {
+                  const rec = sorted[item.dataIndex];
+                  return [
+                    `Coverage Rate: ${rec.rate}%`,
+                    `ANC4 Completed: ${rec.anc4_completed.toLocaleString()}`,
+                    `Pregnancies Registered: ${rec.pregnancies_registered.toLocaleString()}`,
+                    `Source: ${rec.source}`
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                callback: function(val) { return val + '%'; },
+                stepSize: 20
+              },
+              grid: { color: '#f1f5f9' },
+              title: {
+                display: true,
+                text: 'Coverage Percentage (%)',
+                font: { size: 11, weight: 'bold' }
+              }
+            },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function updateLeaderboard(records) {
+      const container = document.getElementById('district-leaderboard');
+      container.innerHTML = '';
+
+      if (records.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic">No districts selected.</p>';
+        document.getElementById('leaderboard-district-count').textContent = '0';
+        document.getElementById('leaderboard-coverage-spread').textContent = '0%';
+        return;
+      }
+
+      const sorted = [...records].sort((a, b) => b.rate - a.rate);
+      document.getElementById('leaderboard-district-count').textContent = sorted.length;
+      
+      const spread = (sorted[0].rate - sorted[sorted.length - 1].rate).toFixed(1);
+      document.getElementById('leaderboard-coverage-spread').textContent = `${spread}% pts`;
+
+      sorted.forEach((rec, idx) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 transition text-xs';
+        
+        const rankColor = idx === 0 ? 'bg-amber-100 text-amber-800 font-bold border border-amber-200' :
+                         idx === 1 ? 'bg-slate-200 text-slate-700 font-bold' :
+                         idx === 2 ? 'bg-orange-100 text-orange-800 font-bold' : 'bg-slate-100 text-slate-500';
+
+        item.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-5 h-5 flex items-center justify-center rounded-full text-[10px] ${rankColor}">
+              ${idx + 1}
+            </span>
+            <div class="truncate">
+              <span class="font-semibold text-slate-800 block truncate">${rec.district}</span>
+              <span class="text-[10px] text-slate-400">${rec.anc4_completed} / ${rec.pregnancies_registered}</span>
+            </div>
+          </div>
+          <div class="text-right ml-2 flex-shrink-0">
+            <span class="font-extrabold text-slate-900 text-sm">${rec.rate}%</span>
+            <div class="w-16 bg-slate-200 rounded-full h-1.5 mt-1 overflow-hidden">
+              <div class="h-1.5 rounded-full ${rec.rate >= 75 ? 'bg-emerald-500' : rec.rate >= 60 ? 'bg-amber-500' : 'bg-rose-500'}" style="width: ${rec.rate}%"></div>
+            </div>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function updateTrendChart() {
+      const ctx = document.getElementById('districtTrendChart').getContext('2d');
+
+      const datasets = [];
+      const selectedDistrictsList = Array.from(selectedDistricts);
+
+      selectedDistrictsList.forEach((district, idx) => {
+        const districtRecords = rawRecords.filter(r => r.district === district);
+        districtRecords.sort((a, b) => a.year.localeCompare(b.year));
+
+        const color = getDistrictColor(district, idx);
+        datasets.push({
+          label: district,
+          data: availableYears.map(year => {
+            const match = districtRecords.find(r => r.year === year);
+            return match ? match.rate : null;
+          }),
+          borderColor: color,
+          backgroundColor: color,
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        });
+      });
+
+      if (trendChartInstance) {
+        trendChartInstance.destroy();
+      }
+
+      trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: availableYears,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                boxWidth: 12,
+                font: { size: 11, weight: '500' }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(item) {
+                  return ` ${item.dataset.label}: ${item.raw}% ANC4 Coverage`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              min: 40,
+              max: 100,
+              ticks: {
+                callback: function(val) { return val + '%'; }
+              },
+              grid: { color: '#f1f5f9' },
+              title: {
+                display: true,
+                text: 'Coverage (%)',
+                font: { size: 11, weight: 'bold' }
+              }
+            },
+            x: {
+              grid: { color: '#f8fafc' },
+              title: {
+                display: true,
+                text: 'Year',
+                font: { size: 11, weight: 'bold' }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('dataset-table-body');
+      const searchVal = (document.getElementById('table-search-input').value || '').toLowerCase();
+
+      let records = rawRecords.filter(r => selectedDistricts.has(r.district));
+
+      if (searchVal) {
+        records = records.filter(r => 
+          r.district.toLowerCase().includes(searchVal) ||
+          r.year.toLowerCase().includes(searchVal) ||
+          r.source.toLowerCase().includes(searchVal)
+        );
+      }
+
+      records.sort((a, b) => {
+        let vA = a[tableSortColumn];
+        let vB = b[tableSortColumn];
+        if (typeof vA === 'string') {
+          return tableSortAsc ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        }
+        return tableSortAsc ? vA - vB : vB - vA;
+      });
+
+      tbody.innerHTML = '';
+      document.getElementById('table-row-count').textContent = records.length;
+
+      records.forEach(rec => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+
+        const isCurrentYear = rec.year === selectedYear;
+        if (isCurrentYear) tr.classList.add('bg-indigo-50/30 font-medium');
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-slate-900 font-medium flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full" style="background-color: ${getDistrictColor(rec.district)}"></span>
+            ${rec.district}
+          </td>
+          <td class="py-3 px-4 text-slate-700">
+            <span class="px-2 py-0.5 rounded ${isCurrentYear ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100'} text-xs">
+              ${rec.year}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-right text-slate-700">${rec.pregnancies_registered.toLocaleString()}</td>
+          <td class="py-3 px-4 text-right text-slate-700 font-medium">${rec.anc4_completed.toLocaleString()}</td>
+          <td class="py-3 px-4 text-right">
+            <div class="flex items-center justify-end gap-2">
+              <span class="font-bold text-slate-900">${rec.rate}%</span>
+              <div class="w-12 bg-slate-200 rounded-full h-1.5">
+                <div class="h-1.5 rounded-full ${rec.rate >= 75 ? 'bg-emerald-500' : rec.rate >= 60 ? 'bg-amber-500' : 'bg-rose-500'}" style="width: ${Math.min(100, rec.rate)}%"></div>
+              </div>
+            </div>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${getBadgeClass(rec.rate)}">
+              ${getStatusLabel(rec.rate)}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-slate-500 text-[11px] font-mono-code">${rec.source}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function sortTable(column) {
+      if (tableSortColumn === column) {
+        tableSortAsc = !tableSortAsc;
+      } else {
+        tableSortColumn = column;
+        tableSortAsc = false;
+      }
+
+      ['district', 'year', 'pregnancies_registered', 'anc4_completed', 'rate'].forEach(c => {
+        const icon = document.getElementById(`sort-icon-${c}`);
+        if (icon) {
+          if (c === column) {
+            icon.textContent = tableSortAsc ? '▲' : '▼';
+            icon.className = 'text-indigo-600 font-bold';
+          } else {
+            icon.textContent = '↕';
+            icon.className = 'text-slate-400';
+          }
+        }
+      });
+
+      renderTable();
+    }
+
+    function exportToCSV() {
+      const headers = ['district', 'year', 'pregnancies_registered', 'anc4_completed', 'anc4_coverage_percentage', 'source'];
+      const rows = rawRecords.map(r => [
+        `"${r.district}"`,
+        r.year,
+        r.pregnancies_registered,
+        r.anc4_completed,
+        r.rate,
+        `"${r.source}"`
+      ]);
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `anc4_coverage_analysis_2021_2023.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function showBanner(msg, type = 'info') {
+      const banner = document.getElementById('status-banner');
+      const msgEl = document.getElementById('status-message');
+      msgEl.textContent = msg;
+      
+      banner.className = `rounded-lg p-3 text-xs sm:text-sm flex items-center justify-between transition-all ${
+        type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+        type === 'error' ? 'bg-rose-50 text-rose-800 border border-rose-200' :
+        'bg-blue-50 text-blue-800 border border-blue-200'
+      }`;
+      banner.classList.remove('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initData();
+
+      const viewChartBtn = document.getElementById('view-chart-btn');
+      const viewTableBtn = document.getElementById('view-table-btn');
+      const chartsContainer = document.getElementById('charts-view-container');
+      const tableContainer = document.getElementById('table-view-container');
+
+      viewChartBtn.addEventListener('click', () => {
+        chartsContainer.classList.remove('hidden');
+        tableContainer.classList.add('hidden');
+        viewChartBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-md bg-white text-indigo-900 shadow-sm transition';
+        viewTableBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition';
+      });
+
+      viewTableBtn.addEventListener('click', () => {
+        chartsContainer.classList.add('hidden');
+        tableContainer.classList.remove('hidden');
+        viewTableBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-md bg-white text-indigo-900 shadow-sm transition';
+        viewChartBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition';
+      });
+
+      document.getElementById('select-all-districts').addEventListener('click', () => {
+        selectedDistricts = new Set(availableDistricts);
+        renderDistrictChips();
+        updateDashboard();
+      });
+
+      document.getElementById('clear-all-districts').addEventListener('click', () => {
+        selectedDistricts.clear();
+        renderDistrictChips();
+        updateDashboard();
+      });
+
+      document.getElementById('chart-sort-select').addEventListener('change', (e) => {
+        chartSort = e.target.value;
+        const filtered = rawRecords.filter(r => r.year === selectedYear && selectedDistricts.has(r.district));
+        updateComparisonChart(filtered);
+      });
+
+      document.getElementById('table-search-input').addEventListener('input', renderTable);
+      document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
+
+      document.getElementById('csv-file-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const content = evt.target.result;
+          const parsed = parseCSV(content);
+          if (parsed.length > 0) {
+            rawRecords = parsed;
+            setupMetadataAndFilters();
+            showBanner(`Successfully uploaded ${file.name} with ${parsed.length} data rows (2021–2023).`, 'success');
+          } else {
+            showBanner('Error parsing CSV. Ensure columns: district,year,pregnancies_registered,anc4_completed,source with years in 2021-2023', 'error');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      document.getElementById('reset-data-btn').addEventListener('click', () => {
+        rawRecords = parseCSV(DEFAULT_CSV_DATA);
+        setupMetadataAndFilters();
+        showBanner('Dataset reset to default fixture (2021–2023).', 'info');
+      });
+    });
+  </script>
+</body>
+</html>

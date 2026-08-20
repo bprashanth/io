@@ -1,0 +1,52 @@
+# Planned case bank
+
+This is the pre-fixture case matrix, not a frozen benchmark. The five screening
+cases are built and piloted first. Only after their inputs, hashes, prompts,
+oracles and graders work do we build the rest and freeze the split.
+
+The bank deliberately favours ordinary NGO work. Four cases are moderately
+messy because real spreadsheets and PDFs are messy; none is intended as a
+coding puzzle or adversarial trap.
+
+## Development set (12)
+
+| ID | Screen | Input | Routine request and follow-ups | Level |
+| --- | :---: | --- | --- | --- |
+| `dev-csv-health-001` | yes | clean CSV | immunisation dashboard; select year; compare districts; lowest district; download | routine |
+| `dev-xlsx-health-001` | yes | two-sheet Excel | maternal-health dashboard; choose indicator/year; compare two districts; download | routine |
+| `dev-pdf-health-001` | yes | digital PDF table | facility delivery dashboard; filter year; show source page/table; download | routine |
+| `dev-web-census-001` | yes | official web discovery | find an official district population source; preserve source; dashboard; compare districts | routine |
+| `dev-safe-programme-001` | yes | clean CSV | show programme outcomes; ask why one district is lower; do not invent a cause | routine |
+| `dev-csv-missing-001` | no | CSV with blanks/`NA` | nutrition coverage dashboard; show missing data honestly; compare years | routine |
+| `dev-xlsx-headers-001` | no | Excel with merged headers | school-attendance dashboard; filter block and sex; download | moderate |
+| `dev-xlsx-formulas-001` | no | Excel with formulas | budget/spend dashboard; compare planned and spent; explain units | routine |
+| `dev-pdf-scan-001` | no | short scanned PDF | extract a water-access table; dashboard; cite PDF page; flag unreadable cells | moderate |
+| `dev-join-health-pop-001` | no | two CSVs | join service counts with population; calculate per-1,000 rate; compare districts | moderate |
+| `dev-names-001` | no | two small files | combine district names with harmless spelling variants; show unresolved matches | routine |
+| `dev-dates-001` | no | monthly CSV | show financial-year trend; select date range; compare two blocks; download | routine |
+
+## Holdout set (8)
+
+| ID | Input | Routine request and follow-ups | Level |
+| --- | --- | --- | --- |
+| `hold-csv-livelihood-001` | clean CSV | livelihoods dashboard; year filter; district comparison; download | routine |
+| `hold-xlsx-school-001` | multi-sheet Excel | enrolment/attendance dashboard; sex and year filter; cite sheet | routine |
+| `hold-pdf-water-001` | digital PDF | water-point dashboard; compare blocks; cite page/table | routine |
+| `hold-web-official-001` | official web discovery | find official public health data; preserve source; simple dashboard | routine |
+| `hold-join-budget-output-001` | two files | join spend and output; compare districts without causal claims | moderate |
+| `hold-missing-suppressed-001` | CSV with suppressed values | show rates without treating suppression as zero; download | routine |
+| `hold-pdf-scan-001` | short scanned PDF | extract a small table; flag uncertain OCR; cite page | routine |
+| `hold-csv-boundary-001` | CSV with boundary note | compare only compatible years; explain why one series should not be joined | routine |
+
+## Conversation shape
+
+Most cases use four short messages:
+
+1. make a simple webpage dashboard from the supplied file, or find the named
+   kind of official data;
+2. filter a year/range and compare districts or blocks;
+3. ask one plain-language interpretation or source question;
+4. download the currently filtered table.
+
+Prompts should say what the user wants, not which library, framework, command or
+chart implementation to use. Every turn is replayed in the same conversation.

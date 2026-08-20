@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maternal Health Coverage — District Comparison</title>
+<style>
+:root{--teal:#0f766e;--teal-light:#ccfbf1;--bg:#f8fafc;--card:#fff;--ink:#1e293b;--muted:#64748b;--border:#e2e8f0;--accent:#0d9488}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+header{background:var(--teal);color:#fff;padding:20px 28px}
+header h1{margin:0 0 4px;font-size:1.4rem}
+header .subtitle{margin:0;opacity:.85;font-size:.9rem}
+main{max-width:980px;margin:0 auto;padding:20px 16px 32px}
+.controls{display:flex;gap:24px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:20px}
+.controls label{display:flex;flex-direction:column;gap:6px;font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.95rem;background:#fff;min-width:280px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px}
+h2{font-size:1.05rem;margin:0 0 4px}
+table{width:100%;border-collapse:collapse;font-size:.92rem;margin-top:10px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.bar{height:10px;border-radius:5px;background:var(--accent);min-width:2px}
+.barwrap{background:#eef2f7;border-radius:5px;width:100%;min-width:110px}
+.rank{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--teal-light);color:var(--teal);align-items:center;justify-content:center;font-weight:700;font-size:.8rem}
+tr.top td{background:#f0fdfa}
+.formula{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#f1f5f9;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:.95rem;display:inline-block;margin:8px 0}
+.badge{display:inline-block;font-size:.65rem;font-weight:700;border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle;text-transform:none;letter-spacing:0}
+.badge.num{background:#ccfbf1;color:#115e59}
+.badge.den{background:#fef3c7;color:#92400e}
+.footnote{font-size:.8rem;color:var(--muted);margin:4px 0}
+.warn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:.85rem;color:#92400e;margin-bottom:16px}
+.calc{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8rem;color:var(--muted)}
+footer{text-align:center;padding:8px 16px 28px;font-size:.78rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Institutional Delivery &amp; Postnatal Check Coverage</h1>
+  <p class="subtitle">Compare districts by year &middot; source workbook: <strong>maternal_health.xlsx</strong> &middot; sheets: &ldquo;District Data&rdquo;, &ldquo;Indicator Notes&rdquo;</p>
+</header>
+<main>
+  <div class="warn" id="disclaimer"></div>
+  <section class="controls">
+    <label>Indicator <select id="indicatorSel"></select></label>
+    <label>Year <select id="yearSel"></select></label>
+  </section>
+  <section class="card">
+    <h2 id="compareTitle"></h2>
+    <div id="comparison"></div>
+  </section>
+  <section class="card">
+    <h2>Formula used</h2>
+    <div id="formulaCard"></div>
+  </section>
+  <section class="card">
+    <h2>Source sheet: &ldquo;District Data&rdquo;</h2>
+    <p class="footnote" id="srcFootnote"></p>
+    <div id="rawData"></div>
+  </section>
+  <section class="card">
+    <h2>Source sheet: &ldquo;Indicator Notes&rdquo;</h2>
+    <p class="footnote">Raw rows from the workbook (includes the formula column) &mdash; the active indicator row is highlighted.</p>
+    <div id="notesSheet"></div>
+  </section>
+</main>
+<footer>Static site &mdash; data embedded from maternal_health.xlsx &middot; no external libraries</footer>
+<script>
+// ---- Data embedded from maternal_health.xlsx (sheet: District Data) ----
+const SHEET_DistrictData={name:'District Data',
+ columns:['district','year','pregnancies_registered','institutional_deliveries','postnatal_check_48h'],
+ rows:[
+  ['Gaya',2021,1000,680,600],['Gaya',2022,1100,792,693],['Gaya',2023,1200,900,816],
+  ['Nalanda',2021,900,675,630],['Nalanda',2022,1000,780,720],['Nalanda',2023,1100,880,825],
+  ['Purnia',2021,1200,720,660],['Purnia',2022,1300,819,728],['Purnia',2023,1400,924,812]
+]};
+// ---- Data embedded from maternal_health.xlsx (sheet: Indicator Notes) ----
+const SHEET_IndicatorNotes={name:'Indicator Notes',
+ columns:['indicator','definition','formula','unit','source'],
+ rows:[
+  ['Institutional delivery coverage','Share of registered pregnancies with an institutional delivery','institutional_deliveries / pregnancies_registered * 100','percent','synthetic maternal-health workbook fixture'],
+  ['Postnatal check within 48 hours coverage','Share of registered pregnancies with a recorded postnatal check within 48 hours','postnatal_check_48h / pregnancies_registered * 100','percent','synthetic maternal-health workbook fixture'],
+  ['Important','Illustrative benchmark data; not official statistics and not person-level records',null,null,'synthetic maternal-health workbook fixture']
+]};
+
+// ---- Derived lookups ----
+const COLS=SHEET_DistrictData.columns, idx=c=>COLS.indexOf(c), val=(r,c)=>r[idx(c)];
+const YEARS=[...new Set(SHEET_DistrictData.rows.map(r=>r[1]))].sort((a,b)=>a-b);
+const DISTRICTS=[...new Set(SHEET_DistrictData.rows.map(r=>r[0]))].sort();
+// Indicators are parsed from the "formula" column of Indicator Notes: "<num> / <den> * 100"
+const INDICATORS=SHEET_IndicatorNotes.rows.filter(r=>r[3]==='percent').map(r=>{
+  const parts=r[2].split(' / ');
+  return{label:r[0],definition:r[1],formula:r[2],unit:r[3],source:r[4],
+         numerator:parts[0].trim(),denominator:parts[1].split(' * ')[0].trim()};
+});
+const WARN=SHEET_IndicatorNotes.rows.find(r=>r[0]==='Important');
+const $=id=>document.getElementById(id);
+const state={ind:0,year:YEARS[YEARS.length-1]};
+const cov=(r,ind)=>{const n=val(r,ind.numerator),d=val(r,ind.denominator);return d?n/d*100:null;};
+const fmtPct=v=>v==null?'—':v.toFixed(1)+'%';
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// ---- Controls ----
+$('disclaimer').textContent='⚠ '+WARN[1];
+const indSel=$('indicatorSel'),yearSel=$('yearSel');
+INDICATORS.forEach((ind,i)=>indSel.add(new Option(ind.label,i)));
+yearSel.add(new Option('All years (trend)','all'));
+YEARS.forEach(y=>yearSel.add(new Option(y,y)));
+indSel.value=String(state.ind);
+yearSel.value=String(state.year);
+indSel.onchange=()=>{state.ind=+indSel.value;render();};
+yearSel.onchange=()=>{state.year=yearSel.value==='all'?'all':+yearSel.value;render();};
+// ---- Rendering ----
+function renderComparison(ind){
+  const box=$('comparison');
+  if(state.year==='all'){
+    let h='<table><tr><th>District</th>'+YEARS.map(y=>`<th class="num">${y}</th>`).join('')+'<th class="num">avg</th></tr>';
+    DISTRICTS.forEach(d=>{
+      const rows=SHEET_DistrictData.rows.filter(r=>r[0]===d).sort((a,b)=>a[1]-b[1]);
+      const vs=rows.map(r=>cov(r,ind));
+      const avg=vs.reduce((s,v)=>s+v,0)/vs.length;
+      h+=`<tr><td><strong>${esc(d)}</strong></td>`
+        +vs.map(v=>`<td class="num">${fmtPct(v)}<div class="barwrap" style="margin-top:4px"><div class="bar" style="width:${v}%"></div></div></td>`).join('')
+        +`<td class="num"><strong>${fmtPct(avg)}</strong></td></tr>`;
+    });
+    box.innerHTML=h+'</table>';
+    return;
+  }
+  const data=SHEET_DistrictData.rows.filter(r=>r[1]===state.year)
+    .map(r=>({d:r[0],n:val(r,ind.numerator),dm:val(r,ind.denominator),v:cov(r,ind)}))
+    .sort((a,b)=>b.v-a.v);
+  let h=`<table><tr><th>#</th><th>District</th><th class="num">${esc(ind.numerator)}</th><th class="num">${esc(ind.denominator)}</th><th class="num">Coverage</th><th style="min-width:170px">Chart</th></tr>`;
+  data.forEach((x,i)=>{
+    h+=`<tr${i===0?' class="top"':''}><td><span class="rank">${i+1}</span></td><td><strong>${esc(x.d)}</strong></td>`
+      +`<td class="num">${x.n.toLocaleString()}</td><td class="num">${x.dm.toLocaleString()}</td>`
+      +`<td class="num"><strong>${fmtPct(x.v)}</strong><div class="calc">${x.n.toLocaleString()} ÷ ${x.dm.toLocaleString()} × 100 = ${x.v.toFixed(1)}%</div></td>`
+      +`<td><div class="barwrap"><div class="bar" style="width:${x.v}%"></div></div></td></tr>`;
+  });
+  box.innerHTML=h+'</table>';
+}
+function renderRawData(ind){
+  const all=SHEET_DistrictData.rows;
+  const rows=state.year==='all'?all:all.filter(r=>r[1]===state.year);
+  let h='<table><tr>'+COLS.map(c=>{
+    let b='';
+    if(c===ind.numerator)b=' <span class="badge num">numerator</span>';
+    if(c===ind.denominator)b=' <span class="badge den">denominator</span>';
+    return `<th class="${(c===ind.numerator||c===ind.denominator)?'num':''}">${esc(c)}${b}</th>`;
+  }).join('')+'</tr>';
+  h+=rows.map(r=>'<tr>'+r.map((v,i)=>`<td class="${i>1?'num':''}">${v}</td>`).join('')+'</tr>').join('');
+  $('rawData').innerHTML=h+'</table>';
+  $('srcFootnote').textContent=state.year==='all'
+    ?`All ${rows.length} rows of the sheet shown (${DISTRICTS.length} districts × ${YEARS.length} years).`
+    :`${rows.length} of ${all.length} rows, filtered to year ${state.year}.`;
+}
+function renderNotes(ind){
+  let h='<table><tr>'+SHEET_IndicatorNotes.columns.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>';
+  h+=SHEET_IndicatorNotes.rows.map(r=>
+    `<tr class="${r[0]===ind.label?'top':''}">`+r.map(v=>`<td>${v==null?'—':esc(v)}</td>`).join('')+'</tr>'
+  ).join('');
+  $('notesSheet').innerHTML=h+'</table>';
+}
+function renderFormula(ind){
+  const targetYear=state.year==='all'?YEARS[YEARS.length-1]:state.year;
+  const row=SHEET_DistrictData.rows.find(r=>r[0]===DISTRICTS[0]&&r[1]===targetYear);
+  const n=val(row,ind.numerator),d=val(row,ind.denominator);
+  $('formulaCard').innerHTML=
+    `<p><strong>${esc(ind.label)}</strong> — ${esc(ind.definition)}</p>`
+    +`<div class="formula">${esc(ind.formula)}</div>`
+    +`<p class="footnote">Unit: ${esc(ind.unit)} &middot; defined in sheet &ldquo;${SHEET_IndicatorNotes.name}&rdquo; (source column: ${esc(ind.source)})</p>`
+    +`<p class="calc">Worked example — ${esc(row[0])}, ${row[1]}: &nbsp; ${n.toLocaleString()} ÷ ${d.toLocaleString()} × 100 = <strong>${(n/d*100).toFixed(1)}%</strong></p>`;
+}
+function render(){
+  const ind=INDICATORS[state.ind];
+  $('compareTitle').textContent=`${ind.label} — ${state.year==='all'?'trend (all years)':state.year}`;
+  renderComparison(ind);
+  renderFormula(ind);
+  renderRawData(ind);
+  renderNotes(ind);
+}
+render();
+</script>
+</body>
+</html>

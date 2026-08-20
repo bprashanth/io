@@ -1,0 +1,85 @@
+<html>
+<head>
+    <title>Women Training Outcomes</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2em auto; }
+        table { border-collapse: collapse; margin-top: 1em; }
+        th, td { border: 1px solid #ccc; padding: 0.5em; text-align: right; }
+        .formula { font-size: 0.9em; color: #555; }
+        .source { font-size: 0.9em; color: #555; }
+    </style>
+</head>
+<body>
+    <h1>Women Training Outcomes by District</h1>
+    
+    <label for="yearSelect">Select Year:</label>
+    <select id="yearSelect"></select>
+
+    <table>
+        <thead>
+            <tr>
+                <th>District</th>
+                <th>Enrolled</th>
+                <th>Completed Training</th>
+                <th>Employed (6mo)</th>
+                <th>Completion Rate</th>
+                <th>Employment Rate</th>
+            </tr>
+        </thead>
+        <tbody id="dataTable">
+            <!-- Data rows will appear here -->
+        </tbody>
+    </table>
+
+    <div class="formula">
+        <strong>Formulas:</strong><br>
+        Completion Rate = (Completed Training / Enrolled) × 100<br>
+        Employment Rate = (Employed at 6mo / Completed Training) × 100
+    </div>
+
+    <div class="source">
+        <a href="https://example.org/data-source" target="_blank">Source: synthetic women livelihood outcomes fixture</a>
+    </div>
+
+    <script>
+        const data = [
+            { district: "Gaya", year: 2022, women_enrolled: 1000, completed_training: 800, employed_at_6_months: 520 },
+            { district: "Gaya", year: 2023, women_enrolled: 1100, completed_training: 902, employed_at_6_months: 616 },
+            { district: "Nalanda", year: 2022, women_enrolled: 900, completed_training: 765, employed_at_6_months: 540 },
+            { district: "Nalanda", year: 2023, women_enrolled: 1000, completed_training: 870, employed_at_6_months: 650 }
+        ];
+
+        const years = [...new Set(data.map(d => d.year))].sort();
+        const yearSelect = document.getElementById('yearSelect');
+        years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearSelect.appendChild(option);
+        });
+
+        function updateTable() {
+            const selectedYear = parseInt(yearSelect.value);
+            const tbody = document.getElementById('dataTable');
+            tbody.innerHTML = '';
+
+            const filtered = data.filter(d => d.year === selectedYear);
+            filtered.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.district}</td>
+                    <td>${item.women_enrolled}</td>
+                    <td>${item.completed_training}</td>
+                    <td>${item.employed_at_6_months}</td>
+                    <td>${((item.completed_training / item.women_enrolled) * 100).toFixed(1)}%</td>
+                    <td>${((item.employed_at_6_months / item.completed_training) * 100).toFixed(1)}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        yearSelect.addEventListener('change', updateTable);
+        updateTable(); // Initialize table
+    </script>
+</body>
+</html>

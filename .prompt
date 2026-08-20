@@ -1,0 +1,251 @@
+# Build and run the NGO data-dashboard agent benchmark
+
+## Objective
+
+Build a reproducible, multi-turn benchmark that finds the smallest locally
+deployable model, or frozen small-model/escalation policy, which gives an NGO
+user an experience within 5--10% of or better than Google Antigravity's
+untouched default setup.
+
+Keep the frozen 7-point non-inferiority margin as the primary benchmark rule.
+As a separately labelled deployment trade-off, a much smaller model may be
+considered up to 15 points behind Antigravity only when it has no additional
+critical failure and the gap is visual polish or convenience rather than data
+correctness, citation integrity, metric definition, causal safety, or a broken
+application. Do not call that relaxed result equivalent.
+
+The users represented by this benchmark are NGO staff who are not assumed to be
+computer literate. They communicate in short, ordinary Indian English, may make
+spelling or grammar mistakes, and should not need to know programming terms.
+Their work starts with a CSV, Excel workbook, PDF, or request to find public data
+online. They ask the agent to make a simple website/dashboard, then refine it in
+the same conversation: filter years, compare districts, explain a chart, add a
+source, or download a filtered table.
+
+Do not describe these users or prompts as "dumb" in benchmark material. Call
+them plain-language or natural-language prompts.
+
+## Comparison under test
+
+- Baseline: the current stable Antigravity IDE in its normal desktop workflow,
+  with a fresh client/workspace and whatever usable model, effort, mode and
+  development policy it resolves out of the box. Record both the displayed and
+  request-resolved model state. Fail closed when a stale label sends no model or
+  silently resolves to a different model. The completed smoke showed why the
+  IDE must be primary: a visible Gemini 3.5 Flash (Low) state was internally
+  unset, while the operational default resolved to Gemini 3.6 Flash (High).
+- Candidate: the current stable VS Code Cline extension using OpenRouter. Start with
+  `qwen/qwen3.8-27b`, whose OpenRouter endpoint and downloadable Apache-2.0
+  weights at `Qwen/Qwen3.8-27B` were directly verified on 2026-08-19. Apart
+  from the provider/model and equivalent unattended
+  permissions, retain Cline's defaults. Record the exact Cline version, model
+  slug, provider route when exposed, reasoning settings, token usage, and cost.
+- Search direction: if a 27B model passes, test smaller locally deployable
+  models. If both fail, move upward through predeclared, locally deployable
+  candidates, including a DeepSeek V4 candidate if its weights and DGX-local
+  feasibility are verified. Do not
+  pretend that models from different Qwen generations or MoE architectures form
+  a clean parameter ladder; record total and active parameters and architecture.
+- Claim precisely: the hosted phase finds the smallest model *served through
+  OpenRouter* that makes Cline non-inferior to default Antigravity. Replay the
+  winning model locally, with the same cases and prompts, before claiming that a
+  quantized local deployment matches Antigravity.
+
+Use the official editor products for primary quality runs because those are the
+surfaces NGO participants will use. A CLI/ACP path may provide unattended
+repetitions only after a sampled replay demonstrates equivalent model,
+multi-turn file changes, approvals and generated-page behavior for that version.
+Do not assume shared agent code makes the product surfaces equivalent. A turn
+counts only when the same live conversation and workspace continue. Fail closed
+if the resolved model differs from the requested model. Codex or DeepSeek
+Harness may be run as clearly labelled diagnostic ablations, but cannot by
+themselves support a claim about the Cline workshop experience.
+
+## Inputs and conversations
+
+Build a small, high-quality suite before scaling it. Target roughly 20 cases,
+three repetitions per agent/model, divided into a development set for choosing
+the model and an untouched holdout set for the final comparison.
+
+Most cases must be routine NGO work, not adversarial puzzles. Include:
+
+- clean and messy census/health CSVs;
+- multi-sheet Excel files, merged headers, formulas, missing cells, and district
+  spelling variations;
+- digital and scanned/OCR PDFs with tables;
+- combining sources whose years, units, or district names do not line up;
+- finding an official public dataset online and preserving its downloaded bytes;
+- percentages versus counts, suppressed values, changed boundaries, and other
+  traps that should produce caveats rather than invented conclusions;
+- follow-ups for filtering, district comparison, explanation without causal
+  overclaiming, citation, and download.
+
+Prefer archived official public datasets plus deterministic scripted mutations.
+Every case needs a manifest, SHA-256 hashes, provenance, prompts in exact order,
+and a machine-readable oracle. Do not have an LLM invent all test data: numerical
+ground truth must be independently computable.
+
+Example conversation style:
+
+1. `one excel is there. make simple website showing district health position. i should select year and compare two districts. please show where each number came from`
+2. `only show 2021 to 2023`
+3. `compare gaya and nalanda`
+4. `why gaya is worse? don't guess if data cannot tell`
+5. `give source and page number`
+6. `download this filtered table`
+
+When a follow-up refers to the website, success requires a durable website
+change as well as a correct chat answer. For example, after `only show 2023`,
+the page must remove stale years from the active view, update summaries and
+carry 2023 into the downloaded rows. A chat-only answer does not satisfy the
+turn. Treat buttons, tabs and dropdowns as equally valid controls when they
+provide the required semantics; do not require a particular HTML element.
+
+## Isolation and execution
+
+Prefer outer container isolation for the official agents as well as the apps:
+
+- Run each official agent in its own disposable container with only its fresh
+  workspace, minimum credential material, and run-specific client state. The
+  container is the security boundary; do not depend on an agent's own sandbox.
+- If an official CLI cannot yet run correctly in a container, use a tightly
+  scoped host fallback only as an explicitly recorded protocol deviation. Prove
+  its observed file/tool paths stayed within scope before accepting the run.
+- Give every repetition a fresh workspace copied from immutable case inputs.
+- Isolate Cline state per run. Isolate Antigravity conversations/workspaces as
+  far as its CLI permits. Never expose one agent's generated files to the other.
+- Run generated application code in a disposable container with resource caps,
+  no Docker socket, read-only benchmark inputs, a writable output mount, and no
+  network after dependencies have been resolved. Record the image digest.
+- Allocate ports dynamically. Do not assume Streamlit, Vite, or a fixed port.
+- Apply the same time limit, network policy, and effective tool approvals to
+  both agents. Record deviations.
+
+Do not upload private, beneficiary-level, or sensitive health information to
+Antigravity or OpenRouter. Benchmark and workshop fixtures must be public or
+synthetic and non-identifying.
+
+## Evaluation
+
+Correctness dominates appearance. Use the weights and critical-failure gates in
+`benchmarks/config/scoring.json`.
+
+Evaluation must include:
+
+- deterministic checks against the oracle for displayed totals, filters,
+  comparisons, units, and downloaded data;
+- browser checks for load success, console/page errors, working controls,
+  responsive layout, and downloads;
+- screenshots at declared desktop and narrow viewport sizes;
+- visual grading of hierarchy, readability, chart choice, labels, contrast,
+  clipping, and whether a non-technical NGO user can understand the page;
+- citation checks for publisher, URL, data vintage, and PDF page/table where
+  applicable;
+- checks for unsupported causal claims, fabricated values, and hidden missing
+  data;
+- time, API usage/cost, agent/tool failures, and human interventions.
+
+Explicitly reject invented performance bands, unexplained target thresholds,
+and percentage-versus-percentage-point label errors. Every filtered export must
+carry enough dimensions and provenance to stand alone, including year and
+source for year-filtered tables. Preserve a separate online workshop pass and
+an offline/CDN-blocked resilience pass.
+
+Actually open every generated website with Playwright. A screenshot-only or
+source-code-only review is not sufficient. Use deterministic browser and data
+checks as primary evidence. A blinded multimodal judge may assist with visual
+quality, but it must not be the sole judge; preserve its exact prompt and raw
+output. Do not use a Gemini-family judge as the only visual judge of a
+Gemini-backed baseline.
+
+Define success as paired non-inferiority, not a vague average. Use a frozen
+7-point primary margin (inside the requested 5--10% tolerance), and always show
+the observed gap and interval so readers can also apply 5- and 10-point margins.
+Critical errors
+(wrong numbers, fabricated sources, a site that does not run, or controls that
+misrepresent data) are separate gates and cannot be offset by attractive design.
+Freeze the threshold before looking at holdout results.
+
+## Replay record
+
+For every run preserve enough to replay it against a local endpoint:
+
+- case ID and input hashes;
+- exact ordered user messages;
+- agent/harness version and settings;
+- provider, resolved model and model metadata;
+- raw structured transcript and tool events;
+- start/end timestamps and duration;
+- token counts, request count, retries and cost when available;
+- generated workspace file manifest and hashes;
+- application start command, container image/digest, port and health result;
+- screenshots, browser console/network errors, downloaded files;
+- deterministic scores, visual score sheets, judge prompts/raw responses, and
+  human notes;
+- for local replay: weights revision/hash, quantization, inference engine and
+  version, context size, tool-call template, hardware, throughput, and memory.
+
+Never store API keys, OAuth tokens, keyring data, or cookies in the repository.
+
+## Efficient search and optional routing
+
+Screen each model on a frozen five-case development subset spanning CSV, Excel,
+PDF, web discovery, and a misleading-data caveat. After at least three paired
+cases, stop a candidate early if it is at least 20 points behind Antigravity
+with no plausible recovery, or has two more critical failures. This is a
+futility rule, never an early declaration of success.
+
+Only candidates within 10 points of Antigravity proceed to the full development
+set and repetitions. Only frozen finalists see the holdout. If no single small
+model passes, evaluate a predeclared router that uses the smallest model first
+and escalates only on observable task/input conditions or an explicit low-
+confidence/failure signal. Save every route decision. Freeze the router before
+holdout and score its combined quality, latency, cost, and escalation rate.
+
+The eventual target is a local DGX-class deployment for roughly 10--20 users,
+but this benchmark does not load-test concurrency. Report model memory,
+throughput, and concurrency projections separately; do not claim measured
+multi-user capacity.
+
+## Current evidence checkpoint
+
+The completed real-product smoke is summarized in
+`benchmarks/results/product-gui-smoke-v1-diagnostic.json`. Preliminary single-
+run scores were Antigravity 80.5, Cline/Qwen 27B Xhigh 91.2 and Cline/Qwen 27B
+Medium 85.5. Advance 27B/Xhigh to the controlled confidence suite. Medium was
+17% cheaper through OpenRouter but slower end to end, lower quality and no
+smaller in local memory. The tested viable bracket remains `14B < size <= 27B`:
+9B failed application generation, and 14B omitted source rows and fabricated a
+citation, so neither qualifies for the 15-point presentation-only trade-off.
+
+The smoke also froze four harness corrections before repetitions: semantic
+year-control detection, durable page updates after follow-ups, year/source in
+exports, and deterministic narrow/offline checks. Do not retroactively rescore
+the preserved smoke; apply these corrections to a newly versioned suite.
+
+## Evidence and chronology
+
+This repository is the producer and source of truth. Follow the Remembrancer
+chronology protocol:
+
+- append timestamped Markdown entries under `chronology/`;
+- do not rewrite old entries to make later results look cleaner;
+- link every measured claim to checked-in design, cases, runners, raw run
+  records, and results;
+- record failed attempts, sample sizes, uncertainty, and material caveats;
+- keep small evidence in git and explain any omitted large/private artifact.
+
+## Order of work
+
+1. Treat the completed product-GUI smoke as immutable diagnostic evidence.
+2. Version the corrected semantic browser/export/durable-page assertions.
+3. Create isolated fresh Antigravity and Cline client profiles and one fresh
+   workspace per run; retain the actual editor products for the first pass.
+4. Replay one ordinary CSV, XLSX, PDF, safe-interpretation and official-web case
+   through both products with 27B/Xhigh as the candidate.
+5. Repair only harness/evaluator defects revealed by that pass, then freeze the
+   development/holdout split, prompts, thresholds and early-stop rules.
+6. Run the remaining repetitions. If 27B passes, search declared intermediate
+   15B--26B candidates before repeating already-rejected 14B or 9B systems.
+7. Replay the finalist through a local endpoint with identical cases before any
+   local-equivalence or DGX capacity claim. Never tune on the holdout set.

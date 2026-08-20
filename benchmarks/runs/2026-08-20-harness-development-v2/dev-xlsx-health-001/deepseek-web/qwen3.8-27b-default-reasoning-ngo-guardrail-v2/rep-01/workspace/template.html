@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maternal health coverage by district</title>
+<style>
+:root{
+  --ink:#1c2b27; --muted:#5c6f69; --line:#d8e2de; --bg:#f4f7f5; --card:#ffffff;
+  --accent:#1f7a5a; --accent-soft:#e3f0ea;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+.wrap{max-width:920px;margin:0 auto;padding:20px 16px 48px}
+header h1{font-size:1.5rem;margin:8px 0 4px}
+.sub{color:var(--muted);margin:0 0 18px;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+.controls{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end}
+.controls>label{font-weight:600;font-size:.95rem;display:flex;flex-direction:column;gap:4px}
+select{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;min-width:220px}
+h2{font-size:1.1rem;margin:0 0 8px}
+.def{margin:4px 0 10px;color:var(--muted)}
+.formula{background:var(--accent-soft);border-radius:6px;padding:8px 10px;font-size:.92rem;margin-bottom:4px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em;background:#eef2f0;padding:1px 5px;border-radius:4px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.bar{height:14px;border-radius:3px;background:var(--accent);min-width:2px}
+.top td{background:var(--accent-soft)}
+.summary{margin:10px 0 0;font-size:.95rem}
+.chipbox{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chipbox-label{font-weight:600;font-size:.95rem}
+.chip{font-size:.9rem;display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:16px;padding:5px 12px;cursor:pointer;background:#fff;margin:0}
+.chip input{accent-color:var(--accent);margin:0}
+.caveat{border:1px solid #e5c8a0;background:#fdf3e3;border-radius:6px;padding:10px 12px;font-size:.92rem;margin-top:12px}
+button{font:inherit;font-size:.9rem;padding:7px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;cursor:pointer}
+button:hover{background:#175f46}
+.dlrow{display:flex;justify-content:flex-end;margin-bottom:10px}
+.small{font-size:.85rem;color:var(--muted)}
+details summary{cursor:pointer;font-weight:600;font-size:.95rem;margin:12px 0 8px}
+footer{margin-top:8px;color:var(--muted);font-size:.85rem}
+@media (max-width:560px){
+  .wrap{padding:12px 10px 36px}
+  header h1{font-size:1.25rem}
+  select{min-width:0;width:100%}
+  .controls{gap:12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>Maternal health coverage by district</h1>
+<p class="sub">Select an indicator, a year and the districts to compare. Built from the local file <code>maternal_health.xlsx</code> (sheets: <code>District Data</code>, <code>Indicator Notes</code>).</p>
+</header>
+
+<section class="card controls" aria-label="Choose indicator, year and districts">
+<label>Indicator
+<select id="indicator"></select>
+</label>
+<label>Year
+<select id="year"></select>
+</label>
+<div class="chipbox" aria-label="Districts to compare">
+<span class="chipbox-label">Districts to compare</span>
+<span id="districtChips"></span>
+</div>
+</section>
+
+<section class="card">
+<h2 id="indTitle"></h2>
+<p class="def" id="indDef"></p>
+<div class="formula" id="indFormula"></div>
+</section>
+
+<section class="card">
+<div class="dlrow"><button id="dlBtn" type="button">Download current comparison as CSV</button></div>
+<h2 id="cmpTitle"></h2>
+<div class="tablewrap">
+<table>
+<thead>
+<tr>
+<th>District</th>
+<th class="num" id="thNum"></th>
+<th class="num">pregnancies_registered</th>
+<th>Coverage (0–100%)</th>
+<th class="num">vs top selected district</th>
+</tr>
+</thead>
+<tbody id="cmpBody"></tbody>
+</table>
+</div>
+<p class="summary" id="summary"></p>
+<p class="small">Raw counts sit next to each coverage so the math can be checked directly: coverage = numerator ÷ pregnancies_registered × 100. The bar shows each district's share of its own registered pregnancies on a 0–100% scale.</p>
+</section>
+
+<section class="card">
+<h2 id="chgTitle"></h2>
+<div class="tablewrap">
+<table>
+<thead><tr><th>District</th><th class="num" id="thY0"></th><th class="num" id="thY1"></th><th class="num">Change</th></tr></thead>
+<tbody id="chgBody"></tbody>
+</table>
+</div>
+<p class="small">A percentage point (pts) is the simple difference between the two coverage rates. For example, 63.0% &#8594; 68.0% is +5.0 pts — this is not the same as a relative percent change.</p>
+</section>
+
+<section class="card">
+<h2>Source: sheets and formulas</h2>
+<p class="small">File: <code>maternal_health.xlsx</code>. Raw counts come from the <code>District Data</code> sheet (columns: district, year, pregnancies_registered, institutional_deliveries, postnatal_check_48h). Definitions, formulas and units come from the <code>Indicator Notes</code> sheet, shown below unmodified:</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th>indicator</th><th>definition</th><th>formula</th><th>unit</th><th>source</th></tr></thead>
+<tbody id="notesBody"></tbody>
+</table>
+</div>
+<details>
+<summary>Raw rows from the "District Data" sheet for the shown years (2022 and 2023, unmodified values)</summary>
+<div class="tablewrap">
+<table>
+<thead><tr><th>district</th><th>year</th><th class="num">pregnancies_registered</th><th class="num">institutional_deliveries</th><th class="num">postnatal_check_48h</th></tr></thead>
+<tbody id="rawBody"></tbody>
+</table>
+</div>
+<p class="small" id="rawNote">__RAWWNOTE__</p>
+</details>
+<p class="caveat" id="caveat"></p>
+</section>
+
+<footer>Coverage is computed on this page directly from the raw counts in the "District Data" sheet — no other data is used. Selecting a different indicator, year or districts updates the URL, so the view can be shared or reloaded and it stays put.</footer>
+</div>
+<script>
+const DATA = __DATA__;
+const NOTES = __NOTES__;
+const IND = __IND__;
+const YEARS = __YEARS__;
+const DISTRICTS = [...new Set(DATA.map(r => r.district))].sort();
+const DEFAULT_STATE = { indicator: 'postnatal48', year: YEARS[YEARS.length - 1], districts: ['Gaya', 'Nalanda'] };
+
+function coverage(row, key){ const ind = IND[key]; return row[ind.num] / row[ind.den] * 100; }
+function fmt1(x){ return x.toFixed(1); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function selRows(state){
+  const year = +state.year;
+  return DATA.filter(r => r.year === year && state.districts.includes(r.district))
+             .sort((a,b) => a.district.localeCompare(b.district));
+}
+
+function tableHTML(state){
+  if (state.districts.length === 0) return '<tr><td colspan="5">Select at least one district to compare.</td></tr>';
+  const key = state.indicator;
+  const rows = selRows(state);
+  const vals = rows.map(r => ({ r, c: coverage(r, key) }));
+  const top = Math.max(...vals.map(v => v.c));
+  const ind = IND[key];
+  return vals.map(v => {
+    const gap = top - v.c;
+    const isTop = gap < 0.0005;
+    const gapTxt = isTop ? 'top' : '\u2212' + fmt1(gap) + ' pts';
+    return '<tr' + (isTop ? ' class="top"' : '') + '>' +
+      '<td>' + esc(v.r.district) + '</td>' +
+      '<td class="num">' + v.r[ind.num] + '</td>' +
+      '<td class="num">' + v.r[ind.den] + '</td>' +
+      '<td><div style="display:flex;align-items:center;gap:8px"><div class="bar" style="width:' + Math.max(2, v.c) + '%"></div><span>' + fmt1(v.c) + '%</span></div></td>' +
+      '<td class="num">' + gapTxt + '</td></tr>';
+  }).join('');
+}
+
+function summaryText(state){
+  const key = state.indicator, year = +state.year;
+  const rows = selRows(state);
+  if (rows.length === 0) return 'Select at least one district to compare.';
+  if (rows.length === 1) return 'In ' + year + ', ' + rows[0].district + ' ' + IND[key].short + ' was ' + fmt1(coverage(rows[0], key)) + '%.';
+  const ranked = rows.map(r => ({ d: r.district, c: coverage(r, key) })).sort((a,b) => b.c - a.c);
+  const best = ranked[0];
+  const rest = ranked.slice(1).map(x => x.d + ' (' + fmt1(x.c) + '%)');
+  return 'In ' + year + ', ' + best.d + ' had the highest ' + IND[key].short + ' at ' + fmt1(best.c) + '%, ahead of ' + rest.join(' and ') + '.';
+}
+
+function changeHTML(state){
+  if (state.districts.length === 0) return '<tr><td colspan="4">Select at least one district to compare.</td></tr>';
+  const key = state.indicator;
+  const y0 = YEARS[0], y1 = YEARS[YEARS.length - 1];
+  const rows = state.districts.map(d => {
+    const r0 = DATA.find(r => r.district === d && r.year === y0);
+    const r1 = DATA.find(r => r.district === d && r.year === y1);
+    return { d, c0: coverage(r0, key), c1: coverage(r1, key) };
+  }).sort((a,b) => a.d.localeCompare(b.d));
+  return rows.map(v => {
+    const delta = v.c1 - v.c0;
+    const dir = delta > 0.0005 ? 'up' : (delta < -0.0005 ? 'down' : 'no change');
+    const sign = delta > 0.0005 ? '+' : (delta < -0.0005 ? '\u2212' : '');
+    return '<tr><td>' + esc(v.d) + '</td><td class="num">' + fmt1(v.c0) + '%</td><td class="num">' + fmt1(v.c1) + '%</td><td class="num">' + dir + ' ' + sign + fmt1(Math.abs(delta)) + ' pts</td></tr>';
+  }).join('');
+}
+
+function csvCell(s){ s = String(s); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+
+function buildCSV(state){
+  const key = state.indicator, ind = IND[key];
+  const y0 = YEARS[0], y1 = YEARS[YEARS.length - 1];
+  const sel = state.districts.slice().sort((a,b) => a.localeCompare(b));
+  const head = ['district',
+    y0 + ' ' + ind.num + ' (count)', y0 + ' pregnancies_registered (count)', y0 + ' coverage (%)',
+    y1 + ' ' + ind.num + ' (count)', y1 + ' pregnancies_registered (count)', y1 + ' coverage (%)',
+    y1 + ' vs top selected district',
+    'change ' + y0 + ' to ' + y1 + ' (percentage points)', 'change direction'];
+  const lines = [head.map(csvCell).join(',')];
+  if (sel.length === 0) { lines.push('Select at least one district to compare.'); return lines.join('\n'); }
+  const selVals = sel.map(d => {
+    const r1 = DATA.find(r => r.district === d && r.year === y1);
+    return { d, c1: coverage(r1, key) };
+  });
+  const top = Math.max(...selVals.map(v => v.c1));
+  for (const d of sel) {
+    const r0 = DATA.find(r => r.district === d && r.year === y0);
+    const r1 = DATA.find(r => r.district === d && r.year === y1);
+    const c0 = coverage(r0, key), c1 = coverage(r1, key);
+    const delta = c1 - c0;
+    const dir = delta > 0.0005 ? 'up' : (delta < -0.0005 ? 'down' : 'no change');
+    const sign = delta > 0.0005 ? '+' : (delta < -0.0005 ? '-' : '');
+    const gap = top - c1;
+    const vsTop = gap < 0.0005 ? 'top' : '-' + fmt1(gap) + ' pts';
+    lines.push([d, r0[ind.num], r0[ind.den], fmt1(c0), r1[ind.num], r1[ind.den], fmt1(c1), vsTop, sign + fmt1(Math.abs(delta)), dir]
+               .map(csvCell).join(','));
+  }
+  lines.push(['formula (from "Indicator Notes" sheet)', ind.formula, '', '', '', '', '', '', '', '']
+             .map(csvCell).join(','));
+  lines.push(['source', 'maternal_health.xlsx - "District Data" sheet (raw counts), "Indicator Notes" sheet (definition and formula)', '', '', '', '', '', '', '', '']
+             .map(csvCell).join(','));
+  return lines.join('\n');
+}
+
+function csvName(state){
+  return 'comparison_' + state.indicator + '_' + YEARS[0] + '_' + YEARS[YEARS.length - 1] + '_' +
+         (state.districts.length ? state.districts.slice().sort().join('_') : 'no_district') + '.csv';
+}
+
+const $ = id => document.getElementById(id);
+let cbMap = {};
+
+function render(){
+  const ind = IND[state.indicator];
+  $('indTitle').textContent = ind.label;
+  $('indDef').textContent = ind.definition;
+  $('indFormula').innerHTML = 'Formula (from the \u201CIndicator Notes\u201D sheet, unmodified): <code>' + esc(ind.formula) + '</code> &nbsp;\u00b7&nbsp; unit: ' + esc(ind.unit);
+  $('cmpTitle').textContent = 'Districts in ' + state.year + ' \u2014 ' + ind.label;
+  $('thNum').textContent = ind.num + ' (count)';
+  $('cmpBody').innerHTML = tableHTML(state);
+  $('summary').textContent = summaryText(state);
+  $('chgTitle').textContent = 'Change from ' + YEARS[0] + ' to ' + YEARS[YEARS.length - 1] + ' (percentage points) \u2014 ' + ind.label;
+  $('thY0').textContent = String(YEARS[0]);
+  $('thY1').textContent = String(YEARS[YEARS.length - 1]);
+  $('chgBody').innerHTML = changeHTML(state);
+}
+
+function stateFromURL(){
+  const p = new URLSearchParams(location.search);
+  const ind = IND[p.get('indicator')] ? p.get('indicator') : DEFAULT_STATE.indicator;
+  const yRaw = p.get('year');
+  const y = (yRaw !== null && YEARS.includes(+yRaw) && String(+yRaw) === yRaw) ? +yRaw : DEFAULT_STATE.year;
+  let districts = (p.get('districts') || '').split(',').map(s => s.trim()).filter(d => DISTRICTS.includes(d));
+  if (districts.length === 0) districts = DEFAULT_STATE.districts.slice();
+  return { indicator: ind, year: y, districts };
+}
+
+function sync(){
+  const params = new URLSearchParams({ indicator: state.indicator, year: String(state.year), districts: state.districts.join(',') });
+  history.replaceState(null, '', '?' + params.toString());
+  render();
+}
+
+let state = stateFromURL();
+
+function init(){
+  const selInd = $('indicator');
+  for (const key of Object.keys(IND)) {
+    const o = document.createElement('option');
+    o.value = key; o.textContent = IND[key].label;
+    selInd.appendChild(o);
+  }
+  const selY = $('year');
+  for (const y of YEARS) {
+    const o = document.createElement('option');
+    o.value = String(y); o.textContent = String(y);
+    selY.appendChild(o);
+  }
+  selInd.value = state.indicator;
+  selY.value = String(state.year);
+  selInd.addEventListener('change', e => { state.indicator = e.target.value; sync(); });
+  selY.addEventListener('change', e => { state.year = +e.target.value; sync(); });
+
+  const chips = $('districtChips');
+  for (const d of DISTRICTS) {
+    const l = document.createElement('label');
+    l.className = 'chip';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = d; cb.checked = state.districts.includes(d);
+    cbMap[d] = cb;
+    cb.addEventListener('change', () => {
+      state.districts = DISTRICTS.filter(x => cbMap[x].checked);
+      sync();
+    });
+    l.appendChild(cb);
+    l.appendChild(document.createTextNode(' ' + d));
+    chips.appendChild(l);
+  }
+
+  $('dlBtn').addEventListener('click', () => {
+    const blob = new Blob([buildCSV(state)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = csvName(state);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  $('notesBody').innerHTML = NOTES.map(n =>
+    '<tr><td>' + esc(n.indicator) + '</td><td>' + esc(n.definition) + '</td><td>' + (n.formula ? '<code>' + esc(n.formula) + '</code>' : '\u2014') + '</td><td>' + esc(n.unit || '\u2014') + '</td><td>' + esc(n.source || '\u2014') + '</td></tr>'
+  ).join('');
+  $('rawBody').innerHTML = DATA.map(r =>
+    '<tr><td>' + esc(r.district) + '</td><td class="num">' + r.year + '</td><td class="num">' + r.pregnancies_registered + '</td><td class="num">' + r.institutional_deliveries + '</td><td class="num">' + r.postnatal_check_48h + '</td></tr>'
+  ).join('');
+  const imp = NOTES.find(n => n.indicator === 'Important');
+  if (imp) $('caveat').innerHTML = '<strong>Important (from the \u201CIndicator Notes\u201D sheet):</strong> ' + esc(imp.definition);
+
+  render();
+}
+
+init();
+</script>
+</body>
+</html>

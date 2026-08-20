@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "case_id": "dev-csv-health-001",
+  "provider": "openai-compatible",
+  "model": "qwen/qwen3.8-27b:nitro",
+  "base_url": "http://host.docker.internal:18150/v1",
+  "thinking": "xhigh",
+  "request_reasoning_effort": "xhigh",
+  "workspace": "/tmp/io-screening-v1-csv-qwen-retry-tllNsV",
+  "isolated_home": "/tmp/io-screening-v1-csv-qwen-state-retry-8WzbXW/home",
+  "outer_container_image": "io-benchmark-agent-tools:2026-08-20",
+  "outer_container_enabled": true,
+  "started_at_unix": 1787168119.967045,
+  "turns": [
+    {
+      "turn": 1,
+      "duration_seconds": 511.42,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 16200,
+      "agent_response": "\n\nI found the CSV. Its structure is as follows: `district, year, pregnancies_registered, anc4_completed, source` \u2014 5 districts (Gaya, Nalanda, Purnia, Kishanganj, Patna), years 2020\u20132023, with the source listed as \"synthetic Bihar ANC fixture\".\n\n**Plan:**\n1. Create a single self-contained `index.html` (no build step, no external libraries \u2014 works offline).\n2. Embed the CSV, parse it at runtime, and make the site data-driven.\n3. Year selector (2020\u20132023) \u2192 horizontal bar chart comparing districts for the selected year, plus a data table with a trend column.\n4. A \"Data source\" card (from the `source` column) and a \"How the rate is calculated\" card, containing the formula and a live worked example.\n5. Verify that the embedded data matches the CSV, and check that the numbers render correctly.\n\n\n\nThe editor has an input size limit, so I'll create the file in staged chunks. First, the `<head>` and all CSS:\n\n\n\nI've created the head + CSS (141 lines). Next, I'll add the body markup (line 142) and the first half of the script (line 208):\n\n\n\n\nBoth inserted cleanly (file now 317 lines). Adding the chart/table rendering (line 318) and the source card + init (line 370):\n\n\n\n\nThe file should be complete at 391 lines. Now let me verify the structure, confirm the embedded CSV matches the source file, and validate the calculations:\n\n\n\nThe structure is correct (393 lines, all boundaries are clean, ends with `</html>`). Now, let's verify the data integrity and calculation logic with Node \u2014 extract the actual JS from the page and run it, then compare it against the results calculated independently from the CSV:\n\n\n\nShell quoting issue with the backticks. I'll write the verification script to a file instead:\n\n\n\nAll validations passed. Final check \u2014 full script syntax check and a visual review of the assembled file, then I'll delete the temporary verification script:\n\n\n\nEverything is verified and complete. Here's what I built:\n\n## `index.html` \u2014 ANC4 Coverage by District\n\nA single, self-contained HTML file (no libraries, no build step, works offline) at `/tmp/io-screening-v1-csv-qwen-retry-tllNsV/index.html`. Just open it in any browser.\n\n**Features, mapped to your request:**\n\n1. **Select year** \u2014 pill buttons for 2020\u20132023 (defaults to 2023). Clicking re-renders everything.\n2. **Compare districts** \u2014 horizontal bar chart of all 5 districts for the chosen year, sorted highest\u2192lowest with a \"BEST\" badge, on a fixed 0\u2013100% scale. A summary strip shows the all-district total, best, and lowest district.\n3. **Show source** \u2014 a \"Data source\" card displays the `source` column from the CSV (`synthetic Bihar ANC fixture`), with an automatic amber warning that the data is synthetic/demo, since the source string says so.\n4. **How the rate is calculated** \u2014 a dedicated card with the formula **ANC4 coverage (%) = ANC4 completed \u00f7 Pregnancies registered \u00d7 100**, definitions of both terms, a note that the all-district total is a weighted sum (not an average of district rates), and a **live worked example** that updates with the selected year (e.g. *\"Worked example (Patna, 2023): 1,548 of 1,800 registered \u2192 1,548 \u00f7 1,800 \u00d7 100 = 86.0%\"*).\n5. **Underlying data table** \u2014 raw registered/completed counts per district for the selected year, a per-district trend strip (2020\u21922023, selected year highlighted), and an all-district total row.\n\n**Data-driven, not hardcoded:** the raw CSV is embedded and parsed at runtime by a small CSV parser, so the years/districts/rates all derive from the data.\n\n**Verification performed (all passed):**\n- Embedded CSV is byte-identical to `anc4_coverage.csv`\n- Ran the page's own JS parse + math in Node: 20 rows, 5 districts, 4 years; every rate matches an independent recomputation from the CSV (e.g. 2023: Patna 86.0%, Nalanda 80.0%, Gaya 74.0%, Purnia 67.0%, Kishanganj 61.0%; all-district 74.5% = 5,290/7,100)\n- `node --check` on the full script: syntax OK\n- All required element IDs present; final file reviewed section by section",
+      "tool_call_count": 14,
+      "last_usage_update": null
+    },
+    {
+      "turn": 2,
+      "duration_seconds": 60.347,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 1666,
+      "agent_response": "\n\nI'll filter the years in the page's JS so only 2021\u20132023 appear (keeping the embedded data intact, with a single clearly-marked filter). First, let me locate the exact lines:\n\n\n\nNow verify the filter works end-to-end:\n\n\n\nSyntax is OK \u2014 my inline test had a typo (`}();` instead of `};`). Re-running the data check:\n\n\n\nDone. The site now shows only **2021\u20132023**.\n\n**What changed** (one edit in `index.html`):\n```js\n// ---- Show only 2021\u20132023 (2020 rows are loaded but hidden from all views) ----\nconst MIN_YEAR = 2021, MAX_YEAR = 2023;\nconst rows = ALL_ROWS.filter(r => r.year >= MIN_YEAR && r.year <= MAX_YEAR);\n```\n\n**Effect everywhere (all auto-derived from the filtered data):**\n- Year selector shows only **2021 \u00b7 2022 \u00b7 2023** buttons (still defaults to 2023)\n- Chart, summary stats, and table render only those years\n- Trend column header now reads \"Trend (2021\u21922023)\" with 3 cells per district\n- Footer now reads \"years 2021\u20132023\"\n\n**Verified by running the page's own logic in Node:**\n- Years shown: 2021, 2022, 2023 \u2014 15 of 20 rows, 2020 confirmed absent\n- Rates intact: 2021 total 67.1% (Patna 80.0% best, Kishanganj 54.0% lowest) \u00b7 2022 total 71.0% \u00b7 2023 total 74.5% (Patna 86.0%, Kishanganj 61.0%)\n- Full script passes `node --check`\n\nIf you later want to change the window again, just adjust `MIN_YEAR` / `MAX_YEAR` at that one spot.",
+      "tool_call_count": 4,
+      "last_usage_update": null
+    },
+    {
+      "turn": 3,
+      "duration_seconds": 22.345,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 974,
+      "agent_response": "\n\nStraight from the CSV (rates already verified earlier):\n\n| District | 2021 | 2023 | Change |\n|---|---|---|---|\n| **Gaya** | 66.0% (825 / 1,250) | 74.0% (999 / 1,350) | **+8.0 percentage points** |\n| **Nalanda** | 73.0% (803 / 1,100) | 80.0% (1,000 / 1,250) | **+7.0 percentage points** |\n\n**Takeaways:**\n- **Gaya improved more (+8.0 pp)** than Nalanda (+7.0 pp) over 2021\u21922023, so it's closing the gap.\n- **Nalanda still leads** \u2014 but its lead narrowed from **7.0 pp** in 2021 to **6.0 pp** in 2023.\n- In relative terms the contrast is sharper: Gaya's rate grew **+12.1%** (66\u219274), while Nalanda's grew **+9.6%** (73\u219280).\n- Both districts improved steadily each year (no year-over-year dips in this window).",
+      "tool_call_count": 0,
+      "last_usage_update": null
+    },
+    {
+      "turn": 4,
+      "duration_seconds": 18.524,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 923,
+      "agent_response": "\n\nHonest answer: **this file can't tell us why.** It contains no explanatory variables at all \u2014 just two counts per district per year (registrations and ANC4 completions) and a source label. There's nothing in the CSV about facilities, staffing, access, or anything else that could explain a difference between districts.\n\nWhat the file *does* show (observation, not cause):\n\n- **Nalanda is above Gaya in every year of the file** \u2014 2020: 70% vs 62% \u00b7 2021: 73% vs 66% \u00b7 2022: 77% vs 69% \u00b7 2023: 80% vs 74%\n- The gap is **stable at 6\u20138 percentage points** \u2014 it's not a one-year blip, it's a persistent pattern\n- Registered volumes are of similar scale (Gaya 1,200\u20131,350; Nalanda 1,000\u20131,250), so the gap isn't just an artifact of one district having a tiny denominator\n\nAnd one more thing the file itself reveals: the `source` column says **\"synthetic Bihar ANC fixture\"** \u2014 this is generated demonstration data. So there isn't a real-world \"why\" behind these numbers even in principle; any explanation I gave you (health infrastructure, access, socioeconomics, etc.) would be invented. If you have a real dataset with context variables, that's where the \"why\" would have to come from.",
+      "tool_call_count": 0,
+      "last_usage_update": null
+    },
+    {
+      "turn": 5,
+      "duration_seconds": 53.417,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 1739,
+      "agent_response": "\n\nI'll generate the CSV from the source data (not hardcoded) and verify the output:\n\n\n\nCleaning up a leftover temp file from the earlier verification:\n\nYour file is ready to download:\n\n**`/tmp/io-screening-v1-csv-qwen-retry-tllNsV/gaya_nalanda_anc4_comparison_2021_2023.csv`**\n\nContents (generated from `anc4_coverage.csv`, verified):\n\n```csv\ndistrict,pregnancies_registered_2021,anc4_completed_2021,anc4_coverage_2021_pct,pregnancies_registered_2023,anc4_completed_2023,anc4_coverage_2023_pct,change_2021_to_2023_pp\nGaya,1250,825,66.0,1350,999,74.0,8.0\nNalanda,1100,803,73.0,1250,1000,80.0,7.0\n```\n\nNotes:\n- Rates and the percentage-point change are computed from the raw counts, not transcribed \u2014 so the change column (`8.0` for Gaya, `7.0` for Nalanda) is reproducible from the counts in the same row.\n- One row per district with both years side by side, matching the comparison table from my previous answer.\n\nIf it would be useful, I can also add a **\"Download CSV\"** button to `index.html` that exports the currently displayed year's district table (or this same Gaya-vs-Nalanda comparison) directly from the browser \u2014 just say the word.",
+      "tool_call_count": 2,
+      "last_usage_update": null
+    }
+  ],
+  "outer_container_image_id": "sha256:3ebc6514c7372bc8cf9f2c533c0716784bd127862f9739cb57739b921d544378",
+  "outer_container_repo_digests": [],
+  "outer_container_platform": "linux/arm64",
+  "agent_info": {
+    "name": "cline",
+    "version": "3.0.55"
+  },
+  "session_id": "1787168120576_CuxNB_cli",
+  "session_model_before_selection": "gpt-4o",
+  "requested_model_available": false,
+  "custom_model_id": true,
+  "session_model": "qwen/qwen3.8-27b:nitro",
+  "usage": {
+    "inputTokens": 716033,
+    "outputTokens": 36117,
+    "cacheReadTokens": 294784,
+    "cacheWriteTokens": 0,
+    "totalCost": 0
+  },
+  "aggregate_usage": {
+    "inputTokens": 716033,
+    "outputTokens": 36117,
+    "cacheReadTokens": 294784,
+    "cacheWriteTokens": 0,
+    "totalCost": 0
+  },
+  "total_cost": 0,
+  "session_metadata_path": "/tmp/io-screening-v1-csv-qwen-state-retry-8WzbXW/home/.cline/data/sessions/1787168120576_CuxNB_cli/1787168120576_CuxNB_cli.json",
+  "finished_at_unix": 1787168796.6414254,
+  "duration_seconds": 676.674,
+  "exit_code": 0
+}

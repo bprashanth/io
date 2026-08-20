@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "case_id": "smoke-001",
+  "provider": "openai-compatible",
+  "model": "qwen/qwen3.8-27b:nitro",
+  "base_url": "https://openrouter.ai/api/v1",
+  "thinking": "provider-default",
+  "workspace": "/tmp/io-smoke-cline-qwen38-nitro-oEhSJA",
+  "isolated_home": "/home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-08-19-smoke/smoke-001/cline/qwen3.8-27b/rep-06-acp-nitro/cline-state/home",
+  "started_at_unix": 1787163744.0548513,
+  "turns": [
+    {
+      "turn": 1,
+      "duration_seconds": 160.451,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 2573,
+      "agent_response": "\n\nI found `district_immunisation.csv` \u2014 its structure is `district,year,children_due,children_fully_immunised,source` (3 districts \u00d7 2 years). My plan:\n\n1. Create a self-contained `index.html` (no external dependencies, works even offline via `file://`).\n2. Load the CSV live if served over HTTP, and fall back to embedded data if opened locally.\n3. Year dropdown \u2192 bar chart comparing districts (immunized child count, target child count, coverage rate %).\n4. Display source information in the table and footer.\n5. Validate the JavaScript.\n\n\n\nFile too large for one edit \u2014 splitting into two chunks:\n\n\n\nNow adding the JavaScript before `</body>`:\n\n\n\nNow verifying \u2014 syntax-check the JS, confirm the embedded data matches the CSV, and smoke-test over a local HTTP server:\n\n\n\nSyntax OK, HTTP serving works. The row-comparison check was flawed (naive comma split broke CSV rows) \u2014 let me verify the embedded data properly:\n\n\n\nAll checks pass. The site is complete and verified.\n\n## What I built\n\n**`/tmp/io-smoke-cline-qwen38-nitro-oEhSJA/index.html`** \u2014 a single, self-contained website (no external libraries, works offline):\n\n- **Year selector** \u2014 dropdown populated from the data (2022, 2023, newest first)\n- **District comparison** \u2014 for the selected year, horizontal bars per district showing fully immunised / children due / coverage %, sorted by performance, plus an overall coverage figure in the chart title\n- **Details table** \u2014 district, children due, fully immunised, coverage badge, and a **Source** column per row\n- **Source shown** \u2014 footer reads *\"Data source: synthetic smoke fixture \u2014 district_immunisation.csv (live / embedded copy)\"*\n- **Data loading** \u2014 if served over HTTP it fetches `district_immunisation.csv` live (so CSV edits reflect immediately); if opened directly via `file://` it falls back to an embedded copy, and the footer tells you which one is in use\n\n## Verification done\n\n- `node --check` on the extracted script \u2192 **OK**\n- Embedded data vs. actual CSV \u2192 **exact match (7/7 rows)**\n- Served via `python3 -m http.server` \u2192 `index.html` **200**, `district_immunisation.csv` fetch **200**\n\n## How to view\n\n```bash\ncd /tmp/io-smoke-cline-qwen38-nitro-oEhSJA\npython3 -m http.server 8000    # then open http://localhost:8000\n```\n\n\u2026or just open `index.html` in a browser (embedded data kicks in automatically).\n\nSample rendering for 2023: Gaya 85.0% (935/1,100) \u00b7 Nalanda 90.0% (765/850) \u00b7 Purnia 76.0% (760/1,000). Note the data source is listed as \"synthetic smoke fixture\" \u2014 I displayed it as-is; let me know if you'd like it labeled differently or any styling/feature tweaks (e.g., side-by-side year comparison).",
+      "tool_call_count": 7,
+      "last_usage_update": null
+    },
+    {
+      "turn": 2,
+      "duration_seconds": 90.062,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 2443,
+      "agent_response": "\n\nI'll fix the page to 2023 only (no selector) and highlight the lowest district. From the CSV, 2023 coverage is: Gaya 85.0%, Nalanda 90.0%, Purnia 76.0% \u2014 so **Purnia is the lowest** (760 of 1,000). I'll flag it in the UI without attributing any reason, since the CSV contains none.\n\nMaking the edits:\n\n\n\n\nNow the JS changes \u2014 remove the year-select logic and mark the lowest district:\n\n\n\nRe-verifying \u2014 syntax check plus a logic test (stubbed DOM) to confirm which district gets flagged as lowest:\n\n\n\nStub missing `createElement` \u2014 fixing the test harness:\n\n\n\nDone and verified.\n\n## Changes to `index.html`\n\n- **Year selector removed** \u2014 the page now renders 2023 only (3 districts)\n- **Lowest district highlighted** \u2014 red bar + \"lowest\" tag in both the chart and the details table, computed dynamically (min coverage) rather than hardcoded, so it stays correct if the CSV changes\n\n## Answer\n\n**Purnia is the lowest district in 2023:** 760 of 1,000 children fully immunised = **76.0% coverage**, vs Gaya 85.0% (935/1,100) and Nalanda 90.0% (765/850). Overall 2023: 83.4% (2,460/2,950).\n\nOn the reason: the CSV contains only `district, year, children_due, children_fully_immunised, source` \u2014 no explanatory fields \u2014 so there's nothing in the data to attribute the gap to, and I haven't guessed.\n\n## Verification\n\n- `node --check` on the extracted script \u2192 OK\n- Logic test with stubbed DOM \u2192 3 districts rendered for 2023, exactly one \"lowest\" tag and one red bar, both on Purnia; footer still shows the source (\"synthetic smoke fixture\" \u2014 live CSV when served over HTTP, embedded copy via `file://`)\n\nView it the same way as before: `python3 -m http.server 8000` \u2192 `http://localhost:8000`, or open `index.html` directly.",
+      "tool_call_count": 7,
+      "last_usage_update": null
+    },
+    {
+      "turn": 3,
+      "duration_seconds": 90.236,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 1896,
+      "agent_response": "\n\nI'll add a \"Download 2023 CSV\" button to the Details card \u2014 it generates the CSV client-side from the displayed 2023 rows (same schema as the source file), so it works even over `file://`.\n\n\n\n\nNow the `downloadCSV()` function in the script:\n\n\n\nVerifying \u2014 syntax check plus a test that captures the generated Blob and compares it against the real 2023 rows:\n\n\n\nTest stub needs `removeChild` (real DOM has it) \u2014 re-running:\n\n\n\nPython string mangle in my harness \u2014 fixing it:\n\n\n\nDone and verified.\n\n## What was added to `index.html`\n\n- **Download button** in the Details card: `Download 2023 CSV`\n- **`downloadCSV()`** \u2014 builds a CSV from the displayed 2023 rows client-side and triggers a browser download of `district_immunisation_2023.csv`. Same schema as the source file (`district,year,children_due,children_fully_immunised,source`), with proper quote-escaping for values containing commas/quotes. No server needed \u2014 works over `http://` and via `file://`.\n\n## Verification\n\n- `node --check` on the full script \u2192 **OK**\n- Logic test with stubbed DOM/Blob \u2192 the generated file is exactly:\n\n```csv\ndistrict,year,children_due,children_fully_immunised,source\nGaya,2023,1100,935,synthetic smoke fixture\nNalanda,2023,850,765,synthetic smoke fixture\nPurnia,2023,1000,760,synthetic smoke fixture\n```\n\n\u2014 which matches the 2023 rows in `district_immunisation.csv` row-for-row, with blob type `text/csv;charset=utf-8`.\n\nRefresh the page (`http://localhost:8000` or open the file directly) and click the button in the Details card to get the download.",
+      "tool_call_count": 6,
+      "last_usage_update": null
+    }
+  ],
+  "agent_info": {
+    "name": "cline",
+    "version": "3.0.55"
+  },
+  "session_id": "1787163744545_mtrxX_cli",
+  "session_model_before_selection": "gpt-4o",
+  "requested_model_available": false,
+  "custom_model_id": true,
+  "session_model": "qwen/qwen3.8-27b:nitro",
+  "usage": {
+    "inputTokens": 332505,
+    "outputTokens": 18315,
+    "cacheReadTokens": 150528,
+    "cacheWriteTokens": 0,
+    "totalCost": 0
+  },
+  "aggregate_usage": {
+    "inputTokens": 332505,
+    "outputTokens": 18315,
+    "cacheReadTokens": 150528,
+    "cacheWriteTokens": 0,
+    "totalCost": 0
+  },
+  "total_cost": 0,
+  "session_metadata_path": "/home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-08-19-smoke/smoke-001/cline/qwen3.8-27b/rep-06-acp-nitro/cline-state/home/.cline/data/sessions/1787163744545_mtrxX_cli/1787163744545_mtrxX_cli.json",
+  "finished_at_unix": 1787164085.3073432,
+  "duration_seconds": 341.252,
+  "exit_code": 0
+}

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANC4 Coverage by District</title>
+<style>
+  :root {
+    --bg: #f6f8fb;
+    --card: #ffffff;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-dark: #1e40af;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  header p.sub { margin: 0 0 20px; color: var(--muted); }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .card h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  .year-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .year-btns button {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--ink);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .year-btns button:hover { border-color: var(--accent); color: var(--accent); }
+  .year-btns button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 64px; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .bar-label { font-size: .95rem; text-align: right; }
+  .bar-track { background: #eef1f5; border-radius: 6px; height: 26px; overflow: hidden; }
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+    border-radius: 6px 0 0 6px;
+    transition: width .35s ease;
+    min-width: 2px;
+  }
+  .bar-value { font-size: .9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; }
+  tbody tr:hover { background: #f9fafb; }
+  tr.total td { font-weight: 700; border-top: 2px solid var(--border); background: #f9fafb; }
+  .rank-badge {
+    display: inline-block; min-width: 22px; text-align: center;
+    background: #eef2ff; color: var(--accent-dark);
+    border-radius: 999px; padding: 1px 8px; font-size: .8rem; font-weight: 600;
+  }
+  .formula {
+    font-family: "Consolas", "Menlo", monospace;
+    background: #f3f4f6;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 10px 0;
+    overflow-x: auto;
+  }
+  .src-list { margin: 8px 0 0; padding-left: 20px; }
+  .src-list li { margin-bottom: 6px; }
+  code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  a { color: var(--accent); }
+  .note { color: var(--muted); font-size: .85rem; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ANC4 Coverage by District</h1>
+    <p class="sub">Share of registered pregnancies that completed at least 4 antenatal checkups.</p>
+  </header>
+
+  <div class="card">
+    <h2>Select a year</h2>
+    <div class="year-btns" id="yearBtns" role="tablist"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="chartTitle">Coverage by district</h2>
+    <div id="chart"></div>
+  </div>
+  <div class="card">
+    <h2>Detail</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Rank</th><th>District</th>
+          <th>Registered pregnancies</th>
+          <th>ANC4 completed</th>
+          <th>Coverage</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <p class="note">Total = sum of all districts shown; total coverage = total completed &divide; total registered.</p>
+  </div>
+
+  <div class="card">
+    <h2>Data source &amp; how the rate is calculated</h2>
+    <ul class="src-list">
+      <li><strong>Source:</strong> <span id="sourceText"></span></li>
+      <li><strong>Raw data file:</strong> <a href="anc4_coverage.csv" download>anc4_coverage.csv</a>
+        (columns: <code>district</code>, <code>year</code>, <code>pregnancies_registered</code>, <code>anc4_completed</code>, <code>source</code>)</li>
+    </ul>
+    <p>Coverage rate is calculated per district and year as:</p>
+    <div class="formula">Coverage rate (%) = anc4_completed &divide; pregnancies_registered &times; 100</div>
+    <p>Example (Gaya, 2020): 744 &divide; 1200 &times; 100 = <strong>62.0%</strong></p>
+  </div>
+</div>
+
+<script>
+// Data inlined from anc4_coverage.csv (source: synthetic Bihar ANC fixture)
+const CSV_ROWS = [
+  ["Gaya", 2020, 1200, 744],
+  ["Gaya", 2021, 1250, 825],
+  ["Gaya", 2022, 1300, 897],
+  ["Gaya", 2023, 1350, 999],
+  ["Nalanda", 2020, 1000, 700],
+  ["Nalanda", 2021, 1100, 803],
+  ["Nalanda", 2022, 1200, 924],
+  ["Nalanda", 2023, 1250, 1000],
+  ["Purnia", 2020, 1400, 770],
+  ["Purnia", 2021, 1500, 870],
+  ["Purnia", 2022, 1550, 992],
+  ["Purnia", 2023, 1600, 1072],
+  ["Kishanganj", 2020, 800, 400],
+  ["Kishanganj", 2021, 900, 486],
+  ["Kishanganj", 2022, 1000, 570],
+  ["Kishanganj", 2023, 1100, 671],
+  ["Patna", 2020, 1500, 1170],
+  ["Patna", 2021, 1600, 1280],
+  ["Patna", 2022, 1700, 1411],
+  ["Patna", 2023, 1800, 1548]
+];
+const SOURCE = "synthetic Bihar ANC fixture";
+
+const YEARS = [...new Set(CSV_ROWS.map(r => r[1]))].sort();
+let selectedYear = YEARS[YEARS.length - 1];
+
+document.getElementById("sourceText").textContent = SOURCE;
+
+const yearBtns = document.getElementById("yearBtns");
+YEARS.forEach(y => {
+  const b = document.createElement("button");
+  b.textContent = y;
+  b.dataset.year = y;
+  b.addEventListener("click", () => { selectedYear = y; render(); });
+  yearBtns.appendChild(b);
+});
+
+function rate(completed, registered) {
+  return (completed / registered) * 100;
+}
+
+function render() {
+  yearBtns.querySelectorAll("button").forEach(b =>
+    b.classList.toggle("active", Number(b.dataset.year) === selectedYear));
+
+  const rows = CSV_ROWS
+    .filter(r => r[1] === selectedYear)
+    .map(r => ({ district: r[0], registered: r[2], completed: r[3], pct: rate(r[3], r[2]) }))
+    .sort((a, b) => b.pct - a.pct);
+
+  const totalReg = rows.reduce((s, r) => s + r.registered, 0);
+  const totalComp = rows.reduce((s, r) => s + r.completed, 0);
+
+  document.getElementById("chartTitle").textContent = `Coverage by district — ${selectedYear}`;
+  const chart = document.getElementById("chart");
+  chart.innerHTML = "";
+  rows.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML =
+      `<div class="bar-label">${r.district}</div>` +
+      `<div class="bar-track"><div class="bar-fill" style="width:${r.pct.toFixed(2)}%"></div></div>` +
+      `<div class="bar-value">${r.pct.toFixed(1)}%</div>`;
+    chart.appendChild(row);
+  });
+
+  const tbody = document.getElementById("tableBody");
+  tbody.innerHTML = "";
+  rows.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td><span class="rank-badge">${i + 1}</span></td>` +
+      `<td>${r.district}</td>` +
+      `<td>${r.registered.toLocaleString()}</td>` +
+      `<td>${r.completed.toLocaleString()}</td>` +
+      `<td>${r.pct.toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+  });
+  const trT = document.createElement("tr");
+  trT.className = "total";
+  trT.innerHTML =
+    `<td></td><td>All districts</td>` +
+    `<td>${totalReg.toLocaleString()}</td>` +
+    `<td>${totalComp.toLocaleString()}</td>` +
+    `<td>${rate(totalComp, totalReg).toFixed(1)}%</td>`;
+  tbody.appendChild(trT);
+}
+
+render();
+</script>
+</body>
+</html>
+

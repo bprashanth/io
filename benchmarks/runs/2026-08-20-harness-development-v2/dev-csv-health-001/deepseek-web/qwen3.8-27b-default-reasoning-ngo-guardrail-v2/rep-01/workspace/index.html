@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANC4 Coverage by District</title>
+<style>
+  :root {
+    --ink: #1a2332;
+    --muted: #5b6675;
+    --line: #dde3ea;
+    --accent: #2563eb;
+    --bar-bg: #e8edf4;
+    --bar: #2f7d4f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--ink);
+    margin: 0;
+    background: #f7f9fc;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 0.95rem; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .controls label { font-weight: 600; }
+  select {
+    font-size: 1rem;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    min-width: 110px;
+  }
+  .year-note { color: var(--muted); font-size: 0.9rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rate-cell { min-width: 160px; }
+  .rate { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bar {
+    margin-top: 4px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--bar-bg);
+    overflow: hidden;
+  }
+  .bar > span { display: block; height: 100%; background: var(--bar); }
+  .calc { color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+  h2 { font-size: 1.1rem; margin: 0 0 10px; }
+  .formula {
+    background: #f0f5ff;
+    border: 1px solid #d4e0f7;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 0.98rem;
+    margin: 8px 0;
+  }
+  .formula b { color: #1e40af; }
+  ul { margin: 8px 0 0; padding-left: 20px; }
+  li { margin-bottom: 6px; font-size: 0.95rem; }
+  code {
+    background: #eef1f5;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.88em;
+  }
+  .note { color: var(--muted); font-size: 0.9rem; margin-top: 10px; }
+  .foot { color: var(--muted); font-size: 0.85rem; margin-top: 24px; }
+  @media (max-width: 560px) {
+    table { font-size: 0.85rem; }
+    th, td { padding: 8px 5px; }
+    .rate-cell { min-width: 120px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>4 antenatal checkup coverage by district</h1>
+  <p class="sub">Share of registered pregnancies in each district that completed 4 or more antenatal (ANC) checkups.</p>
+
+  <div class="card">
+    <div class="controls">
+      <label for="year">Year:</label>
+      <select id="year" aria-label="Select year"></select>
+      <span class="year-note" id="yearNote"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 id="tableTitle">District comparison</h2>
+    <table id="table">
+      <thead>
+        <tr>
+          <th>District</th>
+          <th class="num">Registered pregnancies</th>
+          <th class="num">ANC4 completed</th>
+          <th class="rate-cell">Coverage rate</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="note">Districts are listed from highest to lowest coverage rate for the selected year, so you can compare them directly. Counts are the raw numbers from the file; the rate is calculated from them.</p>
+  </div>
+
+  <div class="card">
+    <h2>Gaya vs Nalanda: change from 2021 to 2023</h2>
+    <table id="compare">
+      <thead>
+        <tr>
+          <th>District</th>
+          <th class="num">2021 completed / registered</th>
+          <th class="num">2021 rate</th>
+          <th class="num">2023 completed / registered</th>
+          <th class="num">2023 rate</th>
+          <th class="num">Change (points)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="note">A "point" is a percentage point: the plain difference between the two rates (example: 74.0% &minus; 66.0% = 8.0 points). Both districts rose over these two years; Nalanda was higher in both years, and Gaya's rate rose a little more. The data shows the change; it cannot show what caused it.</p>
+  </div>
+
+  <div class="card">
+    <h2>Why is Gaya below Nalanda?</h2>
+    <p class="note" style="margin-top:0">This file cannot tell. It only records, per district and year, how many pregnancies were registered and how many completed 4 or more checkups. It has no information about health facilities, health workers, how far women travel, what services are offered, or how any programme was run. So it can show the gap (in 2023: Gaya 74.0%, Nalanda 80.0%), but it cannot explain it.</p>
+    <p class="note">To investigate the reason you would need additional data, for example:</p>
+    <ul>
+      <li>facility-level service data: how many facilities offer ANC in each district, opening hours, staff on duty;</li>
+      <li>health worker staffing and vacancy records by district;</li>
+      <li>records of actual programme activities, outreach sessions, and funding in each district;</li>
+      <li>surveys of women and families on access problems (distance, cost, timing, awareness).</li>
+    </ul>
+    <p class="note">None of these are in <code>anc4_coverage.csv</code>, so any explanation for the gap would be a guess.</p>
+  </div>
+
+  <div class="card">
+    <h2>How the rate is calculated</h2>
+    <div class="formula">
+      Coverage rate = <b>(pregnancies with 4 or more ANC checkups completed) &divide; (registered pregnancies) &times; 100</b>
+    </div>
+    <ul>
+      <li><code>anc4_completed</code> = number of registered pregnancies in the district and year that completed 4 or more antenatal checkups.</li>
+      <li><code>pregnancies_registered</code> = total number of pregnancies registered in the district and year (the denominator).</li>
+    </ul>
+    <p class="note" id="calcExample"></p>
+  </div>
+
+  <div class="card">
+    <h2>Source</h2>
+    <ul>
+      <li>File: <code>anc4_coverage.csv</code>. This page shows the 2021&ndash;2023 rows from it (15 rows); the file also contains 2020, which is not shown here.</li>
+      <li>Source field in the file, identical for every row: <b>"synthetic Bihar ANC fixture"</b> &mdash; this is sample/fixture data, not a real health record extract.</li>
+      <li>Columns used: <code>district</code>, <code>year</code>, <code>pregnancies_registered</code>, <code>anc4_completed</code>, <code>source</code>.</li>
+      <li>Geography: districts of Bihar, India. Years shown: 2021, 2022, 2023 (the file's full range is 2020&ndash;2023). Each district-year appears exactly once.</li>
+    </ul>
+    <p class="note">Because the source is a synthetic fixture, figures show how to read the table, not actual programme performance. Coverage rates describe a share of registered pregnancies; this data alone cannot explain why districts differ.</p>
+  </div>
+
+  <p class="foot">Data shown exactly as in <code>anc4_coverage.csv</code>. No values were changed, estimated, or filled in.</p>
+</div>
+
+<script>
+// Data copied verbatim from anc4_coverage.csv (district, year, pregnancies_registered, anc4_completed, source)
+// Years shown: 2021-2023 (the file also contains 2020, which is not displayed)
+const ROWS = [
+  { district: "Gaya",        year: 2021, pregnancies_registered: 1250, anc4_completed: 825,  source: "synthetic Bihar ANC fixture" },
+  { district: "Gaya",        year: 2022, pregnancies_registered: 1300, anc4_completed: 897,  source: "synthetic Bihar ANC fixture" },
+  { district: "Gaya",        year: 2023, pregnancies_registered: 1350, anc4_completed: 999,  source: "synthetic Bihar ANC fixture" },
+  { district: "Nalanda",     year: 2021, pregnancies_registered: 1100, anc4_completed: 803,  source: "synthetic Bihar ANC fixture" },
+  { district: "Nalanda",     year: 2022, pregnancies_registered: 1200, anc4_completed: 924,  source: "synthetic Bihar ANC fixture" },
+  { district: "Nalanda",     year: 2023, pregnancies_registered: 1250, anc4_completed: 1000, source: "synthetic Bihar ANC fixture" },
+  { district: "Purnia",      year: 2021, pregnancies_registered: 1500, anc4_completed: 870,  source: "synthetic Bihar ANC fixture" },
+  { district: "Purnia",      year: 2022, pregnancies_registered: 1550, anc4_completed: 992,  source: "synthetic Bihar ANC fixture" },
+  { district: "Purnia",      year: 2023, pregnancies_registered: 1600, anc4_completed: 1072, source: "synthetic Bihar ANC fixture" },
+  { district: "Kishanganj",  year: 2021, pregnancies_registered: 900,  anc4_completed: 486,  source: "synthetic Bihar ANC fixture" },
+  { district: "Kishanganj",  year: 2022, pregnancies_registered: 1000, anc4_completed: 570,  source: "synthetic Bihar ANC fixture" },
+  { district: "Kishanganj",  year: 2023, pregnancies_registered: 1100, anc4_completed: 671,  source: "synthetic Bihar ANC fixture" },
+  { district: "Patna",       year: 2021, pregnancies_registered: 1600, anc4_completed: 1280, source: "synthetic Bihar ANC fixture" },
+  { district: "Patna",       year: 2022, pregnancies_registered: 1700, anc4_completed: 1411, source: "synthetic Bihar ANC fixture" },
+  { district: "Patna",       year: 2023, pregnancies_registered: 1800, anc4_completed: 1548, source: "synthetic Bihar ANC fixture" }
+];
+
+const YEARS = [...new Set(ROWS.map(r => r.year))].sort();
+
+function rate(r) {
+  return r.anc4_completed / r.pregnancies_registered * 100;
+}
+
+function fmtRate(r) {
+  return rate(r).toFixed(1) + "%";
+}
+
+function render() {
+  const yearSel = document.getElementById("year");
+  const year = parseInt(yearSel.value, 10);
+  const rows = ROWS.filter(r => r.year === year)
+                   .sort((a, b) => rate(b) - rate(a) || a.district.localeCompare(b.district));
+
+  document.getElementById("tableTitle").textContent =
+    "District comparison for " + year;
+  document.getElementById("yearNote").textContent =
+    rows.length + " districts in the file for this year.";
+
+  const tbody = document.querySelector("#table tbody");
+  tbody.innerHTML = "";
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      "<td>" + r.district + "</td>" +
+      '<td class="num">' + r.pregnancies_registered.toLocaleString("en-US") + "</td>" +
+      '<td class="num">' + r.anc4_completed.toLocaleString("en-US") + "</td>" +
+      '<td class="rate-cell">' +
+        '<span class="rate">' + fmtRate(r) + "</span>" +
+        '<div class="bar"><span style="width:' + rate(r).toFixed(2) + '%"></span></div>' +
+        '<div class="calc">' + r.anc4_completed.toLocaleString("en-US") + " &divide; " +
+          r.pregnancies_registered.toLocaleString("en-US") + " &times; 100</div>" +
+      "</td>";
+    tbody.appendChild(tr);
+  });
+
+  const top = rows[0];
+  document.getElementById("calcExample").textContent =
+    "Example from the table above: for " + top.district + " in " + year + ", " +
+    top.anc4_completed.toLocaleString("en-US") + " completed ANC4 checkups out of " +
+    top.pregnancies_registered.toLocaleString("en-US") + " registered pregnancies, so " +
+    top.anc4_completed + " \u00F7 " + top.pregnancies_registered + " \u00D7 100 = " +
+    rate(top).toFixed(1) + "%.";
+}
+
+function renderComparison() {
+  const tbody = document.querySelector("#compare tbody");
+  tbody.innerHTML = "";
+  ["Gaya", "Nalanda"].forEach(d => {
+    const a = ROWS.find(r => r.district === d && r.year === 2021);
+    const b = ROWS.find(r => r.district === d && r.year === 2023);
+    const ch = rate(b) - rate(a);
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      "<td>" + d + "</td>" +
+      '<td class="num">' + a.anc4_completed.toLocaleString("en-US") + " / " +
+        a.pregnancies_registered.toLocaleString("en-US") + "</td>" +
+      '<td class="num">' + fmtRate(a) + "</td>" +
+      '<td class="num">' + b.anc4_completed.toLocaleString("en-US") + " / " +
+        b.pregnancies_registered.toLocaleString("en-US") + "</td>" +
+      '<td class="num">' + fmtRate(b) + "</td>" +
+      '<td class="num"><b>' + (ch > 0 ? "+" : "") + ch.toFixed(1) + "</b></td>";
+    tbody.appendChild(tr);
+  });
+}
+
+(function init() {
+  const yearSel = document.getElementById("year");
+  YEARS.forEach(y => {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.textContent = y;
+    yearSel.appendChild(opt);
+  });
+
+  // Restore year from the URL if present (keeps the selected view after reload or shared link)
+  const params = new URLSearchParams(location.search);
+  const y = parseInt(params.get("year"), 10);
+  if (YEARS.includes(y)) yearSel.value = String(y);
+
+  yearSel.addEventListener("change", () => {
+    const url = new URL(location.href);
+    url.searchParams.set("year", yearSel.value);
+    history.replaceState(null, "", url);
+    render();
+  });
+
+  render();
+  renderComparison();
+})();
+</script>
+</body>
+</html>

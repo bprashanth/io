@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Women's training completion and employment after 6 months — by district and year</title>
+<style>
+  :root {
+    --ink: #1c2b39;
+    --muted: #5b6b7b;
+    --line: #d8e0e8;
+    --head-bg: #eef3f8;
+    --accent: #1f6feb;
+    --card: #ffffff;
+    --bg: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .page { max-width: 1060px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.55rem; margin: 8px 0 4px; line-height: 1.25; }
+  h2 { font-size: 1.15rem; margin: 0 0 10px; }
+  .subtitle { color: var(--muted); margin: 0 0 18px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    margin: 14px 0;
+  }
+  .controls { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+  .controls label { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  select {
+    font: inherit;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  th { background: var(--head-bg); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:nth-child(even) { background: #fafcfe; }
+  caption {
+    caption-side: top;
+    text-align: left;
+    font-weight: 600;
+    padding: 0 0 8px;
+  }
+  .delta-up { color: #1a7f37; }
+  .delta-down { color: #b42318; }
+  .formula {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    background: #f0f4f8;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+    display: inline-block;
+    margin: 4px 0;
+  }
+  .metric { margin: 14px 0; }
+  .metric h3 { font-size: 1rem; margin: 0 0 2px; }
+  .card h3 { font-size: 1rem; margin: 14px 0 4px; }
+  .metric p { margin: 4px 0; color: var(--muted); }
+  .btn {
+    font: inherit;
+    font-weight: 600;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .btn:hover { background: #f0f4f8; }
+  .note { color: var(--muted); font-size: 0.95em; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 4px 0; }
+  footer { color: var(--muted); font-size: 0.9em; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Women's training completion and employment after 6 months</h1>
+    <p class="subtitle">By district and year. Counts are raw numbers from the data file; rates are calculated on this page. Pick a year and (optionally) compare it with the other year.</p>
+  </header>
+
+  <section class="card" aria-label="Choose the year to show and the year to compare">
+    <div class="controls">
+      <label>Year
+        <select id="year-select" aria-label="Year to show"></select>
+      </label>
+      <label>Compare with
+        <select id="compare-select" aria-label="Year to compare with"></select>
+      </label>
+    </div>
+  </section>
+
+  <main>
+    <section class="card">
+      <h2 id="main-year-title"></h2>
+      <div class="table-wrap">
+        <table id="main-table">
+          <caption>Raw counts and rates, one row per district</caption>
+        </table>
+      </div>
+      <p class="note" style="margin-top:10px">All numbers are for the selected year only. “Employed at 6 months” is a count of women who were employed when checked at 6 months.</p>
+    </section>
+
+    <section class="card" id="compare-block" hidden>
+      <h2 id="compare-year-title"></h2>
+      <div class="table-wrap">
+        <table id="compare-table">
+          <caption>Raw counts and rates for the comparison year</caption>
+        </table>
+      </div>
+
+      <h2 id="change-title" style="margin-top:22px"></h2>
+      <div class="table-wrap">
+        <table id="change-table">
+          <caption>Change in each rate, in percentage points (pp)</caption>
+        </table>
+      </div>
+      <p class="note" style="margin-top:10px">Change is calculated as <strong>Year shown − comparison year</strong>. A rate moving from 60.0% to 62.0% is a change of +2.0 pp. Percentage points are not percent change.</p>
+    </section>
+
+    <section class="card" id="district-block">
+      <h2>Compare two districts (in the shown year)</h2>
+      <div class="controls">
+        <label>District A
+          <select id="district-a" aria-label="First district to compare"></select>
+        </label>
+        <label>District B
+          <select id="district-b" aria-label="Second district to compare"></select>
+        </label>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table id="district-table">
+          <caption>Raw counts and rates for the two selected districts</caption>
+        </table>
+      </div>
+      <p id="district-summary" class="note" style="margin-top:10px"></p>
+      <p class="note" style="margin-top:8px">The gap is <strong>District B minus District A</strong>, shown in percentage points (pp) for the rate rows. The three count rows are numbers of women, so no pp gap is given for them. The two employment rows use the two possible denominators, as explained in the formulas section below.</p>
+      <button id="district-download" class="btn" type="button" style="margin-top:12px">Download this table (CSV)</button>
+    </section>
+  </main>
+
+  <section class="card">
+    <h2>How the rates are calculated (formulas)</h2>
+
+    <div class="metric">
+      <h3>1. Training completion rate (%)</h3>
+      <span class="formula">completed_training ÷ women_enrolled × 100</span>
+      <p>Of the women enrolled in a district in that year, how many completed the training.</p>
+    </div>
+
+    <div class="metric">
+      <h3>2. Employment after 6 months — out of all enrolled (%)</h3>
+      <span class="formula">employed_at_6_months ÷ women_enrolled × 100</span>
+      <p>Of all women enrolled in a district in that year, how many were employed at 6 months.</p>
+    </div>
+
+    <div class="metric">
+      <h3>3. Employment after 6 months — out of training completers (%)</h3>
+      <span class="formula">employed_at_6_months ÷ completed_training × 100</span>
+      <p>Of the women who completed the training, how many were employed at 6 months.</p>
+    </div>
+
+    <p class="note">The data file does not say which group employment is measured against, so both possible employment rates (2 and 3) are shown with clearly different labels. They give different numbers, and neither is marked as “official”. Rates are rounded to 1 decimal place; changes are calculated from the unrounded values.</p>
+  </section>
+
+  <section class="card">
+    <h2>Source of the data</h2>
+    <ul>
+      <li><strong>File:</strong> <code>women_livelihood_outcomes.csv</code> (the data file in this project folder)</li>
+      <li><strong>Rows:</strong> 8 data rows, one per district and year, plus 1 header row</li>
+      <li><strong>Columns:</strong> district, year, women_enrolled, completed_training, employed_at_6_months, source</li>
+      <li><strong>Districts:</strong> Gaya, Nalanda, Purnia, Kishanganj &nbsp;•&nbsp; <strong>Years:</strong> 2022, 2023</li>
+      <li><strong>Source field (same in every row):</strong> “synthetic women livelihood outcomes fixture”</li>
+    </ul>
+    <p class="note">The source field itself states this is a synthetic (made-up) fixture. Treat these numbers as a demonstration of the data structure, not as verified official programme statistics.</p>
+  </section>
+
+  <section class="card">
+    <h2>Reading these figures</h2>
+    <ul>
+      <li>The counts are raw numbers from the file; the percentages are calculated from them using the formulas above.</li>
+      <li>These figures show <strong>patterns, not causes</strong>. The file does not say why a district's rate is higher or lower, what the training consisted of, or what jobs were available, so no “why” can be answered from this data alone.</li>
+      <li>“Employed at 6 months” is a snapshot count. The file does not document how each woman was followed up, so treat it as the programme's reported number.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Why is Purnia lower than Nalanda? (2023) — what this file can and cannot tell us</h2>
+
+    <h3>What the 2023 rows can tell us (arithmetic on the counts)</h3>
+    <ul>
+      <li>Employment at 6 months happens in two stages: a woman must first complete the training, then be employed after completing it. The employment rate out of all enrolled is the product of the other two rates. Check with the 2023 counts: Purnia 73.0% × 63.0% = 46.0% (598 ÷ 1,300); Nalanda 87.0% × 74.7% = 65.0% (650 ÷ 1,000).</li>
+      <li>Purnia is behind Nalanda at <strong>both</strong> stages: completion rate 73.0% vs 87.0% (14.0 pp lower) and employment among completers 63.0% vs 74.7% (11.7 pp lower). The overall 19.0 pp employment gap is a combination of both stages; the file cannot say how much of the 19.0 pp each stage caused.</li>
+      <li>The same pattern is in 2022 (completion 70.0% vs 85.0%; employment out of all enrolled 42.0% vs 60.0%), so it is not a one-year effect.</li>
+    </ul>
+
+    <h3>What this file cannot tell us</h3>
+    <ul>
+      <li><strong>Why</strong> Purnia's completion rate is lower — there are no drop-out reasons, attendance, or training delivery details in the file.</li>
+      <li><strong>Why</strong> fewer of Purnia's completers were employed — there are no job-offer, job-type, wage, or labour-market columns in the file.</li>
+      <li>Whether the two districts' "employed at 6 months" figures were measured the same way — the file does not document the follow-up method.</li>
+    </ul>
+
+    <h3>What would be needed to answer "why" and to choose an intervention</h3>
+    <ul>
+      <li>Training records by district: drop-out reasons, attendance, what the training consisted of, schedule, fees, trainers.</li>
+      <li>Placement records: how many job offers there were, what kind, which employers, wages, and whether the programme or the women themselves found the jobs.</li>
+      <li>The follow-up method: how "employed at 6 months" was determined and the response rate.</li>
+      <li>Separate district labour-market evidence (not in this file).</li>
+    </ul>
+
+    <p class="note">This file alone cannot say which intervention to make in Purnia. All the file supports is that Purnia's gap appears at both stages (completing training, and being employed after completing), so a response aimed at only one stage would not close the full gap.</p>
+  </section>
+
+  <footer>Page generated from women_livelihood_outcomes.csv. No data leaves this page.</footer>
+</div>
+
+<script>
+"use strict";
+
+// --- Data: transcribed from women_livelihood_outcomes.csv (8 data rows) ---
+const FILE_NAME = "women_livelihood_outcomes.csv";
+const ROWS = [
+  { district: "Gaya",       year: "2022", women_enrolled: 1000, completed_training: 800, employed_at_6_months: 520, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Gaya",       year: "2023", women_enrolled: 1100, completed_training: 902, employed_at_6_months: 616, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Nalanda",    year: "2022", women_enrolled: 900,  completed_training: 765, employed_at_6_months: 540, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Nalanda",    year: "2023", women_enrolled: 1000, completed_training: 870, employed_at_6_months: 650, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Purnia",     year: "2022", women_enrolled: 1200, completed_training: 840, employed_at_6_months: 504, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Purnia",     year: "2023", women_enrolled: 1300, completed_training: 949, employed_at_6_months: 598, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Kishanganj", year: "2022", women_enrolled: 800,  completed_training: 520, employed_at_6_months: 280, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Kishanganj", year: "2023", women_enrolled: 900,  completed_training: 612, employed_at_6_months: 342, source: "synthetic women livelihood outcomes fixture" }
+];
+
+const DISTRICTS = [...new Set(ROWS.map(r => r.district))];
+const YEARS = [...new Set(ROWS.map(r => r.year))].sort();
+const NONE = "none";
+
+const MAIN_HEADERS = [
+  "District",
+  "Women enrolled",
+  "Completed training",
+  "Employed at 6 months",
+  "Training completion rate (%)",
+  "Employment after 6 months, out of all enrolled (%)",
+  "Employment after 6 months, out of training completers (%)"
+];
+
+// --- Helpers ---
+function getRow(district, year) {
+  return ROWS.find(r => r.district === district && r.year === year);
+}
+
+function rates(r) {
+  return {
+    enrolled: r.women_enrolled,
+    completed: r.completed_training,
+    employed: r.employed_at_6_months,
+    completionRate: r.completed_training / r.women_enrolled * 100,
+    employedOfEnrolled: r.employed_at_6_months / r.women_enrolled * 100,
+    employedOfCompleted: r.employed_at_6_months / r.completed_training * 100
+  };
+}
+
+function f1(x) {
+  return (Math.round(x * 10) / 10).toFixed(1);
+}
+
+function fSigned(x) {
+  const v = Math.round(x * 10) / 10;
+  if (v === 0) return "0.0";
+  return (v > 0 ? "+" : "-") + Math.abs(v).toFixed(1);
+}
+
+function deltaLabel(x) {
+  const v = Math.round(x * 10) / 10;
+  if (v > 0) return "rose";
+  if (v < 0) return "fell";
+  return "no change";
+}
+
+// --- State (survives reload: URL params, then localStorage, then defaults) ---
+function readState() {
+  let uYear = null, uCompare = null, uA = null, uB = null;
+  try {
+    const q = new URLSearchParams(location.search);
+    uYear = q.get("year");
+    uCompare = q.get("compare");
+    uA = q.get("a");
+    uB = q.get("b");
+  } catch (e) { /* ignore */ }
+  let year = YEARS.includes(uYear) ? uYear : (localStorage.getItem("wl_year") || "2023");
+  let compare;
+  if (uCompare === NONE) compare = NONE;
+  else if (YEARS.includes(uCompare)) compare = uCompare;
+  else compare = localStorage.getItem("wl_compare") || "2022";
+  if (compare === year) compare = NONE;
+  if (!YEARS.includes(compare)) compare = NONE;
+  let a = DISTRICTS.includes(uA) ? uA : (localStorage.getItem("wl_a") || "Purnia");
+  let b = DISTRICTS.includes(uB) ? uB : (localStorage.getItem("wl_b") || "Nalanda");
+  if (!DISTRICTS.includes(a)) a = "Purnia";
+  if (!DISTRICTS.includes(b)) b = "Nalanda";
+  return { year, compare, a, b };
+}
+
+function saveState(s) {
+  try {
+    localStorage.setItem("wl_year", s.year);
+    localStorage.setItem("wl_compare", s.compare);
+    localStorage.setItem("wl_a", s.a);
+    localStorage.setItem("wl_b", s.b);
+  } catch (e) { /* ignore */ }
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set("year", s.year);
+    u.searchParams.set("compare", s.compare);
+    u.searchParams.set("a", s.a);
+    u.searchParams.set("b", s.b);
+    history.replaceState(null, "", u);
+  } catch (e) { /* ignore */ }
+}
+
+// --- Rendering ---
+function buildYearTable(tableEl, year) {
+  let html = "<thead><tr>";
+  MAIN_HEADERS.forEach(h => {
+    html += h === "District" ? "<th>" + h + "</th>" : '<th class="num">' + h + "</th>";
+  });
+  html += "</tr></thead><tbody>";
+  DISTRICTS.forEach(d => {
+    const r = rates(getRow(d, year));
+    html += "<tr>"
+      + "<td>" + d + "</td>"
+      + '<td class="num">' + r.enrolled.toLocaleString() + "</td>"
+      + '<td class="num">' + r.completed.toLocaleString() + "</td>"
+      + '<td class="num">' + r.employed.toLocaleString() + "</td>"
+      + '<td class="num">' + f1(r.completionRate) + "</td>"
+      + '<td class="num">' + f1(r.employedOfEnrolled) + "</td>"
+      + '<td class="num">' + f1(r.employedOfCompleted) + "</td>"
+      + "</tr>";
+  });
+  html += "</tbody>";
+  tableEl.innerHTML = tableEl.querySelector("caption").outerHTML + html;
+}
+
+function buildChangeTable(tableEl, mainYear, compareYear) {
+  const metricKeys = ["completionRate", "employedOfEnrolled", "employedOfCompleted"];
+  const metricNames = ["Training completion rate", "Employment after 6 months (all enrolled)", "Employment after 6 months (completers)"];
+  let html = "<thead><tr><th>District</th>" + metricNames.map(m => '<th class="num">' + m + " change</th>").join("") + "</tr></thead><tbody>";
+  DISTRICTS.forEach(d => {
+    const a = rates(getRow(d, mainYear));
+    const b = rates(getRow(d, compareYear));
+    html += "<tr><td>" + d + "</td>";
+    metricKeys.forEach(k => {
+      const diff = a[k] - b[k];
+      const cls = diff > 0 ? "delta-up" : (diff < 0 ? "delta-down" : "");
+      html += '<td class="num ' + cls + '">' + fSigned(diff) + " pp (" + deltaLabel(diff) + ")</td>";
+    });
+    html += "</tr>";
+  });
+  html += "</tbody>";
+  tableEl.innerHTML = tableEl.querySelector("caption").outerHTML + html;
+}
+
+function buildDistrictTable(tableEl, state) {
+  const a = state.a, b = state.b, year = state.year;
+  const ra = rates(getRow(a, year));
+  const rb = rates(getRow(b, year));
+  tableEl.querySelector("caption").textContent =
+    "Raw counts and rates for " + a + " and " + b + " in " + year;
+  const rows = [
+    ["Women enrolled (women)", ra.enrolled, rb.enrolled, false],
+    ["Completed training (women)", ra.completed, rb.completed, false],
+    ["Employed at 6 months (women)", ra.employed, rb.employed, false],
+    ["Training completion rate (%)", ra.completionRate, rb.completionRate, true],
+    ["Employment after 6 months, out of all enrolled (%)", ra.employedOfEnrolled, rb.employedOfEnrolled, true],
+    ["Employment after 6 months, out of training completers (%)", ra.employedOfCompleted, rb.employedOfCompleted, true]
+  ];
+  let html = "<thead><tr><th>Metric</th><th class=\"num\">" + a + "</th><th class=\"num\">" + b + "</th><th class=\"num\">Gap (" + b + " minus " + a + ")</th></tr></thead><tbody>";
+  rows.forEach(row => {
+    const label = row[0], va = row[1], vb = row[2], isRate = row[3];
+    const cellA = isRate ? f1(va) : va.toLocaleString();
+    const cellB = isRate ? f1(vb) : vb.toLocaleString();
+    let gap = "—";
+    if (isRate) {
+      const diff = vb - va;
+      const cls = diff > 0 ? "delta-up" : (diff < 0 ? "delta-down" : "");
+      gap = '<span class="' + cls + '">' + fSigned(diff) + " pp</span>";
+    }
+    html += "<tr><td>" + label + "</td>"
+      + '<td class="num">' + cellA + "</td>"
+      + '<td class="num">' + cellB + "</td>"
+      + '<td class="num">' + gap + "</td></tr>";
+  });
+  html += "</tbody>";
+  tableEl.innerHTML = tableEl.querySelector("caption").outerHTML + html;
+}
+
+function districtSummary(state) {
+  const a = state.a, b = state.b, year = state.year;
+  const ra = rates(getRow(a, year));
+  const rb = rates(getRow(b, year));
+  const parts = [
+    ["training completion rate", ra.completionRate, rb.completionRate],
+    ["employment after 6 months, out of all enrolled", ra.employedOfEnrolled, rb.employedOfEnrolled],
+    ["employment after 6 months, out of training completers", ra.employedOfCompleted, rb.employedOfCompleted]
+  ];
+  return parts.map(part => {
+    const name = part[0], va = part[1], vb = part[2];
+    const diff = vb - va;
+    const v = Math.round(diff * 10) / 10;
+    if (v === 0) {
+      return "In " + year + ", " + a + " and " + b + " have the same " + name + " (" + f1(va) + "%).";
+    }
+    const higher = diff > 0 ? b : a;
+    const lower = diff > 0 ? a : b;
+    const higherVal = diff > 0 ? f1(vb) : f1(va);
+    const lowerVal = diff > 0 ? f1(va) : f1(vb);
+    return "In " + year + ", " + higher + "'s " + name + " (" + higherVal + "%) is " + Math.abs(v).toFixed(1) + " pp higher than " + lower + "'s (" + lowerVal + "%).";
+  }).join(" ");
+}
+
+function csvField(s) {
+  s = String(s);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function districtCsv(state) {
+  const a = state.a, b = state.b, year = state.year;
+  const ra = rates(getRow(a, year));
+  const rb = rates(getRow(b, year));
+  const lines = [];
+  lines.push(["Metric", a, b, "Gap (" + b + " minus " + a + ")"].map(csvField).join(","));
+  const rows = [
+    ["Women enrolled (women)", String(ra.enrolled), String(rb.enrolled), ""],
+    ["Completed training (women)", String(ra.completed), String(rb.completed), ""],
+    ["Employed at 6 months (women)", String(ra.employed), String(rb.employed), ""],
+    ["Training completion rate (%)", f1(ra.completionRate), f1(rb.completionRate), fSigned(rb.completionRate - ra.completionRate) + " pp"],
+    ["Employment after 6 months, out of all enrolled (%)", f1(ra.employedOfEnrolled), f1(rb.employedOfEnrolled), fSigned(rb.employedOfEnrolled - ra.employedOfEnrolled) + " pp"],
+    ["Employment after 6 months, out of training completers (%)", f1(ra.employedOfCompleted), f1(rb.employedOfCompleted), fSigned(rb.employedOfCompleted - ra.employedOfCompleted) + " pp"]
+  ];
+  rows.forEach(r => lines.push(r.map(csvField).join(",")));
+  lines.push("");
+  lines.push(["Year", year].map(csvField).join(","));
+  lines.push(["Source file", "women_livelihood_outcomes.csv"].map(csvField).join(","));
+  lines.push(["Source field (all rows)", "synthetic women livelihood outcomes fixture"].map(csvField).join(","));
+  lines.push(["Gap direction", b + " minus " + a + "; percentage points for rate rows; count rows are numbers of women"].map(csvField).join(","));
+  lines.push(["Formulas", "Training completion rate (%) = completed_training / women_enrolled * 100; Employment out of all enrolled (%) = employed_at_6_months / women_enrolled * 100; Employment out of training completers (%) = employed_at_6_months / completed_training * 100"].map(csvField).join(","));
+  return lines.join("\r\n") + "\r\n";
+}
+
+function fillSelects(state) {
+  const yearSel = document.getElementById("year-select");
+  const compareSel = document.getElementById("compare-select");
+  yearSel.innerHTML = YEARS.map(y => '<option value="' + y + '"' + (y === state.year ? " selected" : "") + ">" + y + "</option>").join("");
+  compareSel.innerHTML =
+    '<option value="' + NONE + '"' + (state.compare === NONE ? " selected" : "") + ">none</option>" +
+    YEARS.filter(y => y !== state.year)
+      .map(y => '<option value="' + y + '"' + (y === state.compare ? " selected" : "") + ">" + y + "</option>")
+      .join("");
+  const aSel = document.getElementById("district-a");
+  const bSel = document.getElementById("district-b");
+  const dOpts = DISTRICTS.map(d => '<option value="' + d + '">' + d + "</option>").join("");
+  aSel.innerHTML = dOpts;
+  bSel.innerHTML = dOpts;
+  aSel.value = state.a;
+  bSel.value = state.b;
+}
+
+function render() {
+  const state = readState();
+  fillSelects(state);
+
+  document.getElementById("main-year-title").textContent =
+    "Districts in " + state.year + " (shown year)";
+  buildYearTable(document.getElementById("main-table"), state.year);
+
+  const block = document.getElementById("compare-block");
+  if (state.compare === NONE) {
+    block.hidden = true;
+  } else {
+    block.hidden = false;
+    document.getElementById("compare-year-title").textContent =
+      "Districts in " + state.compare + " (comparison year)";
+    document.getElementById("change-title").textContent =
+      "Change from " + state.compare + " to " + state.year;
+    buildYearTable(document.getElementById("compare-table"), state.compare);
+    buildChangeTable(document.getElementById("change-table"), state.year, state.compare);
+  }
+
+  buildDistrictTable(document.getElementById("district-table"), state);
+  document.getElementById("district-summary").textContent = districtSummary(state);
+}
+
+// --- Events ---
+document.getElementById("year-select").addEventListener("change", e => {
+  const s = readState();
+  s.year = e.target.value;
+  if (s.compare === s.year) s.compare = NONE;
+  saveState(s);
+  render();
+});
+
+document.getElementById("compare-select").addEventListener("change", e => {
+  const s = readState();
+  s.compare = e.target.value;
+  saveState(s);
+  render();
+});
+
+document.getElementById("district-a").addEventListener("change", e => {
+  const s = readState();
+  s.a = e.target.value;
+  saveState(s);
+  render();
+});
+
+document.getElementById("district-b").addEventListener("change", e => {
+  const s = readState();
+  s.b = e.target.value;
+  saveState(s);
+  render();
+});
+
+document.getElementById("district-download").addEventListener("click", () => {
+  const s = readState();
+  const blob = new Blob([districtCsv(s)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "district-comparison-" + s.year + "-" + s.a.toLowerCase() + "-vs-" + s.b.toLowerCase() + ".csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+render();
+</script>
+</body>
+</html>

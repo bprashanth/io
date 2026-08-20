@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "case_id": "dev-csv-health-001",
+  "provider": "openai-compatible",
+  "model": "qwen/qwen3.8-27b:nitro",
+  "base_url": "http://host.docker.internal:18150/v1",
+  "thinking": "xhigh",
+  "request_reasoning_effort": "xhigh",
+  "workspace": "/tmp/io-screening-v2-csv-qwen-D9U2wD",
+  "isolated_home": "/tmp/io-screening-v2-csv-qwen-state-n390dw/home",
+  "outer_container_image": "io-benchmark-agent-tools:2026-08-20-v2",
+  "outer_container_enabled": true,
+  "started_at_unix": 1787169708.3722377,
+  "turns": [
+    {
+      "turn": 1,
+      "duration_seconds": 189.507,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 2341,
+      "agent_response": "\n\nFound the CSV \u2014 `anc4_coverage.csv`, with 5 districts (Gaya, Nalanda, Purnia, Kishanganj, Patna), years 2020\u20132023, and columns for registered pregnancies, completed ANC4, and source. Plan:\n\n1. Create a simple dependency-free `index.html` (no CDN, works offline).\n2. Data is inlined from the CSV (with source attribution), plus a link to the raw CSV.\n3. Year selector + district comparison: sortable bar chart + detailed table.\n4. \"Source and Calculation Method\" section: show source (`synthetic Bihar ANC fixture`) and the formula `ANC4 completed \u00f7 Registered pregnancies \u00d7 100`.\n5. Verify that the inlined data exactly matches the CSV, and confirm the calculations.\n\n\n\nFile is too big for one call \u2014 I'll split it into two writes.\n\n\n\nNow let me verify the inlined data matches the CSV exactly and sanity-check the calculations.\n\n\n\nThe data and sources match \u2014 the assertion failure is a bug in my verification script (comparing a tuple to a string). Re-running the remaining checks correctly:\n\n\n\nAll checks pass. Final verification of the complete file structure:\n\nDone. The website is ready at `/tmp/io-screening-v2-csv-qwen-D9U2wD/index.html` \u2014 just open it in any browser (double-click works, no server needed).\n\n**What it shows:**\n- **Year selector** \u2014 buttons for 2020, 2021, 2022, 2023 (defaults to the latest)\n- **District comparison** \u2014 horizontal bar chart of all 5 districts for the selected year, ranked by coverage, plus a detail table with rank, registered pregnancies, ANC4 completed, and coverage %, and an \"All districts\" total row (e.g., 2023: Patna 86.0%, Nalanda 80.0%, Gaya 74.0%, Purnia 67.0%, Kishanganj 61.0%; overall 74.5%)\n- **Source & calculation** \u2014 a card showing the source from the CSV (`synthetic Bihar ANC fixture`), a download link to the raw `anc4_coverage.csv`, and the formula: **Coverage rate (%) = anc4_completed \u00f7 pregnancies_registered \u00d7 100**, with a worked example (Gaya 2020: 744 \u00f7 1200 \u00d7 100 = 62.0%)\n\n**Implementation notes:**\n- Single self-contained HTML file, zero dependencies (no CDN), works offline\n- The CSV data is inlined in the page's script (20 rows). I verified with a script that the inlined values match `anc4_coverage.csv` exactly, the source string matches the CSV's `source` column, and all tags are balanced\n- To update with new data later, just replace the `CSV_ROWS` array (and `SOURCE` constant if it changes) \u2014 everything else (years, chart, table) renders automatically\n\nOne caveat: since the data is inlined rather than fetched at runtime, if you edit the CSV you'd need to re-paste the rows (or I can switch it to a `fetch()`-based version that loads the CSV live, but that requires serving the folder over HTTP instead of opening the file directly).",
+      "tool_call_count": 10,
+      "last_usage_update": null
+    },
+    {
+      "turn": 2,
+      "duration_seconds": 64.882,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 830,
+      "agent_response": "\n\nCore checks passed (15 rows, years 2021\u20132023 only, 2020 removed, default 2023) \u2014 the last error was just a string-division bug in my check script. Quick fix:\n\n\n\nDone. The site now shows only **2021, 2022, and 2023**:\n\n- Removed all 2020 rows from the inlined data in `index.html`\n- Year buttons auto-generate from the data, so the selector now shows just 2021 / 2022 / 2023\n- Default selection remains the latest year (2023)\n- Charts, table, and totals recalculate automatically for the available years\n\nVerified: 15 data rows, only years [2021, 2022, 2023] present, no 2020 remnants, and sample rates check out (e.g., 2021: Patna 80.0% \u2192 Kishanganj 54.0%, overall 67.1%; 2023: overall 74.5%). Just refresh the page in your browser.",
+      "tool_call_count": 4,
+      "last_usage_update": null
+    },
+    {
+      "turn": 3,
+      "duration_seconds": 14.321,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 753,
+      "agent_response": "\n\n**Gaya vs Nalanda, change in ANC4 coverage 2021 \u2192 2023:**\n\n| District | 2021 | 2023 | Change |\n|---|---|---|---|\n| **Gaya** | 825/1250 = **66.0%** | 999/1350 = **74.0%** | **+8.0 percentage points** |\n| **Nalanda** | 803/1100 = **73.0%** | 1000/1250 = **80.0%** | **+7.0 percentage points** |\n\nSo Gaya improved by **8.0 pp** and Nalanda by **7.0 pp**. Nalanda stayed ahead both years (73.0% \u2192 80.0% vs 66.0% \u2192 74.0%), and the gap narrowed slightly \u2014 from 7.0 pp in 2021 to 6.0 pp in 2023 \u2014 because Gaya grew faster.",
+      "tool_call_count": 0,
+      "last_usage_update": null
+    },
+    {
+      "turn": 4,
+      "duration_seconds": 13.327,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 737,
+      "agent_response": "\n\nFair challenge \u2014 **the file cannot tell you why.** It only contains `district, year, pregnancies_registered, anc4_completed, source` \u2014 no explanatory variables at all (no health worker counts, facility access, funding, population, program interventions, etc.). So any real-world explanation would be a guess, and I won't make one.\n\nThree honest, file-based facts you can actually say:\n\n1. **The gap is driven by the completion rate, not the denominator.** The denominators are comparable (Gaya 1,250 vs Nalanda 1,100 registered in 2021), yet Gaya completed a much lower share (66.0% vs 73.0%). The file shows *that* fewer registered pregnancies in Gaya reached 4 ANC visits \u2014 it says nothing about *why*.\n\n2. **The source is `synthetic Bihar ANC fixture`.** This is generated/test data, not an actual survey or health record. So even the \"real\" cause doesn't exist \u2014 the gap is just what the fixture generator produced.\n\n3. **What the file *can* show** (already on the page): the size and trend of the gap \u2014 7.0 pp in 2021 \u2192 5.0 pp in 2022 (Nalanda 77.0%, Gaya 69.0%) \u2192 6.0 pp in 2023. If you need causation, you'd need data with covariates (e.g., a district-level dataset with maternal health indicators), not this one.\n\nIf you'd like, I can add a small \"why the gap\" note to the site that states exactly this limitation (file shows the gap, not the cause), so the page itself stays honest.",
+      "tool_call_count": 0,
+      "last_usage_update": null
+    },
+    {
+      "turn": 5,
+      "duration_seconds": 50.453,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 1786,
+      "agent_response": "\n\nI'll create the filtered comparison as a downloadable CSV file in your workspace:\n\n\n\nCreated and verified: **`/tmp/io-screening-v2-csv-qwen-D9U2wD/gaya_nalanda_anc4_2021_vs_2023.csv`**\n\n```\ndistrict,registered_2021,anc4_completed_2021,coverage_2021_pct,registered_2023,anc4_completed_2023,coverage_2023_pct,change_2021_to_2023_pp\nGaya,1250,825,66.0,1350,999,74.0,8.0\nNalanda,1100,803,73.0,1250,1000,80.0,7.0\n```\n\n- One row per district with both years' counts, coverage rates, and the change in percentage points \u2014 exactly the filtered comparison table from before\n- Every value re-checked against the source `anc4_coverage.csv` (all 8 figures match; rates = completed \u00f7 registered \u00d7 100)\n- Opens directly in Excel/Google Sheets\n\nNote: the CSV keeps the data clean (no source row inside the file) \u2014 it's derived from `anc4_coverage.csv`, source `synthetic Bihar ANC fixture`. If you'd also like a **Download button on the website** that exports this comparison (or any selected year's district table) with one click, I can add that.",
+      "tool_call_count": 2,
+      "last_usage_update": null
+    }
+  ],
+  "outer_container_image_id": "sha256:c4c132d53c8674c187911aec88d2f32b6aee16659e76c8b70e20d06779d09223",
+  "outer_container_repo_digests": [],
+  "outer_container_platform": "linux/arm64",
+  "agent_info": {
+    "name": "cline",
+    "version": "3.0.55"
+  },
+  "session_id": "1787169709013_uzNBO_cli",
+  "session_model_before_selection": "gpt-4o",
+  "requested_model_available": false,
+  "custom_model_id": true,
+  "session_model": "qwen/qwen3.8-27b:nitro",
+  "usage": {
+    "inputTokens": 315293,
+    "outputTokens": 16917,
+    "cacheReadTokens": 117600,
+    "cacheWriteTokens": 0,
+    "totalCost": 0
+  },
+  "aggregate_usage": {
+    "inputTokens": 315293,
+    "outputTokens": 16917,
+    "cacheReadTokens": 117600,
+    "cacheWriteTokens": 0,
+    "totalCost": 0
+  },
+  "total_cost": 0,
+  "session_metadata_path": "/tmp/io-screening-v2-csv-qwen-state-n390dw/home/.cline/data/sessions/1787169709013_uzNBO_cli/1787169709013_uzNBO_cli.json",
+  "finished_at_unix": 1787170051.5143666,
+  "duration_seconds": 343.142,
+  "exit_code": 0
+}

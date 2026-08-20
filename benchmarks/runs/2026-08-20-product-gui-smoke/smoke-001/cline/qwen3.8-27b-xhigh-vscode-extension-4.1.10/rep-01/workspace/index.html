@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>District Immunisation by Year</title>
+<style>
+  :root {
+    --bg: #f6f8fa;
+    --card: #ffffff;
+    --ink: #1f2933;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #2563eb;
+    --good: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 40px; }
+  header h1 { font-size: 1.55rem; margin: 0 0 4px; }
+  header .sub { margin: 0 0 20px; color: var(--muted); }
+  .controls { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .controls label { font-weight: 600; }
+  .year-badge {
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+  }
+  .note { font-size: 0.8rem; color: var(--muted); }
+  .note.warn { color: #b45309; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .stat .num { font-size: 1.35rem; font-weight: 700; }
+  .stat .lbl { color: var(--muted); font-size: 0.82rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 0.85rem;
+    margin: 0 0 14px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .card-head h2 { margin: 0; }
+  .card-head button {
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 7px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .card-head button:hover { background: #eff6ff; border-color: var(--accent); }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    align-items: start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-row .name { text-align: right; font-weight: 600; font-size: 0.95rem; padding-top: 5px; }
+  .bar-track { background: #eef2f7; border-radius: 6px; height: 28px; overflow: hidden; }
+  .bar-fill {
+    height: 100%;
+    min-width: 34px;
+    border-radius: 6px 0 0 6px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: width 0.35s ease;
+  }
+  .bar-fill.top { background: var(--good); }
+  .bar-detail { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child,
+  th:nth-child(2), td:nth-child(2) { text-align: left; }
+  thead th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  tbody tr:last-child td { border-bottom: none; }
+  tr.top td { font-weight: 700; }
+  td .badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--good);
+    border-radius: 999px;
+    padding: 1px 8px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  footer {
+    margin-top: 8px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  footer strong { color: var(--ink); }
+  #loading { padding: 40px 0; text-align: center; color: var(--muted); }
+  .empty { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>District Immunisation by Year</h1>
+    <p class="sub">Comparing how many children were fully immunised across districts in 2023.</p>
+  </header>
+
+  <div class="controls">
+    <label>Year</label>
+    <span id="year" class="year-badge">2023</span>
+    <span id="data-note" class="note"></span>
+  </div>
+
+  <div id="loading">Loading data&hellip;</div>
+  <div id="content" hidden>
+    <div class="stats" id="stats"></div>
+
+    <div class="card">
+      <h2 id="chart-title">Fully immunised share of children due</h2>
+      <div id="chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2 id="table-title">Details</h2>
+        <button id="download-btn" type="button" title="Download this table as CSV">Download CSV</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>District</th>
+              <th>Children due</th>
+              <th>Fully immunised</th>
+              <th>Rate</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer id="source"></footer>
+</div>
+
+<script>
+// Fallback copy of district_immunisation.csv, used only when the live file
+// cannot be fetched (e.g. the page is opened directly via file://).
+const EMBEDDED_CSV = [
+  "district,year,children_due,children_fully_immunised,source",
+  "Gaya,2022,1000,780,synthetic smoke fixture",
+  "Nalanda,2022,800,680,synthetic smoke fixture",
+  "Purnia,2022,900,630,synthetic smoke fixture",
+  "Gaya,2023,1100,935,synthetic smoke fixture",
+  "Nalanda,2023,850,765,synthetic smoke fixture",
+  "Purnia,2023,1000,760,synthetic smoke fixture"
+].join("\n");
+
+const CSV_URL = "district_immunisation.csv";
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const header = lines[0].split(",").map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const cells = line.split(",");
+    const row = {};
+    header.forEach((h, i) => { row[h] = (cells[i] != null ? cells[i] : "").trim(); });
+    return row;
+  });
+}
+
+function toNum(v) {
+  const n = parseFloat(String(v).replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function fmt(n) { return n.toLocaleString("en-IN"); }
+
+function pct(n) { return (Math.round(n * 10) / 10).toFixed(1) + "%"; }
+
+let ROWS = [];
+let usedFallback = false;
+let LAST = null;
+
+async function loadData() {
+  try {
+    const res = await fetch(CSV_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    ROWS = parseCSV(await res.text());
+  } catch (e) {
+    ROWS = parseCSV(EMBEDDED_CSV);
+    usedFallback = true;
+  }
+}
+
+function unique(values) {
+  return [...new Set(values.filter(v => v))];
+}
+
+function render(year) {
+  const rows = ROWS.filter(r => String(r.year) === String(year));
+  const districts = rows.map(r => {
+    const due = toNum(r.children_due);
+    const done = toNum(r.children_fully_immunised);
+    return {
+      district: r.district,
+      due: due,
+      done: done,
+      rate: due > 0 ? (done / due) * 100 : 0
+    };
+  });
+  districts.sort((a, b) => b.rate - a.rate || b.due - a.due);
+  LAST = { year: String(year), districts: districts };
+
+  document.getElementById("chart-title").textContent =
+    "Fully immunised share of children due — " + year;
+  document.getElementById("table-title").textContent =
+    "District details — " + year;
+
+  // Summary stats
+  const totalDue = districts.reduce((s, d) => s + d.due, 0);
+  const totalDone = districts.reduce((s, d) => s + d.done, 0);
+  const overallRate = totalDue > 0 ? (totalDone / totalDue) * 100 : 0;
+  const top = districts[0];
+  document.getElementById("stats").innerHTML =
+    '<div class="stat"><div class="num">' + districts.length + '</div><div class="lbl">Districts</div></div>' +
+    '<div class="stat"><div class="num">' + fmt(totalDue) + '</div><div class="lbl">Children due</div></div>' +
+    '<div class="stat"><div class="num">' + fmt(totalDone) + '</div><div class="lbl">Fully immunised</div></div>' +
+    '<div class="stat"><div class="num">' + pct(overallRate) + '</div><div class="lbl">Overall rate</div></div>' +
+    (top ? '<div class="stat"><div class="num">' + top.district + '</div><div class="lbl">Top district (' + pct(top.rate) + ')</div></div>' : '');
+
+  // Bar chart
+  const chart = document.getElementById("chart");
+  chart.innerHTML = districts.length
+    ? districts.map((d, i) =>
+        '<div class="bar-row">' +
+          '<div class="name">' + d.district + '</div>' +
+          '<div>' +
+            '<div class="bar-track">' +
+              '<div class="bar-fill' + (i === 0 ? ' top' : '') + '" style="width:' + Math.max(d.rate, 4) + '">' + pct(d.rate) + '</div>' +
+            '</div>' +
+            '<div class="bar-detail">' + fmt(d.done) + ' of ' + fmt(d.due) + ' children fully immunised</div>' +
+          '</div>' +
+        '</div>'
+      ).join("")
+    : '<p class="empty">No data for this year.</p>';
+
+  // Details table
+  document.getElementById("table-body").innerHTML = districts.length
+    ? districts.map((d, i) =>
+        '<tr' + (i === 0 ? ' class="top"' : '') + '>' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td>' + d.district + (i === 0 ? '<span class="badge">Top</span>' : '') + '</td>' +
+          '<td>' + fmt(d.due) + '</td>' +
+          '<td>' + fmt(d.done) + '</td>' +
+          '<td>' + pct(d.rate) + '</td>' +
+        '</tr>'
+      ).join("")
+    : '<tr><td colspan="5" class="empty">No data for this year.</td></tr>';
+
+  // Source, from the "source" column of the CSV
+  const sources = unique(rows.map(r => r.source));
+  document.getElementById("source").innerHTML =
+    "<strong>Source:</strong> " +
+    (sources.length ? sources.join("; ") : "not specified in data") +
+    ' &middot; data file: <code>' + CSV_URL + "</code>" +
+    ' &middot; ' + rows.length + " record(s) for " + year;
+}
+
+function csvCell(v) {
+  const s = String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function downloadTable() {
+  if (!LAST || !LAST.districts.length) return;
+  const header = ["rank", "district", "children_due", "children_fully_immunised", "rate_percent"];
+  const lines = [header.map(csvCell).join(",")].concat(LAST.districts.map((d, i) =>
+    [i + 1, d.district, d.due, d.done, (Math.round(d.rate * 10) / 10).toFixed(1)].map(csvCell).join(",")
+  ));
+  const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "district_immunisation_" + LAST.year + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+(async function init() {
+  await loadData();
+  document.getElementById("download-btn").addEventListener("click", downloadTable);
+
+  const note = document.getElementById("data-note");
+  if (usedFallback) {
+    note.textContent = "Live CSV not reachable — showing embedded copy. Serve this folder (e.g. python3 -m http.server) to load the file directly.";
+    note.classList.add("warn");
+  }
+
+  const ONLY_YEAR = "2023";
+  ROWS = ROWS.filter(r => String(r.year) === ONLY_YEAR);
+  if (!ROWS.length) {
+    document.getElementById("loading").textContent = "No data rows found for " + ONLY_YEAR + " in " + CSV_URL;
+    return;
+  }
+
+  document.getElementById("loading").hidden = true;
+  document.getElementById("content").hidden = false;
+  render(ONLY_YEAR);
+})();
+</script>
+
+
+</body>
+</html>
