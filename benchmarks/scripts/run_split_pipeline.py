@@ -397,7 +397,7 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
     years = {int(value) for value in result[year_columns[0]].dropna()}
     allowed: set[int] | None = None
     constraint_kind = ""
-    for message in reversed(messages):
+    for message in messages:
         lowered = message.lower()
         ranges = re.findall(r"only\s+((?:19|20)\d{2})\s+(?:to|through|-)\s+((?:19|20)\d{2})", lowered)
         explicit_sets = re.findall(
@@ -412,8 +412,15 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
             allowed = {int(year) for year in re.findall(r"(?:19|20)\d{2}", explicit_sets[-1])}; constraint_kind = "set"
         elif singles:
             allowed = {int(singles[-1])}; constraint_kind = "single"
-        if allowed is not None:
-            break
+        else:
+            direct = re.findall(r"\b(?:show|filter)\s+(?:only\s+)?((?:19|20)\d{2})\b", lowered)
+            comparison_year = re.findall(
+                r"(?:\bfor\s+|\bin\s+)((?:19|20)\d{2})\b", lowered
+            ) if "compar" in lowered else []
+            if direct:
+                allowed = {int(direct[-1])}; constraint_kind = "direct"
+            elif comparison_year and allowed is None:
+                allowed = {int(comparison_year[-1])}; constraint_kind = "comparison"
     if allowed is not None and years != allowed:
         raise PlanError(
             f"durable year-{constraint_kind} constraint ignored: expected {sorted(allowed)}, got {sorted(years)}"
@@ -436,11 +443,11 @@ def compute_insights(plan: dict[str, Any], frame: pd.DataFrame) -> list[dict[str
                 subset = [r for r in rows if str(r.get(spec["entity_column"])) == str(entity)]
                 start = next((r for r in subset if str(r.get(spec["time_column"])) == str(spec["from"])), None)
                 end = next((r for r in subset if str(r.get(spec["time_column"])) == str(spec["to"])), None)
-                if start and end: output.append({"kind": kind, "label": str(entity), "value": end[spec["metric"]]-start[spec["metric"]], "unit": spec["unit"], "from": spec["from"], "to": spec["to"]})
+                if start and end: output.append({"kind": kind, "label": str(entity), "value": end[spec["metric"]]-start[spec["metric"]], "metric": spec["metric"], "unit": spec["unit"], "from": spec["from"], "to": spec["to"]})
         elif kind == "difference":
             subset = [r for r in rows if str(r.get(spec["time_column"])) == str(spec["time"])]
             found = [next((r for r in subset if str(r.get(spec["entity_column"])) == str(e)), None) for e in spec["entities"]]
-            if all(found): output.append({"kind": kind, "label": f"Gap between {spec['entities'][0]} and {spec['entities'][1]}", "value": abs(found[1][spec["metric"]]-found[0][spec["metric"]]), "unit": spec["unit"], "time": spec["time"]})
+            if all(found): output.append({"kind": kind, "label": f"Gap between {spec['entities'][0]} and {spec['entities'][1]}", "value": abs(found[1][spec["metric"]]-found[0][spec["metric"]]), "metric": spec["metric"], "unit": spec["unit"], "time": spec["time"]})
         elif kind == "causal_limit":
             output.append({"kind": kind, "label": "What this data cannot answer", "text": "This file shows differences and changes, but it has no explanatory variables and cannot establish why they occurred."})
     return output

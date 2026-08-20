@@ -21,6 +21,7 @@ async def main() -> int:
     parser.add_argument("--select-value")
     parser.add_argument("--expected-filtered-rows", type=int)
     parser.add_argument("--expected-current-rows", type=int)
+    parser.add_argument("--select-metric")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
@@ -47,6 +48,15 @@ async def main() -> int:
         })""")
 
         selected_rows = None
+        selected_metric = None
+        if args.select_metric:
+            metric = page.locator("#metricSelect")
+            if await metric.count() != 1:
+                raise AssertionError("missing unique indicator control")
+            await metric.select_option(label=args.select_metric)
+            await page.wait_for_timeout(100)
+            selected_metric = await metric.input_value()
+            await page.screenshot(path=args.output / "desktop-metric-selected.png", full_page=True)
         if args.select_column and args.select_value:
             select = page.locator(f'select[data-col="{args.select_column}"]')
             if await select.count() != 1:
@@ -77,6 +87,7 @@ async def main() -> int:
         "source_text": initial["sourceText"],
         "initial_table_rows": initial_rows,
         "selected_table_rows": selected_rows,
+        "selected_metric": selected_metric,
         "expected_filtered_rows": args.expected_filtered_rows,
         "downloaded_rows": len(downloaded),
         "download_columns": list(downloaded[0]) if downloaded else [],
