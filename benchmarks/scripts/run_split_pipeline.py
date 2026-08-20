@@ -15,6 +15,7 @@ import json
 import math
 import re
 import signal
+import subprocess
 import time
 import urllib.request
 from pathlib import Path
@@ -69,11 +70,83 @@ def profile(frame: pd.DataFrame, include_values: bool) -> dict[str, Any]:
     return {"row_count": len(frame), "columns": columns}
 
 
+def safe_column_name(label: str) -> str:
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", label.lower())).strip("_")
+
+
+def load_digital_pdf(source: Path, include_values: bool) -> tuple[pd.DataFrame, dict[str, Any], dict[str, Any]]:
+    """Extract a simple year-column table while retaining page/table citations.
+
+    This is deliberately narrow. Scans, spanning headers, multiple tables and
+    ambiguous regions belong to the later structure-preserving extraction path.
+    """
+    completed = subprocess.run(
+        ["pdftotext", "-layout", str(source), "-"],
+        check=True, capture_output=True, text=True, timeout=30,
+    )
+    pages = completed.stdout.split("\f")
+    rows: list[dict[str, Any]] = []
+    table_pages: set[int] = set()
+    table_labels: set[str] = set()
+    source_label = source.name
+    document_notes = "\n".join(page.strip() for page in pages if page.strip())
+    label_match = re.search(r"Source label:\s*([^\n.]+)", document_notes, re.I)
+    if label_match:
+        source_label = label_match.group(1).strip().rstrip(".")
+
+    for page_number, page in enumerate(pages, start=1):
+        lines = [line.rstrip() for line in page.splitlines()]
+        for index, line in enumerate(lines):
+            header_years = [int(year) for year in re.findall(r"((?:19|20)\d{2})\s*\(%\)", line)]
+            if len(header_years) < 2 or "district" not in line.lower():
+                continue
+            title = next((prior.strip() for prior in reversed(lines[:index]) if prior.strip()), "Table")
+            table_match = re.match(r"(Table\s+[^.]+)\.\s*(.+)", title, re.I)
+            table_label = table_match.group(1) if table_match else "Table"
+            metric_label = table_match.group(2) if table_match else title
+            metric_label = re.sub(r"\s+by\s+district.*$", "", metric_label, flags=re.I)
+            metric_name = safe_column_name(metric_label) + "_percent"
+            value_pattern = r"^\s*([^\d]+?)\s+((?:-?\d+(?:\.\d+)?\s+){%d}-?\d+(?:\.\d+)?)\s*$" % (len(header_years) - 1)
+            for data_line in lines[index + 1:]:
+                stripped = data_line.strip()
+                if not stripped:
+                    continue
+                if stripped.lower().startswith("source:"):
+                    break
+                match = re.match(value_pattern, data_line)
+                if not match:
+                    continue
+                values = [float(value) for value in re.findall(r"-?\d+(?:\.\d+)?", match.group(2))]
+                if len(values) != len(header_years):
+                    continue
+                for year, value in zip(header_years, values):
+                    rows.append({
+                        "district": match.group(1).strip(), "year": year, metric_name: value,
+                        "source_page": page_number, "source_table": table_label,
+                        "source": source_label,
+                    })
+                table_pages.add(page_number)
+                table_labels.add(table_label)
+    if not rows:
+        raise PlanError("no supported digital PDF table region found")
+    frame = pd.DataFrame(rows)
+    metadata = {
+        "format": "pdf", "pages": len([page for page in pages if page.strip()]),
+        "extracted_pages": sorted(table_pages), "tables": sorted(table_labels),
+        "adapter_scope": "digital PDF with one district-by-year percentage table",
+    }
+    data_profile = profile(frame, include_values)
+    data_profile["document"] = {**metadata, "notes": document_notes[:5000] if include_values else None}
+    return frame, data_profile, metadata
+
+
 def load_source(source: Path, include_values: bool) -> tuple[pd.DataFrame, dict[str, Any], dict[str, Any]]:
     if source.suffix.lower() == ".csv":
         frame = pd.read_csv(source)
         metadata = {"format": "csv", "sheets": [], "selected_sheet": None, "definitions": []}
         return frame, profile(frame, include_values), metadata
+    if source.suffix.lower() == ".pdf":
+        return load_digital_pdf(source, include_values)
     if source.suffix.lower() != ".xlsx":
         raise PlanError(f"unsupported input format: {source.suffix}")
     sheets = pd.read_excel(source, sheet_name=None)
@@ -113,7 +186,7 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
     rules = [
         "Plan a safe analysis of one local table. Never calculate or invent values.",
         "Use supplied column names exactly. The executor applies steps in order.",
-        "For coverage use derive kind percent, numerator/denominator, unit percent.",
+        "For coverage use derive kind percent only when distinct numerator and denominator count columns exist. If the source already supplies a coverage/rate/percent column, use it directly and never derive it again.",
         "Subtracting percentages is percentage points, not percent growth.",
         "Keep rows unless aggregation is requested. Never invent bands or targets.",
         "For an initial request asking for a webpage selector, keep all requested rows; webpage controls are added separately. Never emit placeholders such as {{selected_year}}.",
@@ -121,6 +194,7 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "The view series is a category such as district, never a numeric metric. Put metrics only in view y.",
         "For a district coverage trend use x=year, y=[derived coverage], series=district, unit=percent.",
         "If the initial request names multiple indicators, derive every requested indicator and use a grouped_bar view with each metric in view.y; the webpage adds an indicator selector.",
+        "If a later request asks for a comparison or difference in one year, keep any previously selected year set unless the user says show, filter or only that one year; put the named year on the insight instead.",
         "Source and provenance are rendered separately; do not group or sort merely to display the source.",
         "Write question, title and note for a nontechnical participant. Never mention renderer, SQL, JSON, DuckDB, placeholders or other implementation details.",
         "If data cannot explain why, set can_explain_cause false and add causal_limit.",
@@ -209,6 +283,8 @@ def bind(plan: dict[str, Any], frame: pd.DataFrame) -> None:
             raise PlanError(f"step {index} names missing columns: {missing}")
         if op == "derive":
             if step["name"] in available: raise PlanError("derived column already exists")
+            if step["numerator"] == step["denominator"]:
+                raise PlanError("a percentage numerator and denominator must be different columns")
             available.add(step["name"])
         elif op == "group":
             available = set(step["by"]) | {a["name"] for a in step["aggregates"]}
@@ -305,33 +381,43 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
     asks_for_pp_change = ("percentage point" in text or re.search(r"\bpp\b", text)) and re.search(r"\bchange\b", text)
     if asks_for_pp_change and not any(item["kind"] == "change" for item in plan["insights"]):
         raise PlanError("explicit percentage-point change request requires a change insight")
+    for item in plan["insights"]:
+        if item["kind"] == "difference":
+            shown = {str(value) for value in result[item["entity_column"]].dropna()}
+            requested = {str(value) for value in item["entities"]}
+            if shown != requested:
+                raise PlanError(
+                    f"two-entity comparison must focus the durable result on {sorted(requested)}, got {sorted(shown)}"
+                )
     if (re.search(r"\bwhy\b", text) or "don't guess reason" in text or "dont guess reason" in text) and not any(item["kind"] == "causal_limit" for item in plan["insights"]):
         raise PlanError("causal question requires a visible causal_limit insight")
     year_columns = [str(column) for column in result.columns if "year" in str(column).lower()]
     if not year_columns:
         return
     years = {int(value) for value in result[year_columns[0]].dropna()}
-    ranges = re.findall(r"only\s+((?:19|20)\d{2})\s+(?:to|through|-)\s+((?:19|20)\d{2})", text)
-    explicit_sets = re.findall(
-        r"only\s+((?:19|20)\d{2}(?:\s*(?:,|and)\s*(?:19|20)\d{2})+)", text
-    )
-    singles = re.findall(
-        r"only\s+((?:19|20)\d{2})(?!\s*(?:to|through|-|,|and))", text
-    )
-    if ranges:
-        start, end = map(int, ranges[-1]); allowed = set(range(start, end + 1))
-        if not years or not years <= allowed:
-            raise PlanError(f"durable year-range constraint ignored: expected {start}-{end}, got {sorted(years)}")
-    elif explicit_sets:
-        allowed = {int(year) for year in re.findall(r"(?:19|20)\d{2}", explicit_sets[-1])}
-        if not years or not years <= allowed:
-            raise PlanError(
-                f"durable year-set constraint ignored: expected {sorted(allowed)}, got {sorted(years)}"
-            )
-    elif singles:
-        expected = int(singles[-1])
-        if years != {expected}:
-            raise PlanError(f"durable year-only constraint ignored: expected {expected}, got {sorted(years)}")
+    allowed: set[int] | None = None
+    constraint_kind = ""
+    for message in reversed(messages):
+        lowered = message.lower()
+        ranges = re.findall(r"only\s+((?:19|20)\d{2})\s+(?:to|through|-)\s+((?:19|20)\d{2})", lowered)
+        explicit_sets = re.findall(
+            r"only\s+((?:19|20)\d{2}(?:\s*(?:,|and)\s*(?:19|20)\d{2})+)", lowered
+        )
+        singles = re.findall(
+            r"only\s+((?:19|20)\d{2})(?!\s*(?:to|through|-|,|and))", lowered
+        )
+        if ranges:
+            start, end = map(int, ranges[-1]); allowed = set(range(start, end + 1)); constraint_kind = "range"
+        elif explicit_sets:
+            allowed = {int(year) for year in re.findall(r"(?:19|20)\d{2}", explicit_sets[-1])}; constraint_kind = "set"
+        elif singles:
+            allowed = {int(singles[-1])}; constraint_kind = "single"
+        if allowed is not None:
+            break
+    if allowed is not None and years != allowed:
+        raise PlanError(
+            f"durable year-{constraint_kind} constraint ignored: expected {sorted(allowed)}, got {sorted(years)}"
+        )
 
 
 def compute_insights(plan: dict[str, Any], frame: pd.DataFrame) -> list[dict[str, Any]]:
@@ -354,7 +440,7 @@ def compute_insights(plan: dict[str, Any], frame: pd.DataFrame) -> list[dict[str
         elif kind == "difference":
             subset = [r for r in rows if str(r.get(spec["time_column"])) == str(spec["time"])]
             found = [next((r for r in subset if str(r.get(spec["entity_column"])) == str(e)), None) for e in spec["entities"]]
-            if all(found): output.append({"kind": kind, "label": f"{spec['entities'][1]} minus {spec['entities'][0]}", "value": found[1][spec["metric"]]-found[0][spec["metric"]], "unit": spec["unit"], "time": spec["time"]})
+            if all(found): output.append({"kind": kind, "label": f"Gap between {spec['entities'][0]} and {spec['entities'][1]}", "value": abs(found[1][spec["metric"]]-found[0][spec["metric"]]), "unit": spec["unit"], "time": spec["time"]})
         elif kind == "causal_limit":
             output.append({"kind": kind, "label": "What this data cannot answer", "text": "This file shows differences and changes, but it has no explanatory variables and cannot establish why they occurred."})
     return output

@@ -40,6 +40,7 @@ async def main() -> int:
           title: document.title,
           heading: document.querySelector('h1')?.textContent,
           chartSvg: document.querySelectorAll('#chart svg').length,
+          sourceText: document.querySelector('#source')?.innerText,
           clientWidth: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth,
           bodyText: document.body.innerText
@@ -73,6 +74,7 @@ async def main() -> int:
         "title_present": bool(initial["title"]),
         "heading_present": bool(initial["heading"]),
         "chart_svg_count": initial["chartSvg"],
+        "source_text": initial["sourceText"],
         "initial_table_rows": initial_rows,
         "selected_table_rows": selected_rows,
         "expected_filtered_rows": args.expected_filtered_rows,
