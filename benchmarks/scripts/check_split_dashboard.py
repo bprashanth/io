@@ -42,6 +42,7 @@ async def main() -> int:
           heading: document.querySelector('h1')?.textContent,
           chartSvg: document.querySelectorAll('#chart svg').length,
           sourceText: document.querySelector('#source')?.innerText,
+          outboundLinks: [...document.querySelectorAll('a[href^="https://"]')].map(a => a.href),
           clientWidth: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth,
           bodyText: document.body.innerText
@@ -85,6 +86,8 @@ async def main() -> int:
         "heading_present": bool(initial["heading"]),
         "chart_svg_count": initial["chartSvg"],
         "source_text": initial["sourceText"],
+        "body_text": initial["bodyText"],
+        "outbound_links": initial["outboundLinks"],
         "initial_table_rows": initial_rows,
         "selected_table_rows": selected_rows,
         "selected_metric": selected_metric,
@@ -108,8 +111,10 @@ async def main() -> int:
     if args.expected_current_rows is not None:
         if initial_rows != args.expected_current_rows: failures.append("initial table row count is wrong")
         if len(downloaded) != args.expected_current_rows: failures.append("download row count is wrong")
-    for required in ("year", "source"):
-        if required not in checks["download_columns"]: failures.append(f"download omits {required}")
+    if not any(column == "year" or column.endswith("_year") for column in checks["download_columns"]):
+        failures.append("download omits a year field")
+    if "source" not in checks["download_columns"]:
+        failures.append("download omits source")
     checks["failures"] = failures
     checks["passed"] = not failures
     (args.output / "browser-check.json").write_text(json.dumps(checks, indent=2) + "\n")

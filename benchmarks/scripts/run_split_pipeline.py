@@ -188,6 +188,7 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "Use supplied column names exactly. The executor applies steps in order.",
         "For coverage use derive kind percent only when distinct numerator and denominator count columns exist. If the source already supplies a coverage/rate/percent column, use it directly and never derive it again.",
         "Subtracting percentages is percentage points, not percent growth.",
+        "A difference between raw counts uses unit number; only a difference between percentage metrics uses percentage points.",
         "Keep rows unless aggregation is requested. Never invent bands or targets.",
         "For an initial request asking for a webpage selector, keep all requested rows; webpage controls are added separately. Never emit placeholders such as {{selected_year}}.",
         "Do not group when there is already one row per entity and time. If aggregation is needed for a rate, use weighted_percent rather than sum or mean of a percent.",
@@ -269,6 +270,11 @@ def quoted(name: str) -> str:
 
 def bind(plan: dict[str, Any], frame: pd.DataFrame) -> None:
     available = set(map(str, frame.columns))
+    units = {
+        str(column): "percent"
+        for column in frame.columns
+        if any(token in str(column).lower() for token in ("percent", "pct", "rate", "coverage"))
+    }
     for index, step in enumerate(plan["steps"]):
         op = step["op"]
         needed = []
@@ -286,6 +292,7 @@ def bind(plan: dict[str, Any], frame: pd.DataFrame) -> None:
             if step["numerator"] == step["denominator"]:
                 raise PlanError("a percentage numerator and denominator must be different columns")
             available.add(step["name"])
+            units[step["name"]] = step["unit"]
         elif op == "group":
             available = set(step["by"]) | {a["name"] for a in step["aggregates"]}
         if op == "filter" and isinstance(step["value"], str) and ("{{" in step["value"] or "}}" in step["value"]):
@@ -309,6 +316,13 @@ def bind(plan: dict[str, Any], frame: pd.DataFrame) -> None:
         raise PlanError("participant-facing text contains implementation jargon")
     for insight in plan["insights"]:
         references += [insight[k] for k in ("metric", "label_column", "entity_column", "time_column") if insight.get(k)]
+        if insight["kind"] in ("change", "difference"):
+            metric_unit = units.get(insight["metric"], "number")
+            expected_unit = "percentage points" if metric_unit == "percent" else "number"
+            if insight["unit"] != expected_unit:
+                raise PlanError(
+                    f"{insight['metric']} differences require unit {expected_unit}, got {insight['unit']}"
+                )
     missing = [name for name in references if name not in available]
     if missing: raise PlanError(f"view/insight names missing columns: {missing}")
     admitted = {str(c): set(frame[c].dropna().astype(str)) for c in frame.columns
@@ -381,14 +395,21 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
     asks_for_pp_change = ("percentage point" in text or re.search(r"\bpp\b", text)) and re.search(r"\bchange\b", text)
     if asks_for_pp_change and not any(item["kind"] == "change" for item in plan["insights"]):
         raise PlanError("explicit percentage-point change request requires a change insight")
-    for item in plan["insights"]:
-        if item["kind"] == "difference":
-            shown = {str(value) for value in result[item["entity_column"]].dropna()}
-            requested = {str(value) for value in item["entities"]}
-            if shown != requested:
-                raise PlanError(
-                    f"two-entity comparison must focus the durable result on {sorted(requested)}, got {sorted(shown)}"
-                )
+    ranking = [item for item in plan["insights"] if item["kind"] in ("highest", "lowest")]
+    differences = [item for item in plan["insights"] if item["kind"] == "difference"]
+    for item in differences:
+        shown = {str(value) for value in result[item["entity_column"]].dropna()}
+        requested = {str(value) for value in item["entities"]}
+        valid_scope = requested <= shown if ranking else shown == requested
+        if not valid_scope:
+            raise PlanError(
+                f"two-entity comparison scope must retain {sorted(requested)}, got {sorted(shown)}"
+            )
+    if ranking and differences:
+        ranking_columns = {item["label_column"] for item in ranking}
+        narrowed = [step["column"] for step in plan["steps"] if step["op"] == "filter" and step["column"] in ranking_columns]
+        if narrowed:
+            raise PlanError("a ranking-plus-pairwise-gap turn must retain the ranking population")
     if (re.search(r"\bwhy\b", text) or "don't guess reason" in text or "dont guess reason" in text) and not any(item["kind"] == "causal_limit" for item in plan["insights"]):
         raise PlanError("causal question requires a visible causal_limit insight")
     year_columns = [str(column) for column in result.columns if "year" in str(column).lower()]
