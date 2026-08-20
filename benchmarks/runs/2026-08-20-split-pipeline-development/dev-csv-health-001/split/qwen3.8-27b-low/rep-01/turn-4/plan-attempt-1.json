@@ -1,0 +1,89 @@
+{
+  "attempt": 1,
+  "plan": {
+    "schema_version": 1,
+    "dataset_id": "dev-csv-health-001",
+    "question": "Why is Gaya's ANC4 coverage below Nalanda's between 2021 and 2023?",
+    "clarification": null,
+    "steps": [
+      {
+        "op": "filter",
+        "column": "district",
+        "cmp": "in",
+        "value": [
+          "Gaya",
+          "Nalanda"
+        ]
+      },
+      {
+        "op": "filter",
+        "column": "year",
+        "cmp": "between",
+        "value": [
+          2021,
+          2023
+        ]
+      },
+      {
+        "op": "derive",
+        "name": "anc4_coverage_percent",
+        "kind": "percent",
+        "numerator": "anc4_completed",
+        "denominator": "pregnancies_registered",
+        "unit": "percent"
+      }
+    ],
+    "insights": [
+      {
+        "kind": "causal_limit",
+        "message": "This file contains only the number of registered pregnancies and the number that completed four or more antenatal visits. It has no information about staffing, outreach, infrastructure, or any other factor that could explain why one district's coverage is lower than another's. The gap is visible, but its cause is not in this data."
+      }
+    ],
+    "view": {
+      "title": "ANC4 Coverage Gap: Gaya vs Nalanda (2021–2023)",
+      "chart": "line",
+      "x": "year",
+      "y": [
+        "anc4_coverage_percent"
+      ],
+      "series": "district",
+      "unit": "percent",
+      "note": "The chart shows the percentage of registered pregnancies that completed four or more antenatal visits for each district. The vertical distance between the two lines at any year is the coverage gap in percentage points. This file can show that a gap exists and how wide it is, but it cannot tell you why the gap exists—no explanatory variables (such as health-worker numbers, travel distance, or programme changes) are included."
+    },
+    "interpretation_guard": {
+      "can_explain_cause": false,
+      "caveat": "The dataset records only counts of pregnancies and completed checkups. It does not include any variables that could explain differences between districts (e.g. staffing levels, outreach activity, reporting quality, or population characteristics). Any explanation for the gap would require additional data sources."
+    }
+  },
+  "api": {
+    "requested_model": "qwen/qwen3.8-27b",
+    "resolved_model": "qwen/qwen3.8-27b",
+    "generation_id": "gen-1787229433-A3PGj1slKRlp0yFWdVze",
+    "duration_seconds": 23.067,
+    "finish_reason": "stop",
+    "usage": {
+      "prompt_tokens": 1258,
+      "completion_tokens": 805,
+      "total_tokens": 2063,
+      "cost": 0.00334084,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.00334084,
+        "upstream_inference_prompt_cost": 0.00060384,
+        "upstream_inference_completions_cost": 0.002737
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 402,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "reasoning_effort": "low"
+  }
+}

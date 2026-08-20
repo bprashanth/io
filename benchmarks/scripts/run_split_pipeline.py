@@ -83,6 +83,7 @@ def make_prompt(case: dict[str, Any], data_profile: dict[str, Any], messages: li
         "Source and provenance are rendered separately; do not group or sort merely to display the source.",
         "Write question, title and note for a nontechnical participant. Never mention renderer, SQL, JSON, DuckDB, placeholders or other implementation details.",
         "If data cannot explain why, set can_explain_cause false and add causal_limit.",
+        "When the user explicitly asks for a highest, lowest, change or difference, add the matching insight specification so the answer is stated, not left for the user to infer from a chart.",
         "Use line/slope for time, bars for categories, scatter for two measures.",
         "Return only one JSON object matching the response schema.",
     ]
@@ -260,6 +261,11 @@ def check_conversation_constraints(messages: list[str], plan: dict[str, Any], re
     for word, kind in (("lowest", "lowest"), ("highest", "highest")):
         if re.search(rf"\b{word}\b", text) and not any(item["kind"] == kind for item in plan["insights"]):
             raise PlanError(f"explicit {word} request requires a named {kind} insight")
+    asks_for_pp_change = ("percentage point" in text or re.search(r"\bpp\b", text)) and re.search(r"\bchange\b", text)
+    if asks_for_pp_change and not any(item["kind"] == "change" for item in plan["insights"]):
+        raise PlanError("explicit percentage-point change request requires a change insight")
+    if (re.search(r"\bwhy\b", text) or "don't guess reason" in text or "dont guess reason" in text) and not any(item["kind"] == "causal_limit" for item in plan["insights"]):
+        raise PlanError("causal question requires a visible causal_limit insight")
     year_columns = [str(column) for column in result.columns if "year" in str(column).lower()]
     if not year_columns:
         return
