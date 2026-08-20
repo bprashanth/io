@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "status": "frozen-holdout-before-first-model-run",
+  "purpose": "Cross-sector holdout created after router commit dc9a345; the frozen router may not be changed from this result and rescored as untouched.",
+  "dialect_requested_from_model": "sqlite",
+  "execution_dialect": "duckdb",
+  "comparison": {
+    "numeric_tolerance": 0.000001,
+    "column_names_required": false,
+    "required_columns_may_be_a_projection_of_a_wider_result": true,
+    "equivalent_long_or_grouped_wide_results_accepted": true,
+    "row_order_required_only_for_ranking_tasks": true
+  },
+  "tables": [
+    {"name": "field_harvest", "kind": "csv", "path": "benchmarks/v2/holdout/field_harvest.csv"},
+    {"name": "river_samples", "kind": "csv", "path": "benchmarks/v2/holdout/river_samples.csv"},
+    {"name": "school_attendance", "kind": "csv", "path": "benchmarks/v2/holdout/school_attendance.csv"},
+    {"name": "approved_budget", "kind": "csv", "path": "benchmarks/v2/holdout/approved_budget.csv"},
+    {"name": "actual_spend", "kind": "csv", "path": "benchmarks/v2/holdout/actual_spend.csv"},
+    {"name": "habitat_checks", "kind": "csv", "path": "benchmarks/v2/holdout/habitat_checks.csv"}
+  ],
+  "tasks": [
+    {
+      "id": "agriculture-yield-ranking",
+      "pattern": "filter and rank a non-percentage derived measure",
+      "tables": ["field_harvest"],
+      "order_matters": true,
+      "gold_sql": "SELECT block, ROUND(1.0 * harvest_tonnes / cultivated_hectares, 1) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC, block",
+      "phrasings": [
+        "2024 Monsoon crop yield tonnes per hectare block wise highest first",
+        "for Monsoon 2024 divide harvest tonnes by cultivated hectares for each block and rank best first",
+        "show every block's 2024 Monsoon tonnes per hectare, top to bottom"
+      ]
+    },
+    {
+      "id": "ecology-group-average",
+      "pattern": "grouped average and ascending rank",
+      "tables": ["river_samples"],
+      "order_matters": true,
+      "gold_sql": "SELECT station, ROUND(AVG(nitrate_mg_l), 1) AS average_nitrate_mg_l FROM river_samples WHERE year = 2024 GROUP BY station ORDER BY average_nitrate_mg_l ASC, station",
+      "phrasings": [
+        "2024 average nitrate mg/l for each river station, lowest first",
+        "station wise mean nitrate in 2024 sort low to high",
+        "compare all stations by their 2024 average nitrate, smallest first"
+      ]
+    },
+    {
+      "id": "education-percentage-point-change",
+      "pattern": "percentage-point change by a new grouping dimension",
+      "tables": ["school_attendance"],
+      "gold_sql": "WITH rates AS (SELECT school, year, 100.0 * children_attended / children_enrolled AS attendance_percent FROM school_attendance WHERE year IN (2023, 2024)) SELECT school, ROUND(MAX(CASE WHEN year = 2024 THEN attendance_percent END) - MAX(CASE WHEN year = 2023 THEN attendance_percent END), 1) AS change_pp FROM rates GROUP BY school ORDER BY school",
+      "phrasings": [
+        "school wise attendance percentage-point change from 2023 to 2024",
+        "for each school give 2024 attendance rate minus 2023 rate in percentage points",
+        "how many pp did attended over enrolled move between 2023 and 2024 for every school"
+      ]
+    },
+    {
+      "id": "budget-join-utilisation",
+      "pattern": "join a new key and rank a derived percentage",
+      "tables": ["approved_budget", "actual_spend"],
+      "reference": "The selected tables have the same org_unit-year grain and can be matched on org_unit and year. Percent means 100.0 times numerator divided by the stated denominator.",
+      "order_matters": true,
+      "gold_sql": "SELECT b.org_unit, ROUND(100.0 * s.spent_lakh / b.approved_lakh, 1) AS utilisation_percent FROM approved_budget AS b JOIN actual_spend AS s ON b.org_unit = s.org_unit AND b.year = s.year WHERE b.year = 2024 ORDER BY utilisation_percent ASC, b.org_unit",
+      "phrasings": [
+        "join 2024 approved and spend by org unit and year, utilisation percentage lowest first",
+        "for every org unit show 2024 spent lakh as percent of approved lakh, match both tables and sort smallest",
+        "2024 budget use percentage by org unit from the two files, low to high"
+      ]
+    },
+    {
+      "id": "ecology-missing-observation",
+      "pattern": "missing value lookup with unfamiliar dimensions",
+      "tables": ["habitat_checks"],
+      "gold_sql": "SELECT landscape, round FROM habitat_checks WHERE species_count IS NULL ORDER BY landscape, round",
+      "phrasings": [
+        "where is species count blank? show landscape and round",
+        "list landscape and survey round with missing species_count",
+        "species count not available for which landscape rounds, don't call blank zero"
+      ]
+    }
+  ]
+}
