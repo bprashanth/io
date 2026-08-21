@@ -1,0 +1,126 @@
+{
+  "schema_version": 2,
+  "status": "frozen-development",
+  "purpose": "Generic isolated query-slot gate with explicit selected-dataset context; subjects are fixtures, while tasks measure reusable relational operations.",
+  "supersedes": "benchmarks/v2/query-suite-v1.json",
+  "dialect_requested_from_model": "sqlite",
+  "execution_dialect": "duckdb",
+  "comparison": {
+    "numeric_tolerance": 0.000001,
+    "column_names_required": false,
+    "required_columns_may_be_a_projection_of_a_wider_result": true,
+    "equivalent_long_or_grouped_wide_results_accepted": true,
+    "row_order_required_only_for_ranking_tasks": true
+  },
+  "tables": [
+    {
+      "name": "immunisation",
+      "kind": "csv",
+      "path": "benchmarks/cases/smoke-001/inputs/district_immunisation.csv"
+    },
+    {
+      "name": "anc_visits",
+      "kind": "csv",
+      "path": "benchmarks/cases/dev-csv-health-001/inputs/anc4_coverage.csv"
+    },
+    {
+      "name": "livelihoods",
+      "kind": "csv",
+      "path": "benchmarks/cases/dev-safe-programme-001/inputs/women_livelihood_outcomes.csv"
+    },
+    {
+      "name": "maternal_services",
+      "kind": "xlsx",
+      "path": "benchmarks/cases/dev-xlsx-health-001/inputs/maternal_health.xlsx",
+      "sheet": "District Data"
+    },
+    {
+      "name": "quality_observations",
+      "kind": "csv",
+      "path": "benchmarks/v2/fixtures/quality_observations.csv"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "derived-rate-ranking",
+      "pattern": "filter, derive a comparable percentage, rank",
+      "tables": ["immunisation"],
+      "order_matters": true,
+      "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+      "phrasings": [
+        "2023 only show full immunisation percent district wise highest first",
+        "for 2023 compare districts by fully immunised out of children due, top to bottom",
+        "make district list for 2023 full immunisation coverage percentage and sort best first",
+        "only year 2023. calculate fully immunised percentage for each district descending",
+        "which districts have higher full immunisation coverage in 2023? give all in order"
+      ]
+    },
+    {
+      "id": "time-change-per-group",
+      "pattern": "conditional aggregation and percentage-point change",
+      "tables": ["anc_visits"],
+      "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+      "phrasings": [
+        "for Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023",
+        "compare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+        "give district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda",
+        "2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda",
+        "calculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda"
+      ]
+    },
+    {
+      "id": "derived-rate-lowest-first",
+      "pattern": "filter, derive percentage, ascending rank",
+      "tables": ["livelihoods"],
+      "order_matters": true,
+      "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+      "phrasings": [
+        "2023 employment after 6 months as percent of enrolled, lowest district first",
+        "show all districts 2023 employed divided by women enrolled as a percentage, ascending",
+        "which district has lower employed out of enrolled rate in 2023? list everyone low to high",
+        "for 2023 calculate employment percentage for each district using enrolled as base and sort smallest",
+        "district wise 2023 employed at 6 months over enrolled rate, worst first"
+      ]
+    },
+    {
+      "id": "two-derived-measures",
+      "pattern": "filter two periods and groups, derive two percentages",
+      "tables": ["maternal_services"],
+      "gold_sql": "SELECT district, year, ROUND(100.0 * institutional_deliveries / pregnancies_registered, 1) AS delivery_percent, ROUND(100.0 * postnatal_check_48h / pregnancies_registered, 1) AS postnatal_percent FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) ORDER BY district, year",
+      "phrasings": [
+        "Gaya and Nalanda 2022 2023 show institutional delivery and postnatal percentages of registrations",
+        "compare Gaya and Nalanda for 2022 and 2023: institutional delivery and 48-hour postnatal rates over registered pregnancies",
+        "only Gaya Nalanda and years 2022-2023. calculate delivery coverage and postnatal coverage over registrations",
+        "for Gaya and Nalanda in 2022 and 2023 give two percentages: institutional deliveries and 48 hour checks over registrations",
+        "for Gaya Nalanda show registered pregnancy based rates for delivery and postnatal, 2022 to 2023"
+      ]
+    },
+    {
+      "id": "cross-table-join",
+      "pattern": "join on two keys and derive one measure from each table",
+      "tables": ["anc_visits", "livelihoods"],
+      "reference": "The selected tables have the same district-year grain and can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator.",
+      "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+      "phrasings": [
+        "match the two tables for 2023 and show each district ANC completed over registered percent with employed over enrolled percent",
+        "join ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side",
+        "for 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district",
+        "district wise 2023: ANC completed over registered and employed over enrolled as percentages from both tables",
+        "put 2023 ANC coverage and employment percentages together, matching district and year"
+      ]
+    },
+    {
+      "id": "missing-value-scope",
+      "pattern": "null detection without treating missing as zero",
+      "tables": ["quality_observations"],
+      "gold_sql": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL ORDER BY region, period",
+      "phrasings": [
+        "show region and period where quality score is missing, don't treat blank as zero",
+        "which rows have no quality score? only region and period",
+        "list the places and years with blank quality score",
+        "find missing quality_score records and give region and period",
+        "quality score not available where? show region and period only"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "id": "derived-rate-ranking-p05",
+  "task_id": "derived-rate-ranking",
+  "pattern": "filter, derive a comparable percentage, rank",
+  "question": "which districts have higher full immunisation coverage in 2023? give all in order",
+  "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+  "expected_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda"
+    ],
+    [
+      "Gaya"
+    ],
+    [
+      "Purnia"
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT DISTINCT district FROM immunisation WHERE year = 2023 AND children_due > 0 ORDER BY (children_fully_immunised * 100.0 / NULLIF(children_due, 0)) DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nwhich districts have higher full immunisation coverage in 2023? give all in order\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nwhich districts have higher full immunisation coverage in 2023? give all in order\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to focus on identifying districts with higher full immunization coverage in the year 2023. The question does not require any calculations or comparisons with previous years, so we can simplify the query significantly.\n\nHere's the step-by-step reasoning:\n\n1. **Identify the Relevant Table and Columns**: The relevant table is `immunisation`, and the columns needed are `district`, `year`, and `children_fully_immunised`.\n\n2. **Filter Data for the Year 2023**: We need to filter the records to only include data from the year 2023.\n\n3. **Calculate Full Immunization Coverage**: The full immunization coverage can be calculated as `(children_fully_immunised * 100.0 / children_due)`. However, since the question asks for districts with higher full immunization coverage, we can directly compare the `children_fully_immunised` values after ensuring `children_due` is not zero.\n\n4. **Order the Results**: The results should be ordered by the calculated full immunization coverage in descending order.\n\n5. **Select Distinct Districts**: Since we are interested in the names of the districts, we can select distinct district names.\n\nGiven these steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT DISTINCT district\nFROM immunisation\nWHERE year = 2023 AND children_due > 0\nORDER BY (children_fully_immunised * 100.0 / children_due) DESC;\n```\n\nThis query directly addresses the user's request by filtering the data for the year 2023, ensuring that the number of children due for immunization is greater than zero, and ordering the districts by their full immunization coverage in descending order.",
+      "api": {
+        "id": "chatcmpl-baa0c903675cb699",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 210,
+          "total_tokens": 586,
+          "completion_tokens": 376,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 28.173
+      },
+      "duration_seconds": 28.18,
+      "sql_duckdb": "SELECT DISTINCT district FROM immunisation WHERE year = 2023 AND children_due > 0 ORDER BY (children_fully_immunised * 100.0 / NULLIF(children_due, 0)) DESC",
+      "rows": [
+        [
+          "Nalanda"
+        ],
+        [
+          "Gaya"
+        ],
+        [
+          "Purnia"
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

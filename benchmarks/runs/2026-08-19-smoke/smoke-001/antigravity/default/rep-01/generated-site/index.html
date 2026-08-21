@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>District Immunisation Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="brand">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <div>
+            <h1>District Immunisation Analytics</h1>
+            <p class="subtitle">Track, analyze, and compare child immunisation coverage across districts by year</p>
+          </div>
+        </div>
+        <div class="source-badge" id="headerSourceBadge">
+          <span class="badge-label">Data Source:</span>
+          <span class="badge-value" id="sourceText">Loading...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-layout">
+      <!-- Filter Controls Bar -->
+      <section class="controls-panel card">
+        <div class="controls-grid">
+          <!-- Year Selector -->
+          <div class="control-group">
+            <label for="yearSelect">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              Select Year
+            </label>
+            <div class="year-buttons" id="yearButtonsContainer">
+              <!-- Dynamically populated or select dropdown -->
+            </div>
+            <select id="yearSelect" class="custom-select" aria-label="Select Year">
+              <!-- Populated by JS -->
+            </select>
+          </div>
+
+          <!-- District Comparison Selector -->
+          <div class="control-group districts-filter-group">
+            <div class="district-header-actions">
+              <label>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                Compare Districts
+              </label>
+              <div class="quick-btn-group">
+                <button type="button" id="selectAllDistricts" class="btn-text">Select All</button>
+                <button type="button" id="clearDistricts" class="btn-text">Clear</button>
+              </div>
+            </div>
+            <div class="district-checkboxes" id="districtCheckboxes">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Key Performance Metrics Summary -->
+      <section class="summary-cards-grid">
+        <div class="summary-card">
+          <div class="summary-card-header">
+            <span class="card-title">Overall Immunisation Rate</span>
+            <span class="card-icon rate-icon">%</span>
+          </div>
+          <div class="summary-card-body">
+            <div class="metric-value" id="overallRate">--%</div>
+            <div class="metric-sub" id="rateSubtext">Across selected districts</div>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-card-header">
+            <span class="card-title">Total Children Due</span>
+            <span class="card-icon due-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </span>
+          </div>
+          <div class="summary-card-body">
+            <div class="metric-value" id="totalDue">--</div>
+            <div class="metric-sub">Target cohort for year</div>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-card-header">
+            <span class="card-title">Fully Immunised</span>
+            <span class="card-icon immunised-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </span>
+          </div>
+          <div class="summary-card-body">
+            <div class="metric-value" id="totalImmunised">--</div>
+            <div class="metric-sub" id="immunisedSubtext">Children received full doses</div>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-card-header">
+            <span class="card-title">Top District</span>
+            <span class="card-icon top-icon">★</span>
+          </div>
+          <div class="summary-card-body">
+            <div class="metric-value highlight" id="topDistrict">--</div>
+            <div class="metric-sub" id="topDistrictRate">Highest coverage</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts & Visual Comparison Section -->
+      <section class="visuals-section">
+        <div class="card visual-card">
+          <div class="card-heading-bar">
+            <div>
+              <h2>District Comparison Chart</h2>
+              <p class="section-desc">Comparing Immunisation Coverage Rate (%) and Absolute Numbers</p>
+            </div>
+            <div class="chart-toggles">
+              <button type="button" class="toggle-btn active" data-mode="rate">Coverage Rate (%)</button>
+              <button type="button" class="toggle-btn" data-mode="counts">Absolute Numbers</button>
+            </div>
+          </div>
+
+          <!-- Interactive SVG/CSS Bar Chart -->
+          <div class="chart-container" id="chartContainer">
+            <!-- Chart rendered via JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Detailed Comparison Table -->
+      <section class="card table-section">
+        <div class="card-heading-bar">
+          <div>
+            <h2>Detailed District Immunisation Records</h2>
+            <p class="section-desc">Full breakdown by selected year, children due, immunised, coverage rate, and data source</p>
+          </div>
+          <div class="table-actions">
+            <button type="button" id="downloadTableBtn" class="download-btn" title="Download visible table data as CSV">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Download CSV</span>
+            </button>
+            <span class="record-counter" id="recordCount">0 records</span>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="immunisationTable">
+            <thead>
+              <tr>
+                <th data-sort="district">District <span class="sort-icon">↕</span></th>
+                <th data-sort="year">Year <span class="sort-icon">↕</span></th>
+                <th data-sort="children_due">Children Due <span class="sort-icon">↕</span></th>
+                <th data-sort="children_fully_immunised">Fully Immunised <span class="sort-icon">↕</span></th>
+                <th data-sort="rate">Coverage Rate (%) <span class="sort-icon">↕</span></th>
+                <th data-sort="source">Source <span class="sort-icon">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Multi-Year District Trend Section -->
+      <section class="card trends-section" id="trendsSection">
+        <div class="card-heading-bar">
+          <div>
+            <h2>Year-over-Year District Progress</h2>
+            <p class="section-desc">Tracking immunisation rate improvement across all available years</p>
+          </div>
+        </div>
+        <div class="trend-grid" id="trendGrid">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- Data Source Transparency & Info Box -->
+      <section class="card source-info-card">
+        <div class="source-info-header">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <h3>Dataset & Source Transparency</h3>
+        </div>
+        <div class="source-details-content">
+          <p>This application parses and visualizes data directly from <code>district_immunisation.csv</code>.</p>
+          <div class="source-meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Source Attribute in Data:</span>
+              <strong class="meta-val" id="footerSourceText">synthetic smoke fixture</strong>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">File Name:</span>
+              <code class="meta-val">district_immunisation.csv</code>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Calculated Metric:</span>
+              <span class="meta-val">Coverage Rate (%) = (Children Fully Immunised / Children Due) &times; 100</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>District Immunisation Data Dashboard &bull; Source: <span id="footerSourceInline">synthetic smoke fixture</span></p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

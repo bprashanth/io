@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Women's Training and Employment at 6 Months — by District</title>
+<style>
+  :root {
+    --ink: #1f2933;
+    --muted: #5b6b7b;
+    --line: #d8e0e8;
+    --accent: #1a6b4f;
+    --accent-soft: #e8f3ee;
+    --warn: #8a5a00;
+    --warn-bg: #fdf6e3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    background: #f7f9fb;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+  }
+  h1 { font-size: 1.5rem; margin: 0 0 8px; }
+  h2 { font-size: 1.1rem; margin: 32px 0 10px; }
+  .intro { color: var(--muted); margin: 0 0 20px; max-width: 62ch; }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+  .controls label { font-weight: 600; }
+  select {
+    font-size: 1rem;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+  }
+  .compare-hint { color: var(--muted); font-size: 0.9rem; }
+
+  .tablewrap { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 0.95rem; }
+  caption { text-align: left; font-weight: 600; padding: 10px 12px 0; font-size: 1rem; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { background: var(--accent-soft); font-size: 0.85rem; }
+  tbody tr.total { font-weight: 700; background: #f2f6f3; }
+  tbody tr:last-child td { border-bottom: none; }
+  .up { color: #1a6b4f; }
+  .down { color: #a03030; }
+
+  section.box {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 16px;
+  }
+  section.box p { margin: 8px 0; }
+  .formula {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    background: #f2f6f3;
+    border-left: 3px solid var(--accent);
+    padding: 8px 10px;
+    border-radius: 0 6px 6px 0;
+    margin: 8px 0;
+    overflow-x: auto;
+  }
+  .example { color: var(--muted); font-size: 0.9rem; }
+  .source-note {
+    background: var(--warn-bg);
+    border-left: 3px solid var(--warn);
+    padding: 8px 12px;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.9rem;
+  }
+  footer { margin-top: 28px; color: var(--muted); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Women's Training and Employment at 6 Months</h1>
+  <p class="intro">
+    Results by district and year. Select a year to see each district's results for that year,
+    and how it compares with the other year.
+  </p>
+
+  <div class="controls">
+    <label for="yearSelect">Year</label>
+    <select id="yearSelect" aria-label="Select year"></select>
+    <span class="compare-hint" id="compareHint"></span>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption id="resultsCaption"></caption>
+      <thead>
+        <tr>
+          <th scope="col">District</th>
+          <th scope="col">Women enrolled</th>
+          <th scope="col">Completed training</th>
+          <th scope="col">Training completion rate (%)</th>
+          <th scope="col">Employed at 6 months</th>
+          <th scope="col">Employment rate at 6 months (%)</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="tablewrap" style="margin-top:20px">
+    <table>
+      <caption id="compareCaption"></caption>
+      <thead>
+        <tr>
+          <th scope="col">District</th>
+          <th scope="col" id="thCompOld"></th>
+          <th scope="col" id="thCompNew"></th>
+          <th scope="col">Change (points)</th>
+          <th scope="col" id="thEmpOld"></th>
+          <th scope="col" id="thEmpNew"></th>
+          <th scope="col">Change (points)</th>
+        </tr>
+      </thead>
+      <tbody id="compareBody"></tbody>
+    </table>
+  </div>
+
+  <h2>Formulas used</h2>
+  <section class="box">
+    <p><strong>Training completion rate</strong> — the share of enrolled women who completed training:</p>
+    <div class="formula">Training completion rate (%) = Completed training ÷ Women enrolled × 100</div>
+    <p class="example" id="exampleCompletion"></p>
+
+    <p style="margin-top:16px"><strong>Employment rate at 6 months</strong> — the share of enrolled women who were employed at 6 months:</p>
+    <div class="formula">Employment rate at 6 months (%) = Employed at 6 months ÷ Women enrolled × 100</div>
+    <p class="example" id="exampleEmployment"></p>
+  </section>
+
+  <h2>Source and data notes</h2>
+  <section class="box">
+    <p><strong>Source</strong> (as recorded in the data file's <em>source</em> field): <em>"synthetic women livelihood outcomes fixture"</em></p>
+    <p><strong>File</strong>: <code>women_livelihood_outcomes.csv</code> — 8 data rows: 4 districts × 2 years (2022, 2023).</p>
+    <p class="source-note">
+      The file's source field identifies this data as a <strong>synthetic fixture</strong>,
+      not an official government or programme record.
+    </p>
+    <p>
+      These numbers show what happened by district and year. They do not explain <em>why</em> districts
+      differ. To understand causes, additional evidence would be needed (for example: type of training
+      offered, local labour market conditions, follow-up method).
+    </p>
+  </section>
+
+  <footer>Data file: women_livelihood_outcomes.csv · Districts: Gaya, Nalanda, Purnia, Kishanganj · Years: 2022, 2023</footer>
+</main>
+
+<script>
+// Data transcribed from women_livelihood_outcomes.csv (columns: district, year, women_enrolled, completed_training, employed_at_6_months, source)
+const DATA = {
+  "2022": {
+    "Gaya":       { enrolled: 1000, completed: 800, employed: 520 },
+    "Nalanda":    { enrolled: 900,  completed: 765, employed: 540 },
+    "Purnia":     { enrolled: 1200, completed: 840, employed: 504 },
+    "Kishanganj": { enrolled: 800,  completed: 520, employed: 280 }
+  },
+  "2023": {
+    "Gaya":       { enrolled: 1100, completed: 902, employed: 616 },
+    "Nalanda":    { enrolled: 1000, completed: 870, employed: 650 },
+    "Purnia":     { enrolled: 1300, completed: 949, employed: 598 },
+    "Kishanganj": { enrolled: 900,  completed: 612, employed: 342 }
+  }
+};
+const DISTRICTS = ["Gaya", "Nalanda", "Purnia", "Kishanganj"];
+const YEARS = ["2022", "2023"];
+
+const pct = (num, den) => (num / den) * 100;
+const fmt = (x) => x.toFixed(1);
+const fmtSigned = (x) => (x >= 0 ? "+" : "") + x.toFixed(1);
+
+function totals(year) {
+  const t = { enrolled: 0, completed: 0, employed: 0 };
+  for (const d of DISTRICTS) {
+    const r = DATA[year][d];
+    t.enrolled += r.enrolled;
+    t.completed += r.completed;
+    t.employed += r.employed;
+  }
+  return t;
+}
+
+function render() {
+  const year = yearSelect.value;
+  const other = YEARS.find(y => y !== year);
+  const isCurrentFirst = YEARS.indexOf(other) < YEARS.indexOf(year);
+  const baseYear = isCurrentFirst ? other : year;   // earlier year
+  const compYear = isCurrentFirst ? year : other;    // later year
+  const selYear = year;
+
+  compareHint.textContent = "Comparing with " + other + ".";
+
+  // --- Results table for the selected year ---
+  resultsCaption.textContent = "Results for " + year;
+  const rows = [];
+  for (const d of DISTRICTS) {
+    const r = DATA[year][d];
+    rows.push(
+      "<tr><td>" + d + "</td><td>" + r.enrolled + "</td><td>" + r.completed + "</td>" +
+      "<td>" + fmt(pct(r.completed, r.enrolled)) + "</td><td>" + r.employed + "</td>" +
+      "<td>" + fmt(pct(r.employed, r.enrolled)) + "</td></tr>"
+    );
+  }
+  const t = totals(year);
+  rows.push(
+    '<tr class="total"><td>All districts</td><td>' + t.enrolled + "</td><td>" + t.completed + "</td>" +
+    "<td>" + fmt(pct(t.completed, t.enrolled)) + "</td><td>" + t.employed + "</td>" +
+    "<td>" + fmt(pct(t.employed, t.enrolled)) + "</td></tr>"
+  );
+  resultsBody.innerHTML = rows.join("");
+
+  // --- Comparison table (base year vs comparison year) ---
+  compareCaption.textContent = "Compare " + baseYear + " with " + compYear + " (rates for the whole district)";
+  thCompOld.textContent = "Completion rate " + baseYear + " (%)";
+  thCompNew.textContent = "Completion rate " + compYear + " (%)";
+  thEmpOld.textContent = "Employment rate " + baseYear + " (%)";
+  thEmpNew.textContent = "Employment rate " + compYear + " (%)";
+
+  const crows = [];
+  for (const d of DISTRICTS) {
+    const a = DATA[baseYear][d], b = DATA[compYear][d];
+    const compOld = pct(a.completed, a.enrolled), compNew = pct(b.completed, b.enrolled);
+    const empOld = pct(a.employed, a.enrolled), empNew = pct(b.employed, b.enrolled);
+    const dComp = compNew - compOld, dEmp = empNew - empOld;
+    crows.push(
+      "<tr><td>" + d + "</td>" +
+      "<td>" + fmt(compOld) + "</td><td>" + fmt(compNew) + "</td>" +
+      '<td class="' + (dComp >= 0 ? "up" : "down") + '">' + fmtSigned(dComp) + "</td>" +
+      "<td>" + fmt(empOld) + "</td><td>" + fmt(empNew) + "</td>" +
+      '<td class="' + (dEmp >= 0 ? "up" : "down") + '">' + fmtSigned(dEmp) + "</td></tr>"
+    );
+  }
+  const ta = totals(baseYear), tb = totals(compYear);
+  const dCompT = pct(tb.completed, tb.enrolled) - pct(ta.completed, ta.enrolled);
+  const dEmpT = pct(tb.employed, tb.enrolled) - pct(ta.employed, ta.enrolled);
+  crows.push(
+    '<tr class="total"><td>All districts</td>' +
+    "<td>" + fmt(pct(ta.completed, ta.enrolled)) + "</td><td>" + fmt(pct(tb.completed, tb.enrolled)) + "</td>" +
+    '<td class="' + (dCompT >= 0 ? "up" : "down") + '">' + fmtSigned(dCompT) + "</td>" +
+    "<td>" + fmt(pct(ta.employed, ta.enrolled)) + "</td><td>" + fmt(pct(tb.employed, tb.enrolled)) + "</td>" +
+    '<td class="' + (dEmpT >= 0 ? "up" : "down") + '">' + fmtSigned(dEmpT) + "</td></tr>"
+  );
+  compareBody.innerHTML = crows.join("");
+
+  // --- Worked formula examples for the selected year (Gaya as example) ---
+  const g = DATA[year]["Gaya"];
+  exampleCompletion.textContent =
+    "Example (Gaya, " + year + "): " + g.completed + " ÷ " + g.enrolled + " × 100 = " + fmt(pct(g.completed, g.enrolled)) + "%";
+  exampleEmployment.textContent =
+    "Example (Gaya, " + year + "): " + g.employed + " ÷ " + g.enrolled + " × 100 = " + fmt(pct(g.employed, g.enrolled)) + "%";
+}
+
+const yearSelect = document.getElementById("yearSelect");
+const compareHint = document.getElementById("compareHint");
+const resultsCaption = document.getElementById("resultsCaption");
+const resultsBody = document.getElementById("resultsBody");
+const compareCaption = document.getElementById("compareCaption");
+const thCompOld = document.getElementById("thCompOld");
+const thCompNew = document.getElementById("thCompNew");
+const thEmpOld = document.getElementById("thEmpOld");
+const thEmpNew = document.getElementById("thEmpNew");
+const compareBody = document.getElementById("compareBody");
+const exampleCompletion = document.getElementById("exampleCompletion");
+const exampleEmployment = document.getElementById("exampleEmployment");
+for (const y of YEARS) {
+  const opt = document.createElement("option");
+  opt.value = y;
+  opt.textContent = y;
+  yearSelect.appendChild(opt);
+}
+yearSelect.value = "2023";
+yearSelect.addEventListener("change", render);
+render();
+</script>
+</body>
+</html>

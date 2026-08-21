@@ -1,0 +1,98 @@
+{
+  "id": "turn-2-two-year-trend-p01",
+  "task_id": "turn-2-two-year-trend",
+  "pattern": "follow-up expands the durable result to a time trend",
+  "question": "now show 2023 and 2024 Monsoon tonnes per hectare trend for every block",
+  "gold_sql": "SELECT block, year, ROUND(1.0 * harvest_tonnes / cultivated_hectares, 1) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) ORDER BY block, year",
+  "expected_rows": [
+    [
+      "Bhojpur",
+      2023,
+      2.4
+    ],
+    [
+      "Bhojpur",
+      2024,
+      2.5
+    ],
+    [
+      "Dharwad",
+      2023,
+      3.0
+    ],
+    [
+      "Dharwad",
+      2024,
+      3.2
+    ],
+    [
+      "Wardha",
+      2023,
+      2.5
+    ],
+    [
+      "Wardha",
+      2024,
+      2.7
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dharwad",
+      3.0,
+      3.2
+    ],
+    [
+      "Wardha",
+      2.5,
+      2.7
+    ],
+    [
+      "Bhojpur",
+      2.4,
+      2.5
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT block, SUM(CASE WHEN year = 2023 THEN harvest_tonnes ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN year = 2023 THEN cultivated_hectares ELSE 0 END), 0) AS tonnes_per_hectare_2023, SUM(CASE WHEN year = 2024 THEN harvest_tonnes ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN year = 2024 THEN cultivated_hectares ELSE 0 END), 0) AS tonnes_per_hectare_2024 FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nnow show 2023 and 2024 Monsoon tonnes per hectare trend for every block\n[Database Schema]\nCREATE TABLE \"field_harvest\" (\n  \"block\" VARCHAR,\n  \"season\" VARCHAR,\n  \"year\" BIGINT,\n  \"cultivated_hectares\" BIGINT,\n  \"harvest_tonnes\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nnow show 2023 and 2024 Monsoon tonnes per hectare trend for every block\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to focus on calculating the tonnes per hectare for the Monsoon season in both 2023 and 2024 for each block. The user is interested in the trend, which implies we need to compare the two years. However, the user's request does not explicitly ask for a percentage change, so we will focus on the tonnes per hectare for each year.\n\nHere's the step-by-step breakdown:\n\n1. **Filter the Data**: We need to filter the `field_harvest` table to include only records from the Monsoon season for the years 2023 and 2024.\n2. **Aggregate the Data**: For each block, we need to sum up the `harvest_tonnes` and `cultivated_hectares` for each year.\n3. **Calculate Tonnes per Hectare**: For each block and year, calculate the tonnes per hectare by dividing the total tonnes by the total hectares.\n4. **Select the Required Columns**: Finally, select the block, year, and tonnes per hectare for both 2023 and 2024.\n\nGiven these steps, here is the SQL query:\n\n```sql\nSELECT \n    block,\n    SUM(CASE WHEN year = 2023 THEN harvest_tonnes ELSE 0 END) * 1.0 / SUM(CASE WHEN year = 2023 THEN cultivated_hectares ELSE 0 END) AS tonnes_per_hectare_2023,\n    SUM(CASE WHEN year = 2024 THEN harvest_tonnes ELSE 0 END) * 1.0 / SUM(CASE WHEN year = 2024 THEN cultivated_hectares ELSE 0 END) AS tonnes_per_hectare_2024\nFROM \n    field_harvest\nWHERE \n    season = 'Monsoon' AND year IN (2023, 2024)\nGROUP BY \n    block;\n```\n\n### Explanation:\n- **Filtering**: The `WHERE` clause filters the records to include only those from the Monsoon season in 2023 and 2024.\n- **Aggregation**: The `SUM` function with `CASE` statements calculates the total `harvest_tonnes` and `cultivated_hectares` for each year separately.\n- **Calculation**: The tonnes per hectare for each year is calculated by dividing the total tonnes by the total hectares. The `* 1.0` ensures that the division is performed as floating-point arithmetic.\n- **Grouping**: The `GROUP BY` clause groups the results by `block` to provide the trend for each block.\n\nThis query directly addresses the user's request for the tonnes per hectare trend for the Monsoon season in 2023 and 2024 for every block.",
+      "api": {
+        "id": "chatcmpl-a7094c2ed7e16d91",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 227,
+          "total_tokens": 837,
+          "completion_tokens": 610,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 45.617
+      },
+      "duration_seconds": 45.623,
+      "sql_duckdb": "SELECT block, SUM(CASE WHEN year = 2023 THEN harvest_tonnes ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN year = 2023 THEN cultivated_hectares ELSE 0 END), 0) AS tonnes_per_hectare_2023, SUM(CASE WHEN year = 2024 THEN harvest_tonnes ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN year = 2024 THEN cultivated_hectares ELSE 0 END), 0) AS tonnes_per_hectare_2024 FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block",
+      "rows": [
+        [
+          "Dharwad",
+          3.0,
+          3.2
+        ],
+        [
+          "Wardha",
+          2.5,
+          2.7
+        ],
+        [
+          "Bhojpur",
+          2.4,
+          2.5
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

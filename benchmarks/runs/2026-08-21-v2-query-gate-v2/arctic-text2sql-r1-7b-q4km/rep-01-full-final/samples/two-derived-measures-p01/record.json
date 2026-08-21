@@ -1,0 +1,112 @@
+{
+  "id": "two-derived-measures-p01",
+  "task_id": "two-derived-measures",
+  "pattern": "filter two periods and groups, derive two percentages",
+  "question": "Gaya and Nalanda 2022 2023 show institutional delivery and postnatal percentages of registrations",
+  "gold_sql": "SELECT district, year, ROUND(100.0 * institutional_deliveries / pregnancies_registered, 1) AS delivery_percent, ROUND(100.0 * postnatal_check_48h / pregnancies_registered, 1) AS postnatal_percent FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) ORDER BY district, year",
+  "expected_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, year, (CAST(institutional_deliveries AS REAL) * 100.0 / NULLIF(pregnancies_registered, 0)) AS institutional_delivery_percentage, (CAST(postnatal_check_48h AS REAL) * 100.0 / NULLIF(pregnancies_registered, 0)) AS postnatal_check_percentage FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year BETWEEN 2022 AND 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nGaya and Nalanda 2022 2023 show institutional delivery and postnatal percentages of registrations\n[Database Schema]\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nGaya and Nalanda 2022 2023 show institutional delivery and postnatal percentages of registrations\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to carefully parse the requirements and map them to the available data in the `maternal_services` table. Here's a step-by-step breakdown of how to construct the query:\n\n1. **Identify the Relevant Data**:\n   - The question specifies two districts: Gaya and Nalanda.\n   - The time frame is from 2022 to 2023.\n   - We need to calculate the percentages of institutional deliveries and postnatal checks within 48 hours for these districts and years.\n\n2. **Determine the Required Calculations**:\n   - **Institutional Deliveries Percentage**: This is calculated as `(institutional_deliveries / pregnancies_registered) * 100`.\n   - **Postnatal Checks Percentage**: This is calculated as `(postnatal_check_48h / pregnancies_registered) * 100`.\n\n3. **Filter the Data**:\n   - Filter the records to include only those from the years 2022 and 2023.\n   - Filter the records to include only those from the districts Gaya and Nalanda.\n\n4. **Construct the SQL Query**:\n   - Use a `SELECT` statement to specify the columns we need.\n   - Use a `WHERE` clause to filter the data based on the specified conditions.\n   - Use arithmetic operations to calculate the required percentages.\n\nHere is the final SQL query:\n\n```sql\nSELECT \n    district,\n    year,\n    (CAST(institutional_deliveries AS REAL) * 100.0 / pregnancies_registered) AS institutional_delivery_percentage,\n    (CAST(postnatal_check_48h AS REAL) * 100.0 / pregnancies_registered) AS postnatal_check_percentage\nFROM \n    maternal_services\nWHERE \n    district IN ('Gaya', 'Nalanda')\n    AND year BETWEEN 2022 AND 2023;\n```\n\n### Explanation:\n- **CAST Function**: We use `CAST` to convert the numerator to `REAL` to ensure that the division results in a floating-point number, which is necessary for accurate percentage calculations.\n- **Filtering**: The `WHERE` clause filters the records to include only those from the specified districts and years.\n- **Percentage Calculation**: The percentages are calculated using the formula `(numerator / denominator) * 100.0`.\n\nThis query directly addresses the requirements of the user question by providing the institutional delivery and postnatal check percentages for the specified districts and years.",
+      "api": {
+        "id": "chatcmpl-A6mXwO9uliWgV3fA0IGCl01aEDaDgPAL",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 526,
+          "prompt_tokens": 230,
+          "total_tokens": 756,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 14.841
+      },
+      "duration_seconds": 14.844,
+      "sql_duckdb": "SELECT district, year, (CAST(institutional_deliveries AS REAL) * 100.0 / NULLIF(pregnancies_registered, 0)) AS institutional_delivery_percentage, (CAST(postnatal_check_48h AS REAL) * 100.0 / NULLIF(pregnancies_registered, 0)) AS postnatal_check_percentage FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year BETWEEN 2022 AND 2023",
+      "rows": [
+        [
+          "Gaya",
+          2022,
+          72.0,
+          63.0
+        ],
+        [
+          "Gaya",
+          2023,
+          75.0,
+          68.0
+        ],
+        [
+          "Nalanda",
+          2022,
+          78.0,
+          72.0
+        ],
+        [
+          "Nalanda",
+          2023,
+          80.0,
+          75.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

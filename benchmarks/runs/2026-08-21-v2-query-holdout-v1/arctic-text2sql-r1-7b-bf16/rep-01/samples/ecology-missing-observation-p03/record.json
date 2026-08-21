@@ -1,0 +1,62 @@
+{
+  "id": "ecology-missing-observation-p03",
+  "task_id": "ecology-missing-observation",
+  "pattern": "missing value lookup with unfamiliar dimensions",
+  "question": "species count not available for which landscape rounds, don't call blank zero",
+  "gold_sql": "SELECT landscape, round FROM habitat_checks WHERE species_count IS NULL ORDER BY landscape, round",
+  "expected_rows": [
+    [
+      "Aravalli",
+      2
+    ],
+    [
+      "Sundarbans",
+      1
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Aravalli",
+      2
+    ],
+    [
+      "Sundarbans",
+      1
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT landscape, round FROM habitat_checks WHERE species_count IS NULL",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nspecies count not available for which landscape rounds, don't call blank zero\n[Database Schema]\nCREATE TABLE \"habitat_checks\" (\n  \"landscape\" VARCHAR,\n  \"round\" BIGINT,\n  \"species_count\" DOUBLE,\n  \"canopy_percent\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nspecies count not available for which landscape rounds, don't call blank zero\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to identify the key elements of the question and map them to the appropriate SQL operations. The question asks for landscape rounds where the species count is not available, and it specifies that we should not consider cases where the species count is zero.\n\n### Step-by-Step Reasoning:\n\n1. **Identify the Table**: The data is stored in the `habitat_checks` table.\n2. **Identify the Columns**: We need to focus on the `landscape`, `round`, and `species_count` columns.\n3. **Filtering Condition**: We need to find rows where `species_count` is `NULL` or not available. Since the question specifies not to call blank zero, we should exclude cases where `species_count` is zero.\n4. **Select the Required Columns**: We need to select the `landscape` and `round` columns for the output.\n\n### SQL Query:\nGiven the above reasoning, the SQL query to retrieve the required information is:\n\n```sql\nSELECT landscape, round\nFROM habitat_checks\nWHERE species_count IS NULL;\n```\n\n### Explanation:\n- **SELECT landscape, round**: This selects the `landscape` and `round` columns from the `habitat_checks` table.\n- **FROM habitat_checks**: This specifies the table from which to retrieve the data.\n- **WHERE species_count IS NULL**: This filters the rows to include only those where the `species_count` is `NULL`, indicating that the species count is not available.\n\nThis query directly addresses the user's request without unnecessary complexity or incorrect assumptions.",
+      "api": {
+        "id": "chatcmpl-a06c8153432fe420",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 196,
+          "total_tokens": 522,
+          "completion_tokens": 326,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 24.505
+      },
+      "duration_seconds": 24.508,
+      "sql_duckdb": "SELECT landscape, round FROM habitat_checks WHERE species_count IS NULL",
+      "rows": [
+        [
+          "Aravalli",
+          2
+        ],
+        [
+          "Sundarbans",
+          1
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

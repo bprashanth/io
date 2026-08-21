@@ -1,0 +1,130 @@
+{
+  "id": "cross-table-join-p02",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "join anc visits and livelihoods by district and year, 2023 rates side by side",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2023,
+      74.0,
+      82.0,
+      56.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      87.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      2023,
+      67.0,
+      73.0,
+      46.0
+    ],
+    [
+      "Kishanganj",
+      2023,
+      61.0,
+      68.0,
+      38.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT a.district, a.year, 100.0 * a.anc4_completed / NULLIF(a.pregnancies_registered, 0) AS anc4_rate, 100.0 * l.completed_training / NULLIF(l.women_enrolled, 0) AS training_completion_rate, 100.0 * l.employed_at_6_months / NULLIF(l.women_enrolled, 0) AS employment_rate FROM anc_visits AS a JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\njoin anc visits and livelihoods by district and year, 2023 rates side by side\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\njoin anc visits and livelihoods by district and year, 2023 rates side by side\n```sql",
+      "response": "\n\n```sql\nSELECT\n  a.district,\n  a.year,\n  100.0 * a.anc4_completed / a.pregnancies_registered AS anc4_rate,\n  100.0 * l.completed_training / l.women_enrolled AS training_completion_rate,\n  100.0 * l.employed_at_6_months / l.women_enrolled AS employment_rate\nFROM anc_visits a\nJOIN livelihoods l\n  ON a.district = l.district AND a.year = l.year\nWHERE a.year = 2023;\n```",
+      "api": {
+        "id": "gen-1787250506-Qd0HGkMLkfqJHrfiqY5O",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 483,
+          "completion_tokens": 378,
+          "total_tokens": 861,
+          "cost": 0.0013272,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0013272,
+            "upstream_inference_prompt_cost": 0.0001932,
+            "upstream_inference_completions_cost": 0.001134
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 5.83
+      },
+      "sql_duckdb": "SELECT a.district, a.year, 100.0 * a.anc4_completed / NULLIF(a.pregnancies_registered, 0) AS anc4_rate, 100.0 * l.completed_training / NULLIF(l.women_enrolled, 0) AS training_completion_rate, 100.0 * l.employed_at_6_months / NULLIF(l.women_enrolled, 0) AS employment_rate FROM anc_visits AS a JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023",
+      "rows": [
+        [
+          "Gaya",
+          2023,
+          74.0,
+          82.0,
+          56.0
+        ],
+        [
+          "Nalanda",
+          2023,
+          80.0,
+          87.0,
+          65.0
+        ],
+        [
+          "Purnia",
+          2023,
+          67.0,
+          73.0,
+          46.0
+        ],
+        [
+          "Kishanganj",
+          2023,
+          61.0,
+          68.0,
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

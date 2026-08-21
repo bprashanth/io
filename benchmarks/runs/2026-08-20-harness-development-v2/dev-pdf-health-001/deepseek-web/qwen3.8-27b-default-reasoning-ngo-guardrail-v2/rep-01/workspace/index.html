@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facility delivery coverage by year and district</title>
+<style>
+  :root {
+    --ink: #1c2430;
+    --muted: #5b6675;
+    --line: #d7dde5;
+    --bg: #f6f8fa;
+    --card: #ffffff;
+    --accent: #1f5fa8;
+    --up: #1d7a3e;
+    --down: #b03a2e;
+    --same: #5b6675;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.45;
+  }
+  main {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 20px 16px 48px;
+  }
+  header h1 {
+    font-size: 1.45rem;
+    margin: 8px 0 4px;
+  }
+  header p.sub {
+    margin: 0 0 16px;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  select {
+    font: inherit;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #fff;
+    min-width: 110px;
+  }
+  button {
+    font: inherit;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #eef2f7;
+    cursor: pointer;
+  }
+  button:hover { background: #e2e9f1; }
+  .swap-hint {
+    font-size: 0.8rem;
+    color: var(--muted);
+    align-self: center;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  th, td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line);
+    text-align: right;
+    white-space: nowrap;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  thead th {
+    border-bottom: 2px solid var(--line);
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-transform: none;
+  }
+  tbody tr:hover { background: #f2f6fa; }
+  .bar-wrap {
+    display: inline-block;
+    width: 90px;
+    height: 8px;
+    background: #e7ecf2;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-left: 8px;
+    overflow: hidden;
+  }
+  .bar {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+  }
+  .delta-up { color: var(--up); font-weight: 600; }
+  .delta-down { color: var(--down); font-weight: 600; }
+  .delta-same { color: var(--same); font-weight: 600; }
+  .card h2 {
+    font-size: 1.1rem;
+    margin: 4px 0 10px;
+  }
+  .download-link {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 8px 14px;
+    border: 1px solid var(--accent);
+    border-radius: 7px;
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+    background: #eef4fb;
+  }
+  .download-link:hover { background: #e2ecf8; }
+  .note {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 12px;
+  }
+  .source {
+    font-size: 0.85rem;
+    color: var(--muted);
+    border-top: 1px dashed var(--line);
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+  .source strong { color: var(--ink); }
+  .definition {
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  footer {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  @media (max-width: 520px) {
+    th, td { padding: 8px 6px; font-size: 0.85rem; }
+    .bar-wrap { width: 56px; margin-left: 4px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Facility delivery coverage by year and district</h1>
+    <p class="sub">Share of recorded deliveries that occurred in a health facility. Pick two years to compare districts.</p>
+  </header>
+
+  <section class="card" aria-label="Year selection">
+    <div class="controls">
+      <div class="field">
+        <label for="yearA">Year A</label>
+        <select id="yearA">
+          <option value="2022" selected>2022</option>
+          <option value="2023">2023</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="yearB">Year B (compare)</label>
+        <select id="yearB">
+          <option value="2022">2022</option>
+          <option value="2023" selected>2023</option>
+        </select>
+      </div>
+      <button id="swapBtn" type="button" title="Swap the two selected years">Swap years</button>
+      <span class="swap-hint">Change is Year B &minus; Year A.</span>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Coverage table">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>District</th>
+          <th id="thA">Year A (%)</th>
+          <th id="thB">Year B (%)</th>
+          <th>Change (percentage points)</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+
+    <p class="note" id="deltaNote"></p>
+    <p class="note">The report supplies percentages only; it does not supply delivery counts or explanations for why coverage changed.</p>
+
+    <p class="source">
+      <strong>Source:</strong> <span id="sourceLine"></span>
+    </p>
+  </section>
+
+  <section class="card" aria-label="Purnia and Kishanganj comparison in 2023">
+    <h2>Purnia and Kishanganj in 2023</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>District</th>
+          <th>2023 (%)</th>
+        </tr>
+      </thead>
+      <tbody id="compareBody"></tbody>
+    </table>
+    <p class="note" id="compareDiff"></p>
+    <p>
+      <a class="download-link" href="purnia_kishanganj_2023_facility_delivery_coverage.csv" download>Download this comparison as CSV (Purnia and Kishanganj, 2023)</a>
+    </p>
+    <p class="source">
+      <strong>Source:</strong> facility_delivery_report.pdf — Table 1, page 2 (2023 column). Unit: percent.
+    </p>
+  </section>
+
+  <section class="card">
+    <p class="definition"><strong>How the table is read:</strong> each value is the percentage of recorded deliveries that occurred in a health facility, as printed in the source table. Change = Year B value &minus; Year A value, in percentage points (pp). The report gives percentages only, so no counts or rates beyond these figures can be computed from it.</p>
+    <p class="definition"><strong>Coverage definition (from the report):</strong> “Facility delivery coverage is the percentage of recorded deliveries that occurred in a health facility.”</p>
+  </section>
+
+  <footer>
+    The source states: “This short digital PDF is a synthetic benchmark fixture. It contains no personal records and must not be described as official statistics.” Values shown above are exactly as printed in the source table.
+  </footer>
+</main>
+
+<script>
+"use strict";
+
+// Data transcribed from facility_delivery_report.pdf, page 2, Table 1.
+// Unit: percent. The source prints percentages only (no delivery counts).
+const SOURCE = {
+  file: "facility_delivery_report.pdf",
+  page: 2,
+  table: "Table 1",
+  tableTitle: "Facility delivery coverage by district and year",
+  unit: "percent",
+  note: "Values are illustrative and are not official statistics.",
+  viewNote: "This page shows 2022 and 2023 only; the source table also lists 2021."
+};
+
+const YEARS = [2022, 2023];
+
+// coverage[year][district] = percentage, exactly as printed in the PDF.
+// This page shows 2022 and 2023 only (as requested); the source table also lists 2021.
+const coverage = {
+  2022: { Gaya: 67.0, Nalanda: 74.0, Purnia: 61.0, Kishanganj: 56.0 },
+  2023: { Gaya: 72.0, Nalanda: 79.0, Purnia: 66.0, Kishanganj: 60.0 }
+};
+
+const districts = ["Gaya", "Nalanda", "Purnia", "Kishanganj"];
+
+const yearAEl = document.getElementById("yearA");
+const yearBEl = document.getElementById("yearB");
+const swapBtn = document.getElementById("swapBtn");
+const tableBody = document.getElementById("tableBody");
+const thA = document.getElementById("thA");
+const thB = document.getElementById("thB");
+const deltaNote = document.getElementById("deltaNote");
+const sourceLine = document.getElementById("sourceLine");
+
+sourceLine.textContent = SOURCE.file + " — " + SOURCE.table + ", page " + SOURCE.page +
+  ". " + SOURCE.tableTitle + ". Unit: " + SOURCE.unit + ". " + SOURCE.viewNote + " " + SOURCE.note;
+
+function fmt(v) {
+  return (Math.round(v * 10) / 10).toFixed(1);
+}
+
+function readSelection() {
+  const a = parseInt(yearAEl.value, 10);
+  const b = parseInt(yearBEl.value, 10);
+  return { a: YEARS.includes(a) ? a : YEARS[0], b: YEARS.includes(b) ? b : YEARS[1] };
+}
+
+function updateHash(a, b) {
+  const next = "#a=" + a + "&b=" + b;
+  if (location.hash !== next) {
+    history.replaceState(null, "", next);
+  }
+}
+
+function applyHash() {
+  const m = {};
+  const h = location.hash.replace(/^#/, "");
+  h.split("&").forEach(function (pair) {
+    const kv = pair.split("=");
+    if (kv.length === 2) m[kv[0]] = kv[1];
+  });
+  // Only accept a complete hash with years still offered on this page;
+  // otherwise keep the page defaults (2022 / 2023).
+  const a = parseInt(m.a, 10);
+  const b = parseInt(m.b, 10);
+  if (!m.a || !m.b) return;
+  if (!YEARS.includes(a) || !YEARS.includes(b)) return;
+  yearAEl.value = String(a);
+  yearBEl.value = String(b);
+}
+
+function render() {
+  const sel = readSelection();
+  const a = sel.a, b = sel.b;
+  thA.textContent = a + " (%)";
+  thB.textContent = b + " (%)";
+  updateHash(a, b);
+
+  const rows = districts.map(function (d) {
+    const va = coverage[a][d];
+    const vb = coverage[b][d];
+    const diff = Math.round((vb - va) * 10) / 10;
+    let cls = "delta-same", label = "no change";
+    if (diff > 0) { cls = "delta-up"; label = "+" + fmt(diff) + " pp (up)"; }
+    else if (diff < 0) { cls = "delta-down"; label = fmt(diff) + " pp (down)"; }
+    return { d: d, va: va, vb: vb, diff: diff, cls: cls, label: label };
+  });
+
+  tableBody.innerHTML = rows.map(function (r) {
+    return "<tr>" +
+      "<td>" + r.d + "</td>" +
+      "<td>" + fmt(r.va) + '<span class="bar-wrap"><span class="bar" style="width:' + r.va + '%"></span></span></td>' +
+      "<td>" + fmt(r.vb) + '<span class="bar-wrap"><span class="bar" style="width:' + r.vb + '%"></span></span></td>' +
+      '<td class="' + r.cls + '">' + r.label + "</td>" +
+      "</tr>";
+  }).join("");
+
+  if (a === b) {
+    deltaNote.textContent = "Year A and Year B are the same year, so the change is 0 for every district. Choose a different Year B to see a comparison.";
+  } else if (b > a) {
+    deltaNote.textContent = "Change compares " + b + " (Year B) against " + a + " (Year A), in percentage points.";
+  } else {
+    deltaNote.textContent = "Change compares " + b + " (Year B) against " + a + " (Year A). Year B is earlier than Year A, so negative changes mean coverage was higher in Year B.";
+  }
+}
+
+// Pinned district comparison requested on 2023-08-20: Purnia vs Kishanganj.
+const COMPARE = { year: 2023, d1: "Purnia", d2: "Kishanganj" };
+
+const compareBody = document.getElementById("compareBody");
+const compareDiff = document.getElementById("compareDiff");
+
+function renderCompare() {
+  const year = COMPARE.year, d1 = COMPARE.d1, d2 = COMPARE.d2;
+  const v1 = coverage[year][d1];
+  const v2 = coverage[year][d2];
+  const diff = Math.round((v1 - v2) * 10) / 10;
+  compareBody.innerHTML =
+    "<tr><td>" + d1 + "</td><td>" + fmt(v1) + "</td></tr>" +
+    "<tr><td>" + d2 + "</td><td>" + fmt(v2) + "</td></tr>";
+  if (diff > 0) {
+    compareDiff.textContent = d1 + " is " + fmt(diff) + " percentage points higher than " + d2 + " in " + year +
+      " (" + fmt(v1) + "% \u2212 " + fmt(v2) + "% = " + fmt(diff) + " pp).";
+  } else if (diff < 0) {
+    compareDiff.textContent = d2 + " is " + fmt(-diff) + " percentage points higher than " + d1 + " in " + year +
+      " (" + fmt(v2) + "% \u2212 " + fmt(v1) + "% = " + fmt(-diff) + " pp).";
+  } else {
+    compareDiff.textContent = d1 + " and " + d2 + " are equal in " + year + " (" + fmt(v1) + "% each).";
+  }
+}
+
+yearAEl.addEventListener("change", render);
+yearBEl.addEventListener("change", render);
+swapBtn.addEventListener("click", function () {
+  const a = yearAEl.value, b = yearBEl.value;
+  yearAEl.value = b;
+  yearBEl.value = a;
+  render();
+});
+
+applyHash();
+render();
+renderCompare();
+</script>
+</body>
+</html>

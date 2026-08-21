@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Facility delivery coverage by district and year</title>
+  <style>
+    :root { --ink:#17243b; --muted:#637087; --line:#dfe5ec; --paper:#fff;
+      --wash:#f5f7fa; --blue:#176b87; --teal:#25a18e; --gold:#e3a72f; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--wash); color:var(--ink);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif }
+    .shell { max-width:1220px; margin:0 auto; padding:38px 36px 56px }
+    .eyebrow { color:var(--blue); font-size:12px; font-weight:800;
+      letter-spacing:.14em; text-transform:uppercase }
+    h1 { font:700 42px/1.06 Georgia,serif; margin:9px 0 10px; max-width:900px }
+    .lede { color:var(--muted); font-size:17px; margin:0 0 28px; max-width:850px }
+    .toolbar { display:flex; gap:14px; align-items:end; flex-wrap:wrap;
+      background:#eaf1f4; border:1px solid #d2e1e7; border-radius:16px;
+      padding:14px 16px; margin-bottom:20px }
+    .toolbar label { color:#3a5363; font-size:12px; font-weight:800; text-transform:capitalize }
+    .toolbar select,.toolbar button { display:block; margin-top:5px; border:1px solid #b9c7d0;
+      border-radius:9px; background:white; padding:9px 12px; color:var(--ink); font:inherit }
+    .toolbar button { cursor:pointer; font-weight:750; margin-left:auto }
+    .grid { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(310px,.75fr); gap:20px; align-items:start }
+    .card { min-width:0; padding:22px; background:var(--paper); border:1px solid var(--line);
+      border-radius:18px; box-shadow:0 7px 24px rgba(21,42,59,.06) }
+    .card h2 { font-size:17px; margin:0 0 4px }
+    .sub { color:var(--muted); font-size:13px; margin:0 0 16px }
+    .chart { width:100%; height:410px; overflow:hidden }
+    .axis { stroke:#b9c4cf; stroke-width:1 } .gridline { stroke:#e6eaef; stroke-width:1 }
+    .label { fill:#5b6879; font-size:12px } .value { fill:#27364d; font-size:11px; font-weight:700 }
+    .insights { display:grid; gap:12px }
+    .insight { border-left:4px solid var(--teal); background:#f2f8f7; border-radius:8px; padding:13px 14px }
+    .insight.caution { border-color:var(--gold); background:#fff8e8 }
+    .insight strong { display:block; font-size:21px } .insight span { color:var(--muted); font-size:13px; line-height:1.35 }
+    .table-card { margin-top:20px; overflow:hidden }
+    .table-wrap { max-height:420px; overflow:auto; border:1px solid var(--line); border-radius:12px }
+    table { border-collapse:collapse; width:100%; font-size:13px }
+    th { position:sticky; top:0; background:#edf3f6; text-align:left }
+    th,td { padding:10px 12px; border-bottom:1px solid #e9edf1; white-space:nowrap }
+    td.num { text-align:right; font-variant-numeric:tabular-nums }
+    .source { margin-top:20px; border-top:1px solid var(--line); padding-top:16px;
+      color:var(--muted); font-size:12px; line-height:1.5; overflow-wrap:anywhere }
+    .empty { display:grid; place-items:center; height:100%; color:var(--muted) }
+    @media(max-width:900px) { .grid{grid-template-columns:1fr} h1{font-size:34px} .shell{padding:28px 22px} }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="eyebrow">Local data · checked calculation</div>
+    <h1>Facility delivery coverage by district and year</h1>
+    <p class="lede" id="question"></p>
+    <div class="toolbar" id="toolbar"><button id="download">Download current table</button></div>
+    <section class="grid">
+      <article class="card"><h2 id="chartTitle"></h2><p class="sub" id="chartNote"></p><div class="chart" id="chart"></div></article>
+      <aside class="card"><h2>What stands out</h2><p class="sub">Calculated from the currently visible rows.</p><div class="insights" id="insights"></div></aside>
+    </section>
+    <section class="card table-card"><h2>Values behind the visual</h2><p class="sub" id="rowCount"></p><div class="table-wrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></section>
+    <footer class="source" id="source"></footer>
+  </main>
+  <script>
+    const B={"schema_version": 1, "case_id": "dev-pdf-health-001", "title": "Facility delivery coverage by district and year", "question": "How does facility delivery coverage compare across the four districts, and how has it changed over the three reporting years?", "view": {"title": "Facility delivery coverage by district and year", "chart": "line", "x": "year", "y": ["facility_delivery_coverage_pct"], "series": "district", "unit": "percent", "note": "Each line shows one district. The vertical axis is the percentage of recorded deliveries that took place in a health facility. Source: Table 1, page 2. Values are illustrative and are not official statistics."}, "columns": ["district", "year", "facility_delivery_coverage", "source_page", "source_table", "source", "facility_delivery_coverage_pct"], "rows": [{"district": "Gaya", "year": 2021, "facility_delivery_coverage": 62.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Gaya", "year": 2022, "facility_delivery_coverage": 67.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Gaya", "year": 2023, "facility_delivery_coverage": 72.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Nalanda", "year": 2021, "facility_delivery_coverage": 70.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Nalanda", "year": 2022, "facility_delivery_coverage": 74.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Nalanda", "year": 2023, "facility_delivery_coverage": 79.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Purnia", "year": 2021, "facility_delivery_coverage": 55.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Purnia", "year": 2022, "facility_delivery_coverage": 61.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Purnia", "year": 2023, "facility_delivery_coverage": 66.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Kishanganj", "year": 2021, "facility_delivery_coverage": 50.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Kishanganj", "year": 2022, "facility_delivery_coverage": 56.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}, {"district": "Kishanganj", "year": 2023, "facility_delivery_coverage": 60.0, "source_page": 2, "source_table": "Table 1", "source": "synthetic facility-delivery PDF fixture", "facility_delivery_coverage_pct": 100.0}], "insight_specs": [], "insights": [], "source": {"file": "facility_delivery_report.pdf", "sha256": "5bf5aabf1e801c2d7d432d71a9ea9108f17a002443ac8d9c3486f33c758a7dab", "provenance": "Deterministic two-page digital PDF built by benchmarks/scripts/build_screening_fixtures.py; synthetic district percentages, no sensitive records, not official statistics.", "format": "pdf", "pages": 2, "extracted_pages": [2], "tables": ["Table 1"], "adapter_scope": "digital PDF with one district-by-year percentage table"}}, V=B.view;
+    const colours=['#176b87','#25a18e','#e3a72f','#c8553d','#7259a5','#597a38'];
+    const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const human=s=>String(s).replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()).replace(/ Percent$/,' (%)');
+    const fmt=(v,unit,column)=>{if(typeof v!=='number')return String(v??'—');if(String(column).toLowerCase().includes('year'))return String(v);const x=(Math.round(v*10)/10).toLocaleString(undefined,{maximumFractionDigits:1});return x+(unit==='percent'?'%':unit==='percentage points'?' pp':'')};
+    document.getElementById('question').textContent=B.question;
+    document.getElementById('chartTitle').textContent=V.title;
+    document.getElementById('chartNote').textContent=V.note||((V.unit||'Value')+' · no invented performance bands');
+
+    const controlCols=B.columns.filter(c=>!V.y.includes(c)&&c!=='source'&&(!B.rows.some(r=>typeof r[c]==='number')||c.toLowerCase().includes('year'))&&new Set(B.rows.map(r=>r[c])).size>1&&new Set(B.rows.map(r=>r[c])).size<=12);
+    const toolbar=document.getElementById('toolbar');
+    if(V.y.length>1){const wrap=document.createElement('label');wrap.textContent='Indicator';const select=document.createElement('select');select.id='metricSelect';select.innerHTML=V.y.map(v=>`<option value="${esc(v)}">${esc(human(v))}</option>`).join('');select.onchange=refresh;wrap.appendChild(select);toolbar.insertBefore(wrap,document.getElementById('download'))}
+    controlCols.forEach(c=>{const wrap=document.createElement('label');wrap.textContent=human(c);const select=document.createElement('select');select.dataset.col=c;select.innerHTML='<option value="">All</option>'+[...new Set(B.rows.map(r=>r[c]))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true})).map(v=>`<option>${esc(v)}</option>`).join('');select.onchange=refresh;wrap.appendChild(select);toolbar.insertBefore(wrap,document.getElementById('download'))});
+    function filtered(){let rows=B.rows.slice();document.querySelectorAll('select[data-col]').forEach(s=>{if(s.value!=='')rows=rows.filter(r=>String(r[s.dataset.col])===s.value)});return rows}
+    function drawTable(rows){document.getElementById('rowCount').textContent=rows.length+' rows · filters also apply to the download';document.getElementById('thead').innerHTML='<tr>'+B.columns.map(c=>`<th>${esc(human(c))}</th>`).join('')+'</tr>';document.getElementById('tbody').innerHTML=rows.map(r=>'<tr>'+B.columns.map(c=>`<td class="${typeof r[c]==='number'?'num':''}">${esc(typeof r[c]==='number'?fmt(r[c],V.y.includes(c)?V.unit:null,c):r[c])}</td>`).join('')+'</tr>').join('')}
+    function drawChart(rows){
+      const el=document.getElementById('chart'); if(!rows.length){el.innerHTML='<div class="empty">No rows match these filters</div>';return}
+      const W=760,H=390,p={l:64,r:28,t:26,b:62};
+      const xs=[...new Set(rows.map(r=>r[V.x]))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+      const selectedMetric=document.getElementById('metricSelect')?.value, activeY=selectedMetric?[selectedMetric]:V.y;
+      const series=V.series?[...new Set(rows.map(r=>r[V.series]))]:activeY;
+      const values=rows.flatMap(r=>activeY.map(y=>Number(r[y]))).filter(Number.isFinite), max=V.unit==='percent'?100:Math.max(...values,1)*1.12;
+      const parts=[];
+      for(let i=0;i<=4;i++){const y=p.t+(H-p.t-p.b)*i/4,v=max*(1-i/4);parts.push(`<line class="gridline" x1="${p.l}" x2="${W-p.r}" y1="${y}" y2="${y}"/><text class="label" x="${p.l-9}" y="${y+4}" text-anchor="end">${esc(fmt(v,V.unit))}</text>`)}
+      const lineChart=V.chart==='line'||V.chart==='slope', singleTimeSlice=lineChart&&xs.length===1&&V.series;
+      if(singleTimeSlice){
+        const group=(W-p.l-p.r)/series.length,bar=Math.min(66,group*.55);
+        series.forEach((s,si)=>{const row=rows.find(r=>String(r[V.series])===String(s)),value=row?Number(row[activeY[0]]):NaN;if(!Number.isFinite(value))return;const height=value/max*(H-p.t-p.b),xx=p.l+si*group+(group-bar)/2;parts.push(`<rect x="${xx}" y="${H-p.b-height}" width="${bar}" height="${height}" rx="5" fill="${colours[si%colours.length]}"/><text class="value" x="${xx+bar/2}" y="${H-p.b-height-7}" text-anchor="middle">${esc(fmt(value,V.unit))}</text>`)});
+      } else if(lineChart){
+        series.forEach((s,si)=>{const points=xs.map((x,xi)=>{const row=rows.find(r=>String(r[V.x])===String(x)&&(!V.series||String(r[V.series])===String(s))),value=row?Number(row[activeY[0]]):NaN;return Number.isFinite(value)?[p.l+xi*(W-p.l-p.r)/Math.max(xs.length-1,1),p.t+(max-value)/max*(H-p.t-p.b),value]:null}).filter(Boolean);parts.push(`<polyline fill="none" stroke="${colours[si%colours.length]}" stroke-width="3" points="${points.map(q=>q[0]+','+q[1]).join(' ')}"/>`);points.forEach(q=>parts.push(`<circle cx="${q[0]}" cy="${q[1]}" r="4" fill="${colours[si%colours.length]}"/><text class="value" x="${q[0]}" y="${q[1]-9}" text-anchor="middle">${esc(fmt(q[2],V.unit))}</text>`))})
+      } else {
+        const group=(W-p.l-p.r)/xs.length,bar=Math.min(50,group/(series.length+1));
+        xs.forEach((x,xi)=>series.forEach((s,si)=>{const row=rows.find(r=>String(r[V.x])===String(x)&&(!V.series||String(r[V.series])===String(s))),metric=V.series?activeY[0]:s,value=row?Number(row[metric]):NaN;if(!Number.isFinite(value))return;const height=value/max*(H-p.t-p.b),xx=p.l+xi*group+(group-bar*series.length)/2+si*bar;parts.push(`<rect x="${xx}" y="${H-p.b-height}" width="${Math.max(8,bar-5)}" height="${height}" rx="4" fill="${colours[si%colours.length]}"/><text class="value" x="${xx+(bar-5)/2}" y="${H-p.b-height-7}" text-anchor="middle">${esc(fmt(value,V.unit))}</text>`)}))
+      }
+      const labels=singleTimeSlice?series:xs;
+      labels.forEach((x,i)=>{const xx=singleTimeSlice||!lineChart?p.l+(i+.5)*(W-p.l-p.r)/labels.length:p.l+i*(W-p.l-p.r)/Math.max(labels.length-1,1);parts.push(`<text class="label" x="${xx}" y="${H-p.b+23}" text-anchor="middle">${esc(x)}</text>`)});
+      const legendItems=singleTimeSlice?activeY:series;
+      const legend=legendItems.map((s,i)=>`<span style="color:${colours[i%colours.length]}">●</span> ${esc(human(s))}`).join(' &nbsp; ');
+      el.innerHTML=`<div style="font-size:12px;color:#637087;margin-bottom:4px">${legend}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(V.title)}" style="width:100%;height:370px"><line class="axis" x1="${p.l}" x2="${p.l}" y1="${p.t}" y2="${H-p.b}"/>${parts.join('')}</svg>`;
+    }
+    function drawInsights(rows){
+      const cards=[];
+      for(const spec of (B.insight_specs||[])){
+        if(spec.kind==='causal_limit'){cards.push({kind:spec.kind,text:'This file shows differences and changes, but it has no explanatory variables and cannot establish why they occurred.'});continue}
+        if(spec.kind==='highest'||spec.kind==='lowest'){
+          const valid=rows.filter(r=>typeof r[spec.metric]==='number');if(valid.length){const chosen=valid.reduce((a,b)=>spec.kind==='highest'?(b[spec.metric]>a[spec.metric]?b:a):(b[spec.metric]<a[spec.metric]?b:a));cards.push({kind:spec.kind,label:chosen[spec.label_column],value:chosen[spec.metric],unit:V.unit})}continue
+        }
+        if(spec.kind==='change'){
+          for(const entity of spec.entities){const subset=rows.filter(r=>String(r[spec.entity_column])===String(entity)),start=subset.find(r=>String(r[spec.time_column])===String(spec.from)),end=subset.find(r=>String(r[spec.time_column])===String(spec.to));if(start&&end)cards.push({kind:spec.kind,label:entity,value:end[spec.metric]-start[spec.metric],unit:spec.unit})}continue
+        }
+        if(spec.kind==='difference'){
+          const subset=rows.filter(r=>String(r[spec.time_column])===String(spec.time)),a=subset.find(r=>String(r[spec.entity_column])===String(spec.entities[0])),b=subset.find(r=>String(r[spec.entity_column])===String(spec.entities[1]));if(a&&b)cards.push({kind:spec.kind,label:spec.entities[1]+' minus '+spec.entities[0],value:b[spec.metric]-a[spec.metric],unit:spec.unit})
+        }
+      }
+      document.getElementById('insights').innerHTML=cards.map(i=>i.kind==='causal_limit'?`<div class="insight caution"><strong>Use caution</strong><span>${esc(i.text)}</span></div>`:`<div class="insight"><strong>${esc(fmt(i.value,i.unit||V.unit))}</strong><span>${esc(i.label)} · ${esc(i.kind.replaceAll('_',' '))}</span></div>`).join('')||'<div class="insight"><strong>Explore the comparison</strong><span>Use the controls above to focus the chart and table on the district, year, or indicator you need.</span></div>';
+    }
+    function refresh(){const rows=filtered();drawTable(rows);drawChart(rows);drawInsights(rows)}
+    document.getElementById('download').onclick=()=>{const rows=filtered(),cols=B.columns,safe=v=>{const text=String(v??'');return typeof v==='string'&&/^[=+\-@]/.test(text)?"'"+text:text},csv=[cols.join(','),...rows.map(r=>cols.map(c=>'"'+safe(r[c]).replaceAll('"','""')+'"').join(','))].join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='filtered-dashboard.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+    const sheetText=B.source.sheets?.length?' · Sheets: '+B.source.sheets.map(esc).join(', '):'';
+    const formulas=(B.source.definitions||[]).filter(d=>d.formula).map(d=>'<strong>'+esc(d.indicator)+':</strong> '+esc(d.formula)+(d.sheet?' <span>(sheet: '+esc(d.sheet)+')</span>':'')).join('<br>');
+    const formulaText=formulas?'<br><strong>Formulas used:</strong><br>'+formulas:'';
+    document.getElementById('source').innerHTML='<strong>Source:</strong> '+esc(B.source.file)+sheetText+' · '+esc(B.source.provenance)+formulaText+'<br><details><summary>Verification fingerprint</summary><code>SHA-256 '+esc(B.source.sha256)+'</code></details>';
+    refresh();
+  </script>
+</body>
+</html>

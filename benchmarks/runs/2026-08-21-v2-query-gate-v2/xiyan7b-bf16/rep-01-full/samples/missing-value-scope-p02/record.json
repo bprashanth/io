@@ -1,0 +1,73 @@
+{
+  "id": "missing-value-scope-p02",
+  "task_id": "missing-value-scope",
+  "pattern": "null detection without treating missing as zero",
+  "question": "which rows have no quality score? only region and period",
+  "gold_sql": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL ORDER BY region, period",
+  "expected_rows": [
+    [
+      "East",
+      2023
+    ],
+    [
+      "South",
+      2022
+    ],
+    [
+      "West",
+      2022
+    ]
+  ],
+  "actual_rows": [
+    [
+      "South",
+      2022
+    ],
+    [
+      "West",
+      2022
+    ],
+    [
+      "East",
+      2023
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nwhich rows have no quality score? only region and period\n[Database Schema]\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nwhich rows have no quality score? only region and period\n```sql",
+      "response": "SELECT region , period FROM quality_observations WHERE quality_score IS NULL",
+      "api": {
+        "id": "chatcmpl-bc14ac9a4bdf517e",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-7B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 195,
+          "total_tokens": 209,
+          "completion_tokens": 14,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 1.128
+      },
+      "sql_duckdb": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+      "rows": [
+        [
+          "South",
+          2022
+        ],
+        [
+          "West",
+          2022
+        ],
+        [
+          "East",
+          2023
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

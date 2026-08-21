@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>District Immunisation by Year</title>
+<style>
+  :root {
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --ink: #111827;
+    --muted: #6b7280;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --line: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); font-size: .95rem; }
+  .controls {
+    display: flex; align-items: center; gap: 10px;
+    margin: 20px 0; flex-wrap: wrap;
+  }
+  .controls label { font-weight: 600; }
+  select {
+    font: inherit; padding: 6px 10px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--card); cursor: pointer;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+  .card h2 { font-size: 1.05rem; margin: 0 0 14px; }
+  .row { margin-bottom: 14px; }
+  .row:last-child { margin-bottom: 0; }
+  .row .meta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 4px; font-size: .92rem;
+  }
+  .row .name { font-weight: 600; }
+  .row .nums { color: var(--muted); }
+  .track {
+    background: var(--accent-soft); border-radius: 999px;
+    height: 14px; overflow: hidden;
+  }
+  .bar {
+    height: 100%; background: var(--accent);
+    border-radius: 999px; transition: width .35s ease;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block; font-size: .78rem; padding: 1px 8px;
+    border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+    font-weight: 600;
+  }
+  footer {
+    margin-top: 22px; font-size: .85rem; color: var(--muted);
+    border-top: 1px solid var(--line); padding-top: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>District Immunisation by Year</h1>
+    <p>Select a year to compare fully immunised children across districts.</p>
+  </header>
+
+  <div class="controls">
+    <label for="yearSelect">Year</label>
+    <select id="yearSelect" aria-label="Select year"></select>
+  </div>
+
+  <section class="card" aria-label="District comparison chart">
+    <h2 id="chartTitle"></h2>
+    <div id="chart"></div>
+  </section>
+
+  <section class="card" aria-label="District detail table">
+    <h2>Details</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>District</th>
+          <th class="num">Children due</th>
+          <th class="num">Fully immunised</th>
+          <th class="num">Coverage</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </section>
+
+  <footer id="sourceFooter"></footer>
+</div>
+
+<script>
+// Embedded copy of district_immunisation.csv — used when the page is opened
+// via file:// (fetch of local files is blocked) or when the live fetch fails.
+const EMBEDDED_CSV = [
+  'district,year,children_due,children_fully_immunised,source',
+  'Gaya,2022,1000,780,synthetic smoke fixture',
+  'Nalanda,2022,800,680,synthetic smoke fixture',
+  'Purnia,2022,900,630,synthetic smoke fixture',
+  'Gaya,2023,1100,935,synthetic smoke fixture',
+  'Nalanda,2023,850,765,synthetic smoke fixture',
+  'Purnia,2023,1000,760,synthetic smoke fixture'
+].join('\n');
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  const header = lines[0].split(',').map(s => s.trim());
+  return lines.slice(1).map(line => {
+    const cells = line.split(',').map(s => s.trim());
+    const row = {};
+    header.forEach((h, i) => { row[h] = cells[i] || ''; });
+    return {
+      district: row.district,
+      year: parseInt(row.year, 10),
+      due: parseInt(row.children_due, 10) || 0,
+      immunised: parseInt(row.children_fully_immunised, 10) || 0,
+      source: row.source || 'n/a'
+    };
+  });
+}
+
+function fmt(n) { return n.toLocaleString('en-IN'); }
+function pct(immunised, due) { return due > 0 ? (immunised / due) * 100 : 0; }
+
+let rows = [];
+let sourceLabel = '';
+
+async function loadData() {
+  rows = parseCSV(EMBEDDED_CSV);
+  sourceLabel = 'district_immunisation.csv (embedded copy)';
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    try {
+      const res = await fetch('district_immunisation.csv', { cache: 'no-store' });
+      if (res.ok) {
+        rows = parseCSV(await res.text());
+        sourceLabel = 'district_immunisation.csv (live)';
+      }
+    } catch (e) { /* keep embedded copy */ }
+  }
+}
+
+function render() {
+  const years = [...new Set(rows.map(r => r.year))].sort((a, b) => b - a);
+  const sel = document.getElementById('yearSelect');
+  sel.innerHTML = '';
+  years.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    sel.appendChild(opt);
+  });
+  sel.onchange = renderView;
+  renderView();
+  renderFooter();
+}
+
+function renderView() {
+  const year = parseInt(document.getElementById('yearSelect').value, 10);
+  const data = rows.filter(r => r.year === year)
+                   .sort((a, b) => b.immunised - a.immunised);
+  const totalDue = data.reduce((s, r) => s + r.due, 0);
+  const totalImmunised = data.reduce((s, r) => s + r.immunised, 0);
+  const overall = totalDue > 0 ? ((totalImmunised / totalDue) * 100).toFixed(1) : '0.0';
+  document.getElementById('chartTitle').textContent =
+    'District comparison — ' + year + '  ·  overall ' + overall +
+    '% (' + fmt(totalImmunised) + ' / ' + fmt(totalDue) + ')';
+
+  const chart = document.getElementById('chart');
+  chart.innerHTML = '';
+  data.forEach(r => {
+    const p = pct(r.immunised, r.due);
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'row';
+    rowDiv.innerHTML =
+      '<div class="meta">' +
+        '<span class="name">' + r.district + '</span>' +
+        '<span class="nums">' + fmt(r.immunised) + ' of ' + fmt(r.due) +
+        ' (' + p.toFixed(1) + '%)</span>' +
+      '</div>' +
+      '<div class="track"><div class="bar" style="width:' + p.toFixed(1) + '%"></div></div>';
+    chart.appendChild(rowDiv);
+  });
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  data.forEach(r => {
+    const p = pct(r.immunised, r.due);
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + r.district + '</td>' +
+      '<td class="num">' + fmt(r.due) + '</td>' +
+      '<td class="num">' + fmt(r.immunised) + '</td>' +
+      '<td class="num"><span class="badge">' + p.toFixed(1) + '%</span></td>' +
+      '<td>' + r.source + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function renderFooter() {
+  const sources = [...new Set(rows.map(r => r.source))].join(', ');
+  document.getElementById('sourceFooter').innerHTML =
+    'Data source: <strong>' + sources + '</strong> &mdash; ' + sourceLabel + '.';
+}
+
+loadData().then(render);
+</script>
+</body>
+</html>

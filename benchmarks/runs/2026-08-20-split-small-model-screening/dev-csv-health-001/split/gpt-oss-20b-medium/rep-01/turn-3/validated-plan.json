@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "dataset_id": "dev-csv-health-001",
+  "question": "What is the ANC4 coverage by district and year?",
+  "clarification": "The user wants to select a year and compare districts, and see how the coverage rate is calculated.",
+  "steps": [
+    {
+      "op": "derive",
+      "name": "coverage_percent",
+      "kind": "percent",
+      "numerator": "anc4_completed",
+      "denominator": "pregnancies_registered",
+      "unit": "percent"
+    },
+    {
+      "op": "filter",
+      "column": "year",
+      "cmp": "between",
+      "value": [
+        2021,
+        2023
+      ]
+    },
+    {
+      "op": "filter",
+      "column": "district",
+      "cmp": "in",
+      "value": [
+        "Gaya",
+        "Nalanda"
+      ]
+    }
+  ],
+  "insights": [
+    {
+      "kind": "change",
+      "metric": "coverage_percent",
+      "entity_column": "district",
+      "entities": [
+        "Gaya",
+        "Nalanda"
+      ],
+      "time_column": "year",
+      "from": "2021",
+      "to": "2023",
+      "unit": "percentage points"
+    }
+  ],
+  "view": {
+    "title": "ANC4 Coverage by District and Year",
+    "chart": "line",
+    "x": "year",
+    "y": [
+      "coverage_percent"
+    ],
+    "series": "district",
+    "unit": "percent",
+    "note": "Coverage is calculated as (anc4_completed / pregnancies_registered) × 100. Source: synthetic Bihar ANC fixture."
+  },
+  "interpretation_guard": {
+    "can_explain_cause": false,
+    "caveat": "The data is synthetic and not official statistics."
+  }
+}

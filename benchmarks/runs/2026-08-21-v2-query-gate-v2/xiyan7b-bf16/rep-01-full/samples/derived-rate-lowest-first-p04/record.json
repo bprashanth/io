@@ -1,0 +1,77 @@
+{
+  "id": "derived-rate-lowest-first-p04",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "for 2023 calculate employment percentage using enrolled as base and sort smallest",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      38.0
+    ],
+    [
+      46.0
+    ],
+    [
+      56.0
+    ],
+    [
+      65.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT 100.0 * employed_at_6_months / NULLIF(women_enrolled, 0) AS employment_percentage FROM livelihoods WHERE year = 2023 ORDER BY employment_percentage ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor 2023 calculate employment percentage using enrolled as base and sort smallest\n[Database Schema]\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor 2023 calculate employment percentage using enrolled as base and sort smallest\n```sql",
+      "response": "SELECT 100.0 * employed_at_6_months / women_enrolled AS employment_percentage FROM livelihoods WHERE year = 2023 ORDER BY employment_percentage ASC",
+      "api": {
+        "id": "chatcmpl-acc8f6e723d812ad",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-7B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 212,
+          "total_tokens": 249,
+          "completion_tokens": 37,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 2.833
+      },
+      "sql_duckdb": "SELECT 100.0 * employed_at_6_months / NULLIF(women_enrolled, 0) AS employment_percentage FROM livelihoods WHERE year = 2023 ORDER BY employment_percentage ASC NULLS FIRST",
+      "rows": [
+        [
+          38.0
+        ],
+        [
+          46.0
+        ],
+        [
+          56.0
+        ],
+        [
+          65.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

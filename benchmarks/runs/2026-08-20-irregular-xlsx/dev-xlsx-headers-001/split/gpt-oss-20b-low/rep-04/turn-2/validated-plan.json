@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "dataset_id": "dev-xlsx-headers-001",
+  "question": "Show primary and secondary school attendance by block, year and sex, with selectable indicator and year, and display source sheet and table.",
+  "steps": [
+    {
+      "op": "filter",
+      "column": "primary_boys_attendance_percent",
+      "cmp": "ne",
+      "value": null
+    },
+    {
+      "op": "filter",
+      "column": "primary_girls_attendance_percent",
+      "cmp": "ne",
+      "value": null
+    },
+    {
+      "op": "filter",
+      "column": "secondary_boys_attendance_percent",
+      "cmp": "ne",
+      "value": null
+    },
+    {
+      "op": "filter",
+      "column": "secondary_girls_attendance_percent",
+      "cmp": "ne",
+      "value": null
+    },
+    {
+      "op": "group",
+      "by": [
+        "block",
+        "year"
+      ],
+      "aggregates": [
+        {
+          "name": "primary_boys_attendance_percent",
+          "fn": "mean",
+          "column": "primary_boys_attendance_percent"
+        },
+        {
+          "name": "primary_girls_attendance_percent",
+          "fn": "mean",
+          "column": "primary_girls_attendance_percent"
+        },
+        {
+          "name": "secondary_boys_attendance_percent",
+          "fn": "mean",
+          "column": "secondary_boys_attendance_percent"
+        },
+        {
+          "name": "secondary_girls_attendance_percent",
+          "fn": "mean",
+          "column": "secondary_girls_attendance_percent"
+        }
+      ]
+    }
+  ],
+  "insights": [
+    {
+      "kind": "highest",
+      "metric": "primary_boys_attendance_percent",
+      "label_column": "block"
+    },
+    {
+      "kind": "highest",
+      "metric": "secondary_boys_attendance_percent",
+      "label_column": "block"
+    }
+  ],
+  "view": {
+    "title": "School Attendance by Block, Year and Sex",
+    "chart": "grouped_bar",
+    "x": "year",
+    "y": [
+      "primary_boys_attendance_percent",
+      "primary_girls_attendance_percent",
+      "secondary_boys_attendance_percent",
+      "secondary_girls_attendance_percent"
+    ],
+    "series": "block",
+    "unit": "percent",
+    "note": "Data sourced from Attendance Report!A1:E7; Table 1 and Attendance Report!A11:E17; Table 2 in school_attendance_nested.xlsx. The file does not provide a causal explanation for differences."
+  },
+  "interpretation_guard": {
+    "can_explain_cause": false,
+    "caveat": "The dataset does not contain explanatory variables."
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "id": "education-percentage-point-change-p03",
+  "task_id": "education-percentage-point-change",
+  "pattern": "percentage-point change by a new grouping dimension",
+  "question": "how many pp did attended over enrolled move between 2023 and 2024 for every school",
+  "gold_sql": "WITH rates AS (SELECT school, year, 100.0 * children_attended / children_enrolled AS attendance_percent FROM school_attendance WHERE year IN (2023, 2024)) SELECT school, ROUND(MAX(CASE WHEN year = 2024 THEN attendance_percent END) - MAX(CASE WHEN year = 2023 THEN attendance_percent END), 1) AS change_pp FROM rates GROUP BY school ORDER BY school",
+  "expected_rows": [
+    [
+      "Asha School",
+      10.0
+    ],
+    [
+      "Navjeevan School",
+      5.0
+    ],
+    [
+      "Udaan School",
+      -4.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Asha School",
+      9.999999999999998
+    ],
+    [
+      "Navjeevan School",
+      5.000000000000004
+    ],
+    [
+      "Udaan School",
+      -4.0000000000000036
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT sa1.school, (100.0 * (sa2.children_attended / NULLIF(sa2.children_enrolled, 0) - sa1.children_attended / NULLIF(sa1.children_enrolled, 0))) AS pp_change FROM school_attendance AS sa1 JOIN school_attendance AS sa2 ON sa1.school = sa2.school WHERE sa1.year = 2023 AND sa2.year = 2024",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nhow many pp did attended over enrolled move between 2023 and 2024 for every school\n[Database Schema]\nCREATE TABLE \"school_attendance\" (\n  \"school\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_enrolled\" BIGINT,\n  \"children_attended\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nhow many pp did attended over enrolled move between 2023 and 2024 for every school\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to break down the problem into smaller, manageable steps. The question asks for the percentage-point change in the ratio of children attended to children enrolled between the years 2023 and 2024 for each school. Here's how we can achieve this:\n\n1. **Identify the Relevant Data**: We need data from the `school_attendance` table for the years 2023 and 2024. Specifically, we need the `children_enrolled` and `children_attended` columns for these years.\n\n2. **Calculate the Ratios**: For each school, calculate the ratio of `children_attended` to `children_enrolled` for both 2023 and 2024.\n\n3. **Compute the Percentage-Point Change**: The percentage-point change is calculated as the difference between the two ratios, multiplied by 100.0 to convert it to percentage points.\n\n4. **Group by School**: Since we need the result for each school, we will group the data by the `school` column.\n\n5. **Formulate the SQL Query**: Using the above steps, we can write the SQL query.\n\nHere is the SQL query that accomplishes the task:\n\n```sql\nSELECT \n    sa1.school,\n    (100.0 * (sa2.children_attended / sa2.children_enrolled - sa1.children_attended / sa1.children_enrolled)) AS pp_change\nFROM \n    school_attendance sa1\nJOIN \n    school_attendance sa2\nON \n    sa1.school = sa2.school\nWHERE \n    sa1.year = 2023 AND sa2.year = 2024;\n```\n\n### Explanation:\n\n- **SELECT Clause**: We select the `school` and calculate the percentage-point change in the ratio of `children_attended` to `children_enrolled` between 2023 and 2024.\n\n- **FROM Clause**: We use the `school_attendance` table twice, aliased as `sa1` and `sa2`, to represent the data for 2023 and 2024, respectively.\n\n- **JOIN Clause**: We join the two instances of the `school_attendance` table on the `school` column to ensure we are comparing the same school across the two years.\n\n- **WHERE Clause**: We filter the data to include only the records for the years 2023 and 2024.\n\nThis query efficiently calculates the required percentage-point change for each school between the specified years.",
+      "api": {
+        "id": "chatcmpl-a832341b53f5574c",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 216,
+          "total_tokens": 760,
+          "completion_tokens": 544,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 40.826
+      },
+      "duration_seconds": 40.834,
+      "sql_duckdb": "SELECT sa1.school, (100.0 * (sa2.children_attended / NULLIF(sa2.children_enrolled, 0) - sa1.children_attended / NULLIF(sa1.children_enrolled, 0))) AS pp_change FROM school_attendance AS sa1 JOIN school_attendance AS sa2 ON sa1.school = sa2.school WHERE sa1.year = 2023 AND sa2.year = 2024",
+      "rows": [
+        [
+          "Asha School",
+          9.999999999999998
+        ],
+        [
+          "Navjeevan School",
+          5.000000000000004
+        ],
+        [
+          "Udaan School",
+          -4.0000000000000036
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

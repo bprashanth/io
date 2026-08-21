@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "turns": [
+    {
+      "turn": 1,
+      "question": "compare 2024 actual spend against approved budget by org unit. show utilisation percent highest first, keep source and download",
+      "route": "small",
+      "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+      "sql": "WITH UtilizationCTE AS (SELECT a.org_unit, a.year, a.spent_lakh, b.approved_lakh, a.source, (a.spent_lakh * 100.0 / NULLIF(NULLIF(b.approved_lakh, 0), 0)) AS utilization_percent FROM actual_spend AS a JOIN approved_budget AS b ON a.org_unit = b.org_unit AND a.year = b.year WHERE a.year = 2024) SELECT org_unit, year, spent_lakh, approved_lakh, source, utilization_percent FROM UtilizationCTE ORDER BY utilization_percent DESC",
+      "output_columns": [
+        "org_unit",
+        "year",
+        "spent_lakh",
+        "approved_lakh",
+        "source",
+        "utilization_percent"
+      ],
+      "row_count": 3,
+      "workspace": "benchmarks/runs/2026-08-21-local-first-cli/budget-join-q5/rep-01/turn-1/workspace",
+      "data_hashes": {
+        "actual_spend.csv": "ad92de6371c6d76341d829a1d4870318a64cea1cd0afa3b659e3dca83b8bc6af",
+        "approved_budget.csv": "66206da05234a2b827125874379ddb035c7e838b74acaeeee4fb974dbb00d636"
+      }
+    }
+  ]
+}

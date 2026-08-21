@@ -1,0 +1,51 @@
+{
+  "id": "time-change-per-group-p02",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "compare 2021 with 2023 for gaya nalanda, change in anc4 completed divided registered",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      null
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT (CAST(SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END) AS REAL) / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END), 0)) - (CAST(SUM(CASE WHEN year = 2021 THEN anc4_completed ELSE 0 END) AS REAL) / NULLIF(SUM(CASE WHEN year = 2021 THEN pregnancies_registered ELSE 0 END), 0)) AS percentage_change FROM anc_visits WHERE district = 'gaya nalanda'",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncompare 2021 with 2023 for gaya nalanda, change in anc4 completed divided registered\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncompare 2021 with 2023 for gaya nalanda, change in anc4 completed divided registered\n```sql",
+      "response": "SELECT (CAST(SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END) AS REAL) / SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END)) - (CAST(SUM(CASE WHEN year = 2021 THEN anc4_completed ELSE 0 END) AS REAL) / SUM(CASE WHEN year = 2021 THEN pregnancies_registered ELSE 0 END)) AS percentage_change FROM anc_visits WHERE district = 'gaya nalanda'",
+      "api": {
+        "id": "chatcmpl-863d040149749a6a",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 444,
+          "total_tokens": 555,
+          "completion_tokens": 111,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 3.679
+      },
+      "sql_duckdb": "SELECT (CAST(SUM(CASE WHEN year = 2023 THEN anc4_completed ELSE 0 END) AS REAL) / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered ELSE 0 END), 0)) - (CAST(SUM(CASE WHEN year = 2021 THEN anc4_completed ELSE 0 END) AS REAL) / NULLIF(SUM(CASE WHEN year = 2021 THEN pregnancies_registered ELSE 0 END), 0)) AS percentage_change FROM anc_visits WHERE district = 'gaya nalanda'",
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

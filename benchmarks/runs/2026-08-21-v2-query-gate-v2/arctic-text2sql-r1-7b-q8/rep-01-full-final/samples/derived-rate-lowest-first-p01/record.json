@@ -1,0 +1,88 @@
+{
+  "id": "derived-rate-lowest-first-p01",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "2023 employment after 6 months as percent of enrolled, lowest district first",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, (CAST(employed_at_6_months AS REAL) * 100 / NULLIF(women_enrolled, 0)) AS employment_rate FROM livelihoods WHERE year = 2023 ORDER BY employment_rate ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2023 employment after 6 months as percent of enrolled, lowest district first\n[Database Schema]\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2023 employment after 6 months as percent of enrolled, lowest district first\n```sql",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to focus on calculating the employment rate after six months as a percentage of the number of women enrolled in the program for the year 2023. The result should be ordered by the employment rate in ascending order, so the district with the lowest employment rate appears first.\n\nHere's the step-by-step reasoning:\n\n1. **Select the relevant columns**: We need the district, the number of women enrolled (`women_enrolled`), and the number of women employed after six months (`employed_at_6_months`).\n2. **Filter for the year 2023**: We only want data from the year 2023.\n3. **Calculate the employment rate**: This is done by dividing the number of women employed after six months by the number of women enrolled and multiplying by 100 to get a percentage.\n4. **Order the results**: We need to order the results by the calculated employment rate in ascending order.\n\nGiven this reasoning, the SQL query can be written as follows:\n\n```sql\nSELECT \n  district,\n  (CAST(employed_at_6_months AS REAL) * 100 / women_enrolled) AS employment_rate\nFROM \n  livelihoods\nWHERE \n  year = 2023\nORDER BY \n  employment_rate ASC;\n```\n\nThis query directly addresses the user's request by calculating the employment rate as a percentage and ordering the results from the lowest to the highest rate.",
+      "api": {
+        "id": "chatcmpl-fgfZFSdWnTE3AO3XmTYR1RQZAQtibM0M",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q8_0",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 309,
+          "prompt_tokens": 214,
+          "total_tokens": 523,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 11.407
+      },
+      "duration_seconds": 11.41,
+      "sql_duckdb": "SELECT district, (CAST(employed_at_6_months AS REAL) * 100 / NULLIF(women_enrolled, 0)) AS employment_rate FROM livelihoods WHERE year = 2023 ORDER BY employment_rate ASC NULLS FIRST",
+      "rows": [
+        [
+          "Kishanganj",
+          38.0
+        ],
+        [
+          "Purnia",
+          46.0
+        ],
+        [
+          "Gaya",
+          56.0
+        ],
+        [
+          "Nalanda",
+          65.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

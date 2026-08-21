@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Women's Training &amp; Employment Outcomes — by District &amp; Year</title>
+<style>
+  :root{
+    --bg:#faf6f8; --card:#ffffff; --ink:#241a20; --muted:#7a6a73;
+    --line:#eadfe5; --rose:#c2255c; --rose-soft:#fde7ef; --rose-line:#f5c2d4;
+    --teal:#0ca678; --teal-soft:#e3f8f0; --teal-line:#b5e6d2;
+    --up:#2f9e44; --down:#e03131;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  .hero{background:linear-gradient(135deg,#c2255c 0%,#8f2d56 100%);color:#fff;padding:34px 0 30px}
+  .eyebrow{margin:0 0 6px;text-transform:uppercase;letter-spacing:.14em;font-size:12px;font-weight:600;opacity:.85}
+  h1{margin:0 0 8px;font-size:clamp(24px,4vw,34px);line-height:1.15}
+  .sub{margin:0;opacity:.92;max-width:760px}
+  main.wrap{padding:26px 0 44px;display:grid;gap:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(36,26,32,.05)}
+  .card h2{margin:0 0 14px;font-size:18px}
+  .card h2 span{color:var(--muted);font-weight:500}
+  /* controls */
+  .controls{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+  .control label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:4px}
+  select{padding:8px 12px;font-size:15px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);min-width:110px}
+  select:focus{outline:2px solid var(--rose);outline-offset:1px;border-color:var(--rose)}
+  #swap{margin-bottom:1px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--rose);background:var(--rose-soft);border:1px solid var(--rose-line);border-radius:10px;cursor:pointer}
+  #swap:hover{background:#fbd5e3}
+  .hint{margin:0;flex-basis:100%;color:var(--muted);font-size:13px}
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 1px 2px rgba(36,26,32,.05)}
+  .kpi .t{font-size:13px;color:var(--muted);font-weight:600}
+  .kpi .v{font-size:26px;font-weight:700;margin:4px 0 8px}
+  .chip{display:inline-block;font-size:12.5px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+  .chip.up{color:var(--up);background:#ebf9ee}
+  .chip.down{color:var(--down);background:#fdecec}
+  .chip.flat{color:var(--muted);background:#f1ecef}
+  .vs{display:block;margin-top:6px;font-size:12px;color:var(--muted)}
+  /* table */
+  .tablewrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:920px}
+  th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  th:first-child,td:first-child{text-align:left}
+  thead tr:first-child th{border-bottom:2px solid var(--rose-soft)}
+  thead tr.first .grp-base{color:var(--rose)}
+  thead tr.first .grp-comp{color:var(--teal)}
+  tr.total td{font-weight:700;border-top:2px solid var(--ink);border-bottom:none}
+  td.up{color:var(--up);font-weight:700}
+  td.down{color:var(--down);font-weight:700}
+  td.muted{color:var(--muted)}
+  /* chart */
+  .legend{display:flex;gap:18px;margin:0 0 14px;font-size:13.5px;color:var(--muted);flex-wrap:wrap}
+  .sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .sw-comp{background:var(--rose)}
+  .sw-emp{background:var(--teal)}
+  .crow{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .crow:last-child{border-bottom:none}
+  .clab{font-weight:600;font-size:14px}
+  .barline{display:flex;align-items:center;gap:8px}
+  .barline + .barline{margin-top:5px}
+  .bar{height:12px;border-radius:999px;min-width:2px}
+  .bar.comp{background:var(--rose)}
+  .bar.emp{background:var(--teal)}
+  .val{font-size:12.5px;color:var(--muted);font-weight:600}
+  /* methodology */
+  .formulas{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+  .formula{border-radius:12px;padding:14px 16px}
+  .formula.f1{background:var(--rose-soft);border:1px solid var(--rose-line)}
+  .formula.f2{background:var(--teal-soft);border:1px solid var(--teal-line)}
+  .formula h3{margin:0 0 8px;font-size:14.5px}
+  .formula .eq{margin:0 0 8px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;background:#fff;border:1px dashed #d8c5cf;padding:9px 11px;border-radius:8px}
+  .formula.f2 .eq{border-color:#a9dcc6}
+  .formula p:last-child{margin:0;font-size:13px;color:var(--muted)}
+  .worked{margin-top:16px;padding-top:16px;border-top:1px solid var(--line);display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
+  .worked .inline{display:flex;align-items:center;gap:10px}
+  .worked .inline label{margin:0}
+  #exampleCalc{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+  #exampleCalc p{margin:5px 0}
+  #exampleCalc .res{font-weight:700;color:var(--rose)}
+  /* source */
+  .source{font-size:13.5px;color:var(--muted)}
+  .source h3{margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink)}
+  .source p{margin:0}
+  code{background:#f4edf1;padding:1px 6px;border-radius:6px;font-size:12.5px}
+  @media(max-width:640px){
+    .crow{grid-template-columns:84px 1fr}
+    .clab{font-size:12.5px}
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Monitoring &amp; evaluation · Women's livelihood programme</p>
+    <h1>Women's Training &amp; Employment Outcomes</h1>
+    <p class="sub">Training completion and employment 6 months after completion, by district and year.
+       Select a base year and a compare year to see how each district moved.</p>
+  </div>
+</header>
+<main class="wrap">
+  <noscript><section class="card"><p>This dashboard needs JavaScript enabled.</p></section></noscript>
+  <section class="card controls" aria-label="Year selection">
+    <div class="control">
+      <label for="baseYear">Base year</label>
+      <select id="baseYear"></select>
+    </div>
+    <button id="swap" type="button" title="Swap base and compare years">&#8644; Swap</button>
+    <div class="control">
+      <label for="compareYear">Compare year</label>
+      <select id="compareYear"></select>
+    </div>
+    <p class="hint">Pick a base year and a year to compare it against — rates, totals and year-on-year changes update instantly.</p>
+  </section>
+
+  <section class="kpis" id="kpis" aria-label="Overall indicators"></section>
+
+  <section class="card">
+    <h2>By district — <span id="tableCaption"></span></h2>
+    <div class="tablewrap">
+      <table id="dataTable"></table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Rates by district — <span id="chartYear"></span></h2>
+    <div class="legend">
+      <span><i class="sw sw-comp"></i> Training completion rate</span>
+      <span><i class="sw sw-emp"></i> Employment rate at 6 months</span>
+    </div>
+    <div id="chart"></div>
+  </section>
+
+  <section class="card">
+    <h2>Methodology — how the two rates are computed</h2>
+    <div class="formulas">
+      <div class="formula f1">
+        <h3>1 · Training completion rate</h3>
+        <p class="eq">Completion rate (%) = (completed_training &divide; women_enrolled) &times; 100</p>
+        <p>Share of enrolled women who completed the training.</p>
+      </div>
+      <div class="formula f2">
+        <h3>2 · Employment rate at 6 months</h3>
+        <p class="eq">Employment rate (%) = (employed_at_6_months &divide; completed_training) &times; 100</p>
+        <p>Share of women who completed the training and were found employed 6 months later.
+           Denominator is the cohort of <em>training completers</em>.</p>
+      </div>
+    </div>
+    <div class="worked">
+      <div class="inline">
+        <div class="control">
+          <label for="exampleDistrict">Worked example</label>
+          <select id="exampleDistrict"></select>
+        </div>
+      </div>
+      <div id="exampleCalc"></div>
+    </div>
+  </section>
+
+  <footer class="card source">
+    <h3>Data source</h3>
+    <p id="sourceLine"></p>
+  </footer>
+</main>
+<script>
+'use strict';
+/* ---- data (fallback copy of women_livelihood_outcomes.csv) ---- */
+const EMBEDDED_CSV = [
+  'district,year,women_enrolled,completed_training,employed_at_6_months,source',
+  'Gaya,2022,1000,800,520,synthetic women livelihood outcomes fixture',
+  'Gaya,2023,1100,902,616,synthetic women livelihood outcomes fixture',
+  'Nalanda,2022,900,765,540,synthetic women livelihood outcomes fixture',
+  'Nalanda,2023,1000,870,650,synthetic women livelihood outcomes fixture',
+  'Purnia,2022,1200,840,504,synthetic women livelihood outcomes fixture',
+  'Purnia,2023,1300,949,598,synthetic women livelihood outcomes fixture',
+  'Kishanganj,2022,800,520,280,synthetic women livelihood outcomes fixture',
+  'Kishanganj,2023,900,612,342,synthetic women livelihood outcomes fixture'
+].join('\n');
+
+/* ---- pure helpers ---- */
+function parseCSV(text){
+  const lines = String(text).trim().split(/\r?\n/).filter(Boolean);
+  if(!lines.length) return [];
+  const head = lines[0].split(',').map(s => s.trim());
+  return lines.slice(1).map(line => {
+    const parts = line.split(',').map(s => s.trim());
+    const row = {};
+    head.forEach((h, i) => { row[h] = parts[i]; });
+    row.year = +row.year;
+    row.women_enrolled = +row.women_enrolled;
+    row.completed_training = +row.completed_training;
+    row.employed_at_6_months = +row.employed_at_6_months;
+    return row;
+  });
+}
+
+/* Formula 1: completion rate = completed / enrolled * 100 */
+/* Formula 2: employment rate  = employed_at_6mo / completed * 100 */
+function rate(num, den){ return den > 0 ? (num / den) * 100 : null; }
+
+function addMetrics(r){
+  return Object.assign({}, r, {
+    completionRate: rate(r.completed_training, r.women_enrolled),
+    employmentRate: rate(r.employed_at_6_months, r.completed_training)
+  });
+}
+
+function totalMetrics(rows){
+  const e = rows.reduce((a, r) => a + r.women_enrolled, 0);
+  const c = rows.reduce((a, r) => a + r.completed_training, 0);
+  const m = rows.reduce((a, r) => a + r.employed_at_6_months, 0);
+  return { women_enrolled: e, completed_training: c, employed_at_6_months: m,
+           completionRate: rate(c, e), employmentRate: rate(m, c) };
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtInt = n => (n == null || isNaN(n)) ? '\u2013' : n.toLocaleString('en-IN');
+const fmtPct = p => (p == null || isNaN(p)) ? '\u2013' : p.toFixed(1) + '%';
+
+/* ---- state ---- */
+let rows = parseCSV(EMBEDDED_CSV);
+let sourceNote = 'using the copy embedded in this page';
+const CSV_FILE = 'women_livelihood_outcomes.csv';
+
+function districtsOf(){
+  const seen = [];
+  rows.forEach(r => { if(!seen.includes(r.district)) seen.push(r.district); });
+  return seen;
+}
+function yearsOf(){ return [...new Set(rows.map(r => r.year))].sort((a, b) => a - b); }
+function rowFor(district, year){
+  const r = rows.find(x => x.district === district && x.year === year);
+  return r ? addMetrics(r) : null;
+}
+/* ---- rendering (browser only) ---- */
+function chip(delta, unit){
+  if(delta == null || isNaN(delta)) return '<span class="chip flat">n/a</span>';
+  if(Math.abs(delta) < 1e-9) return '<span class="chip flat">no change</span>';
+  const cls = delta > 0 ? 'up' : 'down';
+  const arrow = delta > 0 ? '\u25B2' : '\u25BC';
+  return `<span class="chip ${cls}">${arrow} ${Math.abs(delta).toFixed(1)}${unit}</span>`;
+}
+
+function kpi(title, value, chipHtml, vsText){
+  return `<div class="kpi"><div class="t">${title}</div><div class="v">${value}</div>${chipHtml}<span class="vs">${vsText}</span></div>`;
+}
+
+function renderKpis(bt, ct, base, compare){
+  const rateDelta = (c, b) => (c == null || b == null) ? null : c - b;
+  const countChip = (cur, prev) => {
+    if(cur == null || prev == null) return '<span class="chip flat">n/a</span>';
+    const d = cur - prev;
+    if(d === 0) return '<span class="chip flat">no change</span>';
+    const rel = prev !== 0 ? (d / prev) * 100 : null;
+    const cls = d > 0 ? 'up' : 'down';
+    const arrow = d > 0 ? '\u25B2' : '\u25BC';
+    return `<span class="chip ${cls}">${arrow} ${d > 0 ? '+' : ''}${fmtInt(d)}${rel == null ? '' : ' (' + (rel > 0 ? '+' : '') + rel.toFixed(1) + '%)'}</span>`;
+  };
+  document.getElementById('kpis').innerHTML =
+    kpi(`Completion rate \u00B7 ${compare}`, fmtPct(ct.completionRate),
+        chip(rateDelta(ct.completionRate, bt.completionRate), ' pp'), `vs ${base}: ${fmtPct(bt.completionRate)}`) +
+    kpi(`Employment rate at 6 months \u00B7 ${compare}`, fmtPct(ct.employmentRate),
+        chip(rateDelta(ct.employmentRate, bt.employmentRate), ' pp'), `vs ${base}: ${fmtPct(bt.employmentRate)}`) +
+    kpi(`Women enrolled \u00B7 ${compare}`, fmtInt(ct.women_enrolled),
+        countChip(ct.women_enrolled, bt.women_enrolled), `vs ${base}: ${fmtInt(bt.women_enrolled)}`) +
+    kpi(`Employed at 6 months \u00B7 ${compare}`, fmtInt(ct.employed_at_6_months),
+        countChip(ct.employed_at_6_months, bt.employed_at_6_months), `vs ${base}: ${fmtInt(bt.employed_at_6_months)}`);
+}
+
+function rowCells(r){
+  if(!r) return '<td class="muted">\u2013</td>'.repeat(5);
+  return `<td>${fmtInt(r.women_enrolled)}</td><td>${fmtInt(r.completed_training)}</td>` +
+         `<td>${fmtInt(r.employed_at_6_months)}</td><td>${fmtPct(r.completionRate)}</td><td>${fmtPct(r.employmentRate)}</td>`;
+}
+
+function cellDelta(a, b){
+  if(a == null || b == null) return '<td class="muted">\u2013</td>';
+  const d = a - b;
+  if(Math.abs(d) < 1e-9) return '<td>0.0 pp</td>';
+  const cls = d > 0 ? 'up' : 'down';
+  const arrow = d > 0 ? '\u25B2 ' : '\u25BC ';
+  return `<td class="${cls}">${arrow}${d > 0 ? '+' : ''}${d.toFixed(1)} pp</td>`;
+}
+
+function renderTable(districts, base, compare){
+  document.getElementById('tableCaption').textContent = `${base} vs ${compare}`;
+  const head =
+    `<thead>` +
+    `<tr class="first"><th rowspan="2">District</th>` +
+    `<th colspan="5" class="grp-base">${base} (base)</th>` +
+    `<th colspan="5" class="grp-comp">${compare} (compare)</th>` +
+    `<th colspan="2">${base} \u2192 ${compare}</th></tr>` +
+    `<tr><th>Enrolled</th><th>Completed</th><th>Employed (6 mo)</th><th>Completion rate</th><th>Employment rate</th>` +
+    `<th>Enrolled</th><th>Completed</th><th>Employed (6 mo)</th><th>Completion rate</th><th>Employment rate</th>` +
+    `<th>Completion \u0394</th><th>Employment \u0394</th></tr>` +
+    `</thead><tbody>`;
+  let body = '';
+  districts.forEach(d => {
+    const a = rowFor(d, base);
+    const b = rowFor(d, compare);
+    body += `<tr><td>${esc(d)}</td>${rowCells(a)}${rowCells(b)}` +
+            cellDelta(b && a ? b.completionRate : null, a ? a.completionRate : null) +
+            cellDelta(b && a ? b.employmentRate : null, a ? a.employmentRate : null) +
+            `</tr>`;
+  });
+  const bt = totalMetrics(rows.filter(r => r.year === base));
+  const ct = totalMetrics(rows.filter(r => r.year === compare));
+  body += `<tr class="total"><td>All districts</td>${rowCells(bt)}${rowCells(ct)}` +
+          cellDelta(ct.completionRate, bt.completionRate) +
+          cellDelta(ct.employmentRate, bt.employmentRate) +
+          `</tr>`;
+  document.getElementById('dataTable').innerHTML = head + body + '</tbody>';
+}
+function renderChart(districts, compare){
+  document.getElementById('chartYear').textContent = compare;
+  let h = '';
+  districts.forEach(d => {
+    const r = rowFor(d, compare);
+    const w = v => (v == null || isNaN(v)) ? 0 : Math.max(0, Math.min(100, v));
+    h += `<div class="crow"><div class="clab">${esc(d)}</div><div>` +
+      `<div class="barline"><div class="bar comp" style="width:${w(r ? r.completionRate : null)}%"></div><span class="val">${fmtPct(r ? r.completionRate : null)}</span></div>` +
+      `<div class="barline"><div class="bar emp" style="width:${w(r ? r.employmentRate : null)}%"></div><span class="val">${fmtPct(r ? r.employmentRate : null)}</span></div>` +
+      `</div></div>`;
+  });
+  document.getElementById('chart').innerHTML = h;
+}
+
+function renderExample(base){
+  const sel = document.getElementById('exampleDistrict');
+  const d = sel.value;
+  const r = rowFor(d, base);
+  const el = document.getElementById('exampleCalc');
+  if(!r){ el.innerHTML = ''; return; }
+  el.innerHTML =
+    `<p><strong>${esc(d)} \u00B7 ${base}</strong></p>` +
+    `<p>Completion rate = ${fmtInt(r.completed_training)} \u00F7 ${fmtInt(r.women_enrolled)} \u00D7 100 = <span class="res">${fmtPct(r.completionRate)}</span></p>` +
+    `<p>Employment rate = ${fmtInt(r.employed_at_6_months)} \u00F7 ${fmtInt(r.completed_training)} \u00D7 100 = <span class="res">${fmtPct(r.employmentRate)}</span></p>`;
+}
+
+function renderSource(){
+  const srcs = [...new Set(rows.map(r => r.source))].map(esc).join('; ');
+  document.getElementById('sourceLine').innerHTML =
+    `Source: ${srcs} \u00B7 file: <code>${esc(CSV_FILE)}</code> \u00B7 ${sourceNote}. ` +
+    `Districts: ${districtsOf().map(esc).join(', ')} \u00B7 Years: ${yearsOf().join(', ')}.`;
+}
+
+function render(){
+  const base = +document.getElementById('baseYear').value;
+  const compare = +document.getElementById('compareYear').value;
+  const districts = districtsOf();
+  const bt = totalMetrics(rows.filter(r => r.year === base));
+  const ct = totalMetrics(rows.filter(r => r.year === compare));
+  renderKpis(bt, ct, base, compare);
+  renderTable(districts, base, compare);
+  renderChart(districts, compare);
+  renderExample(base);
+  renderSource();
+}
+function populateSelects(){
+  const years = yearsOf();
+  const districts = districtsOf();
+  const baseSel = document.getElementById('baseYear');
+  const compareSel = document.getElementById('compareYear');
+  const exSel = document.getElementById('exampleDistrict');
+  baseSel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+  compareSel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+  baseSel.value = String(years[0]);
+  compareSel.value = String(years[years.length - 1]);
+  exSel.innerHTML = districts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+}
+
+function init(){
+  const baseSel = document.getElementById('baseYear');
+  const compareSel = document.getElementById('compareYear');
+  const exSel = document.getElementById('exampleDistrict');
+  baseSel.addEventListener('change', render);
+  compareSel.addEventListener('change', render);
+  exSel.addEventListener('change', render);
+  document.getElementById('swap').addEventListener('click', () => {
+    const t = baseSel.value; baseSel.value = compareSel.value; compareSel.value = t;
+    render();
+  });
+  populateSelects();
+  render();
+  /* if served over HTTP, prefer the live CSV so updated data shows automatically */
+  fetch(CSV_FILE, { cache: 'no-store' })
+    .then(res => res.ok ? res.text() : null)
+    .then(txt => {
+      if(!txt) return;
+      const r2 = parseCSV(txt);
+      if(!r2.length) return;
+      rows = r2;
+      sourceNote = 'loaded live from <code>' + esc(CSV_FILE) + '</code>';
+      const b = baseSel.value, c = compareSel.value;
+      populateSelects();
+      if(yearsOf().includes(+b)) baseSel.value = b;
+      if(yearsOf().includes(+c)) compareSel.value = c;
+      render();
+    })
+    .catch(() => { /* file:// or offline — embedded copy already shown */ });
+}
+
+if(typeof document !== 'undefined' && document.getElementById){
+  init();
+}
+
+/* test hook (used by the verification script, harmless in browsers) */
+globalThis.__app = { parseCSV, rate, addMetrics, totalMetrics, csv: EMBEDDED_CSV };
+</script>
+</body>
+</html>

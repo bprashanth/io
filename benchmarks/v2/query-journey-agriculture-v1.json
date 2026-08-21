@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "status": "frozen-before-first-run",
+  "purpose": "Three-turn cross-sector journey from terse questions to a durable local dashboard.",
+  "dialect_requested_from_model": "sqlite",
+  "execution_dialect": "duckdb",
+  "comparison": {
+    "numeric_tolerance": 0.000001,
+    "column_names_required": false,
+    "required_columns_may_be_a_projection_of_a_wider_result": true,
+    "equivalent_long_or_grouped_wide_results_accepted": true,
+    "row_order_required_only_for_ranking_tasks": true
+  },
+  "tables": [
+    {"name": "field_harvest", "kind": "csv", "path": "benchmarks/v2/holdout/field_harvest.csv"}
+  ],
+  "tasks": [
+    {
+      "id": "turn-1-yield-dashboard",
+      "pattern": "single-year derived-measure ranking",
+      "tables": ["field_harvest"],
+      "order_matters": true,
+      "gold_sql": "SELECT block, ROUND(1.0 * harvest_tonnes / cultivated_hectares, 1) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC, block",
+      "phrasings": ["make a 2024 Monsoon block wise crop yield dashboard, tonnes per hectare highest first"]
+    },
+    {
+      "id": "turn-2-two-year-trend",
+      "pattern": "follow-up expands the durable result to a time trend",
+      "tables": ["field_harvest"],
+      "gold_sql": "SELECT block, year, ROUND(1.0 * harvest_tonnes / cultivated_hectares, 1) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) ORDER BY block, year",
+      "phrasings": ["now show 2023 and 2024 Monsoon tonnes per hectare trend for every block"]
+    },
+    {
+      "id": "turn-3-two-block-change",
+      "pattern": "follow-up narrows entities and computes a time difference",
+      "tables": ["field_harvest"],
+      "gold_sql": "WITH yields AS (SELECT block, year, 1.0 * harvest_tonnes / cultivated_hectares AS yield_value FROM field_harvest WHERE season = 'Monsoon' AND block IN ('Bhojpur', 'Wardha') AND year IN (2023, 2024)) SELECT block, ROUND(MAX(CASE WHEN year = 2024 THEN yield_value END) - MAX(CASE WHEN year = 2023 THEN yield_value END), 1) AS change_tonnes_per_hectare FROM yields GROUP BY block ORDER BY block",
+      "phrasings": ["only Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024"]
+    }
+  ]
+}

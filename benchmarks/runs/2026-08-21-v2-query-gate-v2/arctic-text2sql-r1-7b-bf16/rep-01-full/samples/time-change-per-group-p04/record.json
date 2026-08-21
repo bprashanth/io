@@ -1,0 +1,70 @@
+{
+  "id": "time-change-per-group-p04",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      66.0,
+      74.0,
+      8.0
+    ],
+    [
+      "Nalanda",
+      73.0,
+      80.0,
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH YearlyData AS (SELECT district, year, SUM(anc4_completed) AS total_anc4_completed, SUM(pregnancies_registered) AS total_pregnancies_registered FROM anc_visits WHERE year IN (2021, 2022, 2023) AND district IN ('Gaya', 'Nalanda') GROUP BY district, year), CoverageRates AS (SELECT district, year, (total_anc4_completed * 100.0 / NULLIF(total_pregnancies_registered, 0)) AS anc_coverage_rate FROM YearlyData), StartEndCoverage AS (SELECT cr1.district, cr1.anc_coverage_rate AS start_coverage, cr2.anc_coverage_rate AS end_coverage FROM CoverageRates AS cr1 JOIN CoverageRates AS cr2 ON cr1.district = cr2.district WHERE cr1.year = 2021 AND cr2.year = 2023) SELECT district, start_coverage, end_coverage, (end_coverage - start_coverage) AS percentage_change FROM StartEndCoverage ORDER BY district NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to focus on calculating the ANC (Antenatal Care) coverage movement from 2021 to 2023 for the districts of Gaya and Nalanda. The key steps involve:\n\n1. **Filtering Data**: Select records for the years 2021, 2022, and 2023 for the specified districts.\n2. **Calculating Coverage Rates**: Compute the ANC coverage rate for each year by dividing the number of ANC4 (fourth antenatal care) completed visits by the number of pregnancies registered.\n3. **Calculating Percentage Change**: Determine the percentage-point change in ANC coverage from 2021 to 2023.\n4. **Formatting the Output**: Present the results in a readable format.\n\nHere is the step-by-step SQL query:\n\n1. **Filter Data**: Use a `WHERE` clause to filter records for the years 2021, 2022, and 2023 and the districts Gaya and Nalanda.\n2. **Calculate Coverage Rates**: Use a `CASE` statement within a `SUM` function to calculate the total ANC4 completed visits and pregnancies registered for each year.\n3. **Compute Percentage Change**: Calculate the percentage change in ANC coverage from 2021 to 2023.\n4. **Select and Format**: Select the district, start year, end year, start coverage, end coverage, and percentage change.\n\nHere is the final SQL query:\n\n```sql\nWITH YearlyData AS (\n    SELECT \n        district,\n        year,\n        SUM(anc4_completed) AS total_anc4_completed,\n        SUM(pregnancies_registered) AS total_pregnancies_registered\n    FROM anc_visits\n    WHERE year IN (2021, 2022, 2023) AND district IN ('Gaya', 'Nalanda')\n    GROUP BY district, year\n),\nCoverageRates AS (\n    SELECT \n        district,\n        year,\n        (total_anc4_completed * 100.0 / total_pregnancies_registered) AS anc_coverage_rate\n    FROM YearlyData\n),\nStartEndCoverage AS (\n    SELECT \n        cr1.district,\n        cr1.anc_coverage_rate AS start_coverage,\n        cr2.anc_coverage_rate AS end_coverage\n    FROM CoverageRates cr1\n    JOIN CoverageRates cr2 ON cr1.district = cr2.district\n    WHERE cr1.year = 2021 AND cr2.year = 2023\n)\nSELECT \n    district,\n    start_coverage,\n    end_coverage,\n    (end_coverage - start_coverage) AS percentage_change\nFROM StartEndCoverage\nORDER BY district;\n```\n\n### Explanation:\n- **YearlyData CTE**: Aggregates the total ANC4 completed visits and pregnancies registered for each year and district.\n- **CoverageRates CTE**: Computes the ANC coverage rate for each year.\n- **StartEndCoverage CTE**: Joins the coverage rates for 2021 and 2023 to calculate the percentage change.\n- **Final SELECT**: Retrieves the district, start coverage, end coverage, and percentage change, ordered by district.",
+      "api": {
+        "id": "chatcmpl-adad162f65721c61",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 217,
+          "total_tokens": 901,
+          "completion_tokens": 684,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 51.336
+      },
+      "duration_seconds": 51.347,
+      "sql_duckdb": "WITH YearlyData AS (SELECT district, year, SUM(anc4_completed) AS total_anc4_completed, SUM(pregnancies_registered) AS total_pregnancies_registered FROM anc_visits WHERE year IN (2021, 2022, 2023) AND district IN ('Gaya', 'Nalanda') GROUP BY district, year), CoverageRates AS (SELECT district, year, (total_anc4_completed * 100.0 / NULLIF(total_pregnancies_registered, 0)) AS anc_coverage_rate FROM YearlyData), StartEndCoverage AS (SELECT cr1.district, cr1.anc_coverage_rate AS start_coverage, cr2.anc_coverage_rate AS end_coverage FROM CoverageRates AS cr1 JOIN CoverageRates AS cr2 ON cr1.district = cr2.district WHERE cr1.year = 2021 AND cr2.year = 2023) SELECT district, start_coverage, end_coverage, (end_coverage - start_coverage) AS percentage_change FROM StartEndCoverage ORDER BY district NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          66.0,
+          74.0,
+          8.0
+        ],
+        [
+          "Nalanda",
+          73.0,
+          80.0,
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

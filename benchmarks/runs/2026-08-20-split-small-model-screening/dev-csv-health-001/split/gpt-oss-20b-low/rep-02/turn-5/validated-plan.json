@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "dataset_id": "dev-csv-health-001",
+  "question": "Provide a downloadable table of ANC4 coverage for Gaya and Nalanda for the years 2021‑2023, including the coverage percentage and the change in coverage from 2021 to 2023.",
+  "steps": [
+    {
+      "op": "filter",
+      "column": "year",
+      "cmp": "in",
+      "value": [
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "op": "filter",
+      "column": "district",
+      "cmp": "in",
+      "value": [
+        "Gaya",
+        "Nalanda"
+      ]
+    },
+    {
+      "op": "derive",
+      "name": "coverage_percent",
+      "kind": "percent",
+      "numerator": "anc4_completed",
+      "denominator": "pregnancies_registered",
+      "unit": "percent"
+    }
+  ],
+  "insights": [
+    {
+      "kind": "change",
+      "metric": "coverage_percent",
+      "entity_column": "district",
+      "entities": [
+        "Gaya",
+        "Nalanda"
+      ],
+      "time_column": "year",
+      "from": 2021,
+      "to": 2023,
+      "unit": "percentage points"
+    },
+    {
+      "kind": "causal_limit",
+      "message": "The data do not provide information on why Gaya is below Nalanda. The dataset contains only coverage counts and does not include factors such as health infrastructure, socioeconomic status, or program implementation details."
+    }
+  ],
+  "view": {
+    "title": "ANC4 Coverage Comparison – Gaya vs Nalanda (2021‑2023)",
+    "chart": "line",
+    "x": "year",
+    "y": [
+      "coverage_percent"
+    ],
+    "series": "district",
+    "unit": "percent",
+    "note": "The line chart shows the percentage of pregnancies that completed at least 4 antenatal check‑ups for each district. The change from 2021 to 2023 is displayed as a percentage‑point difference. Source: synthetic Bihar ANC fixture – see the source tab for details."
+  },
+  "interpretation_guard": {
+    "can_explain_cause": false,
+    "caveat": "The data are synthetic and may not reflect real‑world conditions."
+  }
+}

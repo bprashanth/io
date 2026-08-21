@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>District Immunisation Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand-section">
+        <div class="brand-icon">💉</div>
+        <div>
+          <h1 class="brand-title">District Immunisation Dashboard</h1>
+          <p class="brand-subtitle">Monitor and compare immunization coverage across districts by year</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="source-badge" id="headerSourceBadge" title="Data Source">
+          <span>Source:</span> <code>synthetic smoke fixture</code>
+        </div>
+        <button class="btn-icon" id="themeToggle" title="Toggle Dark/Light Mode" aria-label="Toggle Theme">🌙</button>
+        <button class="btn-secondary" id="uploadCsvBtn" title="Load / Upload CSV">
+          <span>📁 Load CSV</span>
+        </button>
+        <input type="file" id="csvFileInput" accept=".csv,text/csv">
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div class="container" style="display: flex; flex-direction: column; gap: 1.5rem;">
+      
+      <!-- Control Panel (Year selection & District filter) -->
+      <section class="control-card" aria-label="Filter controls">
+        <div class="control-row">
+          <div class="control-group">
+            <span class="filter-label">📅 Select Year:</span>
+            <div class="pill-group" id="yearPillGroup" role="group" aria-label="Year selection">
+              <!-- Dynamically rendered year pills -->
+            </div>
+          </div>
+          <div class="control-group">
+            <button class="btn-secondary" id="download2023TopBtn" style="background-color: var(--primary); color: #ffffff; border-color: var(--primary);" title="Download 2023 Table">
+              <span>📥 Download 2023 CSV</span>
+            </button>
+            <button class="btn-secondary" id="exportCsvBtnTop" title="Export Current View as CSV">
+              <span>Export View</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- District Filter Badges -->
+        <div class="district-filter-section">
+          <div class="district-filter-header">
+            <span class="filter-label">🏛️ Compare Districts:</span>
+            <div>
+              <button type="button" class="text-btn" id="selectAllDistrictsBtn">Select All</button>
+              <span style="color: var(--text-muted)">|</span>
+              <button type="button" class="text-btn" id="clearDistrictsBtn">Focus Single</button>
+            </div>
+          </div>
+          <div class="district-badges" id="districtBadgesContainer" role="group" aria-label="District filters">
+            <!-- Dynamically populated district chips -->
+          </div>
+        </div>
+      </section>
+
+      <!-- KPI Overview Cards -->
+      <section class="kpi-grid" aria-label="Key Performance Indicators">
+        <div class="kpi-card primary">
+          <div class="kpi-header">
+            <span class="kpi-title">Children Due</span>
+            <span class="kpi-icon">🎯</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalDue">-</div>
+          <div class="kpi-subtitle">Total target cohort for selected criteria</div>
+        </div>
+
+        <div class="kpi-card info">
+          <div class="kpi-header">
+            <span class="kpi-title">Fully Immunised</span>
+            <span class="kpi-icon">🛡️</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalImmunised">-</div>
+          <div class="kpi-subtitle">Children successfully fully vaccinated</div>
+        </div>
+
+        <div class="kpi-card success">
+          <div class="kpi-header">
+            <span class="kpi-title">Overall Coverage Rate</span>
+            <span class="kpi-icon">📈</span>
+          </div>
+          <div class="kpi-value" id="kpiRate">-%</div>
+          <div class="kpi-progress">
+            <div class="kpi-progress-bar" id="kpiRateProgressBar" style="width: 0%;"></div>
+          </div>
+          <div class="kpi-subtitle" id="kpiGapSummary">Coverage benchmark vs target</div>
+        </div>
+
+        <div class="kpi-card warning">
+          <div class="kpi-header">
+            <span class="kpi-title">Top Performing District</span>
+            <span class="kpi-icon">🏆</span>
+          </div>
+          <div class="kpi-value" style="font-size: 1.4rem;" id="kpiTopDistrict">-</div>
+          <div class="kpi-subtitle">Highest immunisation percentage in selection</div>
+        </div>
+      </section>
+
+      <!-- Analytics Charts Grid -->
+      <section class="charts-grid" aria-label="Visual charts">
+        <!-- Immunisation Rate Comparison Chart -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h2 class="chart-title">📊 District Immunisation Coverage (%)</h2>
+              <p class="chart-subtitle">Direct comparison of full immunisation rates against target</p>
+            </div>
+          </div>
+          <div class="chart-container" id="rateBarChartContainer">
+            <!-- Rendered by app.js -->
+          </div>
+        </div>
+
+        <!-- Due vs Fully Immunised Breakdown -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h2 class="chart-title">⚖️ Target vs Fully Immunised Volume</h2>
+              <p class="chart-subtitle">Comparison of vaccinated numbers against unimmunised gap</p>
+            </div>
+          </div>
+          <div class="chart-container" id="volumeChartContainer">
+            <!-- Rendered by app.js -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Multi-Year Progress & Head-to-Head Comparison -->
+      <section class="charts-grid">
+        <!-- Year-over-Year Progression -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h2 class="chart-title">🚀 Multi-Year Progress (YoY Comparison)</h2>
+              <p class="chart-subtitle">Tracking coverage improvement per district across available years</p>
+            </div>
+          </div>
+          <div id="yoyContainer">
+            <!-- Rendered by app.js -->
+          </div>
+        </div>
+
+        <!-- Head-to-Head District Comparison -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h2 class="chart-title">🆚 Head-to-Head District Comparison</h2>
+              <p class="chart-subtitle">Compare any two districts directly side-by-side</p>
+            </div>
+          </div>
+          <div class="h2h-selectors">
+            <select class="h2h-select" id="h2hSelectA" aria-label="Select District A"></select>
+            <span style="font-weight: 700; color: var(--text-muted);">vs</span>
+            <select class="h2h-select" id="h2hSelectB" aria-label="Select District B"></select>
+          </div>
+          <div id="h2hResultContainer" style="margin-top: 0.5rem;">
+            <!-- Rendered by app.js -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Data Table Section -->
+      <section class="table-card" aria-label="District detailed data table">
+        <div class="table-header">
+          <div>
+            <h2 class="chart-title">📋 Detailed District Immunisation Records</h2>
+            <p class="chart-subtitle">Sortable breakdown showing due counts, immunisation rates, and data source</p>
+          </div>
+          <div class="table-tools">
+            <input type="search" class="search-input" id="tableSearch" placeholder="🔍 Search district or source...">
+            <button class="btn-secondary" id="download2023Btn" style="background-color: var(--primary); color: #ffffff; border-color: var(--primary);" title="Download only the 2023 table as CSV">
+              <span>📥 Download 2023 Table (CSV)</span>
+            </button>
+            <button class="btn-secondary" id="exportCsvBtn" title="Export Current View as CSV">
+              <span>📥 Export View</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" aria-label="Immunisation comparison table">
+            <thead>
+              <tr>
+                <th data-col="district" class="sorted">District <span class="sort-arrow">▲</span></th>
+                <th data-col="year">Year <span class="sort-arrow">⇅</span></th>
+                <th data-col="children_due">Children Due <span class="sort-arrow">⇅</span></th>
+                <th data-col="children_fully_immunised">Fully Immunised <span class="sort-arrow">⇅</span></th>
+                <th data-col="gap">Unimmunised Gap <span class="sort-arrow">⇅</span></th>
+                <th data-col="rate">Coverage Rate <span class="sort-arrow">⇅</span></th>
+                <th>Status</th>
+                <th data-col="source">Data Source <span class="sort-arrow">⇅</span></th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Dynamically populated table rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Source & Methodology Information Box -->
+      <section class="source-info-card" aria-label="Data source information">
+        <h3 class="source-info-title">
+          <span>ℹ️</span> Data Source &amp; Methodology Information
+        </h3>
+        <p style="font-size: 0.875rem; color: var(--text-secondary);">
+          This application reads directly from the dataset file <code style="font-family: monospace; font-weight: bold; background: var(--bg-input); padding: 2px 6px; border-radius: 4px;">district_immunisation.csv</code>. All metrics and district comparisons are calculated based on the official reporting fields provided.
+        </p>
+        <div class="source-details-grid" id="sourceBreakdownGrid">
+          <!-- Dynamically populated source details -->
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <p>District Immunisation Comparison Dashboard &bull; Source: <strong>synthetic smoke fixture</strong></p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{
+  "id": "derived-rate-lowest-first-p04",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "for 2023 calculate employment percentage using enrolled as base and sort smallest",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      51.30232558139535
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT (SUM(employed_at_6_months) * 100.0 / NULLIF(SUM(women_enrolled), 0)) AS employment_percentage FROM livelihoods WHERE year = 2023 ORDER BY employment_percentage ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor 2023 calculate employment percentage using enrolled as base and sort smallest\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor 2023 calculate employment percentage using enrolled as base and sort smallest\n```sql",
+      "response": "SELECT (SUM(employed_at_6_months) * 100.0 / SUM(women_enrolled)) AS employment_percentage FROM livelihoods WHERE year = 2023 ORDER BY employment_percentage ASC",
+      "api": {
+        "id": "chatcmpl-93a12db0ccf5bdf1",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 426,
+          "total_tokens": 470,
+          "completion_tokens": 44,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 1.488
+      },
+      "sql_duckdb": "SELECT (SUM(employed_at_6_months) * 100.0 / NULLIF(SUM(women_enrolled), 0)) AS employment_percentage FROM livelihoods WHERE year = 2023 ORDER BY employment_percentage ASC NULLS FIRST",
+      "rows": [
+        [
+          51.30232558139535
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

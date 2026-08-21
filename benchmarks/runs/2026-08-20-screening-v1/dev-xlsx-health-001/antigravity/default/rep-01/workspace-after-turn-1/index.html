@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maternal Health Indicator Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- SheetJS for local Excel parsing if uploaded -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="brand-section">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+            <path d="M12 5v14"/>
+            <path d="M5 12h14"/>
+          </svg>
+        </div>
+        <div>
+          <div class="title-row">
+            <h1>Maternal Health Coverage Dashboard</h1>
+            <span class="badge badge-teal">Live Indicator Portal</span>
+          </div>
+          <p class="subtitle">Compare District Performance: Institutional Delivery & Postnatal Care Coverage (48h)</p>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <div class="workbook-tag" title="Excel source workbook loaded">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="8" y1="13" x2="16" y2="13"/>
+            <line x1="8" y1="17" x2="16" y2="17"/>
+            <line x1="10" y1="9" x2="8" y2="9"/>
+          </svg>
+          <span id="source-workbook-name">maternal_health.xlsx</span>
+          <span class="sheet-count-tag">2 Sheets</span>
+        </div>
+        <label class="btn btn-secondary upload-btn" for="excel-upload-input">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload Excel
+          <input type="file" id="excel-upload-input" accept=".xlsx, .xls, .csv" style="display:none">
+        </label>
+        <button id="btn-export-csv" class="btn btn-secondary" title="Export Current View to CSV">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="main-tabs">
+      <button class="tab-btn active" data-tab="tab-dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        District Comparison Dashboard
+      </button>
+      <button class="tab-btn" data-tab="tab-multiyear">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Multi-Year Trends (2021-2023)
+      </button>
+      <button class="tab-btn" data-tab="tab-sheets">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Source Sheets & Data Explorer
+      </button>
+    </nav>
+
+    <!-- TAB 1: District Comparison Dashboard -->
+    <main id="tab-dashboard" class="tab-content active">
+      
+      <!-- Selection & Filter Panel -->
+      <section class="control-panel card">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            <h2>Indicator & Comparison Controls</h2>
+          </div>
+          <span class="helper-text">Select indicator, reporting year, and districts to analyze</span>
+        </div>
+
+        <div class="filters-grid">
+          <!-- Indicator Selector -->
+          <div class="filter-group">
+            <label for="indicator-select" class="filter-label">
+              <span class="label-badge">Step 1</span> Select Indicator:
+            </label>
+            <div class="custom-select-wrapper">
+              <select id="indicator-select" class="form-select">
+                <option value="institutional_delivery" selected>Institutional delivery coverage</option>
+                <option value="postnatal_check">Postnatal check within 48 hours coverage</option>
+                <option value="both">Compare Both Indicators Side-by-Side</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Year Selector -->
+          <div class="filter-group">
+            <label for="year-select" class="filter-label">
+              <span class="label-badge">Step 2</span> Select Year:
+            </label>
+            <div class="year-buttons" id="year-buttons-group">
+              <button class="year-btn" data-year="2021">2021</button>
+              <button class="year-btn" data-year="2022">2022</button>
+              <button class="year-btn active" data-year="2023">2023</button>
+              <button class="year-btn" data-year="all">All Years</button>
+            </div>
+          </div>
+
+          <!-- District Filter -->
+          <div class="filter-group">
+            <div class="district-header-row">
+              <label class="filter-label">
+                <span class="label-badge">Step 3</span> Filter Districts:
+              </label>
+              <div class="quick-district-actions">
+                <button type="button" id="btn-select-all-districts" class="link-btn">Select All</button>
+                <span>•</span>
+                <button type="button" id="btn-clear-districts" class="link-btn">Clear</button>
+              </div>
+            </div>
+            <div class="district-chips" id="district-chips-container">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Formula & Source Sheet Callout Box (Requested by user) -->
+      <section class="formula-source-card card" id="formula-source-section">
+        <div class="formula-header">
+          <div class="formula-title-area">
+            <div class="tag-row">
+              <span class="badge badge-purple" id="meta-indicator-badge">Indicator Metadata</span>
+              <span class="badge badge-blue" id="meta-unit-badge">Unit: percent (%)</span>
+              <span class="badge badge-green" id="meta-sheet-badge">Source: District Data + Indicator Notes</span>
+            </div>
+            <h3 id="meta-indicator-name">Institutional delivery coverage</h3>
+            <p id="meta-indicator-def" class="indicator-description">Share of registered pregnancies with an institutional delivery</p>
+          </div>
+        </div>
+
+        <div class="formula-content-grid">
+          <!-- Mathematical / Excel Formula Display -->
+          <div class="formula-box">
+            <div class="box-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
+              Calculation Formula & Math Expression
+            </div>
+            <div class="formula-math-display" id="formula-math-display">
+              <div class="math-fraction">
+                <span class="math-numerator" id="formula-numerator-text">institutional_deliveries</span>
+                <span class="math-denominator" id="formula-denominator-text">pregnancies_registered</span>
+              </div>
+              <span class="math-multiplier">× 100</span>
+              <span class="math-equals">=</span>
+              <span class="math-result">Coverage Rate (%)</span>
+            </div>
+            <div class="excel-formula-code">
+              <span class="code-label">Excel Formula:</span>
+              <code id="excel-formula-text">= institutional_deliveries / pregnancies_registered * 100</code>
+            </div>
+          </div>
+
+          <!-- Source Sheets & Provenance -->
+          <div class="source-mapping-box">
+            <div class="box-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+              Excel Workbook Sheet Mapping
+            </div>
+            <ul class="sheet-mapping-list">
+              <li>
+                <strong class="sheet-pill">Sheet 1: District Data</strong>
+                <span>Provides raw counts: <code id="src-fields-list">pregnancies_registered, institutional_deliveries</code></span>
+              </li>
+              <li>
+                <strong class="sheet-pill">Sheet 2: Indicator Notes</strong>
+                <span>Provides official definition, calculation formula, unit (percent), and source attribution</span>
+              </li>
+              <li class="note-row">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span id="meta-disclaimer-text">synthetic maternal-health workbook fixture — Illustrative benchmark data; not official statistics.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Overall Summary KPI Tiles -->
+      <section class="summary-stats-grid" id="summary-stats-grid">
+        <div class="kpi-card card">
+          <div class="kpi-icon icon-emerald">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="kpi-body">
+            <span class="kpi-title">Average District Coverage</span>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="kpi-avg-coverage">0.0%</span>
+              <span class="kpi-sub" id="kpi-year-label">in 2023</span>
+            </div>
+            <span class="kpi-footnote" id="kpi-aggregate-math">Aggregate: 0 / 0</span>
+          </div>
+        </div>
+
+        <div class="kpi-card card">
+          <div class="kpi-icon icon-indigo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="kpi-body">
+            <span class="kpi-title">Top Performing District</span>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="kpi-top-district">-</span>
+              <span class="badge badge-green" id="kpi-top-coverage">0%</span>
+            </div>
+            <span class="kpi-footnote" id="kpi-top-formula">Highest coverage recorded</span>
+          </div>
+        </div>
+
+        <div class="kpi-card card">
+          <div class="kpi-icon icon-blue">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="kpi-body">
+            <span class="kpi-title">Total Pregnancies Registered</span>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="kpi-total-pregnancies">0</span>
+            </div>
+            <span class="kpi-footnote">District Data denominator sum</span>
+          </div>
+        </div>
+
+        <div class="kpi-card card">
+          <div class="kpi-icon icon-purple">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="kpi-body">
+            <span class="kpi-title">Total Deliveries / Checks</span>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="kpi-total-deliveries">0</span>
+            </div>
+            <span class="kpi-footnote">District Data numerator sum</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- District Comparison Visual Chart Section -->
+      <section class="chart-section card">
+        <div class="chart-header">
+          <div>
+            <h3>District Comparison Chart</h3>
+            <p class="chart-subtitle" id="chart-subtitle-text">Comparing Institutional delivery coverage across districts in 2023</p>
+          </div>
+          <div class="chart-toggles">
+            <span class="chart-legend-item"><span class="legend-color legend-bar"></span> District Coverage (%)</span>
+            <span class="chart-legend-item"><span class="legend-color legend-avg"></span> Benchmark Average</span>
+          </div>
+        </div>
+        <div class="chart-container" id="chart-svg-wrapper">
+          <!-- Custom SVG Bar Chart dynamically drawn -->
+        </div>
+      </section>
+
+      <!-- District Comparison Scorecards -->
+      <section class="district-cards-section">
+        <div class="section-title-row">
+          <h3>District Performance Breakdown</h3>
+          <span class="section-badge">Calculated via Sheet Formula</span>
+        </div>
+        <div class="district-cards-grid" id="district-cards-grid">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- Comprehensive Comparison Table -->
+      <section class="table-section card">
+        <div class="table-header-row">
+          <div>
+            <h3>District Comparison Table</h3>
+            <p class="table-subtitle">All figures extracted from <code>District Data</code> and evaluated with <code>Indicator Notes</code> formula</p>
+          </div>
+          <div class="table-actions">
+            <div class="search-input-wrapper">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="table-search-input" placeholder="Search district...">
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="comparison-data-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>District</th>
+                <th>Year</th>
+                <th id="th-numerator">Institutional Deliveries</th>
+                <th>Registered Pregnancies</th>
+                <th>Formula Evaluation</th>
+                <th>Coverage Rate (%)</th>
+                <th>Performance Status</th>
+                <th>Source Sheet Reference</th>
+              </tr>
+            </thead>
+            <tbody id="comparison-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+            <tfoot id="comparison-tfoot">
+              <!-- Summary aggregate row -->
+            </tfoot>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- TAB 2: Multi-Year Trend Analysis -->
+    <main id="tab-multiyear" class="tab-content">
+      <section class="card trend-overview-card">
+        <div class="panel-header">
+          <div>
+            <h2>Multi-Year Trend Analysis (2021 – 2023)</h2>
+            <p class="subtitle">Analyze district progress and year-over-year gains across both indicators</p>
+          </div>
+        </div>
+
+        <div class="multiyear-charts-grid">
+          <div class="chart-subcard">
+            <h4>Institutional Delivery Coverage Trend (2021–2023)</h4>
+            <div class="trend-chart-box" id="trend-chart-institutional"></div>
+          </div>
+          <div class="chart-subcard">
+            <h4>Postnatal Check (48h) Coverage Trend (2021–2023)</h4>
+            <div class="trend-chart-box" id="trend-chart-postnatal"></div>
+          </div>
+        </div>
+
+        <div class="table-responsive" style="margin-top: 2rem;">
+          <h3>Complete Multi-Year Matrix by District</h3>
+          <table class="data-table" id="multiyear-matrix-table">
+            <thead>
+              <tr>
+                <th>District</th>
+                <th>Indicator</th>
+                <th>2021 Coverage</th>
+                <th>2022 Coverage</th>
+                <th>2023 Coverage</th>
+                <th>3-Year Change (pp)</th>
+                <th>Trend Trajectory</th>
+                <th>Sheet Formula</th>
+              </tr>
+            </thead>
+            <tbody id="multiyear-matrix-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- TAB 3: Source Sheets & Data Explorer -->
+    <main id="tab-sheets" class="tab-content">
+      <section class="card">
+        <div class="panel-header">
+          <div>
+            <h2>Excel Workbook Explorer</h2>
+            <p class="subtitle">Direct inspection of sheets from <code>/workspace/maternal_health.xlsx</code></p>
+          </div>
+          <div class="sheet-tabs-nav" id="sheet-tabs-nav">
+            <button class="sheet-nav-btn active" data-sheet="District Data">Sheet 1: District Data</button>
+            <button class="sheet-nav-btn" data-sheet="Indicator Notes">Sheet 2: Indicator Notes</button>
+          </div>
+        </div>
+
+        <div class="sheet-view-container">
+          <div class="sheet-meta-info" id="sheet-meta-info">
+            <!-- Sheet info -->
+          </div>
+          <div class="table-responsive">
+            <table class="data-table sheet-raw-table" id="raw-sheet-table">
+              <!-- Populated by JS -->
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <span>Maternal Health Indicator Web Application &bull; Bihar District Benchmark Fixture</span>
+        <span>Source Workbook: <code>District Data</code> &amp; <code>Indicator Notes</code></span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

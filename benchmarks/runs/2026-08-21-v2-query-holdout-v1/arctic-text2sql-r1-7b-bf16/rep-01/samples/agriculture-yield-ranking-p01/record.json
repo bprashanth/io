@@ -1,0 +1,74 @@
+{
+  "id": "agriculture-yield-ranking-p01",
+  "task_id": "agriculture-yield-ranking",
+  "pattern": "filter and rank a non-percentage derived measure",
+  "question": "2024 Monsoon crop yield tonnes per hectare block wise highest first",
+  "gold_sql": "SELECT block, ROUND(1.0 * harvest_tonnes / cultivated_hectares, 1) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY tonnes_per_hectare DESC, block",
+  "expected_rows": [
+    [
+      "Dharwad",
+      3.2
+    ],
+    [
+      "Wardha",
+      2.7
+    ],
+    [
+      "Bhojpur",
+      2.5
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dharwad",
+      3.2
+    ],
+    [
+      "Wardha",
+      2.7
+    ],
+    [
+      "Bhojpur",
+      2.5
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT block, (harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0)) AS yield_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY yield_per_hectare DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2024 Monsoon crop yield tonnes per hectare block wise highest first\n[Database Schema]\nCREATE TABLE \"field_harvest\" (\n  \"block\" VARCHAR,\n  \"season\" VARCHAR,\n  \"year\" BIGINT,\n  \"cultivated_hectares\" BIGINT,\n  \"harvest_tonnes\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2024 Monsoon crop yield tonnes per hectare block wise highest first\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to break down the requirements and map them to the appropriate SQL operations.\n\n### Step-by-Step Breakdown:\n\n1. **Identify the Relevant Table and Columns**:\n   - The question is about crop yield data, so we will use the `field_harvest` table.\n   - Relevant columns are `block`, `season`, `year`, `cultivated_hectares`, and `harvest_tonnes`.\n\n2. **Filter Data for the Specific Season and Year**:\n   - The question specifies \"2024 Monsoon\", so we need to filter the records where `season` is 'Monsoon' and `year` is 2024.\n\n3. **Calculate Yield per Hectare**:\n   - Yield per hectare is calculated as `harvest_tonnes / cultivated_hectares`.\n\n4. **Order the Results**:\n   - The results should be ordered by the calculated yield per hectare in descending order to get the highest yields first.\n\n5. **Select the Required Columns**:\n   - We need to select `block` and the calculated yield per hectare.\n\n### SQL Query Construction:\n\nBased on the above steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    block, \n    (harvest_tonnes * 1.0 / cultivated_hectares) AS yield_per_hectare\nFROM \n    field_harvest\nWHERE \n    season = 'Monsoon' AND year = 2024\nORDER BY \n    yield_per_hectare DESC;\n```\n\n### Explanation:\n\n- **SELECT Clause**: We select the `block` and calculate the `yield_per_hectare` by dividing `harvest_tonnes` by `cultivated_hectares`. Multiplying `harvest_tonnes` by `1.0` ensures that the division is performed as floating-point arithmetic.\n- **FROM Clause**: Specifies the `field_harvest` table as the source of data.\n- **WHERE Clause**: Filters the records to include only those from the 'Monsoon' season in the year 2024.\n- **ORDER BY Clause**: Orders the results by `yield_per_hectare` in descending order to list the highest yields first.\n\nThis query directly addresses the user's request without unnecessary complexity or additional calculations.",
+      "api": {
+        "id": "chatcmpl-bcd2729758945148",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 213,
+          "total_tokens": 707,
+          "completion_tokens": 494,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 36.741
+      },
+      "duration_seconds": 36.764,
+      "sql_duckdb": "SELECT block, (harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0)) AS yield_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year = 2024 ORDER BY yield_per_hectare DESC",
+      "rows": [
+        [
+          "Dharwad",
+          3.2
+        ],
+        [
+          "Wardha",
+          2.7
+        ],
+        [
+          "Bhojpur",
+          2.5
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

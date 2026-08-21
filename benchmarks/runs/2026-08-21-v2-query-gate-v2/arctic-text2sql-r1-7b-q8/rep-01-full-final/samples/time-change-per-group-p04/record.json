@@ -1,0 +1,64 @@
+{
+  "id": "time-change-per-group-p04",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH YearlyANC AS (SELECT district, year, (CAST(anc4_completed AS REAL) * 100 / NULLIF(pregnancies_registered, 0)) AS anc_coverage FROM anc_visits WHERE year IN (2021, 2022, 2023) AND district IN ('Gaya', 'Nalanda')), ANCChange AS (SELECT district, MAX(CASE WHEN year = 2023 THEN anc_coverage END) - MAX(CASE WHEN year = 2021 THEN anc_coverage END) AS anc_coverage_change FROM YearlyANC GROUP BY district) SELECT district, anc_coverage_change FROM ANCChange ORDER BY district NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to focus on calculating the ANC (Antenatal Care) coverage movement from 2021 to 2023 for the districts of Gaya and Nalanda. The ANC coverage is defined as the percentage of pregnancies that received at least four ANC visits (ANC4).\n\nHere's the step-by-step breakdown:\n\n1. **Filter Data for Relevant Years and Districts**: We need to filter the `anc_visits` table to include only the years 2021, 2022, and 2023, and only the districts Gaya and Nalanda.\n\n2. **Calculate ANC Coverage for Each Year**: For each year, calculate the ANC coverage as the percentage of pregnancies that received at least four ANC visits. This is done by dividing the number of ANC4 completed visits by the number of pregnancies registered and multiplying by 100.\n\n3. **Compute the Percentage-Point Change**: Calculate the difference in ANC coverage between 2023 and 2021 for each district.\n\n4. **Select and Order the Results**: Finally, select the district and the calculated percentage-point change, ordering the results by district.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nWITH YearlyANC AS (\n    SELECT \n        district,\n        year,\n        (CAST(anc4_completed AS REAL) * 100 / pregnancies_registered) AS anc_coverage\n    FROM anc_visits\n    WHERE year IN (2021, 2022, 2023)\n      AND district IN ('Gaya', 'Nalanda')\n),\nANCChange AS (\n    SELECT \n        district,\n        MAX(CASE WHEN year = 2023 THEN anc_coverage END) - \n        MAX(CASE WHEN year = 2021 THEN anc_coverage END) AS anc_coverage_change\n    FROM YearlyANC\n    GROUP BY district\n)\nSELECT \n    district,\n    anc_coverage_change\nFROM ANCChange\nORDER BY district;\n```\n\n### Explanation:\n\n- **YearlyANC CTE**: This common table expression (CTE) calculates the ANC coverage for each year (2021, 2022, 2023) for the specified districts (Gaya, Nalanda). The `CAST` function is used to ensure that the division results in a real number, allowing for decimal percentages.\n\n- **ANCChange CTE**: This CTE computes the percentage-point change in ANC coverage from 2021 to 2023 for each district. It uses conditional aggregation to select the ANC coverage for 2021 and 2023 and then calculates their difference.\n\n- **Final SELECT**: The final query selects the district and the calculated ANC coverage change, ordering the results by district for clarity.",
+      "api": {
+        "id": "chatcmpl-ALa0NUa2Kl1bzeNNR8Wv5xXcqVVC5Xmt",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q8_0",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 596,
+          "prompt_tokens": 217,
+          "total_tokens": 813,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 22.086
+      },
+      "duration_seconds": 22.092,
+      "sql_duckdb": "WITH YearlyANC AS (SELECT district, year, (CAST(anc4_completed AS REAL) * 100 / NULLIF(pregnancies_registered, 0)) AS anc_coverage FROM anc_visits WHERE year IN (2021, 2022, 2023) AND district IN ('Gaya', 'Nalanda')), ANCChange AS (SELECT district, MAX(CASE WHEN year = 2023 THEN anc_coverage END) - MAX(CASE WHEN year = 2021 THEN anc_coverage END) AS anc_coverage_change FROM YearlyANC GROUP BY district) SELECT district, anc_coverage_change FROM ANCChange ORDER BY district NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

@@ -1,0 +1,105 @@
+{
+  "id": "cross-table-join-p02",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "join ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2023,
+      999,
+      616
+    ],
+    [
+      "Nalanda",
+      2023,
+      1000,
+      650
+    ],
+    [
+      "Purnia",
+      2023,
+      1072,
+      598
+    ],
+    [
+      "Kishanganj",
+      2023,
+      671,
+      342
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT T1.district, T1.year, T1.anc4_completed, T2.employed_at_6_months FROM anc_visits AS T1 INNER JOIN livelihoods AS T2 ON T1.district = T2.district AND T1.year = T2.year WHERE T1.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\njoin ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same district-year grain and can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator.\n[User Question]\njoin ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side\n```sql",
+      "response": "SELECT T1.district, T1.year, T1.anc4_completed, T2.employed_at_6_months FROM anc_visits AS T1 INNER JOIN livelihoods AS T2 ON T1.district = T2.district AND T1.year = T2.year WHERE T1.year = 2023",
+      "api": {
+        "id": "chatcmpl-95747ae5b56c1cc7",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 281,
+          "total_tokens": 349,
+          "completion_tokens": 68,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 2.265
+      },
+      "sql_duckdb": "SELECT T1.district, T1.year, T1.anc4_completed, T2.employed_at_6_months FROM anc_visits AS T1 INNER JOIN livelihoods AS T2 ON T1.district = T2.district AND T1.year = T2.year WHERE T1.year = 2023",
+      "rows": [
+        [
+          "Gaya",
+          2023,
+          999,
+          616
+        ],
+        [
+          "Nalanda",
+          2023,
+          1000,
+          650
+        ],
+        [
+          "Purnia",
+          2023,
+          1072,
+          598
+        ],
+        [
+          "Kishanganj",
+          2023,
+          671,
+          342
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

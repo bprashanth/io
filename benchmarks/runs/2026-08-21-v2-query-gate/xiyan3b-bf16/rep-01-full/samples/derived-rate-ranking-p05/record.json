@@ -1,0 +1,67 @@
+{
+  "id": "derived-rate-ranking-p05",
+  "task_id": "derived-rate-ranking",
+  "pattern": "filter, derive a comparable percentage, rank",
+  "question": "which districts have higher full immunisation coverage in 2023? give all in order",
+  "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+  "expected_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda"
+    ],
+    [
+      "Gaya"
+    ],
+    [
+      "Purnia"
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district FROM immunisation WHERE year = 2023 ORDER BY (children_fully_immunised * 1.0 / NULLIF(children_due, 0)) DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nwhich districts have higher full immunisation coverage in 2023? give all in order\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nwhich districts have higher full immunisation coverage in 2023? give all in order\n```sql",
+      "response": "SELECT district FROM immunisation WHERE year = 2023 ORDER BY (children_fully_immunised * 1.0 / children_due) DESC",
+      "api": {
+        "id": "chatcmpl-b6d973c4265ad718",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 432,
+          "total_tokens": 465,
+          "completion_tokens": 33,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 1.122
+      },
+      "sql_duckdb": "SELECT district FROM immunisation WHERE year = 2023 ORDER BY (children_fully_immunised * 1.0 / NULLIF(children_due, 0)) DESC",
+      "rows": [
+        [
+          "Nalanda"
+        ],
+        [
+          "Gaya"
+        ],
+        [
+          "Purnia"
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

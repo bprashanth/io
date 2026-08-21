@@ -1,0 +1,51 @@
+{
+  "id": "time-change-per-group-p05",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "calculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      0.07608019639934539
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT (((SUM(CASE WHEN year = 2023 THEN anc4_completed END) * 100.0 / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered END), 0)) - (SUM(CASE WHEN year = 2021 THEN anc4_completed END) * 100.0 / NULLIF(SUM(CASE WHEN year = 2021 THEN pregnancies_registered END), 0))) / NULLIF(100.0, 0)) AS percentage_point_change FROM anc_visits WHERE district IN ('Gaya', 'Nalanda')",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda\n```sql",
+      "response": "SELECT ( ( (SUM(CASE WHEN year = 2023 THEN anc4_completed END) * 100.0 / SUM(CASE WHEN year = 2023 THEN pregnancies_registered END)) - (SUM(CASE WHEN year = 2021 THEN anc4_completed END) * 100.0 / SUM(CASE WHEN year = 2021 THEN pregnancies_registered END)) ) / 100.0 ) AS percentage_point_change FROM anc_visits WHERE district IN ('Gaya', 'Nalanda');",
+      "api": {
+        "id": "chatcmpl-ab762ace77838a4b",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-7B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 223,
+          "total_tokens": 341,
+          "completion_tokens": 118,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 8.933
+      },
+      "sql_duckdb": "SELECT (((SUM(CASE WHEN year = 2023 THEN anc4_completed END) * 100.0 / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered END), 0)) - (SUM(CASE WHEN year = 2021 THEN anc4_completed END) * 100.0 / NULLIF(SUM(CASE WHEN year = 2021 THEN pregnancies_registered END), 0))) / NULLIF(100.0, 0)) AS percentage_point_change FROM anc_visits WHERE district IN ('Gaya', 'Nalanda')",
+      "rows": [
+        [
+          0.07608019639934539
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

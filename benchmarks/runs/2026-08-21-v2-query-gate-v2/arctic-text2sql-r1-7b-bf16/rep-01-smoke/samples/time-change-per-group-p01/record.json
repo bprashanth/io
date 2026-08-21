@@ -1,0 +1,62 @@
+{
+  "id": "time-change-per-group-p01",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "for Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH Coverage2021 AS (SELECT district, (SUM(anc4_completed) * 100.0 / NULLIF(SUM(pregnancies_registered), 0)) AS coverage_2021 FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda') GROUP BY district), Coverage2023 AS (SELECT district, (SUM(anc4_completed) * 100.0 / NULLIF(SUM(pregnancies_registered), 0)) AS coverage_2023 FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda') GROUP BY district) SELECT c2021.district, (c2023.coverage_2023 - c2021.coverage_2021) AS percentage_change FROM Coverage2021 AS c2021 JOIN Coverage2023 AS c2023 ON c2021.district = c2023.district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: We need data from the `anc_visits` table for the districts 'Gaya' and 'Nalanda' for the years 2021 and 2023.\n\n2. **Calculate ANC Coverage**: ANC coverage is calculated as the percentage of pregnancies that had 4 ANC visits completed. This is done by dividing the number of `anc4_completed` by `pregnancies_registered` and multiplying by 100.\n\n3. **Compute the Percentage Change**: The percentage change in ANC coverage from 2021 to 2023 is calculated by subtracting the 2021 coverage percentage from the 2023 coverage percentage.\n\n4. **Filter and Aggregate**: We need to filter the data for the specified districts and years, then aggregate the results to compute the required percentage change.\n\nHere is the step-by-step SQL query:\n\n1. **Filter Data for 2021 and 2023**: We will use a `WHERE` clause to filter the data for the years 2021 and 2023.\n\n2. **Calculate Coverage Percentage**: We will calculate the coverage percentage for each year using the formula `(anc4_completed * 100.0 / pregnancies_registered)`.\n\n3. **Join Data for 2021 and 2023**: We will join the filtered data for 2021 and 2023 on the district to compute the percentage change.\n\n4. **Compute the Percentage Change**: Finally, we will compute the percentage change in ANC coverage.\n\nHere is the final SQL query:\n\n```sql\nWITH Coverage2021 AS (\n    SELECT \n        district,\n        (SUM(anc4_completed) * 100.0 / SUM(pregnancies_registered)) AS coverage_2021\n    FROM \n        anc_visits\n    WHERE \n        year = 2021 AND district IN ('Gaya', 'Nalanda')\n    GROUP BY \n        district\n),\nCoverage2023 AS (\n    SELECT \n        district,\n        (SUM(anc4_completed) * 100.0 / SUM(pregnancies_registered)) AS coverage_2023\n    FROM \n        anc_visits\n    WHERE \n        year = 2023 AND district IN ('Gaya', 'Nalanda')\n    GROUP BY \n        district\n)\nSELECT \n    c2021.district,\n    (c2023.coverage_2023 - c2021.coverage_2021) AS percentage_change\nFROM \n    Coverage2021 c2021\nJOIN \n    Coverage2023 c2023 ON c2021.district = c2023.district;\n```\n\n### Explanation:\n- **Coverage2021 and Coverage2023 CTEs**: These Common Table Expressions (CTEs) calculate the ANC coverage percentage for the years 2021 and 2023, respectively, for the districts 'Gaya' and 'Nalanda'.\n- **JOIN**: We join the two CTEs on the `district` to align the coverage percentages for the same districts.\n- **Percentage Change Calculation**: The final `SELECT` statement calculates the percentage change in ANC coverage from 2021 to 2023 for each district.",
+      "api": {
+        "id": "chatcmpl-b0fea6e92be16f10",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 223,
+          "total_tokens": 966,
+          "completion_tokens": 743,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 55.395
+      },
+      "duration_seconds": 55.403,
+      "sql_duckdb": "WITH Coverage2021 AS (SELECT district, (SUM(anc4_completed) * 100.0 / NULLIF(SUM(pregnancies_registered), 0)) AS coverage_2021 FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda') GROUP BY district), Coverage2023 AS (SELECT district, (SUM(anc4_completed) * 100.0 / NULLIF(SUM(pregnancies_registered), 0)) AS coverage_2023 FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda') GROUP BY district) SELECT c2021.district, (c2023.coverage_2023 - c2021.coverage_2021) AS percentage_change FROM Coverage2021 AS c2021 JOIN Coverage2023 AS c2023 ON c2021.district = c2023.district",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

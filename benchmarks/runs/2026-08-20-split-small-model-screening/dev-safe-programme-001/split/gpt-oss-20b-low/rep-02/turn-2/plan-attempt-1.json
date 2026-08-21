@@ -1,0 +1,115 @@
+{
+  "attempt": 1,
+  "plan": {
+    "schema_version": 1,
+    "dataset_id": "dev-safe-programme-001",
+    "question": "What are the gaps in completion and employment rates between Purnia and Nalanda in 2023?",
+    "steps": [
+      {
+        "op": "derive",
+        "name": "completion_rate",
+        "kind": "percent",
+        "numerator": "completed_training",
+        "denominator": "women_enrolled",
+        "unit": "percent"
+      },
+      {
+        "op": "derive",
+        "name": "employment_rate",
+        "kind": "percent",
+        "numerator": "employed_at_6_months",
+        "denominator": "women_enrolled",
+        "unit": "percent"
+      },
+      {
+        "op": "filter",
+        "column": "year",
+        "cmp": "eq",
+        "value": 2023
+      },
+      {
+        "op": "filter",
+        "column": "district",
+        "cmp": "in",
+        "value": [
+          "Purnia",
+          "Nalanda"
+        ]
+      }
+    ],
+    "insights": [
+      {
+        "kind": "difference",
+        "metric": "completion_rate",
+        "entity_column": "district",
+        "entities": [
+          "Purnia",
+          "Nalanda"
+        ],
+        "time_column": "year",
+        "time": "2023",
+        "unit": "percentage points"
+      },
+      {
+        "kind": "difference",
+        "metric": "employment_rate",
+        "entity_column": "district",
+        "entities": [
+          "Purnia",
+          "Nalanda"
+        ],
+        "time_column": "year",
+        "time": "2023",
+        "unit": "percentage points"
+      }
+    ],
+    "view": {
+      "title": "Gap in Completion and Employment Rates (2023)",
+      "chart": "grouped_bar",
+      "x": "district",
+      "y": [
+        "completion_rate",
+        "employment_rate"
+      ],
+      "series": "district",
+      "unit": "percent",
+      "note": "Rates are calculated as (completed_training / women_enrolled) * 100 and (employed_at_6_months / women_enrolled) * 100. The data source is a synthetic aggregate fixture; it does not provide causal explanations or intervention recommendations."
+    },
+    "interpretation_guard": {
+      "can_explain_cause": false,
+      "caveat": "The synthetic dataset cannot explain why rates differ across districts."
+    }
+  },
+  "api": {
+    "requested_model": "openai/gpt-oss-20b",
+    "resolved_model": "openai/gpt-oss-20b",
+    "generation_id": "gen-1787234618-8rAI3al5xeVFgfRQb52c",
+    "duration_seconds": 3.905,
+    "finish_reason": "stop",
+    "usage": {
+      "prompt_tokens": 1369,
+      "completion_tokens": 475,
+      "total_tokens": 1844,
+      "cost": 0.00010752,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 480,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.00010752,
+        "upstream_inference_prompt_cost": 3.627e-05,
+        "upstream_inference_completions_cost": 7.125e-05
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 128,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "reasoning_effort": "low"
+  },
+  "validation_error": "PlanError: view series must not duplicate the x column"
+}

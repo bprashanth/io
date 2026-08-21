@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "dataset_id": "dev-csv-health-001",
+  "question": "How did the share of registered pregnancies completing four or more antenatal checkups change for Gaya and Nalanda between 2021 and 2023, measured in percentage points?",
+  "clarification": null,
+  "steps": [
+    {
+      "op": "filter",
+      "column": "district",
+      "cmp": "in",
+      "value": [
+        "Gaya",
+        "Nalanda"
+      ]
+    },
+    {
+      "op": "filter",
+      "column": "year",
+      "cmp": "between",
+      "value": [
+        2021,
+        2023
+      ]
+    },
+    {
+      "op": "derive",
+      "name": "anc4_coverage_percent",
+      "kind": "percent",
+      "numerator": "anc4_completed",
+      "denominator": "pregnancies_registered",
+      "unit": "percent"
+    }
+  ],
+  "insights": [
+    {
+      "kind": "causal_limit",
+      "message": "This data shows how coverage changed for Gaya and Nalanda but cannot explain why the change occurred."
+    }
+  ],
+  "view": {
+    "title": "ANC4 Coverage: Gaya vs Nalanda (2021–2023)",
+    "chart": "line",
+    "x": "year",
+    "y": [
+      "anc4_coverage_percent"
+    ],
+    "series": "district",
+    "unit": "percent",
+    "note": "Each line shows the percentage of registered pregnancies that completed four or more antenatal visits. The vertical gap between the 2021 and 2023 points for a district is the change in percentage points (for example, a move from 50% to 55% is a 5-percentage-point increase, not a 5% increase)."
+  },
+  "interpretation_guard": {
+    "can_explain_cause": false,
+    "caveat": "The data shows the size and direction of the change but does not contain information about what drove it (e.g. staffing changes, outreach campaigns, or reporting differences)."
+  }
+}

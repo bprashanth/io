@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "dataset_id": "dev-safe-programme-001",
+  "question": "Download the 2023 comparison table for Purnia and Nalanda showing training completion and employment rates.",
+  "clarification": null,
+  "steps": [
+    {
+      "op": "filter",
+      "column": "district",
+      "cmp": "in",
+      "value": [
+        "Nalanda",
+        "Purnia"
+      ]
+    },
+    {
+      "op": "filter",
+      "column": "year",
+      "cmp": "eq",
+      "value": 2023
+    },
+    {
+      "op": "derive",
+      "name": "training_completion_rate",
+      "kind": "percent",
+      "numerator": "completed_training",
+      "denominator": "women_enrolled",
+      "unit": "percent"
+    },
+    {
+      "op": "derive",
+      "name": "employment_rate_6mo",
+      "kind": "percent",
+      "numerator": "employed_at_6_months",
+      "denominator": "women_enrolled",
+      "unit": "percent"
+    }
+  ],
+  "insights": [
+    {
+      "kind": "difference",
+      "metric": "training_completion_rate",
+      "entity_column": "district",
+      "entities": [
+        "Purnia",
+        "Nalanda"
+      ],
+      "time_column": "year",
+      "time": 2023,
+      "unit": "percentage points"
+    },
+    {
+      "kind": "difference",
+      "metric": "employment_rate_6mo",
+      "entity_column": "district",
+      "entities": [
+        "Purnia",
+        "Nalanda"
+      ],
+      "time_column": "year",
+      "time": 2023,
+      "unit": "percentage points"
+    },
+    {
+      "kind": "causal_limit",
+      "message": "This file contains only outcome counts (enrolled, completed, employed) by district and year. It has no columns describing programme inputs, interventions, funding, staffing, or contextual factors that could explain why one district outperforms another. No causal explanation or intervention recommendation can be drawn from this file without guessing. To investigate the cause, additional data such as trainer-to-participant ratios, training duration, local labour market conditions, or programme design differences between districts would be needed."
+    }
+  ],
+  "view": {
+    "title": "Purnia vs Nalanda: 2023 Training and Employment Comparison",
+    "chart": "grouped_bar",
+    "x": "district",
+    "y": [
+      "training_completion_rate",
+      "employment_rate_6mo"
+    ],
+    "series": null,
+    "unit": "percent",
+    "note": "This table shows the 2023 figures for Purnia and Nalanda. Training completion rate = completed training ÷ women enrolled. Employment rate at 6 months = employed at 6 months ÷ women enrolled. The table can be downloaded for offline use or sharing. This file cannot explain why the gap exists or recommend an intervention because it contains no information about programme inputs or local conditions."
+  },
+  "interpretation_guard": {
+    "can_explain_cause": false,
+    "caveat": "This data is a synthetic fixture and does not represent real programme outcomes. The file contains no causal variables, so no cause or intervention can be identified from it."
+  }
+}

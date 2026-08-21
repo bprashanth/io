@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>District Immunisation by Year</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #273449;
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #34d399;
+      --border: #334155;
+      --track: #0b1220;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 50% -10%, #1b2a44 0%, var(--bg) 60%);
+      color: var(--ink);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+
+    header.hero {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap; margin-bottom: 28px;
+    }
+    .hero h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: 0.2px; }
+    .hero p { margin: 0; color: var(--muted); font-size: 14px; max-width: 60ch; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--panel); border: 1px solid var(--border);
+      padding: 8px 12px; border-radius: 999px; font-size: 12.5px; color: var(--ink);
+    }
+    .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2); }
+    .badge code { color: var(--accent); font-family: ui-monospace, "Cascadia Code", Menlo, monospace; }
+
+    .controls {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px 18px; margin-bottom: 22px;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .controls label { font-size: 14px; color: var(--muted); font-weight: 600; }
+    select {
+      background: var(--panel-2); color: var(--ink);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 9px 12px; font-size: 15px; cursor: pointer; min-width: 140px;
+    }
+    select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .summary { margin-left: auto; font-size: 13.5px; color: var(--muted); }
+    .summary b { color: var(--ink); }
+
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; margin-bottom: 22px;
+    }
+    .panel h2 { margin: 0 0 4px; font-size: 16px; font-weight: 700; letter-spacing: 0.2px; }
+    .panel .sub { margin: 0 0 18px; font-size: 12.5px; color: var(--muted); }
+
+    .bars { display: flex; flex-direction: column; gap: 16px; }
+    .bar-row { display: grid; grid-template-columns: 120px 1fr 74px; align-items: center; gap: 14px; }
+    .bar-label { font-size: 14px; font-weight: 600; text-align: right; }
+    .bar-label small { display: block; color: var(--muted); font-weight: 400; font-size: 11.5px; }
+    .bar-track {
+      position: relative; height: 30px; background: var(--track);
+      border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    }
+    .bar-fill {
+      position: absolute; inset: 0 auto 0 0; width: 0;
+      background: linear-gradient(90deg, #0ea5e9, var(--accent));
+      border-radius: 7px 0 0 7px;
+      transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .bar-fill.top { background: linear-gradient(90deg, #10b981, var(--accent-2)); }
+    .bar-pct { font-size: 14px; font-weight: 700; text-align: right; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: right; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th:first-child, td:first-child { text-align: left; }
+    thead th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+    tbody tr:hover { background: rgba(56, 189, 248, 0.06); }
+    tr.total-row td { font-weight: 700; border-top: 2px solid var(--border); }
+    .tag {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      background: rgba(52, 211, 153, 0.15); color: var(--accent-2);
+      padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle;
+    }
+
+    footer.src {
+      margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border);
+      color: var(--muted); font-size: 12.5px;
+    }
+    footer.src .line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    footer.src .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2); display: inline-block; }
+    footer.src code {
+      font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+      background: var(--panel-2); color: var(--accent);
+      padding: 2px 6px; border-radius: 6px;
+    }
+    .note { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+    .rank-1 .bar-label { color: var(--accent-2); }
+    .rank-low .bar-label { color: #f87171; }
+    .rank-low .bar-label small { color: #fca5a5; }
+    .bar-fill.low { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+    .year-badge {
+      display: inline-block; background: var(--panel-2); color: var(--accent);
+      border: 1px solid var(--border); padding: 7px 14px; border-radius: 999px;
+      font-weight: 700; font-size: 14px;
+    }
+
+    .callout {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 18px; flex-wrap: wrap; background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 12px; padding: 16px 18px;
+    }
+    .callout-dist { font-size: 20px; font-weight: 700; color: #f87171; }
+    .callout-dist small { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+    .callout-metric { font-size: 22px; font-weight: 700; }
+    .callout-metric small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); text-align: right; }
+
+    .tag.low { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+    tr.low-row td { color: #fca5a5; }
+
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .btn-download {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(90deg, #0ea5e9, var(--accent));
+      color: #04121f; border: none; border-radius: 10px;
+      padding: 9px 16px; font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: filter 0.15s ease, transform 0.05s ease; white-space: nowrap;
+    }
+    .btn-download:hover { filter: brightness(1.08); }
+    .btn-download:active { transform: translateY(1px); }
+    .btn-download:focus { outline: 2px solid var(--ink); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+
+  <div class="wrap">
+    <header class="hero">
+      <div>
+        <h1>District Immunisation by Year</h1>
+        <p>Showing <b>2023</b> — comparing how many children in each district were fully immunised.</p>
+      </div>
+      <span class="badge"><span class="dot"></span>Data file: <code>district_immunisation.csv</code></span>
+    </header>
+
+    <div class="controls">
+      <span class="year-badge" id="yearBadge">Year 2023</span>
+      <span class="summary" id="summary"></span>
+    </div>
+
+    <section class="panel" id="lowestPanel"></section>
+
+    <section class="panel">
+      <h2>Immunisation coverage by district</h2>
+      <p class="sub">Percentage of children due who were fully immunised, for 2023.</p>
+      <div class="bars" id="bars"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>District breakdown</h2>
+          <p class="sub">Raw figures for 2023.</p>
+        </div>
+        <button id="downloadBtn" class="btn-download" type="button" title="Download the 2023 table as CSV">&#8595; Download CSV</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>District</th>
+            <th>Children due</th>
+            <th>Fully immunised</th>
+            <th>Coverage</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>Total / overall</td>
+            <td id="tDue"></td>
+            <td id="tImmu"></td>
+            <td id="tPct"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </section>
+
+    <footer class="src" id="sourceFooter"></footer>
+  </div>
+
+  <script>
+    // The dataset below is the contents of district_immunisation.csv
+    const CSV = `district,year,children_due,children_fully_immunised,source
+Gaya,2022,1000,780,synthetic smoke fixture
+Nalanda,2022,800,680,synthetic smoke fixture
+Purnia,2022,900,630,synthetic smoke fixture
+Gaya,2023,1100,935,synthetic smoke fixture
+Nalanda,2023,850,765,synthetic smoke fixture
+Purnia,2023,1000,760,synthetic smoke fixture`;
+
+    // ---- Parse CSV ----
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/);
+      const headers = lines[0].split(",").map(h => h.trim());
+      return lines.slice(1).filter(l => l.trim()).map(line => {
+        const cells = line.split(",").map(c => c.trim());
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = cells[i]; });
+        return obj;
+      });
+    }
+
+    const data = parseCSV(CSV);
+    const years = [...new Set(data.map(r => Number(r.year)))].sort((a, b) => a - b);
+    const sources = [...new Set(data.map(r => r.source).filter(Boolean))];
+    const YEAR = 2023;
+
+    const fmt = n => n.toLocaleString("en-US");
+    const pct = (part, whole) => (whole ? (part / whole) * 100 : 0);
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    function render(year) {
+      const rows = data
+        .filter(r => Number(r.year) === year)
+        .map(r => ({
+          district: r.district,
+          due: Number(r.children_due),
+          immu: Number(r.children_fully_immunised),
+          rate: pct(Number(r.children_fully_immunised), Number(r.children_due)),
+        }));
+
+      // Rank: best coverage first
+      rows.sort((a, b) => b.rate - a.rate);
+      const lowest = rows[rows.length - 1];
+
+      // Lowest-district callout
+      document.getElementById("lowestPanel").innerHTML =
+        '<h2>Lowest coverage in ' + year + '</h2>' +
+        '<p class="sub">The district with the lowest immunisation coverage for this year.</p>' +
+        '<div class="callout">' +
+        '<div class="callout-dist">' + escapeHtml(lowest.district) + '<small>lowest coverage</small></div>' +
+        '<div class="callout-metric">' + lowest.rate.toFixed(1) + '%<small>' + fmt(lowest.immu) + ' of ' + fmt(lowest.due) + ' children fully immunised</small></div>' +
+        '</div>';
+
+      // Bars
+      const barsEl = document.getElementById("bars");
+      barsEl.innerHTML = "";
+      rows.forEach((r, i) => {
+        const row = document.createElement("div");
+        const isTop = i === 0;
+        const isLow = i === rows.length - 1;
+        row.className = "bar-row" + (isTop ? " rank-1" : "") + (isLow ? " rank-low" : "");
+        row.innerHTML =
+          '<div class="bar-label">' + escapeHtml(r.district) +
+          '<small>due ' + fmt(r.due) + '</small></div>' +
+          '<div class="bar-track"><div class="bar-fill' + (isTop ? ' top' : '') + (isLow ? ' low' : '') + '"></div></div>' +
+          '<div class="bar-pct">' + r.rate.toFixed(1) + '%</div>';
+        barsEl.appendChild(row);
+        const fill = row.querySelector(".bar-fill");
+        requestAnimationFrame(() => { fill.style.width = Math.min(100, r.rate) + "%"; });
+      });
+
+      // Table
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = "";
+      rows.forEach((r, i) => {
+        const isTop = i === 0;
+        const isLow = i === rows.length - 1;
+        let tag = "";
+        if (isTop) tag = '<span class="tag">top</span>';
+        else if (isLow) tag = '<span class="tag low">lowest</span>';
+        const tr = document.createElement("tr");
+        tr.className = isLow ? "low-row" : "";
+        tr.innerHTML =
+          '<td>' + escapeHtml(r.district) + tag + '</td>' +
+          '<td>' + fmt(r.due) + '</td>' +
+          '<td>' + fmt(r.immu) + '</td>' +
+          '<td>' + r.rate.toFixed(1) + '%</td>';
+        tbody.appendChild(tr);
+      });
+
+      // Totals
+      const tDue = rows.reduce((s, r) => s + r.due, 0);
+      const tImmu = rows.reduce((s, r) => s + r.immu, 0);
+      document.getElementById("tDue").textContent = fmt(tDue);
+      document.getElementById("tImmu").textContent = fmt(tImmu);
+      document.getElementById("tPct").textContent = pct(tImmu, tDue).toFixed(1) + "%";
+
+      // Summary line
+      const best = rows[0];
+      document.getElementById("summary").innerHTML =
+        '<b>' + rows.length + '</b> districts · highest: <b>' + escapeHtml(best.district) +
+        '</b> (' + best.rate.toFixed(1) + '%) · lowest: <b>' + escapeHtml(lowest.district) +
+        '</b> (' + lowest.rate.toFixed(1) + '%)';
+    }
+
+    // ---- Source footer ----
+    (function renderSource() {
+      const el = document.getElementById("sourceFooter");
+      const srcText = sources.length ? sources.join(", ") : "not specified";
+      el.innerHTML =
+        '<div class="line"><span class="dot"></span><span>Data source: <code>' +
+        escapeHtml(srcText) + '</code></span></div>' +
+        '<div class="note">Source as recorded in the <code>source</code> column of ' +
+        '<code>district_immunisation.csv</code>. Coverage = children_fully_immunised &divide; children_due.</div>';
+    })();
+
+    // ---- Download 2023 table as CSV ----
+    function buildCSV(year) {
+      const rows = data
+        .filter(r => Number(r.year) === year)
+        .map(r => ({
+          district: r.district,
+          due: Number(r.children_due),
+          immu: Number(r.children_fully_immunised),
+          rate: pct(Number(r.children_fully_immunised), Number(r.children_due)),
+          source: r.source,
+        }));
+      rows.sort((a, b) => b.rate - a.rate);
+
+      const escape = v => {
+        const s = String(v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const lines = ["district,children_due,children_fully_immunised,coverage_percent,source"];
+      rows.forEach(r => {
+        lines.push([escape(r.district), r.due, r.immu, r.rate.toFixed(1), escape(r.source)].join(","));
+      });
+      const tDue = rows.reduce((s, r) => s + r.due, 0);
+      const tImmu = rows.reduce((s, r) => s + r.immu, 0);
+      lines.push(["Total", tDue, tImmu, pct(tImmu, tDue).toFixed(1), ""].join(","));
+      return lines.join("\n") + "\n";
+    }
+
+    function downloadCSV(year) {
+      const csv = buildCSV(year);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "district_immunisation_" + year + ".csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    document.getElementById("downloadBtn").addEventListener("click", () => downloadCSV(YEAR));
+
+    render(YEAR);
+  </script>
+</body>
+</html>
+

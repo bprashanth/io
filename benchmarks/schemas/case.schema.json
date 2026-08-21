@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bprashanth/io/benchmarks/schemas/case.schema.json",
+  "title": "NGO dashboard benchmark case",
+  "type": "object",
+  "required": ["schema_version", "case_id", "split", "network_policy", "messages", "inputs", "oracle"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "case_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$"},
+    "title": {"type": "string"},
+    "split": {"enum": ["smoke", "development", "holdout"]},
+    "network_policy": {"enum": ["offline", "provided-sources", "web-discovery"]},
+    "messages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["turn", "text"],
+        "properties": {
+          "turn": {"type": "integer", "minimum": 1},
+          "text": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "bytes", "provenance"],
+        "properties": {
+          "path": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "bytes": {"type": "integer", "minimum": 1},
+          "provenance": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "oracle": {"type": "string"},
+    "tags": {"type": "array", "items": {"type": "string"}}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"network_policy": {"const": "web-discovery"}},
+        "required": ["network_policy"]
+      },
+      "else": {"properties": {"inputs": {"minItems": 1}}}
+    }
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,62 @@
+{
+  "id": "time-change-per-group-p05",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "calculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, (SUM(CASE WHEN year = 2023 THEN (anc4_completed * 100.0 / NULLIF(pregnancies_registered, 0)) ELSE 0 END) - SUM(CASE WHEN year = 2021 THEN (anc4_completed * 100.0 / NULLIF(pregnancies_registered, 0)) ELSE 0 END)) AS coverage_rate_difference FROM anc_visits WHERE year IN (2021, 2023) AND district IN ('Gaya', 'Nalanda') GROUP BY district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: We need data from the `anc_visits` table for the years 2021 and 2023, specifically for the districts of Gaya and Nalanda.\n2. **Calculate the ANC Coverage Rate**: The ANC coverage rate is calculated as the percentage of pregnancies that completed ANC4 (Fourth Antenatal Care Visit) out of the total pregnancies registered.\n3. **Compute the Difference in Coverage Rates**: We need to find the difference between the 2023 and 2021 ANC coverage rates for each district.\n4. **Filter for Specific Districts**: We are only interested in the districts of Gaya and Nalanda.\n\nLet's break down the SQL query step-by-step:\n\n1. **Filter Data for Relevant Years and Districts**:\n   - We will use a `WHERE` clause to filter the data for the years 2021 and 2023 and the districts Gaya and Nalanda.\n\n2. **Calculate the ANC Coverage Rate**:\n   - We will use a `CASE` statement within a `SUM` function to count the number of pregnancies that completed ANC4.\n   - We will then calculate the percentage by dividing the sum of ANC4 completed by the sum of pregnancies registered and multiplying by 100.0.\n\n3. **Use Conditional Aggregation**:\n   - We will use `CASE` statements within `SUM` functions to aggregate the data for 2021 and 2023 separately.\n\n4. **Compute the Difference**:\n   - We will subtract the 2021 coverage rate from the 2023 coverage rate.\n\n5. **Select the Required Columns**:\n   - We will select the district and the calculated difference in coverage rates.\n\nHere is the final SQL query:\n\n```sql\nSELECT \n    district,\n    (SUM(CASE WHEN year = 2023 THEN (anc4_completed * 100.0 / pregnancies_registered) ELSE 0 END) -\n     SUM(CASE WHEN year = 2021 THEN (anc4_completed * 100.0 / pregnancies_registered) ELSE 0 END)) AS coverage_rate_difference\nFROM \n    anc_visits\nWHERE \n    year IN (2021, 2023) AND district IN ('Gaya', 'Nalanda')\nGROUP BY \n    district;\n```\n\n### Explanation:\n- **SUM(CASE WHEN year = 2023 THEN (anc4_completed * 100.0 / pregnancies_registered) ELSE 0 END)**: This calculates the ANC coverage rate for the year 2023.\n- **SUM(CASE WHEN year = 2021 THEN (anc4_completed * 100.0 / pregnancies_registered) ELSE 0 END)**: This calculates the ANC coverage rate for the year 2021.\n- **Subtraction**: The difference between the two sums gives the change in coverage rate from 2021 to 2023.\n- **GROUP BY district**: This ensures that the calculation is done separately for each district (Gaya and Nalanda).\n\nThis query efficiently calculates the required difference in ANC coverage rates for the specified districts and years.",
+      "api": {
+        "id": "chatcmpl-86f584e08b29d144",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 223,
+          "total_tokens": 924,
+          "completion_tokens": 701,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 52.593
+      },
+      "duration_seconds": 52.601,
+      "sql_duckdb": "SELECT district, (SUM(CASE WHEN year = 2023 THEN (anc4_completed * 100.0 / NULLIF(pregnancies_registered, 0)) ELSE 0 END) - SUM(CASE WHEN year = 2021 THEN (anc4_completed * 100.0 / NULLIF(pregnancies_registered, 0)) ELSE 0 END)) AS coverage_rate_difference FROM anc_visits WHERE year IN (2021, 2023) AND district IN ('Gaya', 'Nalanda') GROUP BY district",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

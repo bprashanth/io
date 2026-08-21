@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2024 Monsoon Block Wise Crop Yield Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --primary-light: #3b82f6;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            padding: 2.5rem 1.5rem;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1040px;
+            margin: 0 auto;
+        }
+        header {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            background: #ffffff;
+            padding: 1.75rem 2rem;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .title-group h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .title-group p {
+            color: var(--text-muted);
+            margin-top: 0.35rem;
+            font-size: 0.95rem;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.65rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.4rem;
+        }
+        .badge-season {
+            background-color: #ecfdf5;
+            color: #047857;
+            border: 1px solid #a7f3d0;
+        }
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.65rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: #2563eb;
+            color: #ffffff;
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        }
+        .btn-primary:hover {
+            background: #1d4ed8;
+            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
+        }
+        .btn-secondary {
+            background: #f8fafc;
+            color: #334155;
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover {
+            background: #f1f5f9;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+        .kpi-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: #3b82f6;
+        }
+        .kpi-card.top-rank::before {
+            background: #10b981;
+        }
+        .kpi-title {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .kpi-value {
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: baseline;
+            gap: 0.35rem;
+        }
+        .kpi-unit {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        .kpi-sub {
+            font-size: 0.825rem;
+            color: var(--text-muted);
+            margin-top: 0.35rem;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        @media (max-width: 850px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            padding: 1.75rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .card-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 0.95rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background-color: #f8fafc;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        tbody tr {
+            transition: background-color 0.15s ease;
+        }
+        tbody tr:hover {
+            background-color: #f8fafc;
+        }
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+        .rank-1 { background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .rank-2 { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+        .rank-3 { background-color: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+        .yield-badge {
+            font-weight: 700;
+            color: #1e40af;
+            font-size: 1.1rem;
+            background: #eff6ff;
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            display: inline-block;
+        }
+        .source-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: #f1f5f9;
+            color: #334155;
+            padding: 0.25rem 0.65rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid #e2e8f0;
+        }
+        .source-tag::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+        .chart-container {
+            position: relative;
+            height: 280px;
+            width: 100%;
+        }
+        .info-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 1rem;
+            color: #166534;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+        footer {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            padding-top: 1.5rem;
+        }
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #1e293b;
+            color: #ffffff;
+            padding: 0.85rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            font-size: 0.9rem;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: all 0.25s ease;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="title-group">
+                <span class="badge badge-season">Season: Monsoon 2024</span>
+                <h1>Block-Wise Crop Yield Dashboard</h1>
+                <p>Monsoon 2024 agricultural yield analysis &bull; Sorted highest yield first &bull; Source: <strong>field register</strong></p>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="downloadCSV()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download CSV
+                </button>
+                <button class="btn btn-secondary" onclick="copyCSV()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Copy CSV Data
+                </button>
+            </div>
+        </header>
+
+        <!-- KPI Metrics Summary Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card top-rank">
+                <div class="kpi-title">Top Yielding Block</div>
+                <div class="kpi-value" style="color: #047857;">Dharwad</div>
+                <div class="kpi-sub"><strong>3.20</strong> Tonnes/Hectare (Rank #1)</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Average Yield (2024 Monsoon)</div>
+                <div class="kpi-value">2.79 <span class="kpi-unit">t/ha</span></div>
+                <div class="kpi-sub">Total 4,180 T across 1,500 Ha</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Total Harvest Production</div>
+                <div class="kpi-value">4,180 <span class="kpi-unit">tonnes</span></div>
+                <div class="kpi-sub">Across all 3 monitored blocks</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Total Cultivated Area</div>
+                <div class="kpi-value">1,500 <span class="kpi-unit">hectares</span></div>
+                <div class="kpi-sub">Monsoon 2024 crop area</div>
+            </div>
+        </div>
+
+        <!-- Visual Analytics Grid -->
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Yield Comparison (Tonnes / Hectare &mdash; Highest First)</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="yieldChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Harvest vs Cultivated Area</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="compChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table Card -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">2024 Monsoon Block Yield Table</div>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Ordered by Crop Yield (Tonnes per Hectare) in descending order</p>
+                </div>
+                <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" onclick="downloadCSV()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download Table
+                </button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="yieldTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px; text-align: center;">Rank</th>
+                            <th>Block Name</th>
+                            <th>Season</th>
+                            <th>Year</th>
+                            <th style="text-align: right;">Cultivated Area (Ha)</th>
+                            <th style="text-align: right;">Harvest (Tonnes)</th>
+                            <th style="text-align: right;">Yield (Tonnes / Ha)</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="text-align: center;"><span class="rank-badge rank-1">1</span></td>
+                            <td><strong>Dharwad</strong></td>
+                            <td>Monsoon</td>
+                            <td>2024</td>
+                            <td style="text-align: right;">500</td>
+                            <td style="text-align: right;">1,600</td>
+                            <td style="text-align: right;"><span class="yield-badge">3.20</span></td>
+                            <td><span class="source-tag">field register</span></td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;"><span class="rank-badge rank-2">2</span></td>
+                            <td><strong>Wardha</strong></td>
+                            <td>Monsoon</td>
+                            <td>2024</td>
+                            <td style="text-align: right;">400</td>
+                            <td style="text-align: right;">1,080</td>
+                            <td style="text-align: right;"><span class="yield-badge">2.70</span></td>
+                            <td><span class="source-tag">field register</span></td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center;"><span class="rank-badge rank-3">3</span></td>
+                            <td><strong>Bhojpur</strong></td>
+                            <td>Monsoon</td>
+                            <td>2024</td>
+                            <td style="text-align: right;">600</td>
+                            <td style="text-align: right;">1,500</td>
+                            <td style="text-align: right;"><span class="yield-badge">2.50</span></td>
+                            <td><span class="source-tag">field register</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="info-box">
+                <strong>Calculation Method:</strong> Yield (tonnes/ha) = <code>harvest_tonnes</code> / <code>cultivated_hectares</code>.
+                All 3 blocks reported data via <code>field register</code> for the 2024 Monsoon season.
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            Data Source: <code>field_harvest.csv</code> &bull; Source Field: <code>field register</code> &bull; 2024 Monsoon Block-Wise Yield Dashboard
+        </footer>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">Downloaded monsoon_2024_crop_yield.csv</div>
+
+    <script>
+        const tableData = [
+            { rank: 1, block: 'Dharwad', season: 'Monsoon', year: 2024, cultivated_ha: 500, harvest_tonnes: 1600, yield_t_ha: 3.20, source: 'field register' },
+            { rank: 2, block: 'Wardha', season: 'Monsoon', year: 2024, cultivated_ha: 400, harvest_tonnes: 1080, yield_t_ha: 2.70, source: 'field register' },
+            { rank: 3, block: 'Bhojpur', season: 'Monsoon', year: 2024, cultivated_ha: 600, harvest_tonnes: 1500, yield_t_ha: 2.50, source: 'field register' }
+        ];
+
+        // Yield Bar Chart
+        const ctxYield = document.getElementById('yieldChart').getContext('2d');
+        new Chart(ctxYield, {
+            type: 'bar',
+            data: {
+                labels: ['1. Dharwad', '2. Wardha', '3. Bhojpur'],
+                datasets: [{
+                    label: 'Yield (Tonnes/Ha)',
+                    data: [3.20, 2.70, 2.50],
+                    backgroundColor: ['#2563eb', '#3b82f6', '#60a5fa'],
+                    borderColor: ['#1d4ed8', '#2563eb', '#3b82f6'],
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c) {
+                                return ' Yield: ' + c.parsed.y.toFixed(2) + ' t/ha (Source: field register)';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 3.8,
+                        title: { display: true, text: 'Yield (Tonnes / Ha)' },
+                        grid: { color: '#f1f5f9' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // Harvest vs Area Chart
+        const ctxComp = document.getElementById('compChart').getContext('2d');
+        new Chart(ctxComp, {
+            type: 'bar',
+            data: {
+                labels: ['Dharwad', 'Wardha', 'Bhojpur'],
+                datasets: [
+                    {
+                        label: 'Harvest (Tonnes)',
+                        data: [1600, 1080, 1500],
+                        backgroundColor: '#10b981',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Cultivated Area (Ha)',
+                        data: [500, 400, 600],
+                        backgroundColor: '#94a3b8',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        function generateCSVContent() {
+            let csv = 'rank,block,season,year,cultivated_hectares,harvest_tonnes,yield_tonnes_per_hectare,source\n';
+            tableData.forEach(r => {
+                csv += `${r.rank},${r.block},${r.season},${r.year},${r.cultivated_ha},${r.harvest_tonnes},${r.yield_t_ha.toFixed(2)},${r.source}\n`;
+            });
+            return csv;
+        }
+
+        function downloadCSV() {
+            const csvContent = generateCSVContent();
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'monsoon_2024_crop_yield.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('Downloaded monsoon_2024_crop_yield.csv');
+        }
+
+        function copyCSV() {
+            const csvContent = generateCSVContent();
+            navigator.clipboard.writeText(csvContent).then(() => {
+                showToast('CSV data copied to clipboard!');
+            }).catch(err => {
+                showToast('Failed to copy to clipboard');
+            });
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

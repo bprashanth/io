@@ -1,0 +1,105 @@
+{
+  "id": "time-change-per-group-p04",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2021,
+      66.0
+    ],
+    [
+      "Gaya",
+      2022,
+      69.0
+    ],
+    [
+      "Gaya",
+      2023,
+      74.0
+    ],
+    [
+      "Nalanda",
+      2021,
+      73.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      77.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, year, ROUND(100.0 * anc4_completed / NULLIF(pregnancies_registered, 0), 2) AS anc_coverage FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year BETWEEN 2021 AND 2023 ORDER BY district NULLS FIRST, year NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n```sql",
+      "response": "SELECT district, year, ROUND(100.0 * anc4_completed / pregnancies_registered, 2) AS anc_coverage FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year BETWEEN 2021 AND 2023 ORDER BY district, year;",
+      "api": {
+        "id": "chatcmpl-a6f977001a7da7df",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-7B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 217,
+          "total_tokens": 280,
+          "completion_tokens": 63,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 4.804
+      },
+      "sql_duckdb": "SELECT district, year, ROUND(100.0 * anc4_completed / NULLIF(pregnancies_registered, 0), 2) AS anc_coverage FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year BETWEEN 2021 AND 2023 ORDER BY district NULLS FIRST, year NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          2021,
+          66.0
+        ],
+        [
+          "Gaya",
+          2022,
+          69.0
+        ],
+        [
+          "Gaya",
+          2023,
+          74.0
+        ],
+        [
+          "Nalanda",
+          2021,
+          73.0
+        ],
+        [
+          "Nalanda",
+          2022,
+          77.0
+        ],
+        [
+          "Nalanda",
+          2023,
+          80.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

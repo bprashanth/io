@@ -1,0 +1,72 @@
+{
+  "id": "cross-table-join-p01",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "match the two tables for 2023 and show each district ANC percent with employment percent",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "SELECT T1.district, CAST(T2.anc4_completed AS REAL) * 100 / NULLIF(NULLIF(T1.pregnancies_registered, 0), 0) AS anc_percent, CAST(T3.employed_at_6_months AS REAL) * 100 / NULLIF(NULLIF(T3.women_enrolled, 0), 0) AS employment_percent FROM anc_visits AS T1 INNER JOIN livelihoods AS T3 ON T1.district = T3.district AND T1.year = T3.year WHERE T1.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nmatch the two tables for 2023 and show each district ANC percent with employment percent\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nmatch the two tables for 2023 and show each district ANC percent with employment percent\n```sql",
+      "response": "SELECT T1.district, CAST(T2.anc4_completed AS REAL) * 100 / NULLIF(T1.pregnancies_registered, 0) AS anc_percent, CAST(T1.employed_at_6_months AS REAL) * 100 / NULLIF(T1.women_enrolled, 0) AS employment_percent FROM anc_visits AS T1 INNER JOIN livelihoods AS T2 ON T1.district = T2.district AND T1.year = T2.year WHERE T1.year = 2023",
+      "api": {
+        "id": "chatcmpl-b4378e4be902835e",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 432,
+          "total_tokens": 546,
+          "completion_tokens": 114,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 3.751
+      },
+      "error": "BinderException: Binder Error: Table \"T2\" does not have a column named \"anc4_completed\"\n\nCandidate bindings: : \"completed_training\"\n\nLINE 1: EXPLAIN SELECT T1.district, CAST(T2.anc4_completed AS REAL) * 100 / NULLIF(NULLIF(T1.pregnan...\n                                         ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nmatch the two tables for 2023 and show each district ANC percent with employment percent\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nanc_visits and livelihoods can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[Previous Query Error]\nBinderException: Binder Error: Table \"T2\" does not have a column named \"anc4_completed\"\n\nCandidate bindings: : \"completed_training\"\n\nLINE 1: EXPLAIN SELECT T1.district, CAST(T2.anc4_completed AS REAL) * 100 / NULLIF(NULLIF(T1.pregnan...\n                                         ^\nReturn one corrected read-only query.\n[User Question]\nmatch the two tables for 2023 and show each district ANC percent with employment percent\n```sql",
+      "response": "SELECT T1.district, CAST(T2.anc4_completed AS REAL) * 100 / NULLIF(T1.pregnancies_registered, 0) AS anc_percent, CAST(T3.employed_at_6_months AS REAL) * 100 / NULLIF(T3.women_enrolled, 0) AS employment_percent FROM anc_visits AS T1 INNER JOIN livelihoods AS T3 ON T1.district = T3.district AND T1.year = T3.year WHERE T1.year = 2023",
+      "api": {
+        "id": "chatcmpl-bdbb06284d1a109a",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 514,
+          "total_tokens": 628,
+          "completion_tokens": 114,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 3.772
+      },
+      "error": "BinderException: Binder Error: Referenced table \"T2\" not found!\nCandidate tables: \"T1\", \"T3\"\n\nLINE 1: EXPLAIN SELECT T1.district, CAST(T2.anc4_completed AS REAL) * 100 / NULLIF(NULLIF(T1.pregnan...\n                                         ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

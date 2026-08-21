@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "case_id": "dev-pdf-health-001",
+  "provider": "openai-compatible",
+  "model": "qwen/qwen3.8-27b:nitro",
+  "base_url": "http://host.docker.internal:18150/v1",
+  "thinking": "xhigh",
+  "request_reasoning_effort": "xhigh",
+  "workspace": "/tmp/io-screening-v2-pdf-qwen-AEq2rF",
+  "isolated_home": "/tmp/io-screening-v2-pdf-qwen-state-zTHww4/home",
+  "outer_container_image": "io-benchmark-agent-tools:2026-08-20-v2",
+  "outer_container_enabled": true,
+  "started_at_unix": 1787171415.4767725,
+  "turns": [
+    {
+      "turn": 1,
+      "duration_seconds": 524.728,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 6266,
+      "agent_response": "\n\nIt's a 2-page ReportLab-generated PDF. Let me extract its text content.\n\n\n\nThis PDF is a synthetic 2-page fixture containing exactly one district health table:\n\n- **Table 1, page 2** \u2014 \"Facility Delivery Coverage Rate by District and Year\", covering 2021\u20132023, with 4 districts (Gaya, Nalanda, Purnia, Kishanganj) listed as percentages\n- Source label: \"Synthetic facility delivery PDF fixture. Unit: percentage. Values are illustrative, not official statistics.\"\n\n**Plan:** I'll create a single self-contained `index.html` (no external dependencies, works offline) with the following:\n1. Year selector (2021/2022/2023 buttons)\n2. Comparison feature \u2014 a \"Compare with\" year option that displays delta per district (bar chart tick marks + change column)\n3. A horizontal bar chart for the selected year + a full data table with the selected year highlighted\n4. A prominent display of the source: **Table 1, page 2** of `facility_delivery_report.pdf`, along with notes that the data is illustrative/synthetic\n\nAlright, let's build it:\n\n\n\nThe file is too large for a single edit \u2014 I'll write it in 3 chunks and concatenate.\n\n\n\nNow part 2 (body markup):\n\nNow part 3 (script):\n\n\n\nNow concatenate the parts into `index.html` and verify:\n\nJS syntax is valid. Let me verify the page actually renders correctly \u2014 checking for a headless browser, or I'll test the logic with a DOM stub:\n\n\n\nNo headless browser is available, so I'll functionally test the page logic with a minimal DOM stub in Node to verify all computations:\n\nWrong tool call format \u2014 let me create the test file with the editor tool instead:\n\nSlightly over limit \u2014 splitting into two files:\n\nFile is clean. Appending the rest of the tests:\n\n27/29 passed. The 2 failures are artifacts of the stub, not page bugs: (1) my stub wasn't emulating the browser's `select.value` semantics (the page correctly rebuilds options and marks the matching one as `selected`), and (2) the chip uses the `&middot;` HTML entity, but my check was searching for the literal `\u00b7` character. Fixing the test harness:\n\nLet me patch the test via the editor tool instead:\n\nOne remaining artifact: in an actual browser, rebuilding the options (`innerHTML=\"\"`) resets the select's value to the first option (`\"\"`). My stub still holds onto the old `_value`. I'll make the stub match the browser's behavior:\n\nAll 29 checks pass. Final verification \u2014 confirming the assembled file structure and that it serves over HTTP:\n\nThe page is being served correctly (HTTP 200; the non-zero exit code is simply due to `pkill` terminating the temporary server). Let's check the head/body boundaries and the end of the file:\n\nEverything checks out. Cleaning up my temp files:\n\nDone. I built a simple, self-contained website at `/tmp/io-screening-v2-pdf-qwen-AEq2rF/index.html`.\n\n## What's in the PDF\nThe 2-page fixture has exactly one data table: **Table 1, page 2** \u2014 \"Facility delivery coverage by district and year\" (2021\u20132023), with 4 districts: Gaya (62/67/72), Nalanda (70/74/79), Purnia (55/61/66), Kishanganj (50/56/60) \u2014 all percentages. The PDF itself labels it a synthetic fixture, not official statistics, which I preserved in the site.\n\n## What the website does\n- **Year selector** \u2014 buttons for 2021 / 2022 / 2023\n- **Compare with year** \u2014 a dropdown to pick a second year; when set, each bar gets an amber tick at the comparison year's value, per-district delta labels (e.g. \"vs 2023: \u221210.0 pts\"), and the data table gains a \"Change\" column (with average row)\n- **Bar chart** of coverage by district for the selected year (0\u2013100% scale) + **full data table** with the selected year's column highlighted\n- **Source shown prominently in two places**: a chip under the title (\"Source: Table 1 \u00b7 page 2 of facility_delivery_report.pdf\") and a source box at the bottom with the table citation, unit (percent), the synthetic/illustrative disclaimer, and the indicator definition from the PDF\n\nNo external dependencies \u2014 one HTML file with inline CSS/JS, works offline (just open it, or serve it with any static server).\n\n## Verification\n- All values transcribed from `pdftotext` output of the PDF\n- JS syntax checked with `node --check`\n- Ran 29 functional assertions against the page's script via a DOM stub in Node (bar widths, tick positions, delta math, table cells, averages, highlight column, compare-option behavior incl. auto-reset when compare year = selected year) \u2014 **29/29 passed**\n- Served over HTTP: 200 OK, valid single-document structure (`</head>`/`<body>` boundary and exactly one script block confirmed)\n\nOne limitation to note: no headless browser was available in this environment, so I verified rendering logic via the DOM-stub tests rather than a visual screenshot.",
+      "tool_call_count": 30,
+      "last_usage_update": null
+    },
+    {
+      "turn": 2,
+      "duration_seconds": 71.634,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 785,
+      "agent_response": "I'll update the page to offer only 2022 and 2023. Let me check the exact lines to edit:\n\nNow verify with a quick functional test against the updated page:\n\n21/21 functional checks pass. The syntax check just failed on pipe redirection \u2014 redoing with a temp file:\n\nDone. The site now shows only **2022 and 2023**.\n\nChanges made to `/tmp/io-screening-v2-pdf-qwen-AEq2rF/index.html`:\n- **Year buttons**: now only 2022 and 2023 (2021 removed)\n- **Compare dropdown**: adapts automatically \u2014 e.g., with 2023 selected it offers only \"\u2014 none \u2014\" and 2022\n- **Data & table**: 2021 values dropped; table columns are now District | 2022 (%) | 2023 (%), with the selected year highlighted and an Average row\n- **Subtitle**: updated to \"Showing years 2022\u20132023 (source report covers 2021\u20132023)\" so the page stays accurate about what's in the PDF\n- **Source box unchanged**: still cites Table 1, page 2 of `facility_delivery_report.pdf`\n\nVerified: JS syntax check passes, and 21/21 functional assertions pass (buttons, compare options, bar widths 67/74/61/56 and 72/79/66/60, ticks, deltas +5.0/+5.0/+5.0/+4.0 pts, average change +4.8 pts, highlighted column, compare auto-reset, source references intact). The only remaining \"2021\" on the page is that intentional source-accuracy note in the subtitle.",
+      "tool_call_count": 6,
+      "last_usage_update": null
+    },
+    {
+      "turn": 3,
+      "duration_seconds": 5.594,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 90,
+      "agent_response": "For **2023**:\n\n- **Purnia**: 66.0%\n- **Kishanganj**: 60.0%\n\n**Difference: 6.0 percentage points** \u2014 Purnia's facility delivery coverage is 6.0 points higher than Kishanganj's in 2023.\n\n(Both values are from Table 1, page 2 of `facility_delivery_report.pdf`; note the fixture's caveat that values are illustrative, not official statistics. On the website you can see this by selecting 2023 \u2014 the bars show Purnia at 66% and Kishanganj at 60%.)",
+      "tool_call_count": 0,
+      "last_usage_update": null
+    },
+    {
+      "turn": 4,
+      "duration_seconds": 213.697,
+      "response": {
+        "stopReason": "end_turn"
+      },
+      "error": null,
+      "notification_count": 2856,
+      "agent_response": "I'll do two things: (1) create a standalone CSV file of the two-district (Purnia & Kishanganj) table with the source page noted, and (2) add a \"Download CSV\" button to the website so the currently shown (filtered) table can be downloaded with the source footer.\n\nNow the download logic in the script:\n\nNow verify with a stub test that clicks the download button and checks the generated CSV:\n\nAll 9 checks pass. Final validation \u2014 script syntax, CSV artifact parsing, and page serving:\n\nThe CSV label contains an unquoted comma \u2014 fixing:\n\nRe-validating the CSV artifact:\n\nThe metadata rows (Source/Unit/Note) have 2 fields while data rows have 3 \u2014 padding them to 3 columns:\n\nCSV artifact is valid. Final check that the updated page serves correctly:\n\nDone. You can now download the filtered two-district table with its source page in two ways:\n\n## 1. Ready-to-download file (the exact ask)\n**`/tmp/io-screening-v2-pdf-qwen-AEq2rF/purnia_kishanganj_facility_delivery_2022_2023.csv`**\n\n```\nDistrict,2022 (%),2023 (%)\nPurnia,61.0,66.0\nKishanganj,56.0,60.0\n\"Difference in 2023 (Purnia - Kishanganj, percentage points)\",,6.0\nSource,\"Table 1, page 2 of facility_delivery_report.pdf\",\nUnit,percent,\nNote,\"Synthetic facility-delivery PDF fixture; values are illustrative and are not official statistics\",\n```\n\nIt covers the two districts for the currently shown years (2022\u20132023), includes the 6.0-point 2023 difference you asked about, and carries the source citation (**Table 1, page 2**), unit, and the fixture disclaimer. Validated with Python's `csv` parser (7 rows \u00d7 3 columns, clean round-trip).\n\n## 2. New \"Download CSV\" button on the website\nAdded to the **Data** card in `index.html` \u2014 it exports whatever view is currently shown (selected year + optional comparison year, e.g. a \"Change (2022 \u2192 2023)\" column) with the same source footer rows, downloading as e.g. `facility_delivery_coverage_2023_vs_2022.csv`.\n\n**Verification:** JS syntax check passed; 9/9 functional assertions passed against a DOM stub (generated CSV content byte-for-byte in three states \u2014 default 2023, 2023-vs-2022 compare, and 2022 with auto-reset compare; filenames; blob URL revoke; anchor cleanup); page serves HTTP 200.",
+      "tool_call_count": 15,
+      "last_usage_update": null
+    }
+  ],
+  "outer_container_image_id": "sha256:c4c132d53c8674c187911aec88d2f32b6aee16659e76c8b70e20d06779d09223",
+  "outer_container_repo_digests": [],
+  "outer_container_platform": "linux/arm64",
+  "agent_info": {
+    "name": "cline",
+    "version": "3.0.55"
+  },
+  "session_id": "1787171416108_Rdgiq_cli",
+  "session_model_before_selection": "gpt-4o",
+  "requested_model_available": false,
+  "custom_model_id": true,
+  "session_model": "qwen/qwen3.8-27b:nitro",
+  "usage": {
+    "inputTokens": 1757742,
+    "outputTokens": 46164,
+    "cacheReadTokens": 32928,
+    "cacheWriteTokens": 0,
+    "totalCost": 0
+  },
+  "aggregate_usage": {
+    "inputTokens": 1757742,
+    "outputTokens": 46164,
+    "cacheReadTokens": 32928,
+    "cacheWriteTokens": 0,
+    "totalCost": 0
+  },
+  "total_cost": 0,
+  "session_metadata_path": "/tmp/io-screening-v2-pdf-qwen-state-zTHww4/home/.cline/data/sessions/1787171416108_Rdgiq_cli/1787171416108_Rdgiq_cli.json",
+  "finished_at_unix": 1787172241.771734,
+  "duration_seconds": 826.295,
+  "exit_code": 0
+}

@@ -1,0 +1,74 @@
+{
+  "id": "budget-join-utilisation-p03",
+  "task_id": "budget-join-utilisation",
+  "pattern": "join a new key and rank a derived percentage",
+  "question": "2024 budget use percentage by org unit from the two files, low to high",
+  "gold_sql": "SELECT b.org_unit, ROUND(100.0 * s.spent_lakh / b.approved_lakh, 1) AS utilisation_percent FROM approved_budget AS b JOIN actual_spend AS s ON b.org_unit = s.org_unit AND b.year = s.year WHERE b.year = 2024 ORDER BY utilisation_percent ASC, b.org_unit",
+  "expected_rows": [
+    [
+      "South",
+      75.0
+    ],
+    [
+      "North",
+      80.0
+    ],
+    [
+      "Central",
+      90.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "South",
+      75.0
+    ],
+    [
+      "North",
+      80.0
+    ],
+    [
+      "Central",
+      90.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT ab.org_unit, (aspend.spent_lakh * 100.0 / NULLIF(ab.approved_lakh, 0)) AS budget_use_percentage FROM approved_budget AS ab JOIN actual_spend AS aspend ON ab.org_unit = aspend.org_unit AND ab.year = aspend.year WHERE ab.year = 2024 AND NOT ab.approved_lakh IS NULL AND NOT aspend.spent_lakh IS NULL ORDER BY budget_use_percentage ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2024 budget use percentage by org unit from the two files, low to high\n[Database Schema]\nCREATE TABLE \"approved_budget\" (\n  \"org_unit\" VARCHAR,\n  \"year\" BIGINT,\n  \"approved_lakh\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"actual_spend\" (\n  \"org_unit\" VARCHAR,\n  \"year\" BIGINT,\n  \"spent_lakh\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same org_unit-year grain and can be matched on org_unit and year. Percent means 100.0 times numerator divided by the stated denominator.\n[User Question]\n2024 budget use percentage by org unit from the two files, low to high\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the relevant tables and columns**: We need to use the `approved_budget` and `actual_spend` tables. The columns of interest are `org_unit`, `year`, `approved_lakh`, and `spent_lakh`.\n\n2. **Filter for the year 2024**: We need to ensure that we are only considering data for the year 2024.\n\n3. **Calculate the budget use percentage**: This is calculated as `(spent_lakh / approved_lakh) * 100.0`.\n\n4. **Order the results**: The results should be ordered by the budget use percentage in ascending order.\n\n5. **Handle NULL values**: Ensure that we only calculate the percentage for rows where both `approved_lakh` and `spent_lakh` are not NULL.\n\nBased on these steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    ab.org_unit,\n    (aspend.spent_lakh * 100.0 / ab.approved_lakh) AS budget_use_percentage\nFROM \n    approved_budget ab\nJOIN \n    actual_spend aspend ON ab.org_unit = aspend.org_unit AND ab.year = aspend.year\nWHERE \n    ab.year = 2024 AND ab.approved_lakh IS NOT NULL AND aspend.spent_lakh IS NOT NULL\nORDER BY \n    budget_use_percentage ASC;\n```\n\n### Explanation:\n- **SELECT Clause**: We select `org_unit` and calculate the budget use percentage.\n- **FROM Clause**: We specify the `approved_budget` table as the primary table.\n- **JOIN Clause**: We join the `actual_spend` table on `org_unit` and `year` to match the corresponding records.\n- **WHERE Clause**: We filter for the year 2024 and ensure that both `approved_lakh` and `spent_lakh` are not NULL.\n- **ORDER BY Clause**: We order the results by the calculated budget use percentage in ascending order.\n\nThis query directly addresses the user's request and avoids unnecessary complexity.",
+      "api": {
+        "id": "chatcmpl-b38a95f7eb918c81",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 245,
+          "total_tokens": 694,
+          "completion_tokens": 449,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 33.749
+      },
+      "duration_seconds": 33.757,
+      "sql_duckdb": "SELECT ab.org_unit, (aspend.spent_lakh * 100.0 / NULLIF(ab.approved_lakh, 0)) AS budget_use_percentage FROM approved_budget AS ab JOIN actual_spend AS aspend ON ab.org_unit = aspend.org_unit AND ab.year = aspend.year WHERE ab.year = 2024 AND NOT ab.approved_lakh IS NULL AND NOT aspend.spent_lakh IS NULL ORDER BY budget_use_percentage ASC NULLS FIRST",
+      "rows": [
+        [
+          "South",
+          75.0
+        ],
+        [
+          "North",
+          80.0
+        ],
+        [
+          "Central",
+          90.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

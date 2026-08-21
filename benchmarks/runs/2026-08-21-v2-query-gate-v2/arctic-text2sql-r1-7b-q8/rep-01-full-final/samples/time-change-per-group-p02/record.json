@@ -1,0 +1,85 @@
+{
+  "id": "time-change-per-group-p02",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "compare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT a.district, ((a.anc4_completed * 100.0 / NULLIF(a.pregnancies_registered, 0)) - (b.anc4_completed * 100.0 / NULLIF(b.pregnancies_registered, 0))) AS percentage_point_change FROM (SELECT district, SUM(pregnancies_registered) AS pregnancies_registered, SUM(anc4_completed) AS anc4_completed FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda') GROUP BY district) AS a JOIN (SELECT district, SUM(pregnancies_registered) AS pregnancies_registered, SUM(anc4_completed) AS anc4_completed FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda') GROUP BY district) AS b ON a.district = b.district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: We need data from the `anc_visits` table for the years 2021 and 2023, specifically for the districts of Gaya and Nalanda.\n2. **Filter the Data**: We will filter the data to include only the records for the specified years and districts.\n3. **Aggregate the Data**: We need to sum up the `pregnancies_registered` and `anc4_completed` for each district and year.\n4. **Calculate the Percentage-Point Change**: We will calculate the percentage-point change in the ratio of `anc4_completed` to `pregnancies_registered` from 2021 to 2023.\n5. **Format the Output**: The result should show the percentage-point change for each district.\n\nLet's break down the SQL query step-by-step:\n\n### Step 1: Filter and Aggregate Data for 2021 and 2023\n\nWe will use a Common Table Expression (CTE) to aggregate the data for each district and year.\n\n```sql\nWITH AggregatedData AS (\n    SELECT \n        district,\n        year,\n        SUM(pregnancies_registered) AS total_pregnancies_registered,\n        SUM(anc4_completed) AS total_anc4_completed\n    FROM \n        anc_visits\n    WHERE \n        district IN ('Gaya', 'Nalanda')\n        AND year IN (2021, 2023)\n    GROUP BY \n        district, year\n)\n```\n\n### Step 2: Calculate the Percentage-Point Change\n\nWe will use another CTE to calculate the percentage-point change in the ratio of `anc4_completed` to `pregnancies_registered` from 2021 to 2023.\n\n```sql\n, PercentagePointChange AS (\n    SELECT \n        a1.district,\n        ((a2.total_anc4_completed * 100.0 / a2.total_pregnancies_registered) - \n         (a1.total_anc4_completed * 100.0 / a1.total_pregnancies_registered)) AS pp_change\n    FROM \n        AggregatedData a1\n    JOIN \n        AggregatedData a2\n    ON \n        a1.district = a2.district\n    WHERE \n        a1.year = 2021 AND a2.year = 2023\n)\n```\n\n### Step 3: Select and Format the Final Output\n\nFinally, we will select the district and the calculated percentage-point change.\n\n```sql\nSELECT \n    district,\n    pp_change\nFROM \n    PercentagePointChange;\n```\n\n### Final SQL Query\n\nCombining all the steps, the final SQL query is:\n\n```sql\nWITH AggregatedData AS (\n    SELECT \n        district,\n        year,\n        SUM(pregnancies_registered) AS total_pregnancies_registered,\n        SUM(anc4_completed) AS total_anc4_completed\n    FROM \n        anc_visits\n    WHERE \n        district IN ('Gaya', 'Nalanda')\n        AND year IN (2021, 2023)\n    GROUP BY \n        district, year\n),\nPercentagePointChange AS (\n    SELECT \n        a1.district,\n        ((a2.total_anc4_completed * 100.0 / a2.total_pregnancies_registered) - \n         (a1.total_anc4_completed * 100.0 / a1.total_pregnancies_registered)) AS pp_change\n    FROM \n        AggregatedData a1\n    JOIN \n        AggregatedData a2\n    ON \n        a1.district = a2.district\n    WHERE \n        a1.year = 2021 AND a2.year = 2023\n)\nSELECT \n    district,\n    pp_change\nFROM \n    PercentagePointChange;\n```\n\nThis query effectively calculates the percentage-point change in the ratio of ANC4 completed to registered pregnancies for the districts of Gaya and Nalanda from 2021 to 2023.",
+      "api": {
+        "id": "chatcmpl-kDn0d6GsltRU88qr7wtLNqN7Y62IBJSR",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q8_0",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 873,
+          "prompt_tokens": 231,
+          "total_tokens": 1104,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 32.282
+      },
+      "duration_seconds": 32.283,
+      "error": "ParseError: Failed to parse any statement following CTE. Line 14, Col: 1.\n  strict IN ('Gaya', 'Nalanda')\n        AND year IN (2021, 2023)\n    GROUP BY \n        district, year\n\u001b[4m)\u001b[0m"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[Previous Query Error]\nParseError: Failed to parse any statement following CTE. Line 14, Col: 1.\n  strict IN ('Gaya', 'Nalanda')\n        AND year IN (2021, 2023)\n    GROUP BY \n        district, year\n\u001b[4m)\u001b[0m\nReturn one corrected read-only query.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n```sql",
+      "response": "To translate the user's request into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: We need data from the `anc_visits` table for the years 2021 and 2023, specifically for the districts 'Gaya' and 'Nalanda'.\n2. **Aggregate the Data**: We need to sum up the `pregnancies_registered` and `anc4_completed` for each district and year.\n3. **Calculate the Percentage-Point Change**: We need to compute the percentage-point change in the ratio of `anc4_completed` to `pregnancies_registered` from 2021 to 2023.\n4. **Filter the Results**: We need to ensure that we only consider districts 'Gaya' and 'Nalanda'.\n\nLet's break down the steps into SQL:\n\n1. **Filter and Aggregate Data**:\n   - Use a `WHERE` clause to filter for the years 2021 and 2023 and the districts 'Gaya' and 'Nalanda'.\n   - Use `SUM` to aggregate `pregnancies_registered` and `anc4_completed` for each district and year.\n\n2. **Calculate the Percentage-Point Change**:\n   - Use a `CASE` statement or a `JOIN` to compare the sums from 2021 and 2023.\n   - Calculate the percentage-point change using the formula: \\((\\text{2023 Ratio} - \\text{2021 Ratio}) \\times 100\\).\n\n3. **Select the Required Columns**:\n   - Select the district and the calculated percentage-point change.\n\nHere is the final SQL query:\n\n```sql\nSELECT \n    a.district,\n    ((a.anc4_completed * 100.0 / a.pregnancies_registered) - \n     (b.anc4_completed * 100.0 / b.pregnancies_registered)) AS percentage_point_change\nFROM (\n    SELECT \n        district,\n        SUM(pregnancies_registered) AS pregnancies_registered,\n        SUM(anc4_completed) AS anc4_completed\n    FROM anc_visits\n    WHERE year = 2023 AND district IN ('Gaya', 'Nalanda')\n    GROUP BY district\n) a\nJOIN (\n    SELECT \n        district,\n        SUM(pregnancies_registered) AS pregnancies_registered,\n        SUM(anc4_completed) AS anc4_completed\n    FROM anc_visits\n    WHERE year = 2021 AND district IN ('Gaya', 'Nalanda')\n    GROUP BY district\n) b\nON a.district = b.district;\n```\n\n### Explanation:\n- **Subqueries (a and b)**: These subqueries aggregate the `pregnancies_registered` and `anc4_completed` for the years 2023 and 2021, respectively, for the districts 'Gaya' and 'Nalanda'.\n- **JOIN**: The `JOIN` operation ensures that we are comparing the same districts across the two years.\n- **Percentage-Point Change Calculation**: The formula \\((\\text{2023 Ratio} - \\text{2021 Ratio}) \\times 100\\) is used to calculate the percentage-point change in the ratio of `anc4_completed` to `pregnancies_registered`.\n- **SELECT Clause**: We select the district and the calculated percentage-point change.",
+      "api": {
+        "id": "chatcmpl-h1ruj7Y3tN39NgStdTb7nQPBtfl1usUJ",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q8_0",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 725,
+          "prompt_tokens": 310,
+          "total_tokens": 1035,
+          "prompt_tokens_details": {
+            "cached_tokens": 190
+          }
+        },
+        "duration_seconds": 26.956
+      },
+      "duration_seconds": 26.961,
+      "sql_duckdb": "SELECT a.district, ((a.anc4_completed * 100.0 / NULLIF(a.pregnancies_registered, 0)) - (b.anc4_completed * 100.0 / NULLIF(b.pregnancies_registered, 0))) AS percentage_point_change FROM (SELECT district, SUM(pregnancies_registered) AS pregnancies_registered, SUM(anc4_completed) AS anc4_completed FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda') GROUP BY district) AS a JOIN (SELECT district, SUM(pregnancies_registered) AS pregnancies_registered, SUM(anc4_completed) AS anc4_completed FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda') GROUP BY district) AS b ON a.district = b.district",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

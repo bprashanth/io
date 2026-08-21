@@ -1,0 +1,73 @@
+{
+  "id": "derived-rate-ranking-p03",
+  "task_id": "derived-rate-ranking",
+  "pattern": "filter, derive a comparable percentage, rank",
+  "question": "make district list for 2023 full immunisation coverage percentage and sort best first",
+  "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+  "expected_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, CAST(children_fully_immunised AS REAL) * 100 / NULLIF(children_due, 0) AS full_immunisation_coverage FROM immunisation WHERE year = 2023 ORDER BY full_immunisation_coverage DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nmake district list for 2023 full immunisation coverage percentage and sort best first\n[Database Schema]\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nmake district list for 2023 full immunisation coverage percentage and sort best first\n```sql",
+      "response": "SELECT district, CAST(children_fully_immunised AS REAL) * 100 / children_due AS full_immunisation_coverage FROM immunisation WHERE year = 2023 ORDER BY full_immunisation_coverage DESC",
+      "api": {
+        "id": "chatcmpl-929e602f4892f24c",
+        "model": "XGenerationLab/XiYanSQL-QwenCoder-3B-2504",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 208,
+          "total_tokens": 255,
+          "completion_tokens": 47,
+          "prompt_tokens_details": null
+        },
+        "duration_seconds": 1.561
+      },
+      "sql_duckdb": "SELECT district, CAST(children_fully_immunised AS REAL) * 100 / NULLIF(children_due, 0) AS full_immunisation_coverage FROM immunisation WHERE year = 2023 ORDER BY full_immunisation_coverage DESC",
+      "rows": [
+        [
+          "Nalanda",
+          90.0
+        ],
+        [
+          "Gaya",
+          85.0
+        ],
+        [
+          "Purnia",
+          76.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

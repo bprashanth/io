@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Women's Training Completion &amp; 6-Month Employment</title>
+<style>
+  :root {
+    --a: #4f46e5;   /* Year A */
+    --b: #0d9488;   /* Year B */
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --pos: #15803d;
+    --neg: #b91c1c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.5; padding: 24px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header h1 { font-size: 1.45rem; margin-bottom: 4px; }
+  header p.sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+  .card h2 { font-size: 1.02rem; margin-bottom: 12px; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; }
+  .controls label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .controls select {
+    font-size: 1rem; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; color: var(--ink); min-width: 110px;
+  }
+  .chip { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: baseline; }
+  .chip.a { background: var(--a); } .chip.b { background: var(--b); }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #fafafa; }
+  .kpi .k-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .kpi .k-value { font-size: 1.35rem; font-weight: 700; margin-top: 2px; }
+  .kpi .k-sub { font-size: 0.78rem; color: var(--muted); }
+  .kpi.k-a .k-value { color: var(--a); } .kpi.k-b .k-value { color: var(--b); }
+
+  .table-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; white-space: nowrap; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; font-weight: 600; }
+  thead tr:first-child th { border-bottom: none; padding-bottom: 2px; font-size: 0.8rem; }
+  .group-a { color: var(--a); } .group-b { color: var(--b); }
+  .colspan-a { background: #eef2ff; } .colspan-b { background: #f0fdfa; }
+  tfoot td { font-weight: 700; background: #fafafa; }
+  .pos { color: var(--pos); font-weight: 600; }
+  .neg { color: var(--neg); font-weight: 600; }
+  .zero { color: var(--muted); }
+
+  .chart { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; align-items: center; margin-top: 6px; }
+  .chart .d-name { font-size: 0.85rem; font-weight: 600; text-align: right; }
+  .bars { display: grid; gap: 3px; }
+  .bar-row { display: grid; grid-template-columns: 14px 1fr 52px; gap: 8px; align-items: center; }
+  .bar { height: 14px; border-radius: 4px; min-width: 2px; }
+  .bar.a { background: var(--a); } .bar.b { background: var(--b); }
+  .bar-val { font-size: 0.75rem; color: var(--muted); }
+  .chart-title { font-size: 0.9rem; font-weight: 700; margin: 14px 0 4px; }
+  .chart-title:first-child { margin-top: 0; }
+
+  .formula { background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; font-size: 0.92rem; }
+  .formula code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88rem; background: #eef2ff; color: #3730a3; padding: 2px 6px; border-radius: 6px; }
+  .formula .f-name { font-weight: 700; margin-bottom: 4px; }
+  .note { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+  .src-line { font-size: 0.9rem; }
+  .src-line code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; }
+  footer { text-align: center; color: var(--muted); font-size: 0.78rem; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Women's Training Completion &amp; Employment After 6 Months</h1>
+    <p class="sub">Outcomes by district and year &mdash; select two years to compare side by side.</p>
+  </header>
+
+  <div class="card">
+    <div class="controls">
+      <div>
+        <label for="yearA">Year A <span class="chip a"></span></label>
+        <select id="yearA"></select>
+      </div>
+      <div>
+        <label for="yearB">Year B (compare) <span class="chip b"></span></label>
+        <select id="yearB"></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Totals for selected years</h2>
+    <div class="kpis" id="kpis"></div>
+  </div>
+
+  <div class="card">
+    <h2>By district</h2>
+    <div class="table-scroll">
+      <table id="districtTable"></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Comparison charts</h2>
+    <div id="charts"></div>
+  </div>
+
+  <div class="card">
+    <h2>Formulas used</h2>
+    <div class="formula">
+      <div class="f-name">1. Training completion rate</div>
+      <code>Completion&nbsp;rate&nbsp;=&nbsp;(completed_training&nbsp;&divide;&nbsp;women_enrolled)&nbsp;&times;&nbsp;100</code>
+      <p class="note">Share of enrolled women who completed the training program.</p>
+    </div>
+    <div class="formula">
+      <div class="f-name">2. Employment rate after 6 months (among completers)</div>
+      <code>Employment&nbsp;rate&nbsp;=&nbsp;(employed_at_6_months&nbsp;&divide;&nbsp;completed_training)&nbsp;&times;&nbsp;100</code>
+      <p class="note">Share of women who <em>completed</em> training and were employed when re-contacted 6 months after completion.</p>
+    </div>
+    <p class="note">Year-over-year changes are shown in percentage points (pp) as Year B &minus; Year A.</p>
+  </div>
+
+  <div class="card">
+    <h2>Data source</h2>
+    <p class="src-line" id="source"></p>
+    <p class="note" id="sourceFile"></p>
+  </div>
+
+  <footer>Simple static dashboard &middot; no external libraries &middot; data embedded from CSV</footer>
+</div>
+
+<script>
+// ---- Data (from women_livelihood_outcomes.csv) ----
+const DATA = [
+  { district: "Gaya",       year: 2022, women_enrolled: 1000, completed_training: 800, employed_at_6_months: 520, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Gaya",       year: 2023, women_enrolled: 1100, completed_training: 902, employed_at_6_months: 616, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Nalanda",    year: 2022, women_enrolled: 900,  completed_training: 765, employed_at_6_months: 540, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Nalanda",    year: 2023, women_enrolled: 1000, completed_training: 870, employed_at_6_months: 650, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Purnia",     year: 2022, women_enrolled: 1200, completed_training: 840, employed_at_6_months: 504, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Purnia",     year: 2023, women_enrolled: 1300, completed_training: 949, employed_at_6_months: 598, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Kishanganj", year: 2022, women_enrolled: 800,  completed_training: 520, employed_at_6_months: 280, source: "synthetic women livelihood outcomes fixture" },
+  { district: "Kishanganj", year: 2023, women_enrolled: 900,  completed_training: 612, employed_at_6_months: 342, source: "synthetic women livelihood outcomes fixture" }
+];
+const CSV_FILE = "women_livelihood_outcomes.csv";
+
+// ---- Helpers ----
+const $ = (id) => document.getElementById(id);
+const pct = (n, d) => (d ? (n / d) * 100 : 0);
+const fmt1 = (x) => x.toFixed(1);
+const fmtInt = (x) => x.toLocaleString("en-US");
+
+const years = [...new Set(DATA.map(r => r.year))].sort();
+const districts = [...new Set(DATA.map(r => r.district))].sort();
+const byYear = (y) => DATA.filter(r => r.year === y);
+
+function totals(rows) {
+  const t = rows.reduce((a, r) => {
+    a.enrolled += r.women_enrolled; a.completed += r.completed_training; a.employed += r.employed_at_6_months;
+    return a;
+  }, { enrolled: 0, completed: 0, employed: 0 });
+  return t;
+}
+function deltaHTML(d) {
+  const cls = d > 0.05 ? "pos" : d < -0.05 ? "neg" : "zero";
+  const arrow = d > 0.05 ? "&#9650;" : d < -0.05 ? "&#9660;" : "&#8212;";
+  return `<span class="${cls}">${arrow} ${fmt1(Math.abs(d))} pp</span>`;
+}
+
+// ---- Controls ----
+function fillYearSelects() {
+  const selA = $("yearA"), selB = $("yearB");
+  selA.innerHTML = selB.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
+  selA.value = years[0];
+  selB.value = years[years.length - 1];
+  selA.addEventListener("change", render);
+  selB.addEventListener("change", render);
+}
+
+// ---- Render ----
+function render() {
+  const yA = +$("yearA").value, yB = +$("yearB").value;
+  const rowsA = byYear(yA), rowsB = byYear(yB);
+  const tA = totals(rowsA), tB = totals(rowsB);
+
+  // KPIs
+  const kpi = (cls, year, t) => `
+    <div class="kpi ${cls}">
+      <div class="k-label">${year} &middot; Enrolled</div>
+      <div class="k-value">${fmtInt(t.enrolled)}</div>
+      <div class="k-sub">women enrolled</div>
+    </div>
+    <div class="kpi ${cls}">
+      <div class="k-label">${year} &middot; Completion rate</div>
+      <div class="k-value">${fmt1(pct(t.completed, t.enrolled))}%</div>
+      <div class="k-sub">${fmtInt(t.completed)} completed</div>
+    </div>
+    <div class="kpi ${cls}">
+      <div class="k-label">${year} &middot; Employment @ 6 mo</div>
+      <div class="k-value">${fmt1(pct(t.employed, t.completed))}%</div>
+      <div class="k-sub">${fmtInt(t.employed)} of completers</div>
+    </div>`;
+  $("kpis").innerHTML = kpi("k-a", yA, tA) + kpi("k-b", yB, tB);
+
+  // District table
+  const head = `
+    <thead>
+      <tr>
+        <th rowspan="2">District</th>
+        <th colspan="5" class="group-a colspan-a">${yA}</th>
+        <th colspan="5" class="group-b colspan-b">${yB}</th>
+        <th colspan="2" rowspan="2">Change (B &minus; A)</th>
+      </tr>
+      <tr>
+        <th class="colspan-a">Enrolled</th><th class="colspan-a">Completed</th><th class="colspan-a">Completion %</th><th class="colspan-a">Employed @6mo</th><th class="colspan-a">Employment %</th>
+        <th class="colspan-b">Enrolled</th><th class="colspan-b">Completed</th><th class="colspan-b">Completion %</th><th class="colspan-b">Employed @6mo</th><th class="colspan-b">Employment %</th>
+      </tr>
+    </thead>`;
+  const body = districts.map(d => {
+    const a = rowsA.find(r => r.district === d), b = rowsB.find(r => r.district === d);
+    const cA = pct(a.completed_training, a.women_enrolled), eA = pct(a.employed_at_6_months, a.completed_training);
+    const cB = pct(b.completed_training, b.women_enrolled), eB = pct(b.employed_at_6_months, b.completed_training);
+    return `<tr>
+      <td>${d}</td>
+      <td>${fmtInt(a.women_enrolled)}</td><td>${fmtInt(a.completed_training)}</td><td>${fmt1(cA)}</td><td>${fmtInt(a.employed_at_6_months)}</td><td>${fmt1(eA)}</td>
+      <td>${fmtInt(b.women_enrolled)}</td><td>${fmtInt(b.completed_training)}</td><td>${fmt1(cB)}</td><td>${fmtInt(b.employed_at_6_months)}</td><td>${fmt1(eB)}</td>
+      <td>${deltaHTML(cB - cA)}</td><td>${deltaHTML(eB - eA)}</td>
+    </tr>`;
+  }).join("");
+  const cTA = pct(tA.completed, tA.enrolled), eTA = pct(tA.employed, tA.completed);
+  const cTB = pct(tB.completed, tB.enrolled), eTB = pct(tB.employed, tB.completed);
+  const foot = `<tfoot><tr>
+      <td>Total / overall</td>
+      <td>${fmtInt(tA.enrolled)}</td><td>${fmtInt(tA.completed)}</td><td>${fmt1(cTA)}</td><td>${fmtInt(tA.employed)}</td><td>${fmt1(eTA)}</td>
+      <td>${fmtInt(tB.enrolled)}</td><td>${fmtInt(tB.completed)}</td><td>${fmt1(cTB)}</td><td>${fmtInt(tB.employed)}</td><td>${fmt1(eTB)}</td>
+      <td>${deltaHTML(cTB - cTA)}</td><td>${deltaHTML(eTB - eTA)}</td>
+    </tr></tfoot>`;
+  $("districtTable").innerHTML = head + `<tbody>${body}</tbody>` + foot;
+
+  // Charts
+  const chart = (title, pick) => {
+    const rows = districts.map(d => {
+      const a = rowsA.find(r => r.district === d), b = rowsB.find(r => r.district === d);
+      return { d, va: pick(a), vb: pick(b) };
+    });
+    return `<div class="chart-title">${title}</div><div class="chart">` + rows.map(r => `
+      <div class="d-name">${r.d}</div>
+      <div class="bars">
+        <div class="bar-row"><span class="chip a"></span><div class="bar a" style="width:${r.va}%"></div><span class="bar-val">${fmt1(r.va)}%</span></div>
+        <div class="bar-row"><span class="chip b"></span><div class="bar b" style="width:${r.vb}%"></div><span class="bar-val">${fmt1(r.vb)}%</span></div>
+      </div>`).join("") + `</div>`;
+  };
+  $("charts").innerHTML =
+    chart("Training completion rate by district", r => pct(r.completed_training, r.women_enrolled)) +
+    chart("Employment rate after 6 months (among completers) by district", r => pct(r.employed_at_6_months, r.completed_training));
+
+  // Source
+  const srcs = [...new Set(DATA.map(r => r.source))];
+  $("source").innerHTML = `<strong>Source:</strong> ${srcs.join("; ")}`;
+  $("sourceFile").innerHTML = `Dataset: <code>${CSV_FILE}</code> &middot; ${DATA.length} district-year records &middot; figures are ${srcs.join("; ")}, shown as sample data.`;
+}
+
+fillYearSelects();
+render();
+</script>
+</body>
+</html>

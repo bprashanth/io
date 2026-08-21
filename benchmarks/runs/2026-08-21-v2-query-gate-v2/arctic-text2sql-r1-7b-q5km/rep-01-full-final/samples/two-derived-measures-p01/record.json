@@ -1,0 +1,112 @@
+{
+  "id": "two-derived-measures-p01",
+  "task_id": "two-derived-measures",
+  "pattern": "filter two periods and groups, derive two percentages",
+  "question": "Gaya and Nalanda 2022 2023 show institutional delivery and postnatal percentages of registrations",
+  "gold_sql": "SELECT district, year, ROUND(100.0 * institutional_deliveries / pregnancies_registered, 1) AS delivery_percent, ROUND(100.0 * postnatal_check_48h / pregnancies_registered, 1) AS postnatal_percent FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) ORDER BY district, year",
+  "expected_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, year, (SUM(institutional_deliveries) * 100.0 / NULLIF(SUM(pregnancies_registered), 0)) AS institutional_delivery_percentage, (SUM(postnatal_check_48h) * 100.0 / NULLIF(SUM(pregnancies_registered), 0)) AS postnatal_check_48h_percentage FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) GROUP BY district, year ORDER BY district NULLS FIRST, year NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nGaya and Nalanda 2022 2023 show institutional delivery and postnatal percentages of registrations\n[Database Schema]\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nGaya and Nalanda 2022 2023 show institutional delivery and postnatal percentages of registrations\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to carefully break down the requirements and map them to the available data in the `maternal_services` table. Here's the step-by-step reasoning:\n\n1. **Identify the Relevant Data**: The question asks for data from the years 2022 and 2023 for the districts of Gaya and Nalanda. Specifically, we need to calculate the percentages of institutional deliveries and postnatal checks within 48 hours for these years and districts.\n\n2. **Filter the Data**: We need to filter the records to include only those from the specified districts and years.\n\n3. **Calculate Percentages**: For each district and year, we need to calculate the percentage of institutional deliveries and postnatal checks within 48 hours. This involves dividing the respective counts by the total number of pregnancies registered and multiplying by 100.\n\n4. **Structure the Query**: We will use a single query with conditional aggregation to calculate the required percentages for each district and year.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nSELECT \n    district,\n    year,\n    (SUM(institutional_deliveries) * 100.0 / SUM(pregnancies_registered)) AS institutional_delivery_percentage,\n    (SUM(postnatal_check_48h) * 100.0 / SUM(pregnancies_registered)) AS postnatal_check_48h_percentage\nFROM \n    maternal_services\nWHERE \n    district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023)\nGROUP BY \n    district, year\nORDER BY \n    district, year;\n```\n\n### Explanation:\n\n- **SELECT Clause**: We select the `district` and `year` to identify the specific records. We also calculate the `institutional_delivery_percentage` and `postnatal_check_48h_percentage` using the `SUM` function for aggregation and division by `pregnancies_registered`.\n\n- **FROM Clause**: We specify the `maternal_services` table as the source of our data.\n\n- **WHERE Clause**: We filter the records to include only those from the districts 'Gaya' and 'Nalanda' and for the years 2022 and 2023.\n\n- **GROUP BY Clause**: We group the results by `district` and `year` to ensure that the percentages are calculated for each combination of district and year.\n\n- **ORDER BY Clause**: We order the results by `district` and `year` for better readability.\n\nThis query efficiently calculates the required percentages for the specified districts and years without unnecessary complexity or joins.",
+      "api": {
+        "id": "chatcmpl-95kLrBD6mkMMODFTWervUzVpEtz8mJBS",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 550,
+          "prompt_tokens": 230,
+          "total_tokens": 780,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 17.37
+      },
+      "duration_seconds": 17.376,
+      "sql_duckdb": "SELECT district, year, (SUM(institutional_deliveries) * 100.0 / NULLIF(SUM(pregnancies_registered), 0)) AS institutional_delivery_percentage, (SUM(postnatal_check_48h) * 100.0 / NULLIF(SUM(pregnancies_registered), 0)) AS postnatal_check_48h_percentage FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) GROUP BY district, year ORDER BY district NULLS FIRST, year NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          2022,
+          72.0,
+          63.0
+        ],
+        [
+          "Gaya",
+          2023,
+          75.0,
+          68.0
+        ],
+        [
+          "Nalanda",
+          2022,
+          78.0,
+          72.0
+        ],
+        [
+          "Nalanda",
+          2023,
+          80.0,
+          75.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

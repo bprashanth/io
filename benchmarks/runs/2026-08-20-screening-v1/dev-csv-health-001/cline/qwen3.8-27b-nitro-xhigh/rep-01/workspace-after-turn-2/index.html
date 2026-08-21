@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ANC4 Coverage by District</title>
+<style>
+  :root {
+    --teal-900: #134e4a;
+    --teal-700: #0f766e;
+    --teal-600: #0d9488;
+    --teal-100: #ccfbf1;
+    --teal-50:  #f0fdfa;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #f6f8f8;
+    --card: #ffffff;
+    --best: #15803d;
+    --warn-bg: #fffbeb;
+    --warn-line: #fcd34d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  header.page {
+    background: linear-gradient(135deg, var(--teal-900), var(--teal-700));
+    color: #fff;
+    padding: 28px 0 24px;
+  }
+  header.page .wrap { padding-top: 0; padding-bottom: 0; }
+  header.page h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; }
+  header.page p { opacity: 0.85; font-size: 0.95rem; margin-top: 4px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .card h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 4px; }
+  .card .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 14px; }
+
+  /* Year selector */
+  .years { display: flex; gap: 8px; flex-wrap: wrap; }
+  .years button {
+    font: inherit;
+    font-weight: 600;
+    padding: 8px 20px;
+    border-radius: 999px;
+    border: 1.5px solid var(--teal-700);
+    background: #fff;
+    color: var(--teal-700);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .years button:hover { background: var(--teal-50); }
+  .years button.active { background: var(--teal-700); color: #fff; }
+  .years button:focus-visible { outline: 3px solid var(--teal-100); outline-offset: 2px; }
+
+  /* Summary strip */
+  .summary { display: flex; gap: 12px; flex-wrap: wrap; }
+  .stat {
+    flex: 1 1 160px;
+    background: var(--teal-50);
+    border: 1px solid var(--teal-100);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .stat .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .stat .value { font-size: 1.35rem; font-weight: 700; color: var(--teal-900); margin-top: 2px; }
+  .stat .hint { font-size: 0.78rem; color: var(--muted); }
+
+  /* Bars */
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 58px; gap: 10px; align-items: center; margin: 10px 0; }
+  .bar-row .name { font-size: 0.9rem; font-weight: 600; text-align: right; }
+  .bar-row .name .best-tag {
+    display: inline-block; font-size: 0.68rem; font-weight: 700; color: #fff;
+    background: var(--best); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: middle;
+  }
+  .track { background: #eef1f1; border-radius: 6px; height: 22px; overflow: hidden; }
+  .fill {
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--teal-600), var(--teal-700));
+    display: flex; align-items: center; justify-content: flex-end;
+    transition: width 0.4s ease;
+    min-width: 2px;
+  }
+  .pct { font-size: 0.9rem; font-weight: 700; color: var(--teal-900); text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 6px; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { background: var(--teal-50); color: var(--teal-900); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  tbody tr:last-child td { border-bottom: none; }
+  tr.total-row td { font-weight: 700; background: var(--teal-50); border-top: 2px solid var(--teal-100); }
+  td.best-td { color: var(--best); font-weight: 700; }
+  .trend { display: flex; gap: 4px; justify-content: flex-end; }
+  .trend .cell {
+    font-size: 0.72rem; padding: 2px 6px; border-radius: 4px;
+    background: #f3f4f6; color: var(--muted);
+  }
+  .trend .cell.sel { background: var(--teal-700); color: #fff; font-weight: 600; }
+
+  /* Info cards */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 640px) {
+    .info-grid { grid-template-columns: 1fr; }
+    .bar-row { grid-template-columns: 84px 1fr 52px; }
+  }
+  .src-list { font-size: 0.9rem; }
+  .src-list li { margin-left: 18px; margin-top: 6px; }
+  .src-list code { background: #f3f4f6; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 0.82rem; }
+  .synthetic-note {
+    background: var(--warn-bg); border: 1px solid var(--warn-line);
+    border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; margin-top: 12px;
+  }
+  .formula {
+    background: var(--teal-50); border: 1px solid var(--teal-100);
+    border-radius: 8px; padding: 12px 14px; font-size: 0.95rem; margin: 10px 0;
+    text-align: center; font-weight: 600; color: var(--teal-900);
+  }
+  .example {
+    background: #f9fafb; border: 1px dashed var(--line); border-radius: 8px;
+    padding: 10px 12px; font-size: 0.85rem; margin-top: 10px;
+  }
+  .example b { color: var(--teal-900); }
+
+  footer.page { margin-top: 24px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<header class="page">
+  <div class="wrap">
+    <h1>ANC4 Coverage by District</h1>
+    <p>Antenatal checkup coverage — share of registered pregnancies that completed 4+ antenatal visits (ANC4)</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Select a year to compare districts</h2>
+    <p class="sub">Pick a year — the chart and table update to compare all districts for that year.</p>
+    <div class="years" id="yearSelector" role="group" aria-label="Select year"></div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="card">
+    <h2 id="chartTitle">Coverage by district</h2>
+    <p class="sub">ANC4 coverage rate (%), ordered highest to lowest. Scale is 0–100%.</p>
+    <div id="chart" aria-live="polite"></div>
+  </div>
+
+  <div class="card">
+    <h2>Underlying data</h2>
+    <p class="sub">Raw counts behind the chart. Trend column shows the rate in each year (highlighted = selected).</p>
+    <div style="overflow-x:auto;">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>District</th>
+            <th>Pregnancies registered</th>
+            <th>Completed ANC4</th>
+            <th>ANC4 coverage</th>
+            <th id="trendTh">Trend</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="card">
+      <h2>Data source</h2>
+      <p class="sub">Where these numbers come from.</p>
+      <ul class="src-list" id="sourceList"></ul>
+      <div class="synthetic-note" id="syntheticNote" hidden></div>
+    </div>
+    <div class="card">
+      <h2>How the rate is calculated</h2>
+      <p class="sub">The method behind every bar in this page.</p>
+      <div class="formula">ANC4 coverage (%) = ANC4 completed &divide; Pregnancies registered &times; 100</div>
+      <ul class="src-list">
+        <li><b>ANC4 completed</b> — pregnant women who completed 4 or more antenatal checkups (visits) during the year.</li>
+        <li><b>Pregnancies registered</b> — all pregnancies registered at the facility in that district and year (the denominator).</li>
+        <li>The rate is computed <b>per district per year</b> from the counts above; the all-district total is the sum of completions divided by the sum of registrations (not an average of district rates).</li>
+      </ul>
+      <div class="example" id="calcExample"></div>
+    </div>
+  </div>
+
+  <footer class="page" id="footerNote"></footer>
+</div>
+<script>
+"use strict";
+
+// ---- Raw data, exactly as it appears in anc4_coverage.csv ----
+const CSV = `district,year,pregnancies_registered,anc4_completed,source
+Gaya,2020,1200,744,synthetic Bihar ANC fixture
+Gaya,2021,1250,825,synthetic Bihar ANC fixture
+Gaya,2022,1300,897,synthetic Bihar ANC fixture
+Gaya,2023,1350,999,synthetic Bihar ANC fixture
+Nalanda,2020,1000,700,synthetic Bihar ANC fixture
+Nalanda,2021,1100,803,synthetic Bihar ANC fixture
+Nalanda,2022,1200,924,synthetic Bihar ANC fixture
+Nalanda,2023,1250,1000,synthetic Bihar ANC fixture
+Purnia,2020,1400,770,synthetic Bihar ANC fixture
+Purnia,2021,1500,870,synthetic Bihar ANC fixture
+Purnia,2022,1550,992,synthetic Bihar ANC fixture
+Purnia,2023,1600,1072,synthetic Bihar ANC fixture
+Kishanganj,2020,800,400,synthetic Bihar ANC fixture
+Kishanganj,2021,900,486,synthetic Bihar ANC fixture
+Kishanganj,2022,1000,570,synthetic Bihar ANC fixture
+Kishanganj,2023,1100,671,synthetic Bihar ANC fixture
+Patna,2020,1500,1170,synthetic Bihar ANC fixture
+Patna,2021,1600,1280,synthetic Bihar ANC fixture
+Patna,2022,1700,1411,synthetic Bihar ANC fixture
+Patna,2023,1800,1548,synthetic Bihar ANC fixture`;
+
+// ---- Parse CSV ----
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const header = lines[0].split(",").map(h => h.trim());
+  const idx = {
+    district: header.indexOf("district"),
+    year: header.indexOf("year"),
+    reg: header.indexOf("pregnancies_registered"),
+    anc4: header.indexOf("anc4_completed"),
+    source: header.indexOf("source")
+  };
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const c = line.split(",");
+    return {
+      district: c[idx.district].trim(),
+      year: parseInt(c[idx.year], 10),
+      reg: parseInt(c[idx.reg], 10),
+      anc4: parseInt(c[idx.anc4], 10),
+      source: c[idx.source].trim()
+    };
+  });
+}
+
+const ALL_ROWS = parseCSV(CSV);
+
+// ---- Show only 2021–2023 (2020 rows are loaded but hidden from all views) ----
+const MIN_YEAR = 2021, MAX_YEAR = 2023;
+const rows = ALL_ROWS.filter(r => r.year >= MIN_YEAR && r.year <= MAX_YEAR);
+const districts = [...new Set(rows.map(r => r.district))].sort((a, b) => a.localeCompare(b));
+const years = [...new Set(rows.map(r => r.year))].sort((a, b) => a - b);
+const sources = [...new Set(rows.map(r => r.source))];
+
+let selectedYear = years[years.length - 1]; // default to latest year
+
+const fmt = n => n.toLocaleString("en-US");
+const rate = r => r.anc4 / r.reg * 100;
+const pct = r => r.toFixed(1) + "%";
+const rowFor = (d, y) => rows.find(r => r.district === d && r.year === y);
+
+function aggregate(y) {
+  const set = rows.filter(r => r.year === y);
+  return {
+    reg: set.reduce((s, r) => s + r.reg, 0),
+    anc4: set.reduce((s, r) => s + r.anc4, 0)
+  };
+}
+
+// ---- Render ----
+function render() {
+  const sel = document.getElementById("yearSelector");
+  sel.innerHTML = "";
+  years.forEach(y => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = y;
+    b.className = y === selectedYear ? "active" : "";
+    b.setAttribute("aria-pressed", String(y === selectedYear));
+    b.addEventListener("click", () => { selectedYear = y; render(); });
+    sel.appendChild(b);
+  });
+
+  const data = districts
+    .map(d => ({ d, r: rowFor(d, selectedYear) }))
+    .filter(x => x.r)
+    .sort((a, b) => rate(b.r) - rate(a.r));
+
+  const topRate = rate(data[0].r);
+  const agg = aggregate(selectedYear);
+  const aggRate = agg.anc4 / agg.reg * 100;
+
+  // Summary strip
+  document.getElementById("summary").innerHTML = `
+    <div class="stat">
+      <div class="label">All-district total, ${selectedYear}</div>
+      <div class="value">${aggRate.toFixed(1)}%</div>
+      <div class="hint">${fmt(agg.anc4)} of ${fmt(agg.reg)} pregnancies</div>
+    </div>
+    <div class="stat">
+      <div class="label">Best district</div>
+      <div class="value">${data[0].d}</div>
+      <div class="hint">${pct(data[0].r)} ANC4 coverage</div>
+    </div>
+    <div class="stat">
+      <div class="label">Lowest district</div>
+      <div class="value">${data[data.length - 1].d}</div>
+      <div class="hint">${pct(data[data.length - 1].r)} ANC4 coverage</div>
+    </div>`;
+
+  // Chart
+  document.getElementById("chartTitle").textContent = `ANC4 coverage by district — ${selectedYear}`;
+  const chart = document.getElementById("chart");
+  chart.innerHTML = "";
+  data.forEach(({ d, r }) => {
+    const isBest = rate(r) === topRate;
+    const rowEl = document.createElement("div");
+    rowEl.className = "bar-row";
+    rowEl.innerHTML = `
+      <div class="name">${d}${isBest ? '<span class="best-tag">BEST</span>' : ""}</div>
+      <div class="track" role="img" aria-label="${d}: ${pct(rate(r))} ANC4 coverage">
+        <div class="fill" style="width:${rate(r).toFixed(2)}%"></div>
+      </div>
+      <div class="pct">${pct(rate(r))}</div>`;
+    chart.appendChild(rowEl);
+  });
+
+  // Table
+  const tbody = document.querySelector("#dataTable tbody");
+  tbody.innerHTML = "";
+  data.forEach(({ d, r }) => {
+    const isBest = rate(r) === topRate;
+    const trend = years.map(y => {
+      const rr = rowFor(d, y);
+      return `<span class="cell${y === selectedYear ? " sel" : ""}" title="${d} ${y}">${rr ? rate(rr).toFixed(0) : "–"}</span>`;
+    }).join("");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${d}${isBest ? " <b style='color:var(--best)'>★</b>" : ""}</td>
+      <td>${fmt(r.reg)}</td>
+      <td>${fmt(r.anc4)}</td>
+      <td class="${isBest ? "best-td" : ""}">${pct(rate(r))}</td>
+      <td><div class="trend">${trend}</div></td>`;
+    tbody.appendChild(tr);
+  });
+  const total = document.createElement("tr");
+  total.className = "total-row";
+  total.innerHTML = `
+    <td>All districts</td>
+    <td>${fmt(agg.reg)}</td>
+    <td>${fmt(agg.anc4)}</td>
+    <td>${aggRate.toFixed(1)}%</td>
+    <td></td>`;
+  tbody.appendChild(total);
+
+  // Live worked example
+  const ex = data[0];
+  document.getElementById("calcExample").innerHTML =
+    `<b>Worked example (${ex.d}, ${selectedYear}):</b> ${fmt(ex.r.anc4)} pregnancies completed ANC4 out of ` +
+    `${fmt(ex.r.reg)} registered → ${ex.r.anc4} &divide; ${ex.r.reg} &times; 100 = <b>${rate(ex.r).toFixed(1)}%</b>`;
+}
+
+// ---- Source card ----
+function renderSource() {
+  const ul = document.getElementById("sourceList");
+  ul.innerHTML = sources
+    .map(s => `<li><b>Source:</b> <code>${s}</code></li>`)
+    .join("");
+  const note = document.getElementById("syntheticNote");
+  const isSynthetic = sources.some(s => /synthetic|fixture|demo|sample/i.test(s));
+  if (isSynthetic) {
+    note.hidden = false;
+    note.textContent = "Note: the source is marked as a synthetic (generated) dataset — " +
+      "these figures are a fixture for demonstration, not an official health survey.";
+  }
+  document.getElementById("trendTh").textContent = `Trend (${years[0]}→${years[years.length - 1]})`;
+  document.getElementById("footerNote").textContent =
+    `Data: ${sources.join(", ")} · ${districts.length} districts · years ${years[0]}–${years[years.length - 1]} · File: anc4_coverage.csv`;
+}
+
+renderSource();
+render();
+</script>
+</body>
+</html>
+
