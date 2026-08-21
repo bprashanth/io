@@ -7,7 +7,7 @@ values back in the answers and the files it writes.
 ## Install (once)
 1. Install the `.vsix`: Extensions view → `…` → *Install from VSIX…* (or drag it onto the window).
 2. Command palette → **Privacy Shield: Install Python environment** (needs Python 3.10+ and
-   internet once; ~200 MB for the model).
+   internet once; ~1.7 GB on disk, CPU only, no GPU needed).
 3. Command palette → **Privacy Shield: Enable**, then restart Antigravity when asked.
 
 The status bar shows `🛡️ N calls · X ms · vault M`. Click it to toggle. Disable + restart
