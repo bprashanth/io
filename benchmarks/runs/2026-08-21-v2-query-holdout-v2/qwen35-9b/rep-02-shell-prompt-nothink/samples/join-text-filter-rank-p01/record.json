@@ -1,0 +1,235 @@
+{
+  "id": "join-text-filter-rank-p01",
+  "task_id": "join-text-filter-rank",
+  "pattern": "join two tables on a code, filter a Yes/No column, rank a year column",
+  "question": "schools without a working girls toilet and how many girls were enrolled there in 2024, most girls first",
+  "gold_sql": "SELECT e.\"School Name\", e.\"Girls 2024\" AS girls_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Toilets functional (girls)\" = 'No' ORDER BY e.\"Girls 2024\" DESC, e.\"School Name\"",
+  "expected_rows": [
+    [
+      "Madhya Vidyalaya Bhadeya",
+      190
+    ],
+    [
+      "Madhya Vidyalaya Chakand",
+      189
+    ],
+    [
+      "Rajkiya Vidyalaya Chakand",
+      178
+    ],
+    [
+      "Prathmik Vidyalaya Bhadeya",
+      165
+    ],
+    [
+      "Adarsh Vidyalaya Bankat",
+      158
+    ],
+    [
+      "Kanya Vidyalaya Khizarsarai",
+      140
+    ],
+    [
+      "Navin Vidyalaya Tetariya",
+      128
+    ],
+    [
+      "Madhya Vidyalaya Khizarsarai",
+      116
+    ],
+    [
+      "Prathmik Vidyalaya Lodipur",
+      110
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      105
+    ],
+    [
+      "Adarsh Vidyalaya Amas",
+      85
+    ],
+    [
+      "Navin Vidyalaya Chakand",
+      74
+    ],
+    [
+      "Navin Vidyalaya Amas",
+      66
+    ],
+    [
+      "Navin Vidyalaya Rampur",
+      61
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      42
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Madhya Vidyalaya Bhadeya",
+      190
+    ],
+    [
+      "Madhya Vidyalaya Chakand",
+      189
+    ],
+    [
+      "Rajkiya Vidyalaya Chakand",
+      178
+    ],
+    [
+      "Prathmik Vidyalaya Bhadeya",
+      165
+    ],
+    [
+      "Adarsh Vidyalaya Bankat",
+      158
+    ],
+    [
+      "Kanya Vidyalaya Khizarsarai",
+      140
+    ],
+    [
+      "Navin Vidyalaya Tetariya",
+      128
+    ],
+    [
+      "Madhya Vidyalaya Khizarsarai",
+      116
+    ],
+    [
+      "Prathmik Vidyalaya Lodipur",
+      110
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      105
+    ],
+    [
+      "Adarsh Vidyalaya Amas",
+      85
+    ],
+    [
+      "Navin Vidyalaya Chakand",
+      74
+    ],
+    [
+      "Navin Vidyalaya Amas",
+      66
+    ],
+    [
+      "Navin Vidyalaya Rampur",
+      61
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      42
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT s.\"School Name\", s.\"Girls 2024\" FROM \"school_enrolment_by_year\" AS s JOIN \"school_infrastructure\" AS i ON s.\"School Code\" = i.\"School Code\" WHERE i.\"Toilets functional (girls)\" = 'No' ORDER BY s.\"Girls 2024\" DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}, \"school_infrastructure\": {\"Toilets functional (girls)\": [\"No\", \"Yes\"], \"Drinking water\": [\"No\", \"Yes\"], \"Electricity\": [\"No\", \"Yes\"], \"Inspected On\": [\"2024-01-10\", \"2024-01-13\", \"2024-02-13\", \"2024-02-15\", \"2024-02-19\", \"2024-02-21\", \"2024-02-26\", \"2024-03-12\", \"2024-03-22\", \"2024-03-27\", \"2024-04-02\", \"2024-04-04\", \"2024-04-13\", \"2024-04-17\", \"2024-04-20\", \"2024-04-21\", \"2024-04-27\", \"2024-05-13\", \"2024-06-01\", \"2024-06-16\", \"2024-06-27\", \"2024-07-09\", \"2024-07-23\", \"2024-08-02\", \"2024-08-04\", \"2024-08-14\", \"2024-08-17\", \"2024-09-02\", \"2024-09-14\", \"2024-09-15\", \"2024-09-21\", \"2024-09-26\", \"2024-10-24\", \"2024-11-12\", \"2024-11-16\", \"2024-11-20\", \"2024-12-03\", \"2024-12-08\", \"2024-12-19\"], \"Source\": [\"Inspection register\"]}}\n\nCURRENT QUESTION:\nschools without a working girls toilet and how many girls were enrolled there in 2024, most girls first",
+      "response": "SELECT\n  s.\"School Name\",\n  s.\"Girls 2024\"\nFROM \"school_enrolment_by_year\" s\nJOIN \"school_infrastructure\" i ON s.\"School Code\" = i.\"School Code\"\nWHERE i.\"Toilets functional (girls)\" = 'No'\nORDER BY s.\"Girls 2024\" DESC;",
+      "api": {
+        "id": "gen-1787312833-v4RVAN25E4CFfuIAjnYh",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1374,
+          "completion_tokens": 80,
+          "total_tokens": 1454,
+          "cost": 0.0001494,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0001494,
+            "upstream_inference_prompt_cost": 0.0001374,
+            "upstream_inference_completions_cost": 1.2e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.295
+      },
+      "duration_seconds": 2.297,
+      "sql_duckdb": "SELECT s.\"School Name\", s.\"Girls 2024\" FROM \"school_enrolment_by_year\" AS s JOIN \"school_infrastructure\" AS i ON s.\"School Code\" = i.\"School Code\" WHERE i.\"Toilets functional (girls)\" = 'No' ORDER BY s.\"Girls 2024\" DESC",
+      "rows": [
+        [
+          "Madhya Vidyalaya Bhadeya",
+          190
+        ],
+        [
+          "Madhya Vidyalaya Chakand",
+          189
+        ],
+        [
+          "Rajkiya Vidyalaya Chakand",
+          178
+        ],
+        [
+          "Prathmik Vidyalaya Bhadeya",
+          165
+        ],
+        [
+          "Adarsh Vidyalaya Bankat",
+          158
+        ],
+        [
+          "Kanya Vidyalaya Khizarsarai",
+          140
+        ],
+        [
+          "Navin Vidyalaya Tetariya",
+          128
+        ],
+        [
+          "Madhya Vidyalaya Khizarsarai",
+          116
+        ],
+        [
+          "Prathmik Vidyalaya Lodipur",
+          110
+        ],
+        [
+          "Madhya Vidyalaya Karmauni",
+          105
+        ],
+        [
+          "Adarsh Vidyalaya Amas",
+          85
+        ],
+        [
+          "Navin Vidyalaya Chakand",
+          74
+        ],
+        [
+          "Navin Vidyalaya Amas",
+          66
+        ],
+        [
+          "Navin Vidyalaya Rampur",
+          61
+        ],
+        [
+          "Madhya Vidyalaya Karmauni",
+          42
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

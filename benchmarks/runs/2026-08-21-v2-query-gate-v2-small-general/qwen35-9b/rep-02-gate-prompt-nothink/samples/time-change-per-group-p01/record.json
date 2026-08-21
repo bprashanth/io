@@ -1,0 +1,69 @@
+{
+  "id": "time-change-per-group-p01",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "for Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      7.60801963993454
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT (SUM(CASE WHEN year = 2023 THEN anc4_completed END) * 100.0 / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered END), 0)) - (SUM(CASE WHEN year = 2021 THEN anc4_completed END) * 100.0 / NULLIF(SUM(CASE WHEN year = 2021 THEN pregnancies_registered END), 0)) AS percentage_point_change FROM anc_visits WHERE district IN ('Gaya', 'Nalanda')",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023\n```sql",
+      "response": "SELECT \n    (SUM(CASE WHEN year = 2023 THEN anc4_completed END) * 100.0 / SUM(CASE WHEN year = 2023 THEN pregnancies_registered END)) - \n    (SUM(CASE WHEN year = 2021 THEN anc4_completed END) * 100.0 / SUM(CASE WHEN year = 2021 THEN pregnancies_registered END)) AS percentage_point_change\nFROM anc_visits\nWHERE district IN ('Gaya', 'Nalanda');",
+      "api": {
+        "id": "gen-1787312758-W3Q0L2tAFIWXldiz1INK",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 217,
+          "completion_tokens": 113,
+          "total_tokens": 330,
+          "cost": 3.865e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 3.865e-05,
+            "upstream_inference_prompt_cost": 2.17e-05,
+            "upstream_inference_completions_cost": 1.695e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.961
+      },
+      "duration_seconds": 2.964,
+      "sql_duckdb": "SELECT (SUM(CASE WHEN year = 2023 THEN anc4_completed END) * 100.0 / NULLIF(SUM(CASE WHEN year = 2023 THEN pregnancies_registered END), 0)) - (SUM(CASE WHEN year = 2021 THEN anc4_completed END) * 100.0 / NULLIF(SUM(CASE WHEN year = 2021 THEN pregnancies_registered END), 0)) AS percentage_point_change FROM anc_visits WHERE district IN ('Gaya', 'Nalanda')",
+      "rows": [
+        [
+          7.60801963993454
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

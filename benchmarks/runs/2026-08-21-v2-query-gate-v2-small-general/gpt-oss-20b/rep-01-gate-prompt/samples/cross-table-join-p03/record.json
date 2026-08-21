@@ -1,0 +1,115 @@
+{
+  "id": "cross-table-join-p03",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "for 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT a.district, 100.0 * COALESCE(a.anc4_completed, 0) / NULLIF(NULLIF(a.pregnancies_registered, 0), 0) AS anc_coverage_pct, 100.0 * COALESCE(l.employed_at_6_months, 0) / NULLIF(NULLIF(l.women_enrolled, 0), 0) AS employed_out_of_enrolled_pct FROM anc_visits AS a JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same district-year grain and can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator.\n[User Question]\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district\n```sql",
+      "response": "```sql\nSELECT\n    a.district,\n    100.0 * COALESCE(a.anc4_completed, 0) / NULLIF(a.pregnancies_registered, 0) AS anc_coverage_pct,\n    100.0 * COALESCE(l.employed_at_6_months, 0) / NULLIF(l.women_enrolled, 0) AS employed_out_of_enrolled_pct\nFROM anc_visits AS a\nJOIN livelihoods AS l\n  ON a.district = l.district\n AND a.year = l.year\nWHERE a.year = 2023;\n```",
+      "api": {
+        "id": "gen-1787312582-h4o8Runb5orbvZoYeT2a",
+        "model": "openai/gpt-oss-20b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 300,
+          "completion_tokens": 189,
+          "total_tokens": 489,
+          "cost": 3.546e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 3.546e-05,
+            "upstream_inference_prompt_cost": 9e-06,
+            "upstream_inference_completions_cost": 2.646e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 48,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.986
+      },
+      "duration_seconds": 2.991,
+      "sql_duckdb": "SELECT a.district, 100.0 * COALESCE(a.anc4_completed, 0) / NULLIF(NULLIF(a.pregnancies_registered, 0), 0) AS anc_coverage_pct, 100.0 * COALESCE(l.employed_at_6_months, 0) / NULLIF(NULLIF(l.women_enrolled, 0), 0) AS employed_out_of_enrolled_pct FROM anc_visits AS a JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023",
+      "rows": [
+        [
+          "Gaya",
+          74.0,
+          56.0
+        ],
+        [
+          "Nalanda",
+          80.0,
+          65.0
+        ],
+        [
+          "Purnia",
+          67.0,
+          46.0
+        ],
+        [
+          "Kishanganj",
+          61.0,
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

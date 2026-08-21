@@ -1,0 +1,111 @@
+{
+  "id": "time-change-per-group-p04",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      66.0,
+      66.0,
+      null
+    ],
+    [
+      "Gaya",
+      74.0,
+      74.0,
+      8.0
+    ],
+    [
+      "Nalanda",
+      73.0,
+      73.0,
+      null
+    ],
+    [
+      "Nalanda",
+      80.0,
+      80.0,
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, (CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0) * 100.0) AS coverage_2021, (CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0) * 100.0) AS coverage_2023, ((CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0) * 100.0) - (LAG(CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0) * 100.0) OVER (PARTITION BY district ORDER BY year NULLS FIRST))) AS movement FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023) ORDER BY district NULLS FIRST, year NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda\n```sql",
+      "response": "SELECT \n    district,\n    (CAST(anc4_completed AS FLOAT) / NULLIF(pregnancies_registered, 0) * 100.0) AS coverage_2021,\n    (CAST(anc4_completed AS FLOAT) / NULLIF(pregnancies_registered, 0) * 100.0) AS coverage_2023,\n    ((CAST(anc4_completed AS FLOAT) / NULLIF(pregnancies_registered, 0) * 100.0) - \n     (LAG(CAST(anc4_completed AS FLOAT) / NULLIF(pregnancies_registered, 0) * 100.0) OVER (PARTITION BY district ORDER BY year))) AS movement\nFROM anc_visits\nWHERE district IN ('Gaya', 'Nalanda')\n  AND year IN (2021, 2023)\nORDER BY district, year;",
+      "api": {
+        "id": "gen-1787312775-2CeOPPGvRNToiHqjQCon",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 211,
+          "completion_tokens": 199,
+          "total_tokens": 410,
+          "cost": 5.095e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.095e-05,
+            "upstream_inference_prompt_cost": 2.11e-05,
+            "upstream_inference_completions_cost": 2.985e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 5.553
+      },
+      "duration_seconds": 5.561,
+      "sql_duckdb": "SELECT district, (CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0) * 100.0) AS coverage_2021, (CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0) * 100.0) AS coverage_2023, ((CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0) * 100.0) - (LAG(CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0) * 100.0) OVER (PARTITION BY district ORDER BY year NULLS FIRST))) AS movement FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023) ORDER BY district NULLS FIRST, year NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          66.0,
+          66.0,
+          null
+        ],
+        [
+          "Gaya",
+          74.0,
+          74.0,
+          8.0
+        ],
+        [
+          "Nalanda",
+          73.0,
+          73.0,
+          null
+        ],
+        [
+          "Nalanda",
+          80.0,
+          80.0,
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

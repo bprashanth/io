@@ -1,0 +1,115 @@
+{
+  "id": "time-change-per-group-p01",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "for Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH coverage AS (SELECT district, year, CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0) * 100.0 AS coverage_pct FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, MAX(CASE WHEN year = 2023 THEN coverage_pct END) - MAX(CASE WHEN year = 2021 THEN coverage_pct END) AS percentage_point_change FROM coverage GROUP BY district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023\n```sql",
+      "response": "SELECT\n  SUM(CASE WHEN district = 'Gaya' THEN 100.0 * anc4_completed / pregnancies_registered ELSE 0 END) AS gaya_2021,\n  SUM(CASE WHEN district = 'Gaya' THEN 100.0 * anc4_completed / pregnancies_registered ELSE 0 END) AS gaya_2023,\n  SUM(CASE WHEN district = 'Nalanda' THEN 100.0 * anc4_completed / pregnancies_registered ELSE 0 END) AS nalanda_2021,\n  SUM(CASE WHEN district = 'Nalanda' THEN 100.0 * anc4_completed / pregnancies_registered ELSE 0 END) AS nalanda_2023\nFROM (\n  SELECT\n    district,\n    year,\n    pregnancies_registered,\n    anc4_completed,\n    100.0 * anc4_completed / pregnancies_registered AS coverage\n  FROM anc_visits\n  WHERE district IN ('Gaya', 'Nalanda')\n    AND year IN (2021, 2023)\n)\nGROUP BY district, year;\n\n-- The above query returns individual values. To get the percentage point change, we need to compute the difference.\n-- Let's rewrite to directly compute the change.\n\nSELECT\n  (SUM(CASE WHEN district = 'Gaya' AND year = 2023 THEN 100.0 * anc4_completed / pregnancies_registered ELSE NULL END)\n   - SUM(CASE WHEN district = 'Gaya' AND year = 2021 THEN 100.0 * anc4_completed / pregnancies_registered ELSE NULL END)) AS gaya_change,\n  (SUM(CASE WHEN district = 'Nalanda' AND year = 2023 THEN 100.0 * anc4_completed / pregnancies_registered ELSE NULL END)\n   - SUM(CASE WHEN district = 'Nalanda' AND year = 2021 THEN 100.0 * anc4_completed / pregnancies_registered ELSE NULL END)) AS nalanda_change\nFROM anc_visits\nWHERE district IN ('Gaya', 'Nalanda')\n  AND year IN (2021, 2023);",
+      "api": {
+        "id": "gen-1787312737-umDXWHuO8N8r1DIAgSKy",
+        "model": "qwen/qwen3.6-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 217,
+          "completion_tokens": 486,
+          "total_tokens": 703,
+          "cost": 0.0004834,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0004834,
+            "upstream_inference_prompt_cost": 2.17e-05,
+            "upstream_inference_completions_cost": 0.0004617
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 11.962
+      },
+      "duration_seconds": 11.963,
+      "error": "ValueError: response is not exactly one read-only query"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[Previous Query Error]\nValueError: response is not exactly one read-only query\nReturn one corrected read-only query.\n[User Question]\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023\n```sql",
+      "response": "```sql\nWITH coverage AS (\n    SELECT \n        district,\n        year,\n        CAST(anc4_completed AS FLOAT) / pregnancies_registered * 100.0 AS coverage_pct\n    FROM anc_visits\n    WHERE district IN ('Gaya', 'Nalanda')\n      AND year IN (2021, 2023)\n)\nSELECT \n    district,\n    MAX(CASE WHEN year = 2023 THEN coverage_pct END) - MAX(CASE WHEN year = 2021 THEN coverage_pct END) AS percentage_point_change\nFROM coverage\nGROUP BY district;\n```",
+      "api": {
+        "id": "gen-1787312749-CzrBBWTGIEzUi3Y6OY3J",
+        "model": "qwen/qwen3.6-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 243,
+          "completion_tokens": 136,
+          "total_tokens": 379,
+          "cost": 0.00017002,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00017002,
+            "upstream_inference_prompt_cost": 3.402e-05,
+            "upstream_inference_completions_cost": 0.000136
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.522
+      },
+      "duration_seconds": 1.525,
+      "sql_duckdb": "WITH coverage AS (SELECT district, year, CAST(anc4_completed AS REAL) / NULLIF(pregnancies_registered, 0) * 100.0 AS coverage_pct FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, MAX(CASE WHEN year = 2023 THEN coverage_pct END) - MAX(CASE WHEN year = 2021 THEN coverage_pct END) AS percentage_point_change FROM coverage GROUP BY district",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

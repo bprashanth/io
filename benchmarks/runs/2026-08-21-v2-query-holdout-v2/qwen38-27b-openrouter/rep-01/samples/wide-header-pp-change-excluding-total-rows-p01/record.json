@@ -1,0 +1,159 @@
+{
+  "id": "wide-header-pp-change-excluding-total-rows-p01",
+  "task_id": "wide-header-pp-change-excluding-total-rows",
+  "pattern": "percentage-point change between two labelled rounds on messy headers, state filter, detail rows only",
+  "question": "Bihar district wise full vaccination change from NFHS-4 to NFHS-5 in percentage points",
+  "gold_sql": "SELECT \"District\", MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_pp FROM district_health_factsheet WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' GROUP BY \"District\" ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Bhojpur",
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      4.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Saran",
+      4.0
+    ],
+    [
+      "Gaya",
+      7.799999999999997
+    ],
+    [
+      "Rohtas",
+      -1.9000000000000057
+    ],
+    [
+      "Madhubani",
+      3.1999999999999957
+    ],
+    [
+      "State Total",
+      1.5
+    ],
+    [
+      "Kishanganj",
+      2.799999999999997
+    ],
+    [
+      "Purnia",
+      -3.3999999999999986
+    ],
+    [
+      "Bhojpur",
+      -5.800000000000004
+    ],
+    [
+      "Nalanda",
+      5.699999999999996
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT District, MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_in_percentage_points FROM district_health_factsheet WHERE State = 'Bihar' AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') GROUP BY District",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nBihar district wise full vaccination change from NFHS-4 to NFHS-5 in percentage points\n[Database Schema]\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nBihar district wise full vaccination change from NFHS-4 to NFHS-5 in percentage points\n```sql",
+      "response": "\n\n```sql\nSELECT \n    District,\n    MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - \n    MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_in_percentage_points\nFROM district_health_factsheet\nWHERE State = 'Bihar'\n  AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')\nGROUP BY District\n```",
+      "api": {
+        "id": "gen-1787311445-c2xiEpFaKM3lc1MlfV5N",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 311,
+          "completion_tokens": 446,
+          "total_tokens": 757,
+          "cost": 0.00156715,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00156715,
+            "upstream_inference_prompt_cost": 0.00013995,
+            "upstream_inference_completions_cost": 0.0014272
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 281,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 14.484
+      },
+      "duration_seconds": 14.51,
+      "sql_duckdb": "SELECT District, MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_in_percentage_points FROM district_health_factsheet WHERE State = 'Bihar' AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') GROUP BY District",
+      "rows": [
+        [
+          "Saran",
+          4.0
+        ],
+        [
+          "Gaya",
+          7.799999999999997
+        ],
+        [
+          "Rohtas",
+          -1.9000000000000057
+        ],
+        [
+          "Madhubani",
+          3.1999999999999957
+        ],
+        [
+          "State Total",
+          1.5
+        ],
+        [
+          "Kishanganj",
+          2.799999999999997
+        ],
+        [
+          "Purnia",
+          -3.3999999999999986
+        ],
+        [
+          "Bhojpur",
+          -5.800000000000004
+        ],
+        [
+          "Nalanda",
+          5.699999999999996
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

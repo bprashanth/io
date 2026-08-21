@@ -1,0 +1,293 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>2024 Monsoon Block-wise Crop Yield Dashboard</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f4f6f8;color:#222;}
+  .wrap{width:1440px;margin:0 auto;padding:20px;box-sizing:border-box;}
+  h1{font-size:22px;margin-bottom:4px;}
+  .sub{color:#555;font-size:13px;margin-bottom:16px;}
+  .kpis{display:flex;gap:14px;margin-bottom:20px;}
+  .kpi{flex:1;background:#fff;border-radius:8px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.15);}
+  .kpi .val{font-size:22px;font-weight:bold;}
+  .kpi .lbl{font-size:12px;color:#666;}
+  .charts{display:flex;gap:16px;margin-bottom:20px;}
+  .chartbox{flex:1;background:#fff;border-radius:8px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.15);}
+  .chartbox h3{margin:0 0 8px;font-size:15px;}
+  table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
+  th,td{padding:6px 8px;border-bottom:1px solid #ddd;text-align:left;}
+  th{cursor:pointer;background:#eaeef2;position:sticky;top:0;}
+  tr:hover{background:#f0f7ff;}
+  .controls{display:flex;gap:10px;margin:10px 0;align-items:center;}
+  select,button,input{padding:6px 10px;font-size:13px;border-radius:5px;border:1px solid #ccc;}
+  button{background:#2c6fbb;color:#fff;border:none;cursor:pointer;}
+  button:hover{background:#245a99;}
+  .src{margin-top:14px;font-size:12px;color:#666;}
+  .tablewrap{background:#fff;border-radius:8px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.15);max-height:420px;overflow:auto;}
+  .neg{color:#b00020;}
+  .pos{color:#0a7d28;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>2024 Monsoon Block-wise Crop Yield Dashboard</h1>
+  <div class="sub">Yield (tonnes/hectare) by block for Monsoon 2024, sorted highest first, with 2023 comparison.</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="charts">
+    <div class="chartbox">
+      <h3>Yield (t/ha) by Block — Monsoon 2024 (sorted)</h3>
+      <canvas id="barChart" width="680" height="320"></canvas>
+    </div>
+    <div class="chartbox">
+      <h3>2024 vs 2023 Yield (t/ha) — Monsoon</h3>
+      <canvas id="cmpChart" width="680" height="320"></canvas>
+    </div>
+  </div>
+
+  <div class="controls">
+    <label>Filter block: <input id="filterInput" placeholder="type block name"></label>
+    <button id="downloadBtn">Download CSV</button>
+  </div>
+
+  <div class="tablewrap">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th data-key="block">Block</th>
+          <th data-key="cultivated_hectares">Cultivated (ha) 2024</th>
+          <th data-key="harvest_tonnes">Harvest (t) 2024</th>
+          <th data-key="yield2024">Yield 2024 (t/ha)</th>
+          <th data-key="yield2023">Yield 2023 (t/ha)</th>
+          <th data-key="ppDiff">Change (pp)</th>
+          <th data-key="source">Source</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="src" id="sourceLine"></div>
+</div>
+
+<script>
+const DATA = __DATA__;
+
+// --- Build per-block records for Monsoon 2024 & 2023 ---
+function findRow(block, season, year){
+  return DATA.filter(d=>d.block===block && d.season===season && d.year===year);
+}
+
+const blocks = Array.from(new Set(DATA.filter(d=>d.season==="Monsoon").map(d=>d.block)));
+
+const rows = blocks.map(block=>{
+  const r24 = findRow(block,"Monsoon",2024);
+  const r23 = findRow(block,"Monsoon",2023);
+  const cult24 = r24.reduce((s,r)=>s+r.cultivated_hectares,0);
+  const harv24 = r24.reduce((s,r)=>s+r.harvest_tonnes,0);
+  const cult23 = r23.reduce((s,r)=>s+r.cultivated_hectares,0);
+  const harv23 = r23.reduce((s,r)=>s+r.harvest_tonnes,0);
+  const yield24 = cult24>0 ? harv24/cult24 : null;
+  const yield23 = cult23>0 ? harv23/cult23 : null;
+  const ppDiff = (yield24!=null && yield23!=null) ? (yield24-yield23) : null;
+  const sources = Array.from(new Set(r24.concat(r23).map(r=>r.source))).join("; ");
+  return {
+    block, cultivated_hectares: cult24, harvest_tonnes: harv24,
+    yield2024: yield24, yield2023: yield23, ppDiff, source: sources, has2024: r24.length>0
+  };
+}).filter(r=>r.has2024);
+
+// --- KPIs ---
+const totalCult = rows.reduce((s,r)=>s+r.cultivated_hectares,0);
+const totalHarv = rows.reduce((s,r)=>s+r.harvest_tonnes,0);
+const overallYield24 = totalCult>0 ? totalHarv/totalCult : 0;
+const yieldsWith23 = rows.filter(r=>r.yield2023!=null);
+const totalCult23 = yieldsWith23.reduce((s,r)=>s+ (r.cultivated_hectares>0?r.cultivated_hectares:0),0);
+// overall 2023 yield computed from raw totals for blocks that have both years
+let harv23sum=0, cult23sum=0;
+blocks.forEach(b=>{
+  const r23 = findRow(b,"Monsoon",2023);
+  harv23sum += r23.reduce((s,r)=>s+r.harvest_tonnes,0);
+  cult23sum += r23.reduce((s,r)=>s+r.cultivated_hectares,0);
+});
+const overallYield23 = cult23sum>0 ? harv23sum/cult23sum : null;
+const overallPP = overallYield23!=null ? (overallYield24-overallYield23) : null;
+const topBlock = rows.slice().sort((a,b)=>(b.yield2024||0)-(a.yield2024||0))[0];
+
+function fmt(n,d=2){ return n==null || isNaN(n) ? "N/A" : n.toFixed(d); }
+
+const kpis = [
+  {lbl:"Blocks (Monsoon 2024)", val: rows.length},
+  {lbl:"Total Cultivated Area (ha)", val: fmt(totalCult,0)},
+  {lbl:"Total Harvest (tonnes)", val: fmt(totalHarv,0)},
+  {lbl:"Overall Yield 2024 (t/ha)", val: fmt(overallYield24,2)},
+  {lbl:"Yield Change vs 2023 (pp)", val: overallPP==null?"N/A":(overallPP>=0?"+":"")+fmt(overallPP,2)},
+  {lbl:"Top Block 2024", val: topBlock ? topBlock.block+" ("+fmt(topBlock.yield2024,2)+" t/ha)" : "N/A"}
+];
+document.getElementById("kpis").innerHTML = kpis.map(k=>
+  `<div class="kpi"><div class="val">${k.val}</div><div class="lbl">${k.lbl}</div></div>`
+).join("");
+
+// --- Sorted rows highest yield first ---
+let sortKey = "yield2024", sortDir = -1;
+function sortedRows(filterText){
+  let r = rows.slice();
+  if(filterText){
+    r = r.filter(x=>x.block.toLowerCase().includes(filterText.toLowerCase()));
+  }
+  r.sort((a,b)=>{
+    let av=a[sortKey], bv=b[sortKey];
+    if(av==null) av = sortDir===1 ? Infinity : -Infinity;
+    if(bv==null) bv = sortDir===1 ? Infinity : -Infinity;
+    if(typeof av === "string") return sortDir*av.localeCompare(bv);
+    return sortDir*(av-bv);
+  });
+  return r;
+}
+
+function renderTable(){
+  const filterText = document.getElementById("filterInput").value;
+  const r = sortedRows(filterText);
+  const tbody = document.querySelector("#dataTable tbody");
+  tbody.innerHTML = r.map(row=>{
+    const diffClass = row.ppDiff==null? "" : (row.ppDiff>=0?"pos":"neg");
+    const diffTxt = row.ppDiff==null? "N/A" : (row.ppDiff>=0?"+":"")+fmt(row.ppDiff,2)+" pp";
+    return `<tr>
+      <td>${row.block}</td>
+      <td>${fmt(row.cultivated_hectares,0)}</td>
+      <td>${fmt(row.harvest_tonnes,0)}</td>
+      <td>${fmt(row.yield2024,2)}</td>
+      <td>${fmt(row.yield2023,2)}</td>
+      <td class="${diffClass}">${diffTxt}</td>
+      <td>${row.source}</td>
+    </tr>`;
+  }).join("");
+  drawBarChart(r);
+  drawCmpChart(r);
+}
+
+document.querySelectorAll("#dataTable th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    if(sortKey===key){ sortDir *= -1; } else { sortKey = key; sortDir = -1; }
+    renderTable();
+  });
+});
+document.getElementById("filterInput").addEventListener("input", renderTable);
+
+// --- Charts ---
+function drawBarChart(r){
+  const c = document.getElementById("barChart");
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0,0,c.width,c.height);
+  const data = r.filter(x=>x.yield2024!=null);
+  if(data.length===0) return;
+  const maxV = Math.max(...data.map(d=>d.yield2024))*1.15;
+  const padL=50, padB=70, padT=10, w=c.width-padL-10, h=c.height-padB-padT;
+  const bw = w/data.length;
+  ctx.strokeStyle="#ccc"; ctx.beginPath();
+  ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+h); ctx.lineTo(padL+w,padT+h); ctx.stroke();
+  ctx.fillStyle="#333"; ctx.font="10px Arial";
+  for(let i=0;i<=4;i++){
+    const yv = maxV*i/4;
+    const y = padT+h - h*i/4;
+    ctx.fillText(yv.toFixed(1), 5, y+3);
+    ctx.strokeStyle="#eee"; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+w,y); ctx.stroke();
+  }
+  data.forEach((d,i)=>{
+    const bh = (d.yield2024/maxV)*h;
+    const x = padL + i*bw + bw*0.15;
+    const y = padT+h-bh;
+    ctx.fillStyle="#2c6fbb";
+    ctx.fillRect(x,y,bw*0.7,bh);
+    ctx.save();
+    ctx.translate(x+bw*0.35, padT+h+12);
+    ctx.rotate(Math.PI/4);
+    ctx.fillStyle="#333"; ctx.font="10px Arial";
+    ctx.fillText(d.block, 0, 0);
+    ctx.restore();
+  });
+}
+
+function drawCmpChart(r){
+  const c = document.getElementById("cmpChart");
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0,0,c.width,c.height);
+  const data = r.filter(x=>x.yield2024!=null || x.yield2023!=null);
+  if(data.length===0) return;
+  const maxV = Math.max(...data.map(d=>Math.max(d.yield2024||0,d.yield2023||0)))*1.15;
+  const padL=50, padB=70, padT=10, w=c.width-padL-10, h=c.height-padB-padT;
+  const bw = w/data.length;
+  ctx.strokeStyle="#ccc"; ctx.beginPath();
+  ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+h); ctx.lineTo(padL+w,padT+h); ctx.stroke();
+  ctx.fillStyle="#333"; ctx.font="10px Arial";
+  for(let i=0;i<=4;i++){
+    const yv = maxV*i/4;
+    const y = padT+h - h*i/4;
+    ctx.fillText(yv.toFixed(1), 5, y+3);
+    ctx.strokeStyle="#eee"; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+w,y); ctx.stroke();
+  }
+  data.forEach((d,i)=>{
+    const x0 = padL + i*bw + bw*0.1;
+    const bw2 = bw*0.35;
+    if(d.yield2024!=null){
+      const bh = (d.yield2024/maxV)*h;
+      ctx.fillStyle="#2c6fbb";
+      ctx.fillRect(x0, padT+h-bh, bw2, bh);
+    }
+    if(d.yield2023!=null){
+      const bh = (d.yield2023/maxV)*h;
+      ctx.fillStyle="#f0a500";
+      ctx.fillRect(x0+bw2+2, padT+h-bh, bw2, bh);
+    }
+    ctx.save();
+    ctx.translate(x0+bw2, padT+h+12);
+    ctx.rotate(Math.PI/4);
+    ctx.fillStyle="#333"; ctx.font="10px Arial";
+    ctx.fillText(d.block, 0, 0);
+    ctx.restore();
+  });
+  // legend
+  ctx.fillStyle="#2c6fbb"; ctx.fillRect(padL, 0, 10,10);
+  ctx.fillStyle="#333"; ctx.fillText("2024", padL+14, 9);
+  ctx.fillStyle="#f0a500"; ctx.fillRect(padL+60,0,10,10);
+  ctx.fillStyle="#333"; ctx.fillText("2023", padL+74, 9);
+}
+
+// --- CSV download ---
+document.getElementById("downloadBtn").addEventListener("click", ()=>{
+  const filterText = document.getElementById("filterInput").value;
+  const r = sortedRows(filterText);
+  const header = ["block","cultivated_hectares_2024","harvest_tonnes_2024","yield_2024_t_per_ha","yield_2023_t_per_ha","change_pp","source"];
+  const lines = [header.join(",")];
+  r.forEach(row=>{
+    lines.push([
+      row.block,
+      row.cultivated_hectares,
+      row.harvest_tonnes,
+      row.yield2024==null?"":row.yield2024.toFixed(3),
+      row.yield2023==null?"":row.yield2023.toFixed(3),
+      row.ppDiff==null?"":row.ppDiff.toFixed(3),
+      '"'+row.source.replace(/"/g,'""')+'"'
+    ].join(","));
+  });
+  const blob = new Blob([lines.join("\n")], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "monsoon_2024_block_yield.csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// --- Source line ---
+const sources = Array.from(new Set(DATA.map(d=>d.source))).join("; ");
+document.getElementById("sourceLine").textContent = "Source(s): " + (sources || "N/A");
+
+renderTable();
+</script>
+</body>
+</html>
+```

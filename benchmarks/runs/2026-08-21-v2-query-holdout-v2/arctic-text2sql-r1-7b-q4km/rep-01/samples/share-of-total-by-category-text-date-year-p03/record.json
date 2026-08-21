@@ -1,0 +1,130 @@
+{
+  "id": "share-of-total-by-category-text-date-year-p03",
+  "task_id": "share-of-total-by-category-text-date-year",
+  "pattern": "year filter on a text date, group sum, share of grand total, rank",
+  "question": "what share of 2024 loan money went to each purpose? give total and percentage, largest purpose on top",
+  "gold_sql": "WITH y AS (SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Purpose\") SELECT \"Purpose\", total_amount, 100.0 * total_amount / SUM(total_amount) OVER () AS share_percent FROM y ORDER BY total_amount DESC, \"Purpose\"",
+  "expected_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH TotalLoanAmount AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_loan_amount FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2024') SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_loan_amount, (SUM(\"Loan Amount (Rs)\") * 100.0 / NULLIF((SELECT total_loan_amount FROM TotalLoanAmount), 0)) AS percentage_share FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2024' GROUP BY \"Purpose\" ORDER BY percentage_share DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nwhat share of 2024 loan money went to each purpose? give total and percentage, largest purpose on top\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nwhat share of 2024 loan money went to each purpose? give total and percentage, largest purpose on top\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Requirements Breakdown:\n1. **Filter Data for 2024**: We need to consider only the loans disbursed in the year 2024.\n2. **Aggregate by Purpose**: We need to sum up the loan amounts for each purpose.\n3. **Calculate Total Loan Amount for 2024**: This will be used to calculate the percentage share of each purpose.\n4. **Calculate Percentage Share**: For each purpose, calculate the percentage of the total loan amount.\n5. **Order by Percentage Share**: The results should be ordered by the percentage share in descending order, so the largest purpose appears first.\n\n### Step-by-Step Query Construction:\n1. **Filter Data for 2024**: Use the `WHERE` clause to filter records where the `Disbursement Date` falls within the year 2024.\n2. **Aggregate by Purpose**: Use `GROUP BY` to group the data by the `Purpose` column.\n3. **Sum Loan Amounts**: Use `SUM` to calculate the total loan amount for each purpose.\n4. **Calculate Total Loan Amount for 2024**: Use a subquery or a common table expression (CTE) to calculate the total loan amount for the year 2024.\n5. **Calculate Percentage Share**: Divide the sum of loan amounts for each purpose by the total loan amount for 2024 and multiply by 100 to get the percentage.\n6. **Order by Percentage Share**: Use `ORDER BY` to sort the results by the calculated percentage in descending order.\n\n### Final SQL Query:\n```sql\nWITH TotalLoanAmount AS (\n    SELECT SUM(\"Loan Amount (Rs)\") AS total_loan_amount\n    FROM \"shg_loan_register\"\n    WHERE strftime('%Y', \"Disbursement Date\") = '2024'\n)\nSELECT \n    \"Purpose\", \n    SUM(\"Loan Amount (Rs)\") AS total_loan_amount,\n    (SUM(\"Loan Amount (Rs)\") * 100.0 / (SELECT total_loan_amount FROM TotalLoanAmount)) AS percentage_share\nFROM \n    \"shg_loan_register\"\nWHERE \n    strftime('%Y', \"Disbursement Date\") = '2024'\nGROUP BY \n    \"Purpose\"\nORDER BY \n    percentage_share DESC;\n```\n\n### Explanation:\n- **CTE (Common Table Expression)**: `TotalLoanAmount` calculates the total loan amount for the year 2024. This is used to compute the percentage share for each purpose.\n- **Filtering**: The `WHERE` clause ensures that only loans disbursed in 2024 are considered.\n- **Aggregation**: `SUM(\"Loan Amount (Rs)\")` aggregates the loan amounts by purpose.\n- **Percentage Calculation**: The percentage share is calculated by dividing the sum of loan amounts for each purpose by the total loan amount for 2024 and multiplying by 100.\n- **Ordering**: The `ORDER BY percentage_share DESC` ensures that the purpose with the highest percentage share appears first.",
+      "api": {
+        "id": "chatcmpl-tuFO7Ako1INyPS1ti7VMCHO0VJvRKZAg",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 659,
+          "prompt_tokens": 259,
+          "total_tokens": 918,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 14.449
+      },
+      "duration_seconds": 14.453,
+      "sql_duckdb": "WITH TotalLoanAmount AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_loan_amount FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2024') SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_loan_amount, (SUM(\"Loan Amount (Rs)\") * 100.0 / NULLIF((SELECT total_loan_amount FROM TotalLoanAmount), 0)) AS percentage_share FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2024' GROUP BY \"Purpose\" ORDER BY percentage_share DESC",
+      "rows": [
+        [
+          "Agriculture",
+          2000000,
+          25.906735751295336
+        ],
+        [
+          "Livestock",
+          1595000,
+          20.66062176165803
+        ],
+        [
+          "Petty trade",
+          1435000,
+          18.588082901554404
+        ],
+        [
+          "Housing",
+          1245000,
+          16.126943005181346
+        ],
+        [
+          "Education",
+          830000,
+          10.751295336787564
+        ],
+        [
+          "Health",
+          615000,
+          7.966321243523316
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

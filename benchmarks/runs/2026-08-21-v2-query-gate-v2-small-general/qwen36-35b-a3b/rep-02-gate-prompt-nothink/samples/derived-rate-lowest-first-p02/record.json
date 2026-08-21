@@ -1,0 +1,103 @@
+{
+  "id": "derived-rate-lowest-first-p02",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "show all districts 2023 employed divided by women enrolled as a percentage, ascending",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, (CAST(SUM(employed_at_6_months) AS REAL) * 100.0 / NULLIF(SUM(women_enrolled), 0)) AS percentage FROM livelihoods WHERE year = 2023 GROUP BY district ORDER BY percentage ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nshow all districts 2023 employed divided by women enrolled as a percentage, ascending\n[Database Schema]\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nshow all districts 2023 employed divided by women enrolled as a percentage, ascending\n```sql",
+      "response": "```sql\nSELECT district, (CAST(SUM(employed_at_6_months) AS REAL) * 100.0 / SUM(women_enrolled)) AS percentage\nFROM livelihoods\nWHERE year = 2023\nGROUP BY district\nORDER BY percentage ASC;\n```",
+      "api": {
+        "id": "gen-1787312762-rE4HUyOKD8aS3RcvgMtg",
+        "model": "qwen/qwen3.6-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 213,
+          "completion_tokens": 62,
+          "total_tokens": 275,
+          "cost": 6.354e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.354e-05,
+            "upstream_inference_prompt_cost": 1.704e-05,
+            "upstream_inference_completions_cost": 4.65e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 0.928
+      },
+      "duration_seconds": 0.932,
+      "sql_duckdb": "SELECT district, (CAST(SUM(employed_at_6_months) AS REAL) * 100.0 / NULLIF(SUM(women_enrolled), 0)) AS percentage FROM livelihoods WHERE year = 2023 GROUP BY district ORDER BY percentage ASC NULLS FIRST",
+      "rows": [
+        [
+          "Kishanganj",
+          38.0
+        ],
+        [
+          "Purnia",
+          46.0
+        ],
+        [
+          "Gaya",
+          56.0
+        ],
+        [
+          "Nalanda",
+          65.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

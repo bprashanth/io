@@ -1,0 +1,145 @@
+{
+  "id": "conditional-count-share-by-group-p02",
+  "task_id": "conditional-count-share-by-group",
+  "pattern": "count rows matching a text status per group and its percent of all rows in the group, rank",
+  "question": "for each block count overdue loans and overdue percentage out of all its loans, highest percentage first",
+  "gold_sql": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, 100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / COUNT(*) AS overdue_percent FROM shg_loan_register GROUP BY \"Block\" ORDER BY overdue_percent DESC, \"Block\"",
+  "expected_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS \"Overdue Count\", 100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) AS \"Overdue Percentage\" FROM \"shg_loan_register\" GROUP BY \"Block\" ORDER BY \"Overdue Percentage\" DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor each block count overdue loans and overdue percentage out of all its loans, highest percentage first\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor each block count overdue loans and overdue percentage out of all its loans, highest percentage first\n```sql",
+      "response": "\n\n```sql\nSELECT \n  \"Block\",\n  SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS \"Overdue Count\",\n  100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / COUNT(*) AS \"Overdue Percentage\"\nFROM \"shg_loan_register\"\nGROUP BY \"Block\"\nORDER BY \"Overdue Percentage\" DESC;\n```",
+      "api": {
+        "id": "gen-1787311531-QXM7R7llEaaDCapfoDEy",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 276,
+          "completion_tokens": 369,
+          "total_tokens": 645,
+          "cost": 0.0012174,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0012174,
+            "upstream_inference_prompt_cost": 0.0001104,
+            "upstream_inference_completions_cost": 0.001107
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 28.689
+      },
+      "duration_seconds": 28.696,
+      "sql_duckdb": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS \"Overdue Count\", 100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) AS \"Overdue Percentage\" FROM \"shg_loan_register\" GROUP BY \"Block\" ORDER BY \"Overdue Percentage\" DESC",
+      "rows": [
+        [
+          "Fatehpur",
+          15,
+          23.4375
+        ],
+        [
+          "Belaganj",
+          13,
+          20.0
+        ],
+        [
+          "Wazirganj",
+          13,
+          19.696969696969695
+        ],
+        [
+          "Atri",
+          8,
+          15.384615384615385
+        ],
+        [
+          "Barachatti",
+          8,
+          14.285714285714286
+        ],
+        [
+          "Dobhi",
+          3,
+          5.2631578947368425
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

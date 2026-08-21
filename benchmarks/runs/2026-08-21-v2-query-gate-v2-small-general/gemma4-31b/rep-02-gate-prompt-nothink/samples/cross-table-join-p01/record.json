@@ -1,0 +1,115 @@
+{
+  "id": "cross-table-join-p01",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "match the two tables for 2023 and show each district ANC completed over registered percent with employed over enrolled percent",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT t1.district, (CAST(t1.anc4_completed AS REAL) / NULLIF(t1.pregnancies_registered, 0)) * 100.0, (CAST(t2.employed_at_6_months AS REAL) / NULLIF(t2.women_enrolled, 0)) * 100.0 FROM anc_visits AS t1 JOIN livelihoods AS t2 ON t1.district = t2.district AND t1.year = t2.year WHERE t1.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nmatch the two tables for 2023 and show each district ANC completed over registered percent with employed over enrolled percent\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same district-year grain and can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator.\n[User Question]\nmatch the two tables for 2023 and show each district ANC completed over registered percent with employed over enrolled percent\n```sql",
+      "response": "```sql\nSELECT\n  t1.district,\n  (CAST(t1.anc4_completed AS FLOAT) / t1.pregnancies_registered) * 100.0,\n  (CAST(t2.employed_at_6_months AS FLOAT) / t2.women_enrolled) * 100.0\nFROM anc_visits AS t1\nJOIN livelihoods AS t2\n  ON t1.district = t2.district AND t1.year = t2.year\nWHERE t1.year = 2023;\n```",
+      "api": {
+        "id": "gen-1787312786-01hP3ZDm59T5vwieB4GW",
+        "model": "google/gemma-4-31b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 296,
+          "completion_tokens": 129,
+          "total_tokens": 425,
+          "cost": 9.304e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 9.304e-05,
+            "upstream_inference_prompt_cost": 4.144e-05,
+            "upstream_inference_completions_cost": 5.16e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.752
+      },
+      "duration_seconds": 3.755,
+      "sql_duckdb": "SELECT t1.district, (CAST(t1.anc4_completed AS REAL) / NULLIF(t1.pregnancies_registered, 0)) * 100.0, (CAST(t2.employed_at_6_months AS REAL) / NULLIF(t2.women_enrolled, 0)) * 100.0 FROM anc_visits AS t1 JOIN livelihoods AS t2 ON t1.district = t2.district AND t1.year = t2.year WHERE t1.year = 2023",
+      "rows": [
+        [
+          "Gaya",
+          74.0,
+          56.0
+        ],
+        [
+          "Nalanda",
+          80.0,
+          65.0
+        ],
+        [
+          "Purnia",
+          67.0,
+          46.0
+        ],
+        [
+          "Kishanganj",
+          61.0,
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

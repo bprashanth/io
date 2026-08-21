@@ -1,0 +1,121 @@
+{
+  "id": "join-aggregate-by-group-p03",
+  "task_id": "join-aggregate-by-group",
+  "pattern": "join, filter, count and sum two columns per group",
+  "question": "schools lacking electricity: per block the number of such schools and their 2024 students",
+  "gold_sql": "SELECT e.\"Block\", COUNT(*) AS schools_without_electricity, SUM(e.\"Girls 2024\" + e.\"Boys 2024\") AS students_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Electricity\" = 'No' GROUP BY e.\"Block\" ORDER BY e.\"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      2,
+      339
+    ],
+    [
+      "Barachatti",
+      3,
+      709
+    ],
+    [
+      "Belaganj",
+      2,
+      433
+    ],
+    [
+      "Dobhi",
+      3,
+      730
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Barachatti",
+      3,
+      709
+    ],
+    [
+      "Atri",
+      2,
+      339
+    ],
+    [
+      "Dobhi",
+      3,
+      730
+    ],
+    [
+      "Belaganj",
+      2,
+      433
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT sey.Block, COUNT(si.\"School Code\") AS Total_Schools, SUM(sey.\"Girls 2024\" + sey.\"Boys 2024\") AS Total_Students_2024 FROM school_infrastructure AS si INNER JOIN school_enrolment_by_year AS sey ON si.\"School Code\" = sey.\"School Code\" WHERE si.Electricity = 'No' GROUP BY sey.Block",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}, \"school_infrastructure\": {\"Toilets functional (girls)\": [\"No\", \"Yes\"], \"Drinking water\": [\"No\", \"Yes\"], \"Electricity\": [\"No\", \"Yes\"], \"Inspected On\": [\"2024-01-10\", \"2024-01-13\", \"2024-02-13\", \"2024-02-15\", \"2024-02-19\", \"2024-02-21\", \"2024-02-26\", \"2024-03-12\", \"2024-03-22\", \"2024-03-27\", \"2024-04-02\", \"2024-04-04\", \"2024-04-13\", \"2024-04-17\", \"2024-04-20\", \"2024-04-21\", \"2024-04-27\", \"2024-05-13\", \"2024-06-01\", \"2024-06-16\", \"2024-06-27\", \"2024-07-09\", \"2024-07-23\", \"2024-08-02\", \"2024-08-04\", \"2024-08-14\", \"2024-08-17\", \"2024-09-02\", \"2024-09-14\", \"2024-09-15\", \"2024-09-21\", \"2024-09-26\", \"2024-10-24\", \"2024-11-12\", \"2024-11-16\", \"2024-11-20\", \"2024-12-03\", \"2024-12-08\", \"2024-12-19\"], \"Source\": [\"Inspection register\"]}}\n\nCURRENT QUESTION:\nschools lacking electricity: per block the number of such schools and their 2024 students",
+      "response": "To translate the natural language question into an executable SQLite query, we need to carefully break down the requirements and map them to the available data in the schema.\n\n### Step-by-Step Breakdown:\n\n1. **Identify the Relevant Tables:**\n   - `school_infrastructure`: This table contains information about the infrastructure of schools, including whether the school has electricity.\n   - `school_enrolment_by_year`: This table contains enrollment data for schools, including the number of students expected in 2024.\n\n2. **Determine the Required Columns:**\n   - From `school_infrastructure`, we need:\n     - `Block`: To group the results by block.\n     - `Electricity`: To filter schools that lack electricity.\n   - From `school_enrolment_by_year`, we need:\n     - `Block`: To join with the `school_infrastructure` table.\n     - `Girls 2024` and `Boys 2024`: To calculate the total number of students expected in 2024.\n\n3. **Filter Schools Lacking Electricity:**\n   - Use the `WHERE` clause to filter rows where `Electricity` is 'No'.\n\n4. **Aggregate Data:**\n   - Use `COUNT(*)` to count the number of schools lacking electricity per block.\n   - Use `SUM(\"Girls 2024\" + \"Boys 2024\")` to calculate the total number of students expected in 2024 for these schools.\n\n5. **Group Results:**\n   - Use `GROUP BY si.Block` to group the results by block.\n\n### Constructing the SQL Query:\n\nBased on the above steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    si.Block, \n    COUNT(*) AS num_schools, \n    SUM(sey.\"Girls 2024\" + sey.\"Boys 2024\") AS total_students_2024\nFROM \n    school_infrastructure si\nJOIN \n    school_enrolment_by_year sey ON si.`School Code` = sey.`School Code`\nWHERE \n    si.Electricity = 'No'\nGROUP BY \n    si.Block;\n```\n\n### Explanation:\n\n- **SELECT Clause:** We select the `Block` column from `school_infrastructure` to group the results. We also calculate the number of schools (`COUNT(*)`) and the total number of students expected in 2024 (`SUM(\"Girls 2024\" + \"Boys 2024\")`).\n- **FROM Clause:** We specify the `school_infrastructure` table as `si` and join it with the `school_enrolment_by_year` table as `sey` on the `School Code` column.\n- **WHERE Clause:** We filter the rows to include only those schools where `Electricity` is 'No'.\n- **GROUP BY Clause:** We group the results by `si.Block` to get the count and total students per block.\n\nThis query efficiently retrieves the required information by leveraging the relationships between the tables and applying the necessary filters and aggregations.",
+      "api": {
+        "id": "chatcmpl-5elwqX5hEzkZAISa2nmT1emRJBbVvjOE",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 649,
+          "prompt_tokens": 1364,
+          "total_tokens": 2013,
+          "prompt_tokens_details": {
+            "cached_tokens": 1340
+          }
+        },
+        "duration_seconds": 14.319
+      },
+      "duration_seconds": 14.32,
+      "error": "BinderException: Binder Error: Table \"si\" does not have a column named \"Block\"\n\nCandidate bindings: : \"Electricity\"\n\nLINE 1: ...\" = sey.\"School Code\" WHERE si.Electricity = 'No' GROUP BY si.Block\n                                                                      ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}, \"school_infrastructure\": {\"Toilets functional (girls)\": [\"No\", \"Yes\"], \"Drinking water\": [\"No\", \"Yes\"], \"Electricity\": [\"No\", \"Yes\"], \"Inspected On\": [\"2024-01-10\", \"2024-01-13\", \"2024-02-13\", \"2024-02-15\", \"2024-02-19\", \"2024-02-21\", \"2024-02-26\", \"2024-03-12\", \"2024-03-22\", \"2024-03-27\", \"2024-04-02\", \"2024-04-04\", \"2024-04-13\", \"2024-04-17\", \"2024-04-20\", \"2024-04-21\", \"2024-04-27\", \"2024-05-13\", \"2024-06-01\", \"2024-06-16\", \"2024-06-27\", \"2024-07-09\", \"2024-07-23\", \"2024-08-02\", \"2024-08-04\", \"2024-08-14\", \"2024-08-17\", \"2024-09-02\", \"2024-09-14\", \"2024-09-15\", \"2024-09-21\", \"2024-09-26\", \"2024-10-24\", \"2024-11-12\", \"2024-11-16\", \"2024-11-20\", \"2024-12-03\", \"2024-12-08\", \"2024-12-19\"], \"Source\": [\"Inspection register\"]}}\n\nCURRENT QUESTION:\nschools lacking electricity: per block the number of such schools and their 2024 students\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Table \"si\" does not have a column named \"Block\"\n\nCandidate bindings: : \"Electricity\"\n\nLINE 1: ...\" = sey.\"School Code\" WHERE si.Electricity = 'No' GROUP BY si.Block\n                                                                      ^\nReturn a complete corrected query.",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to carefully analyze the requirements and the schema provided. The question asks for the number of schools lacking electricity per block, along with the total number of students expected in 2024 for these schools.\n\n### Step-by-Step Solution:\n\n1. **Identify Relevant Tables and Columns**:\n   - **school_infrastructure**: This table contains information about the infrastructure of schools, including whether the school has electricity.\n   - **school_enrolment_by_year**: This table contains enrollment data for schools, including the expected number of students in 2024.\n\n2. **Determine the Required Columns**:\n   - From **school_infrastructure**: We need the `Block` and `Electricity` columns.\n   - From **school_enrolment_by_year**: We need the `Block` and `Girls 2024` and `Boys 2024` columns to calculate the total number of students expected in 2024.\n\n3. **Join Conditions**:\n   - We need to join the `school_infrastructure` table with the `school_enrolment_by_year` table on the `School Code` column to link each school's infrastructure data with its enrollment data.\n\n4. **Filter Conditions**:\n   - We need to filter the schools where the `Electricity` column in the `school_infrastructure` table is 'No'.\n\n5. **Aggregation**:\n   - We need to group the results by `Block`.\n   - For each block, we need to count the number of schools lacking electricity.\n   - We also need to sum the total number of students expected in 2024 for these schools.\n\n6. **Construct the SQL Query**:\n   - Use an `INNER JOIN` to combine the two tables based on the `School Code`.\n   - Apply the filter condition in the `WHERE` clause.\n   - Use `GROUP BY` to group the results by `Block`.\n   - Use `COUNT` to count the number of schools and `SUM` to calculate the total number of students expected in 2024.\n\n### Final SQL Query\n\n```sql\nSELECT \n    sey.Block, \n    COUNT(si.`School Code`) AS Total_Schools, \n    SUM(sey.`Girls 2024` + sey.`Boys 2024`) AS Total_Students_2024\nFROM \n    school_infrastructure si\nINNER JOIN \n    school_enrolment_by_year sey ON si.`School Code` = sey.`School Code`\nWHERE \n    si.Electricity = 'No'\nGROUP BY \n    sey.Block;\n```\n\n### Explanation:\n- **SELECT Clause**: We select the `Block` column from `school_enrolment_by_year` (aliased as `sey`), count the number of schools (`Total_Schools`), and sum the total number of students expected in 2024 (`Total_Students_2024`).\n- **FROM Clause**: We specify the `school_infrastructure` table (aliased as `si`) and join it with the `school_enrolment_by_year` table (aliased as `sey`) on the `School Code` column.\n- **WHERE Clause**: We filter the rows where the `Electricity` column in the `school_infrastructure` table is 'No'.\n- **GROUP BY Clause**: We group the results by the `Block` column to get the count and sum for each block separately.",
+      "api": {
+        "id": "chatcmpl-SHpEYCTUfpwjraenT6dmRTxGl0vEZdWI",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 736,
+          "prompt_tokens": 1431,
+          "total_tokens": 2167,
+          "prompt_tokens_details": {
+            "cached_tokens": 1359
+          }
+        },
+        "duration_seconds": 16.249
+      },
+      "duration_seconds": 16.254,
+      "sql_duckdb": "SELECT sey.Block, COUNT(si.\"School Code\") AS Total_Schools, SUM(sey.\"Girls 2024\" + sey.\"Boys 2024\") AS Total_Students_2024 FROM school_infrastructure AS si INNER JOIN school_enrolment_by_year AS sey ON si.\"School Code\" = sey.\"School Code\" WHERE si.Electricity = 'No' GROUP BY sey.Block",
+      "rows": [
+        [
+          "Barachatti",
+          3,
+          709
+        ],
+        [
+          "Atri",
+          2,
+          339
+        ],
+        [
+          "Dobhi",
+          3,
+          730
+        ],
+        [
+          "Belaganj",
+          2,
+          433
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

@@ -1,0 +1,68 @@
+{
+  "id": "relative-growth-between-years-p02",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "2024 total loan amount compared to 2023 total, percentage growth",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": [
+    [
+      6125000,
+      7720000,
+      26.040816326530614
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH yearly AS (SELECT SUBSTRING(\"Disbursement Date\", 1, 4) AS yr, SUM(\"Loan Amount (Rs)\") AS total_loan FROM \"shg_loan_register\" WHERE SUBSTRING(\"Disbursement Date\", 1, 4) IN ('2023', '2024') GROUP BY SUBSTRING(\"Disbursement Date\", 1, 4)) SELECT t2023.total_loan AS \"2023 Total Loan Amount\", t2024.total_loan AS \"2024 Total Loan Amount\", (t2024.total_loan - t2023.total_loan) / NULLIF(NULLIF(t2023.total_loan, 0), 0) * 100 AS \"Percentage Growth\" FROM yearly AS t2023 CROSS JOIN yearly AS t2024 WHERE t2023.yr = '2023' AND t2024.yr = '2024'",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\n2024 total loan amount compared to 2023 total, percentage growth",
+      "response": "\n\n```sql\nWITH yearly AS (\n  SELECT\n    SUBSTR(\"Disbursement Date\", 1, 4) AS yr,\n    SUM(\"Loan Amount (Rs)\") AS total_loan\n  FROM \"shg_loan_register\"\n  WHERE SUBSTR(\"Disbursement Date\", 1, 4) IN ('2023', '2024')\n  GROUP BY SUBSTR(\"Disbursement Date\", 1, 4)\n)\nSELECT\n  t2023.total_loan AS \"2023 Total Loan Amount\",\n  t2024.total_loan AS \"2024 Total Loan Amount\",\n  (t2024.total_loan - t2023.total_loan) / NULLIF(t2023.total_loan, 0) * 100 AS \"Percentage Growth\"\nFROM yearly t2023\nCROSS JOIN yearly t2024\nWHERE t2023.yr = '2023'\n  AND t2024.yr = '2024';\n```",
+      "api": {
+        "id": "gen-1787312172-azsxPcz3PH1VQ3YkLaNw",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 446,
+          "completion_tokens": 711,
+          "total_tokens": 1157,
+          "cost": 0.0024759,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0024759,
+            "upstream_inference_prompt_cost": 0.0002007,
+            "upstream_inference_completions_cost": 0.0022752
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 345,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 13.665
+      },
+      "duration_seconds": 13.673,
+      "sql_duckdb": "WITH yearly AS (SELECT SUBSTRING(\"Disbursement Date\", 1, 4) AS yr, SUM(\"Loan Amount (Rs)\") AS total_loan FROM \"shg_loan_register\" WHERE SUBSTRING(\"Disbursement Date\", 1, 4) IN ('2023', '2024') GROUP BY SUBSTRING(\"Disbursement Date\", 1, 4)) SELECT t2023.total_loan AS \"2023 Total Loan Amount\", t2024.total_loan AS \"2024 Total Loan Amount\", (t2024.total_loan - t2023.total_loan) / NULLIF(NULLIF(t2023.total_loan, 0), 0) * 100 AS \"Percentage Growth\" FROM yearly AS t2023 CROSS JOIN yearly AS t2024 WHERE t2023.yr = '2023' AND t2024.yr = '2024'",
+      "rows": [
+        [
+          6125000,
+          7720000,
+          26.040816326530614
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

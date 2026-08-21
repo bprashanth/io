@@ -1,0 +1,103 @@
+{
+  "id": "wide-year-columns-share-p02",
+  "task_id": "wide-year-columns-share",
+  "pattern": "arithmetic across year-named columns, group sum, share",
+  "question": "girls as a share of total students in 2024 for each block",
+  "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / NULLIF((SUM(\"Girls 2024\") + SUM(\"Boys 2024\")), 0) AS girls_share_2024 FROM \"school_enrolment_by_year\" GROUP BY \"Block\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ngirls as a share of total students in 2024 for each block\n[Database Schema]\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ngirls as a share of total students in 2024 for each block\n```sql",
+      "response": "\n\n```sql\nSELECT \"Block\",\n       100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_2024\nFROM \"school_enrolment_by_year\"\nGROUP BY \"Block\"\n```",
+      "api": {
+        "id": "gen-1787311637-IMtibB5nGz7MIHRWKOLL",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 299,
+          "completion_tokens": 149,
+          "total_tokens": 448,
+          "cost": 0.00061135,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00061135,
+            "upstream_inference_prompt_cost": 0.00013455,
+            "upstream_inference_completions_cost": 0.0004768
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 58,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.767
+      },
+      "duration_seconds": 1.773,
+      "sql_duckdb": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / NULLIF((SUM(\"Girls 2024\") + SUM(\"Boys 2024\")), 0) AS girls_share_2024 FROM \"school_enrolment_by_year\" GROUP BY \"Block\"",
+      "rows": [
+        [
+          "Barachatti",
+          55.376344086021504
+        ],
+        [
+          "Atri",
+          53.900375939849624
+        ],
+        [
+          "Dobhi",
+          48.09971393543114
+        ],
+        [
+          "Belaganj",
+          52.563091482649845
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

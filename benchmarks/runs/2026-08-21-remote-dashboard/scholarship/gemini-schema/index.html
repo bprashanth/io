@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scholarship Applications Dashboard</title>
+<style>
+  :root {
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --border: #e2e8f0;
+    --border-subtle: #edf2f7;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --primary-dark: #1d4ed8;
+    --accent-teal: #0d9488;
+    --accent-amber: #d97706;
+    --accent-rose: #e11d48;
+    --accent-indigo: #4f46e5;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    padding: 24px;
+    width: 1440px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-titles h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+  .header-titles p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+  .source-tag {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  /* KPI Grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  }
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+  }
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: 6px;
+    line-height: 1.1;
+  }
+  .kpi-subtext {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* Charts Grid */
+  .charts-grid-2x2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .chart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  }
+  .chart-header {
+    margin-bottom: 16px;
+  }
+  .chart-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .chart-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+  .chart-container {
+    width: 100%;
+    height: 260px;
+    position: relative;
+  }
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+  }
+
+  /* Table Section */
+  .table-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  }
+  .table-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 16px;
+  }
+  .table-title-area h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .table-title-area p {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+  .table-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .search-box, .select-box {
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: #fff;
+    outline: none;
+  }
+  .search-box:focus, .select-box:focus {
+    border-color: var(--primary);
+  }
+  .search-box { width: 220px; }
+  .btn-download {
+    height: 36px;
+    padding: 0 16px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.15s ease;
+  }
+  .btn-download:hover {
+    background: var(--primary-dark);
+  }
+
+  /* Table Styling */
+  .table-container {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+  }
+  th {
+    background: #f1f5f9;
+    color: var(--text-secondary);
+    font-weight: 600;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    user-select: none;
+    cursor: pointer;
+  }
+  th:hover {
+    background: #e2e8f0;
+  }
+  th.no-sort {
+    cursor: default;
+  }
+  th.no-sort:hover {
+    background: #f1f5f9;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+  tr:hover td {
+    background-color: #f8fafc;
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .badge-approved { background: #dcfce7; color: #15803d; }
+  .badge-pending { background: #fef3c7; color: #b45309; }
+  .badge-rejected { background: #fee2e2; color: #b91c1c; }
+  .badge-other { background: #f1f5f9; color: #475569; }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute;
+    display: none;
+    background: rgba(15, 23, 42, 0.9);
+    color: #ffffff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+</style>
+</head>
+<body>
+
+<div id="tooltip"></div>
+
+<header class="dashboard-header">
+  <div class="header-titles">
+    <h1>Scholarship Applications Dashboard</h1>
+    <p>Comprehensive overview of candidate merit, socioeconomic profile, taluka breakdown, and verification status</p>
+  </div>
+  <div class="source-tag">
+    <strong>Source:</strong> Candidate Application Records
+  </div>
+</header>
+
+<section class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Total Applications</div>
+    <div class="kpi-value" id="kpi-total">0</div>
+    <div class="kpi-subtext">Received records</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Approved Candidates</div>
+    <div class="kpi-value" id="kpi-approved">0</div>
+    <div class="kpi-subtext" id="kpi-approval-rate">0% of total</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Average Marks</div>
+    <div class="kpi-value" id="kpi-avg-marks">0.00%</div>
+    <div class="kpi-subtext">Academic merit score</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Avg Family Income</div>
+    <div class="kpi-value" id="kpi-avg-income">₹0</div>
+    <div class="kpi-subtext">Annual household</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Talukas Covered</div>
+    <div class="kpi-value" id="kpi-talukas">0</div>
+    <div class="kpi-subtext">Geographic distribution</div>
+  </div>
+</section>
+
+<section class="charts-grid-2x2">
+  <!-- Chart 1: Taluka Breakdown -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Applications & Status by Taluka</div>
+      <div class="chart-subtitle">Volume of applicants per administrative taluka</div>
+    </div>
+    <div class="chart-container" id="chart-taluka"></div>
+  </div>
+
+  <!-- Chart 2: Category Breakdown -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Distribution by Social Category</div>
+      <div class="chart-subtitle">Applicant count across affirmative action / socioeconomic categories</div>
+    </div>
+    <div class="chart-container" id="chart-category"></div>
+  </div>
+
+  <!-- Chart 3: Marks Distribution -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Academic Merit Score Distribution (Marks %)</div>
+      <div class="chart-subtitle">Frequency of applicants across percentage brackets</div>
+    </div>
+    <div class="chart-container" id="chart-marks"></div>
+  </div>
+
+  <!-- Chart 4: Income vs Marks Scatter -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Family Income vs Marks %</div>
+      <div class="chart-subtitle">Socioeconomic background vs academic performance correlation</div>
+    </div>
+    <div class="chart-container" id="chart-income-marks"></div>
+  </div>
+</section>
+
+<section class="table-section">
+  <div class="table-toolbar">
+    <div class="table-title-area">
+      <h2>Top Applicants & Merited Candidates</h2>
+      <p>Displaying candidate records with Gaon, School, Category, Marks, and Status</p>
+    </div>
+    <div class="table-controls">
+      <input type="text" id="table-search" class="search-box" placeholder="Search applicant, school, gaon...">
+      <select id="taluka-filter" class="select-box">
+        <option value="">All Talukas</option>
+      </select>
+      <select id="status-filter" class="select-box">
+        <option value="">All Statuses</option>
+      </select>
+      <button class="btn-download" id="btn-download-csv">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Download CSV
+      </button>
+    </div>
+  </div>
+  <div class="table-container">
+    <table id="applicants-table">
+      <thead>
+        <tr>
+          <th data-col="rank" class="no-sort" style="width: 50px;">#</th>
+          <th data-col="Naam">Applicant Name</th>
+          <th data-col="Pita ka naam">Father's Name</th>
+          <th data-col="School">School</th>
+          <th data-col="Gaon">Gaon</th>
+          <th data-col="Taluka">Taluka</th>
+          <th data-col="Category">Category</th>
+          <th data-col="Marks %" style="text-align: right;">Marks %</th>
+          <th data-col="Family Income" style="text-align: right;">Income (₹)</th>
+          <th data-col="Status" style="text-align: center;">Status</th>
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <!-- Rendered via JS -->
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+const DATA = [{"Sr No": 1, "Naam": "Gurleen Agarwal", "Pita ka naam": "Dattatray Agarwal", "DOB": "28-04-2015", "Umar": 11, "Mob": "086179-59278", "Alt Contact": "7611040501", "Aadhar No": "289141697536", "School": "Sant Gadge Baba School, Alandi", "Gaon": "Alandi", "Taluka": "Mulshi", "District": "Pune", "Category": "General", "Family Income": 169729, "Marks %": 66.9, "Status": "Disbursed", "Remarks": "Anil Nikam to submit updated income certificate, contact 098066-74009.", "col_17": 1334722995488437, "IFSC": "CNRB0UGCGT4", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 2, "Naam": "Tukaram Chettiar", "Pita ka naam": "Sanjay Chettiar", "DOB": "30-07-2016", "Umar": 10, "Mob": "+91 72202 99512", "Alt Contact": "tukaram_chettiar@yahoo.in", "Aadhar No": "286278304858", "School": "Vidya Mandir High School, Wadgaon", "Gaon": "Wadgaon", "Taluka": "Khed", "District": "Pune", "Category": "OBC-NT", "Family Income": 23901, "Marks %": 85.5, "Status": "Rejected", "Remarks": "Caste certificate under verification.", "col_17": 355527101499745, "IFSC": "ICIC0A2J0AP", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 3, "Naam": "ismail agarwal", "Pita ka naam": "Amit Agarwal", "DOB": "29-12-2007", "Umar": 18, "Mob": "9155162743", "Alt Contact": "6206922030", "Aadhar No": "3428 0948 0593", "School": "Saraswati Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "VJNT", "Family Income": 147319, "Marks %": 67.6, "Status": "Under Review", "Remarks": "Documents pending verification.", "col_17": 1263411169678790, "IFSC": "ICIC0UVRVF9", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 4, "Naam": "M. X. Verma", "Pita ka naam": "Rahul Shinde", "DOB": "02-10-2010", "Umar": 15, "Mob": "070232-67306", "Alt Contact": "simran.verma1@outlook.com", "Aadhar No": "6372 1919 8913", "School": "Government Middle School, Chandwara", "Gaon": "Chandwara", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "ST", "Family Income": 139253, "Marks %": 65.0, "Status": "Disbursed", "Remarks": "Guardian HARI GILL confirmed enrollment.", "col_17": 905022272129, "IFSC": "CNRB0RL2N0N", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 5, "Naam": "POPAT NIKAM", "Pita ka naam": "Sanjay Nikam", "DOB": "04-12-2005", "Umar": 20, "Mob": "6828102034", "Alt Contact": "6633021821", "Aadhar No": "7629 3195 0173", "School": "Municipal School, Kesnand", "Gaon": "Kesnand", "Taluka": "Mulshi", "District": "Pune", "Category": "SC", "Family Income": 153496, "Marks %": 79.9, "Status": "Pending", "Remarks": "Family shifted house, new contact person Xavier Agarwal (093782-97824).", "col_17": 8415780024047079, "IFSC": "HDFC060H22E", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 6, "Naam": "Kavya Gupta", "Pita ka naam": "Shrikant Gupta", "DOB": "17-10-2007", "Umar": 18, "Mob": "+91 85416 21170", "Alt Contact": "6026599897", "Aadhar No": "9199 8330 4614", "School": "Saraswati Vidyalaya, Kharadi", "Gaon": "Kharadi", "Taluka": "Khed", "District": "Pune", "Category": "SC", "Family Income": 201348, "Marks %": 83.3, "Status": "Pending", "Remarks": "School has confirmed attendance record.", "col_17": 907907429042, "IFSC": "SBIN010DK8H", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 7, "Naam": "P. Q. DSouza", "Pita ka naam": "Dinesh DSouza", "DOB": "12-07-2010", "Umar": 16, "Mob": "+91 71168 38873", "Alt Contact": "yashwant_dsouza@rediffmail.com", "Aadhar No": "4263 6403 7758", "School": "Adarsh Vidyalaya, Nira", "Gaon": "Nira", "Taluka": "Mulshi", "District": "Pune", "Category": "General", "Family Income": 206999, "Marks %": 35.2, "Status": "Rejected", "Remarks": "Marksheet not attested by school.", "col_17": 808269186769365, "IFSC": "ICIC0QXKBI9", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 8, "Naam": "VIJAY CHOUGULE", "Pita ka naam": "Vishal Chougule", "DOB": "22-12-2012", "Umar": 13, "Mob": "070855-42295", "Alt Contact": "+91 82361 92568", "Aadhar No": "555717567020", "School": "New English School, Dehu", "Gaon": "Dehu", "Taluka": "Junnar", "District": "Pune", "Category": "NT", "Family Income": 31316, "Marks %": 76.8, "Status": "Approved", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 139510305774181, "IFSC": "ICIC09K7GLG", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 9, "Naam": "Vijay Mirza", "Pita ka naam": "rohit thomas", "DOB": "15-03-2011", "Umar": 15, "Mob": "+91 91261 20300", "Alt Contact": "061826-74540", "Aadhar No": "382300998103", "School": "New English School, Devipur", "Gaon": "Devipur", "Taluka": "Sherghati", "District": "Gaya", "Category": "ST", "Family Income": 222759, "Marks %": 77.7, "Status": "Pending", "Remarks": "Photo missing from file, requested again.", "col_17": 257384593819, "IFSC": "UTIB0LQD2NP", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 10, "Naam": "Shakuntala DSouza", "Pita ka naam": "Aslam DSouza", "DOB": "04-12-2015", "Umar": 10, "Mob": "+91 73189 81910", "Alt Contact": "080468-92434", "Aadhar No": "827851730940", "School": "Lokmanya Tilak Vidyalaya, Amawan", "Gaon": "Amawan", "Taluka": "Wazirganj", "District": "Gaya", "Category": "OBC", "Family Income": 18708, "Marks %": 50.8, "Status": "Approved", "Remarks": "School has confirmed attendance record.", "col_17": 40553455495, "IFSC": "UBIN0GOPD9O", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 11, "Naam": "Tukaram Nair", "Pita ka naam": "Dattatray Chettiar", "DOB": "19-05-2004", "Umar": 22, "Mob": "061127-35617", "Alt Contact": "076122-30491", "Aadhar No": "267762908359", "School": "Rashtriya Balika Vidyalaya, Rajgurunagar", "Gaon": "Rajgurunagar", "Taluka": "Haveli", "District": "Pune", "Category": "ST", "Family Income": 232014, "Marks %": 42.3, "Status": "Pending", "Remarks": "Case reviewed by committee, approved.", "col_17": 90668884203492, "IFSC": "BARB0SMI9H0", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 12, "Naam": "Vimla Chaudhary", "Pita ka naam": "Rahul Chaudhary", "DOB": "19-01-2009", "Umar": 17, "Mob": "076786-20491", "Alt Contact": "+91 67565 07875", "Aadhar No": "7963 5691 8432", "School": "New English School, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 119782, "Marks %": 40.8, "Status": "Disbursed", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 849975608330965, "IFSC": "BARB01QQ1D8", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 13, "Naam": "meena pathan", "Pita ka naam": "Sanjay Pathan", "DOB": "10-11-2015", "Umar": 10, "Mob": "070514-71697", "Alt Contact": "meenapat722@yahoo.in", "Aadhar No": "613230461065", "School": "Vidya Mandir High School, Kalyanpur", "Gaon": "Kalyanpur", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "ST", "Family Income": 130766, "Marks %": 44.4, "Status": "Disbursed", "Remarks": "Documents pending verification.", "col_17": 9423549751484, "IFSC": "MAHB0D07891", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 14, "Naam": "rizwan more", "Pita ka naam": "Vasant More", "DOB": "23-02-2014", "Umar": 12, "Mob": "098173-06131", "Alt Contact": "065199-42718", "Aadhar No": "740376122495", "School": "Lokmanya Tilak Vidyalaya, Rampur", "Gaon": "Rampur", "Taluka": "Belaganj", "District": "Gaya", "Category": "VJNT", "Family Income": 205985, "Marks %": 49.1, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 616183671179838, "IFSC": "UTIB09DLF98", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 15, "Naam": "sheela pathan", "Pita ka naam": "Stephen Pathan", "DOB": "23-03-2007", "Umar": 19, "Mob": "061245-55430", "Alt Contact": "sheela.pathan44@rediffmail.com", "Aadhar No": "7877 7804 1947", "School": "Rashtriya Balika Vidyalaya, Bishunpur", "Gaon": "Bishunpur", "Taluka": "Konch", "District": "Gaya", "Category": "VJNT", "Family Income": 213716, "Marks %": 90.1, "Status": "Rejected", "Remarks": "Caste certificate under verification.", "col_17": 99895289583799, "IFSC": "UTIB0JV88L2", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 16, "Naam": "Harjeet Jadhav", "Pita ka naam": "Iqbal Jadhav", "DOB": "02-09-2007", "Umar": 18, "Mob": "+91 93604 11537", "Alt Contact": "9162938116", "Aadhar No": "2919 3385 4440", "School": "Zilla Parishad Primary School, Basaith", "Gaon": "Basaith", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "General", "Family Income": 55754, "Marks %": 59.3, "Status": "Rejected", "Remarks": "Caste certificate under verification.", "col_17": 3114712072305836, "IFSC": "SBIN0H9RQCS", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 17, "Naam": "Snehal Bansal", "Pita ka naam": "Deepak Bansal", "DOB": "07-04-2014", "Umar": 12, "Mob": "7333847008", "Alt Contact": "8571165505", "Aadhar No": "526363868539", "School": "Sant Gadge Baba School, Nira", "Gaon": "Nira", "Taluka": "Baramati", "District": "Pune", "Category": "NT", "Family Income": 181348, "Marks %": 63.2, "Status": "Pending", "Remarks": "School has confirmed attendance record.", "col_17": 310599534882099, "IFSC": "SBIN0061QCQ", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 18, "Naam": "Milind Dhillon", "Pita ka naam": "Ramu Dhillon", "DOB": "19-06-2012", "Umar": 14, "Mob": "7898081598", "Alt Contact": "7944265604", "Aadhar No": "9222 4732 1608", "School": "Rashtriya Balika Vidyalaya, Bhor", "Gaon": "Bhor", "Taluka": "Junnar", "District": "Pune", "Category": "General", "Family Income": 30555, "Marks %": 63.2, "Status": "Under Review", "Remarks": "Income certificate expired, renewal asked.", "col_17": 5741502403787, "IFSC": "BARB0CX4ORJ", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 19, "Naam": "Jadhav Snehal", "Pita ka naam": "Ganpat", "DOB": "13-09-2012", "Umar": 13, "Mob": "064633-44283", "Alt Contact": "+91 65611 62418", "Aadhar No": "7242 9761 9539", "School": "Zilla Parishad Primary School, Karpi", "Gaon": "Karpi", "Taluka": "Sherghati", "District": "Gaya", "Category": "SC", "Family Income": 137251, "Marks %": 37.1, "Status": "Approved", "Remarks": "School has confirmed attendance record.", "col_17": 776183815405, "IFSC": "HDFC0I0AYD0", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 20, "Naam": "Anthony Gupta", "Pita ka naam": "Prakash Gupta", "DOB": "10-07-2011", "Umar": 15, "Mob": "6201455125", "Alt Contact": "anthonygup492@gmail.com", "Aadhar No": "3845 3889 4493", "School": "Saraswati Vidyalaya, Bishunpur", "Gaon": "Bishunpur", "Taluka": "Belaganj", "District": "Gaya", "Category": "General", "Family Income": 65070, "Marks %": 48.7, "Status": "Rejected", "Remarks": "Documents pending verification.", "col_17": 548307056874977, "IFSC": "PUNB0Z5BWPM", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 21, "Naam": "Bhagyashree Kadam", "Pita ka naam": "Rajesh Kadam", "DOB": "08-09-2005", "Umar": 20, "Mob": "+91 81329 58308", "Alt Contact": "bhagyashree_kadam@outlook.com", "Aadhar No": "240446259206", "School": "Rashtriya Balika Vidyalaya, Motipur", "Gaon": "Motipur", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 36627, "Marks %": 78.6, "Status": "Rejected", "Remarks": "Spoke to Bapu Pathan's mother, call +91 94269 99480 for update.", "col_17": 30815665723118, "IFSC": "CNRB0BLN6KV", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 22, "Naam": "Sushila Deshpande", "Pita ka naam": "Ganesh", "DOB": "24-09-2003", "Umar": 22, "Mob": "+91 74387 91005", "Alt Contact": "sushilades950@rediffmail.com", "Aadhar No": "878467113970", "School": "Lokmanya Tilak Vidyalaya, Nira", "Gaon": "Nira", "Taluka": "Baramati", "District": "Pune", "Category": "NT", "Family Income": 55143, "Marks %": 44.1, "Status": "Approved", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 7905488464074, "IFSC": "ICIC0W3HWHY", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 23, "Naam": "G. I. Thomas", "Pita ka naam": "Anil Thomas", "DOB": "19-08-2006", "Umar": 20, "Mob": "+91 95949 54464", "Alt Contact": "ganeshtho375@gmail.com", "Aadhar No": "817985513922", "School": "New English School, Loni Kalbhor", "Gaon": "Loni Kalbhor", "Taluka": "Khed", "District": "Pune", "Category": "General", "Family Income": 165128, "Marks %": 54.1, "Status": "Under Review", "Remarks": "Spoke to Joseph Bhosale's mother, call +91 88985 52499 for update.", "col_17": 5400676383059, "IFSC": "PUNB0TOEQEE", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 24, "Naam": "Santosh Ansari", "Pita ka naam": "Ravi Ansari", "DOB": "03-04-2013", "Umar": 13, "Mob": "7930382358", "Alt Contact": "santoshans838@rediffmail.com", "Aadhar No": "8201 6221 2430", "School": "Adarsh Vidyalaya, Dehu", "Gaon": "Dehu", "Taluka": "Mulshi", "District": "Pune", "Category": "SC", "Family Income": 170260, "Marks %": 43.4, "Status": "Approved", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 1297701472456356, "IFSC": "ICIC06RGA33", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 25, "Naam": "Kumar Gopal", "Pita ka naam": "S. C. Chougule", "DOB": "15-03-2013", "Umar": 13, "Mob": "8131550802", "Alt Contact": "gopal.kumar58@outlook.com", "Aadhar No": "748916907248", "School": "Saraswati Vidyalaya, Fatehpur", "Gaon": "Fatehpur", "Taluka": "Wazirganj", "District": "Gaya", "Category": "General", "Family Income": 104669, "Marks %": 88.8, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 58712099195, "IFSC": "BARB0Y19LLY", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 26, "Naam": "Kale Sarojini", "Pita ka naam": "Stephen Kale", "DOB": "24-09-2007", "Umar": 18, "Mob": "+91 98214 04823", "Alt Contact": "084948-07816", "Aadhar No": "503741003248", "School": "Sant Gadge Baba School, Bhor", "Gaon": "Bhor", "Taluka": "Haveli", "District": "Pune", "Category": "OBC-NT", "Family Income": 35163, "Marks %": 73.8, "Status": "Approved", "Remarks": "Family shifted house, new contact person Ramdas Mathew (074246-87721).", "col_17": 68662630928, "IFSC": "SBIN0YL8NV5", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 27, "Naam": "A. G. Pereira", "Pita ka naam": "XAVIER YADAV", "DOB": "28-06-2007", "Umar": 19, "Mob": "9087820689", "Alt Contact": "+91 84699 54406", "Aadhar No": "939943578949", "School": "Lokmanya Tilak Vidyalaya, Ambegaon Budruk", "Gaon": "Ambegaon Budruk", "Taluka": "Haveli", "District": "Pune", "Category": "SC", "Family Income": 103367, "Marks %": 54.1, "Status": "Rejected", "Remarks": "Spoke to mukesh thakur's mother, call 086021-38027 for update.", "col_17": 95157880410060, "IFSC": "HDFC0S3DLPR", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 28, "Naam": "Joseph Chougule", "Pita ka naam": "Joseph Chougule", "DOB": "21-01-2005", "Umar": 21, "Mob": "093976-20116", "Alt Contact": "6572709753", "Aadhar No": "5574 8342 8623", "School": "Government Middle School, Dehu", "Gaon": "Dehu", "Taluka": "Baramati", "District": "Pune", "Category": "General", "Family Income": 236641, "Marks %": 92.1, "Status": "Under Review", "Remarks": "School has confirmed attendance record.", "col_17": 7034897201980, "IFSC": "PUNB0P4UPZ0", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 29, "Naam": "VINOD SHINDE", "Pita ka naam": "Prakash Shinde", "DOB": "18-10-2010", "Umar": 15, "Mob": "075800-88088", "Alt Contact": "vinod_shinde@rediffmail.com", "Aadhar No": "910992831357", "School": "Vidya Mandir High School, Rampur Sokho", "Gaon": "Rampur Sokho", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "ST", "Family Income": 98747, "Marks %": 55.6, "Status": "Pending", "Remarks": "Case reviewed by committee, approved.", "col_17": 961565997277148, "IFSC": "UTIB07PD92Y", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 30, "Naam": "Anthony Gupta", "Pita ka naam": "Milind Gupta", "DOB": "02-04-2007", "Umar": 19, "Mob": "064064-04158", "Alt Contact": "+91 70724 45994", "Aadhar No": "8527 8231 3732", "School": "Adarsh Vidyalaya, Manjari", "Gaon": "Manjari", "Taluka": "Junnar", "District": "Pune", "Category": "ST", "Family Income": 56077, "Marks %": 66.2, "Status": "Approved", "Remarks": "Documents pending verification.", "col_17": 3681972134690, "IFSC": "SBIN0GP5UZG", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 31, "Naam": "Rodrigues Anil", "Pita ka naam": "Dubey Dattatray", "DOB": "02-03-2009", "Umar": 17, "Mob": "+91 76256 78058", "Alt Contact": "6697337055", "Aadhar No": "5458 1617 2074", "School": "Vidya Mandir High School, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "SC", "Family Income": 120940, "Marks %": 90.7, "Status": "Pending", "Remarks": "Documents pending verification.", "col_17": 48787978206575, "IFSC": "ICIC01MDC6Z", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 32, "Naam": "Yashwant Reddy", "Pita ka naam": "Sanjay Reddy", "DOB": "15-09-2015", "Umar": 10, "Mob": "8660565005", "Alt Contact": "+91 66930 48769", "Aadhar No": "900293072289", "School": "Municipal School, Barachatti", "Gaon": "Barachatti", "Taluka": "Tekari", "District": "Gaya", "Category": "General", "Family Income": 227303, "Marks %": 61.8, "Status": "Rejected", "Remarks": "Waiting for bank passbook copy.", "col_17": 2289126207385, "IFSC": "PUNB08B584I", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 33, "Naam": "baljeet dhillon", "Pita ka naam": "Krishna", "DOB": "16-11-2003", "Umar": 22, "Mob": "8029429403", "Alt Contact": "baljeetdhi882@rediffmail.com", "Aadhar No": "751557352805", "School": "Lokmanya Tilak Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "SC", "Family Income": 226353, "Marks %": 83.2, "Status": "Approved", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 81936095448, "IFSC": "HDFC0SM065P", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 34, "Naam": "A. Z. Gaikwad", "Pita ka naam": "Baliram Gaikwad", "DOB": "13-06-2008", "Umar": 18, "Mob": "065622-98855", "Alt Contact": "arjungai276@yahoo.in", "Aadhar No": "3913 4570 1653", "School": "Saraswati Vidyalaya, Dobhi", "Gaon": "Dobhi", "Taluka": "Belaganj", "District": "Gaya", "Category": "OBC", "Family Income": 184821, "Marks %": 44.2, "Status": "Approved", "Remarks": "Marksheet not attested by school.", "col_17": 778816592078, "IFSC": "CNRB069YDZI", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 35, "Naam": "T. O. Dhillon", "Pita ka naam": "Sharma Krishna", "DOB": "21-08-2004", "Umar": 22, "Mob": "094177-60708", "Alt Contact": "anthonydhi984@gmail.com", "Aadhar No": "6369 9538 2871", "School": "Saraswati Vidyalaya, Chakan", "Gaon": "Chakan", "Taluka": "Khed", "District": "Pune", "Category": "General", "Family Income": 197557, "Marks %": 51.1, "Status": "Approved", "Remarks": "Application complete, forwarded to district office.", "col_17": 5355239384447, "IFSC": "SBIN00EN78W", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 36, "Naam": "Archana Menon", "Pita ka naam": "U. A. Reddy", "DOB": "04-01-2012", "Umar": 14, "Mob": "091836-38715", "Alt Contact": "+91 93167 47133", "Aadhar No": "9112 2679 5249", "School": "Saraswati Vidyalaya, Paroo", "Gaon": "Paroo", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "NT", "Family Income": 204879, "Marks %": 94.5, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 415503922215, "IFSC": "SBIN0DC2IL9", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 37, "Naam": "Kamala", "Pita ka naam": "Rakesh Iyer", "DOB": "14-07-2011", "Umar": 15, "Mob": "+91 63608 44403", "Alt Contact": "kamalayad173@gmail.com", "Aadhar No": "509030070803", "School": "Sant Gadge Baba School, Devipur", "Gaon": "Devipur", "Taluka": "Belaganj", "District": "Gaya", "Category": "OBC-NT", "Family Income": 26844, "Marks %": 51.2, "Status": "Pending", "Remarks": "Yashoda Dubey to submit updated income certificate, contact 086606-24020.", "col_17": 98729180459, "IFSC": "UBIN0OTSX3J", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 38, "Naam": "Kavya Rao", "Pita ka naam": "Balasaheb Rao", "DOB": "28-12-2009", "Umar": 16, "Mob": "065175-13314", "Alt Contact": "+91 65344 63433", "Aadhar No": "666016183681", "School": "Sant Gadge Baba School, Bishunpur", "Gaon": "Bishunpur", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC-NT", "Family Income": 195413, "Marks %": 97.5, "Status": "Disbursed", "Remarks": "Documents pending verification.", "col_17": 59577730443859, "IFSC": "SBIN0Q1B209", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 39, "Naam": "Baliram Prasad", "Pita ka naam": "Mahesh Prasad", "DOB": "16-03-2006", "Umar": 20, "Mob": "+91 95931 82302", "Alt Contact": "076630-49055", "Aadhar No": "227791939229", "School": "Sant Gadge Baba School, Saswad", "Gaon": "Saswad", "Taluka": "Khed", "District": "Pune", "Category": "SC", "Family Income": 145549, "Marks %": 88.5, "Status": "Disbursed", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 841154044760, "IFSC": "ICIC05I3G2W", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 40, "Naam": "Rekha", "Pita ka naam": "Kiran Chougule", "DOB": "25-11-2010", "Umar": 15, "Mob": "8866210876", "Alt Contact": "062901-82385", "Aadhar No": "529730462242", "School": "Government Middle School, Loni Kalbhor", "Gaon": "Loni Kalbhor", "Taluka": "Baramati", "District": "Pune", "Category": "NT", "Family Income": 196291, "Marks %": 62.9, "Status": "Approved", "Remarks": "Photo missing from file, requested again.", "col_17": 70684047157548, "IFSC": "ICIC0FM7BPH", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 41, "Naam": "Bhoir Pratibha", "Pita ka naam": "Farooq Bhoir", "DOB": "26-03-2013", "Umar": 13, "Mob": "+91 65327 78711", "Alt Contact": "+91 66219 53709", "Aadhar No": "752736521541", "School": "Government Middle School, Basaith", "Gaon": "Basaith", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "NT", "Family Income": 204137, "Marks %": 95.8, "Status": "Approved", "Remarks": "M. F. Bajwa to submit updated income certificate, contact 069847-90846.", "col_17": 84786033137766, "IFSC": "UBIN0F3Y4IN", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 42, "Naam": "Arjun Iyengar", "Pita ka naam": "Tukaram Iyengar", "DOB": "07-01-2004", "Umar": 22, "Mob": "068851-37200", "Alt Contact": "arjun_iyengar@yahoo.in", "Aadhar No": "520344087534", "School": "New English School, Kesnand", "Gaon": "Kesnand", "Taluka": "Khed", "District": "Pune", "Category": "General", "Family Income": 201888, "Marks %": 56.3, "Status": "Approved", "Remarks": "Sunita Pathan to submit updated income certificate, contact +91 84969 29593.", "col_17": 1712954892657820, "IFSC": "UTIB0P3DIBC", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 43, "Naam": "Francis Sheikh", "Pita ka naam": "Vikram Sheikh", "DOB": "23-01-2011", "Umar": 15, "Mob": "6832873248", "Alt Contact": "8536444763", "Aadhar No": "722494044773", "School": "Municipal School, Kadus", "Gaon": "Kadus", "Taluka": "Haveli", "District": "Pune", "Category": "ST", "Family Income": 141220, "Marks %": 74.7, "Status": "Under Review", "Remarks": "Marksheet not attested by school.", "col_17": 80036506820, "IFSC": "CNRB0ZE3TIP", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 44, "Naam": "Pandey Sushma", "Pita ka naam": "Farooq Pandey", "DOB": "24-01-2016", "Umar": 10, "Mob": "+91 95743 06743", "Alt Contact": "6183522547", "Aadhar No": "5042 0742 5514", "School": "Vidya Mandir High School, Chandwara", "Gaon": "Chandwara", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "General", "Family Income": 227856, "Marks %": 74.8, "Status": "Rejected", "Remarks": "School has confirmed attendance record.", "col_17": 2619323677706, "IFSC": "HDFC0DMHUT5", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 45, "Naam": "Geeta", "Pita ka naam": "Gurmeet Rodrigues", "DOB": "30-03-2011", "Umar": 15, "Mob": "7751421958", "Alt Contact": "+91 65496 11464", "Aadhar No": "861918919405", "School": "Sant Gadge Baba School, Deopur", "Gaon": "Deopur", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 238105, "Marks %": 60.3, "Status": "Pending", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 6741402773255, "IFSC": "MAHB0MH4Q1R", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 46, "Naam": "Rupali Thakur", "Pita ka naam": "Balasaheb Thakur", "DOB": "23-06-2008", "Umar": 18, "Mob": "064811-16360", "Alt Contact": "+91 77828 31428", "Aadhar No": "846048266217", "School": "Saraswati Vidyalaya, Devipur", "Gaon": "Devipur", "Taluka": "Wazirganj", "District": "Gaya", "Category": "OBC-NT", "Family Income": 172167, "Marks %": 81.1, "Status": "Pending", "Remarks": "Follow up with Ganesh Qureshi at 085019-59559.", "col_17": 75183664145, "IFSC": "HDFC0PLG69E", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 47, "Naam": "Stephen Mirza", "Pita ka naam": "Ramu Mirza", "DOB": "25-06-2010", "Umar": 16, "Mob": "+91 85805 77637", "Alt Contact": "+91 82107 20652", "Aadhar No": "7386 3618 8992", "School": "New English School, Guraru", "Gaon": "Guraru", "Taluka": "Wazirganj", "District": "Gaya", "Category": "ST", "Family Income": 237969, "Marks %": 49.5, "Status": "Pending", "Remarks": "Marksheet not attested by school.", "col_17": 2619667956418068, "IFSC": "UTIB0U0TXA0", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 48, "Naam": "Sushma George", "Pita ka naam": "Ramesh George", "DOB": "31-10-2005", "Umar": 20, "Mob": "8231622900", "Alt Contact": "sushma_george@outlook.com", "Aadhar No": "741512927831", "School": "Municipal School, Guraru", "Gaon": "Guraru", "Taluka": "Belaganj", "District": "Gaya", "Category": "General", "Family Income": 163813, "Marks %": 96.1, "Status": "Disbursed", "Remarks": "Marksheet not attested by school.", "col_17": 565942688543, "IFSC": "UBIN056T7WJ", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 49, "Naam": "Q. X. Fernandez", "Pita ka naam": "Rohit Dhillon", "DOB": "23-08-2013", "Umar": 12, "Mob": "060791-44881", "Alt Contact": "mahesh_fernandez@yahoo.in", "Aadhar No": "4691 3000 5334", "School": "Zilla Parishad Primary School, Manjari", "Gaon": "Manjari", "Taluka": "Baramati", "District": "Pune", "Category": "OBC", "Family Income": 249611, "Marks %": 78.7, "Status": "Approved", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 19177129035, "IFSC": "UBIN0HJJ8RS", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 50, "Naam": "dagdu deshmukh", "Pita ka naam": "Farooq Deshmukh", "DOB": "01-01-2007", "Umar": 19, "Mob": "061693-04597", "Alt Contact": "dagdu.deshmukh43@rediffmail.com", "Aadhar No": "5954 6429 0677", "School": "Sant Gadge Baba School, Chakan", "Gaon": "Chakan", "Taluka": "Haveli", "District": "Pune", "Category": "NT", "Family Income": 193442, "Marks %": 69.4, "Status": "Disbursed", "Remarks": "Income certificate expired, renewal asked.", "col_17": 4410809394218, "IFSC": "SBIN0C44NIT", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 51, "Naam": "R. N. DSouza", "Pita ka naam": "Kiran DSouza", "DOB": "23-01-2012", "Umar": 14, "Mob": "060254-83885", "Alt Contact": "yashoda.dsouza31@yahoo.in", "Aadhar No": "299475964732", "School": "Rashtriya Balika Vidyalaya, Bhor", "Gaon": "Bhor", "Taluka": "Baramati", "District": "Pune", "Category": "SC", "Family Income": 185248, "Marks %": 67.9, "Status": "Rejected", "Remarks": "Family shifted house, new contact person Archana George (+91 94781 77075).", "col_17": 92742673001523, "IFSC": "CNRB0FS8XRT", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 52, "Naam": "Sarojini Khan", "Pita ka naam": "Dattatray Chougule", "DOB": "26-03-2011", "Umar": 15, "Mob": "060332-81262", "Alt Contact": "sarojini_khan@gmail.com", "Aadhar No": "7023 7191 1144", "School": "Vidya Mandir High School, Motipur", "Gaon": "Motipur", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "SC", "Family Income": 40473, "Marks %": 78.9, "Status": "Rejected", "Remarks": "Family shifted house, new contact person SARLA GAIKWAD (073287-73846).", "col_17": 450928022530, "IFSC": "IOBA03F8UUJ", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 53, "Naam": "NASIR CHOUGULE", "Pita ka naam": "Umesh Chougule", "DOB": "27-02-2007", "Umar": 19, "Mob": "9841338090", "Alt Contact": "nasir.chougule43@yahoo.in", "Aadhar No": "7341 5404 0296", "School": "New English School, Kharadi", "Gaon": "Kharadi", "Taluka": "Junnar", "District": "Pune", "Category": "OBC", "Family Income": 34769, "Marks %": 78.2, "Status": "Disbursed", "Remarks": "School has confirmed attendance record.", "col_17": 3399067969328, "IFSC": "SBIN0M1L8JQ", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 54, "Naam": "Agarwal Champa", "Pita ka naam": "Bhaskar Agarwal", "DOB": "05-09-2005", "Umar": 20, "Mob": "8780866208", "Alt Contact": "champa.agarwal81@gmail.com", "Aadhar No": "7564 8074 7950", "School": "Government Middle School, Kalyanpur", "Gaon": "Kalyanpur", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "SC", "Family Income": 115293, "Marks %": 44.4, "Status": "Pending", "Remarks": "Deepak Nair to submit updated income certificate, contact 8110445305.", "col_17": 608750230286368, "IFSC": "MAHB0BC7DIN", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 55, "Naam": "Ashwini Siddiqui", "Pita ka naam": "Ramu Siddiqui", "DOB": "14-04-2004", "Umar": 22, "Mob": "+91 67061 52023", "Alt Contact": "+91 96036 77956", "Aadhar No": "375461083644", "School": "Municipal School, Basaith", "Gaon": "Basaith", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "VJNT", "Family Income": 232794, "Marks %": 80.0, "Status": "Pending", "Remarks": "Photo missing from file, requested again.", "col_17": 4455844766010, "IFSC": "CNRB04N6LZZ", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 56, "Naam": "Rajesh Pillai", "Pita ka naam": "Ganesh Mathew", "DOB": "12-03-2010", "Umar": 16, "Mob": "+91 63831 42473", "Alt Contact": "086495-73811", "Aadhar No": "2593 4788 2898", "School": "Rashtriya Balika Vidyalaya, Basaith", "Gaon": "Basaith", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "General", "Family Income": 59426, "Marks %": 86.8, "Status": "Disbursed", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 959898046477956, "IFSC": "BARB0MHHQE3", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 57, "Naam": "Baljeet Yadav", "Pita ka naam": "Ganesh Yadav", "DOB": "22-09-2010", "Umar": 15, "Mob": "+91 92257 14333", "Alt Contact": "7393063042", "Aadhar No": "3213 9992 3901", "School": "Vidya Mandir High School, Talegaon Dhamdhere", "Gaon": "Talegaon Dhamdhere", "Taluka": "Khed", "District": "Pune", "Category": "VJNT", "Family Income": 162165, "Marks %": 83.6, "Status": "Pending", "Remarks": "Family shifted house, new contact person Gopal (070006-90296).", "col_17": 6947947084628, "IFSC": "UBIN04JLG9R", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 58, "Naam": "Padma DSouza", "Pita ka naam": "Sanjay DSouza", "DOB": "13-05-2008", "Umar": 18, "Mob": "+91 93602 70752", "Alt Contact": "+91 67857 13088", "Aadhar No": "551033168066", "School": "Sant Gadge Baba School, Nira", "Gaon": "Nira", "Taluka": "Mulshi", "District": "Pune", "Category": "ST", "Family Income": 157522, "Marks %": 75.9, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 711048338532128, "IFSC": "MAHB020XTZW", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 59, "Naam": "T. Q. Sawant", "Pita ka naam": "Rizwan Chavan", "DOB": "15-03-2015", "Umar": 11, "Mob": "+91 92686 75631", "Alt Contact": "sarlasaw498@gmail.com", "Aadhar No": "5226 5462 4511", "School": "Saraswati Vidyalaya, Chandpur", "Gaon": "Chandpur", "Taluka": "Tekari", "District": "Gaya", "Category": "NT", "Family Income": 19485, "Marks %": 64.9, "Status": "Approved", "Remarks": "Caste certificate under verification.", "col_17": 7790998978616201, "IFSC": "IOBA062GMDC", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 60, "Naam": "Bhagyashree Thakur", "Pita ka naam": "Deepak Thakur", "DOB": "02-10-2013", "Umar": 12, "Mob": "7345036765", "Alt Contact": "072452-07257", "Aadhar No": "805362508436", "School": "Sant Gadge Baba School, Rampur", "Gaon": "Rampur", "Taluka": "Tekari", "District": "Gaya", "Category": "VJNT", "Family Income": 76036, "Marks %": 70.0, "Status": "Rejected", "Remarks": "School has confirmed attendance record.", "col_17": 434411012271890, "IFSC": "PUNB0T33E7L", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 61, "Naam": "Thomas Siddiqui", "Pita ka naam": "Anthony Siddiqui", "DOB": "18-04-2010", "Umar": 16, "Mob": "8738112464", "Alt Contact": "8295820268", "Aadhar No": "4520 5351 5170", "School": "Saraswati Vidyalaya, Barachatti", "Gaon": "Barachatti", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC", "Family Income": 142042, "Marks %": 83.8, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 639403099430731, "IFSC": "CNRB0U87ZHU", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 62, "Naam": "Sunil Kulkarni", "Pita ka naam": "Manoj Kulkarni", "DOB": "04-09-2011", "Umar": 14, "Mob": "+91 68762 28837", "Alt Contact": "6142139967", "Aadhar No": "3203 5295 9636", "School": "Adarsh Vidyalaya, Kharadi", "Gaon": "Kharadi", "Taluka": "Haveli", "District": "Pune", "Category": "VJNT", "Family Income": 140226, "Marks %": 82.3, "Status": "Under Review", "Remarks": "Guardian Sidhu Fatima confirmed enrollment.", "col_17": 98523264887, "IFSC": "HDFC0JWUEHK", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 63, "Naam": "lily mirza", "Pita ka naam": "Mukesh Mirza", "DOB": "26-02-2007", "Umar": 19, "Mob": "070151-91959", "Alt Contact": "7929044161", "Aadhar No": "343062275761", "School": "Lokmanya Tilak Vidyalaya, Loni Kalbhor", "Gaon": "Loni Kalbhor", "Taluka": "Baramati", "District": "Pune", "Category": "OBC", "Family Income": 189876, "Marks %": 97.0, "Status": "Rejected", "Remarks": "Income certificate expired, renewal asked.", "col_17": 816174929361382, "IFSC": "MAHB0K7NGBJ", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 64, "Naam": "Kalpana Waghmare", "Pita ka naam": "Bhaskar Bansal", "DOB": "31-08-2014", "Umar": 11, "Mob": "090647-89752", "Alt Contact": "7870039682", "Aadhar No": "4676 5183 8806", "School": "New English School, Wadgaon", "Gaon": "Wadgaon", "Taluka": "Mulshi", "District": "Pune", "Category": "VJNT", "Family Income": 193848, "Marks %": 92.3, "Status": "Approved", "Remarks": "Family shifted house, new contact person shobha dhillon (+91 89490 44714).", "col_17": 742813066148, "IFSC": "HDFC09B9YXJ", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 65, "Naam": "Vishal Nair", "Pita ka naam": "Mahesh Nair", "DOB": "08-08-2015", "Umar": 11, "Mob": "+91 87569 25132", "Alt Contact": "vishal.nair13@rediffmail.com", "Aadhar No": "685301160266", "School": "Zilla Parishad Primary School, Wadgaon", "Gaon": "Wadgaon", "Taluka": "Khed", "District": "Pune", "Category": "General", "Family Income": 165366, "Marks %": 36.9, "Status": "Rejected", "Remarks": "School has confirmed attendance record.", "col_17": 286830049569707, "IFSC": "MAHB0VPFTEN", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 66, "Naam": "R. Q. Chettiar", "Pita ka naam": "Shankar Chettiar", "DOB": "01-08-2009", "Umar": 17, "Mob": "+91 70776 23045", "Alt Contact": "097495-42132", "Aadhar No": "297008480430", "School": "Adarsh Vidyalaya, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "SC", "Family Income": 135149, "Marks %": 74.8, "Status": "Under Review", "Remarks": "School has confirmed attendance record.", "col_17": 1062560309183, "IFSC": "SBIN0PMOJQI", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 67, "Naam": "Kushwaha Yashoda", "Pita ka naam": "Farooq Kushwaha", "DOB": "05-11-2010", "Umar": 15, "Mob": "+91 99532 71583", "Alt Contact": "yashodakus308@rediffmail.com", "Aadhar No": "8799 5202 4748", "School": "Adarsh Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "General", "Family Income": 20358, "Marks %": 37.8, "Status": "Approved", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 864456727755877, "IFSC": "BARB0993029", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 68, "Naam": "GEETA KHAN", "Pita ka naam": "Suresh Khan", "DOB": "28-01-2009", "Umar": 17, "Mob": "081520-37079", "Alt Contact": "+91 68314 78759", "Aadhar No": "8868 6599 5830", "School": "Vidya Mandir High School, Saswad", "Gaon": "Saswad", "Taluka": "Khed", "District": "Pune", "Category": "VJNT", "Family Income": 130512, "Marks %": 80.3, "Status": "Under Review", "Remarks": "Caste certificate under verification.", "col_17": 34513157667412, "IFSC": "PUNB03NELSY", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 69, "Naam": "Sachin Naidu", "Pita ka naam": "Kiran Naidu", "DOB": "02-08-2016", "Umar": 10, "Mob": "9046205759", "Alt Contact": "sachin.naidu50@yahoo.in", "Aadhar No": "770272597005", "School": "Government Middle School, Nira", "Gaon": "Nira", "Taluka": "Baramati", "District": "Pune", "Category": "SC", "Family Income": 136692, "Marks %": 52.8, "Status": "Rejected", "Remarks": "Income certificate expired, renewal asked.", "col_17": 3928490824381771, "IFSC": "IOBA0G6YEW7", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 70, "Naam": "Sheela Qureshi", "Pita ka naam": "Vishal Sharma", "DOB": "21-11-2009", "Umar": 16, "Mob": "+91 67187 47849", "Alt Contact": "097948-36714", "Aadhar No": "9430 5127 8107", "School": "Government Middle School, Bakhtiyarpur Tola", "Gaon": "Bakhtiyarpur Tola", "Taluka": "Konch", "District": "Gaya", "Category": "NT", "Family Income": 57561, "Marks %": 67.5, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 5965527659562, "IFSC": "HDFC0L5B0KG", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 71, "Naam": "Sunita Verma", "Pita ka naam": "Sanjay Verma", "DOB": "07-09-2005", "Umar": 20, "Mob": "6699959795", "Alt Contact": "9670592132", "Aadhar No": "846504553859", "School": "Government Middle School, Barachatti", "Gaon": "Barachatti", "Taluka": "Belaganj", "District": "Gaya", "Category": "VJNT", "Family Income": 110244, "Marks %": 71.9, "Status": "Disbursed", "Remarks": "Spoke to Anita Deshpande's mother, call 8922652391 for update.", "col_17": 610359301973, "IFSC": "MAHB0N4TCCW", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 72, "Naam": "harpreet bajwa", "Pita ka naam": "Ramesh Iyer", "DOB": "14-08-2009", "Umar": 17, "Mob": "078692-98776", "Alt Contact": "harpreet_bajwa@gmail.com", "Aadhar No": "457885594827", "School": "Zilla Parishad Primary School, Bakhtiyarpur Tola", "Gaon": "Bakhtiyarpur Tola", "Taluka": "Tekari", "District": "Gaya", "Category": "ST", "Family Income": 22270, "Marks %": 96.4, "Status": "Under Review", "Remarks": "Case reviewed by committee, approved.", "col_17": 5867170612502, "IFSC": "UTIB06O9S11", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 73, "Naam": "Vinod Singh", "Pita ka naam": "Baban Singh", "DOB": "28-07-2011", "Umar": 15, "Mob": "085069-66413", "Alt Contact": "7117863891", "Aadhar No": "477695010905", "School": "Zilla Parishad Primary School, Fatehpur", "Gaon": "Fatehpur", "Taluka": "Wazirganj", "District": "Gaya", "Category": "OBC-NT", "Family Income": 43082, "Marks %": 56.2, "Status": "Rejected", "Remarks": "Spoke to C. H. Naidu's mother, call 099699-01136 for update.", "col_17": 4994935196465, "IFSC": "CNRB0SGLKBL", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 74, "Naam": "Deepa DSouza", "Pita ka naam": "Dinesh DSouza", "DOB": "23-11-2014", "Umar": 11, "Mob": "080501-33324", "Alt Contact": "+91 89575 76430", "Aadhar No": "3479 0876 7601", "School": "Sant Gadge Baba School, Rampur Sokho", "Gaon": "Rampur Sokho", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "NT", "Family Income": 213678, "Marks %": 77.1, "Status": "Approved", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 8312281207317, "IFSC": "IOBA0RPX7V4", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 75, "Naam": "Priyanka Pandey", "Pita ka naam": "Ayub Pandey", "DOB": "24-10-2003", "Umar": 22, "Mob": "075654-40674", "Alt Contact": "priyankapan772@yahoo.in", "Aadhar No": "957323615479", "School": "Sant Gadge Baba School, Dobhi", "Gaon": "Dobhi", "Taluka": "Wazirganj", "District": "Gaya", "Category": "OBC-NT", "Family Income": 56587, "Marks %": 40.4, "Status": "Disbursed", "Remarks": "M. L. Manjhi to submit updated income certificate, contact 9659163184.", "col_17": 30106416898544, "IFSC": "MAHB0AKXW72", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 76, "Naam": "Durga Bhosale", "Pita ka naam": "Shrikant Bhosale", "DOB": "10-10-2014", "Umar": 11, "Mob": "9714889273", "Alt Contact": "6631887483", "Aadhar No": "851530155864", "School": "Municipal School, Nira", "Gaon": "Nira", "Taluka": "Khed", "District": "Pune", "Category": "VJNT", "Family Income": 63409, "Marks %": 63.6, "Status": "Under Review", "Remarks": "Documents pending verification.", "col_17": 827634586570744, "IFSC": "ICIC0OSHLLH", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 77, "Naam": "Umesh Mahato", "Pita ka naam": "Amarjeet Mahato", "DOB": "10-10-2014", "Umar": 11, "Mob": "7435156403", "Alt Contact": "umeshmah300@gmail.com", "Aadhar No": "380418425015", "School": "New English School, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "ST", "Family Income": 166251, "Marks %": 76.2, "Status": "Rejected", "Remarks": "Mukesh Sawant to submit updated income certificate, contact 9883277429.", "col_17": 2151052650819125, "IFSC": "UBIN0FZMB7Z", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 78, "Naam": "Pandey Stephen", "Pita ka naam": "Rohit Bhosale", "DOB": "03-07-2013", "Umar": 13, "Mob": "7557652578", "Alt Contact": "061589-04309", "Aadhar No": "3129 0262 3682", "School": "Government Middle School, Kharadi", "Gaon": "Kharadi", "Taluka": "Khed", "District": "Pune", "Category": "OBC", "Family Income": 125409, "Marks %": 90.9, "Status": "Approved", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 195216548759, "IFSC": "UTIB0YKQ7OH", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 79, "Naam": "PARVATI DESHMUKH", "Pita ka naam": "Ravi Bajwa", "DOB": "15-02-2006", "Umar": 20, "Mob": "6325302436", "Alt Contact": "074612-01334", "Aadhar No": "695337745015", "School": "Rashtriya Balika Vidyalaya, Deopur", "Gaon": "Deopur", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "SC", "Family Income": 153629, "Marks %": 96.5, "Status": "Pending", "Remarks": "Mohan Fernandes to submit updated income certificate, contact 092754-54709.", "col_17": 703974080518351, "IFSC": "CNRB0JMRB4U", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 80, "Naam": "P. L. Gadhave", "Pita ka naam": "Manpreet Thakur", "DOB": "16-06-2006", "Umar": 20, "Mob": "084026-08524", "Alt Contact": "+91 71704 31171", "Aadhar No": "440961918851", "School": "Vidya Mandir High School, Deopur", "Gaon": "Deopur", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "SC", "Family Income": 131225, "Marks %": 73.0, "Status": "Approved", "Remarks": "Family shifted house, new contact person Fatima Deshmukh (+91 62758 42105).", "col_17": 590851305851, "IFSC": "HDFC0WM6O7Q", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 81, "Naam": "Mangala", "Pita ka naam": "Xavier Manjhi", "DOB": "02-08-2007", "Umar": 19, "Mob": "070798-79514", "Alt Contact": "8607030630", "Aadhar No": "656304143068", "School": "Rashtriya Balika Vidyalaya, Loni Kalbhor", "Gaon": "Loni Kalbhor", "Taluka": "Mulshi", "District": "Pune", "Category": "OBC", "Family Income": 157917, "Marks %": 95.5, "Status": "Under Review", "Remarks": "Caste certificate under verification.", "col_17": 75813660301, "IFSC": "CNRB0QQUHG4", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 82, "Naam": "lakshmi shinde", "Pita ka naam": "Ismail Shinde", "DOB": "05-08-2004", "Umar": 22, "Mob": "085348-33639", "Alt Contact": "lakshmi_shinde@outlook.com", "Aadhar No": "5401 6519 8807", "School": "Saraswati Vidyalaya, Rampur Sokho", "Gaon": "Rampur Sokho", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "General", "Family Income": 242034, "Marks %": 75.5, "Status": "Approved", "Remarks": "Documents pending verification.", "col_17": 51472714161, "IFSC": "MAHB0Z58RU0", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 83, "Naam": "Sushma", "Pita ka naam": "Suresh Salunkhe", "DOB": "22-04-2006", "Umar": 20, "Mob": "+91 61072 39912", "Alt Contact": "sushmasal19@gmail.com", "Aadhar No": "3647 6314 8488", "School": "Lokmanya Tilak Vidyalaya, Dobhi", "Gaon": "Dobhi", "Taluka": "Wazirganj", "District": "Gaya", "Category": "SC", "Family Income": 179471, "Marks %": 42.9, "Status": "Approved", "Remarks": "Marksheet not attested by school.", "col_17": 1145658820757, "IFSC": "SBIN0EQ4H29", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 84, "Naam": "Archana", "Pita ka naam": "Ayub Dhillon", "DOB": "08-06-2008", "Umar": 18, "Mob": "6170761062", "Alt Contact": "archana_dhillon@rediffmail.com", "Aadhar No": "859095022129", "School": "Government Middle School, Amawan", "Gaon": "Amawan", "Taluka": "Konch", "District": "Gaya", "Category": "ST", "Family Income": 184861, "Marks %": 68.5, "Status": "Disbursed", "Remarks": "Marksheet not attested by school.", "col_17": 94202073492943, "IFSC": "MAHB08SHBFZ", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 85, "Naam": "Saraswati Rai", "Pita ka naam": "Mahesh Rai", "DOB": "10-08-2009", "Umar": 17, "Mob": "063910-33592", "Alt Contact": "+91 83360 94106", "Aadhar No": "214013079690", "School": "Vidya Mandir High School, Ambegaon Budruk", "Gaon": "Ambegaon Budruk", "Taluka": "Mulshi", "District": "Pune", "Category": "VJNT", "Family Income": 68242, "Marks %": 84.4, "Status": "Rejected", "Remarks": "Documents pending verification.", "col_17": 885826192519406, "IFSC": "PUNB05AK0KB", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 86, "Naam": "Verma Rehana", "Pita ka naam": "Vishal Verma", "DOB": "14-01-2010", "Umar": 16, "Mob": "+91 60762 14501", "Alt Contact": "rehanaver249@yahoo.in", "Aadhar No": "6439 8930 1053", "School": "New English School, Chandwara", "Gaon": "Chandwara", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "NT", "Family Income": 69520, "Marks %": 48.5, "Status": "Under Review", "Remarks": "Waiting for bank passbook copy.", "col_17": 49054487373928, "IFSC": "HDFC0XUTK4B", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 87, "Naam": "Rekha Waghmare", "Pita ka naam": "Salman Waghmare", "DOB": "23-09-2005", "Umar": 20, "Mob": "+91 78380 75621", "Alt Contact": "089442-43860", "Aadhar No": "5011 6202 9174", "School": "Municipal School, Amawan", "Gaon": "Amawan", "Taluka": "Tekari", "District": "Gaya", "Category": "ST", "Family Income": 89893, "Marks %": 47.4, "Status": "Approved", "Remarks": "Caste certificate under verification.", "col_17": 884939640965, "IFSC": "ICIC0TC0PH9", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 88, "Naam": "Meena Chougule", "Pita ka naam": "Farooq Chougule", "DOB": "19-04-2007", "Umar": 19, "Mob": "089694-09523", "Alt Contact": "069693-08605", "Aadhar No": "394258536665", "School": "Rashtriya Balika Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 64129, "Marks %": 62.4, "Status": "Pending", "Remarks": "Photo missing from file, requested again.", "col_17": 156262129423, "IFSC": "BARB07XX49N", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 89, "Naam": "Kamala Nikam", "Pita ka naam": "Dinesh Nikam", "DOB": "20-01-2004", "Umar": 22, "Mob": "078980-35780", "Alt Contact": "kamala_nikam@gmail.com", "Aadhar No": "213815007558", "School": "Sant Gadge Baba School, Rampur", "Gaon": "Rampur", "Taluka": "Sherghati", "District": "Gaya", "Category": "ST", "Family Income": 239523, "Marks %": 44.1, "Status": "Approved", "Remarks": "Salman Patil to submit updated income certificate, contact 096970-11771.", "col_17": 857434201274, "IFSC": "UBIN0Z9FOT1", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 90, "Naam": "Nirmala DSouza", "Pita ka naam": "Rahul DSouza", "DOB": "18-11-2011", "Umar": 14, "Mob": "+91 68522 03407", "Alt Contact": "9837417342", "Aadhar No": "9044 3713 5281", "School": "Municipal School, Wadgaon", "Gaon": "Wadgaon", "Taluka": "Junnar", "District": "Pune", "Category": "SC", "Family Income": 23015, "Marks %": 87.2, "Status": "Rejected", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 220077849897, "IFSC": "ICIC0FGLCR3", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 91, "Naam": "Krishna Waghmare", "Pita ka naam": "Naveen Waghmare", "DOB": "14-02-2008", "Umar": 18, "Mob": "+91 82376 04369", "Alt Contact": "krishna_waghmare@rediffmail.com", "Aadhar No": "7073 0279 6231", "School": "Saraswati Vidyalaya, Basaith", "Gaon": "Basaith", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "NT", "Family Income": 60647, "Marks %": 62.2, "Status": "Rejected", "Remarks": "Caste certificate under verification.", "col_17": 19550188138, "IFSC": "HDFC00T29J7", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 92, "Naam": "saraswati mishra", "Pita ka naam": "Vikram Mishra", "DOB": "12-05-2012", "Umar": 14, "Mob": "9553067694", "Alt Contact": "saraswati_mishra@outlook.com", "Aadhar No": "5067 8206 9362", "School": "Lokmanya Tilak Vidyalaya, Atri", "Gaon": "Atri", "Taluka": "Belaganj", "District": "Gaya", "Category": "VJNT", "Family Income": 199957, "Marks %": 61.7, "Status": "Pending", "Remarks": "Guardian SUNITA KUSHWAHA confirmed enrollment.", "col_17": 61235780316, "IFSC": "HDFC03FPJY1", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 93, "Naam": "Ashwini Mane", "Pita ka naam": "ANTHONY MATHEW", "DOB": "17-07-2012", "Umar": 14, "Mob": "+91 74723 34275", "Alt Contact": "ashwini_mane@outlook.com", "Aadhar No": "7193 8511 2637", "School": "Adarsh Vidyalaya, Rampur", "Gaon": "Rampur", "Taluka": "Wazirganj", "District": "Gaya", "Category": "OBC-NT", "Family Income": 233020, "Marks %": 52.7, "Status": "Pending", "Remarks": "Caste certificate under verification.", "col_17": 6129668104971877, "IFSC": "BARB0POK7HE", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 94, "Naam": "Sanjay", "Pita ka naam": "Baliram Kadam", "DOB": "28-06-2011", "Umar": 15, "Mob": "9613724237", "Alt Contact": "+91 74722 91103", "Aadhar No": "267971857928", "School": "Saraswati Vidyalaya, Kesnand", "Gaon": "Kesnand", "Taluka": "Junnar", "District": "Pune", "Category": "ST", "Family Income": 120088, "Marks %": 51.2, "Status": "Disbursed", "Remarks": "Caste certificate under verification.", "col_17": 19627374512041, "IFSC": "IOBA08HRCYH", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 95, "Naam": "Kaur Baban", "Pita ka naam": "Popat Kaur", "DOB": "03-12-2006", "Umar": 19, "Mob": "+91 84887 87628", "Alt Contact": "baban_kaur@yahoo.in", "Aadhar No": "7366 2245 1882", "School": "Rashtriya Balika Vidyalaya, Talegaon Dhamdhere", "Gaon": "Talegaon Dhamdhere", "Taluka": "Junnar", "District": "Pune", "Category": "SC", "Family Income": 179127, "Marks %": 80.9, "Status": "Disbursed", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 879524465912, "IFSC": "UBIN029WTGP", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 96, "Naam": "K. R. Lobo", "Pita ka naam": "Yashwant Lobo", "DOB": "05-04-2010", "Umar": 16, "Mob": "+91 72515 56083", "Alt Contact": "vikramlob729@yahoo.in", "Aadhar No": "5760 5549 1181", "School": "Municipal School, Guraru", "Gaon": "Guraru", "Taluka": "Konch", "District": "Gaya", "Category": "NT", "Family Income": 152588, "Marks %": 52.1, "Status": "Disbursed", "Remarks": "Waiting for bank passbook copy.", "col_17": 25550527091919, "IFSC": "MAHB0V2QYBF", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 97, "Naam": "Verma Mohan", "Pita ka naam": "Chavan Zakir", "DOB": "16-03-2011", "Umar": 15, "Mob": "+91 82936 59269", "Alt Contact": "mohan.verma37@gmail.com", "Aadhar No": "8325 1253 8067", "School": "Municipal School, Uruli Kanchan", "Gaon": "Uruli Kanchan", "Taluka": "Khed", "District": "Pune", "Category": "ST", "Family Income": 16071, "Marks %": 65.7, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 945176675417, "IFSC": "CNRB08GMC5L", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 98, "Naam": "Ramu Shinde", "Pita ka naam": "Amit Shinde", "DOB": "22-03-2015", "Umar": 11, "Mob": "079483-55153", "Alt Contact": "+91 79112 31113", "Aadhar No": "4760 8837 4222", "School": "Rashtriya Balika Vidyalaya, Fatehpur", "Gaon": "Fatehpur", "Taluka": "Belaganj", "District": "Gaya", "Category": "SC", "Family Income": 158996, "Marks %": 56.8, "Status": "Disbursed", "Remarks": "Income certificate expired, renewal asked.", "col_17": 717753405052391, "IFSC": "PUNB06CAM6A", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 99, "Naam": "Ashok Kale", "Pita ka naam": "S. R. Naidu", "DOB": "04-09-2013", "Umar": 12, "Mob": "077316-07822", "Alt Contact": "ashok_kale@gmail.com", "Aadhar No": "9889 3220 0991", "School": "Sant Gadge Baba School, Devipur", "Gaon": "Devipur", "Taluka": "Sherghati", "District": "Gaya", "Category": "VJNT", "Family Income": 102283, "Marks %": 85.9, "Status": "Disbursed", "Remarks": "Follow up with Anthony Chandra at 7166364863.", "col_17": 669717012088331, "IFSC": "MAHB0XW3XUR", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 100, "Naam": "shabana gill", "Pita ka naam": "Ramesh Gill", "DOB": "14-08-2007", "Umar": 19, "Mob": "061794-62286", "Alt Contact": "shabana_gill@gmail.com", "Aadhar No": "2387 3659 8334", "School": "Government Middle School, Dobhi", "Gaon": "Dobhi", "Taluka": "Tekari", "District": "Gaya", "Category": "VJNT", "Family Income": 114468, "Marks %": 64.6, "Status": "Rejected", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 793991014790607, "IFSC": "UTIB0U0K8LA", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 101, "Naam": "Amina Verma", "Pita ka naam": "Anthony Verma", "DOB": "05-01-2006", "Umar": 20, "Mob": "+91 83640 38947", "Alt Contact": "+91 63310 02021", "Aadhar No": "536714302885", "School": "Zilla Parishad Primary School, Chandwara", "Gaon": "Chandwara", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "VJNT", "Family Income": 174263, "Marks %": 69.7, "Status": "Pending", "Remarks": "Documents pending verification.", "col_17": 24533566679616, "IFSC": "PUNB0RM63T5", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 102, "Naam": "Irfan Fernandes", "Pita ka naam": "Mukesh Fernandes", "DOB": "29-04-2007", "Umar": 19, "Mob": "060100-38557", "Alt Contact": "irfanfer538@yahoo.in", "Aadhar No": "4353 9194 5382", "School": "Government Middle School, Loni Kalbhor", "Gaon": "Loni Kalbhor", "Taluka": "Khed", "District": "Pune", "Category": "OBC-NT", "Family Income": 166975, "Marks %": 60.0, "Status": "Disbursed", "Remarks": "Application complete, forwarded to district office.", "col_17": 65064441488, "IFSC": "HDFC0BNSPQ8", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 103, "Naam": "N. W. Gill", "Pita ka naam": "Stephen Gill", "DOB": "31-07-2016", "Umar": 10, "Mob": "7652589447", "Alt Contact": "093310-50503", "Aadhar No": "610844109827", "School": "Sant Gadge Baba School, Alandi", "Gaon": "Alandi", "Taluka": "Baramati", "District": "Pune", "Category": "SC", "Family Income": 45381, "Marks %": 45.4, "Status": "Under Review", "Remarks": "Family shifted house, new contact person DURGA KAUR (+91 97052 39960).", "col_17": 172945876425902, "IFSC": "BARB0A4UYM5", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 104, "Naam": "suresh kaur", "Pita ka naam": "Nasir Iyer", "DOB": "15-02-2009", "Umar": 17, "Mob": "075946-96972", "Alt Contact": "sureshkau775@gmail.com", "Aadhar No": "6675 4363 8629", "School": "Saraswati Vidyalaya, Mahuar", "Gaon": "Mahuar", "Taluka": "Konch", "District": "Gaya", "Category": "OBC-NT", "Family Income": 34570, "Marks %": 79.3, "Status": "Rejected", "Remarks": "Waiting for bank passbook copy.", "col_17": 37236354102, "IFSC": "ICIC0ZBVNT7", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 105, "Naam": "Iqbal", "Pita ka naam": "Balasaheb Dhillon", "DOB": "09-05-2012", "Umar": 14, "Mob": "7356384526", "Alt Contact": "+91 97839 50955", "Aadhar No": "797908074792", "School": "Sant Gadge Baba School, Chakan", "Gaon": "Chakan", "Taluka": "Junnar", "District": "Pune", "Category": "OBC-NT", "Family Income": 171443, "Marks %": 81.8, "Status": "Rejected", "Remarks": "Waiting for bank passbook copy.", "col_17": 5646573450733212, "IFSC": "ICIC0F2N62R", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 106, "Naam": "Jadhav Ashwini", "Pita ka naam": "Vijay Jadhav", "DOB": "02-10-2009", "Umar": 16, "Mob": "+91 82702 19387", "Alt Contact": "096750-51182", "Aadhar No": "8307 5581 5965", "School": "Government Middle School, Paraiya", "Gaon": "Paraiya", "Taluka": "Konch", "District": "Gaya", "Category": "OBC-NT", "Family Income": 248808, "Marks %": 62.2, "Status": "Disbursed", "Remarks": "Caste certificate under verification.", "col_17": 22017434217013, "IFSC": "SBIN0Y4732X", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 107, "Naam": "Prakash Menon", "Pita ka naam": "Manpreet Menon", "DOB": "10-02-2015", "Umar": 11, "Mob": "+91 77391 17801", "Alt Contact": "+91 93066 14239", "Aadhar No": "3320 9256 2961", "School": "Rashtriya Balika Vidyalaya, Uruli Kanchan", "Gaon": "Uruli Kanchan", "Taluka": "Baramati", "District": "Pune", "Category": "SC", "Family Income": 185648, "Marks %": 53.7, "Status": "Disbursed", "Remarks": "Family shifted house, new contact person Chandra Anita (099203-28169).", "col_17": 94140734845302, "IFSC": "CNRB0QR123S", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 108, "Naam": "vandana qureshi", "Pita ka naam": "Sunil Qureshi", "DOB": "24-05-2007", "Umar": 19, "Mob": "+91 63511 76615", "Alt Contact": "vandana_qureshi@outlook.com", "Aadhar No": "802187765949", "School": "Vidya Mandir High School, Devipur", "Gaon": "Devipur", "Taluka": "Konch", "District": "Gaya", "Category": "OBC", "Family Income": 84867, "Marks %": 93.5, "Status": "Rejected", "Remarks": "Family shifted house, new contact person Zakir Yadav (6101173526).", "col_17": 3062265312323, "IFSC": "HDFC0YPDK9C", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 109, "Naam": "Mathew Kamala", "Pita ka naam": "Hari Mathew", "DOB": "31-12-2006", "Umar": 19, "Mob": "086216-06040", "Alt Contact": "+91 73877 41774", "Aadhar No": "6530 0594 8777", "School": "Vidya Mandir High School, Guraru", "Gaon": "Guraru", "Taluka": "Belaganj", "District": "Gaya", "Category": "OBC", "Family Income": 177549, "Marks %": 53.6, "Status": "Rejected", "Remarks": "Documents pending verification.", "col_17": 9123078479486018, "IFSC": "SBIN0BWMMJ4", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 110, "Naam": "INDIRA KALE", "Pita ka naam": "Mohan Kale", "DOB": "11-02-2008", "Umar": 18, "Mob": "+91 79683 51264", "Alt Contact": "094459-97484", "Aadhar No": "7829 9880 9739", "School": "New English School, Paroo", "Gaon": "Paroo", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "NT", "Family Income": 108231, "Marks %": 43.5, "Status": "Under Review", "Remarks": "Family shifted house, new contact person Zainab (+91 61358 67301).", "col_17": 313781217580063, "IFSC": "BARB02BZRCA", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 111, "Naam": "Snehal Fernandes", "Pita ka naam": "Rahul Fernandes", "DOB": "29-07-2013", "Umar": 13, "Mob": "+91 85774 15872", "Alt Contact": "snehal.fernandes91@outlook.com", "Aadhar No": "554992432796", "School": "Rashtriya Balika Vidyalaya, Atri", "Gaon": "Atri", "Taluka": "Wazirganj", "District": "Gaya", "Category": "VJNT", "Family Income": 107020, "Marks %": 84.2, "Status": "Rejected", "Remarks": "Family shifted house, new contact person joseph bajwa (+91 63924 45850).", "col_17": 9826490144110, "IFSC": "HDFC0W7HSC2", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 112, "Naam": "Singh Mahesh", "Pita ka naam": "Sachin Kadam", "DOB": "10-12-2010", "Umar": 15, "Mob": "9388635008", "Alt Contact": "7613607695", "Aadhar No": "8395 1847 9111", "School": "Lokmanya Tilak Vidyalaya, Mahuar", "Gaon": "Mahuar", "Taluka": "Konch", "District": "Gaya", "Category": "ST", "Family Income": 231008, "Marks %": 79.6, "Status": "Disbursed", "Remarks": "Spoke to Savita Gadhave's mother, call 088783-39778 for update.", "col_17": 56437943007877, "IFSC": "MAHB08JA00F", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 113, "Naam": "Champa Kaur", "Pita ka naam": "Sachin Kumari", "DOB": "03-03-2013", "Umar": 13, "Mob": "9845285123", "Alt Contact": "champakau528@rediffmail.com", "Aadhar No": "253181421705", "School": "New English School, Chandwara", "Gaon": "Chandwara", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "NT", "Family Income": 16589, "Marks %": 36.9, "Status": "Under Review", "Remarks": "Spoke to Swati Kale's mother, call +91 91528 77468 for update.", "col_17": 32982718870, "IFSC": "CNRB0728UFP", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 114, "Naam": "Krishna Sayyed", "Pita ka naam": "Iqbal Sayyed", "DOB": "08-01-2007", "Umar": 19, "Mob": "+91 68940 77927", "Alt Contact": "krishna.sayyed44@gmail.com", "Aadhar No": "377318654538", "School": "Sant Gadge Baba School, Barachatti", "Gaon": "Barachatti", "Taluka": "Belaganj", "District": "Gaya", "Category": "VJNT", "Family Income": 89937, "Marks %": 89.8, "Status": "Pending", "Remarks": "Mohan Dubey to submit updated income certificate, contact +91 76692 75761.", "col_17": 6054332889206340, "IFSC": "IOBA0I30Q27", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 115, "Naam": "Anthony", "Pita ka naam": "Anthony Bhoir", "DOB": "08-09-2003", "Umar": 22, "Mob": "9619881741", "Alt Contact": "anthonybho743@yahoo.in", "Aadhar No": "561473389159", "School": "Rashtriya Balika Vidyalaya, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "SC", "Family Income": 23223, "Marks %": 73.3, "Status": "Rejected", "Remarks": "School has confirmed attendance record.", "col_17": 84712812582357, "IFSC": "IOBA0B08GP9", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 116, "Naam": "Mahesh", "Pita ka naam": "Mukesh Iyer", "DOB": "03-01-2006", "Umar": 20, "Mob": "+91 93531 69744", "Alt Contact": "064600-07547", "Aadhar No": "385889669365", "School": "Rashtriya Balika Vidyalaya, Talegaon Dhamdhere", "Gaon": "Talegaon Dhamdhere", "Taluka": "Haveli", "District": "Pune", "Category": "General", "Family Income": 26207, "Marks %": 52.1, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 9067609343774734, "IFSC": "PUNB01FF0M0", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 117, "Naam": "Kiran", "Pita ka naam": "Manpreet Bhagat", "DOB": "15-01-2014", "Umar": 12, "Mob": "084100-46087", "Alt Contact": "kiran.bhagat92@outlook.com", "Aadhar No": "498526823036", "School": "Zilla Parishad Primary School, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "General", "Family Income": 190535, "Marks %": 78.5, "Status": "Pending", "Remarks": "Caste certificate under verification.", "col_17": 24899975501572, "IFSC": "MAHB0R055HR", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 118, "Naam": "Divya Gill", "Pita ka naam": "Arjun Gill", "DOB": "01-12-2005", "Umar": 20, "Mob": "090787-05695", "Alt Contact": "6397415939", "Aadhar No": "2459 8904 7927", "School": "New English School, Kesnand", "Gaon": "Kesnand", "Taluka": "Junnar", "District": "Pune", "Category": "OBC", "Family Income": 223430, "Marks %": 77.9, "Status": "Rejected", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 727592758180728, "IFSC": "HDFC0C5L0J9", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 119, "Naam": "Rukhsana Agarwal", "Pita ka naam": "Mahesh Agarwal", "DOB": "17-06-2013", "Umar": 13, "Mob": "7423727575", "Alt Contact": "rukhsana_agarwal@gmail.com", "Aadhar No": "441708619322", "School": "Government Middle School, Paroo", "Gaon": "Paroo", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "General", "Family Income": 50563, "Marks %": 86.1, "Status": "Rejected", "Remarks": "Follow up with GURLEEN SIDDIQUI at 8244971076.", "col_17": 70329539667466, "IFSC": "HDFC0POKLMR", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 120, "Naam": "archana more", "Pita ka naam": "Santosh More", "DOB": "01-04-2006", "Umar": 20, "Mob": "8600477747", "Alt Contact": "archana_more@gmail.com", "Aadhar No": "712581226873", "School": "Rashtriya Balika Vidyalaya, Dehu", "Gaon": "Dehu", "Taluka": "Junnar", "District": "Pune", "Category": "OBC-NT", "Family Income": 62378, "Marks %": 88.0, "Status": "Pending", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 851572367593, "IFSC": "CNRB0S7USE2", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 121, "Naam": "Zakir DSouza", "Pita ka naam": "rakesh rai", "DOB": "27-01-2009", "Umar": 17, "Mob": "+91 84888 42799", "Alt Contact": "zakir.dsouza25@yahoo.in", "Aadhar No": "8776 2794 0386", "School": "Rashtriya Balika Vidyalaya, Imamganj", "Gaon": "Imamganj", "Taluka": "Tekari", "District": "Gaya", "Category": "VJNT", "Family Income": 129505, "Marks %": 84.0, "Status": "Pending", "Remarks": "Marksheet not attested by school.", "col_17": 168947978975047, "IFSC": "CNRB0H0U7VG", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 122, "Naam": "Lata Chandra", "Pita ka naam": "Milind Chandra", "DOB": "22-11-2007", "Umar": 18, "Mob": "070422-41103", "Alt Contact": "lata.chandra5@yahoo.in", "Aadhar No": "421876019700", "School": "Lokmanya Tilak Vidyalaya, Motipur", "Gaon": "Motipur", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "General", "Family Income": 76357, "Marks %": 57.5, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 1598940840462968, "IFSC": "PUNB0X6RNRK", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 123, "Naam": "Baliram Gupta", "Pita ka naam": "Santosh Gupta", "DOB": "01-05-2005", "Umar": 21, "Mob": "065949-35122", "Alt Contact": "086181-09812", "Aadhar No": "630419726369", "School": "Saraswati Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "General", "Family Income": 70190, "Marks %": 85.8, "Status": "Pending", "Remarks": "Application complete, forwarded to district office.", "col_17": 6057991906361, "IFSC": "PUNB0V1W137", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 124, "Naam": "Stephen", "Pita ka naam": "Bapu Reddy", "DOB": "28-01-2016", "Umar": 10, "Mob": "+91 76769 12860", "Alt Contact": "6750540683", "Aadhar No": "374379729500", "School": "Rashtriya Balika Vidyalaya, Mahuar", "Gaon": "Mahuar", "Taluka": "Sherghati", "District": "Gaya", "Category": "ST", "Family Income": 137097, "Marks %": 68.4, "Status": "Approved", "Remarks": "Follow up with Umesh Gill at 8444127138.", "col_17": 26249038767954, "IFSC": "IOBA0R5CU1P", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 125, "Naam": "Mathew Shankar", "Pita ka naam": "Anthony Mathew", "DOB": "01-04-2013", "Umar": 13, "Mob": "+91 91025 10384", "Alt Contact": "shankar.mathew41@gmail.com", "Aadhar No": "3035 8825 4410", "School": "Municipal School, Uruli Kanchan", "Gaon": "Uruli Kanchan", "Taluka": "Khed", "District": "Pune", "Category": "ST", "Family Income": 46283, "Marks %": 51.6, "Status": "Rejected", "Remarks": "Caste certificate under verification.", "col_17": 33776345595, "IFSC": "BARB0E5OJQG", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 126, "Naam": "Nasreen", "Pita ka naam": "Raju Joshi", "DOB": "23-09-2010", "Umar": 15, "Mob": "+91 75483 07430", "Alt Contact": "+91 77862 22067", "Aadhar No": "8976 3529 8749", "School": "Zilla Parishad Primary School, Paroo", "Gaon": "Paroo", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "SC", "Family Income": 70849, "Marks %": 78.9, "Status": "Under Review", "Remarks": "Documents pending verification.", "col_17": 20555889225691, "IFSC": "ICIC0GMPXV5", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 127, "Naam": "Rehana Agarwal", "Pita ka naam": "Umesh Agarwal", "DOB": "27-01-2013", "Umar": 13, "Mob": "+91 63454 25953", "Alt Contact": "rehana_agarwal@outlook.com", "Aadhar No": "874429754271", "School": "Lokmanya Tilak Vidyalaya, Kharadi", "Gaon": "Kharadi", "Taluka": "Mulshi", "District": "Pune", "Category": "General", "Family Income": 138564, "Marks %": 52.3, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 659653102349, "IFSC": "MAHB04NE8CV", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 128, "Naam": "Vasant Dubey", "Pita ka naam": "Vikram Dubey", "DOB": "02-01-2006", "Umar": 20, "Mob": "+91 90954 38564", "Alt Contact": "vasantdub964@gmail.com", "Aadhar No": "750923677670", "School": "New English School, Deopur", "Gaon": "Deopur", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "VJNT", "Family Income": 124131, "Marks %": 40.9, "Status": "Disbursed", "Remarks": "Guardian Gurleen Gupta confirmed enrollment.", "col_17": 5804190474905796, "IFSC": "CNRB0B93O8S", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 129, "Naam": "Hari Chettiar", "Pita ka naam": "Milind Gaikwad", "DOB": "23-04-2011", "Umar": 15, "Mob": "096475-71166", "Alt Contact": "090743-00699", "Aadhar No": "890729301824", "School": "Municipal School, Chandwara", "Gaon": "Chandwara", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "VJNT", "Family Income": 138904, "Marks %": 89.9, "Status": "Rejected", "Remarks": "Guardian Pereira Rupali confirmed enrollment.", "col_17": 837748213325, "IFSC": "IOBA0W9IQ8Y", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 130, "Naam": "Mohan Pathan", "Pita ka naam": "Vikram Pathan", "DOB": "14-09-2008", "Umar": 17, "Mob": "+91 60572 86883", "Alt Contact": "6168356672", "Aadhar No": "893028284173", "School": "Municipal School, Bishunpur", "Gaon": "Bishunpur", "Taluka": "Wazirganj", "District": "Gaya", "Category": "NT", "Family Income": 164210, "Marks %": 80.8, "Status": "Disbursed", "Remarks": "Photo missing from file, requested again.", "col_17": 93650255837, "IFSC": "ICIC0PXEVXA", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 131, "Naam": "Thomas Agarwal", "Pita ka naam": "Raju Agarwal", "DOB": "24-03-2013", "Umar": 13, "Mob": "095542-79770", "Alt Contact": "9414202347", "Aadhar No": "262896584687", "School": "Adarsh Vidyalaya, Motipur", "Gaon": "Motipur", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "ST", "Family Income": 112403, "Marks %": 47.2, "Status": "Under Review", "Remarks": "Family shifted house, new contact person O. R. DSouza (6947859967).", "col_17": 431772101628, "IFSC": "UTIB0PE5KEW", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 132, "Naam": "Rizwan Deshpande", "Pita ka naam": "Dattatray Deshpande", "DOB": "26-11-2009", "Umar": 16, "Mob": "7795568980", "Alt Contact": "067254-33837", "Aadhar No": "8340 4114 3330", "School": "Rashtriya Balika Vidyalaya, Dehu", "Gaon": "Dehu", "Taluka": "Baramati", "District": "Pune", "Category": "General", "Family Income": 132471, "Marks %": 44.2, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 1106359049029, "IFSC": "CNRB080E4HZ", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 133, "Naam": "Krishnan Rehana", "Pita ka naam": "Joseph Krishnan", "DOB": "12-08-2015", "Umar": 11, "Mob": "+91 95693 11283", "Alt Contact": "7203586020", "Aadhar No": "846210305589", "School": "Saraswati Vidyalaya, Harnaut Tola", "Gaon": "Harnaut Tola", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "ST", "Family Income": 89569, "Marks %": 74.7, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 62744276654, "IFSC": "HDFC08TWRF0", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 134, "Naam": "Sheikh Gopal", "Pita ka naam": "Mahesh Sheikh", "DOB": "26-01-2011", "Umar": 15, "Mob": "+91 77799 13023", "Alt Contact": "8253576169", "Aadhar No": "753965119708", "School": "Saraswati Vidyalaya, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "NT", "Family Income": 46654, "Marks %": 54.7, "Status": "Disbursed", "Remarks": "School has confirmed attendance record.", "col_17": 516119070984276, "IFSC": "UBIN0F353KM", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 135, "Naam": "Rekha Deshpande", "Pita ka naam": "Sachin Ranjan", "DOB": "11-10-2012", "Umar": 13, "Mob": "085120-33564", "Alt Contact": "+91 84737 89518", "Aadhar No": "377111904222", "School": "Government Middle School, Bakhtiyarpur Tola", "Gaon": "Bakhtiyarpur Tola", "Taluka": "Wazirganj", "District": "Gaya", "Category": "OBC-NT", "Family Income": 72101, "Marks %": 37.3, "Status": "Rejected", "Remarks": "Follow up with Ramdas Naidu at +91 97172 19546.", "col_17": 225251652886926, "IFSC": "PUNB0N3PQWX", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 136, "Naam": "HARPREET BANSAL", "Pita ka naam": "Vikram Bansal", "DOB": "06-02-2006", "Umar": 20, "Mob": "093850-85762", "Alt Contact": "harpreet_bansal@outlook.com", "Aadhar No": "306074078078", "School": "Saraswati Vidyalaya, Deopur", "Gaon": "Deopur", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 114823, "Marks %": 72.5, "Status": "Rejected", "Remarks": "Follow up with Chandra Bhagyashree at 066921-78116.", "col_17": 224459785936097, "IFSC": "SBIN02N93Q5", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 137, "Naam": "Deepak Gadhave", "Pita ka naam": "Sunil Gadhave", "DOB": "04-07-2012", "Umar": 14, "Mob": "071329-98737", "Alt Contact": "+91 70580 50462", "Aadhar No": "9701 2244 8896", "School": "Saraswati Vidyalaya, Alandi", "Gaon": "Alandi", "Taluka": "Junnar", "District": "Pune", "Category": "SC", "Family Income": 174172, "Marks %": 86.1, "Status": "Disbursed", "Remarks": "Spoke to Meena Rai's mother, call +91 79049 03370 for update.", "col_17": 333544721023, "IFSC": "CNRB0KYGOEG", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 138, "Naam": "Champa Sawant", "Pita ka naam": "Mukesh Sawant", "DOB": "16-10-2005", "Umar": 20, "Mob": "064556-07543", "Alt Contact": "champa_sawant@gmail.com", "Aadhar No": "508870613412", "School": "Saraswati Vidyalaya, Paroo", "Gaon": "Paroo", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "NT", "Family Income": 202275, "Marks %": 88.9, "Status": "Rejected", "Remarks": "Marksheet not attested by school.", "col_17": 6192674883597741, "IFSC": "CNRB0L0A1S6", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 139, "Naam": "Geeta Mirza", "Pita ka naam": "Harpreet Mirza", "DOB": "13-12-2007", "Umar": 18, "Mob": "6354753732", "Alt Contact": "+91 89577 44171", "Aadhar No": "440699236625", "School": "Vidya Mandir High School, Chakan", "Gaon": "Chakan", "Taluka": "Khed", "District": "Pune", "Category": "OBC", "Family Income": 155764, "Marks %": 68.4, "Status": "Approved", "Remarks": "Guardian Lily confirmed enrollment.", "col_17": 390750647250428, "IFSC": "CNRB0HTXAOP", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 140, "Naam": "ZAKIR SHARMA", "Pita ka naam": "Milind Sharma", "DOB": "13-08-2006", "Umar": 20, "Mob": "070465-29187", "Alt Contact": "zakirsha67@gmail.com", "Aadhar No": "617511025802", "School": "Rashtriya Balika Vidyalaya, Bishunpur", "Gaon": "Bishunpur", "Taluka": "Wazirganj", "District": "Gaya", "Category": "OBC", "Family Income": 60465, "Marks %": 86.4, "Status": "Pending", "Remarks": "Follow up with Rai Arjun at 098725-27721.", "col_17": 29866872465295, "IFSC": "UBIN0RSK9SL", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 141, "Naam": "Naidu Rohit", "Pita ka naam": "Bapu Jadhav", "DOB": "23-04-2013", "Umar": 13, "Mob": "+91 64206 15674", "Alt Contact": "rohit.naidu36@yahoo.in", "Aadhar No": "371606604727", "School": "Vidya Mandir High School, Guraru", "Gaon": "Guraru", "Taluka": "Tekari", "District": "Gaya", "Category": "VJNT", "Family Income": 204726, "Marks %": 50.5, "Status": "Pending", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 6889996875256664, "IFSC": "CNRB0NKMCQI", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 142, "Naam": "LALITA SAYYED", "Pita ka naam": "Rohit Sayyed", "DOB": "21-01-2015", "Umar": 11, "Mob": "065946-00161", "Alt Contact": "lalita.sayyed46@yahoo.in", "Aadhar No": "2428 8217 2597", "School": "Sant Gadge Baba School, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "General", "Family Income": 115883, "Marks %": 57.4, "Status": "Disbursed", "Remarks": "School has confirmed attendance record.", "col_17": 6310814546541, "IFSC": "PUNB0YUGSYH", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 143, "Naam": "R. E. Naidu", "Pita ka naam": "Baljeet Naidu", "DOB": "13-01-2006", "Umar": 20, "Mob": "060329-83070", "Alt Contact": "harpreet_naidu@yahoo.in", "Aadhar No": "5668 5927 0475", "School": "Saraswati Vidyalaya, Paraiya", "Gaon": "Paraiya", "Taluka": "Tekari", "District": "Gaya", "Category": "ST", "Family Income": 16026, "Marks %": 96.8, "Status": "Pending", "Remarks": "Application complete, forwarded to district office.", "col_17": 9727647801555267, "IFSC": "IOBA09OMEUY", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 144, "Naam": "Zakir Kumar", "Pita ka naam": "Thomas Rodrigues", "DOB": "26-05-2005", "Umar": 21, "Mob": "6895757585", "Alt Contact": "zakirkum657@rediffmail.com", "Aadhar No": "832158667190", "School": "Municipal School, Harnaut Tola", "Gaon": "Harnaut Tola", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 207659, "Marks %": 52.8, "Status": "Under Review", "Remarks": "Income certificate expired, renewal asked.", "col_17": 6131765685077, "IFSC": "MAHB0ORYPZU", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 145, "Naam": "Shivaji Sheikh", "Pita ka naam": "Vasant Singh", "DOB": "15-12-2005", "Umar": 20, "Mob": "+91 98324 43014", "Alt Contact": "099916-59974", "Aadhar No": "923432366200", "School": "Lokmanya Tilak Vidyalaya, Basaith", "Gaon": "Basaith", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "SC", "Family Income": 131419, "Marks %": 43.1, "Status": "Under Review", "Remarks": "yashwant more to submit updated income certificate, contact 8473492547.", "col_17": 722382985776201, "IFSC": "CNRB06F6PVP", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 146, "Naam": "Vasant Mahato", "Pita ka naam": "Amit Mahato", "DOB": "15-01-2004", "Umar": 22, "Mob": "065814-53060", "Alt Contact": "vasantmah716@gmail.com", "Aadhar No": "332704951794", "School": "Saraswati Vidyalaya, Paroo", "Gaon": "Paroo", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "SC", "Family Income": 236190, "Marks %": 81.7, "Status": "Pending", "Remarks": "Income certificate expired, renewal asked.", "col_17": 685513942084, "IFSC": "IOBA0VM309O", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 147, "Naam": "D. Q. Mishra", "Pita ka naam": "More Thomas", "DOB": "22-06-2009", "Umar": 17, "Mob": "+91 82604 85345", "Alt Contact": "+91 68109 11220", "Aadhar No": "2840 0690 3903", "School": "Adarsh Vidyalaya, Dobhi", "Gaon": "Dobhi", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC-NT", "Family Income": 69362, "Marks %": 78.4, "Status": "Approved", "Remarks": "Family shifted house, new contact person sarla waghmare (+91 90746 70828).", "col_17": 459864553321394, "IFSC": "ICIC08UUNKW", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 148, "Naam": "CHAMPA NIKAM", "Pita ka naam": "Nasir Nikam", "DOB": "09-07-2015", "Umar": 11, "Mob": "6116246094", "Alt Contact": "champa.nikam46@yahoo.in", "Aadhar No": "545694408161", "School": "Sant Gadge Baba School, Supa", "Gaon": "Supa", "Taluka": "Junnar", "District": "Pune", "Category": "ST", "Family Income": 243867, "Marks %": 57.6, "Status": "Disbursed", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 70221710703, "IFSC": "UTIB0FYZEVL", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 149, "Naam": "Champa Krishnan", "Pita ka naam": "Balasaheb Krishnan", "DOB": "20-04-2015", "Umar": 11, "Mob": "065586-63511", "Alt Contact": "6513550725", "Aadhar No": "789310232445", "School": "New English School, Dobhi", "Gaon": "Dobhi", "Taluka": "Konch", "District": "Gaya", "Category": "VJNT", "Family Income": 109780, "Marks %": 89.9, "Status": "Rejected", "Remarks": "Family shifted house, new contact person Padma Ansari (6850028324).", "col_17": 22208062847338, "IFSC": "ICIC0EIB8L3", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 150, "Naam": "Lakshmi Chougule", "Pita ka naam": "Ravi Joshi", "DOB": "26-01-2006", "Umar": 20, "Mob": "6892097427", "Alt Contact": "8767611021", "Aadhar No": "2007 1979 8991", "School": "Lokmanya Tilak Vidyalaya, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 39844, "Marks %": 66.1, "Status": "Rejected", "Remarks": "Follow up with NAVEEN AGARWAL at 087573-78065.", "col_17": 941272198153, "IFSC": "MAHB05K8HF1", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 151, "Naam": "Sushma Yadav", "Pita ka naam": "Rohit Yadav", "DOB": "24-02-2009", "Umar": 17, "Mob": "6785046355", "Alt Contact": "090038-33422", "Aadhar No": "422741248369", "School": "Saraswati Vidyalaya, Barachatti", "Gaon": "Barachatti", "Taluka": "Wazirganj", "District": "Gaya", "Category": "OBC", "Family Income": 219214, "Marks %": 76.1, "Status": "Pending", "Remarks": "School has confirmed attendance record.", "col_17": 55121158374545, "IFSC": "IOBA0S5GZJR", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 152, "Naam": "geeta naidu", "Pita ka naam": "Vinod Naidu", "DOB": "22-07-2012", "Umar": 14, "Mob": "6290940764", "Alt Contact": "+91 94096 76788", "Aadhar No": "4043 7841 2738", "School": "Lokmanya Tilak Vidyalaya, Alandi", "Gaon": "Alandi", "Taluka": "Junnar", "District": "Pune", "Category": "OBC-NT", "Family Income": 57131, "Marks %": 50.3, "Status": "Under Review", "Remarks": "Income certificate expired, renewal asked.", "col_17": 75094946883532, "IFSC": "SBIN0TG8N6I", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 153, "Naam": "Joshi Suresh", "Pita ka naam": "Sanjay Joshi", "DOB": "27-02-2006", "Umar": 20, "Mob": "6144195455", "Alt Contact": "093135-92050", "Aadhar No": "818813071369", "School": "Adarsh Vidyalaya, Shirur", "Gaon": "Shirur", "Taluka": "Baramati", "District": "Pune", "Category": "SC", "Family Income": 88375, "Marks %": 95.3, "Status": "Disbursed", "Remarks": "Guardian priyanka deshmukh confirmed enrollment.", "col_17": 132652643251730, "IFSC": "PUNB06WS87L", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 154, "Naam": "Lalita", "Pita ka naam": "Balasaheb Pereira", "DOB": "27-02-2016", "Umar": 10, "Mob": "7214728872", "Alt Contact": "lalita_agarwal@gmail.com", "Aadhar No": "648128694801", "School": "Municipal School, Bhor", "Gaon": "Bhor", "Taluka": "Khed", "District": "Pune", "Category": "OBC", "Family Income": 44317, "Marks %": 90.6, "Status": "Pending", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 632079839003332, "IFSC": "HDFC01OW1F3", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 155, "Naam": "SHANKAR SHEIKH", "Pita ka naam": "Ganesh Sheikh", "DOB": "16-07-2006", "Umar": 20, "Mob": "6310513270", "Alt Contact": "shankarshe765@outlook.com", "Aadhar No": "3671 4448 9321", "School": "Lokmanya Tilak Vidyalaya, Dobhi", "Gaon": "Dobhi", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC-NT", "Family Income": 88351, "Marks %": 77.8, "Status": "Under Review", "Remarks": "Case reviewed by committee, approved.", "col_17": 9865142388311, "IFSC": "BARB0FBTD9T", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 156, "Naam": "Namdev Tiwari", "Pita ka naam": "Anil Tiwari", "DOB": "05-06-2004", "Umar": 22, "Mob": "072782-84529", "Alt Contact": "namdev_tiwari@gmail.com", "Aadhar No": "2297 2419 4373", "School": "Rashtriya Balika Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "General", "Family Income": 240779, "Marks %": 60.6, "Status": "Pending", "Remarks": "Waiting for bank passbook copy.", "col_17": 27962117284, "IFSC": "CNRB085ENW4", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 157, "Naam": "Rahul Patil", "Pita ka naam": "Rajesh Patil", "DOB": "29-01-2014", "Umar": 12, "Mob": "6112822164", "Alt Contact": "7487527780", "Aadhar No": "3945 4637 3029", "School": "Rashtriya Balika Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 113011, "Marks %": 85.8, "Status": "Pending", "Remarks": "Marksheet not attested by school.", "col_17": 408138629515000, "IFSC": "BARB055CL3I", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 158, "Naam": "Shivaji Fernandez", "Pita ka naam": "Ramesh Fernandez", "DOB": "16-04-2011", "Umar": 15, "Mob": "9005431929", "Alt Contact": "6577950726", "Aadhar No": "718317951839", "School": "Adarsh Vidyalaya, Dobhi", "Gaon": "Dobhi", "Taluka": "Konch", "District": "Gaya", "Category": "NT", "Family Income": 38121, "Marks %": 37.1, "Status": "Rejected", "Remarks": "Waiting for bank passbook copy.", "col_17": 2794095321983139, "IFSC": "CNRB0S92ZH5", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 159, "Naam": "Ramesh Manjhi", "Pita ka naam": "Baban Manjhi", "DOB": "09-06-2015", "Umar": 11, "Mob": "+91 88932 81849", "Alt Contact": "+91 66794 70846", "Aadhar No": "607322710372", "School": "Sant Gadge Baba School, Chikhali", "Gaon": "Chikhali", "Taluka": "Mulshi", "District": "Pune", "Category": "General", "Family Income": 125430, "Marks %": 53.9, "Status": "Pending", "Remarks": "Income certificate expired, renewal asked.", "col_17": 7419297658192710, "IFSC": "ICIC0BRSR81", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 160, "Naam": "Indira Salunkhe", "Pita ka naam": "Ismail Salunkhe", "DOB": "12-06-2012", "Umar": 14, "Mob": "9555582767", "Alt Contact": "+91 96281 45518", "Aadhar No": "3673 7950 7168", "School": "Rashtriya Balika Vidyalaya, Barachatti", "Gaon": "Barachatti", "Taluka": "Konch", "District": "Gaya", "Category": "General", "Family Income": 76981, "Marks %": 55.2, "Status": "Disbursed", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 612631615468, "IFSC": "SBIN0VC8K8I", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 161, "Naam": "SARITA GADHAVE", "Pita ka naam": "Ashok Gadhave", "DOB": "26-01-2013", "Umar": 13, "Mob": "+91 60877 45212", "Alt Contact": "saritagad259@outlook.com", "Aadhar No": "4208 5064 3107", "School": "Zilla Parishad Primary School, Deopur", "Gaon": "Deopur", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 71750, "Marks %": 79.3, "Status": "Disbursed", "Remarks": "School has confirmed attendance record.", "col_17": 62700292689, "IFSC": "ICIC0PYA2SD", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 162, "Naam": "RAHUL REDDY", "Pita ka naam": "Vasant Reddy", "DOB": "02-07-2011", "Umar": 15, "Mob": "7142402526", "Alt Contact": "rahulred372@yahoo.in", "Aadhar No": "9126 3373 5861", "School": "Municipal School, Rajgurunagar", "Gaon": "Rajgurunagar", "Taluka": "Junnar", "District": "Pune", "Category": "VJNT", "Family Income": 241266, "Marks %": 37.3, "Status": "Approved", "Remarks": "Waiting for bank passbook copy.", "col_17": 906491549533552, "IFSC": "BARB0PNU81R", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 163, "Naam": "Mahato Rekha", "Pita ka naam": "Tukaram Mahato", "DOB": "24-03-2016", "Umar": 10, "Mob": "+91 81209 41177", "Alt Contact": "+91 84107 69836", "Aadhar No": "4271 8709 2039", "School": "Zilla Parishad Primary School, Bakhtiyarpur Tola", "Gaon": "Bakhtiyarpur Tola", "Taluka": "Sherghati", "District": "Gaya", "Category": "VJNT", "Family Income": 209183, "Marks %": 65.4, "Status": "Pending", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 188784316772995, "IFSC": "PUNB0GIO3DS", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 164, "Naam": "Mukesh Jadhav", "Pita ka naam": "Ganesh Jadhav", "DOB": "10-12-2015", "Umar": 10, "Mob": "6921626134", "Alt Contact": "+91 74465 21789", "Aadhar No": "6480 8001 0569", "School": "Saraswati Vidyalaya, Deopur", "Gaon": "Deopur", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "ST", "Family Income": 175516, "Marks %": 67.4, "Status": "Disbursed", "Remarks": "Marksheet not attested by school.", "col_17": 6141424579098203, "IFSC": "UBIN0XAHNGQ", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 165, "Naam": "George Ramdas", "Pita ka naam": "Jaspreet George", "DOB": "01-10-2007", "Umar": 18, "Mob": "084390-39698", "Alt Contact": "9884122876", "Aadhar No": "223155820965", "School": "Municipal School, Rampur Sokho", "Gaon": "Rampur Sokho", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "General", "Family Income": 192081, "Marks %": 52.3, "Status": "Pending", "Remarks": "Application complete, forwarded to district office.", "col_17": 1203315716685985, "IFSC": "MAHB0UO9PU3", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 166, "Naam": "Sachin Bhagat", "Pita ka naam": "Stephen Dubey", "DOB": "03-04-2005", "Umar": 21, "Mob": "+91 98704 64182", "Alt Contact": "+91 62507 12509", "Aadhar No": "4699 5297 1868", "School": "New English School, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "SC", "Family Income": 103964, "Marks %": 44.0, "Status": "Under Review", "Remarks": "Application complete, forwarded to district office.", "col_17": 14154270306, "IFSC": "UBIN0G92TXE", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 167, "Naam": "Divya Lobo", "Pita ka naam": "Pradeep Ranjan", "DOB": "29-09-2009", "Umar": 16, "Mob": "064402-68515", "Alt Contact": "divya.lobo37@rediffmail.com", "Aadhar No": "916261435318", "School": "Rashtriya Balika Vidyalaya, Paroo", "Gaon": "Paroo", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "General", "Family Income": 67167, "Marks %": 39.9, "Status": "Disbursed", "Remarks": "Follow up with Irfan at 6911375892.", "col_17": 263452207260, "IFSC": "BARB0B6MKD3", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 168, "Naam": "Sunil Naidu", "Pita ka naam": "Thomas Naidu", "DOB": "15-02-2014", "Umar": 12, "Mob": "9870199806", "Alt Contact": "sunil_naidu@outlook.com", "Aadhar No": "398724715924", "School": "Lokmanya Tilak Vidyalaya, Paraiya", "Gaon": "Paraiya", "Taluka": "Belaganj", "District": "Gaya", "Category": "General", "Family Income": 226023, "Marks %": 44.4, "Status": "Disbursed", "Remarks": "Income certificate expired, renewal asked.", "col_17": 565675384311, "IFSC": "UBIN09SNOFI", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 169, "Naam": "Pawar Indira", "Pita ka naam": "Vasant Kushwaha", "DOB": "26-04-2011", "Umar": 15, "Mob": "095265-76091", "Alt Contact": "indira_pawar@yahoo.in", "Aadhar No": "230524423766", "School": "Adarsh Vidyalaya, Dobhi", "Gaon": "Dobhi", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC-NT", "Family Income": 193640, "Marks %": 56.4, "Status": "Pending", "Remarks": "Family shifted house, new contact person ramdas rodrigues (077728-01606).", "col_17": 76271799422, "IFSC": "HDFC09AQFFT", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 170, "Naam": "Suvarna Mishra", "Pita ka naam": "Umesh Mishra", "DOB": "02-12-2005", "Umar": 20, "Mob": "+91 69645 66690", "Alt Contact": "suvarnamis358@rediffmail.com", "Aadhar No": "9701 3235 9541", "School": "New English School, Dobhi", "Gaon": "Dobhi", "Taluka": "Wazirganj", "District": "Gaya", "Category": "ST", "Family Income": 224375, "Marks %": 57.9, "Status": "Disbursed", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 596702459400, "IFSC": "IOBA0U47OUT", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 171, "Naam": "lakshmi rodrigues", "Pita ka naam": "Mukesh Rodrigues", "DOB": "12-09-2013", "Umar": 12, "Mob": "+91 86168 10264", "Alt Contact": "095053-27712", "Aadhar No": "597978402593", "School": "Government Middle School, Harnaut Tola", "Gaon": "Harnaut Tola", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 150899, "Marks %": 42.5, "Status": "Under Review", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 67695228297996, "IFSC": "HDFC0G6V194", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 172, "Naam": "Umesh Chaudhary", "Pita ka naam": "K. Y. Paswan", "DOB": "09-06-2012", "Umar": 14, "Mob": "+91 91826 15369", "Alt Contact": "8010615000", "Aadhar No": "7395 7900 4431", "School": "Adarsh Vidyalaya, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "SC", "Family Income": 24177, "Marks %": 35.8, "Status": "Under Review", "Remarks": "U. K. Shinde to submit updated income certificate, contact 6406874267.", "col_17": 47016153499, "IFSC": "HDFC0E05FT3", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 173, "Naam": "GURLEEN KHAN", "Pita ka naam": "Kiran Khan", "DOB": "05-08-2004", "Umar": 22, "Mob": "6267654687", "Alt Contact": "+91 80502 16027", "Aadhar No": "3784 5802 4213", "School": "Government Middle School, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "ST", "Family Income": 202093, "Marks %": 94.6, "Status": "Under Review", "Remarks": "Guardian Pooja Krishnan confirmed enrollment.", "col_17": 52351998951144, "IFSC": "CNRB09ZZMUO", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 174, "Naam": "Eknath Bhagat", "Pita ka naam": "Rajesh Bhagat", "DOB": "01-02-2012", "Umar": 14, "Mob": "8153356371", "Alt Contact": "8412545275", "Aadhar No": "851829576973", "School": "Lokmanya Tilak Vidyalaya, Devipur", "Gaon": "Devipur", "Taluka": "Belaganj", "District": "Gaya", "Category": "OBC-NT", "Family Income": 43661, "Marks %": 69.9, "Status": "Approved", "Remarks": "Case reviewed by committee, approved.", "col_17": 607754964642130, "IFSC": "IOBA030EJJY", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 175, "Naam": "Ismail Ranjan", "Pita ka naam": "Joseph Ranjan", "DOB": "15-01-2015", "Umar": 11, "Mob": "+91 65836 78139", "Alt Contact": "+91 85199 83186", "Aadhar No": "998628120211", "School": "Municipal School, Mahuar", "Gaon": "Mahuar", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC-NT", "Family Income": 61846, "Marks %": 67.7, "Status": "Under Review", "Remarks": "Caste certificate under verification.", "col_17": 3553568377661088, "IFSC": "UBIN0Z658L4", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 176, "Naam": "Savita Patil", "Pita ka naam": "Manpreet Patil", "DOB": "06-02-2012", "Umar": 14, "Mob": "+91 96756 64859", "Alt Contact": "076720-76815", "Aadhar No": "342800041520", "School": "Sant Gadge Baba School, Saswad", "Gaon": "Saswad", "Taluka": "Khed", "District": "Pune", "Category": "ST", "Family Income": 138180, "Marks %": 62.6, "Status": "Approved", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 919633740142, "IFSC": "MAHB05F84WM", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 177, "Naam": "Ayub Yadav", "Pita ka naam": "Sachin Yadav", "DOB": "21-06-2008", "Umar": 18, "Mob": "067592-59526", "Alt Contact": "ayubyad402@outlook.com", "Aadhar No": "575463895265", "School": "New English School, Mahuar", "Gaon": "Mahuar", "Taluka": "Sherghati", "District": "Gaya", "Category": "SC", "Family Income": 17581, "Marks %": 40.7, "Status": "Rejected", "Remarks": "Caste certificate under verification.", "col_17": 77796864634, "IFSC": "CNRB0FE9YIQ", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 178, "Naam": "Amina Chettiar", "Pita ka naam": "Sunil Chettiar", "DOB": "30-09-2011", "Umar": 14, "Mob": "+91 65999 96603", "Alt Contact": "amina_chettiar@outlook.com", "Aadhar No": "214443283693", "School": "Vidya Mandir High School, Basaith", "Gaon": "Basaith", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "ST", "Family Income": 128346, "Marks %": 68.7, "Status": "Under Review", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 2613960500516, "IFSC": "HDFC0A6W1K8", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 179, "Naam": "Usha Reddy", "Pita ka naam": "Harpreet Reddy", "DOB": "28-02-2014", "Umar": 12, "Mob": "+91 73023 85553", "Alt Contact": "usha.reddy65@outlook.com", "Aadhar No": "589227822527", "School": "Vidya Mandir High School, Basaith", "Gaon": "Basaith", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "General", "Family Income": 146519, "Marks %": 56.7, "Status": "Approved", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 32320927291, "IFSC": "IOBA0VQ9ZSX", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 180, "Naam": "Pereira Shobha", "Pita ka naam": "Ganpat Mirza", "DOB": "25-08-2003", "Umar": 22, "Mob": "075792-38266", "Alt Contact": "shobha.pereira45@gmail.com", "Aadhar No": "4727 1659 6338", "School": "Lokmanya Tilak Vidyalaya, Paraiya", "Gaon": "Paraiya", "Taluka": "Konch", "District": "Gaya", "Category": "VJNT", "Family Income": 36364, "Marks %": 86.8, "Status": "Under Review", "Remarks": "Dagdu Rai to submit updated income certificate, contact 8319687746.", "col_17": 55442063582, "IFSC": "ICIC0S5GAAS", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 181, "Naam": "Lalita Chettiar", "Pita ka naam": "Vikram Chettiar", "DOB": "28-07-2009", "Umar": 17, "Mob": "+91 63284 59466", "Alt Contact": "lalitache598@gmail.com", "Aadhar No": "617537745180", "School": "Municipal School, Paraiya", "Gaon": "Paraiya", "Taluka": "Belaganj", "District": "Gaya", "Category": "VJNT", "Family Income": 204271, "Marks %": 65.5, "Status": "Pending", "Remarks": "Family shifted house, new contact person Tiwari Anita (+91 77433 44356).", "col_17": 19646029870179, "IFSC": "UBIN03YRY3G", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 182, "Naam": "Kale Ashwini", "Pita ka naam": "Nitin Kale", "DOB": "13-08-2006", "Umar": 20, "Mob": "062828-61592", "Alt Contact": "+91 63880 28871", "Aadhar No": "9850 8558 7738", "School": "New English School, Uruli Kanchan", "Gaon": "Uruli Kanchan", "Taluka": "Khed", "District": "Pune", "Category": "ST", "Family Income": 112753, "Marks %": 71.7, "Status": "Disbursed", "Remarks": "Waiting for bank passbook copy.", "col_17": 624303502022, "IFSC": "ICIC0IBXUJY", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 183, "Naam": "Baban Chougule", "Pita ka naam": "Francis Chougule", "DOB": "18-05-2007", "Umar": 19, "Mob": "097226-33851", "Alt Contact": "baban.chougule45@outlook.com", "Aadhar No": "509114523731", "School": "New English School, Dehu", "Gaon": "Dehu", "Taluka": "Baramati", "District": "Pune", "Category": "General", "Family Income": 115841, "Marks %": 62.1, "Status": "Disbursed", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 39865156003338, "IFSC": "IOBA0TNVST6", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 184, "Naam": "Iyer Raju", "Pita ka naam": "Salman Iyer", "DOB": "04-01-2006", "Umar": 20, "Mob": "+91 69712 27284", "Alt Contact": "+91 99571 01922", "Aadhar No": "300900686029", "School": "Vidya Mandir High School, Nira", "Gaon": "Nira", "Taluka": "Baramati", "District": "Pune", "Category": "VJNT", "Family Income": 63634, "Marks %": 39.0, "Status": "Pending", "Remarks": "Priyanka Kadam to submit updated income certificate, contact +91 78303 95193.", "col_17": 22499217875849, "IFSC": "ICIC0R38LDD", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 185, "Naam": "Namdev Prasad", "Pita ka naam": "Sachin Naidu", "DOB": "24-11-2007", "Umar": 18, "Mob": "8605425085", "Alt Contact": "namdev_prasad@rediffmail.com", "Aadhar No": "667971685007", "School": "Saraswati Vidyalaya, Amawan", "Gaon": "Amawan", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC", "Family Income": 64870, "Marks %": 82.5, "Status": "Pending", "Remarks": "School has confirmed attendance record.", "col_17": 97231563069670, "IFSC": "MAHB0VQGUTF", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 186, "Naam": "Kumari Snehal", "Pita ka naam": "Pankaj Kumari", "DOB": "25-02-2006", "Umar": 20, "Mob": "6859601880", "Alt Contact": "9217340848", "Aadhar No": "259049283620", "School": "Sant Gadge Baba School, Mahuar", "Gaon": "Mahuar", "Taluka": "Konch", "District": "Gaya", "Category": "NT", "Family Income": 42140, "Marks %": 81.1, "Status": "Disbursed", "Remarks": "Photo missing from file, requested again.", "col_17": 83205369667823, "IFSC": "MAHB0MWWX5C", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 187, "Naam": "R. D. Yadav", "Pita ka naam": "Aakash Yadav", "DOB": "26-11-2014", "Umar": 11, "Mob": "088444-72272", "Alt Contact": "simran.yadav56@yahoo.in", "Aadhar No": "386314635512", "School": "Rashtriya Balika Vidyalaya, Devipur", "Gaon": "Devipur", "Taluka": "Belaganj", "District": "Gaya", "Category": "OBC-NT", "Family Income": 157353, "Marks %": 95.9, "Status": "Rejected", "Remarks": "Family shifted house, new contact person Simran Zende (085161-07513).", "col_17": 87291792058, "IFSC": "SBIN0Z3AF7V", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 188, "Naam": "Z. U. Gaikwad", "Pita ka naam": "Baliram Gaikwad", "DOB": "18-10-2009", "Umar": 16, "Mob": "+91 93442 81624", "Alt Contact": "ismail_gaikwad@gmail.com", "Aadhar No": "488065974961", "School": "Adarsh Vidyalaya, Karpi", "Gaon": "Karpi", "Taluka": "Wazirganj", "District": "Gaya", "Category": "SC", "Family Income": 100055, "Marks %": 40.0, "Status": "Under Review", "Remarks": "School has confirmed attendance record.", "col_17": 479800607378, "IFSC": "HDFC0798ZKA", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 189, "Naam": "Lalita Bhagat", "Pita ka naam": "Salman Bhagat", "DOB": "28-10-2010", "Umar": 15, "Mob": "8229582033", "Alt Contact": "lalita.bhagat71@rediffmail.com", "Aadhar No": "6895 8236 9069", "School": "Lokmanya Tilak Vidyalaya, Rampur", "Gaon": "Rampur", "Taluka": "Sherghati", "District": "Gaya", "Category": "SC", "Family Income": 47628, "Marks %": 71.4, "Status": "Disbursed", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 937039675284339, "IFSC": "HDFC00G8XRP", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 190, "Naam": "AMINA GADHAVE", "Pita ka naam": "Krishna Gadhave", "DOB": "24-05-2005", "Umar": 21, "Mob": "090590-75023", "Alt Contact": "+91 68157 93066", "Aadhar No": "782233603061", "School": "Sant Gadge Baba School, Dehu", "Gaon": "Dehu", "Taluka": "Junnar", "District": "Pune", "Category": "ST", "Family Income": 114308, "Marks %": 54.6, "Status": "Disbursed", "Remarks": "Case reviewed by committee, approved.", "col_17": 7495114131482511, "IFSC": "HDFC0IP9CWY", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 191, "Naam": "Lata", "Pita ka naam": "Rahul Verma", "DOB": "05-06-2016", "Umar": 10, "Mob": "084321-19077", "Alt Contact": "7705293098", "Aadhar No": "230781471646", "School": "Sant Gadge Baba School, Basaith", "Gaon": "Basaith", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "General", "Family Income": 156417, "Marks %": 88.2, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 67761190497, "IFSC": "BARB0YC10OU", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 192, "Naam": "Krishna Bhoir", "Pita ka naam": "Jaspreet Bhoir", "DOB": "30-11-2012", "Umar": 13, "Mob": "+91 66896 03362", "Alt Contact": "089361-03526", "Aadhar No": "4626 3668 6916", "School": "Municipal School, Chakan", "Gaon": "Chakan", "Taluka": "Khed", "District": "Pune", "Category": "ST", "Family Income": 121570, "Marks %": 39.2, "Status": "Rejected", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 2439605859053756, "IFSC": "PUNB0JG46OM", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 193, "Naam": "Vijay Siddiqui", "Pita ka naam": "francis pathan", "DOB": "16-01-2015", "Umar": 11, "Mob": "087966-13304", "Alt Contact": "+91 62321 87667", "Aadhar No": "8076 2025 1467", "School": "Vidya Mandir High School, Basaith", "Gaon": "Basaith", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 54864, "Marks %": 87.5, "Status": "Rejected", "Remarks": "Photo missing from file, requested again.", "col_17": 631836124205009, "IFSC": "IOBA0OK5NU2", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 194, "Naam": "Kumari Padma", "Pita ka naam": "Dattatray Kumari", "DOB": "25-04-2009", "Umar": 17, "Mob": "+91 69972 38983", "Alt Contact": "7912475833", "Aadhar No": "282814633576", "School": "Government Middle School, Rampur", "Gaon": "Rampur", "Taluka": "Tekari", "District": "Gaya", "Category": "SC", "Family Income": 30123, "Marks %": 38.3, "Status": "Pending", "Remarks": "Photo missing from file, requested again.", "col_17": 15671358649070, "IFSC": "IOBA0JBSX5E", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 195, "Naam": "Deepa Pawar", "Pita ka naam": "Amarjeet Pawar", "DOB": "26-06-2008", "Umar": 18, "Mob": "+91 76336 06521", "Alt Contact": "+91 91822 26201", "Aadhar No": "8122 8892 0659", "School": "Rashtriya Balika Vidyalaya, Paroo", "Gaon": "Paroo", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "NT", "Family Income": 152045, "Marks %": 87.6, "Status": "Pending", "Remarks": "Application complete, forwarded to district office.", "col_17": 70144021215, "IFSC": "UTIB07AHR10", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 196, "Naam": "AMIT GAIKWAD", "Pita ka naam": "ganesh prasad", "DOB": "27-11-2005", "Umar": 20, "Mob": "6495518839", "Alt Contact": "amit.gaikwad5@gmail.com", "Aadhar No": "2534 1148 0300", "School": "Municipal School, Rampur Sokho", "Gaon": "Rampur Sokho", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "General", "Family Income": 54983, "Marks %": 74.6, "Status": "Disbursed", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 2792809130982, "IFSC": "UTIB0OETTO0", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 197, "Naam": "Tiwari Nirmala", "Pita ka naam": "Vasant Tiwari", "DOB": "23-06-2012", "Umar": 14, "Mob": "079823-23383", "Alt Contact": "7646689504", "Aadhar No": "6984 2701 2769", "School": "Sant Gadge Baba School, Chandpur", "Gaon": "Chandpur", "Taluka": "Belaganj", "District": "Gaya", "Category": "VJNT", "Family Income": 21492, "Marks %": 62.7, "Status": "Under Review", "Remarks": "Documents pending verification.", "col_17": 650980985941012, "IFSC": "MAHB05A5PS2", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 198, "Naam": "JOSEPH MIRZA", "Pita ka naam": "Salman Paswan", "DOB": "24-10-2006", "Umar": 19, "Mob": "6857908408", "Alt Contact": "joseph_mirza@outlook.com", "Aadhar No": "846397594847", "School": "Municipal School, Barachatti", "Gaon": "Barachatti", "Taluka": "Konch", "District": "Gaya", "Category": "OBC", "Family Income": 215475, "Marks %": 43.0, "Status": "Disbursed", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 9285037089227, "IFSC": "UBIN0HQK2ZJ", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 199, "Naam": "Geeta Chaudhary", "Pita ka naam": "Salman Chaudhary", "DOB": "08-11-2006", "Umar": 19, "Mob": "096464-46575", "Alt Contact": "geeta.chaudhary43@yahoo.in", "Aadhar No": "256891188474", "School": "New English School, Paroo", "Gaon": "Paroo", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "General", "Family Income": 164675, "Marks %": 39.5, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 566152934156254, "IFSC": "IOBA00R361Q", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 200, "Naam": "Sidhu Dinesh", "Pita ka naam": "Farooq Sidhu", "DOB": "09-10-2012", "Umar": 13, "Mob": "096801-88804", "Alt Contact": "dinesh_sidhu@rediffmail.com", "Aadhar No": "3596 6910 7718", "School": "Municipal School, Atri", "Gaon": "Atri", "Taluka": "Wazirganj", "District": "Gaya", "Category": "General", "Family Income": 149181, "Marks %": 77.1, "Status": "Rejected", "Remarks": "Guardian HARJEET MAHATO confirmed enrollment.", "col_17": 907718074565304, "IFSC": "UBIN0W5AIO7", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 201, "Naam": "Shobha Ansari", "Pita ka naam": "Ramdas Ansari", "DOB": "14-07-2012", "Umar": 14, "Mob": "6277372730", "Alt Contact": "092218-31312", "Aadhar No": "2529 8372 1247", "School": "Saraswati Vidyalaya, Guraru", "Gaon": "Guraru", "Taluka": "Wazirganj", "District": "Gaya", "Category": "ST", "Family Income": 176249, "Marks %": 66.8, "Status": "Under Review", "Remarks": "H. W. Gaikwad to submit updated income certificate, contact 088347-62936.", "col_17": 295241235811567, "IFSC": "HDFC0GSDJ5E", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 202, "Naam": "Joseph Kadam", "Pita ka naam": "Suresh Kadam", "DOB": "06-05-2013", "Umar": 13, "Mob": "+91 79736 01137", "Alt Contact": "070926-95886", "Aadhar No": "232802437935", "School": "Sant Gadge Baba School, Dehu", "Gaon": "Dehu", "Taluka": "Mulshi", "District": "Pune", "Category": "General", "Family Income": 69588, "Marks %": 59.1, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 628523348105645, "IFSC": "SBIN0NW64Y0", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 203, "Naam": "Jyoti Naidu", "Pita ka naam": "Mishra Shrikant", "DOB": "15-07-2009", "Umar": 17, "Mob": "6026847518", "Alt Contact": "8222674781", "Aadhar No": "2268 8152 3764", "School": "Vidya Mandir High School, Harnaut Tola", "Gaon": "Harnaut Tola", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "General", "Family Income": 227887, "Marks %": 44.7, "Status": "Under Review", "Remarks": "Spoke to rohit pandey's mother, call +91 60079 29130 for update.", "col_17": 5176883507550, "IFSC": "CNRB0426YYP", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 204, "Naam": "Usha Kaur", "Pita ka naam": "Ismail Kaur", "DOB": "04-04-2014", "Umar": 12, "Mob": "+91 84547 62396", "Alt Contact": "usha_kaur@yahoo.in", "Aadhar No": "6205 6745 6772", "School": "Zilla Parishad Primary School, Basaith", "Gaon": "Basaith", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 126710, "Marks %": 74.6, "Status": "Pending", "Remarks": "Application complete, forwarded to district office.", "col_17": 37506483058206, "IFSC": "UBIN0PSAS48", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 205, "Naam": "Sudha Qureshi", "Pita ka naam": "Pradeep Qureshi", "DOB": "15-04-2008", "Umar": 18, "Mob": "+91 65847 84853", "Alt Contact": "+91 97226 89583", "Aadhar No": "492888629981", "School": "Adarsh Vidyalaya, Kalyanpur", "Gaon": "Kalyanpur", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "General", "Family Income": 25718, "Marks %": 59.9, "Status": "Under Review", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 66711244482585, "IFSC": "PUNB0T08JLF", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 206, "Naam": "Shobha Verma", "Pita ka naam": "Baliram Thakur", "DOB": "07-11-2004", "Umar": 21, "Mob": "082265-50952", "Alt Contact": "shobha.verma63@outlook.com", "Aadhar No": "407415528280", "School": "New English School, Saswad", "Gaon": "Saswad", "Taluka": "Baramati", "District": "Pune", "Category": "NT", "Family Income": 171938, "Marks %": 36.3, "Status": "Rejected", "Remarks": "Family shifted house, new contact person Manoj Reddy (6068436102).", "col_17": 9094377854503500, "IFSC": "UBIN0R79PDB", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 207, "Naam": "Pratibha Agarwal", "Pita ka naam": "salman prasad", "DOB": "08-07-2004", "Umar": 22, "Mob": "+91 76454 48525", "Alt Contact": "7506519165", "Aadhar No": "226154809516", "School": "Saraswati Vidyalaya, Bishunpur", "Gaon": "Bishunpur", "Taluka": "Konch", "District": "Gaya", "Category": "VJNT", "Family Income": 130289, "Marks %": 64.8, "Status": "Under Review", "Remarks": "Documents pending verification.", "col_17": 36595166565, "IFSC": "PUNB0J6YNDN", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 208, "Naam": "Sidhu Shankar", "Pita ka naam": "VISHAL JOSHI", "DOB": "03-02-2016", "Umar": 10, "Mob": "+91 87254 06779", "Alt Contact": "9581569189", "Aadhar No": "4451 7153 3088", "School": "Government Middle School, Chakan", "Gaon": "Chakan", "Taluka": "Junnar", "District": "Pune", "Category": "ST", "Family Income": 101873, "Marks %": 81.7, "Status": "Approved", "Remarks": "Family shifted house, new contact person Thakur Milind (+91 93744 83437).", "col_17": 6629184588974, "IFSC": "HDFC0F0VCSK", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 209, "Naam": "Sita Nikam", "Pita ka naam": "Sunil Nikam", "DOB": "13-03-2009", "Umar": 17, "Mob": "089109-82708", "Alt Contact": "061201-33434", "Aadhar No": "2709 6127 0036", "School": "Adarsh Vidyalaya, Kalyanpur", "Gaon": "Kalyanpur", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 48434, "Marks %": 58.8, "Status": "Pending", "Remarks": "Photo missing from file, requested again.", "col_17": 186748821126050, "IFSC": "SBIN0E9V7BG", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 210, "Naam": "Shakuntala Singh", "Pita ka naam": "Gopal Singh", "DOB": "26-06-2010", "Umar": 16, "Mob": "073938-49162", "Alt Contact": "shakuntala_singh@outlook.com", "Aadhar No": "307128176042", "School": "Rashtriya Balika Vidyalaya, Karpi", "Gaon": "Karpi", "Taluka": "Wazirganj", "District": "Gaya", "Category": "VJNT", "Family Income": 207312, "Marks %": 36.3, "Status": "Disbursed", "Remarks": "Follow up with Meena Siddiqui at 074633-75537.", "col_17": 1164933128180036, "IFSC": "MAHB081UGSC", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 211, "Naam": "Sudha", "Pita ka naam": "Vijay", "DOB": "16-04-2013", "Umar": 13, "Mob": "8416421507", "Alt Contact": "9834826828", "Aadhar No": "623585935028", "School": "Rashtriya Balika Vidyalaya, Rampur", "Gaon": "Rampur", "Taluka": "Wazirganj", "District": "Gaya", "Category": "VJNT", "Family Income": 206973, "Marks %": 83.0, "Status": "Under Review", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 90912172916226, "IFSC": "ICIC01TH0MI", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 212, "Naam": "Rupali Thomas", "Pita ka naam": "Thomas Thomas", "DOB": "21-12-2013", "Umar": 12, "Mob": "9864015969", "Alt Contact": "+91 73761 90527", "Aadhar No": "303620912993", "School": "New English School, Motipur", "Gaon": "Motipur", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 102451, "Marks %": 69.7, "Status": "Under Review", "Remarks": "Income certificate expired, renewal asked.", "col_17": 3679807479797798, "IFSC": "MAHB08AA5VU", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 213, "Naam": "Reddy Balasaheb", "Pita ka naam": "Thomas Reddy", "DOB": "04-09-2003", "Umar": 22, "Mob": "+91 90328 27152", "Alt Contact": "083262-14010", "Aadhar No": "452536319090", "School": "Vidya Mandir High School, Alandi", "Gaon": "Alandi", "Taluka": "Mulshi", "District": "Pune", "Category": "SC", "Family Income": 203293, "Marks %": 79.5, "Status": "Pending", "Remarks": "Spoke to Umesh Gupta's mother, call 8430912198 for update.", "col_17": 42632650733, "IFSC": "HDFC0I2FX8B", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 214, "Naam": "Yashwant Mahato", "Pita ka naam": "Fernandes Aslam", "DOB": "30-07-2011", "Umar": 15, "Mob": "7147835060", "Alt Contact": "yashwantmah225@gmail.com", "Aadhar No": "376330572698", "School": "New English School, Chakan", "Gaon": "Chakan", "Taluka": "Khed", "District": "Pune", "Category": "OBC-NT", "Family Income": 125784, "Marks %": 63.0, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 428525877790043, "IFSC": "CNRB0V1WUHM", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 215, "Naam": "Divya Nikam", "Pita ka naam": "Thomas Nikam", "DOB": "04-02-2015", "Umar": 11, "Mob": "+91 84878 68100", "Alt Contact": "divya_nikam@rediffmail.com", "Aadhar No": "9268 4025 1556", "School": "Vidya Mandir High School, Kesnand", "Gaon": "Kesnand", "Taluka": "Khed", "District": "Pune", "Category": "NT", "Family Income": 165882, "Marks %": 69.9, "Status": "Approved", "Remarks": "Follow up with Shakuntala Waghmare at +91 84776 53339.", "col_17": 60449658165, "IFSC": "PUNB0NPU3I9", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 216, "Naam": "Rajwinder", "Pita ka naam": "Manoj Gadhave", "DOB": "11-05-2014", "Umar": 12, "Mob": "9691349922", "Alt Contact": "rajwinder_kumar@yahoo.in", "Aadhar No": "5162 8805 2990", "School": "Municipal School, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 53324, "Marks %": 88.3, "Status": "Pending", "Remarks": "Spoke to Baljeet George's mother, call 061134-31104 for update.", "col_17": 488269516058957, "IFSC": "CNRB01P3W1I", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 217, "Naam": "Sakina Ansari", "Pita ka naam": "Pradeep Ansari", "DOB": "17-05-2014", "Umar": 12, "Mob": "9666805864", "Alt Contact": "078013-06340", "Aadhar No": "389278745960", "School": "Government Middle School, Chandwara", "Gaon": "Chandwara", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 245818, "Marks %": 69.3, "Status": "Pending", "Remarks": "Follow up with G. T. Iyengar at +91 73061 49539.", "col_17": 100784733560004, "IFSC": "BARB0WP3YYV", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 218, "Naam": "ROHIT IYER", "Pita ka naam": "Dattatray Iyer", "DOB": "06-04-2014", "Umar": 12, "Mob": "071423-48287", "Alt Contact": "rohitiye885@gmail.com", "Aadhar No": "5374 7258 9513", "School": "New English School, Uruli Kanchan", "Gaon": "Uruli Kanchan", "Taluka": "Junnar", "District": "Pune", "Category": "OBC-NT", "Family Income": 70733, "Marks %": 68.2, "Status": "Rejected", "Remarks": "Family shifted house, new contact person Baban Kulkarni (066366-58720).", "col_17": 45622264347636, "IFSC": "UBIN0A4ZMAM", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 219, "Naam": "Pratibha", "Pita ka naam": "MANPREET PANDEY", "DOB": "06-01-2016", "Umar": 10, "Mob": "+91 95082 86215", "Alt Contact": "pratibhasin47@outlook.com", "Aadhar No": "7232 2853 7582", "School": "Municipal School, Uruli Kanchan", "Gaon": "Uruli Kanchan", "Taluka": "Junnar", "District": "Pune", "Category": "VJNT", "Family Income": 101262, "Marks %": 74.0, "Status": "Disbursed", "Remarks": "Caste certificate under verification.", "col_17": 9052660083869, "IFSC": "BARB08UJ414", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 220, "Naam": "Ayesha", "Pita ka naam": "Xavier", "DOB": "09-11-2005", "Umar": 20, "Mob": "7112307630", "Alt Contact": "+91 80890 51469", "Aadhar No": "6678 6954 3931", "School": "New English School, Talegaon Dhamdhere", "Gaon": "Talegaon Dhamdhere", "Taluka": "Junnar", "District": "Pune", "Category": "OBC", "Family Income": 124848, "Marks %": 80.1, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 71601316798676, "IFSC": "ICIC0W2S7CR", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 221, "Naam": "nitin dsouza", "Pita ka naam": "NASIR QURESHI", "DOB": "03-07-2005", "Umar": 21, "Mob": "+91 88738 24276", "Alt Contact": "066205-05033", "Aadhar No": "3610 0760 8436", "School": "Adarsh Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "SC", "Family Income": 230683, "Marks %": 77.6, "Status": "Pending", "Remarks": "Waiting for bank passbook copy.", "col_17": 4606190253531054, "IFSC": "HDFC0KZ51X9", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 222, "Naam": "Dinesh Menon", "Pita ka naam": "Aakash Menon", "DOB": "21-02-2004", "Umar": 22, "Mob": "8859689505", "Alt Contact": "dinesh_menon@yahoo.in", "Aadhar No": "2384 5057 1363", "School": "Municipal School, Chandwara", "Gaon": "Chandwara", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "SC", "Family Income": 36465, "Marks %": 36.5, "Status": "Approved", "Remarks": "Caste certificate under verification.", "col_17": 28732848309, "IFSC": "UBIN09VTBC1", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 223, "Naam": "RAJESH MORE", "Pita ka naam": "Namdev More", "DOB": "06-01-2010", "Umar": 16, "Mob": "077348-41827", "Alt Contact": "+91 76491 81842", "Aadhar No": "6071 0020 2240", "School": "Lokmanya Tilak Vidyalaya, Mahuar", "Gaon": "Mahuar", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC", "Family Income": 147501, "Marks %": 89.8, "Status": "Under Review", "Remarks": "Application complete, forwarded to district office.", "col_17": 665977233784199, "IFSC": "ICIC00O8FQE", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 224, "Naam": "Mary Mirza", "Pita ka naam": "Kiran Mirza", "DOB": "19-04-2011", "Umar": 15, "Mob": "095637-78539", "Alt Contact": "mary.mirza23@outlook.com", "Aadhar No": "316283790206", "School": "Saraswati Vidyalaya, Dobhi", "Gaon": "Dobhi", "Taluka": "Sherghati", "District": "Gaya", "Category": "VJNT", "Family Income": 67372, "Marks %": 84.4, "Status": "Approved", "Remarks": "Sunil Waghmare to submit updated income certificate, contact 089416-27090.", "col_17": 942140611728972, "IFSC": "IOBA0HO0VNW", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 225, "Naam": "Balasaheb Dubey", "Pita ka naam": "Kiran Dubey", "DOB": "04-08-2015", "Umar": 11, "Mob": "073006-02662", "Alt Contact": "063709-32510", "Aadhar No": "899254207447", "School": "Rashtriya Balika Vidyalaya, Talegaon Dhamdhere", "Gaon": "Talegaon Dhamdhere", "Taluka": "Mulshi", "District": "Pune", "Category": "SC", "Family Income": 235652, "Marks %": 73.1, "Status": "Under Review", "Remarks": "Case reviewed by committee, approved.", "col_17": 866010507745600, "IFSC": "PUNB0J6B3A1", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 226, "Naam": "sakina sheikh", "Pita ka naam": "Naveen Sheikh", "DOB": "29-03-2007", "Umar": 19, "Mob": "080343-61029", "Alt Contact": "sakinashe905@gmail.com", "Aadhar No": "3839 0243 5202", "School": "Zilla Parishad Primary School, Wadgaon", "Gaon": "Wadgaon", "Taluka": "Mulshi", "District": "Pune", "Category": "NT", "Family Income": 180965, "Marks %": 63.8, "Status": "Rejected", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 948332807825248, "IFSC": "IOBA0BPJWKP", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 227, "Naam": "Lakshmi Rodrigues", "Pita ka naam": "Krishna Rodrigues", "DOB": "09-02-2014", "Umar": 12, "Mob": "8521615647", "Alt Contact": "lakshmi.rodrigues91@outlook.com", "Aadhar No": "6850 9267 2325", "School": "Saraswati Vidyalaya, Manjari", "Gaon": "Manjari", "Taluka": "Haveli", "District": "Pune", "Category": "VJNT", "Family Income": 172584, "Marks %": 80.0, "Status": "Under Review", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 683782120342674, "IFSC": "IOBA0EVNTLU", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 228, "Naam": "Neha Yadav", "Pita ka naam": "Ismail Yadav", "DOB": "13-04-2008", "Umar": 18, "Mob": "073815-46277", "Alt Contact": "nehayad875@yahoo.in", "Aadhar No": "276276011568", "School": "Municipal School, Nanded Phata", "Gaon": "Nanded Phata", "Taluka": "Baramati", "District": "Pune", "Category": "OBC-NT", "Family Income": 128300, "Marks %": 41.8, "Status": "Rejected", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 21357167648, "IFSC": "SBIN0VRJDYS", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 229, "Naam": "manisha gupta", "Pita ka naam": "Suresh Gupta", "DOB": "01-03-2012", "Umar": 14, "Mob": "+91 85924 03813", "Alt Contact": "manishagup912@gmail.com", "Aadhar No": "512526220643", "School": "New English School, Bhor", "Gaon": "Bhor", "Taluka": "Mulshi", "District": "Pune", "Category": "NT", "Family Income": 247825, "Marks %": 88.2, "Status": "Approved", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 9521473965468541, "IFSC": "PUNB0LI75AP", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 230, "Naam": "rehana pereira", "Pita ka naam": "Anil Yadav", "DOB": "26-06-2007", "Umar": 19, "Mob": "9245455150", "Alt Contact": "rehana_pereira@outlook.com", "Aadhar No": "9840 4840 1877", "School": "Lokmanya Tilak Vidyalaya, Mahuar", "Gaon": "Mahuar", "Taluka": "Wazirganj", "District": "Gaya", "Category": "General", "Family Income": 60074, "Marks %": 63.8, "Status": "Under Review", "Remarks": "Follow up with Grace Joshi at +91 60811 25905.", "col_17": 55110687329, "IFSC": "MAHB0YZLZTM", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 231, "Naam": "baliram manjhi", "Pita ka naam": "Baljeet Manjhi", "DOB": "01-08-2013", "Umar": 13, "Mob": "098397-34269", "Alt Contact": "baliram_manjhi@gmail.com", "Aadhar No": "5760 6967 4509", "School": "Lokmanya Tilak Vidyalaya, Chakan", "Gaon": "Chakan", "Taluka": "Khed", "District": "Pune", "Category": "SC", "Family Income": 137119, "Marks %": 72.2, "Status": "Under Review", "Remarks": "Guardian George Harjeet confirmed enrollment.", "col_17": 248611486128, "IFSC": "CNRB0X63DC4", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 232, "Naam": "Mahesh", "Pita ka naam": "Mahesh Krishnan", "DOB": "01-08-2014", "Umar": 12, "Mob": "+91 91359 15640", "Alt Contact": "mahesh_krishnan@yahoo.in", "Aadhar No": "6806 4971 2047", "School": "Municipal School, Manjari", "Gaon": "Manjari", "Taluka": "Haveli", "District": "Pune", "Category": "SC", "Family Income": 142845, "Marks %": 93.6, "Status": "Disbursed", "Remarks": "Family shifted house, new contact person Mahesh Ansari (9341855160).", "col_17": 520376056322, "IFSC": "MAHB0J89GDL", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 233, "Naam": "Bhagat Anil", "Pita ka naam": "Baliram Bhagat", "DOB": "08-10-2004", "Umar": 21, "Mob": "7387256449", "Alt Contact": "anilbha72@outlook.com", "Aadhar No": "9583 5833 1637", "School": "Municipal School, Paroo", "Gaon": "Paroo", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "VJNT", "Family Income": 189290, "Marks %": 72.3, "Status": "Under Review", "Remarks": "Spoke to Aakash Kumar's mother, call 087628-05042 for update.", "col_17": 5108914805457197, "IFSC": "PUNB0YZ1VNW", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 234, "Naam": "Vimla Tiwari", "Pita ka naam": "Mukesh Chavan", "DOB": "09-12-2008", "Umar": 17, "Mob": "+91 83225 28178", "Alt Contact": "vimla.tiwari98@rediffmail.com", "Aadhar No": "491596632698", "School": "Zilla Parishad Primary School, Bishunpur", "Gaon": "Bishunpur", "Taluka": "Wazirganj", "District": "Gaya", "Category": "ST", "Family Income": 150800, "Marks %": 52.6, "Status": "Under Review", "Remarks": "Spoke to Sheikh Balasaheb's mother, call 092290-95262 for update.", "col_17": 8585324181349, "IFSC": "PUNB0ZUSDDO", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 235, "Naam": "Champa Kumar", "Pita ka naam": "Manpreet Kumar", "DOB": "12-10-2008", "Umar": 17, "Mob": "+91 99114 97936", "Alt Contact": "champa.kumar84@gmail.com", "Aadhar No": "3099 1078 7237", "School": "Sant Gadge Baba School, Manjari", "Gaon": "Manjari", "Taluka": "Haveli", "District": "Pune", "Category": "General", "Family Income": 196004, "Marks %": 39.3, "Status": "Rejected", "Remarks": "School has confirmed attendance record.", "col_17": 483480012999627, "IFSC": "UBIN0WPXMPE", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 236, "Naam": "Kamala Yadav", "Pita ka naam": "Krishna Yadav", "DOB": "18-01-2005", "Umar": 21, "Mob": "9012505388", "Alt Contact": "6147745046", "Aadhar No": "808918270620", "School": "Government Middle School, Chikhali", "Gaon": "Chikhali", "Taluka": "Haveli", "District": "Pune", "Category": "OBC", "Family Income": 159737, "Marks %": 92.0, "Status": "Disbursed", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 28105736564343, "IFSC": "CNRB04V1BXH", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 237, "Naam": "Shankar Thomas", "Pita ka naam": "Baliram Thomas", "DOB": "29-02-2008", "Umar": 18, "Mob": "+91 97440 61164", "Alt Contact": "shankartho821@rediffmail.com", "Aadhar No": "6459 3220 7226", "School": "Lokmanya Tilak Vidyalaya, Karpi", "Gaon": "Karpi", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC", "Family Income": 80029, "Marks %": 39.7, "Status": "Rejected", "Remarks": "Follow up with Ismail Naidu at 091116-54376.", "col_17": 519486151596, "IFSC": "HDFC0YEOK16", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 238, "Naam": "Stephen Pawar", "Pita ka naam": "zakir naidu", "DOB": "18-08-2005", "Umar": 21, "Mob": "075876-67166", "Alt Contact": "stephen_pawar@gmail.com", "Aadhar No": "362683834709", "School": "New English School, Karpi", "Gaon": "Karpi", "Taluka": "Tekari", "District": "Gaya", "Category": "VJNT", "Family Income": 149153, "Marks %": 89.6, "Status": "Rejected", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 31915846834559, "IFSC": "IOBA01GEWWB", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 239, "Naam": "N. N. Yadav", "Pita ka naam": "Francis Yadav", "DOB": "14-01-2014", "Umar": 12, "Mob": "8370989478", "Alt Contact": "vimlayad250@rediffmail.com", "Aadhar No": "455456444198", "School": "Vidya Mandir High School, Dehu", "Gaon": "Dehu", "Taluka": "Haveli", "District": "Pune", "Category": "SC", "Family Income": 160874, "Marks %": 62.2, "Status": "Approved", "Remarks": "Spoke to Aakash's mother, call 064329-08945 for update.", "col_17": 3417301880702, "IFSC": "ICIC01Z421E", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 240, "Naam": "Dagdu Bhoir", "Pita ka naam": "Verma Ismail", "DOB": "15-09-2008", "Umar": 17, "Mob": "084492-65839", "Alt Contact": "dagdu.bhoir75@gmail.com", "Aadhar No": "860762782557", "School": "Lokmanya Tilak Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 164177, "Marks %": 96.7, "Status": "Approved", "Remarks": "School has confirmed attendance record.", "col_17": 29505799627718, "IFSC": "SBIN0EFDWU0", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 241, "Naam": "Lakshmi Pillai", "Pita ka naam": "Hari Pillai", "DOB": "14-02-2012", "Umar": 14, "Mob": "9033603224", "Alt Contact": "066012-08352", "Aadhar No": "3821 0787 0158", "School": "Zilla Parishad Primary School, Deopur", "Gaon": "Deopur", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 39925, "Marks %": 37.2, "Status": "Rejected", "Remarks": "Caste certificate under verification.", "col_17": 659356366216738, "IFSC": "UBIN02V222S", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 242, "Naam": "Geeta Fernandes", "Pita ka naam": "Ashok Fernandes", "DOB": "29-05-2005", "Umar": 21, "Mob": "+91 69246 99384", "Alt Contact": "geetafer661@yahoo.in", "Aadhar No": "3101 2767 1033", "School": "Government Middle School, Chakan", "Gaon": "Chakan", "Taluka": "Junnar", "District": "Pune", "Category": "VJNT", "Family Income": 244666, "Marks %": 67.9, "Status": "Pending", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 1223282060406, "IFSC": "UTIB01VCRPO", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 243, "Naam": "Pandey Thomas", "Pita ka naam": "Suresh Pandey", "DOB": "16-07-2005", "Umar": 21, "Mob": "8018772419", "Alt Contact": "092254-81853", "Aadhar No": "606364816228", "School": "Municipal School, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 66474, "Marks %": 70.9, "Status": "Approved", "Remarks": "gurmeet shinde to submit updated income certificate, contact +91 77645 65080.", "col_17": 696132847627791, "IFSC": "IOBA0BT6JMS", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 244, "Naam": "Pooja", "Pita ka naam": "Shankar Bhosale", "DOB": "15-03-2011", "Umar": 15, "Mob": "8853302694", "Alt Contact": "poojabho354@rediffmail.com", "Aadhar No": "3041 7292 0897", "School": "Government Middle School, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "ST", "Family Income": 40757, "Marks %": 46.3, "Status": "Rejected", "Remarks": "Guardian Ansari Rahul confirmed enrollment.", "col_17": 292895291357, "IFSC": "BARB079FKHX", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 245, "Naam": "Mohan Waghmare", "Pita ka naam": "Bhaskar Waghmare", "DOB": "10-07-2009", "Umar": 17, "Mob": "+91 64598 48318", "Alt Contact": "mohan_waghmare@yahoo.in", "Aadhar No": "5943 2001 8336", "School": "Municipal School, Mahuar", "Gaon": "Mahuar", "Taluka": "Wazirganj", "District": "Gaya", "Category": "ST", "Family Income": 193713, "Marks %": 45.7, "Status": "Under Review", "Remarks": "Awaiting scholarship disbursal from state.", "col_17": 2231947445294, "IFSC": "BARB0DSJNWX", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 246, "Naam": "Suvarna Kadam", "Pita ka naam": "Baban Kadam", "DOB": "11-02-2004", "Umar": 22, "Mob": "6492836800", "Alt Contact": "+91 84050 69074", "Aadhar No": "695119547361", "School": "New English School, Harnaut Tola", "Gaon": "Harnaut Tola", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "SC", "Family Income": 166866, "Marks %": 37.0, "Status": "Disbursed", "Remarks": "Income certificate expired, renewal asked.", "col_17": 892495592140555, "IFSC": "UBIN0E6LX5M", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 247, "Naam": "B. O. Sayyed", "Pita ka naam": "W. M. Reddy", "DOB": "07-08-2004", "Umar": 22, "Mob": "065443-57892", "Alt Contact": "lilysay985@gmail.com", "Aadhar No": "959689353831", "School": "Zilla Parishad Primary School, Paroo", "Gaon": "Paroo", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 124653, "Marks %": 79.2, "Status": "Disbursed", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 24979131929, "IFSC": "MAHB0Y1ZBGN", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 248, "Naam": "Shinde Simran", "Pita ka naam": "Pankaj Jadhav", "DOB": "08-04-2009", "Umar": 17, "Mob": "096884-08332", "Alt Contact": "074712-53356", "Aadhar No": "4041 8901 4572", "School": "Municipal School, Deopur", "Gaon": "Deopur", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 213763, "Marks %": 48.2, "Status": "Pending", "Remarks": "Application complete, forwarded to district office.", "col_17": 2808077908811132, "IFSC": "UTIB0ZKLYT3", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 249, "Naam": "SUDHA PRASAD", "Pita ka naam": "Kiran Prasad", "DOB": "23-01-2011", "Umar": 15, "Mob": "076416-24622", "Alt Contact": "sudha_prasad@gmail.com", "Aadhar No": "282670292978", "School": "Zilla Parishad Primary School, Paroo", "Gaon": "Paroo", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "General", "Family Income": 195896, "Marks %": 83.5, "Status": "Under Review", "Remarks": "Marksheet not attested by school.", "col_17": 1379938168331616, "IFSC": "CNRB0VZ7WEH", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 250, "Naam": "Navjot", "Pita ka naam": "Jaspreet Thakur", "DOB": "03-07-2005", "Umar": 21, "Mob": "6156415898", "Alt Contact": "062052-43703", "Aadhar No": "9764 4405 5354", "School": "Rashtriya Balika Vidyalaya, Basaith", "Gaon": "Basaith", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "VJNT", "Family Income": 47493, "Marks %": 64.4, "Status": "Disbursed", "Remarks": "Spoke to SHEELA FERNANDES's mother, call +91 87940 76832 for update.", "col_17": 78865601093912, "IFSC": "PUNB00WTWS2", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 251, "Naam": "Mohan", "Pita ka naam": "Vijay Kadam", "DOB": "23-10-2009", "Umar": 16, "Mob": "+91 74347 25392", "Alt Contact": "mohankad341@outlook.com", "Aadhar No": "7707 2603 6208", "School": "Municipal School, Chikhali", "Gaon": "Chikhali", "Taluka": "Mulshi", "District": "Pune", "Category": "VJNT", "Family Income": 117026, "Marks %": 36.1, "Status": "Rejected", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 97324607580075, "IFSC": "HDFC07OCC1T", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 252, "Naam": "Vimla Deshpande", "Pita ka naam": "Jadhav Aslam", "DOB": "07-06-2005", "Umar": 21, "Mob": "+91 96452 84497", "Alt Contact": "+91 89919 32662", "Aadhar No": "535417718773", "School": "Zilla Parishad Primary School, Harnaut Tola", "Gaon": "Harnaut Tola", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "NT", "Family Income": 67582, "Marks %": 82.3, "Status": "Pending", "Remarks": "Application complete, forwarded to district office.", "col_17": 424907950795009, "IFSC": "UBIN006OM19", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 253, "Naam": "B. U. Yadav", "Pita ka naam": "tukaram gill", "DOB": "08-10-2008", "Umar": 17, "Mob": "078555-84993", "Alt Contact": "rekha_yadav@outlook.com", "Aadhar No": "660132095156", "School": "Lokmanya Tilak Vidyalaya, Rampur", "Gaon": "Rampur", "Taluka": "Tekari", "District": "Gaya", "Category": "NT", "Family Income": 36090, "Marks %": 59.1, "Status": "Under Review", "Remarks": "Marksheet not attested by school.", "col_17": 2296269264727022, "IFSC": "UTIB0CHRDFI", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 254, "Naam": "INDIRA KUMAR", "Pita ka naam": "Eknath Kumar", "DOB": "19-05-2007", "Umar": 19, "Mob": "7986664166", "Alt Contact": "indira_kumar@rediffmail.com", "Aadhar No": "4165 3417 1599", "School": "Adarsh Vidyalaya, Amawan", "Gaon": "Amawan", "Taluka": "Belaganj", "District": "Gaya", "Category": "ST", "Family Income": 172972, "Marks %": 64.7, "Status": "Pending", "Remarks": "School has confirmed attendance record.", "col_17": 443844805218835, "IFSC": "UBIN00VH5LO", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 255, "Naam": "Hari More", "Pita ka naam": "Salman More", "DOB": "17-10-2013", "Umar": 12, "Mob": "8148304509", "Alt Contact": "harimor568@gmail.com", "Aadhar No": "3031 8632 4492", "School": "Rashtriya Balika Vidyalaya, Kalyanpur", "Gaon": "Kalyanpur", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "General", "Family Income": 113220, "Marks %": 64.7, "Status": "Disbursed", "Remarks": "Application complete, forwarded to district office.", "col_17": 33729753554, "IFSC": "UBIN0VC6BO3", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 256, "Naam": "ramesh kaur", "Pita ka naam": "Gopal Kaur", "DOB": "05-09-2003", "Umar": 22, "Mob": "+91 75925 38040", "Alt Contact": "+91 92792 20892", "Aadhar No": "8020 3103 6006", "School": "Lokmanya Tilak Vidyalaya, Chandwara", "Gaon": "Chandwara", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 183457, "Marks %": 50.5, "Status": "Under Review", "Remarks": "Income certificate expired, renewal asked.", "col_17": 90807137918, "IFSC": "UBIN03OVWE3", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 257, "Naam": "sanjay sidhu", "Pita ka naam": "Raju Sidhu", "DOB": "04-04-2010", "Umar": 16, "Mob": "085378-39587", "Alt Contact": "sanjay_sidhu@gmail.com", "Aadhar No": "850906527142", "School": "Saraswati Vidyalaya, Devipur", "Gaon": "Devipur", "Taluka": "Belaganj", "District": "Gaya", "Category": "General", "Family Income": 117581, "Marks %": 63.9, "Status": "Approved", "Remarks": "Family shifted house, new contact person KIRAN CHANDRA (7960915614).", "col_17": 711506594296, "IFSC": "IOBA0F6FMJ2", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 258, "Naam": "Tukaram Deshpande", "Pita ka naam": "Nasir Deshpande", "DOB": "09-02-2009", "Umar": 17, "Mob": "+91 73211 06987", "Alt Contact": "tukaramdes905@rediffmail.com", "Aadhar No": "685077826917", "School": "Municipal School, Bhor", "Gaon": "Bhor", "Taluka": "Mulshi", "District": "Pune", "Category": "OBC-NT", "Family Income": 183179, "Marks %": 93.1, "Status": "Pending", "Remarks": "Follow up with Pradeep at 7456766402.", "col_17": 99433043528, "IFSC": "IOBA0KDYMI5", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 259, "Naam": "Kalpana Gill", "Pita ka naam": "Vasant Gill", "DOB": "05-08-2006", "Umar": 20, "Mob": "+91 81872 40637", "Alt Contact": "kalpanagil74@yahoo.in", "Aadhar No": "4367 9538 9438", "School": "Saraswati Vidyalaya, Karpi", "Gaon": "Karpi", "Taluka": "Wazirganj", "District": "Gaya", "Category": "NT", "Family Income": 240821, "Marks %": 63.1, "Status": "Under Review", "Remarks": "Photo missing from file, requested again.", "col_17": 887072287305536, "IFSC": "ICIC0WB3OOP", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 260, "Naam": "Baljeet Rai", "Pita ka naam": "Bapu Rai", "DOB": "20-02-2009", "Umar": 17, "Mob": "095123-52159", "Alt Contact": "083611-65869", "Aadhar No": "5530 2494 2749", "School": "Adarsh Vidyalaya, Amawan", "Gaon": "Amawan", "Taluka": "Konch", "District": "Gaya", "Category": "SC", "Family Income": 64782, "Marks %": 92.0, "Status": "Rejected", "Remarks": "Follow up with K. P. Naidu at 9616502704.", "col_17": 80568459150, "IFSC": "UTIB0OEP2NY", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 261, "Naam": "Sita More", "Pita ka naam": "Fernandez Amit", "DOB": "07-02-2009", "Umar": 17, "Mob": "081138-14180", "Alt Contact": "091678-55368", "Aadhar No": "689251983981", "School": "New English School, Kadus", "Gaon": "Kadus", "Taluka": "Baramati", "District": "Pune", "Category": "General", "Family Income": 113245, "Marks %": 82.9, "Status": "Approved", "Remarks": "Kalpana Pawar to submit updated income certificate, contact +91 73722 17651.", "col_17": 940356728796, "IFSC": "CNRB0VFEHUG", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 262, "Naam": "Shobha", "Pita ka naam": "Zakir Sidhu", "DOB": "16-02-2013", "Umar": 13, "Mob": "7251197556", "Alt Contact": "shobha.sidhu4@gmail.com", "Aadhar No": "524390413094", "School": "Government Middle School, Chandwara", "Gaon": "Chandwara", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "ST", "Family Income": 100200, "Marks %": 53.6, "Status": "Approved", "Remarks": "Spoke to parvati dhillon's mother, call +91 97333 32775 for update.", "col_17": 2005121987287, "IFSC": "BARB0Y62639", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 263, "Naam": "Mangala", "Pita ka naam": "Baliram Yadav", "DOB": "28-11-2007", "Umar": 18, "Mob": "9535692102", "Alt Contact": "mangalayad274@rediffmail.com", "Aadhar No": "609748484564", "School": "Vidya Mandir High School, Deopur", "Gaon": "Deopur", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "SC", "Family Income": 143056, "Marks %": 85.9, "Status": "Under Review", "Remarks": "Caste certificate under verification.", "col_17": 703411077965603, "IFSC": "ICIC0R202MD", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 264, "Naam": "Vikram Mathew", "Pita ka naam": "Zakir Mathew", "DOB": "21-03-2011", "Umar": 15, "Mob": "+91 68136 37898", "Alt Contact": "vikrammat664@gmail.com", "Aadhar No": "784196931483", "School": "Government Middle School, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "SC", "Family Income": 94940, "Marks %": 90.4, "Status": "Approved", "Remarks": "Follow up with Padma Mane at +91 98082 81867.", "col_17": 5590301177128330, "IFSC": "MAHB0NE2OGT", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 265, "Naam": "Ayesha Kaur", "Pita ka naam": "Yashwant Kaur", "DOB": "04-06-2014", "Umar": 12, "Mob": "094360-93317", "Alt Contact": "+91 71817 25457", "Aadhar No": "9441 8017 1489", "School": "Government Middle School, Chakan", "Gaon": "Chakan", "Taluka": "Khed", "District": "Pune", "Category": "OBC-NT", "Family Income": 243801, "Marks %": 91.9, "Status": "Disbursed", "Remarks": "Caste certificate under verification.", "col_17": 5742805336046662, "IFSC": "CNRB0ZT3R66", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 266, "Naam": "Popat Chougule", "Pita ka naam": "Ramesh Chougule", "DOB": "25-04-2012", "Umar": 14, "Mob": "+91 61907 86740", "Alt Contact": "+91 64370 65415", "Aadhar No": "7275 8763 5493", "School": "Vidya Mandir High School, Kalyanpur", "Gaon": "Kalyanpur", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 171018, "Marks %": 80.0, "Status": "Under Review", "Remarks": "Caste certificate under verification.", "col_17": 3584864782674, "IFSC": "UBIN07JWDUP", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 267, "Naam": "RAKESH MANE", "Pita ka naam": "salman iyengar", "DOB": "09-01-2005", "Umar": 21, "Mob": "6990575161", "Alt Contact": "rakesh_mane@yahoo.in", "Aadhar No": "8443 1807 6411", "School": "Adarsh Vidyalaya, Bariarpur", "Gaon": "Bariarpur", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "VJNT", "Family Income": 55117, "Marks %": 68.6, "Status": "Rejected", "Remarks": "Dagdu Singh to submit updated income certificate, contact 086198-48693.", "col_17": 1630212259145, "IFSC": "MAHB0688SSR", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 268, "Naam": "sunita mishra", "Pita ka naam": "Ismail George", "DOB": "08-01-2010", "Umar": 16, "Mob": "076446-02531", "Alt Contact": "sunita.mishra56@gmail.com", "Aadhar No": "485358865532", "School": "Sant Gadge Baba School, Fatehpur", "Gaon": "Fatehpur", "Taluka": "Tekari", "District": "Gaya", "Category": "OBC-NT", "Family Income": 238137, "Marks %": 86.3, "Status": "Under Review", "Remarks": "Spoke to Shankar Deshmukh's mother, call 8007898669 for update.", "col_17": 1561795638133, "IFSC": "IOBA01RC27X", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 269, "Naam": "C. K. Iyer", "Pita ka naam": "Dagdu Iyer", "DOB": "08-01-2008", "Umar": 18, "Mob": "+91 75598 94447", "Alt Contact": "6694076994", "Aadhar No": "6691 2464 2288", "School": "Sant Gadge Baba School, Kalyanpur", "Gaon": "Kalyanpur", "Taluka": "Musahri", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 68427, "Marks %": 49.8, "Status": "Rejected", "Remarks": "Marksheet not attested by school.", "col_17": 4285016635352167, "IFSC": "CNRB099J4WD", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 270, "Naam": "Deshpande Divya", "Pita ka naam": "Ayub Deshpande", "DOB": "04-11-2008", "Umar": 17, "Mob": "+91 71530 30690", "Alt Contact": "divya_deshpande@rediffmail.com", "Aadhar No": "7177 4779 0970", "School": "Sant Gadge Baba School, Guraru", "Gaon": "Guraru", "Taluka": "Sherghati", "District": "Gaya", "Category": "OBC-NT", "Family Income": 58406, "Marks %": 88.9, "Status": "Under Review", "Remarks": "School has confirmed attendance record.", "col_17": 833670292884427, "IFSC": "IOBA05ZJO9M", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 271, "Naam": "Shobha Shinde", "Pita ka naam": "Vijay Shinde", "DOB": "29-03-2012", "Umar": 14, "Mob": "9502527189", "Alt Contact": "6697435953", "Aadhar No": "670789402848", "School": "Saraswati Vidyalaya, Deopur", "Gaon": "Deopur", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "OBC", "Family Income": 36500, "Marks %": 51.5, "Status": "Rejected", "Remarks": "Documents pending verification.", "col_17": 7949804261976, "IFSC": "CNRB04SL4Y8", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 272, "Naam": "Anita Chettiar", "Pita ka naam": "Thomas Chettiar", "DOB": "05-11-2011", "Umar": 14, "Mob": "084459-75480", "Alt Contact": "anita.chettiar96@outlook.com", "Aadhar No": "8283 6565 4542", "School": "Saraswati Vidyalaya, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "NT", "Family Income": 224187, "Marks %": 86.5, "Status": "Rejected", "Remarks": "Waiting for bank passbook copy.", "col_17": 57582475896658, "IFSC": "UBIN01SUCPU", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 273, "Naam": "vasant deshpande", "Pita ka naam": "Dattatray Deshpande", "DOB": "23-03-2013", "Umar": 13, "Mob": "082901-66851", "Alt Contact": "vasantdes147@gmail.com", "Aadhar No": "5407 7931 1222", "School": "Lokmanya Tilak Vidyalaya, Imamganj", "Gaon": "Imamganj", "Taluka": "Konch", "District": "Gaya", "Category": "OBC", "Family Income": 16192, "Marks %": 81.8, "Status": "Pending", "Remarks": "Family shifted house, new contact person Pankaj Sharma (084717-80642).", "col_17": 758493126702127, "IFSC": "UTIB0OC08SC", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 274, "Naam": "U. X. Sheikh", "Pita ka naam": "Gurmeet Sheikh", "DOB": "09-11-2007", "Umar": 18, "Mob": "6811563565", "Alt Contact": "mohan_sheikh@yahoo.in", "Aadhar No": "874575264129", "School": "Adarsh Vidyalaya, Bhor", "Gaon": "Bhor", "Taluka": "Mulshi", "District": "Pune", "Category": "SC", "Family Income": 177298, "Marks %": 89.0, "Status": "Approved", "Remarks": "School has confirmed attendance record.", "col_17": 310248041525345, "IFSC": "BARB01TOWHP", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 275, "Naam": "Amit Pereira", "Pita ka naam": "Kiran Bajwa", "DOB": "11-03-2016", "Umar": 10, "Mob": "+91 67255 90417", "Alt Contact": "+91 81711 83750", "Aadhar No": "9927 8504 6244", "School": "New English School, Bhor", "Gaon": "Bhor", "Taluka": "Baramati", "District": "Pune", "Category": "ST", "Family Income": 224307, "Marks %": 39.8, "Status": "Pending", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 180121350206, "IFSC": "HDFC0DQVYMI", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 276, "Naam": "Namdev Waghmare", "Pita ka naam": "Dattatray Waghmare", "DOB": "31-01-2005", "Umar": 21, "Mob": "6333636059", "Alt Contact": "099523-49678", "Aadhar No": "924278821463", "School": "Rashtriya Balika Vidyalaya, Kadus", "Gaon": "Kadus", "Taluka": "Junnar", "District": "Pune", "Category": "ST", "Family Income": 121584, "Marks %": 69.0, "Status": "Under Review", "Remarks": "Irfan Sharma to submit updated income certificate, contact +91 89731 14660.", "col_17": 821706890497, "IFSC": "UBIN0Z84ONF", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 277, "Naam": "Shivaji Kale", "Pita ka naam": "Bhaskar Kale", "DOB": "30-09-2003", "Umar": 22, "Mob": "080735-28989", "Alt Contact": "+91 80679 92379", "Aadhar No": "326356683052", "School": "Adarsh Vidyalaya, Devipur", "Gaon": "Devipur", "Taluka": "Belaganj", "District": "Gaya", "Category": "SC", "Family Income": 85052, "Marks %": 87.8, "Status": "Disbursed", "Remarks": "Documents pending verification.", "col_17": 2789342669407, "IFSC": "PUNB0FYIYUB", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 278, "Naam": "Mane Champa", "Pita ka naam": "Baljeet Mane", "DOB": "15-02-2011", "Umar": 15, "Mob": "6981757650", "Alt Contact": "champaman827@yahoo.in", "Aadhar No": "986378703521", "School": "New English School, Imamganj", "Gaon": "Imamganj", "Taluka": "Wazirganj", "District": "Gaya", "Category": "ST", "Family Income": 196549, "Marks %": 43.8, "Status": "Rejected", "Remarks": "Photo missing from file, requested again.", "col_17": 83239447954, "IFSC": "PUNB0RFZ63D", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 279, "Naam": "Ayub Dubey", "Pita ka naam": "Santosh Chougule", "DOB": "05-02-2014", "Umar": 12, "Mob": "073115-07925", "Alt Contact": "ayubdub566@rediffmail.com", "Aadhar No": "745666173561", "School": "Government Middle School, Harnaut Tola", "Gaon": "Harnaut Tola", "Taluka": "Bochaha", "District": "Muzaffarpur", "Category": "NT", "Family Income": 111675, "Marks %": 51.9, "Status": "Disbursed", "Remarks": "Income certificate expired, renewal asked.", "col_17": 62543364530462, "IFSC": "HDFC0GO4IZP", "Name of scheme": "Pre-Matric Scholarship Scheme"}, {"Sr No": 280, "Naam": "S. U. Kumar", "Pita ka naam": "Mukesh Kumar", "DOB": "09-01-2014", "Umar": 12, "Mob": "084904-11771", "Alt Contact": "rosy_kumar@gmail.com", "Aadhar No": "603108514077", "School": "Zilla Parishad Primary School, Bhor", "Gaon": "Bhor", "Taluka": "Haveli", "District": "Pune", "Category": "OBC-NT", "Family Income": 55502, "Marks %": 77.1, "Status": "Under Review", "Remarks": "Income certificate expired, renewal asked.", "col_17": 284054542425, "IFSC": "UTIB0UNR217", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 281, "Naam": "rosy gill", "Pita ka naam": "Shankar Gill", "DOB": "20-04-2015", "Umar": 11, "Mob": "065011-17443", "Alt Contact": "rosy_gill@outlook.com", "Aadhar No": "515718793689", "School": "Adarsh Vidyalaya, Imamganj", "Gaon": "Imamganj", "Taluka": "Belaganj", "District": "Gaya", "Category": "OBC", "Family Income": 158992, "Marks %": 62.5, "Status": "Disbursed", "Remarks": "Guardian L. H. Dubey confirmed enrollment.", "col_17": 3251835525909, "IFSC": "MAHB0CNBORY", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 282, "Naam": "Shabana DSouza", "Pita ka naam": "Baliram DSouza", "DOB": "02-03-2006", "Umar": 20, "Mob": "074896-22302", "Alt Contact": "shabana.dsouza41@gmail.com", "Aadhar No": "400053109730", "School": "Zilla Parishad Primary School, Kesnand", "Gaon": "Kesnand", "Taluka": "Junnar", "District": "Pune", "Category": "OBC", "Family Income": 180258, "Marks %": 59.4, "Status": "Pending", "Remarks": "Case reviewed by committee, approved.", "col_17": 148332433400, "IFSC": "CNRB062N5VK", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 283, "Naam": "Bhaskar Bhagat", "Pita ka naam": "Vikram Bhagat", "DOB": "20-12-2010", "Umar": 15, "Mob": "096705-01625", "Alt Contact": "+91 97002 29072", "Aadhar No": "4453 9125 3133", "School": "Zilla Parishad Primary School, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "General", "Family Income": 113626, "Marks %": 36.1, "Status": "Pending", "Remarks": "Caste certificate under verification.", "col_17": 803320723867715, "IFSC": "MAHB0HGKXQJ", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 284, "Naam": "amina chavan", "Pita ka naam": "Vishal Chavan", "DOB": "30-09-2011", "Umar": 14, "Mob": "7222778180", "Alt Contact": "8591271047", "Aadhar No": "405323899832", "School": "New English School, Imamganj", "Gaon": "Imamganj", "Taluka": "Belaganj", "District": "Gaya", "Category": "General", "Family Income": 166094, "Marks %": 69.3, "Status": "Pending", "Remarks": "Follow up with nirmala iyer at 8460011674.", "col_17": 1369213051699, "IFSC": "SBIN09FAXCK", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 285, "Naam": "Thakur Rukhsana", "Pita ka naam": "Ravi Tiwari", "DOB": "23-07-2012", "Umar": 14, "Mob": "+91 98248 17345", "Alt Contact": "+91 87719 27541", "Aadhar No": "4278 8941 1348", "School": "Vidya Mandir High School, Fatehpur", "Gaon": "Fatehpur", "Taluka": "Belaganj", "District": "Gaya", "Category": "ST", "Family Income": 129432, "Marks %": 69.5, "Status": "Approved", "Remarks": "Marksheet not attested by school.", "col_17": 4576780134860077, "IFSC": "UTIB08QR272", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 286, "Naam": "GOPAL KRISHNAN", "Pita ka naam": "Vasant Verma", "DOB": "18-05-2015", "Umar": 11, "Mob": "8572883517", "Alt Contact": "8321208760", "Aadhar No": "620935994679", "School": "Municipal School, Basaith", "Gaon": "Basaith", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "NT", "Family Income": 124603, "Marks %": 68.1, "Status": "Rejected", "Remarks": "Marksheet not attested by school.", "col_17": 515831686163, "IFSC": "HDFC0SGPBLZ", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 287, "Naam": "A. F. DSouza", "Pita ka naam": "Rakesh DSouza", "DOB": "08-04-2005", "Umar": 21, "Mob": "087439-85053", "Alt Contact": "vimla_dsouza@rediffmail.com", "Aadhar No": "7116 5100 2683", "School": "Lokmanya Tilak Vidyalaya, Deopur", "Gaon": "Deopur", "Taluka": "Kanti", "District": "Muzaffarpur", "Category": "SC", "Family Income": 174137, "Marks %": 58.5, "Status": "Approved", "Remarks": "Family shifted house, new contact person Parvati Patil (+91 86037 13167).", "col_17": 15046791778, "IFSC": "SBIN0JWIXYU", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 288, "Naam": "Nasir Chougule", "Pita ka naam": "Manpreet Chougule", "DOB": "18-08-2015", "Umar": 11, "Mob": "095522-22612", "Alt Contact": "nasircho536@yahoo.in", "Aadhar No": "287998536376", "School": "Rashtriya Balika Vidyalaya, Motipur", "Gaon": "Motipur", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "SC", "Family Income": 41068, "Marks %": 70.1, "Status": "Approved", "Remarks": "Caste certificate under verification.", "col_17": 5778706012449127, "IFSC": "UTIB0W0EN18", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 289, "Naam": "Manisha Fernandez", "Pita ka naam": "Umesh Fernandez", "DOB": "08-01-2010", "Umar": 16, "Mob": "+91 90333 67655", "Alt Contact": "manisha.fernandez2@gmail.com", "Aadhar No": "3656 7938 8779", "School": "Municipal School, Paroo", "Gaon": "Paroo", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "General", "Family Income": 78777, "Marks %": 50.6, "Status": "Under Review", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 726568509766, "IFSC": "SBIN0J6NUWF", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 290, "Naam": "MOHAN SIDDIQUI", "Pita ka naam": "Eknath Siddiqui", "DOB": "29-08-2009", "Umar": 16, "Mob": "067638-76681", "Alt Contact": "mohan.siddiqui17@gmail.com", "Aadhar No": "8235 4830 4212", "School": "Saraswati Vidyalaya, Nanded Phata", "Gaon": "Nanded Phata", "Taluka": "Baramati", "District": "Pune", "Category": "OBC-NT", "Family Income": 177280, "Marks %": 91.6, "Status": "Pending", "Remarks": "School has confirmed attendance record.", "col_17": 86846476138475, "IFSC": "HDFC0VX2RI9", "Name of scheme": "Minority Welfare Scholarship"}, {"Sr No": 291, "Naam": "kavya george", "Pita ka naam": "Naveen Kushwaha", "DOB": "13-09-2009", "Umar": 16, "Mob": "6579774608", "Alt Contact": "8523042925", "Aadhar No": "265409027817", "School": "Lokmanya Tilak Vidyalaya, Dobhi", "Gaon": "Dobhi", "Taluka": "Konch", "District": "Gaya", "Category": "General", "Family Income": 85975, "Marks %": 46.7, "Status": "Under Review", "Remarks": "Documents pending verification.", "col_17": 85495010860754, "IFSC": "BARB0H90UPN", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 292, "Naam": "Baban Rodrigues", "Pita ka naam": "Aslam Rodrigues", "DOB": "31-05-2005", "Umar": 21, "Mob": "076544-05144", "Alt Contact": "baban.rodrigues98@rediffmail.com", "Aadhar No": "751450923487", "School": "Saraswati Vidyalaya, Basaith", "Gaon": "Basaith", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "General", "Family Income": 134927, "Marks %": 67.3, "Status": "Pending", "Remarks": "Follow up with Ravi Mathew at 075487-48971.", "col_17": 576798305522438, "IFSC": "SBIN0DYOKCN", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 293, "Naam": "Baliram Reddy", "Pita ka naam": "Yashwant Reddy", "DOB": "14-04-2011", "Umar": 15, "Mob": "+91 85755 85527", "Alt Contact": "baliram_reddy@gmail.com", "Aadhar No": "918135312995", "School": "Saraswati Vidyalaya, Rampur Sokho", "Gaon": "Rampur Sokho", "Taluka": "Sakra", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 25063, "Marks %": 90.1, "Status": "Pending", "Remarks": "H. U. Gill to submit updated income certificate, contact 094824-49887.", "col_17": 52570189447557, "IFSC": "PUNB0VK4JVI", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 294, "Naam": "Bhagyashree DSouza", "Pita ka naam": "Nitin DSouza", "DOB": "04-12-2008", "Umar": 17, "Mob": "070493-33831", "Alt Contact": "bhagyashree.dsouza40@gmail.com", "Aadhar No": "9094 0147 8424", "School": "Rashtriya Balika Vidyalaya, Sahebganj", "Gaon": "Sahebganj", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "NT", "Family Income": 44194, "Marks %": 73.6, "Status": "Under Review", "Remarks": "Family shifted house, new contact person Ravi (8897238696).", "col_17": 149547014690660, "IFSC": "IOBA0MCAAFF", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 295, "Naam": "Bhaskar Menon", "Pita ka naam": "Bhaskar Kumar", "DOB": "29-08-2014", "Umar": 11, "Mob": "8635357119", "Alt Contact": "bhaskar.menon51@rediffmail.com", "Aadhar No": "935007411714", "School": "Rashtriya Balika Vidyalaya, Alandi", "Gaon": "Alandi", "Taluka": "Junnar", "District": "Pune", "Category": "VJNT", "Family Income": 31538, "Marks %": 42.4, "Status": "Under Review", "Remarks": "School has confirmed attendance record.", "col_17": 525089937532, "IFSC": "HDFC016PSUZ", "Name of scheme": "Rajarshi Shahu Maharaj Scholarship"}, {"Sr No": 296, "Naam": "Bapu Ansari", "Pita ka naam": "Eknath Ansari", "DOB": "26-07-2008", "Umar": 18, "Mob": "068109-53558", "Alt Contact": "bapu_ansari@gmail.com", "Aadhar No": "377559289740", "School": "Zilla Parishad Primary School, Basaith", "Gaon": "Basaith", "Taluka": "Kurhani", "District": "Muzaffarpur", "Category": "OBC-NT", "Family Income": 157451, "Marks %": 69.5, "Status": "Under Review", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 6761232709976, "IFSC": "MAHB0YN3RVZ", "Name of scheme": "Merit-cum-Means Scholarship"}, {"Sr No": 297, "Naam": "M. I. Gill", "Pita ka naam": "Dinesh Sidhu", "DOB": "13-10-2007", "Umar": 18, "Mob": "+91 82588 74709", "Alt Contact": "+91 70710 31904", "Aadhar No": "387453333101", "School": "Lokmanya Tilak Vidyalaya, Chandpur", "Gaon": "Chandpur", "Taluka": "Belaganj", "District": "Gaya", "Category": "ST", "Family Income": 115120, "Marks %": 75.0, "Status": "Approved", "Remarks": "Ayesha Deshpande to submit updated income certificate, contact +91 87554 49673.", "col_17": 34824279736, "IFSC": "PUNB0BK29ZN", "Name of scheme": "Post-Matric Scholarship Scheme"}, {"Sr No": 298, "Naam": "Baban Gill", "Pita ka naam": "Rajesh Gill", "DOB": "22-10-2007", "Umar": 18, "Mob": "068451-92467", "Alt Contact": "babangil328@gmail.com", "Aadhar No": "855005728267", "School": "New English School, Dehu", "Gaon": "Dehu", "Taluka": "Mulshi", "District": "Pune", "Category": "ST", "Family Income": 95376, "Marks %": 63.1, "Status": "Disbursed", "Remarks": "Duplicate application, merged with earlier record.", "col_17": 7166543249943587, "IFSC": "UBIN0LBFD9Q", "Name of scheme": "EBC Scholarship Scheme"}, {"Sr No": 299, "Naam": "Priyanka Pillai", "Pita ka naam": "Mahesh Pillai", "DOB": "11-03-2015", "Umar": 11, "Mob": "7324987760", "Alt Contact": "099378-07598", "Aadhar No": "2533 8073 3058", "School": "Zilla Parishad Primary School, Saswad", "Gaon": "Saswad", "Taluka": "Khed", "District": "Pune", "Category": "NT", "Family Income": 60282, "Marks %": 85.9, "Status": "Rejected", "Remarks": "Sarojini Krishnan to submit updated income certificate, contact 085585-37101.", "col_17": 46447557499, "IFSC": "BARB0TSTL8Q", "Name of scheme": "Savitribai Phule Scholarship"}, {"Sr No": 300, "Naam": "Yashwant", "Pita ka naam": "Nasir Kaur", "DOB": "27-11-2009", "Umar": 16, "Mob": "+91 61270 62011", "Alt Contact": "062040-32154", "Aadhar No": "2757 1969 7970", "School": "Rashtriya Balika Vidyalaya, Ambegaon Budruk", "Gaon": "Ambegaon Budruk", "Taluka": "Baramati", "District": "Pune", "Category": "ST", "Family Income": 204349, "Marks %": 80.6, "Status": "Rejected", "Remarks": "Bank account details mismatch, resubmission needed.", "col_17": 50166614104, "IFSC": "SBIN0XMGP0T", "Name of scheme": "Minority Welfare Scholarship"}];
+
+const tooltip = document.getElementById('tooltip');
+
+function showTooltip(e, text) {
+  tooltip.innerHTML = text;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.pageX + 10) + 'px';
+  tooltip.style.top = (e.pageY + 10) + 'px';
+}
+
+function hideTooltip() {
+  tooltip.style.display = 'none';
+}
+
+function formatCurrency(val) {
+  if (isNaN(val) || val === null || val === undefined) return '₹0';
+  return '₹' + Math.round(val).toLocaleString('en-IN');
+}
+
+function formatNumber(val) {
+  if (isNaN(val) || val === null || val === undefined) return '0';
+  return Number(val).toLocaleString('en-IN');
+}
+
+// 1. Compute & Render KPIs
+function renderKPIs() {
+  const total = DATA.length;
+  let approvedCount = 0;
+  let totalMarks = 0;
+  let validMarksCount = 0;
+  let totalIncome = 0;
+  let validIncomeCount = 0;
+  const talukas = new Set();
+
+  DATA.forEach(row => {
+    const status = (row["Status"] || '').trim().toLowerCase();
+    if (status === 'approved' || status === 'sanctioned' || status === 'pass') {
+      approvedCount++;
+    }
+    const marks = Number(row["Marks %"]);
+    if (!isNaN(marks) && marks > 0) {
+      totalMarks += marks;
+      validMarksCount++;
+    }
+    const income = Number(row["Family Income"]);
+    if (!isNaN(income) && income >= 0) {
+      totalIncome += income;
+      validIncomeCount++;
+    }
+    if (row["Taluka"]) {
+      talukas.add(row["Taluka"].trim());
+    }
+  });
+
+  document.getElementById('kpi-total').innerText = formatNumber(total);
+  document.getElementById('kpi-approved').innerText = formatNumber(approvedCount);
+  const approvalRate = total > 0 ? ((approvedCount / total) * 100).toFixed(1) : '0';
+  document.getElementById('kpi-approval-rate').innerText = `${approvalRate}% approval rate`;
+  
+  const avgMarks = validMarksCount > 0 ? (totalMarks / validMarksCount).toFixed(2) : '0.00';
+  document.getElementById('kpi-avg-marks').innerText = `${avgMarks}%`;
+
+  const avgIncome = validIncomeCount > 0 ? totalIncome / validIncomeCount : 0;
+  document.getElementById('kpi-avg-income').innerText = formatCurrency(avgIncome);
+
+  document.getElementById('kpi-talukas').innerText = talukas.size;
+}
+
+// 2. Chart 1: Taluka Breakdown (Bar Chart)
+function renderTalukaChart() {
+  const container = document.getElementById('chart-taluka');
+  const counts = {};
+  DATA.forEach(d => {
+    const t = (d["Taluka"] || 'Unspecified').trim();
+    counts[t] = (counts[t] || 0) + 1;
+  });
+
+  const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+  if (sorted.length === 0) return;
+
+  const w = container.clientWidth || 600;
+  const h = 260;
+  const pad = { top: 20, right: 20, bottom: 40, left: 100 };
+  const maxVal = Math.max(...sorted.map(d => d[1]), 1);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+  const barH = Math.min(22, (h - pad.top - pad.bottom) / sorted.length - 6);
+  const slotH = (h - pad.top - pad.bottom) / sorted.length;
+
+  sorted.forEach((item, i) => {
+    const [name, count] = item;
+    const y = pad.top + i * slotH + (slotH - barH)/2;
+    const barW = ((w - pad.left - pad.right) * (count / maxVal));
+
+    // Label
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", pad.left - 10);
+    text.setAttribute("y", y + barH/2 + 4);
+    text.setAttribute("text-anchor", "end");
+    text.setAttribute("fill", "var(--text-secondary)");
+    text.setAttribute("font-size", "11px");
+    text.textContent = name.length > 14 ? name.substring(0, 12) + '...' : name;
+    svg.appendChild(text);
+
+    // Background track
+    const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    bgRect.setAttribute("x", pad.left);
+    bgRect.setAttribute("y", y);
+    bgRect.setAttribute("width", w - pad.left - pad.right);
+    bgRect.setAttribute("height", barH);
+    bgRect.setAttribute("fill", "#f1f5f9");
+    bgRect.setAttribute("rx", 3);
+    svg.appendChild(bgRect);
+
+    // Fill bar
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", pad.left);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", Math.max(barW, 2));
+    rect.setAttribute("height", barH);
+    rect.setAttribute("fill", "#2563eb");
+    rect.setAttribute("rx", 3);
+    rect.style.cursor = "pointer";
+    rect.addEventListener("mousemove", (e) => showTooltip(e, `<strong>${name}</strong>: ${count} applicants`));
+    rect.addEventListener("mouseleave", hideTooltip);
+    svg.appendChild(rect);
+
+    // Value text
+    const valText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    valText.setAttribute("x", pad.left + barW + 6);
+    valText.setAttribute("y", y + barH/2 + 4);
+    valText.setAttribute("fill", "var(--text-primary)");
+    valText.setAttribute("font-size", "11px");
+    valText.setAttribute("font-weight", "600");
+    valText.textContent = count;
+    svg.appendChild(valText);
+  });
+
+  container.appendChild(svg);
+}
+
+// 3. Chart 2: Category Distribution (Donut / Slice Chart)
+function renderCategoryChart() {
+  const container = document.getElementById('chart-category');
+  const counts = {};
+  DATA.forEach(d => {
+    const c = (d["Category"] || 'Other').trim();
+    counts[c] = (counts[c] || 0) + 1;
+  });
+
+  const entries = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+  const total = DATA.length || 1;
+  const colors = ['#2563eb', '#0d9488', '#d97706', '#4f46e5', '#e11d48', '#64748b'];
+
+  const w = container.clientWidth || 600;
+  const h = 260;
+  const cx = 140;
+  const cy = h / 2;
+  const r = 85;
+  const innerR = 50;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+  let startAngle = 0;
+  entries.forEach((entry, idx) => {
+    const [cat, val] = entry;
+    const sliceAngle = (val / total) * 2 * Math.PI;
+    const endAngle = startAngle + sliceAngle;
+
+    const x1 = cx + r * Math.sin(startAngle);
+    const y1 = cy - r * Math.cos(startAngle);
+    const x2 = cx + r * Math.sin(endAngle);
+    const y2 = cy - r * Math.cos(endAngle);
+
+    const ix1 = cx + innerR * Math.sin(startAngle);
+    const iy1 = cy - innerR * Math.cos(startAngle);
+    const ix2 = cx + innerR * Math.sin(endAngle);
+    const iy2 = cy - innerR * Math.cos(endAngle);
+
+    const largeArc = sliceAngle > Math.PI ? 1 : 0;
+    const color = colors[idx % colors.length];
+
+    const pathData = [
+      `M ${x1} ${y1}`,
+      `A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`,
+      `L ${ix2} ${iy2}`,
+      `A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix1} ${iy1}`,
+      'Z'
+    ].join(' ');
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", pathData);
+    path.setAttribute("fill", color);
+    path.style.cursor = "pointer";
+    path.addEventListener("mousemove", (e) => {
+      const pct = ((val / total) * 100).toFixed(1);
+      showTooltip(e, `<strong>${cat}</strong>: ${val} (${pct}%)`);
+    });
+    path.addEventListener("mouseleave", hideTooltip);
+    svg.appendChild(path);
+
+    // Legend item
+    const legendY = 30 + idx * 24;
+    if (legendY < h - 20) {
+      const legRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      legRect.setAttribute("x", 280);
+      legRect.setAttribute("y", legendY);
+      legRect.setAttribute("width", 12);
+      legRect.setAttribute("height", 12);
+      legRect.setAttribute("rx", 2);
+      legRect.setAttribute("fill", color);
+      svg.appendChild(legRect);
+
+      const legText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      legText.setAttribute("x", 300);
+      legText.setAttribute("y", legendY + 10);
+      legText.setAttribute("font-size", "12px");
+      legText.setAttribute("fill", "var(--text-secondary)");
+      const pct = ((val / total) * 100).toFixed(1);
+      legText.textContent = `${cat} - ${val} (${pct}%)`;
+      svg.appendChild(legText);
+    }
+
+    startAngle = endAngle;
+  });
+
+  // Center text in Donut
+  const centerText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  centerText.setAttribute("x", cx);
+  centerText.setAttribute("y", cy + 4);
+  centerText.setAttribute("text-anchor", "middle");
+  centerText.setAttribute("font-size", "14px");
+  centerText.setAttribute("font-weight", "bold");
+  centerText.setAttribute("fill", "var(--text-primary)");
+  centerText.textContent = total;
+  svg.appendChild(centerText);
+
+  container.appendChild(svg);
+}
+
+// 4. Chart 3: Marks % Distribution Histogram
+function renderMarksHistogram() {
+  const container = document.getElementById('chart-marks');
+  const buckets = [
+    { label: '< 50%', min: 0, max: 50, count: 0 },
+    { label: '50-60%', min: 50, max: 60, count: 0 },
+    { label: '60-70%', min: 60, max: 70, count: 0 },
+    { label: '70-80%', min: 70, max: 80, count: 0 },
+    { label: '80-90%', min: 80, max: 90, count: 0 },
+    { label: '90-100%', min: 90, max: 100.01, count: 0 }
+  ];
+
+  DATA.forEach(d => {
+    const marks = Number(d["Marks %"]);
+    if (!isNaN(marks)) {
+      for (let b of buckets) {
+        if (marks >= b.min && marks < b.max) {
+          b.count++;
+          break;
+        }
+      }
+    }
+  });
+
+  const maxVal = Math.max(...buckets.map(b => b.count), 1);
+  const w = container.clientWidth || 600;
+  const h = 260;
+  const pad = { top: 20, right: 20, bottom: 40, left: 40 };
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+  const chartW = w - pad.left - pad.right;
+  const chartH = h - pad.top - pad.bottom;
+  const colW = chartW / buckets.length;
+  const barW = Math.max(16, colW - 20);
+
+  // Axis Line
+  const axis = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  axis.setAttribute("x1", pad.left);
+  axis.setAttribute("y1", pad.top + chartH);
+  axis.setAttribute("x2", w - pad.right);
+  axis.setAttribute("y2", pad.top + chartH);
+  axis.setAttribute("stroke", "var(--border)");
+  axis.setAttribute("stroke-width", "1");
+  svg.appendChild(axis);
+
+  buckets.forEach((b, i) => {
+    const bHeight = chartH * (b.count / maxVal);
+    const x = pad.left + i * colW + (colW - barW)/2;
+    const y = pad.top + chartH - bHeight;
+
+    // Bar
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", barW);
+    rect.setAttribute("height", Math.max(bHeight, 2));
+    rect.setAttribute("fill", "#0d9488");
+    rect.setAttribute("rx", 3);
+    rect.style.cursor = "pointer";
+    rect.addEventListener("mousemove", (e) => showTooltip(e, `<strong>${b.label}</strong>: ${b.count} applicants`));
+    rect.addEventListener("mouseleave", hideTooltip);
+    svg.appendChild(rect);
+
+    // Label
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", x + barW / 2);
+    text.setAttribute("y", pad.top + chartH + 18);
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("font-size", "11px");
+    text.setAttribute("fill", "var(--text-secondary)");
+    text.textContent = b.label;
+    svg.appendChild(text);
+
+    // Value count
+    if (b.count > 0) {
+      const vText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      vText.setAttribute("x", x + barW / 2);
+      vText.setAttribute("y", y - 6);
+      vText.setAttribute("text-anchor", "middle");
+      vText.setAttribute("font-size", "11px");
+      vText.setAttribute("font-weight", "600");
+      vText.setAttribute("fill", "var(--text-primary)");
+      vText.textContent = b.count;
+      svg.appendChild(vText);
+    }
+  });
+
+  container.appendChild(svg);
+}
+
+// 5. Chart 4: Scatter Plot (Family Income vs Marks %)
+function renderScatterPlot() {
+  const container = document.getElementById('chart-income-marks');
+  const validPoints = [];
+  
+  DATA.forEach(d => {
+    const income = Number(d["Family Income"]);
+    const marks = Number(d["Marks %"]);
+    if (!isNaN(income) && !isNaN(marks) && marks > 0) {
+      validPoints.push({
+        income,
+        marks,
+        name: d["Naam"] || 'Unknown',
+        taluka: d["Taluka"] || 'Unspecified'
+      });
+    }
+  });
+
+  if (validPoints.length === 0) return;
+
+  const maxIncome = Math.max(...validPoints.map(p => p.income), 10000);
+  const minMarks = 0;
+  const maxMarks = 100;
+
+  const w = container.clientWidth || 600;
+  const h = 260;
+  const pad = { top: 20, right: 20, bottom: 40, left: 60 };
+  const chartW = w - pad.left - pad.right;
+  const chartH = h - pad.top - pad.bottom;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+  // Axes
+  const axisY = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  axisY.setAttribute("x1", pad.left);
+  axisY.setAttribute("y1", pad.top);
+  axisY.setAttribute("x2", pad.left);
+  axisY.setAttribute("y2", pad.top + chartH);
+  axisY.setAttribute("stroke", "var(--border)");
+  svg.appendChild(axisY);
+
+  const axisX = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  axisX.setAttribute("x1", pad.left);
+  axisX.setAttribute("y1", pad.top + chartH);
+  axisX.setAttribute("x2", w - pad.right);
+  axisX.setAttribute("y2", pad.top + chartH);
+  axisX.setAttribute("stroke", "var(--border)");
+  svg.appendChild(axisX);
+
+  // Y-ticks (Marks)
+  [0, 25, 50, 75, 100].forEach(tick => {
+    const y = pad.top + chartH - (tick / 100) * chartH;
+    const tText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    tText.setAttribute("x", pad.left - 8);
+    tText.setAttribute("y", y + 4);
+    tText.setAttribute("text-anchor", "end");
+    tText.setAttribute("font-size", "10px");
+    tText.setAttribute("fill", "var(--text-muted)");
+    tText.textContent = `${tick}%`;
+    svg.appendChild(tText);
+
+    // Subtle Grid line
+    const grid = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    grid.setAttribute("x1", pad.left);
+    grid.setAttribute("y1", y);
+    grid.setAttribute("x2", w - pad.right);
+    grid.setAttribute("y2", y);
+    grid.setAttribute("stroke", "var(--border-subtle)");
+    svg.appendChild(grid);
+  });
+
+  // Scatter dots
+  validPoints.forEach(pt => {
+    const cx = pad.left + (pt.income / maxIncome) * chartW;
+    const cy = pad.top + chartH - ((pt.marks - minMarks) / (maxMarks - minMarks)) * chartH;
+
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", cx);
+    circle.setAttribute("cy", cy);
+    circle.setAttribute("r", 4);
+    circle.setAttribute("fill", "rgba(79, 70, 229, 0.7)");
+    circle.setAttribute("stroke", "#4f46e5");
+    circle.setAttribute("stroke-width", "1");
+    circle.style.cursor = "pointer";
+
+    circle.addEventListener("mousemove", (e) => {
+      showTooltip(e, `<strong>${pt.name}</strong> (${pt.taluka})<br/>Marks: ${pt.marks}%<br/>Income: ${formatCurrency(pt.income)}`);
+    });
+    circle.addEventListener("mouseleave", hideTooltip);
+
+    svg.appendChild(circle);
+  });
+
+  // X Axis Label
+  const xLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  xLabel.setAttribute("x", pad.left + chartW / 2);
+  xLabel.setAttribute("y", pad.top + chartH + 30);
+  xLabel.setAttribute("text-anchor", "middle");
+  xLabel.setAttribute("font-size", "11px");
+  xLabel.setAttribute("fill", "var(--text-secondary)");
+  xLabel.textContent = `Family Income (0 to ${formatCurrency(maxIncome)})`;
+  svg.appendChild(xLabel);
+
+  container.appendChild(svg);
+}
+
+// 6. Table & Interactivity
+let currentSortCol = 'Marks %';
+let currentSortDir = 'desc';
+
+function populateFilters() {
+  const talukaSet = new Set();
+  const statusSet = new Set();
+
+  DATA.forEach(d => {
+    if (d["Taluka"]) talukaSet.add(d["Taluka"].trim());
+    if (d["Status"]) statusSet.add(d["Status"].trim());
+  });
+
+  const talukaSelect = document.getElementById('taluka-filter');
+  Array.from(talukaSet).sort().forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t;
+    talukaSelect.appendChild(opt);
+  });
+
+  const statusSelect = document.getElementById('status-filter');
+  Array.from(statusSet).sort().forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    statusSelect.appendChild(opt);
+  });
+}
+
+function getStatusBadgeClass(status) {
+  const s = (status || '').toLowerCase();
+  if (s === 'approved' || s === 'sanctioned' || s === 'pass') return 'badge-approved';
+  if (s === 'pending' || s === 'in progress' || s === 'under review') return 'badge-pending';
+  if (s === 'rejected' || s === 'failed') return 'badge-rejected';
+  return 'badge-other';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+
+  const search = document.getElementById('table-search').value.toLowerCase();
+  const talukaFilter = document.getElementById('taluka-filter').value;
+  const statusFilter = document.getElementById('status-filter').value;
+
+  // Filter
+  let filtered = DATA.filter(d => {
+    if (talukaFilter && (d["Taluka"] || '').trim() !== talukaFilter) return false;
+    if (statusFilter && (d["Status"] || '').trim() !== statusFilter) return false;
+    if (search) {
+      const matchName = (d["Naam"] || '').toLowerCase().includes(search);
+      const matchSchool = (d["School"] || '').toLowerCase().includes(search);
+      const matchGaon = (d["Gaon"] || '').toLowerCase().includes(search);
+      const matchFather = (d["Pita ka naam"] || '').toLowerCase().includes(search);
+      if (!matchName && !matchSchool && !matchGaon && !matchFather) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    let valA = a[currentSortCol];
+    let valB = b[currentSortCol];
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return currentSortDir === 'asc' ? valA - valB : valB - valA;
+    }
+    valA = (valA || '').toString().toLowerCase();
+    valB = (valB || '').toString().toLowerCase();
+    if (valA < valB) return currentSortDir === 'asc' ? -1 : 1;
+    if (valA > valB) return currentSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  if (filtered.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;">No matching records found</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+
+  filtered.forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    const marks = Number(row["Marks %"]);
+    const formattedMarks = !isNaN(marks) ? marks.toFixed(1) + '%' : '-';
+    const status = row["Status"] || 'Unknown';
+
+    tr.innerHTML = `
+      <td style="color: var(--text-muted);">${idx + 1}</td>
+      <td style="font-weight: 500;">${row["Naam"] || '-'}</td>
+      <td style="color: var(--text-secondary);">${row["Pita ka naam"] || '-'}</td>
+      <td>${row["School"] || '-'}</td>
+      <td>${row["Gaon"] || '-'}</td>
+      <td>${row["Taluka"] || '-'}</td>
+      <td>${row["Category"] || '-'}</td>
+      <td style="text-align: right; font-weight: 600;">${formattedMarks}</td>
+      <td style="text-align: right;">${formatCurrency(row["Family Income"])}</td>
+      <td style="text-align: center;"><span class="status-badge ${getStatusBadgeClass(status)}">${status}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// 7. CSV Download Handler
+function downloadCSV() {
+  if (!DATA || DATA.length === 0) return;
+  const headers = Object.keys(DATA[0]);
+  const csvRows = [];
+  csvRows.push(headers.join(','));
+
+  DATA.forEach(row => {
+    const values = headers.map(header => {
+      const escaped = ('' + (row[header] !== undefined && row[header] !== null ? row[header] : '')).replace(/"/g, '\\"');
+      return `"${escaped}"`;
+    });
+    csvRows.push(values.join(','));
+  });
+
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'scholarship_applications_data.csv');
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Setup Events
+function init() {
+  renderKPIs();
+  renderTalukaChart();
+  renderCategoryChart();
+  renderMarksHistogram();
+  renderScatterPlot();
+  populateFilters();
+  renderTable();
+
+  // Search & Filters
+  document.getElementById('table-search').addEventListener('input', renderTable);
+  document.getElementById('taluka-filter').addEventListener('change', renderTable);
+  document.getElementById('status-filter').addEventListener('change', renderTable);
+  document.getElementById('btn-download-csv').addEventListener('click', downloadCSV);
+
+  // Sorting Header Click
+  document.querySelectorAll('th[data-col]').forEach(th => {
+    if (th.classList.contains('no-sort')) return;
+    th.addEventListener('click', () => {
+      const col = th.getAttribute('data-col');
+      if (currentSortCol === col) {
+        currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSortCol = col;
+        currentSortDir = 'desc';
+      }
+      renderTable();
+    });
+  });
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

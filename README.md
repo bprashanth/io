@@ -31,6 +31,12 @@ separate qualification run, giving a 30/30 routed replay on the frozen suite.
 The larger Arctic BF16 checkpoint scored 26/30 and passed a separate 15/15
 holdout, but is a server/high-end option rather than the intended laptop tier.
 
+**Re-verification note (2026-08-21 evening):** the model ranking above
+reproduces, but the router's "accepted no wrong answers" and the "30/30 routed
+replay" do not hold out of sample, and a 2026 general 9B model matches Arctic
+Q4. Read [the foundation re-verification](docs/foundation-reverification-2026-08-21.md)
+before relying on the router, the escalation rate or the laptop-tier choice.
+
 Read [the event decision](docs/v2-local-first-event-decision.md) before changing
 this architecture. Use [the reproduction guide](docs/local-first-reproduction.md)
 to run it. The aggregate result is

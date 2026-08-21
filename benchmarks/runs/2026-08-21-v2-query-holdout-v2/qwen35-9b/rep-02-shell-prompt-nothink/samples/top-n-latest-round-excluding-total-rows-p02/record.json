@@ -1,0 +1,115 @@
+{
+  "id": "top-n-latest-round-excluding-total-rows-p02",
+  "task_id": "top-n-latest-round-excluding-total-rows",
+  "pattern": "filter one round, rank a plain column, limit to five, detail rows only",
+  "question": "which five districts have the worst under-5 stunting in NFHS-5? highest first",
+  "gold_sql": "SELECT \"District\", \"Children under 5 years who are stunted (%)\" AS stunted_percent FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' AND \"District\" <> 'State Total' ORDER BY stunted_percent DESC, \"District\" LIMIT 5",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      49.6
+    ],
+    [
+      "Ranchi",
+      42.9
+    ],
+    [
+      "Kalahandi",
+      42.7
+    ],
+    [
+      "Rohtas",
+      42.2
+    ],
+    [
+      "Bhojpur",
+      40.9
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      49.6
+    ],
+    [
+      "Ranchi",
+      42.9
+    ],
+    [
+      "Kalahandi",
+      42.7
+    ],
+    [
+      "Rohtas",
+      42.2
+    ],
+    [
+      "Bhojpur",
+      40.9
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT \"District\", \"Children under 5 years who are stunted (%)\" FROM \"district_health_factsheet\" WHERE \"Survey Round\" = 'NFHS-5' ORDER BY \"Children under 5 years who are stunted (%)\" DESC LIMIT 5",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nwhich five districts have the worst under-5 stunting in NFHS-5? highest first",
+      "response": "SELECT \"District\", \"Children under 5 years who are stunted (%)\"\nFROM \"district_health_factsheet\"\nWHERE \"Survey Round\" = 'NFHS-5'\nORDER BY \"Children under 5 years who are stunted (%)\" DESC NULLS LAST\nLIMIT 5;",
+      "api": {
+        "id": "gen-1787312743-Y9PlV1zAz7dGmaBWwZJ8",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 522,
+          "completion_tokens": 63,
+          "total_tokens": 585,
+          "cost": 6.165e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.165e-05,
+            "upstream_inference_prompt_cost": 5.22e-05,
+            "upstream_inference_completions_cost": 9.45e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.256
+      },
+      "duration_seconds": 1.26,
+      "sql_duckdb": "SELECT \"District\", \"Children under 5 years who are stunted (%)\" FROM \"district_health_factsheet\" WHERE \"Survey Round\" = 'NFHS-5' ORDER BY \"Children under 5 years who are stunted (%)\" DESC LIMIT 5",
+      "rows": [
+        [
+          "Kishanganj",
+          49.6
+        ],
+        [
+          "Ranchi",
+          42.9
+        ],
+        [
+          "Kalahandi",
+          42.7
+        ],
+        [
+          "Rohtas",
+          42.2
+        ],
+        [
+          "Bhojpur",
+          40.9
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

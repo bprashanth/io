@@ -1,0 +1,64 @@
+{
+  "id": "relative-growth-between-years-p01",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "by what percent did total loan disbursement grow from 2023 to 2024",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" LIKE '2024%' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" LIKE '2023%' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / NULLIF(SUM(CASE WHEN \"Disbursement Date\" LIKE '2023%' THEN \"Loan Amount (Rs)\" ELSE 0 END), 0) FROM \"shg_loan_register\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nby what percent did total loan disbursement grow from 2023 to 2024\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nby what percent did total loan disbursement grow from 2023 to 2024\n```sql",
+      "response": "\n\n```sql\nSELECT\n  100.0 * (\n    SUM(CASE WHEN \"Disbursement Date\" LIKE '2024%' THEN \"Loan Amount (Rs)\" ELSE 0 END)\n    -\n    SUM(CASE WHEN \"Disbursement Date\" LIKE '2023%' THEN \"Loan Amount (Rs)\" ELSE 0 END)\n  ) /\n  SUM(CASE WHEN \"Disbursement Date\" LIKE '2023%' THEN \"Loan Amount (Rs)\" ELSE 0 END)\nFROM \"shg_loan_register\"\n```",
+      "api": {
+        "id": "gen-1787311565-rmHvn9QhgZGiaL3vmo2E",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 282,
+          "completion_tokens": 400,
+          "total_tokens": 682,
+          "cost": 0.00149536,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00149536,
+            "upstream_inference_prompt_cost": 0.00013536,
+            "upstream_inference_completions_cost": 0.00136
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 209,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 12.894
+      },
+      "duration_seconds": 12.901,
+      "sql_duckdb": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" LIKE '2024%' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" LIKE '2023%' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / NULLIF(SUM(CASE WHEN \"Disbursement Date\" LIKE '2023%' THEN \"Loan Amount (Rs)\" ELSE 0 END), 0) FROM \"shg_loan_register\"",
+      "rows": [
+        [
+          26.040816326530614
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

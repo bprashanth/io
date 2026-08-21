@@ -1,0 +1,49 @@
+{
+  "id": "relative-growth-between-years-p03",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "how much more money was given out in 2024 than in 2023, in percent terms",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT (SUM(CASE WHEN STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2024' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END)) * 100.0 / NULLIF(SUM(CASE WHEN STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END), 0) AS \"Percentage Difference\" FROM \"shg_loan_register\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nhow much more money was given out in 2024 than in 2023, in percent terms\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nhow much more money was given out in 2024 than in 2023, in percent terms\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: The question asks for the percentage difference in loan amounts disbursed between 2023 and 2024. Therefore, we need to focus on the `Loan Amount (Rs)` column and filter the data based on the `Disbursement Date`.\n\n2. **Filter Data by Year**: We need to sum the `Loan Amount (Rs)` for the years 2023 and 2024 separately. This can be achieved using the `STRFTIME` function to extract the year from the `Disbursement Date`.\n\n3. **Calculate the Percentage Difference**: Once we have the total loan amounts for both years, we can calculate the percentage difference using the formula:\n   \\[\n   \\text{Percentage Difference} = \\left( \\frac{\\text{Total Loan Amount in 2024} - \\text{Total Loan Amount in 2023}}{\\text{Total Loan Amount in 2023}} \\right) \\times 100\n   \\]\n\n4. **Construct the SQL Query**: We will use a `CASE` statement within a `SUM` function to aggregate the loan amounts for each year. Then, we will perform the percentage calculation.\n\nHere is the final SQL query:\n\n```sql\nSELECT \n  (SUM(CASE WHEN STRFTIME('%Y', \"Disbursement Date\") = '2024' THEN \"Loan Amount (Rs)\" ELSE 0 END) - \n   SUM(CASE WHEN STRFTIME('%Y', \"Disbursement Date\") = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END)) * 100.0 / \n   SUM(CASE WHEN STRFTIME('%Y', \"Disbursement Date\") = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS \"Percentage Difference\"\nFROM \"shg_loan_register\";\n```\n\n### Explanation:\n- **STRFTIME('%Y', \"Disbursement Date\")**: This extracts the year from the `Disbursement Date` column.\n- **CASE WHEN ... THEN ... ELSE 0 END**: This conditional statement ensures that only the loan amounts for the specified year are summed. For other years, it sums up 0.\n- **SUM(...) - SUM(...)**: This calculates the difference in total loan amounts between 2024 and 2023.\n- **... * 100.0 / SUM(...)**: This computes the percentage difference by dividing the difference by the total loan amount in 2023 and multiplying by 100 to convert it to a percentage.\n\nThis query efficiently calculates the required percentage difference in a single pass through the data, ensuring optimal performance.",
+      "api": {
+        "id": "chatcmpl-ePWPkwpcd2edXhyznmxkfbkQGrehfYxR",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 587,
+          "prompt_tokens": 259,
+          "total_tokens": 846,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 12.908
+      },
+      "duration_seconds": 12.913,
+      "sql_duckdb": "SELECT (SUM(CASE WHEN STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2024' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END)) * 100.0 / NULLIF(SUM(CASE WHEN STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END), 0) AS \"Percentage Difference\" FROM \"shg_loan_register\"",
+      "rows": [
+        [
+          26.040816326530614
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

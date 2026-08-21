@@ -1,0 +1,103 @@
+{
+  "id": "filter-on-derived-decline-p01",
+  "task_id": "filter-on-derived-decline",
+  "pattern": "keep groups whose derived change is negative, null rounds drop out",
+  "question": "in which districts did women literacy go down from NFHS-4 to NFHS-5",
+  "gold_sql": "SELECT \"District\" FROM district_health_factsheet WHERE \"District\" <> 'State Total' GROUP BY \"District\" HAVING MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Women age 15-49 years who are literate (%)\" END) < MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Women age 15-49 years who are literate (%)\" END) ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Cuttack"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ],
+    [
+      "State Total"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "State Total"
+    ],
+    [
+      "Cuttack"
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT a.District FROM district_health_factsheet AS a JOIN district_health_factsheet AS b ON a.District = b.District WHERE a.\"Survey Round\" = 'NFHS-5' AND b.\"Survey Round\" = 'NFHS-4' AND a.\"Women age 15-49 years who are literate (%)\" < b.\"Women age 15-49 years who are literate (%)\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nin which districts did women literacy go down from NFHS-4 to NFHS-5\n[Database Schema]\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nin which districts did women literacy go down from NFHS-4 to NFHS-5\n```sql",
+      "response": "\n\n```sql\nSELECT a.District\nFROM district_health_factsheet a\nJOIN district_health_factsheet b\n  ON a.District = b.District\nWHERE a.\"Survey Round\" = 'NFHS-5'\n  AND b.\"Survey Round\" = 'NFHS-4'\n  AND a.\"Women age 15-49 years who are literate (%)\" < b.\"Women age 15-49 years who are literate (%)\"\n```",
+      "api": {
+        "id": "gen-1787311487-EhRSwY2R2FajuCKLhDQ6",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 307,
+          "completion_tokens": 370,
+          "total_tokens": 677,
+          "cost": 0.00132215,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00132215,
+            "upstream_inference_prompt_cost": 0.00013815,
+            "upstream_inference_completions_cost": 0.001184
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 223,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.045
+      },
+      "duration_seconds": 3.048,
+      "sql_duckdb": "SELECT a.District FROM district_health_factsheet AS a JOIN district_health_factsheet AS b ON a.District = b.District WHERE a.\"Survey Round\" = 'NFHS-5' AND b.\"Survey Round\" = 'NFHS-4' AND a.\"Women age 15-49 years who are literate (%)\" < b.\"Women age 15-49 years who are literate (%)\"",
+      "rows": [
+        [
+          "Purnia"
+        ],
+        [
+          "Rohtas"
+        ],
+        [
+          "State Total"
+        ],
+        [
+          "Hazaribagh"
+        ],
+        [
+          "State Total"
+        ],
+        [
+          "Cuttack"
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

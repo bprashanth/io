@@ -1,0 +1,140 @@
+{
+  "schema_version": 2,
+  "status": "frozen-holdout-before-first-model-run",
+  "purpose": "Realistic-shape out-of-sample check for the v2 query ladder. Headers carry spaces, units and parentheses; a factsheet mixes 'State Total' rows with district rows; a 360-row register needs year extraction from text dates and share-of-total, conditional-count, relative-growth and null-aware averages; enrolment spreads years across columns and joins an inspection table. Questions are terse and do not name columns verbatim. No router, prompt or evaluator rule may be changed after the first model run on this file; a changed rule requires a new holdout.",
+  "built_by": "benchmarks/v2/build_holdout_v2_fixtures.py (seed 20260821)",
+  "frozen_at": "2026-08-21",
+  "dialect_requested_from_model": "sqlite",
+  "execution_dialect": "duckdb",
+  "comparison": {
+    "numeric_rel_tolerance": 1e-06,
+    "numeric_abs_tolerance": 0.06,
+    "tolerance_note": "Gold values are unrounded. A model answer rounded to one decimal is still equal; an answer off by more than 0.06 absolute is wrong.",
+    "column_names_required": false,
+    "required_columns_may_be_a_projection_of_a_wider_result": true,
+    "equivalent_long_or_grouped_wide_results_accepted": true,
+    "row_order_required_only_for_ranking_tasks": true
+  },
+  "tables": [
+    {"name": "district_health_factsheet", "kind": "csv", "path": "benchmarks/v2/holdout-v2/district_health_factsheet.csv"},
+    {"name": "shg_loan_register", "kind": "csv", "path": "benchmarks/v2/holdout-v2/shg_loan_register.csv"},
+    {"name": "school_enrolment_by_year", "kind": "csv", "path": "benchmarks/v2/holdout-v2/school_enrolment_by_year.csv"},
+    {"name": "school_infrastructure", "kind": "csv", "path": "benchmarks/v2/holdout-v2/school_infrastructure.csv"}
+  ],
+  "tasks": [
+    {
+      "id": "wide-header-pp-change-excluding-total-rows",
+      "pattern": "percentage-point change between two labelled rounds on messy headers, state filter, detail rows only",
+      "tables": ["district_health_factsheet"],
+      "gold_sql": "SELECT \"District\", MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_pp FROM district_health_factsheet WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' GROUP BY \"District\" ORDER BY \"District\"",
+      "phrasings": [
+        "Bihar district wise full vaccination change from NFHS-4 to NFHS-5 in percentage points",
+        "for each district of Bihar how many points did full immunisation of 12-23 month children move between the two rounds",
+        "NFHS-5 minus NFHS-4 fully vaccinated percent for every Bihar district, don't include the state total row"
+      ]
+    },
+    {
+      "id": "top-n-latest-round-excluding-total-rows",
+      "pattern": "filter one round, rank a plain column, limit to five, detail rows only",
+      "tables": ["district_health_factsheet"],
+      "order_matters": true,
+      "gold_sql": "SELECT \"District\", \"Children under 5 years who are stunted (%)\" AS stunted_percent FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' AND \"District\" <> 'State Total' ORDER BY stunted_percent DESC, \"District\" LIMIT 5",
+      "phrasings": [
+        "top 5 districts with highest child stunting in NFHS-5",
+        "which five districts have the worst under-5 stunting in NFHS-5? highest first",
+        "NFHS-5 stunting among children under 5, show only the 5 highest districts across all states"
+      ]
+    },
+    {
+      "id": "filter-on-derived-decline",
+      "pattern": "keep groups whose derived change is negative, null rounds drop out",
+      "tables": ["district_health_factsheet"],
+      "gold_sql": "SELECT \"District\" FROM district_health_factsheet WHERE \"District\" <> 'State Total' GROUP BY \"District\" HAVING MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Women age 15-49 years who are literate (%)\" END) < MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Women age 15-49 years who are literate (%)\" END) ORDER BY \"District\"",
+      "phrasings": [
+        "in which districts did women literacy go down from NFHS-4 to NFHS-5",
+        "list the districts where literate women percent is lower in NFHS-5 than in NFHS-4",
+        "women 15-49 literacy decreased between the two rounds - name those districts"
+      ]
+    },
+    {
+      "id": "share-of-total-by-category-text-date-year",
+      "pattern": "year filter on a text date, group sum, share of grand total, rank",
+      "tables": ["shg_loan_register"],
+      "order_matters": true,
+      "gold_sql": "WITH y AS (SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Purpose\") SELECT \"Purpose\", total_amount, 100.0 * total_amount / SUM(total_amount) OVER () AS share_percent FROM y ORDER BY total_amount DESC, \"Purpose\"",
+      "phrasings": [
+        "2024 loans: total amount by purpose and each purpose's share of the total in percent, biggest first",
+        "for loans disbursed in 2024 show purpose wise total rupees and percent share of all 2024 lending, highest first",
+        "what share of 2024 loan money went to each purpose? give total and percentage, largest purpose on top"
+      ]
+    },
+    {
+      "id": "conditional-count-share-by-group",
+      "pattern": "count rows matching a text status per group and its percent of all rows in the group, rank",
+      "tables": ["shg_loan_register"],
+      "order_matters": true,
+      "gold_sql": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, 100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / COUNT(*) AS overdue_percent FROM shg_loan_register GROUP BY \"Block\" ORDER BY overdue_percent DESC, \"Block\"",
+      "phrasings": [
+        "block wise how many loans are overdue and what percent of that block's loans is that, worst block first",
+        "for each block count overdue loans and overdue percentage out of all its loans, highest percentage first",
+        "which blocks have the most overdue loans by percentage? show count and percent, top to bottom"
+      ]
+    },
+    {
+      "id": "relative-growth-between-years",
+      "pattern": "relative percent growth of a yearly total, not percentage points",
+      "tables": ["shg_loan_register"],
+      "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+      "phrasings": [
+        "by what percent did total loan disbursement grow from 2023 to 2024",
+        "2024 total loan amount compared to 2023 total, percentage growth",
+        "how much more money was given out in 2024 than in 2023, in percent terms"
+      ]
+    },
+    {
+      "id": "null-aware-average-by-group",
+      "pattern": "average of a column with blanks per group for one year, blanks excluded not zero",
+      "tables": ["shg_loan_register"],
+      "gold_sql": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS average_repaid FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Block\" ORDER BY \"Block\"",
+      "phrasings": [
+        "2024 loans block wise average amount repaid, blank repaid cells are not zero",
+        "for loans given in 2024 what is the mean repaid amount in each block, skip rows where repaid is blank",
+        "average repayment so far per block for 2024 disbursements, ignore loans with no repaid figure"
+      ]
+    },
+    {
+      "id": "wide-year-columns-share",
+      "pattern": "arithmetic across year-named columns, group sum, share",
+      "tables": ["school_enrolment_by_year"],
+      "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+      "phrasings": [
+        "block wise what percent of 2024 enrolment is girls",
+        "girls as a share of total students in 2024 for each block",
+        "2024 girls percentage of all enrolled children, per block"
+      ]
+    },
+    {
+      "id": "join-text-filter-rank",
+      "pattern": "join two tables on a code, filter a Yes/No column, rank a year column",
+      "tables": ["school_enrolment_by_year", "school_infrastructure"],
+      "order_matters": true,
+      "gold_sql": "SELECT e.\"School Name\", e.\"Girls 2024\" AS girls_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Toilets functional (girls)\" = 'No' ORDER BY e.\"Girls 2024\" DESC, e.\"School Name\"",
+      "phrasings": [
+        "schools without a working girls toilet and how many girls were enrolled there in 2024, most girls first",
+        "list schools where the girls toilet is not functional with their 2024 girls enrolment, highest first",
+        "which schools have no functional girls toilet? show school name and girls in 2024, largest on top"
+      ]
+    },
+    {
+      "id": "join-aggregate-by-group",
+      "pattern": "join, filter, count and sum two columns per group",
+      "tables": ["school_enrolment_by_year", "school_infrastructure"],
+      "gold_sql": "SELECT e.\"Block\", COUNT(*) AS schools_without_electricity, SUM(e.\"Girls 2024\" + e.\"Boys 2024\") AS students_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Electricity\" = 'No' GROUP BY e.\"Block\" ORDER BY e.\"Block\"",
+      "phrasings": [
+        "how many schools in each block have no electricity and how many children studied in them in 2024",
+        "block wise count of schools without electricity plus their total 2024 enrolment, girls and boys together",
+        "schools lacking electricity: per block the number of such schools and their 2024 students"
+      ]
+    }
+  ]
+}

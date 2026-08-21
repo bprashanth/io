@@ -1,0 +1,51 @@
+{
+  "id": "relative-growth-between-years-p02",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "2024 total loan amount compared to 2023 total, percentage growth",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": [
+    [
+      1595000,
+      26.040816326530614
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH YearlyLoanAmounts AS (SELECT STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') AS Year, SUM(\"Loan Amount (Rs)\") AS TotalLoanAmount FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') IN ('2023', '2024') GROUP BY STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y')) SELECT (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2024') - (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023') AS TotalLoanAmountDifference, ((SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2024') - (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023')) * 100.0 / NULLIF((SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023'), 0) AS PercentageGrowth FROM YearlyLoanAmounts LIMIT 1",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2024 total loan amount compared to 2023 total, percentage growth\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2024 total loan amount compared to 2023 total, percentage growth\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: The question asks for the total loan amount for the years 2023 and 2024, and the percentage growth from 2023 to 2024.\n\n2. **Filter Data by Year**: We need to filter the records in the `shg_loan_register` table to get the total loan amounts for the years 2023 and 2024. This can be done using the `strftime` function to extract the year from the `Disbursement Date`.\n\n3. **Aggregate Data**: We need to sum up the `Loan Amount (Rs)` for each year.\n\n4. **Calculate Percentage Growth**: The percentage growth can be calculated using the formula:\n   \\[\n   \\text{Percentage Growth} = \\left( \\frac{\\text{Total Loan Amount in 2024} - \\text{Total Loan Amount in 2023}}{\\text{Total Loan Amount in 2023}} \\right) \\times 100\n   \\]\n\n5. **Construct the Query**: We will use a Common Table Expression (CTE) to first calculate the total loan amounts for each year and then compute the percentage growth.\n\nHere is the final SQL query:\n\n```sql\nWITH YearlyLoanAmounts AS (\n    SELECT \n        strftime('%Y', \"Disbursement Date\") AS Year,\n        SUM(\"Loan Amount (Rs)\") AS TotalLoanAmount\n    FROM \n        \"shg_loan_register\"\n    WHERE \n        strftime('%Y', \"Disbursement Date\") IN ('2023', '2024')\n    GROUP BY \n        strftime('%Y', \"Disbursement Date\")\n)\nSELECT \n    (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2024') - \n    (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023') AS TotalLoanAmountDifference,\n    ((SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2024') - \n     (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023')) * 100.0 / \n    (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023') AS PercentageGrowth\nFROM \n    YearlyLoanAmounts\nLIMIT 1;\n```\n\n### Explanation:\n- **CTE (YearlyLoanAmounts)**: This CTE calculates the total loan amount for each year (2023 and 2024) by filtering the records based on the year extracted from the `Disbursement Date`.\n- **Main Query**: The main query calculates the difference in total loan amounts between 2024 and 2023 and computes the percentage growth using the formula mentioned above.\n- **LIMIT 1**: Since we are only interested in the results for the two years, the `LIMIT 1` ensures that we get a single row of output.",
+      "api": {
+        "id": "chatcmpl-B3PV15gmUXCgosxTr94RuYsMmT7l2NPh",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 647,
+          "prompt_tokens": 247,
+          "total_tokens": 894,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 14.209
+      },
+      "duration_seconds": 14.223,
+      "sql_duckdb": "WITH YearlyLoanAmounts AS (SELECT STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') AS Year, SUM(\"Loan Amount (Rs)\") AS TotalLoanAmount FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') IN ('2023', '2024') GROUP BY STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y')) SELECT (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2024') - (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023') AS TotalLoanAmountDifference, ((SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2024') - (SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023')) * 100.0 / NULLIF((SELECT TotalLoanAmount FROM YearlyLoanAmounts WHERE Year = '2023'), 0) AS PercentageGrowth FROM YearlyLoanAmounts LIMIT 1",
+      "rows": [
+        [
+          1595000,
+          26.040816326530614
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

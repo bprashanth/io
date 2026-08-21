@@ -1,0 +1,242 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>2024 Monsoon Block-wise Crop Yield Dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: #f4f6f7; color: #1f2b2d;
+    font-family: 'Segoe UI', Arial, sans-serif; overflow-x: hidden;
+  }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 28px 40px; }
+  header h1 { margin: 0 0 4px; font-size: 26px; color: #16302b; }
+  header p.sub { margin: 0 0 18px; color: #4a5a5c; font-size: 14px; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 22px; }
+  .kpi-card {
+    background: #fff; border-radius: 10px; padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.10); border-left: 4px solid #3d5a80;
+  }
+  .kpi-card .label { font-size: 11.5px; color: #6b7676; text-transform: uppercase; letter-spacing: .03em; }
+  .kpi-card .value { font-size: 22px; font-weight: 700; margin-top: 4px; color: #16302b; }
+  .kpi-card .note { font-size: 11px; color: #7a8a8a; margin-top: 3px; }
+  .kpi-card.up { border-left-color: #2b7a78; }
+  .kpi-card.down { border-left-color: #c1440e; }
+
+  .charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .chart-card { background: #fff; border-radius: 10px; padding: 12px 14px 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); }
+  .chart-card h3 { margin: 0 0 6px; font-size: 14px; color: #22383a; }
+  .chart-card canvas, .chart-card svg { width: 100%; height: 300px; display: block; }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .controls input[type="text"] {
+    padding: 7px 10px; border: 1px solid #ccd6d6; border-radius: 6px; font-size: 13px; width: 240px;
+  }
+  .controls button {
+    background: #2b7a78; color: #fff; border: none; padding: 8px 16px;
+    border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  .controls button:hover { background: #1f5f5d; }
+  .controls .hint { font-size: 12px; color: #6b7676; }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; font-size: 13px; }
+  thead th {
+    background: #16302b; color: #fff; text-align: left; padding: 9px 10px; cursor: pointer; user-select: none;
+    white-space: nowrap; font-size: 12px;
+  }
+  thead th span.arrow { font-size: 10px; margin-left: 4px; opacity: .8; }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid #eef1f1; white-space: nowrap; }
+  tbody tr:nth-child(even) { background: #fafcfc; }
+  tbody tr:hover { background: #eef7f6; }
+  .table-wrap { max-height: 420px; overflow-y: auto; overflow-x: hidden; border: 1px solid #e2e8e8; border-radius: 8px; }
+  td.num, th.num { text-align: right; }
+
+  footer { margin-top: 20px; font-size: 12px; color: #5a6a6a; }
+  footer .src { margin-top: 4px; font-style: italic; }
+  .na { color: #9aa5a5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>2024 Monsoon Block-wise Crop Yield Dashboard</h1>
+    <p class="sub" id="subtitle">Yield (tonnes/hectare) by block, ranked highest first, with prior-year Monsoon comparison.</p>
+  </header>
+
+  <section class="kpi-grid" id="kpiGrid"></section>
+
+  <section class="charts-grid">
+    <div class="chart-card">
+      <h3 id="chart1Title">Yield (t/ha) by block</h3>
+      <canvas id="barChart" width="420" height="300"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3 id="chart2Title">Yield comparison by block</h3>
+      <svg id="groupedChart"></svg>
+    </div>
+    <div class="chart-card">
+      <h3 id="chart3Title">Harvest share by block</h3>
+      <svg id="donutChart"></svg>
+    </div>
+  </section>
+
+  <section>
+    <div class="controls">
+      <input type="text" id="searchBox" placeholder="Filter by block name…">
+      <button id="downloadBtn">Download CSV</button>
+      <span class="hint">Click a column header to sort. Table shows what will be exported.</span>
+    </div>
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead><tr id="tableHead"></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div>All figures are computed directly from the underlying dataset at render time. Blank/“N/A” = no matching record found.</div>
+    <div class="src" id="sourceLine"></div>
+  </footer>
+</div>
+
+<script>
+const DATA = __DATA__;
+
+/* ---------- helpers ---------- */
+function num(v){ const n = Number(v); return isFinite(n) ? n : 0; }
+function fmtInt(n){ return Math.round(n).toLocaleString(); }
+function fmtNum(n, d){ return (n===null || n===undefined || !isFinite(n)) ? 'N/A' : n.toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d}); }
+function fmtPct(n, d){ return (n===null || n===undefined || !isFinite(n)) ? 'N/A' : (n>=0?'+':'') + n.toFixed(d) + '%'; }
+
+/* ---------- derive year / season context from DATA ---------- */
+const years = Array.from(new Set(DATA.map(r=>r.year))).filter(y=>y!==undefined && y!==null).sort((a,b)=>b-a);
+const currentYear = years[0];
+const priorYear = years.find(y=>y<currentYear);
+
+const seasons = Array.from(new Set(DATA.map(r=>r.season))).filter(Boolean);
+const monsoonSeason = seasons.find(s=> String(s).toLowerCase().includes('monsoon')) || seasons[0] || 'Monsoon';
+
+document.getElementById('subtitle').textContent =
+  `Yield (tonnes/hectare) by block for ${monsoonSeason} ${currentYear ?? ''}, ranked highest first` +
+  (priorYear!==undefined ? `, compared with ${monsoonSeason} ${priorYear}.` : ' (no prior-year data found for comparison).');
+
+/* ---------- aggregate rows by block ---------- */
+function aggregateByBlock(rows){
+  const map = new Map();
+  rows.forEach(r=>{
+    const key = r.block;
+    if(!map.has(key)) map.set(key, { ha:0, tonnes:0, sources:new Set() });
+    const o = map.get(key);
+    o.ha += num(r.cultivated_hectares);
+    o.tonnes += num(r.harvest_tonnes);
+    if(r.source) o.sources.add(r.source);
+  });
+  return map;
+}
+
+const rowsCur = DATA.filter(r=> r.season===monsoonSeason && r.year===currentYear);
+const rowsPri = priorYear!==undefined ? DATA.filter(r=> r.season===monsoonSeason && r.year===priorYear) : [];
+
+const aggCur = aggregateByBlock(rowsCur);
+const aggPri = aggregateByBlock(rowsPri);
+
+const blockNames = Array.from(new Set([...aggCur.keys(), ...aggPri.keys()]));
+
+let tableData = blockNames.map(b=>{
+  const cur = aggCur.get(b);
+  const pri = aggPri.get(b);
+  const haCur = cur ? cur.ha : 0;
+  const tCur  = cur ? cur.tonnes : 0;
+  const haPri = pri ? pri.ha : 0;
+  const tPri  = pri ? pri.tonnes : 0;
+  const yieldCur = (cur && haCur>0) ? tCur/haCur : null;
+  const yieldPri = (pri && haPri>0) ? tPri/haPri : null;
+  let changePct = null;
+  if(yieldCur!==null && yieldPri!==null && yieldPri!==0){
+    changePct = ((yieldCur - yieldPri)/yieldPri) * 100; // relative % change (yield is a rate, not a %, so points do NOT apply)
+  }
+  const sources = new Set([...(cur?cur.sources:[]), ...(pri?pri.sources:[])]);
+  return {
+    block: b,
+    has_cur: !!cur, has_pri: !!pri,
+    ha_cur: haCur, t_cur: tCur, yield_cur: yieldCur,
+    ha_pri: haPri, t_pri: tPri, yield_pri: yieldPri,
+    change_pct: changePct,
+    sources: Array.from(sources).join('; ')
+  };
+});
+
+/* ---------- KPIs ---------- */
+const totalHaCur = Array.from(aggCur.values()).reduce((s,o)=>s+o.ha,0);
+const totalTCur  = Array.from(aggCur.values()).reduce((s,o)=>s+o.tonnes,0);
+const totalHaPri = Array.from(aggPri.values()).reduce((s,o)=>s+o.ha,0);
+const totalTPri  = Array.from(aggPri.values()).reduce((s,o)=>s+o.tonnes,0);
+const overallYieldCur = totalHaCur>0 ? totalTCur/totalHaCur : null;
+const overallYieldPri = totalHaPri>0 ? totalTPri/totalHaPri : null;
+let overallChangePct = null;
+if(overallYieldCur!==null && overallYieldPri!==null && overallYieldPri!==0){
+  overallChangePct = ((overallYieldCur - overallYieldPri)/overallYieldPri)*100;
+}
+
+const kpis = [
+  { label:`Total Cultivated Area (${monsoonSeason} ${currentYear})`, value: fmtInt(totalHaCur)+' ha', note: `${aggCur.size} block(s) reporting`, cls:'' },
+  { label:`Total Harvest (${monsoonSeason} ${currentYear})`, value: fmtInt(totalTCur)+' t', note: 'sum of harvest_tonnes', cls:'' },
+  { label:`Overall Yield (${monsoonSeason} ${currentYear})`, value: fmtNum(overallYieldCur,2)+' t/ha', note: 'total harvest ÷ total area', cls:'' },
+  { label:`YoY Yield Change vs ${priorYear ?? 'N/A'}`,
+    value: overallChangePct===null ? 'N/A' : fmtPct(overallChangePct,1),
+    note: 'relative % change (not percentage points — yield is a rate, not a %)',
+    cls: overallChangePct===null ? '' : (overallChangePct>=0 ? 'up':'down') },
+  { label:'Blocks Reporting', value: fmtInt(aggCur.size), note: `out of ${blockNames.length} total block(s) seen`, cls:'' }
+];
+const kpiGrid = document.getElementById('kpiGrid');
+kpiGrid.innerHTML = kpis.map(k=>`
+  <div class="kpi-card ${k.cls}">
+    <div class="label">${k.label}</div>
+    <div class="value">${k.value}</div>
+    <div class="note">${k.note}</div>
+  </div>`).join('');
+
+/* ---------- charts ---------- */
+document.getElementById('chart1Title').textContent = `Yield (t/ha) by block — ${monsoonSeason} ${currentYear}, highest first`;
+document.getElementById('chart2Title').textContent = `Yield: ${priorYear ?? 'prior year'} vs ${currentYear} (t/ha)`;
+document.getElementById('chart3Title').textContent = `Harvest tonnes share by block — ${monsoonSeason} ${currentYear}`;
+
+function drawBarChart(canvas, items){
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const pad = { top:26, right:16, bottom:78, left:46 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+  const maxVal = Math.max(1, ...items.map(i=>i.value));
+  const n = items.length;
+  const gap = 8;
+  const barW = n>0 ? Math.max(4,(cw - gap*(n-1))/n) : 0;
+
+  ctx.strokeStyle = '#8a9a9a';
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top);
+  ctx.lineTo(pad.left, pad.top+ch);
+  ctx.lineTo(pad.left+cw, pad.top+ch);
+  ctx.stroke();
+
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#556';
+  const ticks = 5;
+  for(let t=0;t<=ticks;t++){
+    const v = maxVal*t/ticks;
+    const y = pad.top+ch-(v/maxVal)*ch;
+    ctx.strokeStyle = '#eef1f1';
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cw,y); ctx.stroke();
+    ctx.textAlign='right';
+    ctx.fillText(v.toFixed(1), pad.left-6, y+3);
+  }
+
+  items.forEach((it, idx)=>{
+    const x = pad.left + idx*(barW+gap);
+    const barH = maxVal>0 ? (it.value/maxVal)*ch : 0;
+    const y = pad.top+ch-barH;
+    ctx.fillStyle = '#2b7a

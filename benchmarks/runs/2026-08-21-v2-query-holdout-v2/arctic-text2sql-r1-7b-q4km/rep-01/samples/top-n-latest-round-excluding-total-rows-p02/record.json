@@ -1,0 +1,100 @@
+{
+  "id": "top-n-latest-round-excluding-total-rows-p02",
+  "task_id": "top-n-latest-round-excluding-total-rows",
+  "pattern": "filter one round, rank a plain column, limit to five, detail rows only",
+  "question": "which five districts have the worst under-5 stunting in NFHS-5? highest first",
+  "gold_sql": "SELECT \"District\", \"Children under 5 years who are stunted (%)\" AS stunted_percent FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' AND \"District\" <> 'State Total' ORDER BY stunted_percent DESC, \"District\" LIMIT 5",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      49.6
+    ],
+    [
+      "Ranchi",
+      42.9
+    ],
+    [
+      "Kalahandi",
+      42.7
+    ],
+    [
+      "Rohtas",
+      42.2
+    ],
+    [
+      "Bhojpur",
+      40.9
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      49.6
+    ],
+    [
+      "Bhojpur",
+      47.2
+    ],
+    [
+      "Kishanganj",
+      46.7
+    ],
+    [
+      "Purnia",
+      46.2
+    ],
+    [
+      "Rohtas",
+      44.2
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT District, \"Children under 5 years who are stunted (%)\" AS stunted_percentage FROM district_health_factsheet ORDER BY stunted_percentage DESC LIMIT 5",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nwhich five districts have the worst under-5 stunting in NFHS-5? highest first\n[Database Schema]\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nwhich five districts have the worst under-5 stunting in NFHS-5? highest first\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to focus on identifying the districts with the highest percentage of children under 5 years who are stunted, based on the data from the NFHS-5 survey. The query should:\n\n1. Select the `District` and the `Children under 5 years who are stunted (%)` from the `district_health_factsheet` table.\n2. Order the results by the percentage of stunted children in descending order to get the highest percentages first.\n3. Limit the results to the top 5 districts.\n\nHere is the step-by-step breakdown:\n\n1. **Identify the Relevant Columns**: We need the `District` and the `Children under 5 years who are stunted (%)` columns from the `district_health_factsheet` table.\n2. **Ordering**: Since we want the districts with the highest stunting percentages, we will order the results by the `Children under 5 years who are stunted (%)` column in descending order.\n3. **Limiting Results**: We only need the top 5 districts, so we will use the `LIMIT` clause to restrict the output to 5 rows.\n\nGiven these steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n  District, \n  \"Children under 5 years who are stunted (%)\" AS stunted_percentage\nFROM \n  district_health_factsheet\nORDER BY \n  stunted_percentage DESC\nLIMIT 5;\n```\n\nThis query directly addresses the user's request by selecting the required columns, ordering them by the stunted percentage in descending order, and limiting the results to the top 5 districts.",
+      "api": {
+        "id": "chatcmpl-scr8gYivjY44MPIJ4VM3quJfZvAGmJqi",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 342,
+          "prompt_tokens": 280,
+          "total_tokens": 622,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 7.428
+      },
+      "duration_seconds": 7.43,
+      "sql_duckdb": "SELECT District, \"Children under 5 years who are stunted (%)\" AS stunted_percentage FROM district_health_factsheet ORDER BY stunted_percentage DESC LIMIT 5",
+      "rows": [
+        [
+          "Kishanganj",
+          49.6
+        ],
+        [
+          "Bhojpur",
+          47.2
+        ],
+        [
+          "Kishanganj",
+          46.7
+        ],
+        [
+          "Purnia",
+          46.2
+        ],
+        [
+          "Rohtas",
+          44.2
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

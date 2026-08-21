@@ -1,0 +1,112 @@
+{
+  "id": "null-aware-average-by-group-p01",
+  "task_id": "null-aware-average-by-group",
+  "pattern": "average of a column with blanks per group for one year, blanks excluded not zero",
+  "question": "2024 loans block wise average amount repaid, blank repaid cells are not zero",
+  "gold_sql": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS average_repaid FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      30016.666666666668
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ],
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Wazirganj",
+      22673.684210526317
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Wazirganj",
+      22673.684210526317
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ],
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Atri",
+      30016.666666666668
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS Average_Amount_Repaid FROM \"shg_loan_register\" WHERE \"Disbursement Date\" LIKE '2024%' GROUP BY \"Block\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2024 loans block wise average amount repaid, blank repaid cells are not zero\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2024 loans block wise average amount repaid, blank repaid cells are not zero\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to carefully consider the requirements and the database schema. The question asks for the average amount repaid for loans disbursed in 2024, grouped by block, and it specifies that blank (NULL) values in the \"Amount Repaid (Rs)\" column should not be treated as zero.\n\nHere's the step-by-step reasoning:\n\n1. **Filtering by Year**: We need to filter the records to include only those loans disbursed in the year 2024. This can be achieved using the `WHERE` clause with a condition on the \"Disbursement Date\" column.\n\n2. **Handling NULL Values**: The question specifies that blank (NULL) values in the \"Amount Repaid (Rs)\" column should not be treated as zero. SQLite's `AVG()` function automatically ignores NULL values, so we don't need to explicitly handle them.\n\n3. **Grouping by Block**: The results need to be grouped by the \"Block\" column to calculate the average amount repaid for each block.\n\n4. **Calculating the Average**: We use the `AVG()` function to calculate the average amount repaid for each block.\n\n5. **Selecting Relevant Columns**: We need to select the \"Block\" column and the calculated average amount repaid.\n\nBased on the above steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    \"Block\", \n    AVG(\"Amount Repaid (Rs)\") AS Average_Amount_Repaid\nFROM \n    \"shg_loan_register\"\nWHERE \n    \"Disbursement Date\" LIKE '2024%'\nGROUP BY \n    \"Block\";\n```\n\n### Explanation:\n- **SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS Average_Amount_Repaid**: This selects the block and calculates the average amount repaid.\n- **FROM \"shg_loan_register\"**: This specifies the table from which to retrieve the data.\n- **WHERE \"Disbursement Date\" LIKE '2024%'**: This filters the records to include only those where the disbursement date starts with '2024', effectively selecting all records from the year 2024.\n- **GROUP BY \"Block\"**: This groups the results by the block, allowing the `AVG()` function to calculate the average amount repaid for each block.\n\nThis query meets the requirements of the user's question without unnecessary complexity or incorrect assumptions.",
+      "api": {
+        "id": "chatcmpl-nffa6etM3Dv5wxKryWOrMcdM83jMF0Pk",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 507,
+          "prompt_tokens": 249,
+          "total_tokens": 756,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 11.149
+      },
+      "duration_seconds": 11.152,
+      "sql_duckdb": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS Average_Amount_Repaid FROM \"shg_loan_register\" WHERE \"Disbursement Date\" LIKE '2024%' GROUP BY \"Block\"",
+      "rows": [
+        [
+          "Wazirganj",
+          22673.684210526317
+        ],
+        [
+          "Belaganj",
+          25352.0
+        ],
+        [
+          "Barachatti",
+          35004.34782608696
+        ],
+        [
+          "Dobhi",
+          33642.857142857145
+        ],
+        [
+          "Fatehpur",
+          28382.608695652172
+        ],
+        [
+          "Atri",
+          30016.666666666668
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

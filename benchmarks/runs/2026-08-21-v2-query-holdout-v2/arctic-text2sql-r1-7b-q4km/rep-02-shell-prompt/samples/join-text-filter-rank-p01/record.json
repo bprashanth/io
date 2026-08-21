@@ -1,0 +1,241 @@
+{
+  "id": "join-text-filter-rank-p01",
+  "task_id": "join-text-filter-rank",
+  "pattern": "join two tables on a code, filter a Yes/No column, rank a year column",
+  "question": "schools without a working girls toilet and how many girls were enrolled there in 2024, most girls first",
+  "gold_sql": "SELECT e.\"School Name\", e.\"Girls 2024\" AS girls_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Toilets functional (girls)\" = 'No' ORDER BY e.\"Girls 2024\" DESC, e.\"School Name\"",
+  "expected_rows": [
+    [
+      "Madhya Vidyalaya Bhadeya",
+      190
+    ],
+    [
+      "Madhya Vidyalaya Chakand",
+      189
+    ],
+    [
+      "Rajkiya Vidyalaya Chakand",
+      178
+    ],
+    [
+      "Prathmik Vidyalaya Bhadeya",
+      165
+    ],
+    [
+      "Adarsh Vidyalaya Bankat",
+      158
+    ],
+    [
+      "Kanya Vidyalaya Khizarsarai",
+      140
+    ],
+    [
+      "Navin Vidyalaya Tetariya",
+      128
+    ],
+    [
+      "Madhya Vidyalaya Khizarsarai",
+      116
+    ],
+    [
+      "Prathmik Vidyalaya Lodipur",
+      110
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      105
+    ],
+    [
+      "Adarsh Vidyalaya Amas",
+      85
+    ],
+    [
+      "Navin Vidyalaya Chakand",
+      74
+    ],
+    [
+      "Navin Vidyalaya Amas",
+      66
+    ],
+    [
+      "Navin Vidyalaya Rampur",
+      61
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      42
+    ]
+  ],
+  "actual_rows": [
+    [
+      190,
+      "Madhya Vidyalaya Bhadeya"
+    ],
+    [
+      189,
+      "Madhya Vidyalaya Chakand"
+    ],
+    [
+      178,
+      "Rajkiya Vidyalaya Chakand"
+    ],
+    [
+      165,
+      "Prathmik Vidyalaya Bhadeya"
+    ],
+    [
+      158,
+      "Adarsh Vidyalaya Bankat"
+    ],
+    [
+      140,
+      "Kanya Vidyalaya Khizarsarai"
+    ],
+    [
+      128,
+      "Navin Vidyalaya Tetariya"
+    ],
+    [
+      116,
+      "Madhya Vidyalaya Khizarsarai"
+    ],
+    [
+      110,
+      "Prathmik Vidyalaya Lodipur"
+    ],
+    [
+      105,
+      "Madhya Vidyalaya Karmauni"
+    ],
+    [
+      85,
+      "Adarsh Vidyalaya Amas"
+    ],
+    [
+      74,
+      "Navin Vidyalaya Chakand"
+    ],
+    [
+      66,
+      "Navin Vidyalaya Amas"
+    ],
+    [
+      61,
+      "Navin Vidyalaya Rampur"
+    ],
+    [
+      42,
+      "Madhya Vidyalaya Karmauni"
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT seb.\"Girls 2024\", seb.\"School Name\" FROM \"school_enrolment_by_year\" AS seb INNER JOIN \"school_infrastructure\" AS si ON seb.\"School Code\" = si.\"School Code\" WHERE si.\"Toilets functional (girls)\" = 'No' ORDER BY seb.\"Girls 2024\" DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}, \"school_infrastructure\": {\"Toilets functional (girls)\": [\"No\", \"Yes\"], \"Drinking water\": [\"No\", \"Yes\"], \"Electricity\": [\"No\", \"Yes\"], \"Inspected On\": [\"2024-01-10\", \"2024-01-13\", \"2024-02-13\", \"2024-02-15\", \"2024-02-19\", \"2024-02-21\", \"2024-02-26\", \"2024-03-12\", \"2024-03-22\", \"2024-03-27\", \"2024-04-02\", \"2024-04-04\", \"2024-04-13\", \"2024-04-17\", \"2024-04-20\", \"2024-04-21\", \"2024-04-27\", \"2024-05-13\", \"2024-06-01\", \"2024-06-16\", \"2024-06-27\", \"2024-07-09\", \"2024-07-23\", \"2024-08-02\", \"2024-08-04\", \"2024-08-14\", \"2024-08-17\", \"2024-09-02\", \"2024-09-14\", \"2024-09-15\", \"2024-09-21\", \"2024-09-26\", \"2024-10-24\", \"2024-11-12\", \"2024-11-16\", \"2024-11-20\", \"2024-12-03\", \"2024-12-08\", \"2024-12-19\"], \"Source\": [\"Inspection register\"]}}\n\nCURRENT QUESTION:\nschools without a working girls toilet and how many girls were enrolled there in 2024, most girls first",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to carefully break down the requirements and map them to the appropriate SQL constructs.\n\n### Step-by-Step Breakdown:\n\n1. **Identify the Relevant Tables and Columns:**\n   - The question involves checking the status of toilets for girls and the number of girls enrolled in 2024.\n   - Relevant tables: `school_infrastructure` and `school_enrolment_by_year`.\n   - Relevant columns:\n     - `school_infrastructure`: `Toilets functional (girls)`, `School Code`.\n     - `school_enrolment_by_year`: `Girls 2024`, `School Code`.\n\n2. **Understand the Conditions:**\n   - We need to filter schools where the toilets for girls are not functional (`Toilets functional (girls) = 'No'`).\n\n3. **Determine the Required Output:**\n   - We need to retrieve the number of girls enrolled in 2024 (`Girls 2024`) for these schools.\n   - The results should be ordered by the number of girls enrolled in descending order (`ORDER BY Girls 2024 DESC`).\n\n4. **Join the Tables:**\n   - Since we need data from both tables, we will perform an inner join on the `School Code` column, which is common to both tables.\n\n5. **Construct the SQL Query:**\n   - Start with the `SELECT` statement to specify the columns we need.\n   - Use the `FROM` clause to specify the primary table (`school_infrastructure`).\n   - Add the `JOIN` clause to include the `school_enrolment_by_year` table.\n   - Apply the `WHERE` clause to filter schools with non-functional girls' toilets.\n   - Finally, use the `ORDER BY` clause to sort the results by the number of girls enrolled in 2024 in descending order.\n\n### Final SQL Query:\n\n```sql\nSELECT \n    seb.Girls_2024\nFROM \n    school_infrastructure si\nJOIN \n    school_enrolment_by_year seb ON si.`School Code` = seb.`School Code`\nWHERE \n    si.`Toilets functional (girls)` = 'No'\nORDER BY \n    seb.Girls_2024 DESC;\n```\n\n### Explanation:\n- **SELECT Clause:** We select `Girls_2024` from the `school_enrolment_by_year` table.\n- **FROM Clause:** We start with the `school_infrastructure` table aliased as `si`.\n- **JOIN Clause:** We join the `school_enrolment_by_year` table aliased as `seb` on the `School Code` column.\n- **WHERE Clause:** We filter the rows where `Toilets functional (girls)` is 'No'.\n- **ORDER BY Clause:** We order the results by `Girls_2024` in descending order to get the schools with the highest enrollment first.\n\nThis query efficiently retrieves the required information based on the specified conditions and outputs the results in the desired order.",
+      "api": {
+        "id": "chatcmpl-YPMsCmI0vmjjS5cF67nS0kccLqVFP3m7",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 646,
+          "prompt_tokens": 1368,
+          "total_tokens": 2014,
+          "prompt_tokens_details": {
+            "cached_tokens": 303
+          }
+        },
+        "duration_seconds": 14.667
+      },
+      "duration_seconds": 14.668,
+      "error": "BinderException: Binder Error: Table \"seb\" does not have a column named \"Girls_2024\"\n\nCandidate bindings: : \"Girls 2024\", \"Girls 2022\", \"Girls 2023\"\n\nLINE 1: EXPLAIN SELECT seb.Girls_2024 FROM school_infrastructure AS si JOIN school...\n                       ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}, \"school_infrastructure\": {\"Toilets functional (girls)\": [\"No\", \"Yes\"], \"Drinking water\": [\"No\", \"Yes\"], \"Electricity\": [\"No\", \"Yes\"], \"Inspected On\": [\"2024-01-10\", \"2024-01-13\", \"2024-02-13\", \"2024-02-15\", \"2024-02-19\", \"2024-02-21\", \"2024-02-26\", \"2024-03-12\", \"2024-03-22\", \"2024-03-27\", \"2024-04-02\", \"2024-04-04\", \"2024-04-13\", \"2024-04-17\", \"2024-04-20\", \"2024-04-21\", \"2024-04-27\", \"2024-05-13\", \"2024-06-01\", \"2024-06-16\", \"2024-06-27\", \"2024-07-09\", \"2024-07-23\", \"2024-08-02\", \"2024-08-04\", \"2024-08-14\", \"2024-08-17\", \"2024-09-02\", \"2024-09-14\", \"2024-09-15\", \"2024-09-21\", \"2024-09-26\", \"2024-10-24\", \"2024-11-12\", \"2024-11-16\", \"2024-11-20\", \"2024-12-03\", \"2024-12-08\", \"2024-12-19\"], \"Source\": [\"Inspection register\"]}}\n\nCURRENT QUESTION:\nschools without a working girls toilet and how many girls were enrolled there in 2024, most girls first\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Table \"seb\" does not have a column named \"Girls_2024\"\n\nCandidate bindings: : \"Girls 2024\", \"Girls 2022\", \"Girls 2023\"\n\nLINE 1: EXPLAIN SELECT seb.Girls_2024 FROM school_infrastructure AS si JOIN school...\n                       ^\nReturn a complete corrected query.",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to carefully analyze the requirements and map them to the appropriate SQL constructs. Here's a step-by-step breakdown:\n\n### Step-by-Step Breakdown\n\n1. **Identify the Relevant Tables and Columns**:\n   - The question involves data from two tables: `school_enrolment_by_year` and `school_infrastructure`.\n   - From `school_enrolment_by_year`, we need the columns `Girls 2024` and `School Name`.\n   - From `school_infrastructure`, we need the column `Toilets functional (girls)`.\n\n2. **Understand the Conditions**:\n   - We need to filter schools where the girls' toilet is not functional (`Toilets functional (girls) = 'No'`).\n\n3. **Determine the Required Output**:\n   - The output should include the number of girls enrolled in 2024 (`Girls 2024`) and the school name (`School Name`).\n   - The results should be ordered by the number of girls enrolled in 2024 in descending order.\n\n4. **Formulate the SQL Query**:\n   - Use an `INNER JOIN` to combine the two tables based on the `School Code`.\n   - Apply the filter condition in the `WHERE` clause.\n   - Select the required columns and order the results as specified.\n\n### SQL Query\n\nBased on the above steps, the SQL query is formulated as follows:\n\n```sql\nSELECT seb.`Girls 2024`, seb.`School Name`\nFROM `school_enrolment_by_year` AS seb\nINNER JOIN `school_infrastructure` AS si\nON seb.`School Code` = si.`School Code`\nWHERE si.`Toilets functional (girls)` = 'No'\nORDER BY seb.`Girls 2024` DESC;\n```\n\n### Explanation\n\n- **SELECT Clause**: We select `Girls 2024` and `School Name` from the `school_enrolment_by_year` table (aliased as `seb`).\n- **FROM Clause**: We specify the `school_enrolment_by_year` table as the primary table.\n- **INNER JOIN Clause**: We join the `school_infrastructure` table (aliased as `si`) on the `School Code` column to link the two tables.\n- **WHERE Clause**: We filter the results to include only those rows where the `Toilets functional (girls)` column in the `school_infrastructure` table is 'No'.\n- **ORDER BY Clause**: We order the results by the number of girls enrolled in 2024 in descending order to show the schools with the highest enrollment first.\n\nThis query accurately captures the requirements of the natural language question and provides the desired output.",
+      "api": {
+        "id": "chatcmpl-2QQOU4FRPVQh0XDbQ6RrvU6BZFgbor7X",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 585,
+          "prompt_tokens": 1461,
+          "total_tokens": 2046,
+          "prompt_tokens_details": {
+            "cached_tokens": 1363
+          }
+        },
+        "duration_seconds": 12.956
+      },
+      "duration_seconds": 12.96,
+      "sql_duckdb": "SELECT seb.\"Girls 2024\", seb.\"School Name\" FROM \"school_enrolment_by_year\" AS seb INNER JOIN \"school_infrastructure\" AS si ON seb.\"School Code\" = si.\"School Code\" WHERE si.\"Toilets functional (girls)\" = 'No' ORDER BY seb.\"Girls 2024\" DESC",
+      "rows": [
+        [
+          190,
+          "Madhya Vidyalaya Bhadeya"
+        ],
+        [
+          189,
+          "Madhya Vidyalaya Chakand"
+        ],
+        [
+          178,
+          "Rajkiya Vidyalaya Chakand"
+        ],
+        [
+          165,
+          "Prathmik Vidyalaya Bhadeya"
+        ],
+        [
+          158,
+          "Adarsh Vidyalaya Bankat"
+        ],
+        [
+          140,
+          "Kanya Vidyalaya Khizarsarai"
+        ],
+        [
+          128,
+          "Navin Vidyalaya Tetariya"
+        ],
+        [
+          116,
+          "Madhya Vidyalaya Khizarsarai"
+        ],
+        [
+          110,
+          "Prathmik Vidyalaya Lodipur"
+        ],
+        [
+          105,
+          "Madhya Vidyalaya Karmauni"
+        ],
+        [
+          85,
+          "Adarsh Vidyalaya Amas"
+        ],
+        [
+          74,
+          "Navin Vidyalaya Chakand"
+        ],
+        [
+          66,
+          "Navin Vidyalaya Amas"
+        ],
+        [
+          61,
+          "Navin Vidyalaya Rampur"
+        ],
+        [
+          42,
+          "Madhya Vidyalaya Karmauni"
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

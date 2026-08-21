@@ -1,0 +1,64 @@
+{
+  "id": "relative-growth-between-years-p02",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "2024 total loan amount compared to 2023 total, percentage growth",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT (SUM(CASE WHEN SUBSTRING(\"Disbursement Date\", 1, 4) = '2024' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN SUBSTRING(\"Disbursement Date\", 1, 4) = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END)) * 100.0 / NULLIF(SUM(CASE WHEN SUBSTRING(\"Disbursement Date\", 1, 4) = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END), 0) AS \"Percentage Growth\" FROM shg_loan_register",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2024 total loan amount compared to 2023 total, percentage growth\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2024 total loan amount compared to 2023 total, percentage growth\n```sql",
+      "response": "\n\n```sql\nSELECT\n  (SUM(CASE WHEN SUBSTR(\"Disbursement Date\", 1, 4) = '2024' THEN \"Loan Amount (Rs)\" ELSE 0 END) -\n   SUM(CASE WHEN SUBSTR(\"Disbursement Date\", 1, 4) = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END)) * 100.0 /\n  SUM(CASE WHEN SUBSTR(\"Disbursement Date\", 1, 4) = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS \"Percentage Growth\"\nFROM shg_loan_register\n```",
+      "api": {
+        "id": "gen-1787311578-lJ5HzZrbclXh0YKOtLJV",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 276,
+          "completion_tokens": 460,
+          "total_tokens": 736,
+          "cost": 0.0015962,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0015962,
+            "upstream_inference_prompt_cost": 0.0001242,
+            "upstream_inference_completions_cost": 0.001472
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 236,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 16.693
+      },
+      "duration_seconds": 16.699,
+      "sql_duckdb": "SELECT (SUM(CASE WHEN SUBSTRING(\"Disbursement Date\", 1, 4) = '2024' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN SUBSTRING(\"Disbursement Date\", 1, 4) = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END)) * 100.0 / NULLIF(SUM(CASE WHEN SUBSTRING(\"Disbursement Date\", 1, 4) = '2023' THEN \"Loan Amount (Rs)\" ELSE 0 END), 0) AS \"Percentage Growth\" FROM shg_loan_register",
+      "rows": [
+        [
+          26.040816326530614
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}
