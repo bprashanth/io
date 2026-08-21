@@ -1,5 +1,9 @@
 # Local-first NGO data insights
 
+<p align="center">
+  <img src="assets/io.jpg" alt="Jupiter and Io" width="360">
+</p>
+
 This repository is working toward one practical event experience: an NGO user
 drops in an unfamiliar CSV, workbook or PDF, asks a short plain-language
 question, gets a correct desktop dashboard, and can refine it without debugging
@@ -26,6 +30,12 @@ accepted no wrong answers, and escalated nine. Qwen 3.8 27B passed 30/30 in its
 separate qualification run, giving a 30/30 routed replay on the frozen suite.
 The larger Arctic BF16 checkpoint scored 26/30 and passed a separate 15/15
 holdout, but is a server/high-end option rather than the intended laptop tier.
+
+**Re-verification note (2026-08-21 evening):** the model ranking above
+reproduces, but the router's "accepted no wrong answers" and the "30/30 routed
+replay" do not hold out of sample, and a 2026 general 9B model matches Arctic
+Q4. Read [the foundation re-verification](docs/foundation-reverification-2026-08-21.md)
+before relying on the router, the escalation rate or the laptop-tier choice.
 
 Read [the event decision](docs/v2-local-first-event-decision.md) before changing
 this architecture. Use [the reproduction guide](docs/local-first-reproduction.md)

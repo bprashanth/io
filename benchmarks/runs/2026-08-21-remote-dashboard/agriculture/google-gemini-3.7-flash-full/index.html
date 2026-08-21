@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2024 Monsoon Block-Wise Crop Yield Dashboard</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --primary: #047857;
+    --primary-light: #ecfdf5;
+    --primary-hover: #065f46;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --bar-2023: #94a3b8;
+    --bar-2024: #059669;
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--text-main);
+    line-height: 1.5;
+    padding: 24px;
+    width: 100%;
+    max-width: 1440px;
+    margin: 0 auto;
+    overflow-x: hidden;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-titles h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
+  }
+  .header-titles p {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    border-radius: 4px;
+    background: var(--primary-light);
+    color: var(--primary);
+    margin-bottom: 6px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--primary);
+    color: #ffffff;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+  .btn:hover {
+    background: var(--primary-hover);
+  }
+
+  /* KPI Grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--card-bg);
+    padding: 18px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .kpi-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .kpi-val {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-top: 6px;
+    line-height: 1.2;
+  }
+  .kpi-val span {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .kpi-sub {
+    font-size: 12px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .trend-up {
+    color: #059669;
+    font-weight: 600;
+  }
+  .trend-neutral {
+    color: var(--text-muted);
+  }
+
+  /* Charts Section */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .chart-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .chart-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+  .chart-legend {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  svg.chart {
+    width: 100%;
+    height: 270px;
+    display: block;
+  }
+
+  /* Table Section */
+  .table-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .table-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .search-input {
+    padding: 7px 12px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: 260px;
+    outline: none;
+  }
+  .search-input:focus {
+    border-color: var(--primary);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+  }
+  th {
+    background: #f1f5f9;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  th:hover {
+    background: #e2e8f0;
+    color: var(--text-main);
+  }
+  th.sorted-asc::after { content: " ↑"; color: var(--primary); }
+  th.sorted-desc::after { content: " ↓"; color: var(--primary); }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-main);
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+  tr:hover td {
+    background: #f8fafc;
+  }
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  th.num {
+    text-align: right;
+  }
+  .badge-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 700;
+    margin-right: 6px;
+  }
+
+  /* Footer */
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .source-pill {
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    color: var(--text-main);
+  }
+</style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-titles">
+      <div class="tag">Monsoon Performance Intelligence</div>
+      <h1>2024 Monsoon Block-Wise Crop Yield Dashboard</h1>
+      <p>Comparative agricultural yield analysis (tonnes/hectare, highest first) vs 2023 Monsoon</p>
+    </div>
+    <div>
+      <button class="btn" id="btnDownload">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Download CSV
+      </button>
+    </div>
+  </header>
+
+  <!-- KPI Cards -->
+  <section class="kpi-grid" id="kpiContainer"></section>
+
+  <!-- Charts -->
+  <section class="charts-grid">
+    <!-- Chart 1: Grouped Bar Chart -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Crop Yield by Block (2023 vs 2024)</div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-color" style="background: var(--bar-2023)"></div>2023 (t/ha)</div>
+          <div class="legend-item"><div class="legend-color" style="background: var(--bar-2024)"></div>2024 (t/ha)</div>
+        </div>
+      </div>
+      <svg id="yieldChart" class="chart"></svg>
+    </div>
+
+    <!-- Chart 2: Production vs Area Breakdown -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">2024 Total Harvest vs Cultivated Area</div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-color" style="background: #2563eb"></div>Harvest (tonnes)</div>
+          <div class="legend-item"><div class="legend-color" style="background: #93c5fd"></div>Area (ha)</div>
+        </div>
+      </div>
+      <svg id="prodAreaChart" class="chart"></svg>
+    </div>
+  </section>
+
+  <!-- Data Table -->
+  <section class="table-card">
+    <div class="table-toolbar">
+      <div class="chart-title">Block Yield &amp; Production Matrix (Sorted: 2024 Yield Highest First)</div>
+      <input type="text" id="searchInput" class="search-input" placeholder="Search block or source...">
+    </div>
+    <div style="overflow-x: auto;">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th data-col="rank" style="width: 60px;">Rank</th>
+            <th data-col="block">Block</th>
+            <th class="num" data-col="area23">2023 Area (ha)</th>
+            <th class="num" data-col="harvest23">2023 Harvest (t)</th>
+            <th class="num" data-col="yield23">2023 Yield (t/ha)</th>
+            <th class="num" data-col="area24">2024 Area (ha)</th>
+            <th class="num" data-col="harvest24">2024 Harvest (t)</th>
+            <th class="num" data-col="yield24">2024 Yield (t/ha)</th>
+            <th class="num" data-col="yieldDelta">Yield Δ (t/ha)</th>
+            <th class="num" data-col="yieldGrowthPct">YoY Growth (%)</th>
+            <th data-col="source">Source</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div>Source: <span class="source-pill">field register</span> (Official agricultural records)</div>
+    <div>Computed directly from in-page raw dataset • Season: Monsoon</div>
+  </footer>
+
+<script>
+  // Raw Data Embedded exactly as provided
+  const RAW_DATA = [
+    { block: "Bhojpur", season: "Monsoon", year: 2023, cultivated_hectares: 580, harvest_tonnes: 1392, source: "field register" },
+    { block: "Bhojpur", season: "Monsoon", year: 2024, cultivated_hectares: 600, harvest_tonnes: 1500, source: "field register" },
+    { block: "Dharwad", season: "Monsoon", year: 2023, cultivated_hectares: 490, harvest_tonnes: 1470, source: "field register" },
+    { block: "Dharwad", season: "Monsoon", year: 2024, cultivated_hectares: 500, harvest_tonnes: 1600, source: "field register" },
+    { block: "Wardha", season: "Monsoon", year: 2023, cultivated_hectares: 390, harvest_tonnes: 975, source: "field register" },
+    { block: "Wardha", season: "Monsoon", year: 2024, cultivated_hectares: 400, harvest_tonnes: 1080, source: "field register" }
+  ];
+
+  // Process data by Block
+  const blocksMap = {};
+  RAW_DATA.forEach(row => {
+    if (!blocksMap[row.block]) {
+      blocksMap[row.block] = { block: row.block, source: row.source };
+    }
+    if (row.year === 2023) {
+      blocksMap[row.block].area23 = row.cultivated_hectares;
+      blocksMap[row.block].harvest23 = row.harvest_tonnes;
+      blocksMap[row.block].yield23 = row.harvest_tonnes / row.cultivated_hectares;
+    } else if (row.year === 2024) {
+      blocksMap[row.block].area24 = row.cultivated_hectares;
+      blocksMap[row.block].harvest24 = row.harvest_tonnes;
+      blocksMap[row.block].yield24 = row.harvest_tonnes / row.cultivated_hectares;
+    }
+  });
+
+  let processedBlocks = Object.values(blocksMap).map(b => {
+    const yieldDelta = b.yield24 - b.yield23;
+    const yieldGrowthPct = ((b.yield24 - b.yield23) / b.yield23) * 100;
+    return {
+      ...b,
+      yieldDelta,
+      yieldGrowthPct
+    };
+  });
+
+  // Sort by 2024 yield descending (Tonnes per hectare highest first)
+  processedBlocks.sort((a, b) => b.yield24 - a.yield24);
+  processedBlocks.forEach((b, idx) => b.rank = idx + 1);
+
+  // Aggregates
+  const totalArea23 = processedBlocks.reduce((acc, b) => acc + b.area23, 0);
+  const totalHarvest23 = processedBlocks.reduce((acc, b) => acc + b.harvest23, 0);
+  const avgYield23 = totalHarvest23 / totalArea23;
+
+  const totalArea24 = processedBlocks.reduce((acc, b) => acc + b.area24, 0);
+  const totalHarvest24 = processedBlocks.reduce((acc, b) => acc + b.harvest24, 0);
+  const avgYield24 = totalHarvest24 / totalArea24;
+
+  const totalYieldDelta = avgYield24 - avgYield23;
+  const totalYieldGrowthPct = (totalYieldDelta / avgYield23) * 100;
+
+  const topBlock = processedBlocks[0];
+
+  // Render KPIs
+  function renderKPIs() {
+    const kpiContainer = document.getElementById("kpiContainer");
+    kpiContainer.innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-title">2024 Weighted Avg Yield</div>
+        <div class="kpi-val">${avgYield24.toFixed(2)} <span>t/ha</span></div>
+        <div class="kpi-sub">
+          <span class="trend-up">+${totalYieldDelta.toFixed(2)} t/ha (+${totalYieldGrowthPct.toFixed(1)}%)</span> vs 2023 (${avgYield23.toFixed(2)})
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Top Performing Block</div>
+        <div class="kpi-val">${topBlock.block}</div>
+        <div class="kpi-sub">
+          <span class="trend-up">${topBlock.yield24.toFixed(2)} t/ha</span> (+${topBlock.yieldGrowthPct.toFixed(1)}% YoY)
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">2024 Total Harvest</div>
+        <div class="kpi-val">${totalHarvest24.toLocaleString()} <span>tonnes</span></div>
+        <div class="kpi-sub">
+          <span class="trend-up">+${((totalHarvest24 - totalHarvest23) / totalHarvest23 * 100).toFixed(1)}%</span> vs 2023 (${totalHarvest23.toLocaleString()} t)
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">2024 Cultivated Area</div>
+        <div class="kpi-val">${totalArea24.toLocaleString()} <span>ha</span></div>
+        <div class="kpi-sub">
+          <span class="trend-neutral">+${totalArea24 - totalArea23} ha (+${(((totalArea24 - totalArea23) / totalArea23) * 100).toFixed(1)}%)</span> vs 2023 (${totalArea23.toLocaleString()} ha)
+        </div>
+      </div>
+    `;
+  }
+
+  // Draw Yield Comparison SVG Chart (Grouped Bars)
+  function renderYieldChart() {
+    const svg = document.getElementById("yieldChart");
+    const width = 680;
+    const height = 270;
+    const margin = { top: 30, right: 20, bottom: 40, left: 50 };
+    const chartW = width - margin.left - margin.right;
+    const chartH = height - margin.top - margin.bottom;
+
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+    const maxVal = 3.6; // Max y-axis
+    const numTicks = 4;
+
+    let content = "";
+
+    // Grid lines & Y Axis Labels
+    for (let i = 0; i <= numTicks; i++) {
+      const val = (maxVal / numTicks) * i;
+      const y = margin.top + chartH - (val / maxVal) * chartH;
+      content += `<line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="#f1f5f9" stroke-width="1.5" />`;
+      content += `<text x="${margin.left - 10}" y="${y + 4}" font-size="11" fill="#64748b" text-anchor="end" font-family="sans-serif">${val.toFixed(1)}</text>`;
+    }
+
+    // Y Axis unit label
+    content += `<text x="${margin.left}" y="${margin.top - 12}" font-size="11" fill="#64748b" font-weight="600">t/ha</text>`;
+
+    // Render bars per block
+    const groupWidth = chartW / processedBlocks.length;
+    const barWidth = 36;
+    const barSpacing = 6;
+
+    processedBlocks.forEach((b, i) => {
+      const groupCenterX = margin.left + (i + 0.5) * groupWidth;
+      
+      const x23 = groupCenterX - barWidth - (barSpacing / 2);
+      const h23 = (b.yield23 / maxVal) * chartH;
+      const y23 = margin.top + chartH - h23;
+
+      const x24 = groupCenterX + (barSpacing / 2);
+      const h24 = (b.yield24 / maxVal) * chartH;
+      const y24 = margin.top + chartH - h24;
+
+      // 2023 Bar
+      content += `<rect x="${x23}" y="${y23}" width="${barWidth}" height="${h23}" fill="var(--bar-2023)" rx="3" />`;
+      content += `<text x="${x23 + barWidth/2}" y="${y23 - 6}" font-size="11" font-weight="600" fill="#64748b" text-anchor="middle">${b.yield23.toFixed(2)}</text>`;
+
+      // 2024 Bar
+      content += `<rect x="${x24}" y="${y24}" width="${barWidth}" height="${h24}" fill="var(--bar-2024)" rx="3" />`;
+      content += `<text x="${x24 + barWidth/2}" y="${y24 - 6}" font-size="11" font-weight="700" fill="#047857" text-anchor="middle">${b.yield24.toFixed(2)}</text>`;
+
+      // Block Label (X-axis)
+      content += `<text x="${groupCenterX}" y="${height - margin.bottom + 22}" font-size="13" font-weight="600" fill="#0f172a" text-anchor="middle">${b.block}</text>`;
+      content += `<text x="${groupCenterX}" y="${height - margin.bottom + 36}" font-size="10" fill="#059669" text-anchor="middle">+${b.yieldGrowthPct.toFixed(1)}% YoY</text>`;
+    });
+
+    svg.innerHTML = content;
+  }
+
+  // Draw Production & Area Breakdown SVG Chart
+  function renderProdAreaChart() {
+    const svg = document.getElementById("prodAreaChart");
+    const width = 560;
+    const height = 270;
+    const margin = { top: 30, right: 30, bottom: 40, left: 60 };
+    const chartW = width - margin.left - margin.right;
+    const chartH = height - margin.top - margin.bottom;
+
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+    const maxHarvest = 1800; // max harvest tonnes
+    const numTicks = 4;
+    let content = "";
+
+    // Grid lines
+    for (let i = 0; i <= numTicks; i++) {
+      const val = (maxHarvest / numTicks) * i;
+      const y = margin.top + chartH - (val / maxHarvest) * chartH;
+      content += `<line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="#f1f5f9" stroke-width="1.5" />`;
+      content += `<text x="${margin.left - 10}" y="${y + 4}" font-size="11" fill="#64748b" text-anchor="end">${val}</text>`;
+    }
+
+    content += `<text x="${margin.left}" y="${margin.top - 12}" font-size="11" fill="#64748b" font-weight="600">Volume / Area</text>`;
+
+    const groupWidth = chartW / processedBlocks.length;
+    const barWidth = 32;
+    const barGap = 6;
+
+    processedBlocks.forEach((b, i) => {
+      const groupCenterX = margin.left + (i + 0.5) * groupWidth;
+
+      // Harvest 2024 bar
+      const xHarvest = groupCenterX - barWidth - (barGap / 2);
+      const hHarvest = (b.harvest24 / maxHarvest) * chartH;
+      const yHarvest = margin.top + chartH - hHarvest;
+
+      // Area 2024 bar
+      const xArea = groupCenterX + (barGap / 2);
+      const hArea = (b.area24 / maxHarvest) * chartH;
+      const yArea = margin.top + chartH - hArea;
+
+      content += `<rect x="${xHarvest}" y="${yHarvest}" width="${barWidth}" height="${hHarvest}" fill="#2563eb" rx="3" />`;
+      content += `<text x="${xHarvest + barWidth/2}" y="${yHarvest - 6}" font-size="10" font-weight="600" fill="#1d4ed8" text-anchor="middle">${b.harvest24}t</text>`;
+
+      content += `<rect x="${xArea}" y="${yArea}" width="${barWidth}" height="${hArea}" fill="#93c5fd" rx="3" />`;
+      content += `<text x="${xArea + barWidth/2}" y="${yArea - 6}" font-size="10" font-weight="600" fill="#3b82f6" text-anchor="middle">${b.area24}ha</text>`;
+
+      content += `<text x="${groupCenterX}" y="${height - margin.bottom + 22}" font-size="13" font-weight="600" fill="#0f172a" text-anchor="middle">${b.block}</text>`;
+    });
+
+    svg.innerHTML = content;
+  }
+
+  // Table Logic: Sorting and Filtering
+  let sortCol = "yield24";
+  let sortAsc = false;
+  let searchTerm = "";
+
+  function renderTable() {
+    const tbody = document.getElementById("tableBody");
+    
+    // Filter
+    let filtered = processedBlocks.filter(item => {
+      const matchSearch = item.block.toLowerCase().includes(searchTerm) || 
+                           item.source.toLowerCase().includes(searchTerm);
+      return matchSearch;
+    });
+
+    // Sort
+    filtered.sort((a, b) => {
+      let valA = a[sortCol];
+      let valB = b[sortCol];
+      if (typeof valA === "string") {
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      return sortAsc ? valA - valB : valB - valA;
+    });
+
+    // Update Th Classes
+    document.querySelectorAll("#dataTable th").forEach(th => {
+      th.classList.remove("sorted-asc", "sorted-desc");
+      if (th.getAttribute("data-col") === sortCol) {
+        th.classList.add(sortAsc ? "sorted-asc" : "sorted-desc");
+      }
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding: 24px; color: var(--text-muted);">No matching blocks found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(b => `
+      <tr>
+        <td><span class="badge-rank">${b.rank}</span></td>
+        <td style="font-weight: 600;">${b.block}</td>
+        <td class="num">${b.area23.toLocaleString()}</td>
+        <td class="num">${b.harvest23.toLocaleString()}</td>
+        <td class="num">${b.yield23.toFixed(2)}</td>
+        <td class="num">${b.area24.toLocaleString()}</td>
+        <td class="num">${b.harvest24.toLocaleString()}</td>
+        <td class="num" style="font-weight: 700; color: #047857;">${b.yield24.toFixed(2)}</td>
+        <td class="num" style="color: #059669; font-weight: 600;">+${b.yieldDelta.toFixed(2)}</td>
+        <td class="num" style="color: #059669; font-weight: 600;">+${b.yieldGrowthPct.toFixed(2)}%</td>
+        <td><span class="source-pill">${b.source}</span></td>
+      </tr>
+    `).join("");
+  }
+
+  // Setup Table Sorting Event
+  document.querySelectorAll("#dataTable th").forEach(th => {
+    th.addEventListener("click", () => {
+      const col = th.getAttribute("data-col");
+      if (sortCol === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = col;
+        sortAsc = col === "block" || col === "source" || col === "rank";
+      }
+      renderTable();
+    });
+  });
+
+  // Setup Search Input Event
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    searchTerm = e.target.value.toLowerCase().trim();
+    renderTable();
+  });
+
+  // CSV Export Handler
+  document.getElementById("btnDownload").addEventListener("click", () => {
+    // Generate CSV strictly from data
+    const headers = [
+      "Rank",
+      "Block",
+      "Season",
+      "2023 Cultivated Area (ha)",
+      "2023 Harvest (tonnes)",
+      "2023 Yield (tonnes/ha)",
+      "2024 Cultivated Area (ha)",
+      "2024 Harvest (tonnes)",
+      "2024 Yield (tonnes/ha)",
+      "Yield Change (tonnes/ha)",
+      "Yield YoY Growth (%)",
+      "Source"
+    ];
+
+    const rows = processedBlocks.map(b => [
+      b.rank,
+      `"${b.block}"`,
+      "Monsoon",
+      b.area23,
+      b.harvest23,
+      b.yield23.toFixed(4),
+      b.area24,
+      b.harvest24,
+      b.yield24.toFixed(4),
+      b.yieldDelta.toFixed(4),
+      b.yieldGrowthPct.toFixed(2),
+      `"${b.source}"`
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + 
+      [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "monsoon_block_crop_yield_2024_vs_2023.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+
+  // Initialize
+  renderKPIs();
+  renderYieldChart();
+  renderProdAreaChart();
+  renderTable();
+</script>
+</body>
+</html>

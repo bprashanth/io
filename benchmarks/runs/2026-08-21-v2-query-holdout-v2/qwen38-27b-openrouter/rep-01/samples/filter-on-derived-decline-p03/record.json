@@ -1,0 +1,103 @@
+{
+  "id": "filter-on-derived-decline-p03",
+  "task_id": "filter-on-derived-decline",
+  "pattern": "keep groups whose derived change is negative, null rounds drop out",
+  "question": "women 15-49 literacy decreased between the two rounds - name those districts",
+  "gold_sql": "SELECT \"District\" FROM district_health_factsheet WHERE \"District\" <> 'State Total' GROUP BY \"District\" HAVING MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Women age 15-49 years who are literate (%)\" END) < MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Women age 15-49 years who are literate (%)\" END) ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Cuttack"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Cuttack"
+    ],
+    [
+      "State Total"
+    ],
+    [
+      "State Total"
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT t2.District FROM district_health_factsheet AS t1 JOIN district_health_factsheet AS t2 ON t1.District = t2.District AND t1.\"Survey Round\" < t2.\"Survey Round\" WHERE t2.\"Women age 15-49 years who are literate (%)\" < t1.\"Women age 15-49 years who are literate (%)\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nwomen 15-49 literacy decreased between the two rounds - name those districts\n[Database Schema]\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nwomen 15-49 literacy decreased between the two rounds - name those districts\n```sql",
+      "response": "\n\n```sql\nSELECT t2.District\nFROM district_health_factsheet t1\nJOIN district_health_factsheet t2\n  ON t1.District = t2.District\n  AND t1.\"Survey Round\" < t2.\"Survey Round\"\nWHERE t2.\"Women age 15-49 years who are literate (%)\" < t1.\"Women age 15-49 years who are literate (%)\"\n```",
+      "api": {
+        "id": "gen-1787311496-8e00NU7Kan8pDMXzOzkZ",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 305,
+          "completion_tokens": 677,
+          "total_tokens": 982,
+          "cost": 0.00230365,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00230365,
+            "upstream_inference_prompt_cost": 0.00013725,
+            "upstream_inference_completions_cost": 0.0021664
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 559,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 6.465
+      },
+      "duration_seconds": 6.466,
+      "sql_duckdb": "SELECT t2.District FROM district_health_factsheet AS t1 JOIN district_health_factsheet AS t2 ON t1.District = t2.District AND t1.\"Survey Round\" < t2.\"Survey Round\" WHERE t2.\"Women age 15-49 years who are literate (%)\" < t1.\"Women age 15-49 years who are literate (%)\"",
+      "rows": [
+        [
+          "Purnia"
+        ],
+        [
+          "Rohtas"
+        ],
+        [
+          "Hazaribagh"
+        ],
+        [
+          "Cuttack"
+        ],
+        [
+          "State Total"
+        ],
+        [
+          "State Total"
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

@@ -96,6 +96,51 @@ def make_prompt(question: str, schema: str, reference: str, repair: str | None =
     return "\n".join(parts)
 
 
+def known_categories(db: duckdb.DuckDBPyConnection, manifest: dict[str, Any], limit: int = 50) -> dict[str, dict[str, list[str]]]:
+    """Distinct values of low-cardinality text columns, as the live shell shows them."""
+    result: dict[str, dict[str, list[str]]] = {}
+    for table in manifest["tables"]:
+        name = table["name"]
+        columns = db.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = ? AND data_type IN ('VARCHAR', 'TEXT') ORDER BY ordinal_position",
+            [name],
+        ).fetchall()
+        per_table: dict[str, list[str]] = {}
+        for (column,) in columns:
+            quoted = column.replace('"', '""')
+            values = [str(row[0]) for row in db.execute(
+                f'SELECT DISTINCT "{quoted}" FROM "{name}" WHERE "{quoted}" IS NOT NULL ORDER BY 1 LIMIT {limit + 1}'
+            ).fetchall()]
+            if len(values) <= limit:
+                per_table[column] = values
+        result[name] = per_table
+    return result
+
+
+def make_shell_prompt(question: str, schema: str, categories: dict[str, Any], repair: str | None = None,
+                      plus: bool = False) -> str:
+    """The prompt family used by run_local_first_insight.py (single turn, no prior turns).
+    ``plus`` adds one generic aggregate-row rule that the live shell does not have yet."""
+    sections = [
+        "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.",
+        "Return SQL only. Never write files, install software, calculate values yourself, or invent columns.",
+        "Use only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.",
+        "A requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.",
+        "When the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.",
+        "When the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.",
+        "When several known category values are named, filter them separately with IN rather than concatenating them.",
+        *(["Aggregate or total rows that sit inside a detail table (for example a 'Total' label in a district column) are not detail rows; exclude them when the user asks about the detail level."] if plus else []),
+        "Use NULLIF for denominators. Missing values remain missing and are not zero.",
+        f"SCHEMA:\n{schema}",
+        f"KNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{json.dumps(categories, ensure_ascii=False)}",
+        f"CURRENT QUESTION:\n{question}",
+    ]
+    if repair:
+        sections.append(f"REJECTED QUERY ERROR:\n{repair}\nReturn a complete corrected query.")
+    return "\n\n".join(sections)
+
+
 def endpoint_json(url: str, body: dict[str, Any], timeout: int, api_key: str | None = None) -> dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     if api_key:
@@ -136,7 +181,12 @@ def call_model(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
-    if reasoning_effort:
+    if reasoning_effort == "none":
+        # Thinking models otherwise spend the whole budget in the hidden
+        # reasoning channel and return empty content, which the gate counts
+        # as a failure. Ask the provider to disable thinking.
+        body["reasoning"] = {"enabled": False}
+    elif reasoning_effort:
         body["reasoning"] = {"effort": reasoning_effort}
     raw = endpoint_json(
         endpoint.rstrip("/") + "/chat/completions",
@@ -188,10 +238,27 @@ def rows(db: duckdb.DuckDBPyConnection, query: str) -> list[list[Any]]:
     return [[clean(value) for value in row] for row in db.execute(query).fetchall()]
 
 
-def equal_value(left: Any, right: Any, tolerance: float) -> bool:
+def equal_value(left: Any, right: Any, tolerance: float | tuple[float, float]) -> bool:
+    """Compare two cells. ``tolerance`` is either one value used for both the
+    relative and absolute tolerance (the v2 gate contract) or a
+    ``(rel_tol, abs_tol)`` pair (holdout-v2 and later, where gold values are
+    unrounded and a model's ROUND(x, 1) must still count as equal)."""
+    if isinstance(left, bool) or isinstance(right, bool):
+        return left == right
     if isinstance(left, (int, float)) and isinstance(right, (int, float)):
-        return math.isclose(float(left), float(right), rel_tol=tolerance, abs_tol=tolerance)
+        rel, absolute = tolerance if isinstance(tolerance, tuple) else (tolerance, tolerance)
+        return math.isclose(float(left), float(right), rel_tol=rel, abs_tol=absolute)
     return left == right
+
+
+def manifest_tolerance(manifest: dict[str, Any]) -> float | tuple[float, float]:
+    comparison = manifest["comparison"]
+    if "numeric_abs_tolerance" in comparison or "numeric_rel_tolerance" in comparison:
+        return (
+            float(comparison.get("numeric_rel_tolerance", 1e-06)),
+            float(comparison.get("numeric_abs_tolerance", 1e-06)),
+        )
+    return float(comparison["numeric_tolerance"])
 
 
 def equal_row(left: list[Any], right: list[Any], tolerance: float) -> bool:
@@ -270,11 +337,13 @@ def main() -> int:
     parser.add_argument("--timeout-seconds", type=int, default=120)
     parser.add_argument("--api-key-file", type=Path)
     parser.add_argument("--max-tokens", type=int, default=1024)
-    parser.add_argument("--reasoning-effort", choices=("low", "medium", "high", "xhigh"))
+    parser.add_argument("--reasoning-effort", choices=("none", "low", "medium", "high", "xhigh"))
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--only-task", action="append", default=[])
     parser.add_argument("--only-sample", action="append", default=[])
     parser.add_argument("--max-samples", type=int)
+    parser.add_argument("--prompt-style", choices=("gate", "shell", "shell-plus"), default="gate",
+                        help="gate: frozen v2 SQLite-expert prompt (default); shell: the live shell's DuckDB prompt with known categorical values; shell-plus: shell plus one generic aggregate-row rule")
     args = parser.parse_args()
     api_key = None
     if args.api_key_file:
@@ -305,11 +374,12 @@ def main() -> int:
         "max_tokens": args.max_tokens,
         "reasoning_effort": args.reasoning_effort,
         "temperature": args.temperature,
+        "prompt_style": args.prompt_style,
         "samples": len(samples),
         "data": data_evidence,
     })
     records = []
-    tolerance = float(manifest["comparison"]["numeric_tolerance"])
+    tolerance = manifest_tolerance(manifest)
     for sample in samples:
         sample_dir = args.output / "samples" / sample["id"]
         expected = rows(db, sample["task"]["gold_sql"])
@@ -319,7 +389,11 @@ def main() -> int:
             "reference",
             "Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.",
         )
-        prompt = make_prompt(sample["question"], schema, reference)
+        if args.prompt_style.startswith("shell"):
+            categories = known_categories(db, scoped_manifest)
+            prompt = make_shell_prompt(sample["question"], schema, categories, plus=args.prompt_style == "shell-plus")
+        else:
+            prompt = make_prompt(sample["question"], schema, reference)
         attempts = []
         actual: list[list[Any]] | None = None
         final_sql = None
@@ -351,7 +425,11 @@ def main() -> int:
                 if attempt == 2:
                     break
                 if not isinstance(error, TimeoutError):
-                    prompt = make_prompt(sample["question"], schema, reference, request_record["error"])
+                    if args.prompt_style.startswith("shell"):
+                        prompt = make_shell_prompt(sample["question"], schema, categories, request_record["error"],
+                                                   plus=args.prompt_style == "shell-plus")
+                    else:
+                        prompt = make_prompt(sample["question"], schema, reference, request_record["error"])
         order_matters = bool(sample["task"].get("order_matters", False))
         passed = actual is not None and equal_rows(actual, expected, tolerance, order_matters)
         record = {

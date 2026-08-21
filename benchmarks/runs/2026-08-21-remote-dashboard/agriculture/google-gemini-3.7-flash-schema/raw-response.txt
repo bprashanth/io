@@ -1,0 +1,1057 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2024 Monsoon Crop Yield & Regional Agricultural Performance Dashboard</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #1e293b;
+      --border-color: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-2024: #38bdf8;
+      --accent-2023: #818cf8;
+      --accent-positive: #34d399;
+      --accent-negative: #f87171;
+      --hover-bg: #2d3f58;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      padding: 24px;
+      min-width: 1400px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+    }
+
+    .title-area h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .title-area p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .meta-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .select-control {
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .btn {
+      background-color: #2563eb;
+      color: #ffffff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: #1d4ed8;
+    }
+
+    /* KPI Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .kpi-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .kpi-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .kpi-value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-unit {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .kpi-subtext {
+      font-size: 12px;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+    }
+
+    .trend-badge {
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .trend-up {
+      background-color: rgba(52, 211, 153, 0.15);
+      color: var(--accent-positive);
+    }
+
+    .trend-down {
+      background-color: rgba(248, 113, 113, 0.15);
+      color: var(--accent-negative);
+    }
+
+    /* Charts Section */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .chart-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      height: 380px;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .chart-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    .chart-body {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Table Section */
+    .table-section {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .table-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .table-search {
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      width: 260px;
+      outline: none;
+    }
+
+    .table-search:focus {
+      border-color: var(--accent-2024);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      max-height: 480px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #162032;
+      color: var(--text-secondary);
+      padding: 10px 14px;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border-color);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    th:hover {
+      color: var(--text-primary);
+    }
+
+    th .sort-icon {
+      margin-left: 4px;
+      font-size: 11px;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    tr:hover td {
+      background-color: var(--hover-bg);
+    }
+
+    .num-col {
+      text-align: right;
+    }
+
+    /* Footer & Source */
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding-top: 8px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .source-text strong {
+      color: var(--text-secondary);
+    }
+
+    /* SVG Chart Styles */
+    svg text {
+      font-family: inherit;
+    }
+
+    .axis text {
+      fill: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .axis line, .axis path {
+      stroke: var(--border-color);
+    }
+
+    .grid-line {
+      stroke: #334155;
+      stroke-opacity: 0.4;
+      stroke-dasharray: 2,2;
+    }
+    
+    .tooltip {
+      position: absolute;
+      background: #0f172a;
+      border: 1px solid #475569;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #fff;
+      pointer-events: none;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="title-area">
+        <h1>2024 Monsoon Crop Yield & Harvest Performance</h1>
+        <p>Comparative Block-wise Analysis (Monsoon 2024 vs Monsoon 2023) &bull; Tonnes per Hectare (t/ha)</p>
+      </div>
+      <div class="meta-controls">
+        <label for="seasonSelect" style="font-size: 13px; color: var(--text-secondary);">Season:</label>
+        <select id="seasonSelect" class="select-control" onchange="handleSeasonChange()">
+          <!-- Populated by JS -->
+        </select>
+        <button class="btn" onclick="downloadCSV()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Download CSV
+        </button>
+      </div>
+    </header>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">2024 Average Yield</div>
+        <div class="kpi-value-row">
+          <span class="kpi-value" id="kpi-2024-yield">-</span>
+          <span class="kpi-unit">t/ha</span>
+        </div>
+        <div class="kpi-subtext" id="kpi-yield-change-wrap">
+          <span class="trend-badge" id="kpi-yield-trend">-</span> vs 2023 (<span id="kpi-2023-yield">-</span> t/ha)
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">2024 Total Harvest</div>
+        <div class="kpi-value-row">
+          <span class="kpi-value" id="kpi-2024-harvest">-</span>
+          <span class="kpi-unit">tonnes</span>
+        </div>
+        <div class="kpi-subtext" id="kpi-harvest-change-wrap">
+          <span class="trend-badge" id="kpi-harvest-trend">-</span> vs 2023 (<span id="kpi-2023-harvest">-</span> t)
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">2024 Cultivated Area</div>
+        <div class="kpi-value-row">
+          <span class="kpi-value" id="kpi-2024-area">-</span>
+          <span class="kpi-unit">hectares</span>
+        </div>
+        <div class="kpi-subtext" id="kpi-area-change-wrap">
+          <span class="trend-badge" id="kpi-area-trend">-</span> vs 2023 (<span id="kpi-2023-area">-</span> ha)
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Top Performing Block (2024)</div>
+        <div class="kpi-value-row">
+          <span class="kpi-value" id="kpi-top-block" style="font-size: 20px;">-</span>
+        </div>
+        <div class="kpi-subtext">
+          Peak yield: <strong id="kpi-top-block-yield" style="color: var(--accent-2024); margin-left: 4px;">-</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="charts-grid">
+      <!-- Chart 1: Yield Comparison (t/ha) -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Crop Yield by Block (Tonnes / Hectare) &mdash; Highest First</div>
+          <div class="chart-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background-color: var(--accent-2024);"></div>
+              <span>2024 Yield</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background-color: var(--accent-2023);"></div>
+              <span>2023 Yield</span>
+            </div>
+          </div>
+        </div>
+        <div class="chart-body" id="yieldChartContainer">
+          <!-- Rendered via SVG JS -->
+        </div>
+      </div>
+
+      <!-- Chart 2: Cultivated Area vs Total Harvest (2024) -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Cultivated Area (ha) vs Total Harvest (tonnes) &mdash; 2024</div>
+          <div class="chart-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background-color: #38bdf8;"></div>
+              <span>Harvest (t)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background-color: #f59e0b;"></div>
+              <span>Area (ha)</span>
+            </div>
+          </div>
+        </div>
+        <div class="chart-body" id="harvestAreaChartContainer">
+          <!-- Rendered via SVG JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Table Section -->
+    <div class="table-section">
+      <div class="table-controls">
+        <h2 style="font-size: 16px; font-weight: 600;">Block Yield Performance Breakdown</h2>
+        <input type="text" id="tableFilter" class="table-search" placeholder="Filter by Block name..." oninput="handleTableSearch(this.value)">
+      </div>
+      <div class="table-wrapper">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable('block')">Block <span class="sort-icon" id="sort-block">⇅</span></th>
+              <th class="num-col" onclick="sortTable('yield_2024')">2024 Yield (t/ha) <span class="sort-icon" id="sort-yield_2024">▼</span></th>
+              <th class="num-col" onclick="sortTable('yield_2023')">2023 Yield (t/ha) <span class="sort-icon" id="sort-yield_2023">⇅</span></th>
+              <th class="num-col" onclick="sortTable('yield_change_pct')">YoY Yield Change (%) <span class="sort-icon" id="sort-yield_change_pct">⇅</span></th>
+              <th class="num-col" onclick="sortTable('harvest_2024')">2024 Harvest (t) <span class="sort-icon" id="sort-harvest_2024">⇅</span></th>
+              <th class="num-col" onclick="sortTable('area_2024')">2024 Area (ha) <span class="sort-icon" id="sort-area_2024">⇅</span></th>
+              <th class="num-col" onclick="sortTable('harvest_2023')">2023 Harvest (t) <span class="sort-icon" id="sort-harvest_2023">⇅</span></th>
+              <th class="num-col" onclick="sortTable('area_2023')">2023 Area (ha) <span class="sort-icon" id="sort-area_2023">⇅</span></th>
+              <th>Source <span class="sort-icon" id="sort-source">⇅</span></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div class="source-text">
+        <strong>Data Source:</strong> <span id="sourceDisplay">Agricultural Department Registry</span>
+      </div>
+      <div>
+        <span>Generated offline &bull; Figures calculated dynamically</span>
+      </div>
+    </footer>
+  </div>
+
+  <div id="chartTooltip" class="tooltip"></div>
+
+  <script>
+    // DATA PLACEHOLDER
+    const DATA = __DATA__;
+
+    // State Variables
+    let selectedSeason = "";
+    let processedBlocks = [];
+    let filteredBlocks = [];
+    let currentSort = { column: 'yield_2024', asc: false };
+
+    // Formatters
+    const numFmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const intFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
+    function init() {
+      if (!DATA || DATA.length === 0) {
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 24px;">No data available.</td></tr>';
+        return;
+      }
+
+      // Populate seasons dropdown
+      const seasons = Array.from(new Set(DATA.map(d => d.season).filter(Boolean)));
+      const seasonSelect = document.getElementById('seasonSelect');
+      seasonSelect.innerHTML = '';
+      
+      // Look for "Monsoon" or "Kharif" as default priority
+      let defaultSeason = seasons[0];
+      const monsoonMatch = seasons.find(s => s.toLowerCase().includes('monsoon') || s.toLowerCase().includes('kharif'));
+      if (monsoonMatch) defaultSeason = monsoonMatch;
+
+      seasons.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        if (s === defaultSeason) opt.selected = true;
+        seasonSelect.appendChild(opt);
+      });
+
+      selectedSeason = seasonSelect.value;
+      processData();
+    }
+
+    function handleSeasonChange() {
+      selectedSeason = document.getElementById('seasonSelect').value;
+      processData();
+    }
+
+    function processData() {
+      const seasonRows = DATA.filter(d => d.season === selectedSeason);
+
+      // Collect sources
+      const sources = Array.from(new Set(seasonRows.map(d => d.source).filter(Boolean)));
+      document.getElementById('sourceDisplay').textContent = sources.length ? sources.join(', ') : 'Not specified';
+
+      // Group by block
+      const blockMap = {};
+
+      seasonRows.forEach(row => {
+        const b = row.block;
+        if (!blockMap[b]) {
+          blockMap[b] = {
+            block: b,
+            source: row.source || 'N/A',
+            area_2024: 0,
+            harvest_2024: 0,
+            area_2023: 0,
+            harvest_2023: 0,
+            has_2024: false,
+            has_2023: false
+          };
+        }
+        if (row.year === 2024) {
+          blockMap[b].area_2024 += (Number(row.cultivated_hectares) || 0);
+          blockMap[b].harvest_2024 += (Number(row.harvest_tonnes) || 0);
+          blockMap[b].has_2024 = true;
+        } else if (row.year === 2023) {
+          blockMap[b].area_2023 += (Number(row.cultivated_hectares) || 0);
+          blockMap[b].harvest_2023 += (Number(row.harvest_tonnes) || 0);
+          blockMap[b].has_2023 = true;
+        }
+        if (row.source) blockMap[b].source = row.source;
+      });
+
+      processedBlocks = Object.values(blockMap).map(b => {
+        const yield_2024 = b.area_2024 > 0 ? (b.harvest_tonnes_2024 = b.harvest_2024) / b.area_2024 : 0;
+        const yield_2023 = b.area_2023 > 0 ? b.harvest_2023 / b.area_2023 : 0;
+        
+        let yield_change_pct = null;
+        if (b.has_2023 && b.has_2024 && yield_2023 > 0) {
+          yield_change_pct = ((yield_2024 - yield_2023) / yield_2023) * 100;
+        }
+
+        return {
+          ...b,
+          yield_2024: yield_2024,
+          yield_2023: yield_2023,
+          yield_change_pct: yield_change_pct
+        };
+      });
+
+      // Default sort: yield_2024 descending
+      currentSort = { column: 'yield_2024', asc: false };
+      sortProcessedData();
+      
+      updateKPIs();
+      renderCharts();
+      renderTable();
+    }
+
+    function updateKPIs() {
+      // 2024 totals
+      let totalArea24 = 0, totalHarvest24 = 0;
+      let totalArea23 = 0, totalHarvest23 = 0;
+      let topBlock = null;
+
+      processedBlocks.forEach(b => {
+        totalArea24 += b.area_2024;
+        totalHarvest24 += b.harvest_2024;
+        totalArea23 += b.area_2023;
+        totalHarvest23 += b.harvest_2023;
+
+        if (b.has_2024) {
+          if (!topBlock || b.yield_2024 > topBlock.yield_2024) {
+            topBlock = b;
+          }
+        }
+      });
+
+      const avgYield24 = totalArea24 > 0 ? totalHarvest24 / totalArea24 : 0;
+      const avgYield23 = totalArea23 > 0 ? totalHarvest23 / totalArea23 : 0;
+
+      // Yield KPI
+      document.getElementById('kpi-2024-yield').textContent = numFmt.format(avgYield24);
+      document.getElementById('kpi-2023-yield').textContent = numFmt.format(avgYield23);
+      const yieldTrendEl = document.getElementById('kpi-yield-trend');
+      if (avgYield23 > 0) {
+        const pct = ((avgYield24 - avgYield23) / avgYield23) * 100;
+        const sign = pct >= 0 ? '+' : '';
+        yieldTrendEl.textContent = `${sign}${pct.toFixed(1)}%`;
+        yieldTrendEl.className = `trend-badge ${pct >= 0 ? 'trend-up' : 'trend-down'}`;
+      } else {
+        yieldTrendEl.textContent = 'N/A';
+        yieldTrendEl.className = 'trend-badge';
+      }
+
+      // Harvest KPI
+      document.getElementById('kpi-2024-harvest').textContent = intFmt.format(totalHarvest24);
+      document.getElementById('kpi-2023-harvest').textContent = intFmt.format(totalHarvest23);
+      const harvestTrendEl = document.getElementById('kpi-harvest-trend');
+      if (totalHarvest23 > 0) {
+        const pct = ((totalHarvest24 - totalHarvest23) / totalHarvest23) * 100;
+        const sign = pct >= 0 ? '+' : '';
+        harvestTrendEl.textContent = `${sign}${pct.toFixed(1)}%`;
+        harvestTrendEl.className = `trend-badge ${pct >= 0 ? 'trend-up' : 'trend-down'}`;
+      } else {
+        harvestTrendEl.textContent = 'N/A';
+        harvestTrendEl.className = 'trend-badge';
+      }
+
+      // Area KPI
+      document.getElementById('kpi-2024-area').textContent = intFmt.format(totalArea24);
+      document.getElementById('kpi-2023-area').textContent = intFmt.format(totalArea23);
+      const areaTrendEl = document.getElementById('kpi-area-trend');
+      if (totalArea23 > 0) {
+        const pct = ((totalArea24 - totalArea23) / totalArea23) * 100;
+        const sign = pct >= 0 ? '+' : '';
+        areaTrendEl.textContent = `${sign}${pct.toFixed(1)}%`;
+        areaTrendEl.className = `trend-badge ${pct >= 0 ? 'trend-up' : 'trend-down'}`;
+      } else {
+        areaTrendEl.textContent = 'N/A';
+        areaTrendEl.className = 'trend-badge';
+      }
+
+      // Top Block KPI
+      if (topBlock) {
+        document.getElementById('kpi-top-block').textContent = topBlock.block;
+        document.getElementById('kpi-top-block-yield').textContent = `${numFmt.format(topBlock.yield_2024)} t/ha`;
+      } else {
+        document.getElementById('kpi-top-block').textContent = '-';
+        document.getElementById('kpi-top-block-yield').textContent = '-';
+      }
+    }
+
+    function sortProcessedData() {
+      const col = currentSort.column;
+      const asc = currentSort.asc;
+      processedBlocks.sort((a, b) => {
+        let vA = a[col];
+        let vB = b[col];
+        if (vA === null || vA === undefined) return 1;
+        if (vB === null || vB === undefined) return -1;
+        if (typeof vA === 'string') {
+          return asc ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        }
+        return asc ? vA - vB : vB - vA;
+      });
+    }
+
+    function sortTable(column) {
+      if (currentSort.column === column) {
+        currentSort.asc = !currentSort.asc;
+      } else {
+        currentSort.column = column;
+        currentSort.asc = column === 'block' || column === 'source';
+      }
+      
+      // Update icons
+      const headers = ['block', 'yield_2024', 'yield_2023', 'yield_change_pct', 'harvest_2024', 'area_2024', 'harvest_2023', 'area_2023', 'source'];
+      headers.forEach(h => {
+        const el = document.getElementById(`sort-${h}`);
+        if (el) {
+          if (h === currentSort.column) {
+            el.textContent = currentSort.asc ? '▲' : '▼';
+          } else {
+            el.textContent = '⇅';
+          }
+        }
+      });
+
+      sortProcessedData();
+      renderTable();
+    }
+
+    function handleTableSearch(val) {
+      const term = val.toLowerCase().trim();
+      if (!term) {
+        filteredBlocks = [...processedBlocks];
+      } else {
+        filteredBlocks = processedBlocks.filter(b => b.block.toLowerCase().includes(term));
+      }
+      renderTableRows();
+    }
+
+    function renderTable() {
+      const searchVal = document.getElementById('tableFilter').value;
+      handleTableSearch(searchVal);
+    }
+
+    function renderTableRows() {
+      const tbody = document.getElementById('tableBody');
+      if (filteredBlocks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">No matching records found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filteredBlocks.map(b => {
+        let changeCell = '<span style="color: var(--text-muted);">-</span>';
+        if (b.yield_change_pct !== null) {
+          const isPos = b.yield_change_pct >= 0;
+          const sign = isPos ? '+' : '';
+          const col = isPos ? 'var(--accent-positive)' : 'var(--accent-negative)';
+          changeCell = `<span style="color: ${col}; font-weight: 600;">${sign}${b.yield_change_pct.toFixed(2)}%</span>`;
+        }
+
+        return `
+          <tr>
+            <td style="font-weight: 600;">${escapeHtml(b.block)}</td>
+            <td class="num-col" style="color: var(--accent-2024); font-weight: 600;">${b.has_2024 ? numFmt.format(b.yield_2024) : '-'}</td>
+            <td class="num-col" style="color: var(--accent-2023);">${b.has_2023 ? numFmt.format(b.yield_2023) : '-'}</td>
+            <td class="num-col">${changeCell}</td>
+            <td class="num-col">${b.has_2024 ? intFmt.format(b.harvest_2024) : '-'}</td>
+            <td class="num-col">${b.has_2024 ? intFmt.format(b.area_2024) : '-'}</td>
+            <td class="num-col">${b.has_2023 ? intFmt.format(b.harvest_2023) : '-'}</td>
+            <td class="num-col">${b.has_2023 ? intFmt.format(b.area_2023) : '-'}</td>
+            <td style="color: var(--text-secondary); font-size: 12px;">${escapeHtml(b.source)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /* CHART RENDERING (Inline SVG) */
+    function renderCharts() {
+      renderYieldBarChart();
+      renderHarvestAreaChart();
+    }
+
+    function renderYieldBarChart() {
+      const container = document.getElementById('yieldChartContainer');
+      const w = container.clientWidth || 650;
+      const h = container.clientHeight || 320;
+      const margin = { top: 20, right: 20, bottom: 45, left: 45 };
+      const width = w - margin.left - margin.right;
+      const height = h - margin.top - margin.bottom;
+
+      // Top 10-15 blocks sorted by 2024 yield desc for chart clarity
+      const sorted = [...processedBlocks].sort((a, b) => b.yield_2024 - a.yield_2024).slice(0, 12);
+
+      if (sorted.length === 0) {
+        container.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;color:var(--text-muted);">No data available</div>';
+        return;
+      }
+
+      let maxYield = 0;
+      sorted.forEach(b => {
+        if (b.yield_2024 > maxYield) maxYield = b.yield_2024;
+        if (b.yield_2023 > maxYield) maxYield = b.yield_2023;
+      });
+      maxYield = maxYield * 1.15 || 1;
+
+      // Grouped Bar Math
+      const numGroups = sorted.length;
+      const groupWidth = width / numGroups;
+      const barWidth = Math.min(24, Math.max(6, (groupWidth - 10) / 2));
+
+      // Y Axis Ticks
+      const yTicksCount = 5;
+      let yTicksHtml = '';
+      for (let i = 0; i <= yTicksCount; i++) {
+        const val = (maxYield / yTicksCount) * i;
+        const yPos = height - (val / maxYield) * height;
+        yTicksHtml += `
+          <line x1="0" y1="${yPos}" x2="${width}" y2="${yPos}" class="grid-line" />
+          <text x="-8" y="${yPos + 4}" text-anchor="end" fill="var(--text-secondary)" font-size="10">${val.toFixed(1)}</text>
+        `;
+      }
+
+      // Bars & X labels
+      let barsHtml = '';
+      sorted.forEach((d, idx) => {
+        const groupCenterX = idx * groupWidth + groupWidth / 2;
+        const h24 = d.has_2024 ? (d.yield_2024 / maxYield) * height : 0;
+        const h23 = d.has_2023 ? (d.yield_2023 / maxYield) * height : 0;
+
+        const x24 = groupCenterX - barWidth - 1;
+        const y24 = height - h24;
+
+        const x23 = groupCenterX + 1;
+        const y23 = height - h23;
+
+        // Label truncating
+        const displayLabel = d.block.length > 8 ? d.block.substring(0, 7) + '…' : d.block;
+
+        barsHtml += `
+          <g class="bar-group" data-block="${escapeHtml(d.block)}" data-y24="${d.yield_2024.toFixed(2)}" data-y23="${d.yield_2023.toFixed(2)}">
+            <rect x="${x24}" y="${y24}" width="${barWidth}" height="${h24}" fill="var(--accent-2024)" rx="2" style="transition: opacity 0.2s;" />
+            <rect x="${x23}" y="${y23}" width="${barWidth}" height="${h23}" fill="var(--accent-2023)" rx="2" style="transition: opacity 0.2s;" />
+            <text x="${groupCenterX}" y="${height + 16}" text-anchor="middle" fill="var(--text-secondary)" font-size="11" transform="rotate(0 ${groupCenterX} ${height+16})">${escapeHtml(displayLabel)}</text>
+          </g>
+        `;
+      });
+
+      const svg = `
+        <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+          <g transform="translate(${margin.left},${margin.top})">
+            ${yTicksHtml}
+            <line x1="0" y1="${height}" x2="${width}" y2="${height}" stroke="var(--border-color)" stroke-width="1.5" />
+            <line x1="0" y1="0" x2="0" y2="${height}" stroke="var(--border-color)" stroke-width="1.5" />
+            ${barsHtml}
+          </g>
+        </svg>
+      `;
+
+      container.innerHTML = svg;
+      attachBarTooltips(container, 'Yield (t/ha)');
+    }
+
+    function renderHarvestAreaChart() {
+      const container = document.getElementById('harvestAreaChartContainer');
+      const w = container.clientWidth || 650;
+      const h = container.clientHeight || 320;
+      const margin = { top: 20, right: 45, bottom: 45, left: 45 };
+      const width = w - margin.left - margin.right;
+      const height = h - margin.top - margin.bottom;
+
+      // Top blocks sorted by 2024 Harvest
+      const sorted = [...processedBlocks].sort((a, b) => b.harvest_2024 - a.harvest_2024).slice(0, 12);
+
+      if (sorted.length === 0) {
+        container.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;color:var(--text-muted);">No data available</div>';
+        return;
+      }
+
+      let maxHarvest = Math.max(...sorted.map(d => d.harvest_2024), 1) * 1.15;
+      let maxArea = Math.max(...sorted.map(d => d.area_2024), 1) * 1.15;
+
+      const numGroups = sorted.length;
+      const groupWidth = width / numGroups;
+      const barWidth = Math.min(22, Math.max(6, (groupWidth - 12) / 2));
+
+      // Y Left Axis (Harvest - t)
+      let yTicksHtml = '';
+      const yTicksCount = 5;
+      for (let i = 0; i <= yTicksCount; i++) {
+        const valH = (maxHarvest / yTicksCount) * i;
+        const valA = (maxArea / yTicksCount) * i;
+        const yPos = height - (i / yTicksCount) * height;
+        yTicksHtml += `
+          <line x1="0" y1="${yPos}" x2="${width}" y2="${yPos}" class="grid-line" />
+          <text x="-6" y="${yPos + 4}" text-anchor="end" fill="#38bdf8" font-size="10">${intFmt.format(valH)}</text>
+          <text x="${width + 6}" y="${yPos + 4}" text-anchor="start" fill="#f59e0b" font-size="10">${intFmt.format(valA)}</text>
+        `;
+      }
+
+      let elementsHtml = '';
+      sorted.forEach((d, idx) => {
+        const groupCenterX = idx * groupWidth + groupWidth / 2;
+        const hHarvest = (d.harvest_2024 / maxHarvest) * height;
+        const hArea = (d.area_2024 / maxArea) * height;
+
+        const xH = groupCenterX - barWidth - 1;
+        const yH = height - hHarvest;
+
+        const xA = groupCenterX + 1;
+        const yA = height - hArea;
+
+        const displayLabel = d.block.length > 8 ? d.block.substring(0, 7) + '…' : d.block;
+
+        elementsHtml += `
+          <g class="dual-bar-group" data-block="${escapeHtml(d.block)}" data-harvest="${d.harvest_2024}" data-area="${d.area_2024}">
+            <rect x="${xH}" y="${yH}" width="${barWidth}" height="${hHarvest}" fill="#38bdf8" rx="2" />
+            <rect x="${xA}" y="${yA}" width="${barWidth}" height="${hArea}" fill="#f59e0b" rx="2" />
+            <text x="${groupCenterX}" y="${height + 16}" text-anchor="middle" fill="var(--text-secondary)" font-size="11">${escapeHtml(displayLabel)}</text>
+          </g>
+        `;
+      });
+
+      const svg = `
+        <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+          <g transform="translate(${margin.left},${margin.top})">
+            ${yTicksHtml}
+            <line x1="0" y1="${height}" x2="${width}" y2="${height}" stroke="var(--border-color)" stroke-width="1.5" />
+            <line x1="0" y1="0" x2="0" y2="${height}" stroke="#38bdf8" stroke-width="1" />
+            <line x1="${width}" y1="0" x2="${width}" y2="${height}" stroke="#f59e0b" stroke-width="1" />
+            ${elementsHtml}
+          </g>
+        </svg>
+      `;
+
+      container.innerHTML = svg;
+      attachDualBarTooltips(container);
+    }
+
+    function attachBarTooltips(container, unit) {
+      const tooltip = document.getElementById('chartTooltip');
+      const groups = container.querySelectorAll('.bar-group');
+
+      groups.forEach(g => {
+        g.addEventListener('mouseenter', (e) => {
+          const b = g.getAttribute('data-block');
+          const y24 = g.getAttribute('data-y24');
+          const y23 = g.getAttribute('data-y23');
+          tooltip.innerHTML = `
+            <strong>${b}</strong><br/>
+            <span style="color:var(--accent-2024);">● 2024: ${y24} ${unit}</span><br/>
+            <span style="color:var(--accent-2023);">● 2023: ${y23} ${unit}</span>
+          `;
+          tooltip.style.display = 'block';
+        });
+
+        g.addEventListener('mousemove', (e) => {
+          tooltip.style.left = (e.pageX + 12) + 'px';
+          tooltip.style.top = (e.pageY - 28) + 'px';
+        });
+
+        g.addEventListener('mouseleave', () => {
+          tooltip.style.display = 'none';
+        });
+      });
+    }
+
+    function attachDualBarTooltips(container) {
+      const tooltip = document.getElementById('chartTooltip');
+      const groups = container.querySelectorAll('.dual-bar-group');
+
+      groups.forEach(g => {
+        g.addEventListener('mouseenter', (e) => {
+          const b = g.getAttribute('data-block');
+          const harvest = numFmt.format(g.getAttribute('data-harvest'));
+          const area = numFmt.format(g.getAttribute('data-area'));
+          tooltip.innerHTML = `
+            <strong>${b} (2024)</strong><br/>
+            <span style="color:#38bdf8;">● Harvest: ${harvest} tonnes</span><br/>
+            <span style="color:#f59e0b;">● Area: ${area} ha</span>
+          `;
+          tooltip.style.display = 'block';
+        });
+
+        g.addEventListener('mousemove', (e) => {
+          tooltip.style.left = (e.pageX + 12) + 'px';
+          tooltip.style.top = (e.pageY - 28) + 'px';
+        });
+
+        g.addEventListener('mouseleave', () => {
+          tooltip.style.display = 'none';
+        });
+      });
+    }
+
+    // CSV Download Builder
+    function downloadCSV() {
+      if (!processedBlocks || processedBlocks.length === 0) return;
+
+      const headers = [
+        "Block",
+        "Season",
+        "2024 Yield (tonnes/ha)",
+        "2023 Yield (tonnes/ha)",
+        "YoY Yield Change (%)",
+        "2024 Harvest (tonnes)",
+        "2024 Cultivated Area (ha)",
+        "2023 Harvest (tonnes)",
+        "2023 Cultivated Area (ha)",
+        "Source"
+      ];
+
+      const rows = processedBlocks.map(b => [
+        `"${(b.block || '').replace(/"/g, '""')}"`,
+        `"${(selectedSeason || '').replace(/"/g, '""')}"`,
+        b.has_2024 ? b.yield_2024.toFixed(4) : "",
+        b.has_2023 ? b.yield_2023.toFixed(4) : "",
+        b.yield_change_pct !== null ? b.yield_change_pct.toFixed(2) : "",
+        b.has_2024 ? b.harvest_2024 : "",
+        b.has_2024 ? b.area_2024 : "",
+        b.has_2023 ? b.harvest_2023 : "",
+        b.has_2023 ? b.area_2023 : "",
+        `"${(b.source || '').replace(/"/g, '""')}"`
+      ]);
+
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Crop_Yield_${selectedSeason.replace(/\s+/g, '_')}_2024_vs_2023.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Initial Trigger
+    window.addEventListener('DOMContentLoaded', init);
+    window.addEventListener('resize', () => {
+      renderCharts();
+    });
+  </script>
+</body>
+</html>
+```

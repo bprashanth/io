@@ -1,0 +1,127 @@
+{
+  "id": "null-aware-average-by-group-p03",
+  "task_id": "null-aware-average-by-group",
+  "pattern": "average of a column with blanks per group for one year, blanks excluded not zero",
+  "question": "average repayment so far per block for 2024 disbursements, ignore loans with no repaid figure",
+  "gold_sql": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS average_repaid FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      30016.666666666668
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ],
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Wazirganj",
+      22673.684210526317
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ],
+    [
+      "Atri",
+      30016.666666666668
+    ],
+    [
+      "Wazirganj",
+      22673.684210526317
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%' AND NOT \"Amount Repaid (Rs)\" IS NULL GROUP BY \"Block\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\naverage repayment so far per block for 2024 disbursements, ignore loans with no repaid figure\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\naverage repayment so far per block for 2024 disbursements, ignore loans with no repaid figure\n```sql",
+      "response": "\n\n```sql\nSELECT \"Block\", AVG(\"Amount Repaid (Rs)\")\nFROM shg_loan_register\nWHERE \"Disbursement Date\" LIKE '2024%'\n  AND \"Amount Repaid (Rs)\" IS NOT NULL\nGROUP BY \"Block\"\n```",
+      "api": {
+        "id": "gen-1787311614-IS6y4WXGeNB4jC7R7wsB",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 286,
+          "completion_tokens": 300,
+          "total_tokens": 586,
+          "cost": 0.0010144,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0010144,
+            "upstream_inference_prompt_cost": 0.0001144,
+            "upstream_inference_completions_cost": 0.0009
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 17.263
+      },
+      "duration_seconds": 17.268,
+      "sql_duckdb": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%' AND NOT \"Amount Repaid (Rs)\" IS NULL GROUP BY \"Block\"",
+      "rows": [
+        [
+          "Fatehpur",
+          28382.608695652172
+        ],
+        [
+          "Dobhi",
+          33642.857142857145
+        ],
+        [
+          "Barachatti",
+          35004.34782608696
+        ],
+        [
+          "Atri",
+          30016.666666666668
+        ],
+        [
+          "Wazirganj",
+          22673.684210526317
+        ],
+        [
+          "Belaganj",
+          25352.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

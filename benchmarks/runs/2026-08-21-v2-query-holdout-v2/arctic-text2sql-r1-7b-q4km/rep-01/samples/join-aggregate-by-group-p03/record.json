@@ -1,0 +1,100 @@
+{
+  "id": "join-aggregate-by-group-p03",
+  "task_id": "join-aggregate-by-group",
+  "pattern": "join, filter, count and sum two columns per group",
+  "question": "schools lacking electricity: per block the number of such schools and their 2024 students",
+  "gold_sql": "SELECT e.\"Block\", COUNT(*) AS schools_without_electricity, SUM(e.\"Girls 2024\" + e.\"Boys 2024\") AS students_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Electricity\" = 'No' GROUP BY e.\"Block\" ORDER BY e.\"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      2,
+      339
+    ],
+    [
+      "Barachatti",
+      3,
+      709
+    ],
+    [
+      "Belaganj",
+      2,
+      433
+    ],
+    [
+      "Dobhi",
+      3,
+      730
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dobhi",
+      3,
+      730
+    ],
+    [
+      "Atri",
+      2,
+      339
+    ],
+    [
+      "Barachatti",
+      3,
+      709
+    ],
+    [
+      "Belaganj",
+      2,
+      433
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT seb.Block, COUNT(*) AS num_schools, SUM(seb.\"Girls 2024\" + seb.\"Boys 2024\") AS total_students_2024 FROM school_infrastructure AS si JOIN school_enrolment_by_year AS seb ON si.\"School Code\" = seb.\"School Code\" WHERE si.Electricity = 'No' GROUP BY seb.Block",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nschools lacking electricity: per block the number of such schools and their 2024 students\n[Database Schema]\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nschools lacking electricity: per block the number of such schools and their 2024 students\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to break down the requirements and map them to the available tables and columns in the database schema.\n\n### Requirements Breakdown:\n1. **Identify Schools Lacking Electricity**: This information is available in the `school_infrastructure` table under the column `Electricity`.\n2. **Group by Block**: The grouping should be done based on the `Block` column, which is present in both `school_infrastructure` and `school_enrolment_by_year` tables.\n3. **Count of Such Schools**: We need to count the number of schools in each block that lack electricity.\n4. **Total Number of 2024 Students**: We need to sum up the total number of students in 2024 for these schools. This information is available in the `school_enrolment_by_year` table under the columns `Girls 2024` and `Boys 2024`.\n\n### Step-by-Step Solution:\n1. **Join Tables**: We need to join the `school_infrastructure` table with the `school_enrolment_by_year` table on the `School Code` column to get both the electricity status and the student enrollment data.\n2. **Filter Schools Lacking Electricity**: Use a `WHERE` clause to filter out schools where the `Electricity` column in the `school_infrastructure` table is 'No'.\n3. **Group by Block**: Use the `GROUP BY` clause to group the results by the `Block` column.\n4. **Count Schools and Sum Students**: Use `COUNT(*)` to count the number of schools and `SUM()` to sum the number of students in 2024 for each block.\n\n### SQL Query:\n```sql\nSELECT \n    seb.Block,\n    COUNT(*) AS num_schools,\n    SUM(seb.\"Girls 2024\" + seb.\"Boys 2024\") AS total_students_2024\nFROM \n    school_infrastructure si\nJOIN \n    school_enrolment_by_year seb ON si.`School Code` = seb.`School Code`\nWHERE \n    si.Electricity = 'No'\nGROUP BY \n    seb.Block;\n```\n\n### Explanation:\n- **SELECT Clause**: We select the `Block` column from the `school_enrolment_by_year` table, count the number of schools (`COUNT(*)`), and sum the total number of students in 2024 (`SUM(seb.\"Girls 2024\" + seb.\"Boys 2024\")`).\n- **FROM Clause**: We start from the `school_infrastructure` table (aliased as `si`).\n- **JOIN Clause**: We join the `school_enrolment_by_year` table (aliased as `seb`) on the `School Code` column to link the electricity status with the student enrollment data.\n- **WHERE Clause**: We filter the rows where the `Electricity` column in the `school_infrastructure` table is 'No'.\n- **GROUP BY Clause**: We group the results by the `Block` column to get the count and sum for each block.\n\nThis query efficiently retrieves the required information by leveraging the appropriate joins and aggregations.",
+      "api": {
+        "id": "chatcmpl-arS2cVy3zqeairUWGX234fZCPOUr937l",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 677,
+          "prompt_tokens": 341,
+          "total_tokens": 1018,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 14.828
+      },
+      "duration_seconds": 14.831,
+      "sql_duckdb": "SELECT seb.Block, COUNT(*) AS num_schools, SUM(seb.\"Girls 2024\" + seb.\"Boys 2024\") AS total_students_2024 FROM school_infrastructure AS si JOIN school_enrolment_by_year AS seb ON si.\"School Code\" = seb.\"School Code\" WHERE si.Electricity = 'No' GROUP BY seb.Block",
+      "rows": [
+        [
+          "Dobhi",
+          3,
+          730
+        ],
+        [
+          "Atri",
+          2,
+          339
+        ],
+        [
+          "Barachatti",
+          3,
+          709
+        ],
+        [
+          "Belaganj",
+          2,
+          433
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

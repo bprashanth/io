@@ -1,0 +1,88 @@
+{
+  "id": "filter-on-derived-decline-p02",
+  "task_id": "filter-on-derived-decline",
+  "pattern": "keep groups whose derived change is negative, null rounds drop out",
+  "question": "list the districts where literate women percent is lower in NFHS-5 than in NFHS-4",
+  "gold_sql": "SELECT \"District\" FROM district_health_factsheet WHERE \"District\" <> 'State Total' GROUP BY \"District\" HAVING MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Women age 15-49 years who are literate (%)\" END) < MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Women age 15-49 years who are literate (%)\" END) ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Cuttack"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Cuttack"
+    ],
+    [
+      "State Total"
+    ],
+    [
+      "State Total"
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT nfhs4.\"District\" FROM \"district_health_factsheet\" AS nfhs4 JOIN \"district_health_factsheet\" AS nfhs5 ON nfhs4.\"District\" = nfhs5.\"District\" WHERE nfhs4.\"Survey Round\" = 'NFHS-4' AND nfhs5.\"Survey Round\" = 'NFHS-5' AND nfhs4.\"Women age 15-49 years who are literate (%)\" > nfhs5.\"Women age 15-49 years who are literate (%)\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nlist the districts where literate women percent is lower in NFHS-5 than in NFHS-4",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Tables and Columns**: The question is about comparing the percentage of literate women across two survey rounds (NFHS-4 and NFHS-5). Therefore, we need to focus on the `district_health_factsheet` table and the columns `District`, `Survey Round`, and `Women age 15-49 years who are literate (%)`.\n\n2. **Filter Data for Relevant Survey Rounds**: We need to filter the data for the two survey rounds, NFHS-4 and NFHS-5.\n\n3. **Join the Data for Comparison**: We will join the data for NFHS-4 and NFHS-5 on the `District` column to compare the percentage of literate women in each district across the two survey rounds.\n\n4. **Calculate the Condition**: We need to find districts where the percentage of literate women is lower in NFHS-5 compared to NFHS-4.\n\n5. **Select the Required Columns**: Finally, we select the `District` column for the districts that meet the condition.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nSELECT \n    nfhs4.\"District\"\nFROM \n    \"district_health_factsheet\" nfhs4\nJOIN \n    \"district_health_factsheet\" nfhs5\nON \n    nfhs4.\"District\" = nfhs5.\"District\"\nWHERE \n    nfhs4.`Survey Round` = 'NFHS-4'\n    AND nfhs5.`Survey Round` = 'NFHS-5'\n    AND nfhs4.`Women age 15-49 years who are literate (%)` > nfhs5.`Women age 15-49 years who are literate (%)`;\n```\n\n### Explanation:\n\n- **SELECT Clause**: We select the `District` column from the NFHS-4 dataset (`nfhs4`).\n- **FROM Clause**: We specify the `district_health_factsheet` table twice, once for NFHS-4 (`nfhs4`) and once for NFHS-5 (`nfhs5`).\n- **JOIN Clause**: We join the two tables on the `District` column to ensure we are comparing the same districts across the two survey rounds.\n- **WHERE Clause**: \n  - We filter the rows to include only those where the `Survey Round` is NFHS-4 for `nfhs4` and NFHS-5 for `nfhs5`.\n  - We add a condition to check if the percentage of literate women in NFHS-4 is greater than in NFHS-5, indicating that it is lower in NFHS-5.\n\nThis query efficiently retrieves the districts where the percentage of literate women is lower in NFHS-5 compared to NFHS-4.",
+      "api": {
+        "id": "chatcmpl-iHndHrH1nzjDUL0Zo1uN6p4CHllpalG1",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 591,
+          "prompt_tokens": 518,
+          "total_tokens": 1109,
+          "prompt_tokens_details": {
+            "cached_tokens": 492
+          }
+        },
+        "duration_seconds": 13.009
+      },
+      "duration_seconds": 13.012,
+      "sql_duckdb": "SELECT nfhs4.\"District\" FROM \"district_health_factsheet\" AS nfhs4 JOIN \"district_health_factsheet\" AS nfhs5 ON nfhs4.\"District\" = nfhs5.\"District\" WHERE nfhs4.\"Survey Round\" = 'NFHS-4' AND nfhs5.\"Survey Round\" = 'NFHS-5' AND nfhs4.\"Women age 15-49 years who are literate (%)\" > nfhs5.\"Women age 15-49 years who are literate (%)\"",
+      "rows": [
+        [
+          "Purnia"
+        ],
+        [
+          "Rohtas"
+        ],
+        [
+          "Hazaribagh"
+        ],
+        [
+          "Cuttack"
+        ],
+        [
+          "State Total"
+        ],
+        [
+          "State Total"
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

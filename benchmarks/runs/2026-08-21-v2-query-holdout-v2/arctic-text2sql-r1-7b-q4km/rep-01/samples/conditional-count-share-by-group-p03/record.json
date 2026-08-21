@@ -1,0 +1,142 @@
+{
+  "id": "conditional-count-share-by-group-p03",
+  "task_id": "conditional-count-share-by-group",
+  "pattern": "count rows matching a text status per group and its percent of all rows in the group, rank",
+  "question": "which blocks have the most overdue loans by percentage? show count and percent, top to bottom",
+  "gold_sql": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, 100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / COUNT(*) AS overdue_percent FROM shg_loan_register GROUP BY \"Block\" ORDER BY overdue_percent DESC, \"Block\"",
+  "expected_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Fatehpur",
+      64,
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      65,
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      66,
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      52,
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      56,
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      57,
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT Block, COUNT(*) AS TotalLoans, SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS OverdueLoans, (SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0)) AS OverduePercentage FROM shg_loan_register GROUP BY Block ORDER BY OverduePercentage DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nwhich blocks have the most overdue loans by percentage? show count and percent, top to bottom\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nwhich blocks have the most overdue loans by percentage? show count and percent, top to bottom\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: The question is about blocks with the most overdue loans by percentage. This means we need to focus on the `shg_loan_register` table, specifically the columns related to the block and the repayment status.\n\n2. **Determine the Calculation**: We need to calculate the percentage of overdue loans for each block. This involves counting the total number of loans and the number of overdue loans for each block, then computing the percentage.\n\n3. **Grouping and Aggregation**: We will group the data by the `Block` column and use aggregate functions to count the total number of loans and the number of overdue loans.\n\n4. **Sorting and Limiting**: Finally, we will sort the results by the percentage of overdue loans in descending order to show the blocks with the most overdue loans at the top.\n\n5. **Construct the SQL Query**: Based on the above steps, we can construct the SQL query.\n\nHere is the SQL query that answers the user question:\n\n```sql\nSELECT \n    Block,\n    COUNT(*) AS TotalLoans,\n    SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS OverdueLoans,\n    (SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) AS OverduePercentage\nFROM \n    shg_loan_register\nGROUP BY \n    Block\nORDER BY \n    OverduePercentage DESC;\n```\n\n### Explanation:\n\n- **SELECT Clause**: We select the `Block`, the total number of loans (`TotalLoans`), the number of overdue loans (`OverdueLoans`), and the percentage of overdue loans (`OverduePercentage`).\n\n- **COUNT(*)**: Counts the total number of loans for each block.\n\n- **SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END)**: Sums up the number of overdue loans for each block.\n\n- **(SUM(...) * 100.0 / COUNT(*))**: Calculates the percentage of overdue loans by dividing the number of overdue loans by the total number of loans and multiplying by 100.\n\n- **FROM Clause**: Specifies the `shg_loan_register` table as the source of data.\n\n- **GROUP BY Clause**: Groups the results by the `Block` column to perform the aggregation for each block.\n\n- **ORDER BY Clause**: Orders the results by `OverduePercentage` in descending order to show the blocks with the highest percentage of overdue loans first.",
+      "api": {
+        "id": "chatcmpl-Kl8a7eCT09xpR3aB6MSmExEoZrzhOdLm",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 549,
+          "prompt_tokens": 247,
+          "total_tokens": 796,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 12.058
+      },
+      "duration_seconds": 12.062,
+      "sql_duckdb": "SELECT Block, COUNT(*) AS TotalLoans, SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS OverdueLoans, (SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0)) AS OverduePercentage FROM shg_loan_register GROUP BY Block ORDER BY OverduePercentage DESC",
+      "rows": [
+        [
+          "Fatehpur",
+          64,
+          15,
+          23.4375
+        ],
+        [
+          "Belaganj",
+          65,
+          13,
+          20.0
+        ],
+        [
+          "Wazirganj",
+          66,
+          13,
+          19.696969696969695
+        ],
+        [
+          "Atri",
+          52,
+          8,
+          15.384615384615385
+        ],
+        [
+          "Barachatti",
+          56,
+          8,
+          14.285714285714286
+        ],
+        [
+          "Dobhi",
+          57,
+          3,
+          5.2631578947368425
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

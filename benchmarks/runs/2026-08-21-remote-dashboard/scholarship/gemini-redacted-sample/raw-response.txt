@@ -1,0 +1,788 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440, initial-scale=1.0">
+<title>Scholarship Applications Analytics Dashboard</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --primary: #3b82f6;
+    --primary-dark: #1d4ed8;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #8b5cf6;
+    --navy: #1e293b;
+    --teal: #0d9488;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    width: 1440px;
+    margin: 0 auto;
+    padding: 24px;
+    line-height: 1.4;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .title-area h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -0.5px;
+  }
+  .title-area p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .source-tag {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: #e2e8f0;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .kpi-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 6px;
+    color: var(--navy);
+  }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    position: relative;
+  }
+  .chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .chart-container {
+    width: 100%;
+    height: 250px;
+    position: relative;
+  }
+  svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    margin-bottom: 24px;
+  }
+  .table-header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .table-controls {
+    display: flex;
+    gap: 12px;
+  }
+  .table-controls input, .table-controls select {
+    padding: 6px 12px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    outline: none;
+  }
+  .btn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+  }
+  .btn:hover {
+    background: var(--primary-dark);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+  }
+  th {
+    background: #f1f5f9;
+    padding: 10px 12px;
+    font-weight: 600;
+    color: var(--navy);
+    border-bottom: 2px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  th:hover {
+    background: #e2e8f0;
+  }
+  th.sorted-asc::after { content: " ↑"; color: var(--primary); }
+  th.sorted-desc::after { content: " ↓"; color: var(--primary); }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  tr:hover td {
+    background: #f8fafc;
+  }
+  .badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-block;
+  }
+  .badge-approved { background: #dcfce7; color: #166534; }
+  .badge-disbursed { background: #dbeafe; color: #1e40af; }
+  .badge-under-review { background: #fef3c7; color: #92400e; }
+  .badge-pending { background: #f3e8ff; color: #6b21a8; }
+  .badge-rejected { background: #fee2e2; color: #991b1b; }
+
+  .legend-row {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .legend-color {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+  .tooltip {
+    position: absolute;
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    pointer-events: none;
+    display: none;
+    z-index: 100;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-area">
+    <h1>Scholarship Applications & Performance Analytics</h1>
+    <p>Comprehensive monitoring of application status, taluka distributions, category trends, and academic metrics</p>
+  </div>
+  <div class="source-tag">Source: State Scholarship Management Portal (Verified Dataset)</div>
+</header>
+
+<div class="kpi-grid" id="kpi-grid"></div>
+
+<div class="charts-grid">
+  <!-- Chart 1: Taluka Breakdown by Status -->
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>Applications & Approval Status by Taluka</span>
+      <div class="legend-row" id="taluka-legend"></div>
+    </div>
+    <div class="chart-container" id="chart-taluka"></div>
+  </div>
+
+  <!-- Chart 2: Category Breakdown by Status -->
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>Application Status by Social Category</span>
+      <div class="legend-row" id="cat-legend"></div>
+    </div>
+    <div class="chart-container" id="chart-category"></div>
+  </div>
+
+  <!-- Chart 3: Marks Distribution (Histogram) -->
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>Marks (%) Distribution</span>
+      <span style="font-size: 11px; color: var(--text-muted);">Bin Size: 10% Intervals</span>
+    </div>
+    <div class="chart-container" id="chart-marks"></div>
+  </div>
+
+  <!-- Chart 4: Family Income vs Marks % (Scatter Plot) -->
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>Family Annual Income vs. Marks (%)</span>
+      <span style="font-size: 11px; color: var(--text-muted);">Correlation & Merit Assessment</span>
+    </div>
+    <div class="chart-container" id="chart-scatter"></div>
+  </div>
+</div>
+
+<div class="table-card">
+  <div class="table-header-controls">
+    <div>
+      <h2 style="font-size: 16px; font-weight: 700; color: var(--navy);">Top 15 Applicants by Marks</h2>
+      <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Merit-based ranking showing academic performance, school, gaon, and approval status</p>
+    </div>
+    <div class="table-controls">
+      <input type="text" id="table-search" placeholder="Search applicant, school, gaon..." />
+      <select id="status-filter">
+        <option value="ALL">All Statuses</option>
+        <option value="Approved">Approved</option>
+        <option value="Disbursed">Disbursed</option>
+        <option value="Under Review">Under Review</option>
+        <option value="Pending">Pending</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+      <button class="btn" id="download-csv-btn">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Download CSV
+      </button>
+    </div>
+  </div>
+  <div style="overflow-x: auto;">
+    <table id="top-applicants-table">
+      <thead>
+        <tr>
+          <th data-col="rank">Rank</th>
+          <th data-col="Naam">Applicant Name</th>
+          <th data-col="Marks %">Marks %</th>
+          <th data-col="School">School</th>
+          <th data-col="Gaon">Gaon</th>
+          <th data-col="Taluka">Taluka</th>
+          <th data-col="District">District</th>
+          <th data-col="Category">Category</th>
+          <th data-col="Family Income">Family Income (₹)</th>
+          <th data-col="Status">Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+const DATA = __DATA__;
+
+// Status colors
+const STATUS_COLORS = {
+  'Approved': '#10b981',
+  'Disbursed': '#3b82f6',
+  'Under Review': '#f59e0b',
+  'Pending': '#8b5cf6',
+  'Rejected': '#ef4444'
+};
+const ALL_STATUSES = ['Disbursed', 'Approved', 'Under Review', 'Pending', 'Rejected'];
+
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, text) {
+  tooltip.innerHTML = text;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.pageX + 10) + 'px';
+  tooltip.style.top = (e.pageY - 25) + 'px';
+}
+function hideTooltip() {
+  tooltip.style.display = 'none';
+}
+
+function formatINR(val) {
+  return '₹' + Number(val).toLocaleString('en-IN');
+}
+
+// 1. Render KPIs
+function renderKPIs() {
+  const total = DATA.length;
+  const approvedCount = DATA.filter(d => d.Status === 'Approved').length;
+  const disbursedCount = DATA.filter(d => d.Status === 'Disbursed').length;
+  const approvedOrDisbursed = approvedCount + disbursedCount;
+  const approvalRate = total ? ((approvedOrDisbursed / total) * 100).toFixed(1) : 0;
+  
+  const avgMarks = total ? (DATA.reduce((acc, d) => acc + (d['Marks %'] || 0), 0) / total).toFixed(1) : 0;
+  const avgIncome = total ? Math.round(DATA.reduce((acc, d) => acc + (d['Family Income'] || 0), 0) / total) : 0;
+  const uniqueSchools = new Set(DATA.map(d => d.School)).size;
+  const underReview = DATA.filter(d => d.Status === 'Under Review' || d.Status === 'Pending').length;
+
+  const kpiData = [
+    { label: 'Total Applications', value: total.toLocaleString(), sub: 'Across all schemes' },
+    { label: 'Approval / Disbursed', value: `${approvalRate}%`, sub: `${approvedOrDisbursed} of ${total} total` },
+    { label: 'Pending Action', value: underReview.toLocaleString(), sub: 'Review or pending status' },
+    { label: 'Avg Marks Scored', value: `${avgMarks}%`, sub: 'Overall academic avg' },
+    { label: 'Avg Family Income', value: formatINR(avgIncome), sub: 'Annual household' },
+    { label: 'Participating Schools', value: uniqueSchools.toLocaleString(), sub: 'Registered institutions' }
+  ];
+
+  const grid = document.getElementById('kpi-grid');
+  grid.innerHTML = kpiData.map(k => `
+    <div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('');
+}
+
+// 2. Render Legends
+function renderLegends() {
+  const legendHtml = ALL_STATUSES.map(s => `
+    <div class="legend-item">
+      <div class="legend-color" style="background:${STATUS_COLORS[s]}"></div>
+      <span>${s}</span>
+    </div>
+  `).join('');
+  document.getElementById('taluka-legend').innerHTML = legendHtml;
+  document.getElementById('cat-legend').innerHTML = legendHtml;
+}
+
+// 3. Chart 1: Taluka Breakdown (Stacked Bar)
+function renderTalukaChart() {
+  const container = document.getElementById('chart-taluka');
+  const talukas = [...new Set(DATA.map(d => d.Taluka || 'Unknown'))].sort();
+  
+  const counts = {};
+  talukas.forEach(t => {
+    counts[t] = { total: 0 };
+    ALL_STATUSES.forEach(s => counts[t][s] = 0);
+  });
+
+  DATA.forEach(d => {
+    const t = d.Taluka || 'Unknown';
+    if (counts[t] && counts[t][d.Status] !== undefined) {
+      counts[t][d.Status]++;
+      counts[t].total++;
+    }
+  });
+
+  const maxTotal = Math.max(...Object.values(counts).map(c => c.total), 1);
+  const w = 620, h = 240, padLeft = 70, padBottom = 40, padTop = 15, padRight = 20;
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
+  const barWidth = Math.min(36, (chartW / talukas.length) * 0.65);
+  const colStep = chartW / talukas.length;
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}">`;
+  
+  // Y-axis gridlines
+  const yTicks = 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const yVal = Math.round((maxTotal / yTicks) * i);
+    const yPos = padTop + chartH - (i / yTicks) * chartH;
+    svg += `
+      <line x1="${padLeft}" y1="${yPos}" x2="${w - padRight}" y2="${yPos}" stroke="#f1f5f9" stroke-width="1"/>
+      <text x="${padLeft - 8}" y="${yPos + 4}" font-size="10" fill="#94a3b8" text-anchor="end">${yVal}</text>
+    `;
+  }
+
+  // Bars
+  talukas.forEach((t, i) => {
+    const x = padLeft + i * colStep + (colStep - barWidth) / 2;
+    let currentY = padTop + chartH;
+
+    ALL_STATUSES.forEach(status => {
+      const cnt = counts[t][status];
+      if (cnt > 0) {
+        const segHeight = (cnt / maxTotal) * chartH;
+        currentY -= segHeight;
+        svg += `
+          <rect x="${x}" y="${currentY}" width="${barWidth}" height="${segHeight}" fill="${STATUS_COLORS[status]}" rx="1"
+            onmousemove="showTooltip(event, '${t} &bull; ${status}: ${cnt} (${((cnt/counts[t].total)*100).toFixed(1)}%)')"
+            onmouseout="hideTooltip()" style="cursor:pointer;"/>
+        `;
+      }
+    });
+
+    // X Axis Labels
+    svg += `
+      <text x="${x + barWidth / 2}" y="${padTop + chartH + 16}" font-size="10" fill="#475569" text-anchor="middle">${t.length > 8 ? t.substring(0,7)+'…' : t}</text>
+      <text x="${x + barWidth / 2}" y="${padTop + chartH + 30}" font-size="9" fill="#94a3b8" text-anchor="middle">n=${counts[t].total}</text>
+    `;
+  });
+
+  svg += `</svg>`;
+  container.innerHTML = svg;
+}
+
+// 4. Chart 2: Category Breakdown (Stacked Bar)
+function renderCategoryChart() {
+  const container = document.getElementById('chart-category');
+  const categories = [...new Set(DATA.map(d => d.Category || 'Unknown'))].sort();
+  
+  const counts = {};
+  categories.forEach(c => {
+    counts[c] = { total: 0 };
+    ALL_STATUSES.forEach(s => counts[c][s] = 0);
+  });
+
+  DATA.forEach(d => {
+    const c = d.Category || 'Unknown';
+    if (counts[c] && counts[c][d.Status] !== undefined) {
+      counts[c][d.Status]++;
+      counts[c].total++;
+    }
+  });
+
+  const maxTotal = Math.max(...Object.values(counts).map(c => c.total), 1);
+  const w = 620, h = 240, padLeft = 70, padBottom = 40, padTop = 15, padRight = 20;
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
+  const barWidth = Math.min(36, (chartW / categories.length) * 0.65);
+  const colStep = chartW / categories.length;
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}">`;
+  
+  // Y-axis grid
+  const yTicks = 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const yVal = Math.round((maxTotal / yTicks) * i);
+    const yPos = padTop + chartH - (i / yTicks) * chartH;
+    svg += `
+      <line x1="${padLeft}" y1="${yPos}" x2="${w - padRight}" y2="${yPos}" stroke="#f1f5f9" stroke-width="1"/>
+      <text x="${padLeft - 8}" y="${yPos + 4}" font-size="10" fill="#94a3b8" text-anchor="end">${yVal}</text>
+    `;
+  }
+
+  // Bars
+  categories.forEach((c, i) => {
+    const x = padLeft + i * colStep + (colStep - barWidth) / 2;
+    let currentY = padTop + chartH;
+
+    ALL_STATUSES.forEach(status => {
+      const cnt = counts[c][status];
+      if (cnt > 0) {
+        const segHeight = (cnt / maxTotal) * chartH;
+        currentY -= segHeight;
+        svg += `
+          <rect x="${x}" y="${currentY}" width="${barWidth}" height="${segHeight}" fill="${STATUS_COLORS[status]}" rx="1"
+            onmousemove="showTooltip(event, '${c} &bull; ${status}: ${cnt} (${((cnt/counts[c].total)*100).toFixed(1)}%)')"
+            onmouseout="hideTooltip()" style="cursor:pointer;"/>
+        `;
+      }
+    });
+
+    const shortLabel = c.replace('CASTE_CATEGORY_', 'Cat ');
+    svg += `
+      <text x="${x + barWidth / 2}" y="${padTop + chartH + 16}" font-size="10" fill="#475569" text-anchor="middle">${shortLabel}</text>
+      <text x="${x + barWidth / 2}" y="${padTop + chartH + 30}" font-size="9" fill="#94a3b8" text-anchor="middle">n=${counts[c].total}</text>
+    `;
+  });
+
+  svg += `</svg>`;
+  container.innerHTML = svg;
+}
+
+// 5. Chart 3: Marks Histogram
+function renderMarksHistogram() {
+  const container = document.getElementById('chart-marks');
+  const bins = [
+    { label: '30-39%', min: 30, max: 40, count: 0 },
+    { label: '40-49%', min: 40, max: 50, count: 0 },
+    { label: '50-59%', min: 50, max: 60, count: 0 },
+    { label: '60-69%', min: 60, max: 70, count: 0 },
+    { label: '70-79%', min: 70, max: 80, count: 0 },
+    { label: '80-89%', min: 80, max: 90, count: 0 },
+    { label: '90-100%', min: 90, max: 101, count: 0 }
+  ];
+
+  DATA.forEach(d => {
+    const m = d['Marks %'];
+    if (typeof m === 'number') {
+      const bin = bins.find(b => m >= b.min && m < b.max);
+      if (bin) bin.count++;
+    }
+  });
+
+  const maxCount = Math.max(...bins.map(b => b.count), 1);
+  const w = 620, h = 240, padLeft = 50, padBottom = 35, padTop = 15, padRight = 20;
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
+  const barWidth = (chartW / bins.length) * 0.75;
+  const colStep = chartW / bins.length;
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}">`;
+
+  for (let i = 0; i <= 4; i++) {
+    const yVal = Math.round((maxCount / 4) * i);
+    const yPos = padTop + chartH - (i / 4) * chartH;
+    svg += `
+      <line x1="${padLeft}" y1="${yPos}" x2="${w - padRight}" y2="${yPos}" stroke="#f1f5f9" stroke-width="1"/>
+      <text x="${padLeft - 8}" y="${yPos + 4}" font-size="10" fill="#94a3b8" text-anchor="end">${yVal}</text>
+    `;
+  }
+
+  bins.forEach((b, i) => {
+    const x = padLeft + i * colStep + (colStep - barWidth) / 2;
+    const barH = (b.count / maxCount) * chartH;
+    const y = padTop + chartH - barH;
+
+    svg += `
+      <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="#3b82f6" rx="3"
+        onmousemove="showTooltip(event, 'Range: ${b.label}&lt;br/&gt;Applicants: ${b.count} (${((b.count/DATA.length)*100).toFixed(1)}%)')"
+        onmouseout="hideTooltip()" style="cursor:pointer;"/>
+      <text x="${x + barWidth / 2}" y="${padTop + chartH + 16}" font-size="10" fill="#475569" text-anchor="middle">${b.label}</text>
+    `;
+  });
+
+  svg += `</svg>`;
+  container.innerHTML = svg;
+}
+
+// 6. Chart 4: Family Income vs Marks % (Scatter)
+function renderScatterPlot() {
+  const container = document.getElementById('chart-scatter');
+  const validData = DATA.filter(d => typeof d['Family Income'] === 'number' && typeof d['Marks %'] === 'number');
+
+  const maxIncome = Math.max(...validData.map(d => d['Family Income']), 250000);
+  const minMarks = 30, maxMarks = 100;
+
+  const w = 620, h = 240, padLeft = 65, padBottom = 35, padTop = 15, padRight = 20;
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}">`;
+
+  // Grid Y (Marks)
+  [40, 60, 80, 100].forEach(m => {
+    const y = padTop + chartH - ((m - minMarks) / (maxMarks - minMarks)) * chartH;
+    svg += `
+      <line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="#f1f5f9" stroke-width="1"/>
+      <text x="${padLeft - 8}" y="${y + 4}" font-size="10" fill="#94a3b8" text-anchor="end">${m}%</text>
+    `;
+  });
+
+  // Grid X (Income)
+  const incomeSteps = 4;
+  for (let i = 0; i <= incomeSteps; i++) {
+    const inc = (maxIncome / incomeSteps) * i;
+    const x = padLeft + (inc / maxIncome) * chartW;
+    svg += `
+      <line x1="${x}" y1="${padTop}" x2="${x}" y2="${padTop + chartH}" stroke="#f1f5f9" stroke-width="1"/>
+      <text x="${x}" y="${padTop + chartH + 18}" font-size="10" fill="#94a3b8" text-anchor="middle">₹${Math.round(inc/1000)}k</text>
+    `;
+  }
+
+  // Dots
+  validData.forEach(d => {
+    const x = padLeft + (d['Family Income'] / maxIncome) * chartW;
+    const y = padTop + chartH - ((d['Marks %'] - minMarks) / (maxMarks - minMarks)) * chartH;
+    const color = STATUS_COLORS[d.Status] || '#64748b';
+
+    svg += `
+      <circle cx="${x}" cy="${y}" r="4.5" fill="${color}" opacity="0.8" stroke="#ffffff" stroke-width="1"
+        onmousemove="showTooltip(event, '&lt;strong&gt;${d.Naam}&lt;/strong&gt;&lt;br/&gt;Marks: ${d['Marks %']}%&lt;br/&gt;Income: ${formatINR(d['Family Income'])}&lt;br/&gt;Status: ${d.Status}')"
+        onmouseout="hideTooltip()" style="cursor:pointer;"/>
+    `;
+  });
+
+  svg += `</svg>`;
+  container.innerHTML = svg;
+}
+
+// 7. Top 15 Applicants Table
+let currentSort = { col: 'Marks %', asc: false };
+
+function getStatusBadge(status) {
+  const clsMap = {
+    'Approved': 'badge-approved',
+    'Disbursed': 'badge-disbursed',
+    'Under Review': 'badge-under-review',
+    'Pending': 'badge-pending',
+    'Rejected': 'badge-rejected'
+  };
+  return `<span class="badge ${clsMap[status] || ''}">${status}</span>`;
+}
+
+function renderTable() {
+  const search = document.getElementById('table-search').value.toLowerCase();
+  const statusFilter = document.getElementById('status-filter').value;
+
+  // Filter
+  let list = DATA.filter(d => {
+    if (statusFilter !== 'ALL' && d.Status !== statusFilter) return false;
+    if (search) {
+      const matchNaam = (d.Naam || '').toLowerCase().includes(search);
+      const matchSchool = (d.School || '').toLowerCase().includes(search);
+      const matchGaon = (d.Gaon || '').toLowerCase().includes(search);
+      const matchTaluka = (d.Taluka || '').toLowerCase().includes(search);
+      if (!matchNaam && !matchSchool && !matchGaon && !matchTaluka) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  list.sort((a, b) => {
+    let valA = a[currentSort.col];
+    let valB = b[currentSort.col];
+    if (typeof valA === 'string') valA = valA.toLowerCase();
+    if (typeof valB === 'string') valB = valB.toLowerCase();
+    if (valA < valB) return currentSort.asc ? -1 : 1;
+    if (valA > valB) return currentSort.asc ? 1 : -1;
+    return 0;
+  });
+
+  // Top 15 slice
+  const top15 = list.slice(0, 15);
+
+  const tbody = document.querySelector('#top-applicants-table tbody');
+  if (top15.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding: 24px; color: var(--text-muted);">No matching applicants found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = top15.map((row, idx) => `
+    <tr>
+      <td style="font-weight:600; color: var(--text-muted);">${idx + 1}</td>
+      <td style="font-weight:600;">${row.Naam}</td>
+      <td style="font-weight:700; color: var(--primary);">${row['Marks %']}%</td>
+      <td>${row.School || '-'}</td>
+      <td>${row.Gaon || '-'}</td>
+      <td>${row.Taluka || '-'}</td>
+      <td>${row.District || '-'}</td>
+      <td>${(row.Category || '').replace('CASTE_CATEGORY_', 'Cat ')}</td>
+      <td>${formatINR(row['Family Income'] || 0)}</td>
+      <td>${getStatusBadge(row.Status)}</td>
+    </tr>
+  `).join('');
+}
+
+// 8. Download CSV
+function downloadCSV() {
+  // Extract currently displayed table data or top 15 by marks
+  let sortedByMarks = [...DATA].sort((a, b) => (b['Marks %'] || 0) - (a['Marks %'] || 0)).slice(0, 15);
+  
+  const headers = ['Rank', 'Naam', 'Pita ka naam', 'Marks %', 'School', 'Gaon', 'Taluka', 'District', 'Category', 'Family Income', 'Status', 'Name of scheme'];
+  const rows = sortedByMarks.map((d, i) => [
+    i + 1,
+    `"${(d.Naam || '').replace(/"/g, '""')}"`,
+    `"${(d['Pita ka naam'] || '').replace(/"/g, '""')}"`,
+    d['Marks %'],
+    `"${(d.School || '').replace(/"/g, '""')}"`,
+    `"${(d.Gaon || '').replace(/"/g, '""')}"`,
+    `"${(d.Taluka || '').replace(/"/g, '""')}"`,
+    `"${(d.District || '').replace(/"/g, '""')}"`,
+    `"${(d.Category || '').replace(/"/g, '""')}"`,
+    d['Family Income'],
+    `"${(d.Status || '').replace(/"/g, '""')}"`,
+    `"${(d['Name of scheme'] || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'top_15_scholarship_applicants.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Table sort listener
+document.querySelectorAll('#top-applicants-table th').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.getAttribute('data-col');
+    if (!col || col === 'rank') return;
+
+    if (currentSort.col === col) {
+      currentSort.asc = !currentSort.asc;
+    } else {
+      currentSort.col = col;
+      currentSort.asc = true;
+    }
+
+    document.querySelectorAll('#top-applicants-table th').forEach(h => {
+      h.classList.remove('sorted-asc', 'sorted-desc');
+    });
+    th.classList.add(currentSort.asc ? 'sorted-asc' : 'sorted-desc');
+    renderTable();
+  });
+});
+
+document.getElementById('table-search').addEventListener('input', renderTable);
+document.getElementById('status-filter').addEventListener('change', renderTable);
+document.getElementById('download-csv-btn').addEventListener('click', downloadCSV);
+
+// Initial Load
+window.addEventListener('DOMContentLoaded', () => {
+  renderKPIs();
+  renderLegends();
+  renderTalukaChart();
+  renderCategoryChart();
+  renderMarksHistogram();
+  renderScatterPlot();
+  renderTable();
+});
+</script>
+</body>
+</html>
+```

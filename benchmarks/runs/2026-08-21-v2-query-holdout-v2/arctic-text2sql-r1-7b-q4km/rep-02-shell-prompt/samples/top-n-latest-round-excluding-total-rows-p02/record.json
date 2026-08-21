@@ -1,0 +1,100 @@
+{
+  "id": "top-n-latest-round-excluding-total-rows-p02",
+  "task_id": "top-n-latest-round-excluding-total-rows",
+  "pattern": "filter one round, rank a plain column, limit to five, detail rows only",
+  "question": "which five districts have the worst under-5 stunting in NFHS-5? highest first",
+  "gold_sql": "SELECT \"District\", \"Children under 5 years who are stunted (%)\" AS stunted_percent FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' AND \"District\" <> 'State Total' ORDER BY stunted_percent DESC, \"District\" LIMIT 5",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      49.6
+    ],
+    [
+      "Ranchi",
+      42.9
+    ],
+    [
+      "Kalahandi",
+      42.7
+    ],
+    [
+      "Rohtas",
+      42.2
+    ],
+    [
+      "Bhojpur",
+      40.9
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      49.6
+    ],
+    [
+      "Ranchi",
+      42.9
+    ],
+    [
+      "Kalahandi",
+      42.7
+    ],
+    [
+      "Rohtas",
+      42.2
+    ],
+    [
+      "Bhojpur",
+      40.9
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT District, \"Children under 5 years who are stunted (%)\" AS Stunted_Percentage FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' ORDER BY Stunted_Percentage DESC LIMIT 5",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nwhich five districts have the worst under-5 stunting in NFHS-5? highest first",
+      "response": "To translate the natural language question into an executable SQLite query, we need to carefully parse the requirements and map them to the appropriate SQL constructs. Here's a step-by-step breakdown:\n\n1. **Identify the Relevant Table and Columns**:\n   - The question is about districts and their under-5 stunting rates, so we need to use the `district_health_factsheet` table.\n   - The relevant columns are `District` and `Children under 5 years who are stunted (%)`.\n\n2. **Filter by Survey Round**:\n   - The question specifies \"NFHS-5\", so we need to filter the records where `Survey Round` is 'NFHS-5'.\n\n3. **Order the Results**:\n   - The question asks for the districts with the worst under-5 stunting rates, which means we need to order the results in descending order based on the `Children under 5 years who are stunted (%)` column.\n\n4. **Limit the Results**:\n   - The question specifies that we need the top five districts, so we will use the `LIMIT` clause to restrict the output to five records.\n\n5. **Construct the SQL Query**:\n   - Start with the `SELECT` statement to specify the columns we need (`District` and the stunting percentage).\n   - Use the `FROM` clause to specify the table (`district_health_factsheet`).\n   - Add the `WHERE` clause to filter the records by `Survey Round`.\n   - Use the `ORDER BY` clause to sort the results in descending order based on the stunting percentage.\n   - Finally, use the `LIMIT` clause to limit the output to five records.\n\nHere is the final SQL query:\n\n```sql\nSELECT District, \"Children under 5 years who are stunted (%)\" AS Stunted_Percentage\nFROM district_health_factsheet\nWHERE \"Survey Round\" = 'NFHS-5'\nORDER BY Stunted_Percentage DESC\nLIMIT 5;\n```\n\nThis query accurately captures the requirements of the question by filtering, ordering, and limiting the results as specified.",
+      "api": {
+        "id": "chatcmpl-tMyMHjdUBbyT3RA29x4zs3cks3Zueq5o",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 429,
+          "prompt_tokens": 516,
+          "total_tokens": 945,
+          "prompt_tokens_details": {
+            "cached_tokens": 492
+          }
+        },
+        "duration_seconds": 9.485
+      },
+      "duration_seconds": 9.487,
+      "sql_duckdb": "SELECT District, \"Children under 5 years who are stunted (%)\" AS Stunted_Percentage FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' ORDER BY Stunted_Percentage DESC LIMIT 5",
+      "rows": [
+        [
+          "Kishanganj",
+          49.6
+        ],
+        [
+          "Ranchi",
+          42.9
+        ],
+        [
+          "Kalahandi",
+          42.7
+        ],
+        [
+          "Rohtas",
+          42.2
+        ],
+        [
+          "Bhojpur",
+          40.9
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

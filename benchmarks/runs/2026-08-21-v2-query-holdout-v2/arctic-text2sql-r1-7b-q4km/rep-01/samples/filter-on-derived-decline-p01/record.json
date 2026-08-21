@@ -1,0 +1,88 @@
+{
+  "id": "filter-on-derived-decline-p01",
+  "task_id": "filter-on-derived-decline",
+  "pattern": "keep groups whose derived change is negative, null rounds drop out",
+  "question": "in which districts did women literacy go down from NFHS-4 to NFHS-5",
+  "gold_sql": "SELECT \"District\" FROM district_health_factsheet WHERE \"District\" <> 'State Total' GROUP BY \"District\" HAVING MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Women age 15-49 years who are literate (%)\" END) < MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Women age 15-49 years who are literate (%)\" END) ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Cuttack"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Cuttack"
+    ],
+    [
+      "State Total"
+    ],
+    [
+      "State Total"
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT nfhs4.\"District\" FROM \"district_health_factsheet\" AS nfhs4 JOIN \"district_health_factsheet\" AS nfhs5 ON nfhs4.\"District\" = nfhs5.\"District\" WHERE nfhs4.\"Survey Round\" = 'NFHS-4' AND nfhs5.\"Survey Round\" = 'NFHS-5' AND nfhs4.\"Women age 15-49 years who are literate (%)\" > nfhs5.\"Women age 15-49 years who are literate (%)\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nin which districts did women literacy go down from NFHS-4 to NFHS-5\n[Database Schema]\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nin which districts did women literacy go down from NFHS-4 to NFHS-5\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to identify the districts where women's literacy rates decreased from the NFHS-4 survey to the NFHS-5 survey. Here's a step-by-step breakdown of how to construct the query:\n\n1. **Identify Relevant Columns**: We need the `District`, `Survey Round`, and `Women age 15-49 years who are literate (%)` columns from the `district_health_factsheet` table.\n\n2. **Filter Survey Rounds**: We need to filter the data for only two survey rounds: NFHS-4 and NFHS-5.\n\n3. **Join Data for Comparison**: We need to join the data for NFHS-4 and NFHS-5 on the `District` column to compare literacy rates between the two survey rounds.\n\n4. **Calculate Literacy Rate Change**: We need to calculate the difference in literacy rates between NFHS-5 and NFHS-4 for each district.\n\n5. **Filter for Decrease in Literacy**: We need to filter the results to only include districts where the literacy rate decreased.\n\n6. **Select Districts**: Finally, we select the districts that meet the criteria.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nSELECT \n    nfhs4.\"District\"\nFROM \n    \"district_health_factsheet\" nfhs4\nJOIN \n    \"district_health_factsheet\" nfhs5\nON \n    nfhs4.\"District\" = nfhs5.\"District\"\nWHERE \n    nfhs4.`Survey Round` = 'NFHS-4' \n    AND nfhs5.`Survey Round` = 'NFHS-5'\n    AND nfhs4.`Women age 15-49 years who are literate (%)` > nfhs5.`Women age 15-49 years who are literate (%)`\n```\n\n### Explanation:\n\n- **JOIN Clause**: We perform an inner join on the `District` column to match records from NFHS-4 and NFHS-5 for the same district.\n- **WHERE Clause**: We filter the joined records to include only those where the `Survey Round` is NFHS-4 and NFHS-5, respectively.\n- **Comparison**: We compare the literacy rates (`Women age 15-49 years who are literate (%)`) for the two survey rounds and select only those districts where the rate in NFHS-4 is greater than in NFHS-5, indicating a decrease.\n\nThis query efficiently identifies the districts where women's literacy rates decreased from NFHS-4 to NFHS-5.",
+      "api": {
+        "id": "chatcmpl-INen0d6r9h3TK4rQdCBwMAiLHNusdzTn",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 538,
+          "prompt_tokens": 278,
+          "total_tokens": 816,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 11.73
+      },
+      "duration_seconds": 11.732,
+      "sql_duckdb": "SELECT nfhs4.\"District\" FROM \"district_health_factsheet\" AS nfhs4 JOIN \"district_health_factsheet\" AS nfhs5 ON nfhs4.\"District\" = nfhs5.\"District\" WHERE nfhs4.\"Survey Round\" = 'NFHS-4' AND nfhs5.\"Survey Round\" = 'NFHS-5' AND nfhs4.\"Women age 15-49 years who are literate (%)\" > nfhs5.\"Women age 15-49 years who are literate (%)\"",
+      "rows": [
+        [
+          "Purnia"
+        ],
+        [
+          "Rohtas"
+        ],
+        [
+          "Hazaribagh"
+        ],
+        [
+          "Cuttack"
+        ],
+        [
+          "State Total"
+        ],
+        [
+          "State Total"
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

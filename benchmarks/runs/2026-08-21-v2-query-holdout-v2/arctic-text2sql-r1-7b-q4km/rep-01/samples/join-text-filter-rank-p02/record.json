@@ -1,0 +1,241 @@
+{
+  "id": "join-text-filter-rank-p02",
+  "task_id": "join-text-filter-rank",
+  "pattern": "join two tables on a code, filter a Yes/No column, rank a year column",
+  "question": "list schools where the girls toilet is not functional with their 2024 girls enrolment, highest first",
+  "gold_sql": "SELECT e.\"School Name\", e.\"Girls 2024\" AS girls_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Toilets functional (girls)\" = 'No' ORDER BY e.\"Girls 2024\" DESC, e.\"School Name\"",
+  "expected_rows": [
+    [
+      "Madhya Vidyalaya Bhadeya",
+      190
+    ],
+    [
+      "Madhya Vidyalaya Chakand",
+      189
+    ],
+    [
+      "Rajkiya Vidyalaya Chakand",
+      178
+    ],
+    [
+      "Prathmik Vidyalaya Bhadeya",
+      165
+    ],
+    [
+      "Adarsh Vidyalaya Bankat",
+      158
+    ],
+    [
+      "Kanya Vidyalaya Khizarsarai",
+      140
+    ],
+    [
+      "Navin Vidyalaya Tetariya",
+      128
+    ],
+    [
+      "Madhya Vidyalaya Khizarsarai",
+      116
+    ],
+    [
+      "Prathmik Vidyalaya Lodipur",
+      110
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      105
+    ],
+    [
+      "Adarsh Vidyalaya Amas",
+      85
+    ],
+    [
+      "Navin Vidyalaya Chakand",
+      74
+    ],
+    [
+      "Navin Vidyalaya Amas",
+      66
+    ],
+    [
+      "Navin Vidyalaya Rampur",
+      61
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      42
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Madhya Vidyalaya Bhadeya",
+      190
+    ],
+    [
+      "Madhya Vidyalaya Chakand",
+      189
+    ],
+    [
+      "Rajkiya Vidyalaya Chakand",
+      178
+    ],
+    [
+      "Prathmik Vidyalaya Bhadeya",
+      165
+    ],
+    [
+      "Adarsh Vidyalaya Bankat",
+      158
+    ],
+    [
+      "Kanya Vidyalaya Khizarsarai",
+      140
+    ],
+    [
+      "Navin Vidyalaya Tetariya",
+      128
+    ],
+    [
+      "Madhya Vidyalaya Khizarsarai",
+      116
+    ],
+    [
+      "Prathmik Vidyalaya Lodipur",
+      110
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      105
+    ],
+    [
+      "Adarsh Vidyalaya Amas",
+      85
+    ],
+    [
+      "Navin Vidyalaya Chakand",
+      74
+    ],
+    [
+      "Navin Vidyalaya Amas",
+      66
+    ],
+    [
+      "Navin Vidyalaya Rampur",
+      61
+    ],
+    [
+      "Madhya Vidyalaya Karmauni",
+      42
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT seb.\"School Name\", seb.\"Girls 2024\" FROM \"school_enrolment_by_year\" AS seb INNER JOIN \"school_infrastructure\" AS si ON seb.\"School Code\" = si.\"School Code\" WHERE si.\"Toilets functional (girls)\" = 'No' ORDER BY seb.\"Girls 2024\" DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nlist schools where the girls toilet is not functional with their 2024 girls enrolment, highest first\n[Database Schema]\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nlist schools where the girls toilet is not functional with their 2024 girls enrolment, highest first\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to carefully interpret the requirements and map them to the available database schema. Here's a step-by-step breakdown of how to construct the query:\n\n### Step-by-Step Breakdown\n\n1. **Identify the Relevant Tables and Columns**:\n   - The question involves checking the status of girls' toilets and the number of girls enrolled in 2024.\n   - The `school_infrastructure` table contains the status of toilets (`Toilets functional (girls)`).\n   - The `school_enrolment_by_year` table contains the number of girls enrolled in 2024 (`Girls 2024`).\n\n2. **Determine the Condition for Girls' Toilets**:\n   - The question specifies that we need to list schools where the girls' toilet is not functional. This translates to checking where `Toilets functional (girls)` is 'No'.\n\n3. **Join the Tables**:\n   - Since we need data from both tables, we will perform an inner join on the `School Code` column, which is common to both tables.\n\n4. **Filter and Order the Results**:\n   - We need to filter the results to include only those schools where the girls' toilet is not functional.\n   - The results should be ordered by the number of girls enrolled in 2024 in descending order to list the schools with the highest enrolment first.\n\n5. **Select the Required Columns**:\n   - The question asks for a list of schools, so we will select the `School Name` from the `school_enrolment_by_year` table.\n\n### Constructing the SQL Query\n\nBased on the above steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    seb.School_Name\nFROM \n    school_enrolment_by_year seb\nINNER JOIN \n    school_infrastructure si \nON \n    seb.`School Code` = si.`School Code`\nWHERE \n    si.`Toilets functional (girls)` = 'No'\nORDER BY \n    seb.`Girls 2024` DESC;\n```\n\n### Explanation of the Query\n\n- **SELECT Clause**: We select the `School_Name` from the `school_enrolment_by_year` table.\n- **FROM Clause**: We specify the `school_enrolment_by_year` table as the primary table (`seb`).\n- **INNER JOIN Clause**: We join the `school_infrastructure` table (`si`) on the `School Code` column to access the toilet status.\n- **WHERE Clause**: We filter the results to include only those rows where the girls' toilet is not functional (`si.`Toilets functional (girls)` = 'No'`).\n- **ORDER BY Clause**: We order the results by the number of girls enrolled in 2024 in descending order (`seb.`Girls 2024` DESC`).\n\nThis query efficiently retrieves the required information based on the user's question.",
+      "api": {
+        "id": "chatcmpl-ogt7cBwyBJuD58TczNzPblqOOo9aIvWi",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 623,
+          "prompt_tokens": 347,
+          "total_tokens": 970,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 13.717
+      },
+      "duration_seconds": 13.719,
+      "error": "BinderException: Binder Error: Table \"seb\" does not have a column named \"School_Name\"\n\nCandidate bindings: : \"School Name\"\n\nLINE 1: EXPLAIN SELECT seb.School_Name FROM school_enrolment_by_year AS seb INNER...\n                       ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nlist schools where the girls toilet is not functional with their 2024 girls enrolment, highest first\n[Database Schema]\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[Previous Query Error]\nBinderException: Binder Error: Table \"seb\" does not have a column named \"School_Name\"\n\nCandidate bindings: : \"School Name\"\n\nLINE 1: EXPLAIN SELECT seb.School_Name FROM school_enrolment_by_year AS seb INNER...\n                       ^\nReturn one corrected read-only query.\n[User Question]\nlist schools where the girls toilet is not functional with their 2024 girls enrolment, highest first\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to carefully consider the requirements and the available data in the database schema. Here's a step-by-step breakdown of how to construct the query:\n\n1. **Identify the Relevant Tables**: \n   - `school_enrolment_by_year`: This table contains the enrollment data for each school, including the number of girls enrolled in 2024.\n   - `school_infrastructure`: This table contains information about the infrastructure of each school, including whether the girls' toilet is functional.\n\n2. **Determine the Required Columns**:\n   - From `school_enrolment_by_year`, we need the `School Name` and `Girls 2024` columns.\n   - From `school_infrastructure`, we need the `Toilets functional (girls)` column to check if the girls' toilet is functional.\n\n3. **Join the Tables**:\n   - We need to join `school_enrolment_by_year` and `school_infrastructure` on the `School Code` column, which is common to both tables.\n\n4. **Filter the Data**:\n   - We need to filter the schools where the girls' toilet is not functional (`Toilets functional (girls) = 'No'`).\n\n5. **Order the Results**:\n   - The results should be ordered by the number of girls enrolled in 2024 in descending order (`ORDER BY \"Girls 2024\" DESC`).\n\n6. **Construct the SQL Query**:\n   - Using the above steps, we can construct the SQL query.\n\nHere is the final SQL query:\n\n```sql\nSELECT seb.\"School Name\", seb.\"Girls 2024\"\nFROM \"school_enrolment_by_year\" AS seb\nINNER JOIN \"school_infrastructure\" AS si\nON seb.\"School Code\" = si.\"School Code\"\nWHERE si.\"Toilets functional (girls)\" = 'No'\nORDER BY seb.\"Girls 2024\" DESC;\n```\n\nThis query selects the school names and the number of girls enrolled in 2024 for schools where the girls' toilet is not functional, ordering the results by the number of girls enrolled in 2024 in descending order.",
+      "api": {
+        "id": "chatcmpl-UaSWwYQ5SiheDxN9flh0vxCDV3m1pDu7",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 471,
+          "prompt_tokens": 414,
+          "total_tokens": 885,
+          "prompt_tokens_details": {
+            "cached_tokens": 314
+          }
+        },
+        "duration_seconds": 10.319
+      },
+      "duration_seconds": 10.323,
+      "sql_duckdb": "SELECT seb.\"School Name\", seb.\"Girls 2024\" FROM \"school_enrolment_by_year\" AS seb INNER JOIN \"school_infrastructure\" AS si ON seb.\"School Code\" = si.\"School Code\" WHERE si.\"Toilets functional (girls)\" = 'No' ORDER BY seb.\"Girls 2024\" DESC",
+      "rows": [
+        [
+          "Madhya Vidyalaya Bhadeya",
+          190
+        ],
+        [
+          "Madhya Vidyalaya Chakand",
+          189
+        ],
+        [
+          "Rajkiya Vidyalaya Chakand",
+          178
+        ],
+        [
+          "Prathmik Vidyalaya Bhadeya",
+          165
+        ],
+        [
+          "Adarsh Vidyalaya Bankat",
+          158
+        ],
+        [
+          "Kanya Vidyalaya Khizarsarai",
+          140
+        ],
+        [
+          "Navin Vidyalaya Tetariya",
+          128
+        ],
+        [
+          "Madhya Vidyalaya Khizarsarai",
+          116
+        ],
+        [
+          "Prathmik Vidyalaya Lodipur",
+          110
+        ],
+        [
+          "Madhya Vidyalaya Karmauni",
+          105
+        ],
+        [
+          "Adarsh Vidyalaya Amas",
+          85
+        ],
+        [
+          "Navin Vidyalaya Chakand",
+          74
+        ],
+        [
+          "Navin Vidyalaya Amas",
+          66
+        ],
+        [
+          "Navin Vidyalaya Rampur",
+          61
+        ],
+        [
+          "Madhya Vidyalaya Karmauni",
+          42
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

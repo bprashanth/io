@@ -1,0 +1,130 @@
+{
+  "id": "conditional-count-share-by-group-p02",
+  "task_id": "conditional-count-share-by-group",
+  "pattern": "count rows matching a text status per group and its percent of all rows in the group, rank",
+  "question": "for each block count overdue loans and overdue percentage out of all its loans, highest percentage first",
+  "gold_sql": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, 100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / COUNT(*) AS overdue_percent FROM shg_loan_register GROUP BY \"Block\" ORDER BY overdue_percent DESC, \"Block\"",
+  "expected_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969985961914
+    ],
+    [
+      "Atri",
+      8,
+      15.384614944458008
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714149475098
+    ],
+    [
+      "Dobhi",
+      3,
+      5.263157844543457
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS OverdueCount, CAST(SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS REAL) * 100.0 / NULLIF(COUNT(*), 0) AS OverduePercentage FROM \"shg_loan_register\" GROUP BY \"Block\" ORDER BY OverduePercentage DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nfor each block count overdue loans and overdue percentage out of all its loans, highest percentage first\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nfor each block count overdue loans and overdue percentage out of all its loans, highest percentage first\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Requirements Breakdown:\n1. **Count Overdue Loans**: We need to count the number of loans that are overdue for each block.\n2. **Calculate Overdue Percentage**: For each block, calculate the percentage of overdue loans out of the total number of loans.\n3. **Order by Overdue Percentage**: The results should be ordered by the overdue percentage in descending order.\n\n### Steps to Construct the Query:\n1. **Identify Overdue Loans**: Use a `CASE` statement to identify loans that are overdue based on the `Repayment Status`.\n2. **Aggregate Data**: Use `GROUP BY` to aggregate data by `Block`.\n3. **Count Overdue Loans**: Use `SUM` with a `CASE` statement to count the number of overdue loans.\n4. **Calculate Overdue Percentage**: Use `CAST` to ensure proper division and calculate the percentage.\n5. **Order Results**: Use `ORDER BY` to sort the results by the overdue percentage in descending order.\n\n### SQL Query Construction:\n```sql\nSELECT \n    \"Block\",\n    SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS OverdueCount,\n    CAST(SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS REAL) * 100.0 / COUNT(*) AS OverduePercentage\nFROM \n    \"shg_loan_register\"\nGROUP BY \n    \"Block\"\nORDER BY \n    OverduePercentage DESC;\n```\n\n### Explanation:\n- **SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END)**: This counts the number of overdue loans for each block.\n- **CAST(... AS REAL) * 100.0 / COUNT(*)**: This calculates the percentage of overdue loans. The `CAST` ensures that the division is performed as floating-point arithmetic.\n- **GROUP BY \"Block\"**: This groups the results by block, so we get the count and percentage for each block.\n- **ORDER BY OverduePercentage DESC**: This orders the results by the overdue percentage in descending order, so the blocks with the highest overdue percentages appear first.\n\nThis query efficiently calculates the required metrics and presents them in the desired order.",
+      "api": {
+        "id": "chatcmpl-HucApuK37aBvPB0ckh2Y2n1JXbQgEiYa",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 493,
+          "prompt_tokens": 247,
+          "total_tokens": 740,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 10.788
+      },
+      "duration_seconds": 10.792,
+      "sql_duckdb": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS OverdueCount, CAST(SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS REAL) * 100.0 / NULLIF(COUNT(*), 0) AS OverduePercentage FROM \"shg_loan_register\" GROUP BY \"Block\" ORDER BY OverduePercentage DESC",
+      "rows": [
+        [
+          "Fatehpur",
+          15,
+          23.4375
+        ],
+        [
+          "Belaganj",
+          13,
+          20.0
+        ],
+        [
+          "Wazirganj",
+          13,
+          19.696969985961914
+        ],
+        [
+          "Atri",
+          8,
+          15.384614944458008
+        ],
+        [
+          "Barachatti",
+          8,
+          14.285714149475098
+        ],
+        [
+          "Dobhi",
+          3,
+          5.263157844543457
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

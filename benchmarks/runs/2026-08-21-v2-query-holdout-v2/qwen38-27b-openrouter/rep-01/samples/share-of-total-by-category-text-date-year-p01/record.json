@@ -1,0 +1,145 @@
+{
+  "id": "share-of-total-by-category-text-date-year-p01",
+  "task_id": "share-of-total-by-category-text-date-year",
+  "pattern": "year filter on a text date, group sum, share of grand total, rank",
+  "question": "2024 loans: total amount by purpose and each purpose's share of the total in percent, biggest first",
+  "gold_sql": "WITH y AS (SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Purpose\") SELECT \"Purpose\", total_amount, 100.0 * total_amount / SUM(total_amount) OVER () AS share_percent FROM y ORDER BY total_amount DESC, \"Purpose\"",
+  "expected_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount, 100.0 * SUM(\"Loan Amount (Rs)\") / NULLIF((SELECT SUM(\"Loan Amount (Rs)\") FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%'), 0) AS percent FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%' GROUP BY \"Purpose\" ORDER BY total_amount DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\n2024 loans: total amount by purpose and each purpose's share of the total in percent, biggest first\n[Database Schema]\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\n2024 loans: total amount by purpose and each purpose's share of the total in percent, biggest first\n```sql",
+      "response": "\n\n```sql\nSELECT\n  \"Purpose\",\n  SUM(\"Loan Amount (Rs)\") AS total_amount,\n  100.0 * SUM(\"Loan Amount (Rs)\") / (SELECT SUM(\"Loan Amount (Rs)\") FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%') AS percent\nFROM shg_loan_register\nWHERE \"Disbursement Date\" LIKE '2024%'\nGROUP BY \"Purpose\"\nORDER BY total_amount DESC;\n```",
+      "api": {
+        "id": "gen-1787311503-NHbpqfjpAQl8PcPkmt8h",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 286,
+          "completion_tokens": 401,
+          "total_tokens": 687,
+          "cost": 0.00150068,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00150068,
+            "upstream_inference_prompt_cost": 0.00013728,
+            "upstream_inference_completions_cost": 0.0013634
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 258,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.346
+      },
+      "duration_seconds": 4.374,
+      "sql_duckdb": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount, 100.0 * SUM(\"Loan Amount (Rs)\") / NULLIF((SELECT SUM(\"Loan Amount (Rs)\") FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%'), 0) AS percent FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%' GROUP BY \"Purpose\" ORDER BY total_amount DESC",
+      "rows": [
+        [
+          "Agriculture",
+          2000000,
+          25.906735751295336
+        ],
+        [
+          "Livestock",
+          1595000,
+          20.66062176165803
+        ],
+        [
+          "Petty trade",
+          1435000,
+          18.588082901554404
+        ],
+        [
+          "Housing",
+          1245000,
+          16.126943005181346
+        ],
+        [
+          "Education",
+          830000,
+          10.751295336787564
+        ],
+        [
+          "Health",
+          615000,
+          7.966321243523316
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>2024 Monsoon Block-wise Crop Yield Dashboard</title>
+<style>
+  :root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --card-border:#334155;
+    --accent:#38bdf8;
+    --accent2:#34d399;
+    --text:#e2e8f0;
+    --muted:#94a3b8;
+    --danger:#f87171;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    width:1440px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:Segoe UI, Arial, sans-serif;
+    padding:24px 32px 48px;
+  }
+  h1{font-size:26px;margin:0 0 4px 0;}
+  .subtitle{color:var(--muted);font-size:14px;margin-bottom:20px;}
+
+  .kpi-row{
+    display:flex;
+    gap:16px;
+    margin-bottom:24px;
+  }
+  .kpi-card{
+    flex:1;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    padding:16px 18px;
+  }
+  .kpi-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+  .kpi-value{font-size:26px;font-weight:700;margin-top:6px;}
+  .kpi-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+
+  .charts-row{
+    display:flex;
+    gap:16px;
+    margin-bottom:24px;
+  }
+  .chart-card{
+    flex:1;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    padding:16px;
+  }
+  .chart-title{font-size:15px;font-weight:600;margin-bottom:4px;}
+  .chart-note{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  canvas{width:100%;display:block;}
+
+  .table-card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .table-controls{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+  }
+  .table-controls input[type="text"]{
+    background:#0f172a;
+    border:1px solid var(--card-border);
+    color:var(--text);
+    padding:6px 10px;
+    border-radius:6px;
+    font-size:13px;
+    width:220px;
+  }
+  .table-controls label{font-size:13px;color:var(--muted);}
+  select{
+    background:#0f172a;
+    border:1px solid var(--card-border);
+    color:var(--text);
+    padding:5px 8px;
+    border-radius:6px;
+    font-size:13px;
+  }
+  button.dl{
+    margin-left:auto;
+    background:var(--accent);
+    color:#0f172a;
+    border:none;
+    font-weight:600;
+    padding:8px 16px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:13px;
+  }
+  button.dl:hover{background:#7dd3fc;}
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+  th, td{
+    padding:8px 10px;
+    text-align:right;
+    border-bottom:1px solid var(--card-border);
+  }
+  th:first-child, td:first-child{text-align:left;}
+  th{
+    cursor:pointer;
+    color:var(--muted);
+    font-weight:600;
+    user-select:none;
+    white-space:nowrap;
+  }
+  th.sorted{color:var(--accent);}
+  tr:hover td{background:#243247;}
+  .pos{color:var(--accent2);}
+  .neg{color:var(--danger);}
+
+  .source-line{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:6px;
+  }
+</style>
+</head>
+<body>
+
+<h1>2024 Monsoon Block-wise Crop Yield Dashboard</h1>
+<div class="subtitle">Yield sorted highest first (tonnes per hectare) &middot; compared against 2023 Monsoon season</div>
+
+<div class="kpi-row" id="kpiRow"></div>
+
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">Yield by block (t/ha): 2024 vs 2023</div>
+    <div class="chart-note">Grouped bars, sorted by 2024 yield descending</div>
+    <canvas id="chartYield" width="680" height="300"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Yield change 2023&rarr;2024 (%)</div>
+    <div class="chart-note">Percent change in tonnes/hectare, relative to each block's 2023 yield</div>
+    <canvas id="chartChange" width="680" height="300"></canvas>
+  </div>
+</div>
+
+<div class="table-card">
+  <div class="table-controls">
+    <label for="search">Filter block:</label>
+    <input type="text" id="search" placeholder="type block name...">
+    <label for="growthFilter">Growth:</label>
+    <select id="growthFilter">
+      <option value="all">All</option>
+      <option value="pos">Improved (2024 &gt; 2023)</option>
+      <option value="neg">Declined (2024 &lt; 2023)</option>
+    </select>
+    <button class="dl" id="downloadBtn">Download CSV</button>
+  </div>
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th data-key="block">Block</th>
+        <th data-key="cult2024">2024 Cultivated (ha)</th>
+        <th data-key="harvest2024">2024 Harvest (t)</th>
+        <th data-key="yield2024">2024 Yield (t/ha)</th>
+        <th data-key="yield2023">2023 Yield (t/ha)</th>
+        <th data-key="diffAbs">Change (t/ha)</th>
+        <th data-key="diffPct">Change (%)</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <div class="source-line" id="sourceLine"></div>
+</div>
+
+<script>
+// ---------- Raw embedded data ----------
+const DATA = [
+  {block:"Bhojpur", season:"Monsoon", year:2023, cultivated_hectares:580, harvest_tonnes:1392, source:"field register"},
+  {block:"Bhojpur", season:"Monsoon", year:2024, cultivated_hectares:600, harvest_tonnes:1500, source:"field register"},
+  {block:"Dharwad", season:"Monsoon", year:2023, cultivated_hectares:490, harvest_tonnes:1470, source:"field register"},
+  {block:"Dharwad", season:"Monsoon", year:2024, cultivated_hectares:500, harvest_tonnes:1600, source:"field register"},
+  {block:"Wardha",  season:"Monsoon", year:2023, cultivated_hectares:390, harvest_tonnes:975,  source:"field register"},
+  {block:"Wardha",  season:"Monsoon", year:2024, cultivated_hectares:400, harvest_tonnes:1080, source:"field register"}
+];
+
+// ---------- Derive per-block stats ----------
+function buildStats(data){
+  const blocks = [...new Set(data.map(d=>d.block))];
+  return blocks.map(b=>{
+    const r2024 = data.find(d=>d.block===b && d.year===2024 && d.season==="Monsoon");
+    const r2023 = data.find(d=>d.block===b && d.year===2023 && d.season==="Monsoon");
+    const yield2024 = r2024.harvest_tonnes / r2024.cultivated_hectares;
+    const yield2023 = r2023.harvest_tonnes / r2023.cultivated_hectares;
+    const diffAbs = yield2024 - yield2023;
+    const diffPct = (diffAbs / yield2023) * 100;
+    return {
+      block:b,
+      cult2024:r2024.cultivated_hectares,
+      harvest2024:r2024.harvest_tonnes,
+      cult2023:r2023.cultivated_hectares,
+      harvest2023:r2023.harvest_tonnes,
+      yield2024, yield2023, diffAbs, diffPct,
+      source:r2024.source
+    };
+  }).sort((a,b)=>b.yield2024 - a.yield2024);
+}
+
+const STATS = buildStats(DATA);
+const SOURCES = [...new Set(DATA.map(d=>d.source))];
+
+// ---------- KPI computations ----------
+const totalHarvest2024 = DATA.filter(d=>d.year===2024).reduce((s,d)=>s+d.harvest_tonnes,0);
+const totalHectares2024 = DATA.filter(d=>d.year===2024).reduce((s,d)=>s+d.cultivated_hectares,0);
+const totalHarvest2023 = DATA.filter(d=>d.year===2023).reduce((s,d)=>s+d.harvest_tonnes,0);
+const totalHectares2023 = DATA.filter(d=>d.year===2023).reduce((s,d)=>s+d.cultivated_hectares,0);
+
+const overallYield2024 = totalHarvest2024 / totalHectares2024;
+const overallYield2023 = totalHarvest2023 / totalHectares2023;
+const overallDiffAbs = overallYield2024 - overallYield2023;
+const overallDiffPct = (overallDiffAbs / overallYield2023) * 100;
+
+const topBlock = STATS[0];
+
+function fmt(n, d=2){ return n.toFixed(d); }
+
+const kpis = [
+  {
+    label:"Total 2024 harvest",
+    value: `${totalHarvest2024.toLocaleString()} t`,
+    sub:`across ${totalHectares2024.toLocaleString()} ha cultivated`
+  },
+  {
+    label:"Overall 2024 yield",
+    value:`${fmt(overallYield2024)} t/ha`,
+    sub:`weighted across ${STATS.length} blocks`
+  },
+  {
+    label:"Yield change vs 2023",
+    value:`${overallDiffAbs>=0?"+":""}${fmt(overallDiffAbs)} t/ha`,
+    sub:`${overallDiffPct>=0?"+":""}${fmt(overallDiffPct)}% vs 2023 (${fmt(overallYield2023)} t/ha)`
+  },
+  {
+    label:"Highest-yield block (2024)",
+    value:`${topBlock.block}`,
+    sub:`${fmt(topBlock.yield2024)} t/ha`
+  }
+];
+
+const kpiRow = document.getElementById("kpiRow");
+kpiRow.innerHTML = kpis.map(k=>`
+  <div class="kpi-card">
+    <div class="kpi-label">${k.label}</div>
+    <div class="kpi-value">${k.value}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>
+`).join("");
+
+// ---------- Table rendering ----------
+let sortKey = "yield2024";
+let sortDir = -1; // -1 desc, 1 asc
+let searchTerm = "";
+let growthFilter = "all";
+
+function getFilteredSorted(){
+  let rows = STATS.filter(r => r.block.toLowerCase().includes(searchTerm.toLowerCase()));
+  if(growthFilter === "pos") rows = rows.filter(r=>r.diffAbs > 0);
+  if(growthFilter === "neg") rows = rows.filter(r=>r.diffAbs < 0);
+  rows = rows.slice().sort((a,b)=>{
+    const av = a[sortKey], bv = b[sortKey];
+    if(typeof av === "string") return av.localeCompare(bv) * sortDir;
+    return (av - bv) * sortDir;
+  });
+  return rows;
+}
+
+function renderTable(){
+  const rows = getFilteredSorted();
+  const tbody = document.getElementById("tableBody");
+  tbody.innerHTML = rows.map(r=>`
+    <tr>
+      <td>${r.block}</td>
+      <td>${r.cult2024.toLocaleString()}</td>
+      <td>${r.harvest2024.toLocaleString()}</td>
+      <td>${fmt(r.yield2024)}</td>
+      <td>${fmt(r.yield2023)}</td>
+      <td class="${r.diffAbs>=0?'pos':'neg'}">${r.diffAbs>=0?'+':''}${fmt(r.diffAbs)}</td>
+      <td class="${r.diffPct>=0?'pos':'neg'}">${r.diffPct>=0?'+':''}${fmt(r.diffPct)}%</td>
+    </tr>
+  `).join("");
+
+  document.querySelectorAll("th").forEach(th=>{
+    th.classList.toggle("sorted", th.dataset.key === sortKey);
+    th.textContent = th.textContent.replace(/ [▲▼]$/,"");
+    if(th.dataset.key === sortKey){
+      th.textContent += sortDir === 1 ? " ▲" : " ▼";
+    }
+  });
+
+  const srcLine = SOURCES.length===1
+    ? `Source: ${SOURCES[0]}`
+    : `Sources: ${SOURCES.join(", ")}`;
+  document.getElementById("sourceLine").textContent = srcLine + ` · ${rows.length} of ${STATS.length} blocks shown`;
+}
+
+document.querySelectorAll("th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    if(sortKey === key){
+      sortDir *= -1;
+    } else {
+      sortKey = key;
+      sortDir = -1;
+    }
+    renderTable();
+  });
+});
+
+document.getElementById("search").addEventListener("input", e=>{
+  searchTerm = e.target.value;
+  renderTable();
+});
+document.getElementById("growthFilter").addEventListener("change", e=>{
+  growthFilter = e.target.value;
+  renderTable();
+});
+
+// ---------- CSV download (from currently displayed table state) ----------
+document.getElementById("downloadBtn").addEventListener("click", ()=>{
+  const rows = getFilteredSorted();
+  const header = [
+    "block","cultivated_hectares_2024","harvest_tonnes_2024",
+    "yield_2024_t_per_ha","yield_2023_t_per_ha",
+    "change_t_per_ha","change_percent","source"
+  ];
+  const lines = [header.join(",")];
+  rows.forEach(r=>{
+    lines.push([
+      r.block,
+      r.cult2024,
+      r.harvest2024,
+      fmt(r.yield2024,4),
+      fmt(r.yield2023,4),
+      fmt(r.diffAbs,4),
+      fmt(r.diffPct,2),
+      r.source
+    ].join(","));
+  });
+  const csv = lines.join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "monsoon_2024_block_yield.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+renderTable();
+
+// ---------- Chart 1: grouped bar, yield 2024 vs 2023 ----------
+function drawGroupedBar(canvasId, dataRows){
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const padL = 50, padR = 20, padT = 20, padB = 40;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  const maxVal = Math.max(...dataRows.map(r=>Math.max(r.yield2024, r.yield2023))) * 1.15;
+  const n = dataRows.length;
+  const groupW = chartW / n;
+  const barW = groupW * 0.32;
+
+  // axes
+  ctx.strokeStyle = "#334155";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padL, padT);
+  ctx.lineTo(padL, padT+chartH);
+  ctx.lineTo(padL+chartW, padT+chartH);
+  ctx.stroke();
+
+  // gridlines + y labels
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "11px Segoe UI";
+  ctx.textAlign = "right";
+  const gridCount = 5;
+  for(let i=0;i<=gridCount;i++){
+    const val = maxVal * i / gridCount;
+    const y = padT + chartH - (val/maxVal)*chartH;
+    ctx.strokeStyle = "rgba(148,163,184,0.15)";
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL+chartW, y);
+    ctx.stroke();
+    ctx.fillText(val.toFixed(1), padL-6, y+3);
+  }
+
+  dataRows.forEach((r, i)=>{
+    const cx = padL + i*groupW + groupW/2;
+    // 2024 bar
+    const h24 = (r.yield2024/maxVal)*chartH;
+    const x24 = cx - barW - 4;
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillRect(x24, padT+chartH-h24, barW, h24);
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "11px Segoe UI";
+    ctx.textAlign = "center";
+    ctx.fillText(r.yield2024.toFixed(2), x24+barW/2, padT+chartH-h24-6);
+
+    // 2023 bar
+    const h23 = (r.yield2023/maxVal)*chartH;
+    const x23 = cx + 4;
+    ctx.fillStyle = "#64748b";
+    ctx.fillRect(x23, padT+chartH-h23, barW, h23);
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillText(r.yield2023.toFixed(2), x23+barW/2, padT+chartH-h23-6);
+
+    // label
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(r.block, cx, padT+chartH+16);
+  });
+
+  // legend
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#38bdf8";
+  ctx.fillRect(padL, 4, 10, 10);
+  ctx.fillStyle = "#e2e8f0";
+  ctx.fillText("2024", padL+14, 13);
+  ctx.fillStyle = "#64748b";
+  ctx.fillRect(padL+60, 4, 10, 10);
+  ctx.fillStyle = "#e2e8f0";
+  ctx.fillText("2023", padL+74, 13);
+}
+
+// sorted highest-first order for charts (same as default table sort by yield2024 desc)
+const chartOrder = STATS.slice().sort((a,b)=>b.yield2024 - a.yield2024);
+drawGroupedBar("chartYield", chartOrder);
+
+// ---------- Chart 2: percent change bar ----------
+function drawChangeBar(canvasId, dataRows){
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const padL = 50, padR = 20, padT = 20, padB = 40;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  const maxAbs = Math.max(...dataRows.map(r=>Math.abs(r.diffPct))) * 1.3;
+  const zeroY = padT + chartH/2;
+  const scale = (chartH/2) / maxAbs;
+
+  const n = dataRows.length;
+  const groupW = chartW / n;
+  const barW = groupW * 0.5;
+
+  // zero line
+  ctx.strokeStyle = "#334155";
+  ctx.beginPath();
+  ctx.moveTo(padL, zeroY);
+  ctx.lineTo(padL+chartW, zeroY);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(padL, padT);
+  ctx.lineTo(padL, padT+chartH);
+  ctx.stroke();
+
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "11px Segoe UI";
+  ctx.textAlign = "right";
+  ctx.fillText("0%", padL-6, zeroY+3);
+  ctx.fillText(maxAbs.toFixed(0)+"%", padL-6, padT+8);
+  ctx.fillText("-"+maxAbs.toFixed(0)+"%", padL-6, padT+chartH);
+
+  dataRows.forEach((r,i)=>{
+    const cx = padL + i*groupW + groupW/2;
+    const h = Math.abs(r.diffPct) * scale;
+    const y = r.diffPct >= 0 ? zeroY - h : zeroY;
+    ctx.fillStyle = r.diffPct >= 0 ? "#34d399" : "#f87171";
+    ctx.fillRect(cx - barW/2, y, barW, h);
+
+    ctx.fillStyle = "#e2e8f0";
+    ctx.textAlign = "center";
+    const labelY = r.diffPct >= 0 ? y - 6 : y + h + 14;
+    ctx.fillText((r.diffPct>=0?"+":"")+r.diffPct.toFixed(1)+"%", cx, labelY);
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(r.block, cx, padT+chartH+16);
+  });
+}
+
+drawChangeBar("chartChange", chartOrder);
+</script>
+
+</body>
+</html>

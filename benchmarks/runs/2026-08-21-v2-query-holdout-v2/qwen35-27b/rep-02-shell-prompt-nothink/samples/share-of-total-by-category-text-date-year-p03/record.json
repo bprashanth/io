@@ -1,0 +1,145 @@
+{
+  "id": "share-of-total-by-category-text-date-year-p03",
+  "task_id": "share-of-total-by-category-text-date-year",
+  "pattern": "year filter on a text date, group sum, share of grand total, rank",
+  "question": "what share of 2024 loan money went to each purpose? give total and percentage, largest purpose on top",
+  "gold_sql": "WITH y AS (SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Purpose\") SELECT \"Purpose\", total_amount, 100.0 * total_amount / SUM(total_amount) OVER () AS share_percent FROM y ORDER BY total_amount DESC, \"Purpose\"",
+  "expected_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.91
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.59
+    ],
+    [
+      "Housing",
+      1245000,
+      16.13
+    ],
+    [
+      "Education",
+      830000,
+      10.75
+    ],
+    [
+      "Health",
+      615000,
+      7.97
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS \"Total Loan Amount (Rs)\", ROUND(100.0 * SUM(\"Loan Amount (Rs)\") / NULLIF(NULLIF(SUM(SUM(\"Loan Amount (Rs)\")) OVER (), 0), 0), 2) AS \"Percentage\" FROM \"shg_loan_register\" WHERE \"Disbursement Date\" LIKE '2024%' GROUP BY \"Purpose\" ORDER BY \"Total Loan Amount (Rs)\" DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nwhat share of 2024 loan money went to each purpose? give total and percentage, largest purpose on top",
+      "response": "SELECT\n  \"Purpose\",\n  SUM(\"Loan Amount (Rs)\") AS \"Total Loan Amount (Rs)\",\n  ROUND(100.0 * SUM(\"Loan Amount (Rs)\") / NULLIF(SUM(SUM(\"Loan Amount (Rs)\")) OVER (), 0), 2) AS \"Percentage\"\nFROM \"shg_loan_register\"\nWHERE \"Disbursement Date\" LIKE '2024%'\nGROUP BY \"Purpose\"\nORDER BY \"Total Loan Amount (Rs)\" DESC;",
+      "api": {
+        "id": "gen-1787312768-AqebKgbWFUzluZ1GyLZv",
+        "model": "qwen/qwen3.5-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 424,
+          "completion_tokens": 107,
+          "total_tokens": 531,
+          "cost": 0.00032,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00032,
+            "upstream_inference_prompt_cost": 0.000106,
+            "upstream_inference_completions_cost": 0.000214
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 5.031
+      },
+      "duration_seconds": 5.035,
+      "sql_duckdb": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS \"Total Loan Amount (Rs)\", ROUND(100.0 * SUM(\"Loan Amount (Rs)\") / NULLIF(NULLIF(SUM(SUM(\"Loan Amount (Rs)\")) OVER (), 0), 0), 2) AS \"Percentage\" FROM \"shg_loan_register\" WHERE \"Disbursement Date\" LIKE '2024%' GROUP BY \"Purpose\" ORDER BY \"Total Loan Amount (Rs)\" DESC",
+      "rows": [
+        [
+          "Agriculture",
+          2000000,
+          25.91
+        ],
+        [
+          "Livestock",
+          1595000,
+          20.66
+        ],
+        [
+          "Petty trade",
+          1435000,
+          18.59
+        ],
+        [
+          "Housing",
+          1245000,
+          16.13
+        ],
+        [
+          "Education",
+          830000,
+          10.75
+        ],
+        [
+          "Health",
+          615000,
+          7.97
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

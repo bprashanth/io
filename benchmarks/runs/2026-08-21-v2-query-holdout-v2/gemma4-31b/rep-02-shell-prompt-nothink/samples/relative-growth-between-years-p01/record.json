@@ -1,0 +1,64 @@
+{
+  "id": "relative-growth-between-years-p01",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "by what percent did total loan disbursement grow from 2023 to 2024",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH yearly_disbursement AS (SELECT STRFTIME(CAST(CAST(\"Disbursement Date\" AS DATE) AS TIMESTAMP), '%Y') AS year, SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE STRFTIME(CAST(CAST(\"Disbursement Date\" AS DATE) AS TIMESTAMP), '%Y') IN ('2023', '2024') GROUP BY 1), metrics AS (SELECT MAX(CASE WHEN year = '2023' THEN total_amount END) AS amount_2023, MAX(CASE WHEN year = '2024' THEN total_amount END) AS amount_2024 FROM yearly_disbursement) SELECT ((amount_2024 - amount_2023) / NULLIF(NULLIF(amount_2023, 0), 0)) * 100 FROM metrics",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nby what percent did total loan disbursement grow from 2023 to 2024",
+      "response": "```sql\nWITH yearly_disbursement AS (\n  SELECT\n    strftime('%Y', CAST(\"Disbursement Date\" AS DATE)) AS year,\n    SUM(\"Loan Amount (Rs)\") AS total_amount\n  FROM shg_loan_register\n  WHERE strftime('%Y', CAST(\"Disbursement Date\" AS DATE)) IN ('2023', '2024')\n  GROUP BY 1\n),\nmetrics AS (\n  SELECT\n    MAX(CASE WHEN year = '2023' THEN total_amount END) AS amount_2023,\n    MAX(CASE WHEN year = '2024' THEN total_amount END) AS amount_2024\n  FROM yearly_disbursement\n)\nSELECT\n  ((amount_2024 - amount_2023) / NULLIF(amount_2023, 0)) * 100\nFROM metrics;\n```",
+      "api": {
+        "id": "gen-1787312761-gNN8fWUhwWbl8SzdA2tL",
+        "model": "google/gemma-4-31b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 417,
+          "completion_tokens": 207,
+          "total_tokens": 624,
+          "cost": 9.255e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 9.255e-05,
+            "upstream_inference_prompt_cost": 2.217e-05,
+            "upstream_inference_completions_cost": 7.038e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.178
+      },
+      "duration_seconds": 3.184,
+      "sql_duckdb": "WITH yearly_disbursement AS (SELECT STRFTIME(CAST(CAST(\"Disbursement Date\" AS DATE) AS TIMESTAMP), '%Y') AS year, SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE STRFTIME(CAST(CAST(\"Disbursement Date\" AS DATE) AS TIMESTAMP), '%Y') IN ('2023', '2024') GROUP BY 1), metrics AS (SELECT MAX(CASE WHEN year = '2023' THEN total_amount END) AS amount_2023, MAX(CASE WHEN year = '2024' THEN total_amount END) AS amount_2024 FROM yearly_disbursement) SELECT ((amount_2024 - amount_2023) / NULLIF(NULLIF(amount_2023, 0), 0)) * 100 FROM metrics",
+      "rows": [
+        [
+          26.040816326530614
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

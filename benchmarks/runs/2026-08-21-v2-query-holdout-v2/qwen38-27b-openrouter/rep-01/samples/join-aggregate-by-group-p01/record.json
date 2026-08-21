@@ -1,0 +1,115 @@
+{
+  "id": "join-aggregate-by-group-p01",
+  "task_id": "join-aggregate-by-group",
+  "pattern": "join, filter, count and sum two columns per group",
+  "question": "how many schools in each block have no electricity and how many children studied in them in 2024",
+  "gold_sql": "SELECT e.\"Block\", COUNT(*) AS schools_without_electricity, SUM(e.\"Girls 2024\" + e.\"Boys 2024\") AS students_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Electricity\" = 'No' GROUP BY e.\"Block\" ORDER BY e.\"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      2,
+      339
+    ],
+    [
+      "Barachatti",
+      3,
+      709
+    ],
+    [
+      "Belaganj",
+      2,
+      433
+    ],
+    [
+      "Dobhi",
+      3,
+      730
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dobhi",
+      3,
+      730
+    ],
+    [
+      "Belaganj",
+      2,
+      433
+    ],
+    [
+      "Barachatti",
+      3,
+      709
+    ],
+    [
+      "Atri",
+      2,
+      339
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT e.\"Block\", COUNT(*) AS \"Number of Schools\", SUM(COALESCE(e.\"Girls 2024\", 0) + COALESCE(e.\"Boys 2024\", 0)) AS \"Children in 2024\" FROM \"school_enrolment_by_year\" AS e JOIN \"school_infrastructure\" AS s ON e.\"School Code\" = s.\"School Code\" WHERE s.\"Electricity\" = 'No' GROUP BY e.\"Block\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nhow many schools in each block have no electricity and how many children studied in them in 2024\n[Database Schema]\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nhow many schools in each block have no electricity and how many children studied in them in 2024\n```sql",
+      "response": "\n\n```sql\nSELECT\n    e.\"Block\",\n    COUNT(*) AS \"Number of Schools\",\n    SUM(COALESCE(e.\"Girls 2024\", 0) + COALESCE(e.\"Boys 2024\", 0)) AS \"Children in 2024\"\nFROM \"school_enrolment_by_year\" e\nJOIN \"school_infrastructure\" s ON e.\"School Code\" = s.\"School Code\"\nWHERE s.\"Electricity\" = 'No'\nGROUP BY e.\"Block\"\n```",
+      "api": {
+        "id": "gen-1787311686-7VfoIGDu8O51pBjrcoYa",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 384,
+          "completion_tokens": 639,
+          "total_tokens": 1023,
+          "cost": 0.0022176,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0022176,
+            "upstream_inference_prompt_cost": 0.0001728,
+            "upstream_inference_completions_cost": 0.0020448
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 441,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 34.177
+      },
+      "duration_seconds": 34.186,
+      "sql_duckdb": "SELECT e.\"Block\", COUNT(*) AS \"Number of Schools\", SUM(COALESCE(e.\"Girls 2024\", 0) + COALESCE(e.\"Boys 2024\", 0)) AS \"Children in 2024\" FROM \"school_enrolment_by_year\" AS e JOIN \"school_infrastructure\" AS s ON e.\"School Code\" = s.\"School Code\" WHERE s.\"Electricity\" = 'No' GROUP BY e.\"Block\"",
+      "rows": [
+        [
+          "Dobhi",
+          3,
+          730
+        ],
+        [
+          "Belaganj",
+          2,
+          433
+        ],
+        [
+          "Barachatti",
+          3,
+          709
+        ],
+        [
+          "Atri",
+          2,
+          339
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

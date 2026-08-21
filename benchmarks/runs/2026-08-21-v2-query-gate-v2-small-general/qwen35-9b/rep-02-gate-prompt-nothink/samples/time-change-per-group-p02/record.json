@@ -1,0 +1,96 @@
+{
+  "id": "time-change-per-group-p02",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "compare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, ((CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0)) * 100.0) - ((CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0)) * 100.0) AS percentage_point_change FROM (SELECT district, year, anc4_completed, pregnancies_registered FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) AS sub GROUP BY district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n```sql",
+      "response": "SELECT \n    district,\n    (\n        (CAST(anc4_completed AS FLOAT) / NULLIF(pregnancies_registered, 0)) * 100.0\n    ) - (\n        (CAST(anc4_completed AS FLOAT) / NULLIF(pregnancies_registered, 0)) * 100.0\n    ) AS percentage_point_change\nFROM (\n    SELECT \n        district,\n        year,\n        anc4_completed,\n        pregnancies_registered\n    FROM anc_visits\n    WHERE district IN ('Gaya', 'Nalanda')\n    AND year IN (2021, 2023)\n) sub\nGROUP BY district;",
+      "api": {
+        "id": "gen-1787312761-iwnrGnzr3GW4zggkNOCL",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 225,
+          "completion_tokens": 148,
+          "total_tokens": 373,
+          "cost": 4.47e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.47e-05,
+            "upstream_inference_prompt_cost": 2.25e-05,
+            "upstream_inference_completions_cost": 2.22e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.619
+      },
+      "duration_seconds": 3.62,
+      "error": "BinderException: Binder Error: column \"anc4_completed\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(anc4_completed)\" if the exact value of \"anc4_completed\" is not important.\n\nLINE 1: EXPLAIN SELECT district, ((CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered...\n                                        ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[Previous Query Error]\nBinderException: Binder Error: column \"anc4_completed\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(anc4_completed)\" if the exact value of \"anc4_completed\" is not important.\n\nLINE 1: EXPLAIN SELECT district, ((CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered...\n                                        ^\nReturn one corrected read-only query.\n[User Question]\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n```sql",
+      "response": "SELECT \n    district,\n    (CAST(2023_anc4 AS REAL) / NULLIF(2023_reg, 0)) * 100.0 - (CAST(2021_anc4 AS REAL) / NULLIF(2021_reg, 0)) * 100.0 AS percentage_point_change\nFROM (\n    SELECT \n        district,\n        MAX(CASE WHEN year = 2021 THEN anc4_completed END) AS 2021_anc4,\n        MAX(CASE WHEN year = 2021 THEN pregnancies_registered END) AS 2021_reg,\n        MAX(CASE WHEN year = 2023 THEN anc4_completed END) AS 2023_anc4,\n        MAX(CASE WHEN year = 2023 THEN pregnancies_registered END) AS 2023_reg\n    FROM anc_visits\n    WHERE district IN ('Gaya', 'Nalanda')\n    GROUP BY district\n) sub;",
+      "api": {
+        "id": "gen-1787312765-8fzkbXhwjgiTJ2fAeqz0",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 334,
+          "completion_tokens": 227,
+          "total_tokens": 561,
+          "cost": 6.745e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.745e-05,
+            "upstream_inference_prompt_cost": 3.34e-05,
+            "upstream_inference_completions_cost": 3.405e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.836
+      },
+      "duration_seconds": 7.837,
+      "error": "ParseError: Expected AS after CAST. Line 3, Col: 19.\n  SELECT \n    district,\n    (CAST(2023\u001b[4m_anc4\u001b[0m AS REAL) / NULLIF(2023_reg, 0)) * 100.0 - (CAST(2021_anc4 AS REAL) / NULLIF(2021_reg, 0)) * 100.0 A"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

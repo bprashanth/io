@@ -1,0 +1,112 @@
+{
+  "id": "null-aware-average-by-group-p01",
+  "task_id": "null-aware-average-by-group",
+  "pattern": "average of a column with blanks per group for one year, blanks excluded not zero",
+  "question": "2024 loans block wise average amount repaid, blank repaid cells are not zero",
+  "gold_sql": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS average_repaid FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      30016.666666666668
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ],
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Wazirganj",
+      22673.684210526317
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Barachatti",
+      34981.48148148148
+    ],
+    [
+      "Dobhi",
+      33401.754385964916
+    ],
+    [
+      "Fatehpur",
+      34160.65573770492
+    ],
+    [
+      "Belaganj",
+      31196.875
+    ],
+    [
+      "Wazirganj",
+      29966.129032258064
+    ],
+    [
+      "Atri",
+      33410.204081632655
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT Block, AVG(NULLIF(\"Amount Repaid (Rs)\", 0)) AS Average_Amount_Repaid FROM shg_loan_register GROUP BY Block",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\n2024 loans block wise average amount repaid, blank repaid cells are not zero",
+      "response": "To translate the natural language question into an executable SQLite query, let's break down the requirements:\n\n1. **Identify the Relevant Table**: The question is about loans, so the relevant table is `shg_loan_register`.\n2. **Determine the Required Columns**:\n   - `Block`: To group the loans by block.\n   - `Amount Repaid (Rs)`: To calculate the average amount repaid.\n3. **Filtering and Grouping**:\n   - Group the data by `Block`.\n   - Calculate the average of `Amount Repaid (Rs)` for each block.\n4. **Handling NULL Values**:\n   - The question specifies that blank (NULL) repaid cells should not be zero. This is already handled by the `NULLIF` function in the reference solution, which ensures that NULL values are treated as zero when calculating the average.\n5. **Construct the SQL Query**:\n   - Use the `SELECT` statement to specify the columns to retrieve.\n   - Use the `FROM` clause to specify the table.\n   - Use the `GROUP BY` clause to group the results by `Block`.\n   - Use the `AVG` function to calculate the average amount repaid, with `NULLIF` applied to `Amount Repaid (Rs)`.\n\nBased on the above steps, the SQL query is constructed as follows:\n\n```sql\nSELECT \n    Block, \n    AVG(NULLIF(`Amount Repaid (Rs)`, 0)) AS Average_Amount_Repaid\nFROM \n    shg_loan_register\nGROUP BY \n    Block;\n```\n\nThis query will provide the average amount repaid for each block, treating NULL values appropriately as specified in the question.",
+      "api": {
+        "id": "chatcmpl-xil9mBdBm9gLjUHQJT5ZqP3m2LMrAEiV",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 349,
+          "prompt_tokens": 413,
+          "total_tokens": 762,
+          "prompt_tokens_details": {
+            "cached_tokens": 389
+          }
+        },
+        "duration_seconds": 7.679
+      },
+      "duration_seconds": 7.681,
+      "sql_duckdb": "SELECT Block, AVG(NULLIF(\"Amount Repaid (Rs)\", 0)) AS Average_Amount_Repaid FROM shg_loan_register GROUP BY Block",
+      "rows": [
+        [
+          "Barachatti",
+          34981.48148148148
+        ],
+        [
+          "Dobhi",
+          33401.754385964916
+        ],
+        [
+          "Fatehpur",
+          34160.65573770492
+        ],
+        [
+          "Belaganj",
+          31196.875
+        ],
+        [
+          "Wazirganj",
+          29966.129032258064
+        ],
+        [
+          "Atri",
+          33410.204081632655
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

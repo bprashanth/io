@@ -1,0 +1,88 @@
+{
+  "id": "wide-year-columns-share-p01",
+  "task_id": "wide-year-columns-share",
+  "pattern": "arithmetic across year-named columns, group sum, share",
+  "question": "block wise what percent of 2024 enrolment is girls",
+  "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Atri",
+      53.90037536621094
+    ],
+    [
+      "Belaganj",
+      52.56309127807617
+    ],
+    [
+      "Dobhi",
+      48.09971237182617
+    ],
+    [
+      "Barachatti",
+      55.3763427734375
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT Block, (CAST(SUM(\"Girls 2024\") AS REAL) * 100.0 / NULLIF(SUM(\"Girls 2024\" + \"Boys 2024\"), 0)) AS Percentage_Girls_2024 FROM school_enrolment_by_year GROUP BY Block",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nblock wise what percent of 2024 enrolment is girls\n[Database Schema]\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nblock wise what percent of 2024 enrolment is girls\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to follow these steps:\n\n1. **Understand the Question**: The question asks for the percentage of girls enrolled in the year 2024, broken down by block. This means we need to calculate the percentage of girls out of the total enrollment (both girls and boys) for the year 2024, grouped by the block.\n\n2. **Identify Relevant Columns**: From the schema, the relevant columns are:\n   - `Block`: To group the results by block.\n   - `Girls 2024`: To get the number of girls enrolled in 2024.\n   - `Boys 2024`: To get the number of boys enrolled in 2024.\n\n3. **Calculate the Total Enrollment for 2024**: For each block, we need to sum the number of girls and boys enrolled in 2024 to get the total enrollment for that block.\n\n4. **Calculate the Percentage of Girls**: For each block, calculate the percentage of girls by dividing the number of girls by the total enrollment and multiplying by 100.\n\n5. **Group By Block**: Since the question asks for the result to be block-wise, we need to group the results by the `Block` column.\n\n6. **Formulate the SQL Query**: Based on the above steps, the SQL query can be formulated as follows:\n\n```sql\nSELECT \n    Block, \n    (CAST(SUM(`Girls 2024`) AS REAL) * 100.0 / SUM(`Girls 2024` + `Boys 2024`)) AS Percentage_Girls_2024\nFROM \n    school_enrolment_by_year\nGROUP BY \n    Block;\n```\n\n### Explanation:\n- **CAST(SUM(`Girls 2024`) AS REAL)**: This ensures that the division operation results in a floating-point number, which is necessary for accurate percentage calculation.\n- **SUM(`Girls 2024` + `Boys 2024`)**: This calculates the total enrollment for each block.\n- **SUM(`Girls 2024`) * 100.0 / SUM(`Girls 2024` + `Boys 2024`)**: This calculates the percentage of girls in the total enrollment for each block.\n- **GROUP BY Block**: This groups the results by block, providing the percentage of girls for each block separately.\n\nThis query directly addresses the user's request by calculating the required percentage for each block without unnecessary operations or joins.",
+      "api": {
+        "id": "chatcmpl-Q3uFhOjigfu2L6pEvRDFCERLbSJzgzzt",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 553,
+          "prompt_tokens": 266,
+          "total_tokens": 819,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 12.108
+      },
+      "duration_seconds": 12.111,
+      "sql_duckdb": "SELECT Block, (CAST(SUM(\"Girls 2024\") AS REAL) * 100.0 / NULLIF(SUM(\"Girls 2024\" + \"Boys 2024\"), 0)) AS Percentage_Girls_2024 FROM school_enrolment_by_year GROUP BY Block",
+      "rows": [
+        [
+          "Atri",
+          53.90037536621094
+        ],
+        [
+          "Belaganj",
+          52.56309127807617
+        ],
+        [
+          "Dobhi",
+          48.09971237182617
+        ],
+        [
+          "Barachatti",
+          55.3763427734375
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

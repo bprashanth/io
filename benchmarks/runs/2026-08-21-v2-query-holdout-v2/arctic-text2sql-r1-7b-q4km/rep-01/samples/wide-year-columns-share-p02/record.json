@@ -1,0 +1,74 @@
+{
+  "id": "wide-year-columns-share-p02",
+  "task_id": "wide-year-columns-share",
+  "pattern": "arithmetic across year-named columns, group sum, share",
+  "question": "girls as a share of total students in 2024 for each block",
+  "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"Block\", (CAST(\"Girls 2024\" AS REAL) * 100.0 / NULLIF(NULLIF(\"Girls 2024\" + \"Boys 2024\", 0), 0)) AS \"Girls Percentage 2024\" FROM \"school_enrolment_by_year\" GROUP BY \"Block\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ngirls as a share of total students in 2024 for each block\n[Database Schema]\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ngirls as a share of total students in 2024 for each block\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to focus on calculating the percentage of girls among the total students for the year 2024, grouped by each block. Here's a step-by-step breakdown of how to construct the query:\n\n1. **Identify the Relevant Columns**: We need the \"Block\" column to group the data and the \"Girls 2024\" and \"Boys 2024\" columns to calculate the percentage of girls.\n\n2. **Calculate Total Students in 2024**: For each block, we need to sum the number of girls and boys in 2024 to get the total number of students in 2024.\n\n3. **Calculate the Percentage of Girls**: Using the formula `(Girls 2024 / Total Students 2024) * 100`, we can compute the percentage of girls in each block.\n\n4. **Group By Block**: Since we need the percentage for each block, we will group the results by the \"Block\" column.\n\n5. **Select the Required Columns**: We will select the \"Block\" and the calculated percentage of girls.\n\nHere is the SQL query that accomplishes the above steps:\n\n```sql\nSELECT \n    \"Block\",\n    (CAST(\"Girls 2024\" AS REAL) * 100.0 / (\"Girls 2024\" + \"Boys 2024\")) AS \"Girls Percentage 2024\"\nFROM \n    \"school_enrolment_by_year\"\nGROUP BY \n    \"Block\";\n```\n\n### Explanation:\n- **CAST(\"Girls 2024\" AS REAL)**: This ensures that the division operation results in a floating-point number, which is necessary for accurate percentage calculation.\n- **100.0**: This multiplier converts the ratio into a percentage.\n- **(\"Girls 2024\" + \"Boys 2024\")**: This calculates the total number of students in 2024 for each block.\n- **GROUP BY \"Block\"**: This groups the results by block, ensuring that the percentage is calculated for each block separately.\n\nThis query directly addresses the user's request by calculating the percentage of girls among the total students for each block in the year 2024.",
+      "api": {
+        "id": "chatcmpl-2l8894lEtvqNIUiTtQp5rS3oEp0xWB6p",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 485,
+          "prompt_tokens": 270,
+          "total_tokens": 755,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 10.611
+      },
+      "duration_seconds": 10.612,
+      "error": "BinderException: Binder Error: column \"Girls 2024\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Girls 2024)\" if the exact value of \"Girls 2024\" is not important.\n\nLINE 1: EXPLAIN SELECT \"Block\", (CAST(\"Girls 2024\" AS REAL) * 100.0 / NULLIF((\"Girls 2024\" + ...\n                                      ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ngirls as a share of total students in 2024 for each block\n[Database Schema]\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[Previous Query Error]\nBinderException: Binder Error: column \"Girls 2024\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Girls 2024)\" if the exact value of \"Girls 2024\" is not important.\n\nLINE 1: EXPLAIN SELECT \"Block\", (CAST(\"Girls 2024\" AS REAL) * 100.0 / NULLIF((\"Girls 2024\" + ...\n                                      ^\nReturn one corrected read-only query.\n[User Question]\ngirls as a share of total students in 2024 for each block\n```sql",
+      "response": "To translate the user question into an executable SQLite query, we need to follow these steps:\n\n1. **Understand the Question**: The question asks for the percentage of girls among the total students in the year 2024, grouped by each block.\n\n2. **Identify Relevant Columns**: \n   - \"Block\" to group the results.\n   - \"Girls 2024\" to calculate the number of girls in 2024.\n   - \"Boys 2024\" to calculate the number of boys in 2024.\n\n3. **Calculate the Percentage**: \n   - The percentage of girls in 2024 can be calculated as `(Girls 2024 / (Girls 2024 + Boys 2024)) * 100.0`.\n   - Use `NULLIF` to avoid division by zero.\n\n4. **Group By Block**: \n   - Group the results by the \"Block\" column to get the percentage for each block.\n\n5. **Formulate the SQL Query**: \n   - Use `SELECT` to specify the columns to retrieve.\n   - Use `FROM` to specify the table.\n   - Use `GROUP BY` to group the results by block.\n   - Use `CAST` to ensure the division is performed as floating-point arithmetic.\n\nHere is the corrected SQL query:\n\n```sql\nSELECT \n  \"Block\", \n  (CAST(\"Girls 2024\" AS REAL) * 100.0 / NULLIF(\"Girls 2024\" + \"Boys 2024\", 0)) AS \"Girls Percentage 2024\"\nFROM \n  \"school_enrolment_by_year\"\nGROUP BY \n  \"Block\";\n```\n\n### Explanation:\n- **SELECT Clause**: We select the \"Block\" column and calculate the percentage of girls in 2024.\n- **CAST Function**: Converts \"Girls 2024\" to a real number to ensure floating-point division.\n- **NULLIF Function**: Ensures that the denominator is not zero, preventing division by zero errors.\n- **FROM Clause**: Specifies the table \"school_enrolment_by_year\" from which to retrieve the data.\n- **GROUP BY Clause**: Groups the results by the \"Block\" column to provide the percentage for each block.\n\nThis query accurately calculates the percentage of girls as a share of total students in 2024 for each block, addressing the user's request.",
+      "api": {
+        "id": "chatcmpl-PyA6i7z2aixmnq59iuXS2tdhxXLUCTlQ",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 520,
+          "prompt_tokens": 398,
+          "total_tokens": 918,
+          "prompt_tokens_details": {
+            "cached_tokens": 243
+          }
+        },
+        "duration_seconds": 11.407
+      },
+      "duration_seconds": 11.409,
+      "error": "BinderException: Binder Error: column \"Girls 2024\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Girls 2024)\" if the exact value of \"Girls 2024\" is not important.\n\nLINE 1: EXPLAIN SELECT \"Block\", (CAST(\"Girls 2024\" AS REAL) * 100.0 / NULLIF(NULLIF(\"Girls 2024...\n                                      ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

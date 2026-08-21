@@ -1,0 +1,112 @@
+{
+  "id": "null-aware-average-by-group-p03",
+  "task_id": "null-aware-average-by-group",
+  "pattern": "average of a column with blanks per group for one year, blanks excluded not zero",
+  "question": "average repayment so far per block for 2024 disbursements, ignore loans with no repaid figure",
+  "gold_sql": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS average_repaid FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      30016.666666666668
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ],
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Wazirganj",
+      22673.684210526317
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ],
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Atri",
+      30016.666666666668
+    ],
+    [
+      "Wazirganj",
+      22673.684210526317
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS average_repayment FROM \"shg_loan_register\" WHERE \"Disbursement Date\" LIKE '2024%' AND NOT \"Amount Repaid (Rs)\" IS NULL GROUP BY \"Block\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\naverage repayment so far per block for 2024 disbursements, ignore loans with no repaid figure",
+      "response": "To translate the natural language question into an executable SQLite query, let's break down the requirements:\n\n1. **Identify the Relevant Table**: The question is about loan repayments, so the relevant table is `shg_loan_register`.\n\n2. **Filter by Disbursement Year**: The question specifies \"2024 disbursements\". This means we need to filter the records where the `Disbursement Date` falls within the year 2024. We can use the `LIKE` operator or `SUBSTR` to extract the year from the `Disbursement Date` column.\n\n3. **Exclude Loans with No Repaid Figure**: The question asks to ignore loans with no repaid figure. This means we need to filter out records where `Amount Repaid (Rs)` is `NULL`.\n\n4. **Calculate Average Repayment per Block**: The question asks for the average repayment per block. This requires grouping the data by the `Block` column and then calculating the average of `Amount Repaid (Rs)` for each block.\n\n5. **Select Relevant Columns**: We need to select the `Block` and the calculated average repayment.\n\nBased on these steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    \"Block\", \n    AVG(\"Amount Repaid (Rs)\") AS average_repayment\nFROM \n    \"shg_loan_register\"\nWHERE \n    \"Disbursement Date\" LIKE '2024%' \n    AND \"Amount Repaid (Rs)\" IS NOT NULL\nGROUP BY \n    \"Block\";\n```\n\n### Explanation:\n- **SELECT Clause**: We select the `Block` and calculate the average of `Amount Repaid (Rs)` using the `AVG` function.\n- **FROM Clause**: The data is sourced from the `shg_loan_register` table.\n- **WHERE Clause**: \n  - `Disbursement Date LIKE '2024%'` filters records to include only those from the year 2024.\n  - `Amount Repaid (Rs) IS NOT NULL` ensures that we only consider loans where the repayment amount is available.\n- **GROUP BY Clause**: We group the results by `Block` to calculate the average repayment per block.\n\nThis query efficiently answers the question by focusing on the necessary data and calculations, ensuring that the output is accurate and relevant.",
+      "api": {
+        "id": "chatcmpl-my1ohzxeeeQbKpTxjYKSwTOAFljMMSys",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 477,
+          "prompt_tokens": 417,
+          "total_tokens": 894,
+          "prompt_tokens_details": {
+            "cached_tokens": 389
+          }
+        },
+        "duration_seconds": 10.358
+      },
+      "duration_seconds": 10.362,
+      "sql_duckdb": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS average_repayment FROM \"shg_loan_register\" WHERE \"Disbursement Date\" LIKE '2024%' AND NOT \"Amount Repaid (Rs)\" IS NULL GROUP BY \"Block\"",
+      "rows": [
+        [
+          "Fatehpur",
+          28382.608695652172
+        ],
+        [
+          "Barachatti",
+          35004.34782608696
+        ],
+        [
+          "Dobhi",
+          33642.857142857145
+        ],
+        [
+          "Atri",
+          30016.666666666668
+        ],
+        [
+          "Wazirganj",
+          22673.684210526317
+        ],
+        [
+          "Belaganj",
+          25352.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}
