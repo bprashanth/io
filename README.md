@@ -1,5 +1,9 @@
 # Local-first NGO data insights
 
+<p align="center">
+  <img src="assets/io.jpg" alt="Jupiter and Io" width="360">
+</p>
+
 This repository is working toward one practical event experience: an NGO user
 drops in an unfamiliar CSV, workbook or PDF, asks a short plain-language
 question, gets a correct desktop dashboard, and can refine it without debugging

@@ -10,7 +10,8 @@ append a timestamped `chronology/` entry. Keep private data local/DGX; the
 OpenRouter key is at `~/.config/idlisseus/openrouter.json` and must never be
 printed, copied into a workspace, or committed.
 
-Use Cursor `agent -p` or `claude -p` with a cheaper model for bounded mechanical
-work when useful. Give it a narrow task, prefer read-only mode or a disposable
-worktree, and review its output yourself. Keep architecture, privacy decisions,
-benchmark validity and final grading with the primary agent.
+Use Cursor `agent -p` or `claude -p` (or codex cli) with a cheaper model for
+bounded mechanical work when useful. Give it a narrow task, prefer read-only
+mode or a disposable worktree, and review its output yourself. Keep
+architecture, privacy decisions, benchmark validity and final grading with the
+primary agent.
