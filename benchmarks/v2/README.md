@@ -29,6 +29,59 @@ Run a local OpenAI-compatible model:
   --output benchmarks/runs/RUN_ID
 ```
 
+The measured laptop-tier candidate is the exact Q4_K_M file below. The path is
+outside the repository and the checksum is part of the result contract:
+
+```text
+/mnt/seagate/io-models/Arctic-Text2SQL-R1-7B-GGUF-Q4_K_M/Arctic-Text2SQL-R1-7B.Q4_K_M.gguf
+SHA-256 9c005244e3ab7fada2c53a9511999f4d22fbbd4f76a4416416a6d41d82702255
+```
+
+Start it with an official llama.cpp server build (the container is the measured
+Linux path; a packaged llama.cpp executable is the intended Windows path):
+
+```bash
+docker run --rm --name io-v2-arctic7b-q4 --gpus all \
+  --memory 16g --cpus 8 \
+  -v /mnt/seagate/io-models/Arctic-Text2SQL-R1-7B-GGUF-Q4_K_M:/models:ro \
+  -p 127.0.0.1:8022:8080 ghcr.io/ggml-org/llama.cpp:server-cuda13 \
+  -m /models/Arctic-Text2SQL-R1-7B.Q4_K_M.gguf \
+  --alias Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M \
+  --host 0.0.0.0 --port 8080 --ctx-size 8192 --parallel 1 \
+  --gpu-layers 99 --threads 8 --threads-batch 8 --jinja
+```
+
+Reproduce the strict gate and generic routing replay:
+
+```bash
+.venv-v2/bin/python benchmarks/scripts/run_v2_query_gate.py \
+  --model Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M \
+  --endpoint http://127.0.0.1:8022/v1 --max-tokens 1024 \
+  --temperature 0 --timeout-seconds 120 \
+  --output benchmarks/runs/RUN_ID
+
+.venv-v2/bin/python benchmarks/scripts/replay_query_router.py \
+  --run benchmarks/runs/RUN_ID \
+  --output benchmarks/runs/RUN_ID/router-replay.json
+```
+
+Run one local-first turn with Qwen 3.8 27B fallback. Only public or synthetic
+fixtures may be sent to OpenRouter. In private deployment, point the fallback
+endpoint at the trusted local DGX service instead.
+
+```bash
+.venv-v2/bin/python benchmarks/scripts/run_local_first_insight.py \
+  --data benchmarks/cases/v2-agriculture-journey-001/inputs/field_harvest.csv \
+  --question 'show 2024 Monsoon tonnes per hectare by block highest first, keep source and download' \
+  --session benchmarks/runs/LOCAL_SESSION \
+  --fallback-endpoint https://openrouter.ai/api/v1 \
+  --fallback-api-key-file ~/.config/idlisseus/openrouter.json
+```
+
+The script writes `index.html`, a filtered CSV download, the exact selected SQL,
+route decision, conversation state and a frontier envelope that is not sent.
+The frontier envelope contains no raw question or values.
+
 Run Qwen 3.8 27B through OpenRouter for development-only public or synthetic
 fixtures:
 

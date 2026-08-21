@@ -1,0 +1,100 @@
+{
+  "id": "cross-table-join-p01",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "match the two tables for 2023 and show each district ANC completed over registered percent with employed over enrolled percent",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT av.district, (CAST(av.anc4_completed AS REAL) * 100.0 / NULLIF(av.pregnancies_registered, 0)) AS anc4_completed_over_registered, (CAST(l.employed_at_6_months AS REAL) * 100.0 / NULLIF(l.women_enrolled, 0)) AS employed_over_enrolled FROM anc_visits AS av INNER JOIN livelihoods AS l ON av.district = l.district AND av.year = l.year WHERE av.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nmatch the two tables for 2023 and show each district ANC completed over registered percent with employed over enrolled percent\n[Database Schema]\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nThe selected tables have the same district-year grain and can be matched on district and year. Percent means 100.0 times numerator divided by the stated denominator.\n[User Question]\nmatch the two tables for 2023 and show each district ANC completed over registered percent with employed over enrolled percent\n```sql",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to focus on the following points:\n\n1. **Matching the Tables**: We need to match the `anc_visits` and `livelihoods` tables on the `district` and `year` columns.\n2. **Filtering for 2023**: We need to filter the records to only include those from the year 2023.\n3. **Calculating Percentages**: We need to calculate the percentage of ANC4 completed over ANC4 registered and the percentage of women employed over women enrolled.\n4. **Selecting Relevant Columns**: We need to select the district, the calculated percentages, and ensure the query is read-only.\n\nHere is the step-by-step SQL query:\n\n1. **Join the Tables**: We will join the `anc_visits` and `livelihoods` tables on `district` and `year`.\n2. **Filter for 2023**: We will add a `WHERE` clause to filter for the year 2023.\n3. **Calculate Percentages**: We will calculate the required percentages using the appropriate columns.\n4. **Select the Required Columns**: We will select the district, the calculated percentages, and ensure the query is read-only.\n\nHere is the SQL query:\n\n```sql\nSELECT \n  av.district,\n  (CAST(av.anc4_completed AS REAL) * 100.0 / av.pregnancies_registered) AS anc4_completed_over_registered,\n  (CAST(l.employed_at_6_months AS REAL) * 100.0 / l.women_enrolled) AS employed_over_enrolled\nFROM \n  anc_visits av\nINNER JOIN \n  livelihoods l ON av.district = l.district AND av.year = l.year\nWHERE \n  av.year = 2023;\n```\n\n### Explanation:\n- **Join Clause**: We join the `anc_visits` and `livelihoods` tables on `district` and `year` to ensure we are comparing the same districts and years.\n- **Filter Clause**: We filter the records to only include those from the year 2023.\n- **Percentage Calculation**: We calculate the percentage of ANC4 completed over ANC4 registered and the percentage of women employed over women enrolled using the appropriate columns.\n- **Select Clause**: We select the district and the calculated percentages.\n\nThis query ensures that we are only working with the relevant data and performing the necessary calculations to answer the question accurately.",
+      "api": {
+        "id": "chatcmpl-f7Z57n0HZjxEW8hOgfPZTk6w11T3CPpp",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q8_0",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 519,
+          "prompt_tokens": 283,
+          "total_tokens": 802,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 19.26
+      },
+      "duration_seconds": 19.263,
+      "sql_duckdb": "SELECT av.district, (CAST(av.anc4_completed AS REAL) * 100.0 / NULLIF(av.pregnancies_registered, 0)) AS anc4_completed_over_registered, (CAST(l.employed_at_6_months AS REAL) * 100.0 / NULLIF(l.women_enrolled, 0)) AS employed_over_enrolled FROM anc_visits AS av INNER JOIN livelihoods AS l ON av.district = l.district AND av.year = l.year WHERE av.year = 2023",
+      "rows": [
+        [
+          "Gaya",
+          74.0,
+          56.0
+        ],
+        [
+          "Nalanda",
+          80.0,
+          65.0
+        ],
+        [
+          "Purnia",
+          67.0,
+          46.0
+        ],
+        [
+          "Kishanganj",
+          61.0,
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

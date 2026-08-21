@@ -10,6 +10,10 @@ record, document why in chronology, and regenerate the aggregate.
 
 Current files deliberately represent different claim scopes:
 
+- `v2-local-first-ladder-2026-08-21.json` is the current event-prototype
+  decision. It links the frozen local-model gates, routed replay, rendered
+  cross-shape journeys, privacy scan and later Antigravity agriculture runs. It
+  explicitly excludes Windows, local-Qwen and concurrency claims;
 - `screening-v2-counted.json` is the primary counted product screen;
 - `screening-qwen35-9b-default-v1-futility.json` is an early-stop model screen;
 - `deepseek-web-qwen38-27b-guardrail-v2-development.json` is named alternative-

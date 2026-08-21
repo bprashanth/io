@@ -89,6 +89,34 @@ def validate_obligations(
         errors.append("requested metric is not present in the SELECT output")
 
     output_names = {name.casefold() for name in output_columns}
+    years = set(re.findall(r"\b(?:19|20)\d{2}\b", question))
+    if len(years) >= 2:
+        asks_change = any(term in lowered for term in (
+            "change", "difference", "growth", "increase", "decrease",
+        ))
+        time_indexes = [
+            index for index, name in enumerate(output_columns)
+            if any(token in name.casefold() for token in (
+                "year", "date", "period", "month", "quarter",
+            ))
+        ]
+        retained_periods = {
+            str(value)
+            for index in time_indexes
+            for row in output_rows
+            for value in [row[index]]
+            if value is not None
+        }
+        has_long_endpoints = all(year in retained_periods for year in years)
+        has_wide_endpoints = all(
+            any(year in name for name in output_names) for year in years
+        )
+        if not has_long_endpoints and not has_wide_endpoints:
+            qualifier = "change " if asks_change else "multi-period "
+            errors.append(
+                f"{qualifier}output omits the named comparison periods or their endpoint measures"
+            )
+
     dimension_rules = {
         "district": (
             r"district[ -]?wise", r"each district", r"show[^.]*district",

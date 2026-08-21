@@ -1,0 +1,115 @@
+{
+  "accepted": true,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"actual_spend\" (\"org_unit\" VARCHAR, \"year\" BIGINT, \"spent_lakh\" BIGINT, \"source\" VARCHAR);\nCREATE TABLE \"approved_budget\" (\"org_unit\" VARCHAR, \"year\" BIGINT, \"approved_lakh\" BIGINT, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"actual_spend\": {\"org_unit\": [\"Central\", \"North\", \"South\"], \"source\": [\"ledger\"]}, \"approved_budget\": {\"org_unit\": [\"Central\", \"North\", \"South\"], \"source\": [\"board approval\"]}}\n\nPRIOR TURNS:\n[]\n\nCURRENT QUESTION:\ncompare 2024 actual spend against approved budget by org unit. show utilisation percent highest first, keep source and download",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to follow these steps:\n\n1. Identify the relevant tables and columns from the schema.\n2. Filter the data based on the year 2024.\n3. Calculate the utilization percentage.\n4. Order the results by utilization percentage in descending order.\n5. Ensure the query includes the source information and is optimized for readability and performance.\n\n### Step-by-Step Solution\n\n1. **Identify Relevant Tables and Columns**:\n   - We need data from the `actual_spend` and `approved_budget` tables.\n   - The columns of interest are `org_unit`, `year`, `spent_lakh`, `approved_lakh`, and `source`.\n\n2. **Filter Data for Year 2024**:\n   - We will filter the records to include only those from the year 2024.\n\n3. **Calculate Utilization Percentage**:\n   - Utilization percentage is calculated as `(spent_lakh / approved_lakh) * 100`.\n   - We use `NULLIF` to avoid division by zero.\n\n4. **Order Results**:\n   - Order the results by the calculated utilization percentage in descending order.\n\n5. **Include Source Information**:\n   - Ensure the source information is included in the output.\n\n### SQL Query\n\nBased on the above steps, the SQL query can be written as follows:\n\n```sql\nWITH UtilizationCTE AS (\n    SELECT\n        a.org_unit,\n        a.year,\n        a.spent_lakh,\n        b.approved_lakh,\n        a.source,\n        (a.spent_lakh * 100.0 / NULLIF(b.approved_lakh, 0)) AS utilization_percent\n    FROM\n        actual_spend a\n    JOIN\n        approved_budget b ON a.org_unit = b.org_unit AND a.year = b.year\n    WHERE\n        a.year = 2024\n)\nSELECT\n    org_unit,\n    year,\n    spent_lakh,\n    approved_lakh,\n    source,\n    utilization_percent\nFROM\n    UtilizationCTE\nORDER BY\n    utilization_percent DESC;\n```\n\n### Explanation\n\n- **Common Table Expression (CTE)**: The `UtilizationCTE` CTE is used to calculate the utilization percentage for each organization unit in the year 2024.\n- **JOIN**: We join the `actual_spend` and `approved_budget` tables on `org_unit` and `year` to ensure we are comparing the correct records.\n- **Filtering**: The `WHERE` clause filters the records to include only those from the year 2024.\n- **Utilization Calculation**: The utilization percentage is calculated using the formula `(spent_lakh * 100.0 / NULLIF(approved_lakh, 0))`.\n- **Final Selection**: The final `SELECT` statement retrieves the necessary columns and orders the results by the utilization percentage in descending order.\n\nThis query efficiently addresses the requirements of the question, providing a clear and concise solution.",
+      "api": {
+        "id": "chatcmpl-JkugcRtspPu9RPbvrvHb0pyr5hH5hyqe",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 636,
+          "prompt_tokens": 360,
+          "total_tokens": 996,
+          "prompt_tokens_details": {
+            "cached_tokens": 192
+          }
+        },
+        "duration_seconds": 19.85
+      },
+      "sql": "WITH UtilizationCTE AS (SELECT a.org_unit, a.year, a.spent_lakh, b.approved_lakh, a.source, (a.spent_lakh * 100.0 / NULLIF(NULLIF(b.approved_lakh, 0), 0)) AS utilization_percent FROM actual_spend AS a JOIN approved_budget AS b ON a.org_unit = b.org_unit AND a.year = b.year WHERE a.year = 2024) SELECT org_unit, year, spent_lakh, approved_lakh, source, utilization_percent FROM UtilizationCTE ORDER BY utilization_percent DESC",
+      "output_columns": [
+        "org_unit",
+        "year",
+        "spent_lakh",
+        "approved_lakh",
+        "source",
+        "utilization_percent"
+      ],
+      "rows": [
+        [
+          "Central",
+          2024,
+          108,
+          120,
+          "ledger",
+          90.0
+        ],
+        [
+          "North",
+          2024,
+          80,
+          100,
+          "ledger",
+          80.0
+        ],
+        [
+          "South",
+          2024,
+          60,
+          80,
+          "ledger",
+          75.0
+        ]
+      ],
+      "obligation_errors": [],
+      "duration_seconds": 19.867
+    }
+  ],
+  "attempt": 1,
+  "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"actual_spend\" (\"org_unit\" VARCHAR, \"year\" BIGINT, \"spent_lakh\" BIGINT, \"source\" VARCHAR);\nCREATE TABLE \"approved_budget\" (\"org_unit\" VARCHAR, \"year\" BIGINT, \"approved_lakh\" BIGINT, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"actual_spend\": {\"org_unit\": [\"Central\", \"North\", \"South\"], \"source\": [\"ledger\"]}, \"approved_budget\": {\"org_unit\": [\"Central\", \"North\", \"South\"], \"source\": [\"board approval\"]}}\n\nPRIOR TURNS:\n[]\n\nCURRENT QUESTION:\ncompare 2024 actual spend against approved budget by org unit. show utilisation percent highest first, keep source and download",
+  "response": "To translate the given natural language question into an executable SQLite query, we need to follow these steps:\n\n1. Identify the relevant tables and columns from the schema.\n2. Filter the data based on the year 2024.\n3. Calculate the utilization percentage.\n4. Order the results by utilization percentage in descending order.\n5. Ensure the query includes the source information and is optimized for readability and performance.\n\n### Step-by-Step Solution\n\n1. **Identify Relevant Tables and Columns**:\n   - We need data from the `actual_spend` and `approved_budget` tables.\n   - The columns of interest are `org_unit`, `year`, `spent_lakh`, `approved_lakh`, and `source`.\n\n2. **Filter Data for Year 2024**:\n   - We will filter the records to include only those from the year 2024.\n\n3. **Calculate Utilization Percentage**:\n   - Utilization percentage is calculated as `(spent_lakh / approved_lakh) * 100`.\n   - We use `NULLIF` to avoid division by zero.\n\n4. **Order Results**:\n   - Order the results by the calculated utilization percentage in descending order.\n\n5. **Include Source Information**:\n   - Ensure the source information is included in the output.\n\n### SQL Query\n\nBased on the above steps, the SQL query can be written as follows:\n\n```sql\nWITH UtilizationCTE AS (\n    SELECT\n        a.org_unit,\n        a.year,\n        a.spent_lakh,\n        b.approved_lakh,\n        a.source,\n        (a.spent_lakh * 100.0 / NULLIF(b.approved_lakh, 0)) AS utilization_percent\n    FROM\n        actual_spend a\n    JOIN\n        approved_budget b ON a.org_unit = b.org_unit AND a.year = b.year\n    WHERE\n        a.year = 2024\n)\nSELECT\n    org_unit,\n    year,\n    spent_lakh,\n    approved_lakh,\n    source,\n    utilization_percent\nFROM\n    UtilizationCTE\nORDER BY\n    utilization_percent DESC;\n```\n\n### Explanation\n\n- **Common Table Expression (CTE)**: The `UtilizationCTE` CTE is used to calculate the utilization percentage for each organization unit in the year 2024.\n- **JOIN**: We join the `actual_spend` and `approved_budget` tables on `org_unit` and `year` to ensure we are comparing the correct records.\n- **Filtering**: The `WHERE` clause filters the records to include only those from the year 2024.\n- **Utilization Calculation**: The utilization percentage is calculated using the formula `(spent_lakh * 100.0 / NULLIF(approved_lakh, 0))`.\n- **Final Selection**: The final `SELECT` statement retrieves the necessary columns and orders the results by the utilization percentage in descending order.\n\nThis query efficiently addresses the requirements of the question, providing a clear and concise solution.",
+  "api": {
+    "id": "chatcmpl-JkugcRtspPu9RPbvrvHb0pyr5hH5hyqe",
+    "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M",
+    "finish_reason": "stop",
+    "usage": {
+      "completion_tokens": 636,
+      "prompt_tokens": 360,
+      "total_tokens": 996,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      }
+    },
+    "duration_seconds": 19.85
+  },
+  "sql": "WITH UtilizationCTE AS (SELECT a.org_unit, a.year, a.spent_lakh, b.approved_lakh, a.source, (a.spent_lakh * 100.0 / NULLIF(NULLIF(b.approved_lakh, 0), 0)) AS utilization_percent FROM actual_spend AS a JOIN approved_budget AS b ON a.org_unit = b.org_unit AND a.year = b.year WHERE a.year = 2024) SELECT org_unit, year, spent_lakh, approved_lakh, source, utilization_percent FROM UtilizationCTE ORDER BY utilization_percent DESC",
+  "output_columns": [
+    "org_unit",
+    "year",
+    "spent_lakh",
+    "approved_lakh",
+    "source",
+    "utilization_percent"
+  ],
+  "rows": [
+    [
+      "Central",
+      2024,
+      108,
+      120,
+      "ledger",
+      90.0
+    ],
+    [
+      "North",
+      2024,
+      80,
+      100,
+      "ledger",
+      80.0
+    ],
+    [
+      "South",
+      2024,
+      60,
+      80,
+      "ledger",
+      75.0
+    ]
+  ],
+  "obligation_errors": [],
+  "duration_seconds": 19.867
+}

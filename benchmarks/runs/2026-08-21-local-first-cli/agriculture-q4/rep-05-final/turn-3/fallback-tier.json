@@ -1,0 +1,123 @@
+{
+  "accepted": true,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"field_harvest\" (\"block\" VARCHAR, \"season\" VARCHAR, \"year\" BIGINT, \"cultivated_hectares\" BIGINT, \"harvest_tonnes\" BIGINT, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"field_harvest\": {\"block\": [\"Bhojpur\", \"Dharwad\", \"Wardha\"], \"season\": [\"Monsoon\"], \"source\": [\"field register\"]}}\n\nPRIOR TURNS:\n[{\"question\": \"one csv is there. make a 2024 Monsoon block wise crop yield dashboard, tonnes per hectare highest first. i should see source and download the table\", \"sql\": \"SELECT block, source, SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare FROM field_harvest WHERE year = 2024 AND season = 'Monsoon' GROUP BY block, source ORDER BY tonnes_per_hectare DESC\", \"output_columns\": [\"block\", \"source\", \"tonnes_per_hectare\"]}, {\"question\": \"now show 2023 and 2024 Monsoon tonnes per hectare trend for every block\", \"sql\": \"SELECT block, year, SUM(harvest_tonnes) * 1.0 / NULLIF(NULLIF(SUM(cultivated_hectares), 0), 0) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block, year ORDER BY block NULLS FIRST, year NULLS FIRST\", \"output_columns\": [\"block\", \"year\", \"tonnes_per_hectare\"]}]\n\nCURRENT QUESTION:\nonly Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024. keep source and download",
+      "response": "\n\n```sql\nWITH yearly AS (\n    SELECT block, source, year,\n           SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare\n    FROM field_harvest\n    WHERE block IN ('Bhojpur', 'Wardha')\n      AND season = 'Monsoon'\n      AND year IN (2023, 2024)\n    GROUP BY block, source, year\n)\nSELECT\n    a.block,\n    a.source,\n    a.tonnes_per_hectare AS t2023,\n    b.tonnes_per_hectare AS t2024,\n    b.tonnes_per_hectare - a.tonnes_per_hectare AS change_in_tonnes_per_hectare\nFROM yearly a\nJOIN yearly b\n  ON a.block = b.block AND a.source = b.source\nWHERE a.year = 2023\n  AND b.year = 2024\nORDER BY a.block, a.source\n```",
+      "api": {
+        "id": "gen-1787279985-io3DvZ4P14U70UQRuyyI",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 644,
+          "completion_tokens": 847,
+          "total_tokens": 1491,
+          "cost": 0.0030002,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0030002,
+            "upstream_inference_prompt_cost": 0.0002898,
+            "upstream_inference_completions_cost": 0.0027104
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 475,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 5.291
+      },
+      "sql": "WITH yearly AS (SELECT block, source, year, SUM(harvest_tonnes) * 1.0 / NULLIF(NULLIF(SUM(cultivated_hectares), 0), 0) AS tonnes_per_hectare FROM field_harvest WHERE block IN ('Bhojpur', 'Wardha') AND season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block, source, year) SELECT a.block, a.source, a.tonnes_per_hectare AS t2023, b.tonnes_per_hectare AS t2024, b.tonnes_per_hectare - a.tonnes_per_hectare AS change_in_tonnes_per_hectare FROM yearly AS a JOIN yearly AS b ON a.block = b.block AND a.source = b.source WHERE a.year = 2023 AND b.year = 2024 ORDER BY a.block NULLS FIRST, a.source NULLS FIRST",
+      "output_columns": [
+        "block",
+        "source",
+        "t2023",
+        "t2024",
+        "change_in_tonnes_per_hectare"
+      ],
+      "rows": [
+        [
+          "Bhojpur",
+          "field register",
+          2.4,
+          2.5,
+          0.10000000000000009
+        ],
+        [
+          "Wardha",
+          "field register",
+          2.5,
+          2.7,
+          0.20000000000000018
+        ]
+      ],
+      "obligation_errors": [],
+      "duration_seconds": 5.296
+    }
+  ],
+  "attempt": 1,
+  "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"field_harvest\" (\"block\" VARCHAR, \"season\" VARCHAR, \"year\" BIGINT, \"cultivated_hectares\" BIGINT, \"harvest_tonnes\" BIGINT, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"field_harvest\": {\"block\": [\"Bhojpur\", \"Dharwad\", \"Wardha\"], \"season\": [\"Monsoon\"], \"source\": [\"field register\"]}}\n\nPRIOR TURNS:\n[{\"question\": \"one csv is there. make a 2024 Monsoon block wise crop yield dashboard, tonnes per hectare highest first. i should see source and download the table\", \"sql\": \"SELECT block, source, SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare FROM field_harvest WHERE year = 2024 AND season = 'Monsoon' GROUP BY block, source ORDER BY tonnes_per_hectare DESC\", \"output_columns\": [\"block\", \"source\", \"tonnes_per_hectare\"]}, {\"question\": \"now show 2023 and 2024 Monsoon tonnes per hectare trend for every block\", \"sql\": \"SELECT block, year, SUM(harvest_tonnes) * 1.0 / NULLIF(NULLIF(SUM(cultivated_hectares), 0), 0) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block, year ORDER BY block NULLS FIRST, year NULLS FIRST\", \"output_columns\": [\"block\", \"year\", \"tonnes_per_hectare\"]}]\n\nCURRENT QUESTION:\nonly Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024. keep source and download",
+  "response": "\n\n```sql\nWITH yearly AS (\n    SELECT block, source, year,\n           SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare\n    FROM field_harvest\n    WHERE block IN ('Bhojpur', 'Wardha')\n      AND season = 'Monsoon'\n      AND year IN (2023, 2024)\n    GROUP BY block, source, year\n)\nSELECT\n    a.block,\n    a.source,\n    a.tonnes_per_hectare AS t2023,\n    b.tonnes_per_hectare AS t2024,\n    b.tonnes_per_hectare - a.tonnes_per_hectare AS change_in_tonnes_per_hectare\nFROM yearly a\nJOIN yearly b\n  ON a.block = b.block AND a.source = b.source\nWHERE a.year = 2023\n  AND b.year = 2024\nORDER BY a.block, a.source\n```",
+  "api": {
+    "id": "gen-1787279985-io3DvZ4P14U70UQRuyyI",
+    "model": "qwen/qwen3.8-27b",
+    "finish_reason": "stop",
+    "usage": {
+      "prompt_tokens": 644,
+      "completion_tokens": 847,
+      "total_tokens": 1491,
+      "cost": 0.0030002,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.0030002,
+        "upstream_inference_prompt_cost": 0.0002898,
+        "upstream_inference_completions_cost": 0.0027104
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 475,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "duration_seconds": 5.291
+  },
+  "sql": "WITH yearly AS (SELECT block, source, year, SUM(harvest_tonnes) * 1.0 / NULLIF(NULLIF(SUM(cultivated_hectares), 0), 0) AS tonnes_per_hectare FROM field_harvest WHERE block IN ('Bhojpur', 'Wardha') AND season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block, source, year) SELECT a.block, a.source, a.tonnes_per_hectare AS t2023, b.tonnes_per_hectare AS t2024, b.tonnes_per_hectare - a.tonnes_per_hectare AS change_in_tonnes_per_hectare FROM yearly AS a JOIN yearly AS b ON a.block = b.block AND a.source = b.source WHERE a.year = 2023 AND b.year = 2024 ORDER BY a.block NULLS FIRST, a.source NULLS FIRST",
+  "output_columns": [
+    "block",
+    "source",
+    "t2023",
+    "t2024",
+    "change_in_tonnes_per_hectare"
+  ],
+  "rows": [
+    [
+      "Bhojpur",
+      "field register",
+      2.4,
+      2.5,
+      0.10000000000000009
+    ],
+    [
+      "Wardha",
+      "field register",
+      2.5,
+      2.7,
+      0.20000000000000018
+    ]
+  ],
+  "obligation_errors": [],
+  "duration_seconds": 5.296
+}

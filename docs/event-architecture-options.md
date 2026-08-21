@@ -18,6 +18,22 @@ retry is acceptable. Repeated crashes, silent stale pages and unbounded waiting
 are failures because they destroy confidence even if an expert could repair
 them.
 
+## Measured decision on 21 August
+
+The option study has now produced an event prototype decision. Use Arctic
+Text2SQL 7B Q4_K_M as a checked speculative laptop planner, route rejected
+queries to Qwen 3.8 27B on the trusted DGX, execute in local DuckDB, and render
+a self-contained page deterministically. Q4 scored 25/30 by itself, below the
+85% standalone gate. The generic router accepted 21 correct plans, accepted no
+wrong plans, and escalated nine; the qualified Qwen run scored 30/30. This is a
+30/30 routed replay, not a claim that Q4 alone is sufficient.
+
+The optional frontier tier is now layout-only. It receives a value-free intent
+enum and result column name/type/role, not the raw question, rows, categories,
+aggregates or screenshot. The fuller decision, exact evidence and remaining
+Windows/concurrency work are in
+[`v2-local-first-event-decision.md`](v2-local-first-event-decision.md).
+
 ## Requirements frozen for the event study
 
 - Desktop only for the next phase. Pages must not clip, overflow, show raw code,
@@ -90,7 +106,7 @@ from historical scores.
 | 27B plan compiler + deterministic executor/renderer | local rows may remain local if only the profile is sent | strong language understanding without fragile generated code | shared-model queue and profile privacy | needs batching/queue measurements on DGX |
 | tuned 2B or 9B Algebra compiler + deterministic executor/renderer | none | small, auditable and potentially laptop-capable | existing dialect is scientific, not general tabular GROUP/join | 2B could be per laptop; 9B may need capable laptops or DGX |
 | small local compiler with 27B fallback | local by default; fallback policy decides | cheap happy path with bounded recovery | routing errors and unpredictable escalation rate | plausible event and DGX path |
-| local analysis + schema-only frontier layout | schema, visual intent and fake values only | high visual ceiling without sharing real values | generated layout may not hydrate safely | remote calls are small and parallelisable |
+| local analysis + schema-only frontier layout | value-free intent enum and schema only | high visual ceiling without sharing real values or raw questions | generated layout may not hydrate safely | remote calls are small and parallelisable |
 | shared server analysis and hosted page | depends on chosen compiler | simplest participant installation | less visible local “magic”, hosting/auth lifecycle | operationally easiest for mixed Windows laptops |
 
 An 8B model should not be used merely to turn trusted JSON into HTML if a

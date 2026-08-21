@@ -65,8 +65,9 @@
     const colours=['#176b87','#25a18e','#e3a72f','#c8553d','#7259a5','#597a38'];
     const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const human=s=>String(s).replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()).replace(/ Percent$/,' (%)');
-    const fmt=(v,unit,column)=>{if(typeof v!=='number')return String(v??'—');if(String(column).toLowerCase().includes('year'))return String(v);const lakh=String(column).toLowerCase().includes('lakh'),x=v.toLocaleString(undefined,lakh?{minimumFractionDigits:2,maximumFractionDigits:2}:{maximumFractionDigits:1});return x+(lakh?' lakh':unit==='percent'?'%':unit==='percentage points'?' pp':'')};
-    const unitFor=metric=>B.source?.definitions?.find(item=>item.indicator===metric)?.unit||(/(?:percent|percentage|coverage|rate|pct)/i.test(metric)?'percent':(V.y.length===1?V.unit:null));
+    const fmt=(v,unit,column)=>{if(typeof v!=='number')return String(v??'—');if(String(column).toLowerCase().includes('year'))return String(v);const lakh=String(column).toLowerCase().includes('lakh'),small=v!==0&&Math.abs(v)<1,x=v.toLocaleString(undefined,lakh?{minimumFractionDigits:2,maximumFractionDigits:2}:{maximumFractionDigits:small?2:1});return x+(lakh?' lakh':unit==='percent'?'%':unit==='percentage points'?' pp':'')};
+    const metricTokens=metric=>String(metric).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    const unitFor=metric=>B.source?.definitions?.find(item=>item.indicator===metric)?.unit||(metricTokens(metric).some(token=>['percent','percentage','coverage','rate','pct'].includes(token))?'percent':(V.y.length===1?V.unit:null));
     document.getElementById('question').textContent=B.question;
     document.getElementById('chartTitle').textContent=V.title;
     document.getElementById('chartNote').textContent=V.note||((V.unit||'Value')+' · no invented performance bands');
@@ -84,7 +85,7 @@
       const selectedMetric=document.getElementById('metricSelect')?.value, activeY=selectedMetric?[selectedMetric]:V.y;
       const activeUnit=unitFor(activeY[0]);
       const series=V.series?[...new Set(rows.map(r=>r[V.series]))]:activeY;
-      const values=rows.flatMap(r=>activeY.map(y=>Number(r[y]))).filter(Number.isFinite), max=activeUnit==='percent'?100:Math.max(...values,1)*1.12;
+      const values=rows.flatMap(r=>activeY.map(y=>Number(r[y]))).filter(Number.isFinite),dataMax=Math.max(...values,0),max=activeUnit==='percent'?100:(dataMax>0?dataMax*1.12:1);
       const parts=[];
       for(let i=0;i<=4;i++){const y=p.t+(H-p.t-p.b)*i/4,v=max*(1-i/4);parts.push(`<line class="gridline" x1="${p.l}" x2="${W-p.r}" y1="${y}" y2="${y}"/><text class="label" x="${p.l-9}" y="${y+4}" text-anchor="end">${esc(fmt(v,activeUnit,activeY[0]))}</text>`)}
       const lineChart=V.chart==='line'||V.chart==='slope', singleTimeSlice=lineChart&&xs.length===1&&V.series;

@@ -1,0 +1,76 @@
+{
+  "id": "missing-value-scope-p02",
+  "task_id": "missing-value-scope",
+  "pattern": "null detection without treating missing as zero",
+  "question": "which rows have no quality score? only region and period",
+  "gold_sql": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL ORDER BY region, period",
+  "expected_rows": [
+    [
+      "East",
+      2023
+    ],
+    [
+      "South",
+      2022
+    ],
+    [
+      "West",
+      2022
+    ]
+  ],
+  "actual_rows": [
+    [
+      "South",
+      2022
+    ],
+    [
+      "West",
+      2022
+    ],
+    [
+      "East",
+      2023
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\nwhich rows have no quality score? only region and period\n[Database Schema]\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\nwhich rows have no quality score? only region and period\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to focus on identifying rows where the `quality_score` is missing (i.e., `NULL`). The user specifically asked for only the `region` and `period` columns in the output.\n\nHere's the step-by-step reasoning:\n\n1. **Identify the Relevant Table**: The table `quality_observations` contains the necessary columns (`region`, `period`, and `quality_score`).\n\n2. **Determine the Condition**: We need to filter rows where `quality_score` is `NULL`.\n\n3. **Select the Required Columns**: The user requested only the `region` and `period` columns.\n\n4. **Construct the SQL Query**: Using the `SELECT` statement, we specify the columns `region` and `period`. The `FROM` clause indicates the table `quality_observations`. The `WHERE` clause filters the rows where `quality_score` is `NULL`.\n\nGiven these steps, the SQL query is constructed as follows:\n\n```sql\nSELECT region, period\nFROM quality_observations\nWHERE quality_score IS NULL;\n```\n\nThis query directly addresses the user's request by selecting only the `region` and `period` columns from the `quality_observations` table where the `quality_score` is `NULL`.",
+      "api": {
+        "id": "chatcmpl-anc8qWR5cv7FKOiyv95J8YuRifvdkvg4",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q8_0",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 265,
+          "prompt_tokens": 195,
+          "total_tokens": 460,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 9.812
+      },
+      "duration_seconds": 9.815,
+      "sql_duckdb": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+      "rows": [
+        [
+          "South",
+          2022
+        ],
+        [
+          "West",
+          2022
+        ],
+        [
+          "East",
+          2023
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

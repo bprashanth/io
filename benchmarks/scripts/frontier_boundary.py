@@ -21,11 +21,26 @@ def semantic_role(name: str, kind: str) -> str:
 
 
 def serialize_frontier_layout_request(question: str, columns: list[dict[str, str]]) -> dict[str, Any]:
-    """Return only user prose, schema roles and the renderer contract.
+    """Return only a value-free intent outline, schema roles and renderer contract.
 
     No caller-supplied rows, aggregates, samples, cardinalities or extrema are
-    accepted by this function, so they cannot accidentally cross the boundary.
+    accepted by this function. The raw question is not serialized because it
+    can contain values copied from the participant's data.
     """
+    lowered = question.casefold()
+    intents = []
+    for intent, markers in (
+        ("trend", ("trend", "over time", "year by year")),
+        ("change", ("change", "difference", "increase", "decrease", "growth")),
+        ("comparison", ("compare", "comparison", "versus", " vs ")),
+        ("ranking", ("highest", "lowest", "top", "bottom", "rank", "order")),
+        ("distribution", ("distribution", "spread", "histogram")),
+        ("relationship", ("correlation", "relationship", "scatter")),
+    ):
+        if any(marker in lowered for marker in markers):
+            intents.append(intent)
+    if not intents:
+        intents.append("overview")
     schema = [
         {
             "name": column["name"],
@@ -37,7 +52,11 @@ def serialize_frontier_layout_request(question: str, columns: list[dict[str, str
     return {
         "schema_version": 1,
         "task": "Choose a declarative desktop dashboard layout. Do not calculate or invent values.",
-        "user_question": question,
+        "intent_outline_no_values": {
+            "analysis": intents,
+            "source_visible": any(term in lowered for term in ("source", "citation", "cite")),
+            "download_required": any(term in lowered for term in ("download", "export")),
+        },
         "result_schema_no_values": schema,
         "layout_contract": {
             "allowed_charts": ALLOWED_CHARTS,

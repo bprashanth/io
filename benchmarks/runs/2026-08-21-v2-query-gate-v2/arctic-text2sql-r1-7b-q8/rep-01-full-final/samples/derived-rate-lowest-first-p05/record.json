@@ -1,0 +1,88 @@
+{
+  "id": "derived-rate-lowest-first-p05",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "district wise 2023 employed at 6 months over enrolled rate, worst first",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda",
+      65.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Kishanganj",
+      38.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, (employed_at_6_months * 100.0 / NULLIF(women_enrolled, 0)) AS employment_rate FROM livelihoods WHERE year = 2023 ORDER BY employment_rate DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You are a SQLite expert. Read the database schema and return exactly one read-only SQL query that answers the user question.\nDo not explain the query. Do not invent tables, columns or values. Use NULL handling and floating-point arithmetic where needed.\n[User Question]\ndistrict wise 2023 employed at 6 months over enrolled rate, worst first\n[Database Schema]\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n[Reference Information]\nPercent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.\n[User Question]\ndistrict wise 2023 employed at 6 months over enrolled rate, worst first\n```sql",
+      "response": "To translate the user's question into an executable SQLite query, we need to focus on calculating the rate of women who were employed at 6 months post-enrollment over those who were initially enrolled in 2023. The requirement is to list these rates district-wise, ordered from the worst (highest rate) to the best (lowest rate).\n\nHere's the step-by-step reasoning:\n\n1. **Filter the Data**: We need to filter the data for the year 2023.\n2. **Calculate the Rate**: We need to calculate the rate of women who were employed at 6 months post-enrollment over those who were initially enrolled. This can be done using the formula `(employed_at_6_months * 100.0 / women_enrolled)`.\n3. **Order the Results**: We need to order the results in descending order to list the worst rates first.\n\nGiven the schema and the requirements, the SQL query can be written as follows:\n\n```sql\nSELECT \n  district,\n  (employed_at_6_months * 100.0 / women_enrolled) AS employment_rate\nFROM \n  livelihoods\nWHERE \n  year = 2023\nORDER BY \n  employment_rate DESC;\n```\n\nThis query selects the district and calculates the employment rate for women at 6 months post-enrollment over those who were initially enrolled in 2023. It then orders the results in descending order to show the worst rates first.",
+      "api": {
+        "id": "chatcmpl-2uCvaYOdRFitUv4n9Mi8Q8Xi26LdAgqe",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q8_0",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 303,
+          "prompt_tokens": 216,
+          "total_tokens": 519,
+          "prompt_tokens_details": {
+            "cached_tokens": 77
+          }
+        },
+        "duration_seconds": 11.372
+      },
+      "duration_seconds": 11.375,
+      "sql_duckdb": "SELECT district, (employed_at_6_months * 100.0 / NULLIF(women_enrolled, 0)) AS employment_rate FROM livelihoods WHERE year = 2023 ORDER BY employment_rate DESC",
+      "rows": [
+        [
+          "Nalanda",
+          65.0
+        ],
+        [
+          "Gaya",
+          56.0
+        ],
+        [
+          "Purnia",
+          46.0
+        ],
+        [
+          "Kishanganj",
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

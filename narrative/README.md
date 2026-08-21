@@ -8,6 +8,7 @@ Remembrancer page.
 Current note:
 
 - [Overnight field note: looking for a local-size alternative to Antigravity](2026-08-20-local-model-equivalence-field-note.md)
+- [Local-first ladder field note](2026-08-21-local-first-ladder-field-note.md)
 
 When the result is mature, Remembrancer should import a snapshot of
 `../chronology/`, copy the smallest useful evidence cut from `../benchmarks/`,

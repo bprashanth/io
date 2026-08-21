@@ -1,0 +1,103 @@
+{
+  "accepted": false,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"field_harvest\" (\"block\" VARCHAR, \"season\" VARCHAR, \"year\" BIGINT, \"cultivated_hectares\" BIGINT, \"harvest_tonnes\" BIGINT, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"field_harvest\": {\"block\": [\"Bhojpur\", \"Dharwad\", \"Wardha\"], \"season\": [\"Monsoon\"], \"source\": [\"field register\"]}}\n\nPRIOR TURNS:\n[{\"question\": \"one csv is there. make a 2024 Monsoon block wise crop yield dashboard, tonnes per hectare highest first. i should see source and download the table\", \"sql\": \"SELECT block, source, SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare FROM field_harvest WHERE year = 2024 AND season = 'Monsoon' GROUP BY block, source ORDER BY tonnes_per_hectare DESC\", \"output_columns\": [\"block\", \"source\", \"tonnes_per_hectare\"]}]\n\nCURRENT QUESTION:\nnow show 2023 and 2024 Monsoon tonnes per hectare trend for every block",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to focus on the following key points:\n\n1. **Data Selection**: We need to select data for the years 2023 and 2024 for the Monsoon season.\n2. **Grouping**: The data should be grouped by `block` to compare the `tonnes_per_hectare` for each block.\n3. **Calculation**: We need to calculate the `tonnes_per_hectare` for each year.\n4. **Comparison**: We need to compare the `tonnes_per_hectare` for 2023 and 2024 to show the trend.\n5. **Output**: The output should include the block, the `tonnes_per_hectare` for both years, and the percentage-point change.\n\nLet's break down the steps to construct the SQL query:\n\n1. **Select the necessary columns**: We need `block`, `year`, `harvest_tonnes`, and `cultivated_hectares`.\n2. **Filter the data**: We need to filter the data for the years 2023 and 2024 and the season 'Monsoon'.\n3. **Aggregate the data**: We need to sum up `harvest_tonnes` and `cultivated_hectares` for each block and year.\n4. **Calculate `tonnes_per_hectare`**: We need to calculate the `tonnes_per_hectare` for each year.\n5. **Join the data**: We need to join the data for 2023 and 2024 on the `block` to compare the `tonnes_per_hectare`.\n6. **Calculate the percentage-point change**: We need to calculate the percentage-point change in `tonnes_per_hectare` from 2023 to 2024.\n7. **Order the results**: We need to order the results by `block`.\n\nHere is the final SQL query:\n\n```sql\nWITH YearlyData AS (\n    SELECT \n        block,\n        year,\n        SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare\n    FROM \n        field_harvest\n    WHERE \n        season = 'Monsoon' AND year IN (2023, 2024)\n    GROUP BY \n        block, year\n)\nSELECT \n    y2023.block,\n    y2023.tonnes_per_hectare AS tonnes_per_hectare_2023,\n    y2024.tonnes_per_hectare AS tonnes_per_hectare_2024,\n    (y2024.tonnes_per_hectare - y2023.tonnes_per_hectare) AS percentage_point_change\nFROM \n    YearlyData y2023\nJOIN \n    YearlyData y2024 ON y2023.block = y2024.block\nWHERE \n    y2023.year = 2023 AND y2024.year = 2024\nORDER BY \n    y2023.block;\n```\n\n### Explanation:\n- **YearlyData CTE**: This Common Table Expression (CTE) calculates the `tonnes_per_hectare` for each block for the years 2023 and 2024.\n- **Main Query**: The main query joins the `YearlyData` CTE for 2023 and 2024 on the `block` to compare the `tonnes_per_hectare` for each block. It also calculates the percentage-point change.\n- **Order By**: The results are ordered by `block` for better readability.",
+      "api": {
+        "id": "chatcmpl-cImN59aH1UyBv5DtcXGQxpiwFiSXxy9T",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 810,
+          "prompt_tokens": 469,
+          "total_tokens": 1279,
+          "prompt_tokens_details": {
+            "cached_tokens": 301
+          }
+        },
+        "duration_seconds": 17.185
+      },
+      "sql": "WITH YearlyData AS (SELECT block, year, SUM(harvest_tonnes) * 1.0 / NULLIF(NULLIF(SUM(cultivated_hectares), 0), 0) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block, year) SELECT y2023.block, y2023.tonnes_per_hectare AS tonnes_per_hectare_2023, y2024.tonnes_per_hectare AS tonnes_per_hectare_2024, (y2024.tonnes_per_hectare - y2023.tonnes_per_hectare) AS percentage_point_change FROM YearlyData AS y2023 JOIN YearlyData AS y2024 ON y2023.block = y2024.block WHERE y2023.year = 2023 AND y2024.year = 2024 ORDER BY y2023.block NULLS FIRST",
+      "output_columns": [
+        "block",
+        "tonnes_per_hectare_2023",
+        "tonnes_per_hectare_2024",
+        "percentage_point_change"
+      ],
+      "rows": [
+        [
+          "Bhojpur",
+          2.4,
+          2.5,
+          0.10000000000000009
+        ],
+        [
+          "Dharwad",
+          3.0,
+          3.2,
+          0.20000000000000018
+        ],
+        [
+          "Wardha",
+          2.5,
+          2.7,
+          0.20000000000000018
+        ]
+      ],
+      "obligation_errors": [
+        "output claims an unrequested percentage unit: percentage_point_change"
+      ],
+      "duration_seconds": 17.203
+    }
+  ],
+  "attempt": 1,
+  "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"field_harvest\" (\"block\" VARCHAR, \"season\" VARCHAR, \"year\" BIGINT, \"cultivated_hectares\" BIGINT, \"harvest_tonnes\" BIGINT, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"field_harvest\": {\"block\": [\"Bhojpur\", \"Dharwad\", \"Wardha\"], \"season\": [\"Monsoon\"], \"source\": [\"field register\"]}}\n\nPRIOR TURNS:\n[{\"question\": \"one csv is there. make a 2024 Monsoon block wise crop yield dashboard, tonnes per hectare highest first. i should see source and download the table\", \"sql\": \"SELECT block, source, SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare FROM field_harvest WHERE year = 2024 AND season = 'Monsoon' GROUP BY block, source ORDER BY tonnes_per_hectare DESC\", \"output_columns\": [\"block\", \"source\", \"tonnes_per_hectare\"]}]\n\nCURRENT QUESTION:\nnow show 2023 and 2024 Monsoon tonnes per hectare trend for every block",
+  "response": "To translate the given natural language question into an executable SQLite query, we need to focus on the following key points:\n\n1. **Data Selection**: We need to select data for the years 2023 and 2024 for the Monsoon season.\n2. **Grouping**: The data should be grouped by `block` to compare the `tonnes_per_hectare` for each block.\n3. **Calculation**: We need to calculate the `tonnes_per_hectare` for each year.\n4. **Comparison**: We need to compare the `tonnes_per_hectare` for 2023 and 2024 to show the trend.\n5. **Output**: The output should include the block, the `tonnes_per_hectare` for both years, and the percentage-point change.\n\nLet's break down the steps to construct the SQL query:\n\n1. **Select the necessary columns**: We need `block`, `year`, `harvest_tonnes`, and `cultivated_hectares`.\n2. **Filter the data**: We need to filter the data for the years 2023 and 2024 and the season 'Monsoon'.\n3. **Aggregate the data**: We need to sum up `harvest_tonnes` and `cultivated_hectares` for each block and year.\n4. **Calculate `tonnes_per_hectare`**: We need to calculate the `tonnes_per_hectare` for each year.\n5. **Join the data**: We need to join the data for 2023 and 2024 on the `block` to compare the `tonnes_per_hectare`.\n6. **Calculate the percentage-point change**: We need to calculate the percentage-point change in `tonnes_per_hectare` from 2023 to 2024.\n7. **Order the results**: We need to order the results by `block`.\n\nHere is the final SQL query:\n\n```sql\nWITH YearlyData AS (\n    SELECT \n        block,\n        year,\n        SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare\n    FROM \n        field_harvest\n    WHERE \n        season = 'Monsoon' AND year IN (2023, 2024)\n    GROUP BY \n        block, year\n)\nSELECT \n    y2023.block,\n    y2023.tonnes_per_hectare AS tonnes_per_hectare_2023,\n    y2024.tonnes_per_hectare AS tonnes_per_hectare_2024,\n    (y2024.tonnes_per_hectare - y2023.tonnes_per_hectare) AS percentage_point_change\nFROM \n    YearlyData y2023\nJOIN \n    YearlyData y2024 ON y2023.block = y2024.block\nWHERE \n    y2023.year = 2023 AND y2024.year = 2024\nORDER BY \n    y2023.block;\n```\n\n### Explanation:\n- **YearlyData CTE**: This Common Table Expression (CTE) calculates the `tonnes_per_hectare` for each block for the years 2023 and 2024.\n- **Main Query**: The main query joins the `YearlyData` CTE for 2023 and 2024 on the `block` to compare the `tonnes_per_hectare` for each block. It also calculates the percentage-point change.\n- **Order By**: The results are ordered by `block` for better readability.",
+  "api": {
+    "id": "chatcmpl-cImN59aH1UyBv5DtcXGQxpiwFiSXxy9T",
+    "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+    "finish_reason": "stop",
+    "usage": {
+      "completion_tokens": 810,
+      "prompt_tokens": 469,
+      "total_tokens": 1279,
+      "prompt_tokens_details": {
+        "cached_tokens": 301
+      }
+    },
+    "duration_seconds": 17.185
+  },
+  "sql": "WITH YearlyData AS (SELECT block, year, SUM(harvest_tonnes) * 1.0 / NULLIF(NULLIF(SUM(cultivated_hectares), 0), 0) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block, year) SELECT y2023.block, y2023.tonnes_per_hectare AS tonnes_per_hectare_2023, y2024.tonnes_per_hectare AS tonnes_per_hectare_2024, (y2024.tonnes_per_hectare - y2023.tonnes_per_hectare) AS percentage_point_change FROM YearlyData AS y2023 JOIN YearlyData AS y2024 ON y2023.block = y2024.block WHERE y2023.year = 2023 AND y2024.year = 2024 ORDER BY y2023.block NULLS FIRST",
+  "output_columns": [
+    "block",
+    "tonnes_per_hectare_2023",
+    "tonnes_per_hectare_2024",
+    "percentage_point_change"
+  ],
+  "rows": [
+    [
+      "Bhojpur",
+      2.4,
+      2.5,
+      0.10000000000000009
+    ],
+    [
+      "Dharwad",
+      3.0,
+      3.2,
+      0.20000000000000018
+    ],
+    [
+      "Wardha",
+      2.5,
+      2.7,
+      0.20000000000000018
+    ]
+  ],
+  "obligation_errors": [
+    "output claims an unrequested percentage unit: percentage_point_change"
+  ],
+  "duration_seconds": 17.203
+}

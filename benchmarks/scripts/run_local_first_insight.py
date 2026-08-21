@@ -170,18 +170,9 @@ def extra_obligations(question: str, sql: str, columns: list[str], rows: list[li
             "output claims an unrequested percentage unit: "
             + ", ".join(unrequested_percent_outputs)
         )
-    years = set(re.findall(r"\b(?:19|20)\d{2}\b", question))
-    asks_change = any(term in lowered for term in ("change", "difference", "growth", "increase", "decrease"))
-    if len(years) >= 2 and not asks_change:
-        has_time_column = any(
-            token in name for name in names
-            for token in ("year", "date", "period", "month", "quarter")
-        )
-        has_one_metric_column_per_period = all(
-            any(year in name for name in names) for year in years
-        )
-        if not has_time_column and not has_one_metric_column_per_period:
-            errors.append("multiple requested periods are collapsed into an output without a time column")
+    if any(term in lowered for term in ("source", "citation", "cite", "provenance")):
+        if not any(name == "source" or name.startswith("source_") for name in names):
+            errors.append("requested source or citation column is absent from output")
 
     output_index = {name.casefold(): index for index, name in enumerate(columns)}
     for table in tables:
@@ -269,9 +260,13 @@ def build_report(question: str, columns: list[str], rows: list[list[Any]],
     ]
     if not numeric:
         raise ValueError("the executed result contains no numeric measure to visualize")
+    metric_words = {
+        "rate", "percent", "percentage", "coverage", "change", "difference",
+        "yield", "average", "avg", "mean", "total",
+    }
     preferred = [
         column for column in numeric
-        if any(token in column.casefold() for token in ("rate", "percent", "coverage", "change", "difference", "yield", "average"))
+        if set(filter(None, re.split(r"[^a-z0-9]+", column.casefold()))) & metric_words
     ]
     measures = (preferred or numeric)[:4]
     usable_time = next(
@@ -344,7 +339,7 @@ def main() -> int:
     parser.add_argument("--question", required=True)
     parser.add_argument("--session", type=Path, required=True)
     parser.add_argument("--small-endpoint", default="http://127.0.0.1:8022/v1")
-    parser.add_argument("--small-model", default="Snowflake/Arctic-Text2SQL-R1-7B-Q5_K_M")
+    parser.add_argument("--small-model", default="Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M")
     parser.add_argument("--fallback-endpoint")
     parser.add_argument("--fallback-model", default="qwen/qwen3.8-27b")
     parser.add_argument("--fallback-api-key-file", type=Path)

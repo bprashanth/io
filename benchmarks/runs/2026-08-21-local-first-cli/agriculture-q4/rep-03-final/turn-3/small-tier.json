@@ -1,0 +1,81 @@
+{
+  "accepted": true,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"field_harvest\" (\"block\" VARCHAR, \"season\" VARCHAR, \"year\" BIGINT, \"cultivated_hectares\" BIGINT, \"harvest_tonnes\" BIGINT, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"field_harvest\": {\"block\": [\"Bhojpur\", \"Dharwad\", \"Wardha\"], \"season\": [\"Monsoon\"], \"source\": [\"field register\"]}}\n\nPRIOR TURNS:\n[{\"question\": \"one csv is there. make a 2024 Monsoon block wise crop yield dashboard, tonnes per hectare highest first. i should see source and download the table\", \"sql\": \"SELECT block, source, SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare FROM field_harvest WHERE year = 2024 AND season = 'Monsoon' GROUP BY block, source ORDER BY tonnes_per_hectare DESC\", \"output_columns\": [\"block\", \"source\", \"tonnes_per_hectare\"]}, {\"question\": \"now show 2023 and 2024 Monsoon tonnes per hectare trend for every block\", \"sql\": \"SELECT block, year, SUM(harvest_tonnes) * 1.0 / NULLIF(NULLIF(SUM(cultivated_hectares), 0), 0) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block, year ORDER BY block NULLS FIRST, year NULLS FIRST\", \"output_columns\": [\"block\", \"year\", \"tonnes_per_hectare\"]}]\n\nCURRENT QUESTION:\nonly Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024. keep source and download",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to focus on the following key points:\n\n1. **Filtering by Block**: The query should only consider data for the blocks \"Bhojpur\" and \"Wardha\".\n2. **Filtering by Season**: The query should only consider the \"Monsoon\" season.\n3. **Comparing Years**: The query should compare the \"tonnes per hectare\" for the years 2023 and 2024.\n4. **Calculating Change**: The query should calculate the change in \"tonnes per hectare\" from 2023 to 2024.\n5. **Preserving Source**: The query should include the \"source\" column in the output.\n6. **Ordering**: The query should order the results by block and year.\n\nLet's break down the steps to construct the query:\n\n1. **Calculate Tonnes per Hectare for Each Year**:\n   - We need to calculate the \"tonnes per hectare\" for each block and year separately for 2023 and 2024.\n   - This can be done using a `CASE` statement within a `SUM` function to filter the data by year.\n\n2. **Join the Calculated Values**:\n   - We need to join the calculated values for 2023 and 2024 on the block to compare the \"tonnes per hectare\" for each block.\n\n3. **Calculate the Change**:\n   - The change in \"tonnes per hectare\" can be calculated by subtracting the value for 2023 from the value for 2024.\n\n4. **Select the Required Columns**:\n   - We need to select the block, source, and the calculated change in \"tonnes per hectare\".\n\n5. **Order the Results**:\n   - The results should be ordered by block and year.\n\nHere is the final SQL query:\n\n```sql\nWITH yearly_tonnes AS (\n    SELECT \n        block, \n        source, \n        SUM(CASE WHEN year = 2023 THEN harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0) ELSE 0 END) AS tonnes_per_hectare_2023,\n        SUM(CASE WHEN year = 2024 THEN harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0) ELSE 0 END) AS tonnes_per_hectare_2024\n    FROM \n        field_harvest\n    WHERE \n        season = 'Monsoon' AND block IN ('Bhojpur', 'Wardha')\n    GROUP BY \n        block, source\n)\nSELECT \n    block, \n    source, \n    (tonnes_per_hectare_2024 - tonnes_per_hectare_2023) AS change_in_tonnes_per_hectare\nFROM \n    yearly_tonnes\nORDER BY \n    block, source;\n```\n\n### Explanation:\n- **CTE (Common Table Expression) `yearly_tonnes`**: This CTE calculates the \"tonnes per hectare\" for each block and source for the years 2023 and 2024 separately.\n- **CASE Statement**: The `CASE` statement is used to filter the data for each year and calculate the \"tonnes per hectare\".\n- **SUM Function**: The `SUM` function aggregates the calculated \"tonnes per hectare\" for each block and source.\n- **Main Query**: The main query selects the block, source, and calculates the change in \"tonnes per hectare\" by subtracting the value for 2023 from the value for 2024.\n- **Ordering**: The results are ordered by block and source to ensure a clear and organized output.",
+      "api": {
+        "id": "chatcmpl-e1vNwAiBjhh1TNsDAbnvDJbs6ryJYtgh",
+        "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 821,
+          "prompt_tokens": 619,
+          "total_tokens": 1440,
+          "prompt_tokens_details": {
+            "cached_tokens": 436
+          }
+        },
+        "duration_seconds": 17.458
+      },
+      "sql": "WITH yearly_tonnes AS (SELECT block, source, SUM(CASE WHEN year = 2023 THEN harvest_tonnes * 1.0 / NULLIF(NULLIF(cultivated_hectares, 0), 0) ELSE 0 END) AS tonnes_per_hectare_2023, SUM(CASE WHEN year = 2024 THEN harvest_tonnes * 1.0 / NULLIF(NULLIF(cultivated_hectares, 0), 0) ELSE 0 END) AS tonnes_per_hectare_2024 FROM field_harvest WHERE season = 'Monsoon' AND block IN ('Bhojpur', 'Wardha') GROUP BY block, source) SELECT block, source, (tonnes_per_hectare_2024 - tonnes_per_hectare_2023) AS change_in_tonnes_per_hectare FROM yearly_tonnes ORDER BY block NULLS FIRST, source NULLS FIRST",
+      "output_columns": [
+        "block",
+        "source",
+        "change_in_tonnes_per_hectare"
+      ],
+      "rows": [
+        [
+          "Bhojpur",
+          "field register",
+          0.10000000000000009
+        ],
+        [
+          "Wardha",
+          "field register",
+          0.20000000000000018
+        ]
+      ],
+      "obligation_errors": [],
+      "duration_seconds": 17.476
+    }
+  ],
+  "attempt": 1,
+  "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"field_harvest\" (\"block\" VARCHAR, \"season\" VARCHAR, \"year\" BIGINT, \"cultivated_hectares\" BIGINT, \"harvest_tonnes\" BIGINT, \"source\" VARCHAR);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"field_harvest\": {\"block\": [\"Bhojpur\", \"Dharwad\", \"Wardha\"], \"season\": [\"Monsoon\"], \"source\": [\"field register\"]}}\n\nPRIOR TURNS:\n[{\"question\": \"one csv is there. make a 2024 Monsoon block wise crop yield dashboard, tonnes per hectare highest first. i should see source and download the table\", \"sql\": \"SELECT block, source, SUM(harvest_tonnes) * 1.0 / NULLIF(SUM(cultivated_hectares), 0) AS tonnes_per_hectare FROM field_harvest WHERE year = 2024 AND season = 'Monsoon' GROUP BY block, source ORDER BY tonnes_per_hectare DESC\", \"output_columns\": [\"block\", \"source\", \"tonnes_per_hectare\"]}, {\"question\": \"now show 2023 and 2024 Monsoon tonnes per hectare trend for every block\", \"sql\": \"SELECT block, year, SUM(harvest_tonnes) * 1.0 / NULLIF(NULLIF(SUM(cultivated_hectares), 0), 0) AS tonnes_per_hectare FROM field_harvest WHERE season = 'Monsoon' AND year IN (2023, 2024) GROUP BY block, year ORDER BY block NULLS FIRST, year NULLS FIRST\", \"output_columns\": [\"block\", \"year\", \"tonnes_per_hectare\"]}]\n\nCURRENT QUESTION:\nonly Bhojpur and Wardha now, compare change in tonnes per hectare from 2023 to 2024. keep source and download",
+  "response": "To translate the given natural language question into an executable SQLite query, we need to focus on the following key points:\n\n1. **Filtering by Block**: The query should only consider data for the blocks \"Bhojpur\" and \"Wardha\".\n2. **Filtering by Season**: The query should only consider the \"Monsoon\" season.\n3. **Comparing Years**: The query should compare the \"tonnes per hectare\" for the years 2023 and 2024.\n4. **Calculating Change**: The query should calculate the change in \"tonnes per hectare\" from 2023 to 2024.\n5. **Preserving Source**: The query should include the \"source\" column in the output.\n6. **Ordering**: The query should order the results by block and year.\n\nLet's break down the steps to construct the query:\n\n1. **Calculate Tonnes per Hectare for Each Year**:\n   - We need to calculate the \"tonnes per hectare\" for each block and year separately for 2023 and 2024.\n   - This can be done using a `CASE` statement within a `SUM` function to filter the data by year.\n\n2. **Join the Calculated Values**:\n   - We need to join the calculated values for 2023 and 2024 on the block to compare the \"tonnes per hectare\" for each block.\n\n3. **Calculate the Change**:\n   - The change in \"tonnes per hectare\" can be calculated by subtracting the value for 2023 from the value for 2024.\n\n4. **Select the Required Columns**:\n   - We need to select the block, source, and the calculated change in \"tonnes per hectare\".\n\n5. **Order the Results**:\n   - The results should be ordered by block and year.\n\nHere is the final SQL query:\n\n```sql\nWITH yearly_tonnes AS (\n    SELECT \n        block, \n        source, \n        SUM(CASE WHEN year = 2023 THEN harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0) ELSE 0 END) AS tonnes_per_hectare_2023,\n        SUM(CASE WHEN year = 2024 THEN harvest_tonnes * 1.0 / NULLIF(cultivated_hectares, 0) ELSE 0 END) AS tonnes_per_hectare_2024\n    FROM \n        field_harvest\n    WHERE \n        season = 'Monsoon' AND block IN ('Bhojpur', 'Wardha')\n    GROUP BY \n        block, source\n)\nSELECT \n    block, \n    source, \n    (tonnes_per_hectare_2024 - tonnes_per_hectare_2023) AS change_in_tonnes_per_hectare\nFROM \n    yearly_tonnes\nORDER BY \n    block, source;\n```\n\n### Explanation:\n- **CTE (Common Table Expression) `yearly_tonnes`**: This CTE calculates the \"tonnes per hectare\" for each block and source for the years 2023 and 2024 separately.\n- **CASE Statement**: The `CASE` statement is used to filter the data for each year and calculate the \"tonnes per hectare\".\n- **SUM Function**: The `SUM` function aggregates the calculated \"tonnes per hectare\" for each block and source.\n- **Main Query**: The main query selects the block, source, and calculates the change in \"tonnes per hectare\" by subtracting the value for 2023 from the value for 2024.\n- **Ordering**: The results are ordered by block and source to ensure a clear and organized output.",
+  "api": {
+    "id": "chatcmpl-e1vNwAiBjhh1TNsDAbnvDJbs6ryJYtgh",
+    "model": "Snowflake/Arctic-Text2SQL-R1-7B-Q4_K_M",
+    "finish_reason": "stop",
+    "usage": {
+      "completion_tokens": 821,
+      "prompt_tokens": 619,
+      "total_tokens": 1440,
+      "prompt_tokens_details": {
+        "cached_tokens": 436
+      }
+    },
+    "duration_seconds": 17.458
+  },
+  "sql": "WITH yearly_tonnes AS (SELECT block, source, SUM(CASE WHEN year = 2023 THEN harvest_tonnes * 1.0 / NULLIF(NULLIF(cultivated_hectares, 0), 0) ELSE 0 END) AS tonnes_per_hectare_2023, SUM(CASE WHEN year = 2024 THEN harvest_tonnes * 1.0 / NULLIF(NULLIF(cultivated_hectares, 0), 0) ELSE 0 END) AS tonnes_per_hectare_2024 FROM field_harvest WHERE season = 'Monsoon' AND block IN ('Bhojpur', 'Wardha') GROUP BY block, source) SELECT block, source, (tonnes_per_hectare_2024 - tonnes_per_hectare_2023) AS change_in_tonnes_per_hectare FROM yearly_tonnes ORDER BY block NULLS FIRST, source NULLS FIRST",
+  "output_columns": [
+    "block",
+    "source",
+    "change_in_tonnes_per_hectare"
+  ],
+  "rows": [
+    [
+      "Bhojpur",
+      "field register",
+      0.10000000000000009
+    ],
+    [
+      "Wardha",
+      "field register",
+      0.20000000000000018
+    ]
+  ],
+  "obligation_errors": [],
+  "duration_seconds": 17.476
+}

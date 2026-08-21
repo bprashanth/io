@@ -8,6 +8,26 @@ stable: Antigravity averaged 52.2 and Cline/Qwen 67.8, with a serious failure in
 three of five cases for both systems. The correct conclusion is “advance 27B to
 repeated GUI cases,” not “the benchmark is finished.”
 
+## Later three-turn agriculture comparison
+
+The follow-up run strengthened the durable-page concern. Antigravity 1.1.15
+resolved to Gemini 3.7 Flash (High) in two repetitions of the same three-turn
+CSV journey. Repetition one failed on the second turn with a network error and
+never reached turn three. Repetition two returned useful and largely correct
+chat prose for all three turns, but every turn had `status: ERROR` because the
+agent wrote to an invalid artifact path. The dashboard file hash never changed
+after turn one. The final visible website therefore remained an all-block 2024
+ranking even though the chat had moved to a 2023/2024 trend and then a
+Bhojpur/Wardha comparison.
+
+The online page looked excellent, but it loaded Tailwind, Chart.js, Font
+Awesome and Google Fonts from CDNs. In the saved offline browser check those
+requests failed and the page raised `Chart is not defined`. The local routed
+prototype completed all three durable page turns without external requests.
+This is a reliability and offline win on one measured journey, not general
+equivalence across arbitrary files. See
+[`v2-local-first-event-decision.md`](v2-local-first-event-decision.md).
+
 ## Antigravity faults that matter for the NGO use case
 
 Antigravity's largest problem was not ugly output. It often made a convincing
