@@ -16,6 +16,8 @@ let daemon = null;
 let statusBar = null;
 let poller = null;
 let ctx = null;
+let baselineCalls = null;   // daemon call-count when this window attached; routing is
+let verified = false;       // "verified" once a model call arrives after that.
 
 const cfg = () => vscode.workspace.getConfiguration("privacyShield");
 const port = () => cfg().get("port") || 8765;
@@ -186,10 +188,9 @@ async function enable() {
     // The app-level language server reads jetski.cloudCodeUrl only at app launch
     // (or from a push that races our activation), so the setting must already be
     // in settings.json when the relaunched app starts. The daemon is confirmed
-    // listening, so pointing the launch at it is safe; deactivate() skips its
-    // usual cleanup exactly once.
+    // listening, so pointing the launch at it is safe; deactivate() keeps the
+    // setting for every quit while the shield is enabled.
     setCloudCodeUrlSetting(proxyUrl());
-    await ctx.globalState.update("keepSettingOnQuit", true);
     relaunch(true);
   } else if (setCloudCodeUrlSetting(proxyUrl()) === "written") {
     // No relaunch: the running language server only learns the URL from the next
@@ -245,10 +246,41 @@ async function reset() {
   refresh();
 }
 
+// ---- status bar menu --------------------------------------------------------------
+// Clicking the shield opens a picker instead of toggling: turning the shield off
+// mid-session should be a deliberate choice, not a misclick.
+async function menu() {
+  const enabled = ctx.globalState.get("enabled");
+  const items = enabled ? [
+    { label: "$(dashboard) Show shield status", action: "status" },
+    { label: "$(search) Show last request that left the laptop", action: "wire" },
+    { label: "$(key) Show vault (what is being hidden)", action: "vault" },
+    { label: "$(circle-slash) Disable Privacy Shield…", action: "disable",
+      description: "agent traffic goes directly to Google again" },
+  ] : [
+    { label: "$(shield) Enable Privacy Shield", action: "enable" },
+    { label: "$(dashboard) Show shield status", action: "status" },
+  ];
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: enabled ? "Privacy Shield is ON — personal data is replaced before it leaves this laptop"
+                         : "Privacy Shield is OFF — agent traffic goes directly to Google",
+  });
+  if (!pick) return;
+  if (pick.action === "enable") return enable();
+  if (pick.action === "disable") return disable();
+  if (pick.action === "status") return openUrl("/shield/status");
+  if (pick.action === "wire") return openUrl("/shield/last-request");
+  if (pick.action === "vault") return openUrl("/shield/vault");
+}
+
 // ---- status bar -------------------------------------------------------------------
 async function refresh() {
   const enabled = ctx.globalState.get("enabled");
   const s = enabled ? await getJson(`${proxyUrl()}/shield/status.json`) : null;
+  if (s) {
+    if (baselineCalls === null) baselineCalls = s.calls;
+    if (s.calls > baselineCalls) verified = true;
+  }
   if (!enabled) {
     statusBar.text = "$(shield) Shield off";
     statusBar.tooltip = "Privacy Shield is off. Click to enable.";
@@ -256,10 +288,15 @@ async function refresh() {
   } else if (!s) {
     statusBar.text = "$(shield) Shield starting…";
     statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
-  } else if (!languageServerUsesProxy()) {
-    statusBar.text = "$(shield) Shield ready – relaunch Antigravity";
-    statusBar.tooltip = "The shield is running but this Antigravity was started without it. Run 'Privacy Shield: Enable' and choose Relaunch.";
-    statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+  } else if (!verified) {
+    // The daemon is up but no model call has passed through it in this session yet,
+    // so routing is unproven. This clears on the first shielded agent message; if it
+    // never clears while the agent answers, traffic is bypassing the shield.
+    statusBar.text = "$(shield) Shield on · awaiting first call";
+    statusBar.tooltip = `Privacy Shield is running on ${proxyUrl()} and Antigravity is pointed at it, ` +
+      "but no model call has arrived yet. The first agent message verifies routing." +
+      (languageServerUsesProxy() ? "" : "\nIf this persists after a chat message, run 'Privacy Shield: Enable' and choose Relaunch.");
+    statusBar.backgroundColor = undefined;
   } else {
     const peek = s.peek ? " · PEEK" : "";
     const blocked = s.blocked ? ` · ${s.blocked} blocked` : "";
@@ -276,11 +313,12 @@ async function refresh() {
 function activate(context) {
   ctx = context;
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1000);
-  statusBar.command = "privacyShield.toggle";
+  statusBar.command = "privacyShield.menu";
   context.subscriptions.push(statusBar,
     vscode.commands.registerCommand("privacyShield.enable", enable),
     vscode.commands.registerCommand("privacyShield.disable", disable),
     vscode.commands.registerCommand("privacyShield.toggle", () => (ctx.globalState.get("enabled") ? disable() : enable())),
+    vscode.commands.registerCommand("privacyShield.menu", menu),
     vscode.commands.registerCommand("privacyShield.status", () => openUrl("/shield/status")),
     vscode.commands.registerCommand("privacyShield.vault", () => openUrl("/shield/vault")),
     vscode.commands.registerCommand("privacyShield.wire", () => openUrl("/shield/last-request")),
@@ -290,7 +328,6 @@ function activate(context) {
     vscode.commands.registerCommand("privacyShield.openServerFolder", () => vscode.env.openExternal(vscode.Uri.file(serverDir()))),
     vscode.commands.registerCommand("privacyShield.showLog", () => vscode.commands.executeCommand("workbench.action.output.show.extension-output-insight-out.privacy-shield-#1-Privacy Shield").then(undefined, () => vscode.commands.executeCommand("workbench.action.output.toggleOutput"))),
     { dispose: stopDaemon });
-  ctx.globalState.update("keepSettingOnQuit", false);
   if (!ctx.globalState.get("enabled")) {
     if (setCloudCodeUrlSetting(null) === "written") {
       pushCloudCodeUrlToLanguageServers();  // never let a stale override survive a crash
@@ -313,12 +350,14 @@ function activate(context) {
 }
 
 function deactivate() {
-  // The daemon stays up on purpose (the relaunched Antigravity needs it listening).
-  // The setting normally must not survive the session (a dead proxy port at the
-  // next launch breaks auth validation until the daemon is adopted), except for
-  // the one quit that an Enable-relaunch just scheduled: the relaunched app must
-  // see it at launch so its language server starts on the proxy endpoint.
-  if (ctx && ctx.globalState.get("keepSettingOnQuit")) return;
+  // The daemon stays up on purpose and survives quits, and the app-level language
+  // server reads jetski.cloudCodeUrl only at launch — so while the shield is
+  // enabled the setting must survive every quit, or a normal reopen starts the
+  // agent talking to Google directly until the next endpoint push (measured on
+  // 1.107.0). If the daemon is dead at the next launch the cost is a transient
+  // login error that clears once activation restarts the daemon (also measured);
+  // activation clears the setting itself when the daemon cannot be started.
+  if (ctx && ctx.globalState.get("enabled")) return;
   try { setCloudCodeUrlSetting(null); } catch { /* shutting down */ }
 }
 
