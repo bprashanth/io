@@ -68,11 +68,19 @@ KEPT_SWEEP = {"email", "aadhaar", "pan", "ifsc", "upi_id", "phone", "voter_id", 
 
 def KEPT_SWEEP_ENGINE(text):
     return [s for s in regex_engine(text) if s[2] in KEPT_SWEEP]
-NAME_SHAPE = re.compile(r"^[A-Za-z][a-z]+(?:\s[A-Za-z]\.?)*(?:\s[A-Za-z][a-z]+){1,3}$")
+# two to four words, each Capitalised, ALLCAPS or an initial ("Gurleen Siddiqui",
+# "GURLEEN SIDDIQUI", "M. X. Verma"); lowercase names are caught by the title-cased pass
+ROLE_PREFIX = re.compile(r"^(?:guardian|mr|mrs|ms|dr|shri|smt|sri|contact person|contact|person|father|mother|parent)\.?\s+", re.I)
+LOOSE_NAME = re.compile(r"^[A-Za-z][A-Za-z.'-]*(?:\s[A-Za-z][A-Za-z.'-]*){0,3}$")
+COMMON_WORDS = {"family", "school", "office", "village", "district", "block", "taluka", "total", "status", "pending",
+                "approved", "rejected", "disbursed", "review", "scheme", "scholarship", "certificate", "income",
+                "caste", "bank", "account", "number", "mobile", "phone", "email", "name", "unknown", "none", "null"}
+NAME_SHAPE = re.compile(r"^(?:[A-Z][a-z]+|[A-Z]{2,}|[A-Z]\.?)(?:\s(?:[A-Z][a-z]+|[A-Z]{2,}|[A-Z]\.?)){1,3}$")
 LINE_NO = re.compile(r"^(\d+): ", re.M)
 FOOTER = re.compile(r"\n*_shield: [^\n]*_\s*$")
 CODE_HINT = re.compile(r"^\s*(def |class |import |from \S+ import|#include|function |const |let |var |\{|\}|</?\w+>|<\?xml)|;\s*$|=>|\(\)\s*\{", re.M)
-SHELL_HINT = re.compile(r"^(total \d+|[d-][rwx-]{9}\s|\$ |PID\s|USER\s+PID)|\S+/\S+/\S+", re.M)
+# directory listings, prompts, ps output, or unix paths with letters (never dates like 01/03/26)
+SHELL_HINT = re.compile(r"^(total \d+|[d-][rwx-]{9}\s|\$ |PID\s|USER\s+PID)|(?<![\w/])[A-Za-z~.][\w.-]*/[A-Za-z][\w.-]*/[\w.-]+", re.M)
 USER_REQ = re.compile(r"<USER_REQUEST>\s*(.*?)\s*</USER_REQUEST>", re.S)
 
 STATS: dict[str, Any] = {"calls": 0, "redact_ms_total": 0.0, "redact_ms_last": 0.0, "spans_total": 0,
@@ -105,15 +113,23 @@ class Shield:
         self.vault = PseudonymMap(vault_path)
         self.cache: dict[str, str] = {}
         self.headers: set[str] = set()   # column names seen in any table: never identifiers
-        self.kept: set[str] = set()      # values of columns the user chose to keep: allowed anywhere
-        self.kept_long: set[str] = set()
         self.hidden_headers: dict[str, str] = {}   # header (lower) -> class, from reviewed tables
         self.numbers = numbers
         self.review = review
         self.pending: dict[str, Any] | None = None   # in-chat review waiting for the user
         self.decisions_path = vault_path.with_name("shield-decisions-local-only.json")
-        self.decisions: dict[str, dict[str, str]] = (
-            json.loads(self.decisions_path.read_text()) if self.decisions_path.exists() else {})
+        self.decisions: dict[str, dict[str, str]] = {}
+        self.kept: set[str] = set()
+        self.kept_long: set[str] = set()
+        if self.decisions_path.exists():
+            saved = json.loads(self.decisions_path.read_text())
+            self.decisions = saved.get("decisions", saved) if isinstance(saved, dict) else {}
+            self.decisions = {k: v for k, v in self.decisions.items() if k != "_kept"}
+            kept = saved.get("_kept", []) if isinstance(saved, dict) else []
+            self._kept_saved = set(kept)
+        self.kept: set[str] = set(getattr(self, "_kept_saved", set()))   # kept-column values: allowed anywhere
+        self.kept_long: set[str] = {v for v in self.kept if len(v) >= 4 and not v.replace(".", "").isdigit()}
+
         if always_hide and always_hide.exists():
             for line in always_hide.read_text().splitlines():
                 value = line.strip()
@@ -136,8 +152,20 @@ class Shield:
                 spans.append((start, start + len(value), self.hidden_headers[m.group(1).casefold()], 1.0))
         return spans
 
-    def data_engine(self, text: str):
+    # deterministic name shapes the span model is unsure about: initials ("L. H. Dubey",
+    # "U.K. Shinde") and a capitalised word between a contact cue and a phone/email
+    INITIALS_NAME = re.compile(r"\b(?:[A-Z]\.\s?){1,3}[A-Z][a-z]{2,}\b")
+    CUE_NAME = re.compile(r"(?i)(?:with|contact(?: person)?|call|guardian|parent|father|mother)\s+((?-i:[A-Z][a-z]{2,}(?:\s[A-Z][a-z]{2,})?))\s*(?=(?:at|on|,|\(|-)\s*(?:\+?\d|[A-Z]+_\d|[\w.+-]+@))")
+
+    # WhatsApp/Signal export line: "dd/mm/yy, hh:mm - Sender Name: message"
+    CHAT_LINE = re.compile(r"^\[?\d{1,2}/\d{1,2}/\d{2,4},? \d{1,2}:\d{2}(?::\d{2})?(?: [AP]M)?\]? ?- ([^:\n]{2,60}):", re.M)
+
+    def data_engine(self, text: str, single_min: float = 0.65):
         spans = [sp for sp in regex_engine(text) if sp[1] - sp[0] >= 4] + self.header_value_spans(text)
+        spans += [(m.start(1), m.end(1), "person_name", 1.0) for m in self.CHAT_LINE.finditer(text)]
+        spans += [(m.start(), m.end(), "person_name", 0.9) for m in self.INITIALS_NAME.finditer(text)]
+        spans += [(m.start(1), m.end(1), "person_name", 0.9) for m in self.CUE_NAME.finditer(text)
+                  if m.group(1).casefold() not in COMMON_WORDS]
         seen = set()
         for variant in (text, text.title()):
             for start, end, label, score in self.span_engine(variant):
@@ -153,14 +181,37 @@ class Shield:
                     continue  # column headers / values from kept columns are not identifiers
                 if any(len(k) >= 4 and (k in low or low in k) for k in self.kept_long):
                     continue  # overlaps a kept value ("Pune district", scheme names)
-                if label == "person_name" and not NAME_SHAPE.match(value):
-                    continue
+                if label == "person_name":
+                    # strip leading role words, then accept letters-only names of 1-4 words;
+                    # a single word needs higher confidence (the model finds "Pradeep",
+                    # "gurmeet shinde", "L. H. Dubey"; the old strict shape threw them away)
+                    m_role = ROLE_PREFIX.match(value)
+                    if m_role:
+                        start += m_role.end(); value = value[m_role.end():]
+                    if not LOOSE_NAME.match(value):
+                        continue
+                    if " " not in value and score < single_min:
+                        continue
+                    if value.casefold() in COMMON_WORDS:
+                        continue
                 seen.add((start, end))
                 spans.append((start, end, label, score))
         if self.numbers:
             spans += [(m.start(), m.end(), "long_number", 1.0)
-                      for m in re.finditer(rf"(?<!\d)(?:\d[ -]?){{{self.numbers - 1},}}\d(?!\d)", text)]
+                      for m in re.finditer(rf"(?<![\d-])(?:\d ?){{{self.numbers - 1},}}\d(?![\d-])", text)]
+        # a name found once is a name everywhere in this text, whatever the casing
+        found = {text[a:b] for a, b, lab, _ in spans if lab == "person_name" and b - a >= 4}
+        covered = {(a, b) for a, b, _, _ in spans}
+        for value in found:
+            for m in re.finditer(rf"(?<![\w]){re.escape(value)}(?![\w])", text, flags=re.I):
+                if (m.start(), m.end()) not in covered:
+                    spans.append((m.start(), m.end(), "person_name", 0.9)); covered.add((m.start(), m.end()))
         return spans
+
+    def cell_engine(self, text: str):
+        """Free-text cells inside tables: names and validator-backed identifiers only.
+        Place/address guesses on short cells produce junk ('shifted house')."""
+        return [sp for sp in self.data_engine(text, single_min=0.45) if sp[2] not in ("village", "address")]
 
     def code_engine(self, text: str):
         return list(regex_engine(text))
@@ -168,10 +219,13 @@ class Shield:
     # ----------------------------------------------------------------- tables
     def parse_table(self, text: str) -> tuple[pd.DataFrame, list[str], str]:
         prefixes = LINE_NO.findall(text)
-        raw = LINE_NO.sub("", text)
+        raw = "\n".join(l.strip() for l in LINE_NO.sub("", text).split("\n"))
         sep = "\t" if raw.count("\t") > raw.count(",") else ","
         frame = pd.read_csv(io.StringIO(raw), dtype=str, keep_default_na=False, sep=sep, skip_blank_lines=False)
         return frame, prefixes, sep
+
+    def save_decisions(self) -> None:
+        self.decisions_path.write_text(json.dumps({"decisions": self.decisions, "_kept": sorted(self.kept)}, indent=1))
 
     def header_key(self, text: str) -> str:
         """Decisions are keyed by the column-header signature, so an approved table is
@@ -189,18 +243,26 @@ class Shield:
 
     def redact_table(self, text: str, classes: dict[str, str]) -> tuple[str, int]:
         frame, prefixes, sep = self.parse_table(text)
+        # a column whose values the user already keeps elsewhere is kept here too
+        for c in list(classes):
+            if classes[c] not in ("none", "record_id_non_pii", "age") and c in frame.columns:
+                vals = [str(v).casefold().strip() for v in frame[c].unique() if str(v).strip()]
+                if vals and self.kept and sum(v in self.kept for v in vals) >= 0.8 * len(vals):
+                    classes[c] = "none"
         self.headers.update(str(c).casefold().strip() for c in frame.columns)
         for c, cls in classes.items():
             if cls not in ("none", "record_id_non_pii", "age", "dob", "gps", "free_text_with_pii"):
                 self.hidden_headers[str(c).casefold().strip()] = cls
             if cls in ("none", "record_id_non_pii", "age") and c in frame.columns:
                 vals = {str(v).casefold().strip() for v in frame[c].unique() if str(v).strip()}
-                self.kept.update(vals)
-                self.kept_long.update(v for v in vals if len(v) >= 4 and not v.replace(".", "").isdigit())
+                if vals - self.kept:
+                    self.kept.update(vals)
+                    self.kept_long.update(v for v in vals if len(v) >= 4 and not v.replace(".", "").isdigit())
+                    self.save_decisions()
         before = len(self.vault.display)
-        shadow = pseudonymise_frame(frame, classes, self.vault, self.data_engine, kept_validator=KEPT_SWEEP_ENGINE)
+        shadow = pseudonymise_frame(frame, classes, self.vault, self.cell_engine, kept_validator=KEPT_SWEEP_ENGINE)
         if self.numbers:
-            shadow = shadow.map(lambda v: re.sub(rf"(?<!\d)(?:\d[ -]?){{{self.numbers - 1},}}\d(?!\d)",
+            shadow = shadow.map(lambda v: re.sub(rf"(?<![\d-])(?:\d ?){{{self.numbers - 1},}}\d(?![\d-])",
                                                  lambda m: self.vault.token(m.group(0), "long_number"), v)
                                 if isinstance(v, str) else v)
         out = shadow.to_csv(index=False, sep=sep, lineterminator="\n")
@@ -211,10 +273,44 @@ class Shield:
         return out, len(self.vault.display) - before
 
     # ---------------------------------------------------------------- strings
+    def parses_as_table(self, block: str) -> bool:
+        """A block is a table only if pandas parses it AND the header is credible:
+        mostly named columns (not 'Unnamed: n'), short header cells, no duplicate
+        names, at least two data rows. Tracebacks, command errors and prose with
+        commas fail this and are treated as text."""
+        try:
+            frame, _, _ = self.parse_table(block)
+        except Exception:
+            return False
+        cols = [str(c) for c in frame.columns]
+        if len(cols) < 3 or len(frame) < 2:
+            return False
+        unnamed = sum(c.startswith("Unnamed") or not c.strip() for c in cols)
+        if unnamed > len(cols) * 0.3 or any(len(c) > 48 for c in cols) or len(set(c.casefold() for c in cols)) < len(cols):
+            return False
+        if sum(bool(re.search(r"[.!?]\s|\b(error|failed|traceback|exception)\b", c, re.I)) for c in cols):
+            return False
+        # header cells must read like labels, not like data: no quotes/brackets, not
+        # numeric, not phone/date/email shaped (tuple-printed rows fail here)
+        def label_like(c: str) -> bool:
+            c = c.strip()
+            if not c or c[0] in "'\"([{" or c[-1] in "'\")]}":
+                return False
+            if re.fullmatch(r"[-+]?\d[\d., ]*", c) or re.search(r"\d{2}[-/]\d{2}[-/]\d{2,4}|@|\+91", c):
+                return False
+            return bool(re.search(r"[A-Za-z]", c))
+        if sum(label_like(c) for c in cols) < 0.7 * len(cols):
+            return False
+        return True
+
     def split_table(self, text: str) -> tuple[str, str, str] | None:
+        found = self._split_table(text)
+        return found if found and self.parses_as_table(found[1]) else None
+
+    def _split_table(self, text: str) -> tuple[str, str, str] | None:
         """Find a CSV/TSV block inside a tool result: returns (preamble, table, rest)."""
         lines = text.split("\n")
-        stripped = [LINE_NO.sub("", l) for l in lines]
+        stripped = [LINE_NO.sub("", l).strip() for l in lines]
         for sep in (",", "\t"):
             for start in range(min(len(lines), 15)):
                 try:
@@ -253,8 +349,8 @@ class Shield:
     # model sometimes misses the name in noisy extractor output, but the shape is
     # deterministic once the identifiers next to it are tokens.
     CONTACT_NAME = re.compile(
-        r"([A-Z][\w'.-]+(?:\s+[A-Z][\w'.-]+){1,3})"
-        r"(?=\s*[(\[][^()\[\]]{0,60}(?:EMAIL|PHONE|AADHAAR|PAN|ACCOUNT|VOTER)\\?_\d)")
+        r"((?![A-Z_]+\\?_\d)[A-Z][\w'.-]+(?:\s+(?![A-Z_]+\\?_\d)[A-Z][\w'.-]+){1,3})"
+        r"(?=\s*(?:[(\[][^()\[\]]{0,60}|(?:at|on|:|,|-)\s*)(?:EMAIL|PHONE|AADHAAR|PAN|ACCOUNT|VOTER|UPI)\\?_\d)")
 
     def _hide_contact_names(self, text: str) -> str:
         return self.CONTACT_NAME.sub(lambda m: self.vault.token(m.group(1), "person_name"), text)
@@ -392,7 +488,7 @@ class Shield:
         if extra_values:
             self.vault.save()
         self.decisions[self.pending["key"]] = classes
-        self.decisions_path.write_text(json.dumps(self.decisions, indent=1))
+        self.save_decisions()
         self.pending = None
         hidden = [c for c, k in classes.items() if k not in ("none", "record_id_non_pii", "age")]
         note = f"Understood. Hiding {len(hidden)} columns: {', '.join(hidden)}."
@@ -486,10 +582,10 @@ class Shield:
         walked: list[str] = []
         before = len(self.vault.display)
         req["contents"] = self.walk(req["contents"], counters, True, walked)
-        if len(self.vault.display) != before:
-            # values minted late in this walk may appear in parts walked earlier: one vault-only pass
-            walked = []
-            req["contents"] = self.walk(req["contents"], {"spans": 0, "hits": 0, "misses": 0}, False, walked)
+        # Consistency pass, always: every known value must be a token everywhere in
+        # the outgoing request, whatever order parts were walked or cached in.
+        walked = []
+        req["contents"] = self.walk(req["contents"], {"spans": 0, "hits": 0, "misses": 0}, False, walked)
         self.vault.save()
         self.last_walked = "\n".join(walked)
         return json.dumps(payload, ensure_ascii=False).encode(), counters, None
@@ -732,13 +828,33 @@ def make_handler(shield: Shield, annotate: bool):
             is_model_call = "streamGenerateContent" in self.path or "generateContent" in self.path
             if is_model_call and body:
                 t0 = time.monotonic()
-                body2, counters, synthetic = shield.redact_request(body)
+                try:
+                    body2, counters, synthetic = shield.redact_request(body)
+                except Exception as error:  # fail closed, never leave the client hanging
+                    import traceback
+                    with open("shield.log", "a") as log:
+                        log.write(json.dumps({"t": time.time(), "redaction_error": f"{type(error).__name__}: {error}",
+                                              "trace": traceback.format_exc()[-2000:]}) + "\n")
+                    with LOCK:
+                        STATS["errors"] = STATS.get("errors", 0) + 1
+                    return self.send_sse([sse_text_event(
+                        "🛡️ Privacy shield hit an internal error while checking this request, so nothing was sent. "
+                        "Please try the message again; if it repeats, run 'Privacy Shield: Show daemon log'.", finish=True)])
                 redact_ms = (time.monotonic() - t0) * 1000
                 if synthetic is not None:
                     with open("shield.log", "a") as log:
                         log.write(json.dumps({"t": time.time(), "review_prompt": True, "redact_ms": round(redact_ms, 1)}) + "\n")
                     return self.send_sse([sse_text_event(synthetic, finish=True)])
                 body = body2
+                # last line of defence repairs before it refuses: substitute every known
+                # value once more over the final body (order-independent), then check
+                known = shield.vault.known_regex()
+                if known:
+                    def _sub(m):
+                        return shield.vault.forward.get(re.sub(r"\s+", " ", m.group(0).strip()).casefold(), m.group(0))
+                    fixed = known.sub(_sub, body.decode("utf8", "replace"))
+                    body = fixed.encode()
+                    shield.last_walked = known.sub(_sub, getattr(shield, "last_walked", ""))
                 lowered = getattr(shield, "last_walked", "").casefold()
                 leak = next((v for t, v in shield.vault.display.items()
                              if len(v) >= 4 and not t.startswith(("NUMBER", "AGE"))

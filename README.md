@@ -31,6 +31,11 @@ separate qualification run, giving a 30/30 routed replay on the frozen suite.
 The larger Arctic BF16 checkpoint scored 26/30 and passed a separate 15/15
 holdout, but is a server/high-end option rather than the intended laptop tier.
 
+**Stage ledger:** the work is now three additive stages — see
+[`docs/stages/`](docs/stages/README.md) (Cline vs Antigravity; local-first
+ladder and its re-verification; the Antigravity privacy shield, verified in
+the real IDE). The shield is `extension/privacy-shield-0.2.3.vsix`.
+
 **Re-verification note (2026-08-21 evening):** the model ranking above
 reproduces, but the router's "accepted no wrong answers" and the "30/30 routed
 replay" do not hold out of sample, and a 2026 general 9B model matches Arctic

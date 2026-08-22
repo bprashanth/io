@@ -51,6 +51,10 @@ class PseudonymMap:
         key = normalise(value)
         if key in self.forward:
             return self.forward[key]
+        bare = value.strip().strip("'\"`")
+        if re.fullmatch(TOKEN_RE.pattern, bare, re.I):
+            return value.strip()       # already one of our tokens (possibly quoted or
+                                       # lower-cased by a script's repr): never re-mint
         prefix = PREFIX.get(pii_class, pii_class.upper())
         self.counters[prefix] = self.counters.get(prefix, 0) + 1
         token = f"{prefix}_{self.counters[prefix]:03d}"
@@ -154,11 +158,21 @@ def redact_cells(values: list[str], pmap: PseudonymMap, detector: Callable | Non
 
 
 def pseudonymise_frame(frame: pd.DataFrame, column_classes: dict[str, Any], pmap: PseudonymMap,
-                       detector: Callable[[str], list[tuple[int, int, str, float]]] | None = None) -> pd.DataFrame:
-    """column_classes: {column: class | [classes] | 'free_text_with_pii' | 'none'}."""
+                       detector: Callable[[str], list[tuple[int, int, str, float]]] | None = None,
+                       kept_validator: Callable[[str], list[tuple[int, int, str, float]]] | None = None) -> pd.DataFrame:
+    """column_classes: {column: class | [classes] | 'free_text_with_pii' | 'none'}.
+    kept_validator: hard validators (email/PAN/aadhaar/...) still applied to cells of
+    kept columns — a mangled header must never let a checksummed identifier through."""
     result = frame.copy()
     for column, cls in column_classes.items():
         if column not in result.columns or cls in (None, "none", "record_id_non_pii", "age"):
+            if kept_validator is not None and column in result.columns:
+                series = result[column].astype("string")
+                uniq = [str(v) for v in series.dropna().unique() if str(v).strip()]
+                if uniq:
+                    mapping = redact_cells(uniq, pmap, kept_validator)
+                    if any(mapping.get(v, v) != v for v in uniq):
+                        result[column] = series.map(lambda v: mapping.get(str(v), v) if pd.notna(v) else v)
             continue
         classes = cls if isinstance(cls, list) else [cls]
         series = result[column].astype("string")
