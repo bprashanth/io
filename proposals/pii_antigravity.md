@@ -1,9 +1,10 @@
 # PII masking & rehydration proxy for Antigravity
 
-Status: **built and working** — extension `privacy-shield-0.2.2.vsix`
-(`extension/privacy-shield/`), verified end-to-end on Antigravity 1.107.0
-(Linux x64, apt `1.23.2-1776332190`) on 2026-08-22 with Claude Sonnet 4.6 and
-Gemini 3.6 Flash. This document is the living design record: the original
+Status: **built and working** — extension `privacy-shield-0.2.3.vsix`
+(`extension/privacy-shield/`), verified end-to-end on Antigravity 1.107.0 on
+the Linux x64 laptop (apt `1.23.2-1776332190`, 0.2.2, Claude Sonnet 4.6 and
+Gemini 3.6 Flash) and on the DGX arm64 build (0.2.3, Gemini 3.6/3.7 Flash,
+driven through the real IDE under Xvfb) on 2026-08-22. This document is the living design record: the original
 proposal below was written before implementation; §"As built" onward records
 what is actually true, measured on the real product. Where the two disagree,
 "As built" wins.
@@ -181,6 +182,36 @@ rows, second sheet), `survey_report.pdf` (table + prose contact lines).
 | Egress firewall | fired once (on a token echo — false positive, fixed); fail-closed behaviour confirmed |
 | Model families | Claude Sonnet 4.6 and Gemini 3.6 Flash, both shielded, both rehydrate correctly |
 | Enable/Disable via picker | two deliberate steps to disable; relaunch round-trips verified both ways |
+
+## 0.2.3 changes (DGX verification, 2026-08-22 evening)
+
+Re-verifying 0.2.2 in the real IDE on a second machine found eleven defects;
+all are fixed in 0.2.3 and listed in
+`chronology/2026-08-22T2130-shield-0.2.3-verification.md`. The ones that change
+the design:
+
+- **Daemon outside the process tree.** VS Code kills the extension host's
+  children on quit, so the proxy died during the relaunch, the new instance's
+  login check hit ECONNREFUSED and the IDE showed "Log in" for the session.
+  The daemon is now spawned via `setsid`/`start`, and the relaunch helper
+  waits for `/shield/status.json` before starting Antigravity.
+- **No exception may leave the request handler.** A pandas parse error inside
+  the review path had left the language server waiting ten minutes. Any
+  internal error now returns a visible shield message (fail closed).
+- **Credible headers only.** Command errors, tracebacks and tuple-printed rows
+  are never "tables" (the review had once listed data values as columns).
+- **Repair before refuse.** The egress guard applies the vault substitution
+  over the final outgoing body, then blocks only if a value still survives.
+- **Recall work in cells and prose**: uppercase/lowercase/initialled names,
+  cue-word and contact-line rules, chat-sender rule and in-text propagation,
+  GPS before a full stop, `dd/mm/yy` no longer mistaken for a shell path;
+  place/address guesses are no longer minted from short cells (junk source).
+- **Kept values persist** with the review decisions; a new table column made
+  of kept values is kept; free-port selection; Disable stops the daemon.
+
+Routing note for this build: the setting-before-relaunch rule from the laptop
+holds on arm64 too; the env variable is kept as well. Both machines now run
+the same recipe.
 
 ## Known limits & brittleness (honest list)
 

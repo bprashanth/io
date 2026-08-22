@@ -20,7 +20,31 @@ let baselineCalls = null;   // daemon call-count when this window attached; rout
 let verified = false;       // "verified" once a model call arrives after that.
 
 const cfg = () => vscode.workspace.getConfiguration("privacyShield");
-const port = () => cfg().get("port") || 8765;
+const net = require("net");
+let chosenPort = null;
+const port = () => chosenPort || (ctx && ctx.globalState.get("port")) || cfg().get("port") || 8765;
+
+function portFree(p) {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.once("error", () => resolve(false));
+    srv.once("listening", () => srv.close(() => resolve(true)));
+    srv.listen(p, "127.0.0.1");
+  });
+}
+
+// Our daemon answers /shield/status.json; anything else on the port is a stranger.
+// Pick the first free port from the configured one upwards and remember it.
+async function choosePort() {
+  const base = cfg().get("port") || 8765;
+  for (let p = base; p < base + 20; p++) {
+    chosenPort = p;
+    if (await getJson(`http://127.0.0.1:${p}/shield/status.json`)) return p;   // our daemon, adopt
+    if (await portFree(p)) return p;
+  }
+  chosenPort = null;
+  return null;
+}
 const proxyUrl = () => `http://127.0.0.1:${port()}`;
 
 function serverDir() {
@@ -117,13 +141,21 @@ function relaunch(withShield) {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.CLOUD_CODE_URL;
+  const cmd = withShield ? daemonCommand() : null;
+  const q = (v) => `"${String(v).replace(/"/g, '\\"')}"`;
   if (os.platform() === "win32") {
     const setLine = withShield ? `set "CLOUD_CODE_URL=${proxyUrl()}" && ` : `set "CLOUD_CODE_URL=" && `;
-    cp.spawn("cmd.exe", ["/c", `timeout /t 4 /nobreak >nul && ${setLine}start "" "${exe}" ${extra} "${folder}"`],
-      { detached: true, stdio: "ignore", windowsHide: true, env }).unref();
+    const daemonLine = cmd ? `(curl -s -m 2 ${proxyUrl()}/shield/status.json >nul 2>&1 || start "" /b ${q(cmd.py)} ${cmd.args.map(q).join(" ")} >> ${q(cmd.log)} 2>&1) && ` +
+      `for /l %i in (1,1,90) do @(curl -s -m 2 ${proxyUrl()}/shield/status.json >nul 2>&1 && goto up || timeout /t 1 /nobreak >nul)\n:up\n` : `curl -s -m 2 ${proxyUrl()}/shield/quit >nul 2>&1 & `;
+    cp.spawn("cmd.exe", ["/c", `timeout /t 4 /nobreak >nul && ${daemonLine}${setLine}start "" "${exe}" ${extra} "${folder}"`],
+      { detached: true, stdio: "ignore", windowsHide: true, env: cmd ? cmd.env : env }).unref();
   } else {
-    const line = `sleep 4; ${withShield ? `CLOUD_CODE_URL="${proxyUrl()}"` : ""} "${exe}" ${extra} "${folder}" >/dev/null 2>&1 &`;
-    cp.spawn("/bin/sh", ["-c", line], { detached: true, stdio: "ignore", env }).unref();
+    const daemonLine = cmd
+      ? `curl -s -m 2 ${proxyUrl()}/shield/status.json >/dev/null 2>&1 || ${os.platform() === "linux" ? "setsid " : ""}nohup ${q(cmd.py)} ${cmd.args.map(q).join(" ")} >> ${q(cmd.log)} 2>&1 & ` +
+        `for i in $(seq 1 90); do curl -s -m 2 ${proxyUrl()}/shield/status.json >/dev/null 2>&1 && break; sleep 1; done; `
+      : `curl -s -m 2 ${proxyUrl()}/shield/quit >/dev/null 2>&1; `;
+    const line = `sleep 4; ${daemonLine}${withShield ? `CLOUD_CODE_URL="${proxyUrl()}"` : ""} "${exe}" ${extra} "${folder}" >/dev/null 2>&1 &`;
+    cp.spawn("/bin/sh", ["-c", line], { cwd: stateDir(), detached: true, stdio: "ignore", env: cmd ? cmd.env : env }).unref();
   }
   setTimeout(() => vscode.commands.executeCommand("workbench.action.quit"), 500);
 }
@@ -133,16 +165,9 @@ async function daemonAlive() {
   return !!(await getJson(`${proxyUrl()}/shield/status.json`));
 }
 
-async function startDaemon() {
-  if (await daemonAlive()) return true;   // adopt a daemon left running from a previous session
+function daemonCommand() {
   const py = pythonPath();
-  if (!py) {
-    const pick = await vscode.window.showErrorMessage(
-      "Privacy Shield: Python environment not found. Run the one-time install (needs internet, ~200 MB).",
-      "Install now");
-    if (pick === "Install now") await install();
-    return false;
-  }
+  if (!py) return null;
   const args = [path.join(serverDir(), "shield_proxy.py"), "--port", String(port()),
     "--vault", path.join(stateDir(), "shield-vault-local-only.json"),
     "--review", cfg().get("review") || "chat"];
@@ -152,23 +177,56 @@ async function startDaemon() {
   const env = { ...process.env, PII_THREADS: String(cfg().get("threads") || 4),
     HF_HOME: path.join(serverDir(), "hf-cache"), PYTHONUNBUFFERED: "1" };
   delete env.CLOUD_CODE_URL; // the daemon itself must talk to Google directly
-  const logFile = path.join(stateDir(), "daemon.out");
-  const fd = fs.openSync(logFile, "a");
-  daemon = cp.spawn(py, args, { cwd: stateDir(), env, detached: true, stdio: ["ignore", fd, fd], windowsHide: true });
-  daemon.unref();
-  daemon.on("exit", (code) => { daemon = null; refresh(); });
-  for (let i = 0; i < 60; i++) {
+  delete env.ELECTRON_RUN_AS_NODE;
+  return { py, args, env, log: path.join(stateDir(), "daemon.out") };
+}
+
+// Spawn the daemon OUTSIDE the extension host's process tree. VS Code kills its
+// children on quit, which left the proxy dead for the seconds the relaunched app
+// needs it most (measured: the login check hit ECONNREFUSED and the IDE showed
+// "Log in" for the rest of the session). setsid/start make it a free process.
+function spawnDetachedDaemon(cmd) {
+  const q = (v) => `"${String(v).replace(/"/g, '\\"')}"`;
+  if (os.platform() === "win32") {
+    const line = `start "" /b ${q(cmd.py)} ${cmd.args.map(q).join(" ")} >> ${q(cmd.log)} 2>&1`;
+    cp.spawn("cmd.exe", ["/c", line], { cwd: stateDir(), env: cmd.env, detached: true, stdio: "ignore", windowsHide: true }).unref();
+  } else {
+    const line = `${os.platform() === "linux" ? "setsid " : ""}nohup ${q(cmd.py)} ${cmd.args.map(q).join(" ")} >> ${q(cmd.log)} 2>&1 &`;
+    cp.spawn("/bin/sh", ["-c", line], { cwd: stateDir(), env: cmd.env, detached: true, stdio: "ignore" }).unref();
+  }
+}
+
+async function startDaemon() {
+  if (await daemonAlive()) return true;   // adopt a daemon left running from a previous session
+  const p = await choosePort();
+  if (p === null) {
+    vscode.window.showErrorMessage("Privacy Shield: no free local port between 8765 and 8784.");
+    return false;
+  }
+  await ctx.globalState.update("port", p);
+  if (await daemonAlive()) return true;
+  const py = pythonPath();
+  if (!py) {
+    const pick = await vscode.window.showErrorMessage(
+      "Privacy Shield: Python environment not found. Run the one-time install (needs internet, ~200 MB).",
+      "Install now");
+    if (pick === "Install now") await install();
+    return false;
+  }
+  spawnDetachedDaemon(daemonCommand());
+  daemon = true;
+  for (let i = 0; i < 90; i++) {
     await new Promise((r) => setTimeout(r, 1000));
     if (await getJson(`${proxyUrl()}/shield/status.json`)) return true;
-    if (!daemon) return false;
   }
+  daemon = null;
   vscode.window.showErrorMessage("Privacy Shield: daemon did not start; see the 'Privacy Shield' output channel.");
   return false;
 }
 
 function stopDaemon() {
   getJson(`${proxyUrl()}/shield/quit`);
-  if (daemon) { try { daemon.kill(); } catch { /* already gone */ } daemon = null; }
+  daemon = null;
 }
 
 // ---- commands -----------------------------------------------------------------
@@ -200,17 +258,26 @@ async function enable() {
 }
 
 async function disable() {
-  if (setCloudCodeUrlSetting(null) === "written") await pushCloudCodeUrlToLanguageServers();
-  stopDaemon();
+  const changed = setCloudCodeUrlSetting(null) === "written";
   await ctx.globalState.update("enabled", false);
   refresh();
-  if (!process.env.CLOUD_CODE_URL) {
+  if (!process.env.CLOUD_CODE_URL && !changed) {
+    // never routed through the shield in this session: just stop quietly
+    stopDaemon();
     vscode.window.showInformationMessage("Privacy Shield is off.");
     return;
   }
   const pick = await vscode.window.showWarningMessage(
     "Privacy Shield stopped. Relaunch Antigravity so it talks to Google directly again?", { modal: true }, "Relaunch now");
-  if (pick === "Relaunch now") relaunch(false);
+  if (pick === "Relaunch now") {
+    // stop the daemon only after the relaunch has started; the running app still
+    // points at it until it quits, and a dead port mid-session shows login errors
+    setTimeout(stopDaemon, 3000);
+    relaunch(false);
+  } else {
+    stopDaemon();
+    await pushCloudCodeUrlToLanguageServers();
+  }
 }
 
 async function install() {

@@ -59,7 +59,8 @@ REGEXES: list[tuple[str, re.Pattern[str], Callable[[str], bool] | None]] = [
     ("phone", re.compile(r"(?<!\d)(?:\+91[ -]?|0)?[6-9]\d{4}[ -]?\d{5}(?!\d)"), None),
     ("vehicle_number", re.compile(r"\b[A-Z]{2}[ -]?\d{1,2}[ -]?[A-Z]{1,3}[ -]?\d{4}\b"), None),
     ("voter_id", re.compile(r"\b[A-Z]{3}\d{7}\b"), None),
-    ("gps", re.compile(r"(?<![\d.])-?\d{1,2}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}(?![\d.])"), None),
+    ("gps", re.compile(r"(?<![\d.])-?\d{1,2}\.\d{2,}\s*,\s*-?\d{1,3}\.\d{2,}(?!\d|\.\d)"),
+     lambda s: abs(float(s.split(",")[0])) <= 90 and abs(float(s.split(",")[1])) <= 180),
     ("dob", re.compile(r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})\b"), None),
 ]
 
