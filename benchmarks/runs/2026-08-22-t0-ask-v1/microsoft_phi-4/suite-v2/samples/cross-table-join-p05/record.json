@@ -1,0 +1,123 @@
+{
+  "id": "cross-table-join-p05",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "put 2023 ANC coverage and employment percentages together, matching district and year",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2023,
+      74.0,
+      56.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      2023,
+      67.0,
+      46.0
+    ],
+    [
+      "Kishanganj",
+      2023,
+      61.0,
+      38.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH anc_coverage AS (SELECT district, year, (anc4_completed * 100.0 / NULLIF(NULLIF(pregnancies_registered, 0), 0)) AS anc_coverage_percentage FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Patna', 'Purnia') AND source = 'synthetic Bihar ANC fixture'), employment_percentage AS (SELECT district, year, (employed_at_6_months * 100.0 / NULLIF(NULLIF(women_enrolled, 0), 0)) AS employment_percentage FROM livelihoods WHERE year = 2023 AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Purnia') AND source = 'synthetic women livelihood outcomes fixture') SELECT a.district, a.year, a.anc_coverage_percentage, e.employment_percentage FROM anc_coverage AS a JOIN employment_percentage AS e ON a.district = e.district AND a.year = e.year",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}, \"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\nput 2023 ANC coverage and employment percentages together, matching district and year",
+      "response": "To combine the ANC coverage and employment percentages for the year 2023, matching by district, we need to calculate the percentages for each dataset and then join them on the district and year. Here's the SQL query to achieve this:\n\n```sql\nWITH anc_coverage AS (\n  SELECT\n    district,\n    year,\n    (anc4_completed * 100.0 / NULLIF(pregnancies_registered, 0)) AS anc_coverage_percentage\n  FROM\n    anc_visits\n  WHERE\n    year = 2023\n    AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Patna', 'Purnia')\n    AND source = 'synthetic Bihar ANC fixture'\n),\nemployment_percentage AS (\n  SELECT\n    district,\n    year,\n    (employed_at_6_months * 100.0 / NULLIF(women_enrolled, 0)) AS employment_percentage\n  FROM\n    livelihoods\n  WHERE\n    year = 2023\n    AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Purnia')\n    AND source = 'synthetic women livelihood outcomes fixture'\n)\nSELECT\n  a.district,\n  a.year,\n  a.anc_coverage_percentage,\n  e.employment_percentage\nFROM\n  anc_coverage a\nJOIN\n  employment_percentage e\nON\n  a.district = e.district\n  AND a.year = e.year;\n```\n\nThis query calculates the ANC coverage percentage and employment percentage for each district in 2023, then joins the results on district and year.",
+      "api": {
+        "id": "gen-1787421273-izNZTUSKLeT9XHAV26PU",
+        "model": "microsoft/phi-4",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 390,
+          "completion_tokens": 329,
+          "total_tokens": 719,
+          "cost": 7.336e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 7.336e-05,
+            "upstream_inference_prompt_cost": 2.73e-05,
+            "upstream_inference_completions_cost": 4.606e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.716
+      },
+      "duration_seconds": 4.725,
+      "sql_duckdb": "WITH anc_coverage AS (SELECT district, year, (anc4_completed * 100.0 / NULLIF(NULLIF(pregnancies_registered, 0), 0)) AS anc_coverage_percentage FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Patna', 'Purnia') AND source = 'synthetic Bihar ANC fixture'), employment_percentage AS (SELECT district, year, (employed_at_6_months * 100.0 / NULLIF(NULLIF(women_enrolled, 0), 0)) AS employment_percentage FROM livelihoods WHERE year = 2023 AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Purnia') AND source = 'synthetic women livelihood outcomes fixture') SELECT a.district, a.year, a.anc_coverage_percentage, e.employment_percentage FROM anc_coverage AS a JOIN employment_percentage AS e ON a.district = e.district AND a.year = e.year",
+      "rows": [
+        [
+          "Gaya",
+          2023,
+          74.0,
+          56.0
+        ],
+        [
+          "Nalanda",
+          2023,
+          80.0,
+          65.0
+        ],
+        [
+          "Purnia",
+          2023,
+          67.0,
+          46.0
+        ],
+        [
+          "Kishanganj",
+          2023,
+          61.0,
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

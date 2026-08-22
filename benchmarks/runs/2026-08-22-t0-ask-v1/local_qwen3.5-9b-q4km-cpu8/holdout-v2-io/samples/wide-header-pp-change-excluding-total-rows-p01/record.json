@@ -1,0 +1,360 @@
+{
+  "id": "wide-header-pp-change-excluding-total-rows-p01",
+  "task_id": "wide-header-pp-change-excluding-total-rows",
+  "pattern": "percentage-point change between two labelled rounds on messy headers, state filter, detail rows only",
+  "question": "Bihar district wise full vaccination change from NFHS-4 to NFHS-5 in percentage points",
+  "gold_sql": "SELECT \"District\", MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_pp FROM district_health_factsheet WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' GROUP BY \"District\" ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Bhojpur",
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      4.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Bhojpur",
+      "Bihar",
+      "NFHS-4",
+      60.7,
+      null,
+      null
+    ],
+    [
+      "Bhojpur",
+      "Bihar",
+      "NFHS-5",
+      54.9,
+      60.7,
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      "Bihar",
+      "NFHS-4",
+      47.5,
+      null,
+      null
+    ],
+    [
+      "Gaya",
+      "Bihar",
+      "NFHS-5",
+      55.3,
+      47.5,
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      "Bihar",
+      "NFHS-4",
+      58.6,
+      null,
+      null
+    ],
+    [
+      "Kishanganj",
+      "Bihar",
+      "NFHS-5",
+      61.4,
+      58.6,
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      "Bihar",
+      "NFHS-4",
+      50.1,
+      null,
+      null
+    ],
+    [
+      "Madhubani",
+      "Bihar",
+      "NFHS-5",
+      53.3,
+      50.1,
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      "Bihar",
+      "NFHS-4",
+      56.6,
+      null,
+      null
+    ],
+    [
+      "Nalanda",
+      "Bihar",
+      "NFHS-5",
+      62.3,
+      56.6,
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      "Bihar",
+      "NFHS-4",
+      46.8,
+      null,
+      null
+    ],
+    [
+      "Purnia",
+      "Bihar",
+      "NFHS-5",
+      43.4,
+      46.8,
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      "Bihar",
+      "NFHS-4",
+      68.5,
+      null,
+      null
+    ],
+    [
+      "Rohtas",
+      "Bihar",
+      "NFHS-5",
+      66.6,
+      68.5,
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      "Bihar",
+      "NFHS-4",
+      66.3,
+      null,
+      null
+    ],
+    [
+      "Saran",
+      "Bihar",
+      "NFHS-5",
+      70.3,
+      66.3,
+      4.0
+    ],
+    [
+      "State Total",
+      "Bihar",
+      "NFHS-4",
+      56.9,
+      null,
+      null
+    ],
+    [
+      "State Total",
+      "Bihar",
+      "NFHS-5",
+      58.4,
+      56.9,
+      1.5
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"District\", \"State\", \"Survey Round\", \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-4 Vaccination %\", LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\", \"State\" ORDER BY \"Survey Round\" NULLS FIRST) AS \"NFHS-5 Vaccination %\", \"Children age 12-23 months fully vaccinated (%)\" - LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\", \"State\" ORDER BY \"Survey Round\" NULLS FIRST) AS \"Change in Percentage Points\" FROM \"district_health_factsheet\" WHERE \"State\" = 'Bihar' AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') ORDER BY \"District\" NULLS FIRST, \"Survey Round\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nBihar district wise full vaccination change from NFHS-4 to NFHS-5 in percentage points",
+      "response": "SELECT \n  \"District\",\n  \"State\",\n  \"Survey Round\",\n  \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-4 Vaccination %\",\n  LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\", \"State\" ORDER BY \"Survey Round\") AS \"NFHS-5 Vaccination %\",\n  \"Children age 12-23 months fully vaccinated (%)\" - LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\", \"State\" ORDER BY \"Survey Round\") AS \"Change in Percentage Points\"\nFROM \n  \"district_health_factsheet\"\nWHERE \n  \"State\" = 'Bihar'\n  AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')\nORDER BY \n  \"District\", \"Survey Round\";",
+      "api": {
+        "id": "chatcmpl-0BYFwCnBEC2GAi4fsoHzFEJ58uTVRH5Z",
+        "model": "/models/Qwen3.5-9B-Q4_K_M.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 201,
+          "prompt_tokens": 629,
+          "total_tokens": 830,
+          "prompt_tokens_details": {
+            "cached_tokens": 418
+          }
+        },
+        "duration_seconds": 13.566
+      },
+      "duration_seconds": 13.581,
+      "sql_duckdb": "SELECT \"District\", \"State\", \"Survey Round\", \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-4 Vaccination %\", LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\", \"State\" ORDER BY \"Survey Round\" NULLS FIRST) AS \"NFHS-5 Vaccination %\", \"Children age 12-23 months fully vaccinated (%)\" - LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\", \"State\" ORDER BY \"Survey Round\" NULLS FIRST) AS \"Change in Percentage Points\" FROM \"district_health_factsheet\" WHERE \"State\" = 'Bihar' AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') ORDER BY \"District\" NULLS FIRST, \"Survey Round\" NULLS FIRST",
+      "rows": [
+        [
+          "Bhojpur",
+          "Bihar",
+          "NFHS-4",
+          60.7,
+          null,
+          null
+        ],
+        [
+          "Bhojpur",
+          "Bihar",
+          "NFHS-5",
+          54.9,
+          60.7,
+          -5.800000000000004
+        ],
+        [
+          "Gaya",
+          "Bihar",
+          "NFHS-4",
+          47.5,
+          null,
+          null
+        ],
+        [
+          "Gaya",
+          "Bihar",
+          "NFHS-5",
+          55.3,
+          47.5,
+          7.799999999999997
+        ],
+        [
+          "Kishanganj",
+          "Bihar",
+          "NFHS-4",
+          58.6,
+          null,
+          null
+        ],
+        [
+          "Kishanganj",
+          "Bihar",
+          "NFHS-5",
+          61.4,
+          58.6,
+          2.799999999999997
+        ],
+        [
+          "Madhubani",
+          "Bihar",
+          "NFHS-4",
+          50.1,
+          null,
+          null
+        ],
+        [
+          "Madhubani",
+          "Bihar",
+          "NFHS-5",
+          53.3,
+          50.1,
+          3.1999999999999957
+        ],
+        [
+          "Nalanda",
+          "Bihar",
+          "NFHS-4",
+          56.6,
+          null,
+          null
+        ],
+        [
+          "Nalanda",
+          "Bihar",
+          "NFHS-5",
+          62.3,
+          56.6,
+          5.699999999999996
+        ],
+        [
+          "Purnia",
+          "Bihar",
+          "NFHS-4",
+          46.8,
+          null,
+          null
+        ],
+        [
+          "Purnia",
+          "Bihar",
+          "NFHS-5",
+          43.4,
+          46.8,
+          -3.3999999999999986
+        ],
+        [
+          "Rohtas",
+          "Bihar",
+          "NFHS-4",
+          68.5,
+          null,
+          null
+        ],
+        [
+          "Rohtas",
+          "Bihar",
+          "NFHS-5",
+          66.6,
+          68.5,
+          -1.9000000000000057
+        ],
+        [
+          "Saran",
+          "Bihar",
+          "NFHS-4",
+          66.3,
+          null,
+          null
+        ],
+        [
+          "Saran",
+          "Bihar",
+          "NFHS-5",
+          70.3,
+          66.3,
+          4.0
+        ],
+        [
+          "State Total",
+          "Bihar",
+          "NFHS-4",
+          56.9,
+          null,
+          null
+        ],
+        [
+          "State Total",
+          "Bihar",
+          "NFHS-5",
+          58.4,
+          56.9,
+          1.5
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

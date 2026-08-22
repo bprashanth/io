@@ -1,0 +1,204 @@
+{
+ "plan": {
+  "title": "Scholarship Scheme Progress by District",
+  "subtitle": "Pending cases and approval status distribution across districts for all schemes",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Pending Applications",
+    "sql": "SELECT COUNT(*) AS n FROM scholarship_applicants WHERE \"Status\" = 'Pending'",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Highest Pending Cases",
+    "sql": "SELECT \"District\", COUNT(*) AS pending FROM scholarship_applicants WHERE \"Status\" = 'Pending' GROUP BY 1 ORDER BY 2 DESC LIMIT 1",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Pending Applications by District",
+    "sql": "SELECT \"District\", COUNT(*) AS pending FROM scholarship_applicants WHERE \"Status\" = 'Pending' GROUP BY 1 ORDER BY 2 DESC",
+    "x": "District",
+    "y": [
+     "pending"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "stacked_bar",
+    "title": "Status Distribution by District",
+    "sql": "SELECT \"District\", COUNT(*) AS total, SUM(CASE WHEN \"Status\" = 'Pending' THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN \"Status\" IN ('Approved', 'Disbursed') THEN 1 ELSE 0 END) AS approved FROM scholarship_applicants GROUP BY 1 ORDER BY 1",
+    "x": "District",
+    "y": [
+     "pending",
+     "approved"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top 5 Districts by Pending Applications",
+    "sql": "SELECT \"District\", COUNT(*) AS pending, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM scholarship_applicants WHERE \"Status\" = 'Pending'), 1) AS pct FROM scholarship_applicants WHERE \"Status\" = 'Pending' GROUP BY 1 ORDER BY 2 DESC LIMIT 5"
+   },
+   {
+    "id": "p6",
+    "kind": "pie",
+    "title": "Pending Applications by Scheme",
+    "sql": "SELECT \"Name of scheme\", COUNT(*) AS pending FROM scholarship_applicants WHERE \"Status\" = 'Pending' GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Name of scheme",
+    "y": [
+     "pending"
+    ]
+   }
+  ],
+  "narrative": "The scholarship scheme progress reveals {{p1}} pending applications across all districts. {{p2}} district has the highest pending cases with {{p2.pending}} applications. The bar chart shows the distribution of pending cases, with {{p3.y[0][0]}} district having the most pending applications. The stacked bar chart reveals that {{p4.y[0][0]}} district has the largest proportion of pending cases relative to total applications, while {{p4.y[1][0]}} district has the highest number of approved/disbursed cases. The top 5 districts by pending cases are {{p5.District[0]}} ({{p5.pending[0]}} cases, {{p5.pct[0]}}% of total), {{p5.District[1]}} ({{p5.pending[1]}} cases, {{p5.pct[1]}}%), and {{p5.District[2]}} ({{p5.pending[2]}} cases, {{p5.pct[2]}}%). The pie chart highlights that the {{p6.x[0]}} scheme has the most pending applications, followed by {{p6.x[1]}} and {{p6.x[2]}}. These insights suggest targeted follow-ups are needed in districts with the highest pending cases."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 60
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "District",
+    "pending"
+   ],
+   "rows": [
+    {
+     "District": "Muzaffarpur",
+     "pending": 25
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "District",
+    "pending"
+   ],
+   "rows": [
+    {
+     "District": "Muzaffarpur",
+     "pending": 25
+    },
+    {
+     "District": "Gaya",
+     "pending": 20
+    },
+    {
+     "District": "Pune",
+     "pending": 15
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "District",
+    "total",
+    "pending",
+    "approved"
+   ],
+   "rows": [
+    {
+     "District": "Gaya",
+     "total": 96,
+     "pending": 20,
+     "approved": 34
+    },
+    {
+     "District": "Muzaffarpur",
+     "total": 105,
+     "pending": 25,
+     "approved": 30
+    },
+    {
+     "District": "Pune",
+     "total": 99,
+     "pending": 15,
+     "approved": 39
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "District",
+    "pending",
+    "pct"
+   ],
+   "rows": [
+    {
+     "District": "Muzaffarpur",
+     "pending": 25,
+     "pct": 41.7
+    },
+    {
+     "District": "Gaya",
+     "pending": 20,
+     "pct": 33.3
+    },
+    {
+     "District": "Pune",
+     "pending": 15,
+     "pct": 25.0
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Name of scheme",
+    "pending"
+   ],
+   "rows": [
+    {
+     "Name of scheme": "Post-Matric Scholarship Scheme",
+     "pending": 14
+    },
+    {
+     "Name of scheme": "EBC Scholarship Scheme",
+     "pending": 11
+    },
+    {
+     "Name of scheme": "Merit-cum-Means Scholarship",
+     "pending": 9
+    },
+    {
+     "Name of scheme": "Savitribai Phule Scholarship",
+     "pending": 9
+    },
+    {
+     "Name of scheme": "Minority Welfare Scholarship",
+     "pending": 9
+    },
+    {
+     "Name of scheme": "Rajarshi Shahu Maharaj Scholarship",
+     "pending": 4
+    },
+    {
+     "Name of scheme": "Pre-Matric Scholarship Scheme",
+     "pending": 4
+    }
+   ],
+   "rowcount": 7,
+   "error": null
+  }
+ }
+}

@@ -1,0 +1,65 @@
+{
+ "plan": {
+  "title": "Improvement by Gender",
+  "subtitle": "Are girls and boys improving equally?",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Girls improving",
+    "sql": "SELECT COUNT(*) AS n FROM (SELECT * FROM baseline WHERE Gender = 'Female') INTERSECT SELECT * FROM endline WHERE Gender = 'Female'",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Boys improving",
+    "sql": "SELECT COUNT(*) AS n FROM (SELECT * FROM baseline WHERE Gender = 'Male') INTERSECT SELECT * FROM endline WHERE Gender = 'Male'",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Average shuttle run by gender",
+    "sql": "SELECT Gender, AVG(CASE WHEN baseline.\"Shuttle run sec\" IS NULL THEN NULL ELSE baseline.\"Shuttle run sec\" END) AS avg_shuttle FROM baseline INTERSECT SELECT Gender, AVG(CASE WHEN endline.\"Shuttle run sec\" IS NULL THEN NULL ELSE endline.\"Shuttle run sec\" END) AS avg_shuttle FROM endline GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Gender",
+    "y": [
+     "avg_shuttle"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Girls and boys by location",
+    "sql": "SELECT Gender, Location, COUNT(*) AS n FROM baseline INTERSECT SELECT Gender, Location, COUNT(*) AS n FROM endline GROUP BY 1, 2"
+   }
+  ],
+  "narrative": "Girls {{p1.n}} and boys {{p2.n}}. The average shuttle run for girls is {{p3.avg_shuttle}} and for boys is {{p3.avg_shuttle}}. The number of girls and boys by location is {{p4.n}}."
+ },
+ "results": {
+  "p1": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Set operations can only apply to expressions with the same number of result columns"
+  },
+  "p2": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Set operations can only apply to expressions with the same number of result columns"
+  },
+  "p3": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: column \"Gender\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Gender)\" if the exact value of \"Gender\" is not important.\n\nLINE 1: SELECT Gender, AVG(CASE WHEN baseline.\"Shuttle run sec\""
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: column \"Gender\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Gender)\" if the exact value of \"Gender\" is not important.\n\nLINE 1: SELECT Gender, Location, COUNT(*) AS n FROM baseline IN"
+  }
+ }
+}

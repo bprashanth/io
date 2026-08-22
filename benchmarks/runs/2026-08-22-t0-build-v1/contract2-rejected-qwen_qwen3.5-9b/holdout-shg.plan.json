@@ -1,0 +1,216 @@
+{
+ "plan": {
+  "title": "SHG Loan Repayment & Purpose",
+  "subtitle": "Overview of loan status and usage across blocks",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total loans disbursed",
+    "sql": "SELECT COUNT(*) AS n FROM \"shg_loan_register\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total amount repaid",
+    "sql": "SELECT COALESCE(SUM(\"Amount Repaid (Rs)\"), 0) AS n FROM \"shg_loan_register\"",
+    "unit": "Rs"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Total loan amount",
+    "sql": "SELECT COALESCE(SUM(\"Loan Amount (Rs)\"), 0) AS n FROM \"shg_loan_register\"",
+    "unit": "Rs"
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Repayment status distribution",
+    "sql": "SELECT \"Repayment Status\" AS status, COUNT(*) AS count FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "status",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Loan purpose breakdown",
+    "sql": "SELECT \"Purpose\" AS purpose, COUNT(*) AS count FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "purpose",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Repayment performance by block",
+    "sql": "SELECT \"Block\", COUNT(*) AS total_loans, SUM(\"Amount Repaid (Rs)\") AS repaid, SUM(\"Loan Amount (Rs)\") AS total, COALESCE(SUM(\"Amount Repaid (Rs)\"), 0) * 100.0 / NULLIF(SUM(\"Loan Amount (Rs)\"), 0) AS recovery_pct FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 3 DESC LIMIT 10",
+    "x": "block",
+    "y": [
+     "total_loans",
+     "repaid",
+     "total",
+     "recovery_pct"
+    ]
+   }
+  ],
+  "narrative": "The dashboard displays the total number of loans disbursed and the aggregate amounts involved. It highlights the recovery rate by comparing total repaid against total loaned.\n\nThe bar charts break down the portfolio by repayment status and loan purpose, showing where the majority of funds are directed and how many loans are currently overdue or regular.\n\nThe final table details performance at the block level, listing the top blocks by total loan volume and their specific recovery percentages.",
+  "missing": [
+   "average loan size",
+   "overdue amount"
+  ]
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 11368300.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 17815000
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "status",
+    "count"
+   ],
+   "rows": [
+    {
+     "status": "Regular",
+     "count": 156
+    },
+    {
+     "status": "Closed",
+     "count": 144
+    },
+    {
+     "status": "Overdue",
+     "count": 60
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "purpose",
+    "count"
+   ],
+   "rows": [
+    {
+     "purpose": "Agriculture",
+     "count": 106
+    },
+    {
+     "purpose": "Livestock",
+     "count": 79
+    },
+    {
+     "purpose": "Petty trade",
+     "count": 66
+    },
+    {
+     "purpose": "Health",
+     "count": 46
+    },
+    {
+     "purpose": "Housing",
+     "count": 32
+    },
+    {
+     "purpose": "Education",
+     "count": 31
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Block",
+    "total_loans",
+    "repaid",
+    "total",
+    "recovery_pct"
+   ],
+   "rows": [
+    {
+     "Block": "Fatehpur",
+     "total_loans": 64,
+     "repaid": 2083800.0,
+     "total": 3305000,
+     "recovery_pct": 63.0499243570348
+    },
+    {
+     "Block": "Belaganj",
+     "total_loans": 65,
+     "repaid": 1996600.0,
+     "total": 3170000,
+     "recovery_pct": 62.98422712933754
+    },
+    {
+     "Block": "Dobhi",
+     "total_loans": 57,
+     "repaid": 1903900.0,
+     "total": 2765000,
+     "recovery_pct": 68.85714285714286
+    },
+    {
+     "Block": "Barachatti",
+     "total_loans": 56,
+     "repaid": 1889000.0,
+     "total": 2790000,
+     "recovery_pct": 67.70609318996416
+    },
+    {
+     "Block": "Wazirganj",
+     "total_loans": 66,
+     "repaid": 1857900.0,
+     "total": 3165000,
+     "recovery_pct": 58.70142180094787
+    },
+    {
+     "Block": "Atri",
+     "total_loans": 52,
+     "repaid": 1637100.0,
+     "total": 2620000,
+     "recovery_pct": 62.48473282442748
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  }
+ }
+}

@@ -1,0 +1,229 @@
+{
+ "plan": {
+  "title": "Fitness Programme Impact Summary",
+  "subtitle": "Overview of participant growth and performance changes from baseline to endline",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total participants",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM \"baseline\" UNION ALL SELECT COUNT(DISTINCT \"Child ID\") AS n FROM \"endline\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Average height gain by location",
+    "sql": "WITH joined AS (SELECT b.\"Child ID\", b.\"Location\", b.\"Height cm\" AS h1, e.\"Height cm\" AS h2 FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), gains AS (SELECT \"Location\", AVG(h2 - h1) AS avg_gain FROM joined WHERE h2 IS NOT NULL AND h1 IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10) SELECT \"Location\", avg_gain FROM gains",
+    "x": "Location",
+    "y": [
+     "avg_gain"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Average sit-ups improvement by coach",
+    "sql": "WITH joined AS (SELECT b.\"Child ID\", b.\"Coach\", b.\"Sit ups\" AS s1, e.\"Sit ups\" AS s2 FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), gains AS (SELECT \"Coach\", AVG(s2 - s1) AS avg_gain FROM joined WHERE s2 IS NOT NULL AND s1 IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10) SELECT \"Coach\", avg_gain FROM gains",
+    "x": "Coach",
+    "y": [
+     "avg_gain"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Top 10 individual height improvements",
+    "sql": "WITH joined AS (SELECT b.\"Child ID\", b.\"Child name\", b.\"Location\", b.\"Height cm\" AS h1, e.\"Height cm\" AS h2 FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), gains AS (SELECT \"Child name\", \"Location\", (h2 - h1) AS improvement FROM joined WHERE h2 IS NOT NULL AND h1 IS NOT NULL ORDER BY 3 DESC LIMIT 10) SELECT * FROM gains",
+    "x": "Child name",
+    "y": [
+     "improvement"
+    ]
+   }
+  ],
+  "narrative": "The programme engaged {{p1}} unique children across multiple locations. Analysis of physical metrics reveals significant growth, with the average height increase varying by region, led by {{p2}} in the top-performing location. Strength improvements were also notable, with coaches like {{p3}} showing the highest average gains in sit-ups among their assigned groups. Individual success stories highlight the programme's effectiveness, with the top performer achieving a height increase of {{p4}}.",
+  "missing": [
+   "disbursed amount",
+   "attendance rate",
+   "injury count"
+  ]
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    },
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "Location",
+    "avg_gain"
+   ],
+   "rows": [
+    {
+     "Location": "Nira",
+     "avg_gain": 21.69999999999999
+    },
+    {
+     "Location": "Kalyanpur",
+     "avg_gain": 20.899999999999995
+    },
+    {
+     "Location": "Alandi",
+     "avg_gain": 20.300000000000004
+    },
+    {
+     "Location": "Paroo",
+     "avg_gain": 20.020000000000007
+    },
+    {
+     "Location": "Dehu",
+     "avg_gain": 19.73333333333333
+    },
+    {
+     "Location": "Bakhtiyarpur Tola",
+     "avg_gain": 18.487499999999997
+    },
+    {
+     "Location": "Manjari",
+     "avg_gain": 16.96666666666667
+    },
+    {
+     "Location": "Barachatti",
+     "avg_gain": 15.099999999999994
+    },
+    {
+     "Location": "Sahebganj",
+     "avg_gain": 15.019999999999992
+    },
+    {
+     "Location": "Chandwara",
+     "avg_gain": 11.825
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Coach",
+    "avg_gain"
+   ],
+   "rows": [
+    {
+     "Coach": "T. S. Fernandez",
+     "avg_gain": 11.090909090909092
+    },
+    {
+     "Coach": "Vimla",
+     "avg_gain": 8.615384615384615
+    },
+    {
+     "Coach": "Jaspreet George",
+     "avg_gain": 7.461538461538462
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "avg_gain": 6.285714285714286
+    },
+    {
+     "Coach": "sunil thakur",
+     "avg_gain": 5.117647058823529
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "avg_gain": 3.888888888888889
+    },
+    {
+     "Coach": "Bhagyashree",
+     "avg_gain": 1.6923076923076923
+    },
+    {
+     "Coach": "indira chandra",
+     "avg_gain": 1.2777777777777777
+    },
+    {
+     "Coach": "Rosy",
+     "avg_gain": 1.1111111111111112
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "avg_gain": 0.7058823529411765
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Child name",
+    "Location",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Child name": "Jadhav Francis",
+     "Location": "Kalyanpur",
+     "improvement": 49.400000000000006
+    },
+    {
+     "Child name": "Vinod Mishra",
+     "Location": "Bakhtiyarpur Tola",
+     "improvement": 46.30000000000001
+    },
+    {
+     "Child name": "Sudha Tiwari",
+     "Location": "Nanded Phata",
+     "improvement": 46.3
+    },
+    {
+     "Child name": "Nitin Shinde",
+     "Location": "Sahebganj",
+     "improvement": 45.70000000000002
+    },
+    {
+     "Child name": "Farooq Sharma",
+     "Location": "Dehu",
+     "improvement": 45.0
+    },
+    {
+     "Child name": "Vishal Chaudhary",
+     "Location": "Dehu",
+     "improvement": 44.099999999999994
+    },
+    {
+     "Child name": "Gadhave Shakuntala",
+     "Location": "Harnaut Tola",
+     "improvement": 40.60000000000001
+    },
+    {
+     "Child name": "Iyengar Sudha",
+     "Location": "Supa",
+     "improvement": 38.5
+    },
+    {
+     "Child name": "Navjot Rai",
+     "Location": "Talegaon Dhamdhere",
+     "improvement": 38.29999999999998
+    },
+    {
+     "Child name": "Francis Prasad",
+     "Location": "Barachatti",
+     "improvement": 37.60000000000001
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

@@ -1,0 +1,92 @@
+{
+  "id": "attendance-biggest-drop-p01",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "which centre saw the biggest fall in attendance rate from 2023 to 2024",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": true,
+  "sql_duckdb": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nwhich centre saw the biggest fall in attendance rate from 2023 to 2024",
+      "response": "```sql\nSELECT\n  a.Centre\nFROM attendance_2023 AS a\nJOIN attendance_2024 AS b\n  ON a.Centre = b.centre_name\nWHERE\n  a.Month = b.month\n  AND a.Enrolled Kids IS NOT NULL\n  AND b.enrolment IS NOT NULL\n  AND a.Avg Daily Present IS NOT NULL\n  AND b.average_attendance IS NOT NULL\nORDER BY\n  (b.average_attendance - a.Avg Daily Present) DESC\nLIMIT 1;\n```",
+      "api": {
+        "id": "gen-1787420991-b8pUhkvNGFiOnwaZvIcs",
+        "model": "google/gemma-3n-e4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 536,
+          "completion_tokens": 123,
+          "total_tokens": 659,
+          "cost": 4.692e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.692e-05,
+            "upstream_inference_prompt_cost": 3.216e-05,
+            "upstream_inference_completions_cost": 1.476e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.19
+      },
+      "duration_seconds": 3.191,
+      "error": "ParseError: Invalid expression / Unexpected token. Line 8, Col: 21.\n  \nJOIN attendance_2024 AS b\n  ON a.Centre = b.centre_name\nWHERE\n  a.Month = b.month\n  AND a.Enrolled \u001b[4mKids\u001b[0m IS NOT NULL\n  AND b.enrolment IS NOT NULL\n  AND a.Avg Daily Present IS NOT NULL\n  AND b.average_att"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nwhich centre saw the biggest fall in attendance rate from 2023 to 2024\n\nREJECTED QUERY ERROR:\nParseError: Invalid expression / Unexpected token. Line 8, Col: 21.\n  \nJOIN attendance_2024 AS b\n  ON a.Centre = b.centre_name\nWHERE\n  a.Month = b.month\n  AND a.Enrolled \u001b[4mKids\u001b[0m IS NOT NULL\n  AND b.enrolment IS NOT NULL\n  AND a.Avg Daily Present IS NOT NULL\n  AND b.average_att\nReturn a complete corrected query.",
+      "response": "```sql\nSELECT\n  a.Centre\nFROM attendance_2023 AS a\nJOIN attendance_2024 AS b\n  ON a.Centre = b.centre_name\nWHERE\n  a.Month = b.month\n  AND a.Enrolled Kids IS NOT NULL\n  AND b.enrolment IS NOT NULL\n  AND a.Avg Daily Present IS NOT NULL\n  AND b.average_attendance IS NOT NULL\nORDER BY\n  (b.average_attendance - a.Avg Daily Present) DESC\nLIMIT 1;\n```",
+      "api": {
+        "id": "gen-1787420995-VRStqy3qStULqgqWQnTz",
+        "model": "google/gemma-3n-e4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 653,
+          "completion_tokens": 123,
+          "total_tokens": 776,
+          "cost": 5.394e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.394e-05,
+            "upstream_inference_prompt_cost": 3.918e-05,
+            "upstream_inference_completions_cost": 1.476e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.709
+      },
+      "duration_seconds": 2.71,
+      "error": "ParseError: Invalid expression / Unexpected token. Line 8, Col: 21.\n  \nJOIN attendance_2024 AS b\n  ON a.Centre = b.centre_name\nWHERE\n  a.Month = b.month\n  AND a.Enrolled \u001b[4mKids\u001b[0m IS NOT NULL\n  AND b.enrolment IS NOT NULL\n  AND a.Avg Daily Present IS NOT NULL\n  AND b.average_att"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

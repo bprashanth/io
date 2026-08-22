@@ -1,0 +1,91 @@
+{
+  "id": "derived-rate-ranking-p02",
+  "task_id": "derived-rate-ranking",
+  "pattern": "filter, derive a comparable percentage, rank",
+  "question": "for 2023 compare districts by fully immunised out of children due, top to bottom",
+  "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+  "expected_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH district_rates AS (SELECT district, children_fully_immunised, children_due, (children_fully_immunised * 100.0) / NULLIF(NULLIF(children_due, 0), 0) AS immunisation_rate FROM immunisation WHERE year = 2023 AND district IN ('Gaya', 'Nalanda', 'Purnia') AND source = 'synthetic smoke fixture') SELECT district, immunisation_rate FROM district_rates ORDER BY immunisation_rate DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"immunisation\": {\"district\": [\"Gaya\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic smoke fixture\"]}}\n\nCURRENT QUESTION:\nfor 2023 compare districts by fully immunised out of children due, top to bottom",
+      "response": "```sql\nWITH district_rates AS (\n  SELECT\n    district,\n    children_fully_immunised,\n    children_due,\n    (children_fully_immunised * 100.0) / NULLIF(children_due, 0) AS immunisation_rate\n  FROM immunisation\n  WHERE year = 2023\n    AND district IN ('Gaya', 'Nalanda', 'Purnia')\n    AND source = 'synthetic smoke fixture'\n)\nSELECT\n  district,\n  immunisation_rate\nFROM district_rates\nORDER BY immunisation_rate DESC\n```",
+      "api": {
+        "id": "gen-1787421078-EKYgb04pEKkA5zwLc6p3",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 291,
+          "completion_tokens": 129,
+          "total_tokens": 420,
+          "cost": 3.792e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 3.792e-05,
+            "upstream_inference_prompt_cost": 1.212e-05,
+            "upstream_inference_completions_cost": 2.58e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.476
+      },
+      "duration_seconds": 1.48,
+      "sql_duckdb": "WITH district_rates AS (SELECT district, children_fully_immunised, children_due, (children_fully_immunised * 100.0) / NULLIF(NULLIF(children_due, 0), 0) AS immunisation_rate FROM immunisation WHERE year = 2023 AND district IN ('Gaya', 'Nalanda', 'Purnia') AND source = 'synthetic smoke fixture') SELECT district, immunisation_rate FROM district_rates ORDER BY immunisation_rate DESC",
+      "rows": [
+        [
+          "Nalanda",
+          90.0
+        ],
+        [
+          "Gaya",
+          85.0
+        ],
+        [
+          "Purnia",
+          76.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

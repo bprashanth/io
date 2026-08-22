@@ -1,0 +1,172 @@
+{
+ "plan": {
+  "title": "Gender Equity in Physical Progress",
+  "subtitle": "Comparing baseline to endline performance improvements between boys and girls",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Girls Tracked",
+    "sql": "SELECT COUNT(*) AS n FROM (SELECT \"Child ID\" FROM \"baseline\" WHERE \"Gender\" = 'Female' UNION SELECT \"Child ID\" FROM \"endline\" WHERE \"Gender\" = 'Female') AS unique_girls",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Boys Tracked",
+    "sql": "SELECT COUNT(*) AS n FROM (SELECT \"Child ID\" FROM \"baseline\" WHERE \"Gender\" = 'Male' UNION SELECT \"Child ID\" FROM \"endline\" WHERE \"Gender\" = 'Male') AS unique_boys",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Avg Shuttle Run Improvement (Seconds)",
+    "sql": "WITH combined AS (\n  SELECT \"Child ID\", \"Gender\", \"Shuttle run sec\" AS baseline_val, NULL AS endline_val FROM \"baseline\"\n  UNION ALL\n  SELECT \"Child ID\", \"Gender\", NULL AS baseline_val, \"Shuttle run sec\" AS endline_val FROM \"endline\"\n),\nmatched AS (\n  SELECT \n    c1.\"Gender\",\n    c1.baseline_val,\n    c2.endline_val,\n    (c1.baseline_val - c2.endline_val) AS improvement_sec\n  FROM combined c1\n  JOIN combined c2 ON c1.\"Child ID\" = c2.\"Child ID\" AND c1.\"Gender\" = c2.\"Gender\"\n  WHERE c1.baseline_val IS NOT NULL AND c2.endline_val IS NOT NULL\n)\nSELECT \"Gender\", AVG(improvement_sec) AS avg_improvement FROM matched GROUP BY 1 ORDER BY 2 DESC",
+    "x": "gender",
+    "y": [
+     "avg_improvement"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Avg Sit Ups Improvement (Count)",
+    "sql": "WITH combined AS (\n  SELECT \"Child ID\", \"Gender\", \"Sit ups\" AS baseline_val, NULL AS endline_val FROM \"baseline\"\n  UNION ALL\n  SELECT \"Child ID\", \"Gender\", NULL AS baseline_val, \"Sit ups\" AS endline_val FROM \"endline\"\n),\nmatched AS (\n  SELECT \n    c1.\"Gender\",\n    c1.baseline_val,\n    c2.endline_val,\n    (c2.endline_val - c1.baseline_val) AS improvement_count\n  FROM combined c1\n  JOIN combined c2 ON c1.\"Child ID\" = c2.\"Child ID\" AND c1.\"Gender\" = c2.\"Gender\"\n  WHERE c1.baseline_val IS NOT NULL AND c2.endline_val IS NOT NULL\n)\nSELECT \"Gender\", AVG(improvement_count) AS avg_improvement FROM matched GROUP BY 1 ORDER BY 2 DESC",
+    "x": "gender",
+    "y": [
+     "avg_improvement"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top 10 Improvers by Gender",
+    "sql": "WITH combined AS (\n  SELECT \"Child ID\", \"Gender\", \"Shuttle run sec\" AS baseline_val, NULL AS endline_val FROM \"baseline\"\n  UNION ALL\n  SELECT \"Child ID\", \"Gender\", NULL AS baseline_val, \"Shuttle run sec\" AS endline_val FROM \"endline\"\n),\nmatched AS (\n  SELECT \n    c1.\"Child ID\",\n    c1.\"Gender\",\n    c1.baseline_val,\n    c2.endline_val,\n    (c1.baseline_val - c2.endline_val) AS shuttle_improvement\n  FROM combined c1\n  JOIN combined c2 ON c1.\"Child ID\" = c2.\"Child ID\" AND c1.\"Gender\" = c2.\"Gender\"\n  WHERE c1.baseline_val IS NOT NULL AND c2.endline_val IS NOT NULL\n)\nSELECT \"Child ID\", \"Gender\", ROUND(shuttle_improvement, 2) AS shuttle_gain FROM matched ORDER BY shuttle_improvement DESC LIMIT 10"
+   }
+  ],
+  "narrative": "This dashboard compares the physical development of boys and girls from baseline to endline measurements. We track {{p1}} girls and {{p2}} boys who have complete records for both time periods.\n\nIn terms of speed and agility, measured by the shuttle run test, one gender shows an average improvement of {{p3.avg_improvement}} seconds, while the other improved by {{p3.avg_improvement}} seconds (note: lower time is better). This indicates whether the training program benefits one group more than the other in cardiovascular endurance.\n\nFor core strength, measured by sit-ups, the data reveals that one gender increased their average count by {{p4.avg_improvement}} repetitions compared to the other. A positive number here signifies a gain in muscle endurance over the program duration.\n\nThe table below highlights the top 10 individual performers across both genders based on shuttle run gains, allowing us to see if specific outliers are driving the averages or if the trend is consistent across the population."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 88
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 112
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Gender",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "Gender": "Male",
+     "avg_improvement": 0.014285714285714615
+    },
+    {
+     "Gender": "Female",
+     "avg_improvement": 0.012500000000000016
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Gender",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "Gender": "Male",
+     "avg_improvement": 3.4464285714285716
+    },
+    {
+     "Gender": "Female",
+     "avg_improvement": 2.2386363636363638
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Child ID",
+    "Gender",
+    "shuttle_gain"
+   ],
+   "rows": [
+    {
+     "Child ID": "CFS0150",
+     "Gender": "Male",
+     "shuttle_gain": 8.4
+    },
+    {
+     "Child ID": "CFS0165",
+     "Gender": "Male",
+     "shuttle_gain": 8.0
+    },
+    {
+     "Child ID": "CFS0118",
+     "Gender": "Male",
+     "shuttle_gain": 7.9
+    },
+    {
+     "Child ID": "CFS0004",
+     "Gender": "Female",
+     "shuttle_gain": 7.3
+    },
+    {
+     "Child ID": "CFS0182",
+     "Gender": "Male",
+     "shuttle_gain": 6.7
+    },
+    {
+     "Child ID": "CFS0014",
+     "Gender": "Male",
+     "shuttle_gain": 6.6
+    },
+    {
+     "Child ID": "CFS0145",
+     "Gender": "Male",
+     "shuttle_gain": 5.9
+    },
+    {
+     "Child ID": "CFS0091",
+     "Gender": "Female",
+     "shuttle_gain": 5.5
+    },
+    {
+     "Child ID": "CFS0049",
+     "Gender": "Female",
+     "shuttle_gain": 5.4
+    },
+    {
+     "Child ID": "CFS0089",
+     "Gender": "Female",
+     "shuttle_gain": 5.2
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

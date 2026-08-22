@@ -1,0 +1,103 @@
+{
+  "id": "derived-rate-lowest-first-p01",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "2023 employment after 6 months as percent of enrolled, lowest district first",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT district, (SUM(employed_at_6_months) * 100.0 / NULLIF(NULLIF(SUM(women_enrolled), 0), 0)) AS percent_employed FROM livelihoods WHERE year = 2023 GROUP BY district ORDER BY percent_employed ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\n2023 employment after 6 months as percent of enrolled, lowest district first",
+      "response": "```sql\nSELECT\n    district,\n    (SUM(employed_at_6_months) * 100.0 / NULLIF(SUM(women_enrolled), 0)) AS percent_employed\nFROM livelihoods\nWHERE year = 2023\nGROUP BY district\nORDER BY percent_employed ASC;\n```",
+      "api": {
+        "id": "gen-1787421220-FRVUtU0cfM3heep9KU9f",
+        "model": "ibm-granite/granite-4.1-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 301,
+          "completion_tokens": 65,
+          "total_tokens": 366,
+          "cost": 2.155e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 160,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 2.155e-05,
+            "upstream_inference_prompt_cost": 1.505e-05,
+            "upstream_inference_completions_cost": 6.5e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 0.818
+      },
+      "duration_seconds": 0.823,
+      "sql_duckdb": "SELECT district, (SUM(employed_at_6_months) * 100.0 / NULLIF(NULLIF(SUM(women_enrolled), 0), 0)) AS percent_employed FROM livelihoods WHERE year = 2023 GROUP BY district ORDER BY percent_employed ASC NULLS FIRST",
+      "rows": [
+        [
+          "Kishanganj",
+          38.0
+        ],
+        [
+          "Purnia",
+          46.0
+        ],
+        [
+          "Gaya",
+          56.0
+        ],
+        [
+          "Nalanda",
+          65.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

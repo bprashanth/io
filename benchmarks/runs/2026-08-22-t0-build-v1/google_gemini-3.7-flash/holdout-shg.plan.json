@@ -1,0 +1,256 @@
+{
+ "plan": {
+  "title": "SHG Loan Portfolio & Repayment Performance",
+  "subtitle": "Analysis of loan disbursements, repayment recovery rates, purpose distribution, and overdue exposures across blocks",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Loans Disbursed",
+    "sql": "SELECT COUNT(\"Loan ID\") AS total_loans FROM \"shg_loan_register\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Overall Recovery Rate",
+    "sql": "SELECT ROUND(SUM(\"Amount Repaid (Rs)\") * 100.0 / NULLIF(SUM(\"Loan Amount (Rs)\"), 0), 1) AS recovery_rate FROM \"shg_loan_register\"",
+    "unit": "%"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Overdue Loan Count",
+    "sql": "SELECT COUNT(*) AS overdue_count FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue'",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "kpi",
+    "title": "Overdue Principal Amount",
+    "sql": "SELECT SUM(\"Loan Amount (Rs)\") AS overdue_amount FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue'",
+    "unit": "Rs"
+   },
+   {
+    "id": "p5",
+    "kind": "pie",
+    "title": "Loans by Purpose",
+    "sql": "SELECT \"Purpose\" AS purpose, SUM(\"Loan Amount (Rs)\") AS total_amount FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "purpose",
+    "y": "total_amount"
+   },
+   {
+    "id": "p6",
+    "kind": "bar",
+    "title": "Disbursement and Repayment by Block",
+    "sql": "SELECT \"Block\" AS block, SUM(\"Loan Amount (Rs)\") AS disbursed, SUM(\"Amount Repaid (Rs)\") AS repaid FROM \"shg_loan_register\" GROUP BY 1 ORDER BY disbursed DESC",
+    "x": "block",
+    "y": [
+     "disbursed",
+     "repaid"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Block-wise Repayment Status & Overdue Breakdown",
+    "sql": "SELECT \"Block\" AS block, COUNT(\"Loan ID\") AS total_loans, SUM(\"Loan Amount (Rs)\") AS total_disbursed, SUM(\"Amount Repaid (Rs)\") AS total_repaid, ROUND(SUM(\"Amount Repaid (Rs)\") * 100.0 / NULLIF(SUM(\"Loan Amount (Rs)\"), 0), 1) AS recovery_pct, SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS overdue_principal FROM \"shg_loan_register\" GROUP BY 1 ORDER BY total_disbursed DESC"
+   }
+  ],
+  "narrative": "Across the operational blocks, a total of {{p1}} SHG loans have been issued. The overall portfolio exhibits an aggregate recovery rate of {{p2}}%, reflecting steady repayments alongside outstanding obligations.\n\nHowever, portfolio quality requires monitoring, with {{p3}} accounts currently categorized as overdue, representing an aggregate principal at risk of Rs {{p4}}. Loan utilization spans multiple sectors including agriculture, livestock, petty trade, and family welfare, with regional variations evident across blocks."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_loans"
+   ],
+   "rows": [
+    {
+     "total_loans": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "recovery_rate"
+   ],
+   "rows": [
+    {
+     "recovery_rate": 63.8
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "overdue_count"
+   ],
+   "rows": [
+    {
+     "overdue_count": 60
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "overdue_amount"
+   ],
+   "rows": [
+    {
+     "overdue_amount": 3110000
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "purpose",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "purpose": "Agriculture",
+     "total_amount": 5335000
+    },
+    {
+     "purpose": "Livestock",
+     "total_amount": 3565000
+    },
+    {
+     "purpose": "Petty trade",
+     "total_amount": 2795000
+    },
+    {
+     "purpose": "Housing",
+     "total_amount": 2740000
+    },
+    {
+     "purpose": "Health",
+     "total_amount": 1890000
+    },
+    {
+     "purpose": "Education",
+     "total_amount": 1490000
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "block",
+    "disbursed",
+    "repaid"
+   ],
+   "rows": [
+    {
+     "block": "Fatehpur",
+     "disbursed": 3305000,
+     "repaid": 2083800.0
+    },
+    {
+     "block": "Belaganj",
+     "disbursed": 3170000,
+     "repaid": 1996600.0
+    },
+    {
+     "block": "Wazirganj",
+     "disbursed": 3165000,
+     "repaid": 1857900.0
+    },
+    {
+     "block": "Barachatti",
+     "disbursed": 2790000,
+     "repaid": 1889000.0
+    },
+    {
+     "block": "Dobhi",
+     "disbursed": 2765000,
+     "repaid": 1903900.0
+    },
+    {
+     "block": "Atri",
+     "disbursed": 2620000,
+     "repaid": 1637100.0
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "block",
+    "total_loans",
+    "total_disbursed",
+    "total_repaid",
+    "recovery_pct",
+    "overdue_loans",
+    "overdue_principal"
+   ],
+   "rows": [
+    {
+     "block": "Fatehpur",
+     "total_loans": 64,
+     "total_disbursed": 3305000,
+     "total_repaid": 2083800.0,
+     "recovery_pct": 63.0,
+     "overdue_loans": 15,
+     "overdue_principal": 795000
+    },
+    {
+     "block": "Belaganj",
+     "total_loans": 65,
+     "total_disbursed": 3170000,
+     "total_repaid": 1996600.0,
+     "recovery_pct": 63.0,
+     "overdue_loans": 13,
+     "overdue_principal": 735000
+    },
+    {
+     "block": "Wazirganj",
+     "total_loans": 66,
+     "total_disbursed": 3165000,
+     "total_repaid": 1857900.0,
+     "recovery_pct": 58.7,
+     "overdue_loans": 13,
+     "overdue_principal": 620000
+    },
+    {
+     "block": "Barachatti",
+     "total_loans": 56,
+     "total_disbursed": 2790000,
+     "total_repaid": 1889000.0,
+     "recovery_pct": 67.7,
+     "overdue_loans": 8,
+     "overdue_principal": 310000
+    },
+    {
+     "block": "Dobhi",
+     "total_loans": 57,
+     "total_disbursed": 2765000,
+     "total_repaid": 1903900.0,
+     "recovery_pct": 68.9,
+     "overdue_loans": 3,
+     "overdue_principal": 190000
+    },
+    {
+     "block": "Atri",
+     "total_loans": 52,
+     "total_disbursed": 2620000,
+     "total_repaid": 1637100.0,
+     "recovery_pct": 62.5,
+     "overdue_loans": 8,
+     "overdue_principal": 460000
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  }
+ }
+}

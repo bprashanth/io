@@ -1,0 +1,80 @@
+<title>Gender Equity in Physical Progress</title><style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1360px;margin:0 auto;padding:28px 32px}
+h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:24px 0 8px}h3{font-size:15px;margin:0}
+.sub{color:var(--muted);margin:0 0 18px}.source{color:var(--muted);font-size:13px;margin-top:24px;border-top:1px solid var(--line);padding-top:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:14px 0}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.kpi-title{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi-value{font-size:30px;font-weight:700;margin:4px 0}.kpi-label{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0;overflow:hidden}
+.panel header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+.panel header h3{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel.wide{grid-column:1/-1}
+button.dl{font:inherit;font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--accent);cursor:pointer;white-space:nowrap}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{color:var(--muted);font-weight:600;background:#fafafa;position:sticky;top:0}td.num{text-align:right;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-bottom:4px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+.note{font-size:12px;color:var(--muted);margin:6px 0 0}.empty{color:var(--muted);font-style:italic}
+details.receipt{margin-top:8px;font-size:12px;color:var(--muted)}details.receipt pre{white-space:pre-wrap;background:#f3f4f6;padding:8px;border-radius:8px;font-size:11px;color:#374151}
+.report p{max-width:820px}.report b{color:var(--accent)}mark{background:#fee2e2}
+svg text{font-family:inherit}
+@media print{button.dl{display:none}}
+</style><div class=wrap><h1>Gender Equity in Physical Progress</h1><p class=sub>Comparing baseline to endline performance improvements between boys and girls</p><div class=kpis><div class="kpi" data-receipt="p1"><div class=kpi-title>Total Girls Tracked</div><div class=kpi-value>88</div><div class=kpi-label></div></div><div class="kpi" data-receipt="p2"><div class=kpi-title>Total Boys Tracked</div><div class=kpi-value>112</div><div class=kpi-label></div></div></div><div class=report><p>This dashboard compares the physical development of boys and girls from baseline to endline measurements. We track <b data-receipt="p1">88</b> girls and <b data-receipt="p2">112</b> boys who have complete records for both time periods.</p><p>In terms of speed and agility, measured by the shuttle run test, one gender shows an average improvement of <b data-receipt="p3">0.01</b> seconds, while the other improved by <b data-receipt="p3">0.01</b> seconds (note: lower time is better). This indicates whether the training program benefits one group more than the other in cardiovascular endurance.</p><p>For core strength, measured by sit-ups, the data reveals that one gender increased their average count by <b data-receipt="p4">3.45</b> repetitions compared to the other. A positive number here signifies a gain in muscle endurance over the program duration.</p><p>The table below highlights the top 10 individual performers across both genders based on shuttle run gains, allowing us to see if specific outliers are driving the averages or if the trend is consistent across the population.</p></div><div class=grid><section class="panel" data-receipt="p3"><header><h3>Avg Shuttle Run Improvement (Seconds)</h3><button class=dl data-panel="p3">Download CSV</button></header><p class=empty>No rows to chart.</p><details class=receipt><summary>How this was computed · 2 rows</summary><pre>WITH combined AS (
+  SELECT &quot;Child ID&quot;, &quot;Gender&quot;, &quot;Shuttle run sec&quot; AS baseline_val, NULL AS endline_val FROM &quot;baseline&quot;
+  UNION ALL
+  SELECT &quot;Child ID&quot;, &quot;Gender&quot;, NULL AS baseline_val, &quot;Shuttle run sec&quot; AS endline_val FROM &quot;endline&quot;
+),
+matched AS (
+  SELECT 
+    c1.&quot;Gender&quot;,
+    c1.baseline_val,
+    c2.endline_val,
+    (c1.baseline_val - c2.endline_val) AS improvement_sec
+  FROM combined c1
+  JOIN combined c2 ON c1.&quot;Child ID&quot; = c2.&quot;Child ID&quot; AND c1.&quot;Gender&quot; = c2.&quot;Gender&quot;
+  WHERE c1.baseline_val IS NOT NULL AND c2.endline_val IS NOT NULL
+)
+SELECT &quot;Gender&quot;, AVG(improvement_sec) AS avg_improvement FROM matched GROUP BY 1 ORDER BY 2 DESC</pre></details></section><section class="panel" data-receipt="p4"><header><h3>Avg Sit Ups Improvement (Count)</h3><button class=dl data-panel="p4">Download CSV</button></header><p class=empty>No rows to chart.</p><details class=receipt><summary>How this was computed · 2 rows</summary><pre>WITH combined AS (
+  SELECT &quot;Child ID&quot;, &quot;Gender&quot;, &quot;Sit ups&quot; AS baseline_val, NULL AS endline_val FROM &quot;baseline&quot;
+  UNION ALL
+  SELECT &quot;Child ID&quot;, &quot;Gender&quot;, NULL AS baseline_val, &quot;Sit ups&quot; AS endline_val FROM &quot;endline&quot;
+),
+matched AS (
+  SELECT 
+    c1.&quot;Gender&quot;,
+    c1.baseline_val,
+    c2.endline_val,
+    (c2.endline_val - c1.baseline_val) AS improvement_count
+  FROM combined c1
+  JOIN combined c2 ON c1.&quot;Child ID&quot; = c2.&quot;Child ID&quot; AND c1.&quot;Gender&quot; = c2.&quot;Gender&quot;
+  WHERE c1.baseline_val IS NOT NULL AND c2.endline_val IS NOT NULL
+)
+SELECT &quot;Gender&quot;, AVG(improvement_count) AS avg_improvement FROM matched GROUP BY 1 ORDER BY 2 DESC</pre></details></section><section class="panel" data-receipt="p5"><header><h3>Top 10 Improvers by Gender</h3><button class=dl data-panel="p5">Download CSV</button></header><div class=tablewrap><table id="t-p5"><thead><tr><th>Child ID</th><th>Gender</th><th>shuttle_gain</th></tr></thead><tbody><tr><td class="">CFS0150</td><td class="">Male</td><td class="num">8.4</td></tr><tr><td class="">CFS0165</td><td class="">Male</td><td class="num">8</td></tr><tr><td class="">CFS0118</td><td class="">Male</td><td class="num">7.9</td></tr><tr><td class="">CFS0004</td><td class="">Female</td><td class="num">7.3</td></tr><tr><td class="">CFS0182</td><td class="">Male</td><td class="num">6.7</td></tr><tr><td class="">CFS0014</td><td class="">Male</td><td class="num">6.6</td></tr><tr><td class="">CFS0145</td><td class="">Male</td><td class="num">5.9</td></tr><tr><td class="">CFS0091</td><td class="">Female</td><td class="num">5.5</td></tr><tr><td class="">CFS0049</td><td class="">Female</td><td class="num">5.4</td></tr><tr><td class="">CFS0089</td><td class="">Female</td><td class="num">5.2</td></tr></tbody></table></div><p class=note>10 rows.</p><details class=receipt><summary>How this was computed · 10 rows</summary><pre>WITH combined AS (
+  SELECT &quot;Child ID&quot;, &quot;Gender&quot;, &quot;Shuttle run sec&quot; AS baseline_val, NULL AS endline_val FROM &quot;baseline&quot;
+  UNION ALL
+  SELECT &quot;Child ID&quot;, &quot;Gender&quot;, NULL AS baseline_val, &quot;Shuttle run sec&quot; AS endline_val FROM &quot;endline&quot;
+),
+matched AS (
+  SELECT 
+    c1.&quot;Child ID&quot;,
+    c1.&quot;Gender&quot;,
+    c1.baseline_val,
+    c2.endline_val,
+    (c1.baseline_val - c2.endline_val) AS shuttle_improvement
+  FROM combined c1
+  JOIN combined c2 ON c1.&quot;Child ID&quot; = c2.&quot;Child ID&quot; AND c1.&quot;Gender&quot; = c2.&quot;Gender&quot;
+  WHERE c1.baseline_val IS NOT NULL AND c2.endline_val IS NOT NULL
+)
+SELECT &quot;Child ID&quot;, &quot;Gender&quot;, ROUND(shuttle_improvement, 2) AS shuttle_gain FROM matched ORDER BY shuttle_improvement DESC LIMIT 10</pre></details></section></div><p class=source>Source: child_fitness_scores.xlsx, child_fitness_scores.xlsx · every figure computed locally by DuckDB from the file(s) above; open a panel's receipt for the query.</p></div><script>
+(function(){
+  const DATA = {"p1": {"columns": ["n"], "rows": [{"n": 88}]}, "p2": {"columns": ["n"], "rows": [{"n": 112}]}, "p3": {"columns": ["Gender", "avg_improvement"], "rows": [{"Gender": "Male", "avg_improvement": 0.014285714285714615}, {"Gender": "Female", "avg_improvement": 0.012500000000000016}]}, "p4": {"columns": ["Gender", "avg_improvement"], "rows": [{"Gender": "Male", "avg_improvement": 3.4464285714285716}, {"Gender": "Female", "avg_improvement": 2.2386363636363638}]}, "p5": {"columns": ["Child ID", "Gender", "shuttle_gain"], "rows": [{"Child ID": "CFS0150", "Gender": "Male", "shuttle_gain": 8.4}, {"Child ID": "CFS0165", "Gender": "Male", "shuttle_gain": 8.0}, {"Child ID": "CFS0118", "Gender": "Male", "shuttle_gain": 7.9}, {"Child ID": "CFS0004", "Gender": "Female", "shuttle_gain": 7.3}, {"Child ID": "CFS0182", "Gender": "Male", "shuttle_gain": 6.7}, {"Child ID": "CFS0014", "Gender": "Male", "shuttle_gain": 6.6}, {"Child ID": "CFS0145", "Gender": "Male", "shuttle_gain": 5.9}, {"Child ID": "CFS0091", "Gender": "Female", "shuttle_gain": 5.5}, {"Child ID": "CFS0049", "Gender": "Female", "shuttle_gain": 5.4}, {"Child ID": "CFS0089", "Gender": "Female", "shuttle_gain": 5.2}]}};
+  document.querySelectorAll('button.dl').forEach(b => b.addEventListener('click', () => {
+    const p = DATA[b.dataset.panel]; if(!p) return;
+    const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+    const csv = [p.columns.join(',')].concat(p.rows.map(r => p.columns.map(c => esc(r[c])).join(','))).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download = b.dataset.panel + '.csv'; a.click();
+  }));
+})();
+</script>

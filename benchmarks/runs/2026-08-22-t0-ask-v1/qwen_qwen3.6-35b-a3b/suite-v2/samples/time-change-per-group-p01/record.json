@@ -1,0 +1,79 @@
+{
+  "id": "time-change-per-group-p01",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "for Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH coverage AS (SELECT district, year, 100.0 * anc4_completed / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS pct_coverage FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, MAX(CASE WHEN year = 2023 THEN pct_coverage END) - MAX(CASE WHEN year = 2021 THEN pct_coverage END) AS percentage_point_change FROM coverage GROUP BY district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\nfor Gaya and Nalanda how many percentage points ANC coverage changed from 2021 to 2023",
+      "response": "WITH coverage AS (\n    SELECT\n        district,\n        year,\n        100.0 * anc4_completed / NULLIF(pregnancies_registered, 0) AS pct_coverage\n    FROM anc_visits\n    WHERE district IN ('Gaya', 'Nalanda')\n      AND year IN (2021, 2023)\n)\nSELECT\n    district,\n    MAX(CASE WHEN year = 2023 THEN pct_coverage END) - MAX(CASE WHEN year = 2021 THEN pct_coverage END) AS percentage_point_change\nFROM coverage\nGROUP BY district;",
+      "api": {
+        "id": "gen-1787420903-3sneJCnAjtQJMFgIaBXM",
+        "model": "qwen/qwen3.6-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 341,
+          "completion_tokens": 133,
+          "total_tokens": 474,
+          "cost": 0.00021155475,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00021155475,
+            "upstream_inference_prompt_cost": 6.3426e-05,
+            "upstream_inference_completions_cost": 0.00014812875
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.357
+      },
+      "duration_seconds": 2.36,
+      "sql_duckdb": "WITH coverage AS (SELECT district, year, 100.0 * anc4_completed / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS pct_coverage FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, MAX(CASE WHEN year = 2023 THEN pct_coverage END) - MAX(CASE WHEN year = 2021 THEN pct_coverage END) AS percentage_point_change FROM coverage GROUP BY district",
+      "rows": [
+        [
+          "Gaya",
+          8.0
+        ],
+        [
+          "Nalanda",
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

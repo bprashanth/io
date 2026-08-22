@@ -1,0 +1,387 @@
+{
+ "plan": {
+  "title": "SHG Loan Repayment & Purpose Report",
+  "subtitle": "Analysis of loan repayment status and purpose distribution across blocks",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Loans Disbursed",
+    "sql": "SELECT COUNT(*) AS n FROM \"shg_loan_register\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Overdue Loans",
+    "sql": "SELECT COUNT(*) AS n FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue'",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Total Amount Repaid",
+    "sql": "SELECT COALESCE(SUM(\"Amount Repaid (Rs)\"), 0) AS n FROM \"shg_loan_register\"",
+    "unit": "Rs"
+   },
+   {
+    "id": "p4",
+    "kind": "kpi",
+    "title": "Repayment Rate",
+    "sql": "SELECT ROUND(COALESCE(SUM(CASE WHEN \"Repayment Status\" = 'Closed' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 0), 1) AS n FROM \"shg_loan_register\"",
+    "unit": "%"
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Loans by Purpose",
+    "sql": "SELECT \"Purpose\" AS purpose, COUNT(*) AS count FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "purpose",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "bar",
+    "title": "Repayment Status by Block",
+    "sql": "SELECT \"Block\" AS block, \"Repayment Status\" AS status, COUNT(*) AS count FROM \"shg_loan_register\" GROUP BY 1, 2 ORDER BY 1, 2",
+    "x": "block",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Loan Details by Purpose",
+    "sql": "SELECT \"Purpose\", \"Repayment Status\", COUNT(*) AS loan_count, SUM(\"Loan Amount (Rs)\") AS total_disbursed, SUM(\"Amount Repaid (Rs)\") AS total_repaid FROM \"shg_loan_register\" GROUP BY 1, 2 ORDER BY 1, 2"
+   }
+  ],
+  "narrative": "The SHG loan program has disbursed {{p1}} loans in total. Among these, {{p2}} loans are currently marked as Overdue, while the overall repayment rate stands at {{p4}}. The total amount repaid so far is {{p3}}. Looking at the distribution of loan purposes, the bar chart shows the volume of loans taken for each category. The table below provides a detailed breakdown of loan counts and amounts by purpose and repayment status, allowing for a granular view of financial health across different sectors."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 60
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 11368300.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 40.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "purpose",
+    "count"
+   ],
+   "rows": [
+    {
+     "purpose": "Agriculture",
+     "count": 106
+    },
+    {
+     "purpose": "Livestock",
+     "count": 79
+    },
+    {
+     "purpose": "Petty trade",
+     "count": 66
+    },
+    {
+     "purpose": "Health",
+     "count": 46
+    },
+    {
+     "purpose": "Housing",
+     "count": 32
+    },
+    {
+     "purpose": "Education",
+     "count": 31
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "block",
+    "status",
+    "count"
+   ],
+   "rows": [
+    {
+     "block": "Atri",
+     "status": "Closed",
+     "count": 22
+    },
+    {
+     "block": "Atri",
+     "status": "Overdue",
+     "count": 8
+    },
+    {
+     "block": "Atri",
+     "status": "Regular",
+     "count": 22
+    },
+    {
+     "block": "Barachatti",
+     "status": "Closed",
+     "count": 21
+    },
+    {
+     "block": "Barachatti",
+     "status": "Overdue",
+     "count": 8
+    },
+    {
+     "block": "Barachatti",
+     "status": "Regular",
+     "count": 27
+    },
+    {
+     "block": "Belaganj",
+     "status": "Closed",
+     "count": 28
+    },
+    {
+     "block": "Belaganj",
+     "status": "Overdue",
+     "count": 13
+    },
+    {
+     "block": "Belaganj",
+     "status": "Regular",
+     "count": 24
+    },
+    {
+     "block": "Dobhi",
+     "status": "Closed",
+     "count": 26
+    },
+    {
+     "block": "Dobhi",
+     "status": "Overdue",
+     "count": 3
+    },
+    {
+     "block": "Dobhi",
+     "status": "Regular",
+     "count": 28
+    },
+    {
+     "block": "Fatehpur",
+     "status": "Closed",
+     "count": 26
+    },
+    {
+     "block": "Fatehpur",
+     "status": "Overdue",
+     "count": 15
+    },
+    {
+     "block": "Fatehpur",
+     "status": "Regular",
+     "count": 23
+    },
+    {
+     "block": "Wazirganj",
+     "status": "Closed",
+     "count": 21
+    },
+    {
+     "block": "Wazirganj",
+     "status": "Overdue",
+     "count": 13
+    },
+    {
+     "block": "Wazirganj",
+     "status": "Regular",
+     "count": 32
+    }
+   ],
+   "rowcount": 18,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "Purpose",
+    "Repayment Status",
+    "loan_count",
+    "total_disbursed",
+    "total_repaid"
+   ],
+   "rows": [
+    {
+     "Purpose": "Agriculture",
+     "Repayment Status": "Closed",
+     "loan_count": 43,
+     "total_disbursed": 2120000,
+     "total_repaid": 2120000.0
+    },
+    {
+     "Purpose": "Agriculture",
+     "Repayment Status": "Overdue",
+     "loan_count": 18,
+     "total_disbursed": 935000,
+     "total_repaid": 238600.0
+    },
+    {
+     "Purpose": "Agriculture",
+     "Repayment Status": "Regular",
+     "loan_count": 45,
+     "total_disbursed": 2280000,
+     "total_repaid": 1115700.0
+    },
+    {
+     "Purpose": "Education",
+     "Repayment Status": "Closed",
+     "loan_count": 13,
+     "total_disbursed": 580000,
+     "total_repaid": 580000.0
+    },
+    {
+     "Purpose": "Education",
+     "Repayment Status": "Overdue",
+     "loan_count": 5,
+     "total_disbursed": 190000,
+     "total_repaid": 52600.0
+    },
+    {
+     "Purpose": "Education",
+     "Repayment Status": "Regular",
+     "loan_count": 13,
+     "total_disbursed": 720000,
+     "total_repaid": 286900.0
+    },
+    {
+     "Purpose": "Health",
+     "Repayment Status": "Closed",
+     "loan_count": 19,
+     "total_disbursed": 800000,
+     "total_repaid": 800000.0
+    },
+    {
+     "Purpose": "Health",
+     "Repayment Status": "Overdue",
+     "loan_count": 9,
+     "total_disbursed": 310000,
+     "total_repaid": 92500.0
+    },
+    {
+     "Purpose": "Health",
+     "Repayment Status": "Regular",
+     "loan_count": 18,
+     "total_disbursed": 780000,
+     "total_repaid": 361700.0
+    },
+    {
+     "Purpose": "Housing",
+     "Repayment Status": "Closed",
+     "loan_count": 12,
+     "total_disbursed": 935000,
+     "total_repaid": 935000.0
+    },
+    {
+     "Purpose": "Housing",
+     "Repayment Status": "Overdue",
+     "loan_count": 6,
+     "total_disbursed": 635000,
+     "total_repaid": 164700.0
+    },
+    {
+     "Purpose": "Housing",
+     "Repayment Status": "Regular",
+     "loan_count": 14,
+     "total_disbursed": 1170000,
+     "total_repaid": 514300.0
+    },
+    {
+     "Purpose": "Livestock",
+     "Repayment Status": "Closed",
+     "loan_count": 33,
+     "total_disbursed": 1580000,
+     "total_repaid": 1580000.0
+    },
+    {
+     "Purpose": "Livestock",
+     "Repayment Status": "Overdue",
+     "loan_count": 14,
+     "total_disbursed": 675000,
+     "total_repaid": 174000.0
+    },
+    {
+     "Purpose": "Livestock",
+     "Repayment Status": "Regular",
+     "loan_count": 32,
+     "total_disbursed": 1310000,
+     "total_repaid": 600000.0
+    },
+    {
+     "Purpose": "Petty trade",
+     "Repayment Status": "Closed",
+     "loan_count": 24,
+     "total_disbursed": 905000,
+     "total_repaid": 905000.0
+    },
+    {
+     "Purpose": "Petty trade",
+     "Repayment Status": "Overdue",
+     "loan_count": 8,
+     "total_disbursed": 365000,
+     "total_repaid": 92900.0
+    },
+    {
+     "Purpose": "Petty trade",
+     "Repayment Status": "Regular",
+     "loan_count": 34,
+     "total_disbursed": 1525000,
+     "total_repaid": 754400.0
+    }
+   ],
+   "rowcount": 18,
+   "error": null
+  }
+ }
+}

@@ -1,0 +1,1100 @@
+{
+ "summary": {
+  "model": "qwen/qwen3.5-9b",
+  "endpoint": "https://openrouter.ai/api/v1",
+  "manifest": "benchmarks/t0/build-suite-v1.json",
+  "requests": 12,
+  "plan_valid": 12,
+  "panels_total": 75,
+  "panels_ok": 62,
+  "fully_clean": 5,
+  "repairs": 8,
+  "lint_literal_requests": 2,
+  "mean_model_seconds": 19.25
+ },
+ "records": [
+  {
+   "id": "scholarship-dashboard",
+   "dataset": "scholarship",
+   "mode": "dashboard",
+   "request": "build me a dashboard for this scholarship sheet - status, marks, income, which talukas, that kind of thing",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421728-eNjOe6ixtcVEDJgBUcO1",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1331,
+       "completion_tokens": 959,
+       "total_tokens": 2290,
+       "cost": 0.00027695,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00027695,
+        "upstream_inference_prompt_cost": 0.0001331,
+        "upstream_inference_completions_cost": 0.00014385
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 26.912
+     },
+     "raw": "{\n  \"title\": \"Scholarship Applicant Overview\",\n  \"subtitle\": \"Analyze applicant status, academic performance, family income, and geographic distribution\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Applicants\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"kpi\",\n      \"title\": \"Average Marks\",\n      \"sql\": \"SELECT AVG(\\\"Marks %\\\") AS avg_marks FROM \\\"scholarship_applicants\\\"\",\n      \"unit\": \"%\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"kpi\",\n      \"title\": \"Average Family Income\",\n      \"sql\": \"SELECT AVG(\\\"Family Income\\\") AS avg_income FROM \\\"scholarship_applicants\\\"\",\n      \"unit\": \"INR\"\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"kpi\",\n      \"title\": \"Approved Count\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Approved'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Applicants by Status\",\n      \"sql\": \"SELECT \\\"Status\\\", COUNT(*) AS count FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Status\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"bar\",\n      \"title\": \"Applicants by Category\",\n      \"sql\": \"SELECT \\\"Category\\\", COUNT(*) AS count FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Category\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p7\",\n      \"kind\": \"bar\",\n      \"title\": \"Applicants by District\",\n      \"sql\": \"SELECT \\\"District\\\", COUNT(*) AS count FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"District\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p8\",\n      \"kind\": \"bar\",\n      \"title\": \"Applicants by Taluka\",\n      \"sql\": \"SELECT \\\"Taluka\\\", COUNT(*) AS count FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Taluka\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p9\",\n      \"kind\": \"line\",\n      \"title\": \"Income vs Marks Trend\",\n      \"sql\": \"WITH grouped AS (SELECT AVG(\\\"Family Income\\\") AS avg_income, AVG(\\\"Marks %\\\") AS avg_marks, COUNT(*) AS n FROM \\\"scholarship_applicants\\\" GROUP BY 1) SELECT n AS month, avg_income AS income, avg_marks AS marks FROM grouped\",\n      \"x\": \"month\",\n      \"y\": [\"income\", \"marks\"],\n      \"series\": \"income, marks\"\n    },\n    {\n      \"id\": \"p10\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Applicants by Marks\",\n      \"sql\": \"SELECT \\\"Naam\\\", \\\"School\\\", \\\"Gaon\\\", \\\"Taluka\\\", \\\"District\\\", \\\"Marks %\\\", \\\"Status\\\" FROM \\\"scholarship_applicants\\\" ORDER BY \\\"Marks %\\\" DESC LIMIT 10\",\n      \"x\": \"Naam\",\n      \"y\": [\"School\", \"Gaon\", \"Taluka\", \"District\", \"Marks %\", \"Status\"]\n    }\n  ],\n  \"narrative\": \"The dashboard reveals that out of {{p1}} total applicants, {{p4}} have been approved. Academic performance is measured by an average of {{p2}} marks across the cohort. Financial need is assessed via an average family income of {{p3}}.\",\n  \"missing\": [\"disbursed amount\", \"specific scheme name per applicant\"]\n}",
+     "problems": [],
+     "panel_problems": [
+      "p9: BinderException: Binder Error: GROUP BY clause cannot contain aggregates!\n\nLINE 1: WITH grouped AS (SELECT AVG(\"Family Income\") AS avg_income, AVG(\"Marks %\") AS avg_m...\n                                ^"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787421755-Lvt8K8G7QBkLxJWYS7Mp",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1420,
+       "completion_tokens": 789,
+       "total_tokens": 2209,
+       "cost": 0.00026035,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00026035,
+        "upstream_inference_prompt_cost": 0.000142,
+        "upstream_inference_completions_cost": 0.00011835
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 13.005
+     },
+     "raw": "{\n  \"title\": \"Scholarship Applicant Overview\",\n  \"subtitle\": \"Status distribution, academic performance, and regional breakdown\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Applicants\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"kpi\",\n      \"title\": \"Average Marks\",\n      \"sql\": \"SELECT AVG(\\\"Marks %\\\") AS avg_marks FROM \\\"scholarship_applicants\\\"\",\n      \"unit\": \"%\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"kpi\",\n      \"title\": \"Average Family Income\",\n      \"sql\": \"SELECT AVG(\\\"Family Income\\\") AS avg_income FROM \\\"scholarship_applicants\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"kpi\",\n      \"title\": \"Approved Count\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Approved'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Applicants by Status\",\n      \"sql\": \"SELECT \\\"Status\\\", COUNT(*) AS count FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Status\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"bar\",\n      \"title\": \"Applicants by Category\",\n      \"sql\": \"SELECT \\\"Category\\\", COUNT(*) AS count FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Category\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p7\",\n      \"kind\": \"bar\",\n      \"title\": \"Applicants by Taluka\",\n      \"sql\": \"SELECT \\\"Taluka\\\", COUNT(*) AS count FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"Taluka\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p8\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 by Marks\",\n      \"sql\": \"SELECT \\\"Naam\\\", \\\"Marks %\\\", \\\"Status\\\" FROM \\\"scholarship_applicants\\\" ORDER BY \\\"Marks %\\\" DESC LIMIT 10\",\n      \"x\": \"Naam\",\n      \"y\": [\"Marks %\", \"Status\"]\n    }\n  ],\n  \"narrative\": \"The dashboard displays {{p1}} total applicants in the system. On average, candidates scored {{p2}} marks with a family income of {{p3}}. {{p4}} of these applications have been approved so far.\\n\\nWhen looking at the status distribution, the panel shows the count for each state like Approved, Pending, or Rejected. The category breakdown reveals how many applicants fall into groups such as SC, ST, or General.\\n\\nGeographically, the top 10 talukas with the highest number of applicants are listed in the bar chart. Finally, the table highlights the top 10 individuals with the highest marks along with their current status.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": []
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 10,
+   "panels_ok": 9,
+   "panel_problems": [
+    "p9: BinderException: Binder Error: GROUP BY clause cannot contain aggregates!\n\nLINE 1: WITH grouped AS (SELECT AVG(\"Family Income\") AS avg_income, AVG(\"Marks %\") AS avg_m...\n                                ^"
+   ],
+   "kinds": [
+    "kpi",
+    "kpi",
+    "kpi",
+    "kpi",
+    "bar",
+    "bar",
+    "bar",
+    "bar",
+    "line",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 39.92,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/scholarship-dashboard.html",
+   "wall_seconds": 39.97
+  },
+  {
+   "id": "scholarship-report",
+   "dataset": "scholarship",
+   "mode": "report",
+   "request": "write me a short report summarising the scholarship applications for our board",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421768-D6COC5azTPRNhWiHkMk7",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1321,
+       "completion_tokens": 687,
+       "total_tokens": 2008,
+       "cost": 0.00023515,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00023515,
+        "upstream_inference_prompt_cost": 0.0001321,
+        "upstream_inference_completions_cost": 0.00010305
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 15.967
+     },
+     "raw": "{\n  \"title\": \"Scholarship Application Overview\",\n  \"subtitle\": \"Summary of applicant demographics, approval status, and scheme distribution\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total applicants\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"kpi\",\n      \"title\": \"Approved applications\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Approved'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"kpi\",\n      \"title\": \"Disbursed applications\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Disbursed'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"kpi\",\n      \"title\": \"Pending applications\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Pending'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Applications by Category\",\n      \"sql\": \"SELECT \\\"Category\\\", COUNT(*) AS cnt FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Category\",\n      \"y\": [\"cnt\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"bar\",\n      \"title\": \"Applications by Scheme\",\n      \"sql\": \"SELECT \\\"Name of scheme\\\", COUNT(*) AS cnt FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Name of scheme\",\n      \"y\": [\"cnt\"]\n    },\n    {\n      \"id\": \"p7\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Villages by Applications\",\n      \"sql\": \"SELECT \\\"Gaon\\\", COUNT(*) AS cnt FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"Gaon\",\n      \"y\": [\"cnt\"]\n    }\n  ],\n  \"narrative\": \"The board received a total of {{p1}} scholarship applications. Out of these, {{p2}} were approved, {{p3}} have been disbursed, and {{p4}} remain pending. The majority of applicants fall under the {{p5.0}} category, followed by {{p5.1}}. Applications are distributed across various schemes, with the highest volume for {{p6.0}}. The village with the most applications is {{p7.0}}.\",\n  \"missing\": [\"Family Income\", \"Marks %\", \"Age\", \"Contact details\"]\n}",
+     "problems": [],
+     "panel_problems": []
+    }
+   ],
+   "repair_used": false,
+   "plan_valid": true,
+   "panels_total": 7,
+   "panels_ok": 7,
+   "panel_problems": [],
+   "kinds": [
+    "kpi",
+    "kpi",
+    "kpi",
+    "kpi",
+    "bar",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 15.97,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/scholarship-report.html",
+   "wall_seconds": 15.98
+  },
+  {
+   "id": "scholarship-website",
+   "dataset": "scholarship",
+   "mode": "dashboard",
+   "request": "make a website page showing the scholarship scheme progress district wise with pending cases",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421784-nqpRAXx0HHzgBbJM68CZ",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1322,
+       "completion_tokens": 760,
+       "total_tokens": 2082,
+       "cost": 0.0002462,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0002462,
+        "upstream_inference_prompt_cost": 0.0001322,
+        "upstream_inference_completions_cost": 0.000114
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 27.032
+     },
+     "raw": "{\n  \"title\": \"Scholarship Progress & Pending Cases\",\n  \"subtitle\": \"Overview of scheme status, district-wise distribution, and pending approvals\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Applicants\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"kpi\",\n      \"title\": \"Pending Cases\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Pending'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"kpi\",\n      \"title\": \"Approved Cases\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Approved'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"kpi\",\n      \"title\": \"Disbursed Cases\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Disbursed'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Pending Cases by District\",\n      \"sql\": \"SELECT \\\"District\\\", COUNT(*) AS pending FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Pending' GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"pending\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"bar\",\n      \"title\": \"Approved Cases by District\",\n      \"sql\": \"SELECT \\\"District\\\", COUNT(*) AS approved FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Approved' GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"approved\"]\n    },\n    {\n      \"id\": \"p7\",\n      \"kind\": \"bar\",\n      \"title\": \"Scheme Distribution\",\n      \"sql\": \"SELECT \\\"Name of scheme\\\", COUNT(*) AS count FROM \\\"scholarship_applicants\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 8\",\n      \"x\": \"Name of scheme\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p8\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Pending Applicants\",\n      \"sql\": \"SELECT \\\"Naam\\\", \\\"District\\\", \\\"Status\\\", \\\"Remarks\\\" FROM \\\"scholarship_applicants\\\" WHERE \\\"Status\\\" = 'Pending' ORDER BY \\\"Sr No\\\" LIMIT 10\",\n      \"x\": \"Sr No\",\n      \"y\": [\"Naam\", \"District\", \"Status\", \"Remarks\"]\n    }\n  ],\n  \"narrative\": \"The dashboard tracks the progress of scholarship applications across the region. There are {{p1}} total applicants in the system, with {{p2}} currently pending review. Of the processed cases, {{p3}} have been approved and {{p4}} have been disbursed.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": []
+    }
+   ],
+   "repair_used": false,
+   "plan_valid": true,
+   "panels_total": 8,
+   "panels_ok": 8,
+   "panel_problems": [],
+   "kinds": [
+    "kpi",
+    "kpi",
+    "kpi",
+    "kpi",
+    "bar",
+    "bar",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 27.03,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/scholarship-website.html",
+   "wall_seconds": 27.04
+  },
+  {
+   "id": "fitness-dashboard",
+   "dataset": "fitness",
+   "mode": "dashboard",
+   "request": "dashboard showing how the kids improved from baseline to endline, by location and coach",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421811-lvQM8M7FQOrA6xtyZLLz",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3140,
+       "completion_tokens": 676,
+       "total_tokens": 3816,
+       "cost": 0.0004154,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0004154,
+        "upstream_inference_prompt_cost": 0.000314,
+        "upstream_inference_completions_cost": 0.0001014
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 5.071
+     },
+     "raw": "{\n  \"title\": \"Kids Improvement Dashboard\",\n  \"subtitle\": \"Comparing baseline and endline metrics by location and coach\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total children tracked\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"baseline\\\" UNION ALL SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"endline\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Average height gain by location\",\n      \"sql\": \"WITH combined AS (SELECT \\\"Location\\\", AVG(\\\"Height cm\\\") AS avg_height FROM \\\"baseline\\\" UNION ALL SELECT \\\"Location\\\", AVG(\\\"Height cm\\\") AS avg_height FROM \\\"endline\\\") SELECT \\\"Location\\\", avg_height - LAG(avg_height) OVER (PARTITION BY \\\"Location\\\" ORDER BY \\\"Location\\\") AS gain FROM combined GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Location\",\n      \"y\": [\"gain\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Average sit-ups improvement by coach\",\n      \"sql\": \"WITH combined AS (SELECT \\\"Coach\\\", AVG(\\\"Sit ups\\\") AS avg_situps FROM \\\"baseline\\\" UNION ALL SELECT \\\"Coach\\\", AVG(\\\"Sit ups\\\") AS avg_situps FROM \\\"endline\\\") SELECT \\\"Coach\\\", avg_situps - LAG(avg_situps) OVER (PARTITION BY \\\"Coach\\\" ORDER BY \\\"Coach\\\") AS improvement FROM combined GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Coach\",\n      \"y\": [\"improvement\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 locations by shuttle run improvement\",\n      \"sql\": \"WITH combined AS (SELECT \\\"Location\\\", AVG(\\\"Shuttle run sec\\\") AS avg_time FROM \\\"baseline\\\" UNION ALL SELECT \\\"Location\\\", AVG(\\\"Shuttle run sec\\\") AS avg_time FROM \\\"endline\\\") SELECT \\\"Location\\\", avg_time - LAG(avg_time) OVER (PARTITION BY \\\"Location\\\" ORDER BY \\\"Location\\\") AS improvement FROM combined GROUP BY 1 ORDER BY 2 ASC LIMIT 10\",\n      \"x\": \"Location\",\n      \"y\": [\"improvement\"]\n    }\n  ],\n  \"narrative\": \"This dashboard tracks the physical progress of children across various locations and coaching groups. The first panel shows the total number of unique children recorded in the dataset. The second panel highlights which locations saw the most significant average increase in height from the baseline to the endline assessment. The third panel identifies the coaches whose groups showed the greatest improvement in sit-up performance. Finally, the fourth table lists the top ten locations where children demonstrated the most dramatic reduction in shuttle run times, indicating enhanced speed and agility.\",\n  \"missing\": [\"disbursed amount\", \"attendance rate\", \"parent satisfaction score\"]\n}",
+     "problems": [],
+     "panel_problems": [
+      "p1: kpi needs one row with a number",
+      "p2: BinderException: Binder Error: column \"Location\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Location)\" if the exact value of \"Location\" is not important.\n\nLINE 1: WITH combined AS (SELECT \"Location\", AVG(\"Height ",
+      "p3: BinderException: Binder Error: column \"Coach\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Coach)\" if the exact value of \"Coach\" is not important.\n\nLINE 1: WITH combined AS (SELECT \"Coach\", AVG(\"Sit ups\") AS avg_si",
+      "p4: BinderException: Binder Error: column \"Location\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Location)\" if the exact value of \"Location\" is not important.\n\nLINE 1: WITH combined AS (SELECT \"Location\", AVG(\"Shuttle"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787421816-AOjYrIrXFJRoLAkfM34D",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3426,
+       "completion_tokens": 876,
+       "total_tokens": 4302,
+       "cost": 0.000474,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.000474,
+        "upstream_inference_prompt_cost": 0.0003426,
+        "upstream_inference_completions_cost": 0.0001314
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 17.185
+     },
+     "raw": "{\n  \"title\": \"Child Fitness Improvement\",\n  \"subtitle\": \"Comparing baseline and endline metrics by location and coach\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Children\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"baseline\\\" UNION ALL SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"endline\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Avg Height Change by Location\",\n      \"sql\": \"WITH diffs AS (SELECT \\\"Location\\\", AVG(\\\"Height cm\\\") - ANY_VALUE(\\\"Height cm\\\") OVER (PARTITION BY \\\"Child ID\\\") AS change FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), SELECT \\\"Location\\\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"Location\",\n      \"y\": [\"diff\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Avg Sit-ups Change by Coach\",\n      \"sql\": \"WITH diffs AS (SELECT \\\"Coach\\\", AVG(\\\"Sit ups\\\") - ANY_VALUE(\\\"Sit ups\\\") OVER (PARTITION BY \\\"Child ID\\\") AS change FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), SELECT \\\"Coach\\\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"Coach\",\n      \"y\": [\"diff\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"bar\",\n      \"title\": \"Avg Shuttle Run Change by Location\",\n      \"sql\": \"WITH diffs AS (SELECT \\\"Location\\\", AVG(\\\"Shuttle run sec\\\") - ANY_VALUE(\\\"Shuttle run sec\\\") OVER (PARTITION BY \\\"Child ID\\\") AS change FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), SELECT \\\"Location\\\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 ASC LIMIT 10\",\n      \"x\": \"Location\",\n      \"y\": [\"diff\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Height Gainers\",\n      \"sql\": \"SELECT b.\\\"Child name\\\", b.\\\"Location\\\", b.\\\"Coach\\\", (e.\\\"Height cm\\\" - b.\\\"Height cm\\\") AS gain FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\" ORDER BY gain DESC LIMIT 10\",\n      \"x\": \"Child name\",\n      \"y\": [\"gain\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Sit-ups Gainers\",\n      \"sql\": \"SELECT b.\\\"Child name\\\", b.\\\"Location\\\", b.\\\"Coach\\\", (e.\\\"Sit ups\\\" - b.\\\"Sit ups\\\") AS gain FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\" ORDER BY gain DESC LIMIT 10\",\n      \"x\": \"Child name\",\n      \"y\": [\"gain\"]\n    }\n  ],\n  \"narrative\": \"This dashboard tracks the physical progress of children from baseline to endline measurements. The first panel shows the total number of unique children recorded in the dataset. Subsequent bar charts break down the average improvement in height, sit-ups, and shuttle run times by location and coach, highlighting which groups saw the most significant gains. The tables list the individual children with the highest improvements in height and sit-ups, providing specific examples of success.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": [
+      "p1: kpi needs one row with a number",
+      "p2: ParseError: Expected CTE to have alias. Line 1, Col: 191.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Location\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+      "p3: ParseError: Expected CTE to have alias. Line 1, Col: 184.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Coach\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+      "p4: ParseError: Expected CTE to have alias. Line 1, Col: 203.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Location\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 ASC LIMIT 10"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 6,
+   "panels_ok": 2,
+   "panel_problems": [
+    "p1: kpi needs one row with a number",
+    "p2: ParseError: Expected CTE to have alias. Line 1, Col: 191.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Location\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "p3: ParseError: Expected CTE to have alias. Line 1, Col: 184.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Coach\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "p4: ParseError: Expected CTE to have alias. Line 1, Col: 203.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Location\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 ASC LIMIT 10"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "bar",
+    "bar",
+    "table",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 22.26,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/fitness-dashboard.html",
+   "wall_seconds": 22.27
+  },
+  {
+   "id": "fitness-report",
+   "dataset": "fitness",
+   "mode": "report",
+   "request": "write me a summary of the fitness programme results for the donor",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421834-OgczF5Zes29PzUlbAPvc",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3136,
+       "completion_tokens": 747,
+       "total_tokens": 3883,
+       "cost": 0.00042565,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00042565,
+        "upstream_inference_prompt_cost": 0.0003136,
+        "upstream_inference_completions_cost": 0.00011205
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 8.664
+     },
+     "raw": "{\n  \"title\": \"Fitness Programme Impact Summary\",\n  \"subtitle\": \"Overview of participant growth and performance changes from baseline to endline\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total participants\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"baseline\\\" UNION ALL SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"endline\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Average height gain by location\",\n      \"sql\": \"WITH joined AS (SELECT b.\\\"Child ID\\\", b.\\\"Location\\\", b.\\\"Height cm\\\" AS h1, e.\\\"Height cm\\\" AS h2 FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), gains AS (SELECT \\\"Location\\\", AVG(h2 - h1) AS avg_gain FROM joined WHERE h2 IS NOT NULL AND h1 IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10) SELECT \\\"Location\\\", avg_gain FROM gains\",\n      \"x\": \"Location\",\n      \"y\": [\"avg_gain\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Average sit-ups improvement by coach\",\n      \"sql\": \"WITH joined AS (SELECT b.\\\"Child ID\\\", b.\\\"Coach\\\", b.\\\"Sit ups\\\" AS s1, e.\\\"Sit ups\\\" AS s2 FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), gains AS (SELECT \\\"Coach\\\", AVG(s2 - s1) AS avg_gain FROM joined WHERE s2 IS NOT NULL AND s1 IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10) SELECT \\\"Coach\\\", avg_gain FROM gains\",\n      \"x\": \"Coach\",\n      \"y\": [\"avg_gain\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 individual height improvements\",\n      \"sql\": \"WITH joined AS (SELECT b.\\\"Child ID\\\", b.\\\"Child name\\\", b.\\\"Location\\\", b.\\\"Height cm\\\" AS h1, e.\\\"Height cm\\\" AS h2 FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), gains AS (SELECT \\\"Child name\\\", \\\"Location\\\", (h2 - h1) AS improvement FROM joined WHERE h2 IS NOT NULL AND h1 IS NOT NULL ORDER BY 3 DESC LIMIT 10) SELECT * FROM gains\",\n      \"x\": \"Child name\",\n      \"y\": [\"improvement\"]\n    }\n  ],\n  \"narrative\": \"The programme engaged {{p1}} unique children across multiple locations. Analysis of physical metrics reveals significant growth, with the average height increase varying by region, led by {{p2}} in the top-performing location. Strength improvements were also notable, with coaches like {{p3}} showing the highest average gains in sit-ups among their assigned groups. Individual success stories highlight the programme's effectiveness, with the top performer achieving a height increase of {{p4}}.\",\n  \"missing\": [\"disbursed amount\", \"attendance rate\", \"injury count\"]\n}",
+     "problems": [],
+     "panel_problems": [
+      "p1: kpi needs one row with a number"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787421842-yESMmai4ETejdKNoRXxw",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3189,
+       "completion_tokens": 834,
+       "total_tokens": 4023,
+       "cost": 0.000444,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.000444,
+        "upstream_inference_prompt_cost": 0.0003189,
+        "upstream_inference_completions_cost": 0.0001251
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 9.835
+     },
+     "raw": "{\n  \"title\": \"Fitness Programme Impact Summary\",\n  \"subtitle\": \"Overview of participant growth and performance changes from baseline to endline\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Participants\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"baseline\\\" UNION ALL SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"endline\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Average Height Change by Location\",\n      \"sql\": \"WITH combined AS (SELECT \\\"Child ID\\\", \\\"Location\\\", \\\"Height cm\\\" FROM \\\"baseline\\\" UNION ALL SELECT \\\"Child ID\\\", \\\"Location\\\", \\\"Height cm\\\" FROM \\\"endline\\\") SELECT \\\"Location\\\", AVG(CASE WHEN \\\"Height cm\\\" IN (SELECT \\\"Height cm\\\" FROM \\\"endline\\\" WHERE \\\"Child ID\\\" = combined.\\\"Child ID\\\") - CASE WHEN \\\"Height cm\\\" IN (SELECT \\\"Height cm\\\" FROM \\\"baseline\\\" WHERE \\\"Child ID\\\" = combined.\\\"Child ID\\\") THEN 0 ELSE 1000000 END) AS diff FROM combined GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"Location\",\n      \"y\": [\"diff\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Average Sit-ups Improvement by Coach\",\n      \"sql\": \"WITH combined AS (SELECT \\\"Child ID\\\", \\\"Coach\\\", \\\"Sit ups\\\" FROM \\\"baseline\\\" UNION ALL SELECT \\\"Child ID\\\", \\\"Coach\\\", \\\"Sit ups\\\" FROM \\\"endline\\\") SELECT \\\"Coach\\\", AVG(CASE WHEN \\\"Sit ups\\\" IN (SELECT \\\"Sit ups\\\" FROM \\\"endline\\\" WHERE \\\"Child ID\\\" = combined.\\\"Child ID\\\") - CASE WHEN \\\"Sit ups\\\" IN (SELECT \\\"Sit ups\\\" FROM \\\"baseline\\\" WHERE \\\"Child ID\\\" = combined.\\\"Child ID\\\") THEN 0 ELSE 1000000 END) AS diff FROM combined GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"Coach\",\n      \"y\": [\"diff\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Individual Improvements\",\n      \"sql\": \"WITH combined AS (SELECT \\\"Child ID\\\", \\\"Child name\\\", \\\"School\\\", \\\"Height cm\\\" FROM \\\"baseline\\\" UNION ALL SELECT \\\"Child ID\\\", \\\"Child name\\\", \\\"School\\\", \\\"Height cm\\\" FROM \\\"endline\\\") SELECT \\\"Child name\\\", \\\"School\\\", AVG(CASE WHEN \\\"Height cm\\\" IN (SELECT \\\"Height cm\\\" FROM \\\"endline\\\" WHERE \\\"Child ID\\\" = combined.\\\"Child ID\\\") - CASE WHEN \\\"Height cm\\\" IN (SELECT \\\"Height cm\\\" FROM \\\"baseline\\\" WHERE \\\"Child ID\\\" = combined.\\\"Child ID\\\") THEN 0 ELSE 1000000 END) AS height_gain FROM combined GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 10\",\n      \"x\": \"Child name\",\n      \"y\": [\"height_gain\"]\n    }\n  ],\n  \"narrative\": \"The programme engaged {{p1}} unique children across multiple locations. Analysis of the data reveals significant physical development, with the average height increase varying by location, where {{p2}} shows the highest growth. Coach performance also varied, with {{p3}} demonstrating the greatest average improvement in sit-ups among their group. Individual success stories are highlighted in the top performers list, where {{p4}} stands out for the most substantial height gain.\",\n  \"missing\": [\"disbursed amount\", \"attendance rate\", \"injury count\"]\n}",
+     "problems": [],
+     "panel_problems": [
+      "p1: kpi needs one row with a number",
+      "p2: ParseError: Expected END after CASE. Line 1, Col: 395.\n   IN (SELECT \"Height cm\" FROM \"baseline\" WHERE \"Child ID\" = combined.\"Child ID\") THEN 0 ELSE 1000000 \u001b[4mEND\u001b[0m) AS diff FROM combined GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+      "p3: ParseError: Expected END after CASE. Line 1, Col: 374.\n  s\" IN (SELECT \"Sit ups\" FROM \"baseline\" WHERE \"Child ID\" = combined.\"Child ID\") THEN 0 ELSE 1000000 \u001b[4mEND\u001b[0m) AS diff FROM combined GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+      "p4: ParseError: Expected END after CASE. Line 1, Col: 431.\n   IN (SELECT \"Height cm\" FROM \"baseline\" WHERE \"Child ID\" = combined.\"Child ID\") THEN 0 ELSE 1000000 \u001b[4mEND\u001b[0m) AS height_gain FROM combined GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 10"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 4,
+   "panels_ok": 3,
+   "panel_problems": [
+    "p1: kpi needs one row with a number"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 18.5,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/fitness-report.html",
+   "wall_seconds": 18.53
+  },
+  {
+   "id": "fitness-gender",
+   "dataset": "fitness",
+   "mode": "dashboard",
+   "request": "are girls and boys improving equally? show me",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421852-t3bcxD57U9mhfhJh8IcW",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3133,
+       "completion_tokens": 1524,
+       "total_tokens": 4657,
+       "cost": 0.0005419,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0005419,
+        "upstream_inference_prompt_cost": 0.0003133,
+        "upstream_inference_completions_cost": 0.0002286
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 27.029
+     },
+     "raw": "{\n  \"title\": \"Gender Gap Analysis\",\n  \"subtitle\": \"Comparing improvement in physical fitness metrics between girls and boys\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total participants\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM (SELECT * FROM \\\"baseline\\\" UNION ALL SELECT * FROM \\\"endline\\\")\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Average Sit-ups improvement by gender\",\n      \"sql\": \"WITH baseline AS (SELECT \\\"Child ID\\\", AVG(\\\"Sit ups\\\") AS b_sit FROM \\\"baseline\\\" GROUP BY 1), endline AS (SELECT \\\"Child ID\\\", AVG(\\\"Sit ups\\\") AS e_sit FROM \\\"endline\\\" GROUP BY 1), joined AS (SELECT b.\\\"Child ID\\\", b.b_sit, e.e_sit FROM baseline b JOIN endline e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), gender AS (SELECT \\\"Child ID\\\", CASE WHEN b.\\\"Gender\\\" = 'Female' THEN 'Girls' ELSE 'Boys' END AS gender FROM joined b JOIN baseline b ON b.\\\"Child ID\\\" = b.\\\"Child ID\\\"), improvement AS (SELECT gender, AVG(e_sit - b_sit) AS diff FROM gender GROUP BY 1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), SELECT gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn\",\n      \"x\": \"gender\",\n      \"y\": [\"diff\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Average Shuttle run improvement by gender\",\n      \"sql\": \"WITH baseline AS (SELECT \\\"Child ID\\\", AVG(\\\"Shuttle run sec\\\") AS b_run FROM \\\"baseline\\\" GROUP BY 1), endline AS (SELECT \\\"Child ID\\\", AVG(\\\"Shuttle run sec\\\") AS e_run FROM \\\"endline\\\" GROUP BY 1), joined AS (SELECT b.\\\"Child ID\\\", b.b_run, e.e_run FROM baseline b JOIN endline e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), gender AS (SELECT \\\"Child ID\\\", CASE WHEN b.\\\"Gender\\\" = 'Female' THEN 'Girls' ELSE 'Boys' END AS gender FROM joined b JOIN baseline b ON b.\\\"Child ID\\\" = b.\\\"Child ID\\\"), improvement AS (SELECT gender, AVG(e_run - b_run) AS diff FROM gender GROUP BY 1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), SELECT gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn\",\n      \"x\": \"gender\",\n      \"y\": [\"diff\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"bar\",\n      \"title\": \"Average Height improvement by gender\",\n      \"sql\": \"WITH baseline AS (SELECT \\\"Child ID\\\", AVG(\\\"Height cm\\\") AS b_hgt FROM \\\"baseline\\\" GROUP BY 1), endline AS (SELECT \\\"Child ID\\\", AVG(\\\"Height cm\\\") AS e_hgt FROM \\\"endline\\\" GROUP BY 1), joined AS (SELECT b.\\\"Child ID\\\", b.b_hgt, e.e_hgt FROM baseline b JOIN endline e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), gender AS (SELECT \\\"Child ID\\\", CASE WHEN b.\\\"Gender\\\" = 'Female' THEN 'Girls' ELSE 'Boys' END AS gender FROM joined b JOIN baseline b ON b.\\\"Child ID\\\" = b.\\\"Child ID\\\"), improvement AS (SELECT gender, AVG(e_hgt - b_hgt) AS diff FROM gender GROUP BY 1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), SELECT gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn\",\n      \"x\": \"gender\",\n      \"y\": [\"diff\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"table\",\n      \"title\": \"Top 5 Girls by Sit-ups gain\",\n      \"sql\": \"WITH baseline AS (SELECT \\\"Child ID\\\", \\\"Sit ups\\\" AS b_sit FROM \\\"baseline\\\" WHERE \\\"Gender\\\" = 'Female'), endline AS (SELECT \\\"Child ID\\\", \\\"Sit ups\\\" AS e_sit FROM \\\"endline\\\" WHERE \\\"Gender\\\" = 'Female'), joined AS (SELECT b.\\\"Child ID\\\", b.b_sit, e.e_sit FROM baseline b JOIN endline e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), improvement AS (SELECT \\\"Child ID\\\", (e_sit - b_sit) AS gain FROM joined WHERE e_sit IS NOT NULL AND b_sit IS NOT NULL), ranked AS (SELECT \\\"Child ID\\\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), SELECT \\\"Child ID\\\", gain FROM ranked WHERE rn <= 5 ORDER BY rn\",\n      \"x\": \"Child ID\",\n      \"y\": [\"gain\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"table\",\n      \"title\": \"Top 5 Boys by Sit-ups gain\",\n      \"sql\": \"WITH baseline AS (SELECT \\\"Child ID\\\", \\\"Sit ups\\\" AS b_sit FROM \\\"baseline\\\" WHERE \\\"Gender\\\" = 'Male'), endline AS (SELECT \\\"Child ID\\\", \\\"Sit ups\\\" AS e_sit FROM \\\"endline\\\" WHERE \\\"Gender\\\" = 'Male'), joined AS (SELECT b.\\\"Child ID\\\", b.b_sit, e.e_sit FROM baseline b JOIN endline e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), improvement AS (SELECT \\\"Child ID\\\", (e_sit - b_sit) AS gain FROM joined WHERE e_sit IS NOT NULL AND b_sit IS NOT NULL), ranked AS (SELECT \\\"Child ID\\\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), SELECT \\\"Child ID\\\", gain FROM ranked WHERE rn <= 5 ORDER BY rn\",\n      \"x\": \"Child ID\",\n      \"y\": [\"gain\"]\n    }\n  ],\n  \"narrative\": \"This dashboard compares the average improvement in sit-ups, shuttle run times, and height between girls and boys. The first bar chart shows the average gain in sit-ups, while the second displays the change in shuttle run seconds (where a negative value indicates improvement). The third panel tracks height growth for both groups.\\n\\nDetailed tables list the top five performers for each gender based on sit-ups improvement. These tables help identify specific individuals who have shown the most significant gains in strength and endurance.\\n\\nBy comparing the average differences across the bar charts, you can determine if one gender is outperforming the other in specific metrics. The data allows for a direct comparison of progress rates between the two groups.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Expected CTE to have alias. Line 1, Col: 635.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+      "p3: ParseError: Expected CTE to have alias. Line 1, Col: 651.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+      "p4: ParseError: Expected CTE to have alias. Line 1, Col: 639.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+      "p5: ParseError: Expected CTE to have alias. Line 1, Col: 531.\n  ranked AS (SELECT \"Child ID\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m \"Child ID\", gain FROM ranked WHERE rn <= 5 ORDER BY rn",
+      "p6: ParseError: Expected CTE to have alias. Line 1, Col: 527.\n  ranked AS (SELECT \"Child ID\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m \"Child ID\", gain FROM ranked WHERE rn <= 5 ORDER BY rn"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787421879-xmg5oyGgEPJyMfWQm1nX",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3546,
+       "completion_tokens": 563,
+       "total_tokens": 4109,
+       "cost": 0.00043905,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00043905,
+        "upstream_inference_prompt_cost": 0.0003546,
+        "upstream_inference_completions_cost": 8.445e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 4.894
+     },
+     "raw": "{\n  \"title\": \"Gender Improvement Comparison\",\n  \"subtitle\": \"Comparing performance gains between girls and boys across physical metrics\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Children\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"baseline\\\" UNION ALL SELECT COUNT(DISTINCT \\\"Child ID\\\") AS n FROM \\\"endline\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Average Improvement by Gender\",\n      \"sql\": \"WITH improvement AS (SELECT \\\"Gender\\\", AVG(\\\"Height cm\\\") AS height_gain, AVG(\\\"Weight kg\\\") AS weight_gain, AVG(\\\"Sit ups\\\") AS sit_ups_gain FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\" GROUP BY 1) SELECT \\\"Gender\\\", height_gain, weight_gain, sit_ups_gain FROM improvement ORDER BY \\\"Gender\\\"\",\n      \"x\": \"Gender\",\n      \"y\": [\"height_gain\", \"weight_gain\", \"sit_ups_gain\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Individual Gains\",\n      \"sql\": \"WITH improvement AS (SELECT \\\"Child ID\\\", \\\"Gender\\\", \\\"Height cm\\\" - \\\"Height cm\\\" AS height_gain, \\\"Weight kg\\\" - \\\"Weight kg\\\" AS weight_gain, \\\"Sit ups\\\" - \\\"Sit ups\\\" AS sit_ups_gain FROM \\\"baseline\\\" b JOIN \\\"endline\\\" e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\"), ranked AS (SELECT \\\"Child ID\\\", \\\"Gender\\\", height_gain, weight_gain, sit_ups_gain, ROW_NUMBER() OVER (ORDER BY height_gain DESC) AS rn FROM improvement) SELECT \\\"Child ID\\\", \\\"Gender\\\", height_gain, weight_gain, sit_ups_gain FROM ranked WHERE rn <= 10 ORDER BY rn\",\n      \"x\": \"Child ID\",\n      \"y\": [\"height_gain\", \"weight_gain\", \"sit_ups_gain\"]\n    }\n  ],\n  \"narrative\": \"The dashboard compares the average improvement in height, weight, and sit-ups between girls and boys. The bar chart shows the mean gain for each gender across these three metrics. The table lists the top 10 individual children with the highest gains in height.\",\n  \"missing\": [\"disbursed amount\", \"monthly trend\", \"site\"]\n}",
+     "problems": [],
+     "panel_problems": [
+      "p1: kpi needs one row with a number",
+      "p2: BinderException: Binder Error: Ambiguous reference to column name \"Gender\" (use: \"b.Gender\" or \"e.Gender\")\n\nLINE 1: WITH improvement AS (SELECT \"Gender\", AVG(\"Height cm\") AS height_gain, AVG(\"Weight kg...\n                                    ^",
+      "p3: BinderException: Binder Error: Ambiguous reference to column name \"Child ID\" (use: \"b.Child ID\" or \"e.Child ID\")\n\nLINE 1: WITH improvement AS (SELECT \"Child ID\", \"Gender\", \"Height cm\" - \"Height cm\" AS height_gain...\n                                    ^"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 6,
+   "panels_ok": 1,
+   "panel_problems": [
+    "p2: ParseError: Expected CTE to have alias. Line 1, Col: 635.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+    "p3: ParseError: Expected CTE to have alias. Line 1, Col: 651.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+    "p4: ParseError: Expected CTE to have alias. Line 1, Col: 639.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+    "p5: ParseError: Expected CTE to have alias. Line 1, Col: 531.\n  ranked AS (SELECT \"Child ID\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m \"Child ID\", gain FROM ranked WHERE rn <= 5 ORDER BY rn",
+    "p6: ParseError: Expected CTE to have alias. Line 1, Col: 527.\n  ranked AS (SELECT \"Child ID\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m \"Child ID\", gain FROM ranked WHERE rn <= 5 ORDER BY rn"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "bar",
+    "bar",
+    "table",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 31.92,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/fitness-gender.html",
+   "wall_seconds": 31.94
+  },
+  {
+   "id": "donors-dashboard",
+   "dataset": "donors",
+   "mode": "dashboard",
+   "request": "donation dashboard - monthly trend, top cities, payment modes, repeat donors",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421884-9VJGWUIJgpDZg3eWCXuX",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 869,
+       "completion_tokens": 748,
+       "total_tokens": 1617,
+       "cost": 0.0001991,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0001991,
+        "upstream_inference_prompt_cost": 8.69e-05,
+        "upstream_inference_completions_cost": 0.0001122
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 6.185
+     },
+     "raw": "{\n  \"title\": \"Donation Dashboard\",\n  \"subtitle\": \"Overview of donation trends, top cities, payment modes, and donor frequency\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Donations\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Amount Collected\",\n      \"sql\": \"SELECT SUM(\\\"Amount\\\") AS n FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"INR\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Unique Donors\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Donor\\\") AS n FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"line\",\n      \"title\": \"Monthly Donation Trend\",\n      \"sql\": \"WITH monthly AS (SELECT DATE_TRUNC('month', \\\"Date\\\") AS month, SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 1) SELECT month, total FROM monthly\",\n      \"x\": \"month\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Donations by City\",\n      \"sql\": \"SELECT \\\"City\\\", SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"City\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"bar\",\n      \"title\": \"Donations by Payment Mode\",\n      \"sql\": \"SELECT \\\"Mode\\\", SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Mode\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p7\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Donors by Frequency\",\n      \"sql\": \"SELECT \\\"Donor\\\", COUNT(*) AS count FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"Donor\",\n      \"y\": [\"count\"]\n    }\n  ],\n  \"narrative\": \"The dashboard reveals that the total number of donations received is {{p1.n}}, generating a cumulative amount of {{p2.n}} INR across {{p3.n}} unique donors. Over time, the monthly trend shows fluctuations in contribution volume, with the most recent month recording a total of {{p4.total}}. \\n\\nGeographically, the top cities driving contributions are highlighted in the bar chart, where the leading city accounts for {{p5.total}} in donations. Payment preferences vary, with the most popular mode being {{p6.total}} in contributions, followed by other methods. \\n\\nFinally, the table identifies the most active supporters, with the top donor having contributed {{p7.count}} times to the cause.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": [
+      "p4: BinderException: Binder Error: No function matches the given name and argument types 'date_trunc(STRING_LITERAL, VARCHAR)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tdate_trunc(VARCHAR, DATE) -> TIMESTAMP\n\tdate_trunc(VARCHAR, INTERVAL) -> INTERVAL\n\tdate_trunc(VARCHAR, TIMESTA"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787421890-t9txOq94kZ2icO2f1KIV",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 985,
+       "completion_tokens": 841,
+       "total_tokens": 1826,
+       "cost": 0.00022465,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 528,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00022465,
+        "upstream_inference_prompt_cost": 9.85e-05,
+        "upstream_inference_completions_cost": 0.00012615
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 6.756
+     },
+     "raw": "{\n  \"title\": \"Donation Overview\",\n  \"subtitle\": \"Monthly trends, top cities, payment modes, and donor frequency\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total donations collected\",\n      \"sql\": \"SELECT SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"INR\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total number of donors\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Donor\\\") AS n FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"kpi\",\n      \"title\": \"Average donation amount\",\n      \"sql\": \"SELECT AVG(\\\"Amount\\\") AS avg_amount FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"INR\"\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total transactions\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"line\",\n      \"title\": \"Monthly donation trend\",\n      \"sql\": \"WITH monthly AS (SELECT DATE_TRUNC('month', CAST(\\\"Date\\\" AS DATE)) AS month, SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 1) SELECT month, total FROM monthly\",\n      \"x\": \"month\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"bar\",\n      \"title\": \"Donations by city\",\n      \"sql\": \"SELECT \\\"City\\\", SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"City\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p7\",\n      \"kind\": \"bar\",\n      \"title\": \"Donations by payment mode\",\n      \"sql\": \"SELECT \\\"Mode\\\", SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Mode\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p8\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 repeat donors\",\n      \"sql\": \"WITH donor_counts AS (SELECT \\\"Donor\\\", COUNT(*) AS freq FROM \\\"donor_transactions\\\" GROUP BY 1 HAVING COUNT(*) > 1 ORDER BY freq DESC LIMIT 10) SELECT \\\"Donor\\\", freq FROM donor_counts\",\n      \"x\": \"Donor\",\n      \"y\": [\"freq\"]\n    }\n  ],\n  \"narrative\": \"The dashboard tracks the total funds raised, which stands at {{p1}}. We have engaged {{p2}} unique donors, with an average contribution of {{p3}} per transaction across {{p4}} total payments.\\n\\nOver time, the monthly collection pattern shows a trend where the total amount collected in the most recent month was {{p5.total}}. This helps identify seasonal giving patterns.\\n\\nGeographically, the city contributing the highest amount is {{p6.total}} (from the top city panel), followed by others. The most popular payment method for the largest sum is {{p7.total}} (from the top mode panel).\\n\\nFinally, we identified {{p8.freq}} as the most frequent donor among those who contributed more than once, highlighting key supporters.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": [
+      "p5: ConversionException: Conversion Error: invalid date field format: \"29-05-2025\", expected format is (YYYY-MM-DD) when casting from source column Date\n\nLINE 1: WITH monthly AS (SELECT DATE_TRUNC('MONTH', CAST(\"Date\" AS DATE)) AS month, SUM(\"Amount\") AS total FROM...\n                                   "
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 8,
+   "panels_ok": 7,
+   "panel_problems": [
+    "p5: ConversionException: Conversion Error: invalid date field format: \"29-05-2025\", expected format is (YYYY-MM-DD) when casting from source column Date\n\nLINE 1: WITH monthly AS (SELECT DATE_TRUNC('MONTH', CAST(\"Date\" AS DATE)) AS month, SUM(\"Amount\") AS total FROM...\n                                   "
+   ],
+   "kinds": [
+    "kpi",
+    "kpi",
+    "kpi",
+    "kpi",
+    "line",
+    "bar",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [
+    "p5.total"
+   ],
+   "duration_seconds": 12.94,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/donors-dashboard.html",
+   "wall_seconds": 12.97
+  },
+  {
+   "id": "donors-report",
+   "dataset": "donors",
+   "mode": "report",
+   "request": "summarise our donations this year in a page I can paste into the annual report",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421897-PhCoRfvCmjOlBTsEjxZc",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 871,
+       "completion_tokens": 603,
+       "total_tokens": 1474,
+       "cost": 0.00017755,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00017755,
+        "upstream_inference_prompt_cost": 8.71e-05,
+        "upstream_inference_completions_cost": 9.045e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 4.719
+     },
+     "raw": "{\n  \"title\": \"Annual Donation Summary\",\n  \"subtitle\": \"Overview of total funds, donor distribution, and payment methods for the year\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Donations\",\n      \"sql\": \"SELECT SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"INR\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Unique Donors\",\n      \"sql\": \"SELECT COUNT(DISTINCT \\\"Donor\\\") AS n FROM \\\"donor_transactions\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Donations by Payment Mode\",\n      \"sql\": \"SELECT \\\"Mode\\\", SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 6\",\n      \"x\": \"Mode\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"bar\",\n      \"title\": \"Donations by City\",\n      \"sql\": \"SELECT \\\"City\\\", SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"City\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Donors by Amount\",\n      \"sql\": \"SELECT \\\"Donor\\\", SUM(\\\"Amount\\\") AS total FROM \\\"donor_transactions\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"Donor\",\n      \"y\": [\"total\"]\n    }\n  ],\n  \"narrative\": \"This year, our organization received a total of {{p1}} in donations from {{p2}} unique individuals. The data highlights the diverse ways our supporters contribute, with various payment modes being utilized across the country.\\n\\nWhen analyzing the sources of these funds, it is evident that certain cities have been more generous than others. The top contributing cities, ranked by total amount received, are detailed in the city breakdown panel, showing a strong presence from major urban centers.\\n\\nFurthermore, the payment method analysis reveals the preferred channels for our donors. Whether through digital means like UPI and cards or traditional methods like cheques and cash, every contribution is vital. The top 10 donors by total amount are listed to recognize the significant impact of our most generous supporters.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": []
+    }
+   ],
+   "repair_used": false,
+   "plan_valid": true,
+   "panels_total": 5,
+   "panels_ok": 5,
+   "panel_problems": [],
+   "kinds": [
+    "kpi",
+    "kpi",
+    "bar",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 4.72,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/donors-report.html",
+   "wall_seconds": 4.73
+  },
+  {
+   "id": "household-dashboard",
+   "dataset": "household",
+   "mode": "dashboard",
+   "request": "build a dashboard of the household survey - coverage by village and by enumerator, submissions over time",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421902-EIv01uSroIto57BKowvL",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2056,
+       "completion_tokens": 520,
+       "total_tokens": 2576,
+       "cost": 0.0002836,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 528,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0002836,
+        "upstream_inference_prompt_cost": 0.0002056,
+        "upstream_inference_completions_cost": 7.8e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 4.614
+     },
+     "raw": "{\n  \"title\": \"Household Survey Dashboard\",\n  \"subtitle\": \"Overview of survey coverage, enumerator distribution, and submission trends\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total households surveyed\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"household_survey\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Households by village\",\n      \"sql\": \"SELECT village, COUNT(*) AS n FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 20\",\n      \"x\": \"village\",\n      \"y\": [\"n\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Households by enumerator\",\n      \"sql\": \"SELECT enumerator_name, COUNT(*) AS n FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 20\",\n      \"x\": \"enumerator_name\",\n      \"y\": [\"n\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"line\",\n      \"title\": \"Submissions over time\",\n      \"sql\": \"SELECT DATE_TRUNC('day', _submission_time) AS day, COUNT(*) AS n FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 1\",\n      \"x\": \"day\",\n      \"y\": [\"n\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 villages by count\",\n      \"sql\": \"SELECT village, COUNT(*) AS n FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"\n    }\n  ],\n  \"narrative\": \"The survey covered a total of {{p1}} households across the region. Distribution varies significantly by location, with the most visited village accounting for {{p2.n}} responses. Enumerator workload is also uneven, where the top enumerator recorded {{p3.n}} visits. Over the reporting period, submissions peaked on {{p4.x}} with {{p4.y[0]}} entries recorded that day.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": [
+      "p4: BinderException: Binder Error: No function matches the given name and argument types 'date_trunc(STRING_LITERAL, VARCHAR)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tdate_trunc(VARCHAR, DATE) -> TIMESTAMP\n\tdate_trunc(VARCHAR, INTERVAL) -> INTERVAL\n\tdate_trunc(VARCHAR, TIMESTA"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787421907-6oOks2FPHPGyVvTpE880",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2172,
+       "completion_tokens": 497,
+       "total_tokens": 2669,
+       "cost": 0.00029175,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00029175,
+        "upstream_inference_prompt_cost": 0.0002172,
+        "upstream_inference_completions_cost": 7.455e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 6.693
+     },
+     "raw": "{\n  \"title\": \"Household Survey Dashboard\",\n  \"subtitle\": \"Coverage by village, enumerator, and submission timeline\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total households surveyed\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"household_survey\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Households by village\",\n      \"sql\": \"SELECT village, COUNT(*) AS n FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 20\",\n      \"x\": \"village\",\n      \"y\": [\"n\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Households by enumerator\",\n      \"sql\": \"SELECT enumerator_name, COUNT(*) AS n FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 20\",\n      \"x\": \"enumerator_name\",\n      \"y\": [\"n\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"line\",\n      \"title\": \"Submissions over time\",\n      \"sql\": \"SELECT DATE(\\\"_submission_time\\\") AS day, COUNT(*) AS n FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 1\",\n      \"x\": \"day\",\n      \"y\": [\"n\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"table\",\n      \"title\": \"Recent submissions\",\n      \"sql\": \"SELECT enumerator_name, village, _submission_time FROM \\\"household_survey\\\" ORDER BY _submission_time DESC LIMIT 10\",\n      \"x\": \"\",\n      \"y\": []\n    }\n  ],\n  \"narrative\": \"The survey covered {{p1}} households in total. Village-level coverage shows {{p2}} as the most represented location, followed by others. Enumerator performance varies, with {{p3}} leading the count of completed surveys. Over time, submissions peaked on {{p4}}.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": []
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 5,
+   "panels_ok": 5,
+   "panel_problems": [],
+   "kinds": [
+    "kpi",
+    "bar",
+    "bar",
+    "line",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 11.31,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/household-dashboard.html",
+   "wall_seconds": 11.32
+  },
+  {
+   "id": "holdout-schools",
+   "dataset": "holdout",
+   "mode": "dashboard",
+   "request": "build me a school dashboard - enrolment trend over years, infrastructure gaps, girls vs boys",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421913-XfQiKVbD6KhehmtZluSr",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2322,
+       "completion_tokens": 1051,
+       "total_tokens": 3373,
+       "cost": 0.00038985,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 528,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00038985,
+        "upstream_inference_prompt_cost": 0.0002322,
+        "upstream_inference_completions_cost": 0.00015765
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 20.349
+     },
+     "raw": "{\n  \"title\": \"School Dashboard\",\n  \"subtitle\": \"Enrolment trends, infrastructure status, and gender gaps\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Students 2024\",\n      \"sql\": \"SELECT SUM(Girls 2024) + SUM(Boys 2024) AS total FROM \\\"school_enrolment_by_year\\\" WHERE \\\"School Code\\\" IS NOT NULL\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"line\",\n      \"title\": \"Enrolment Trend (Girls)\",\n      \"sql\": \"SELECT 'Girls' AS series, SUM(Girls 2022) AS g22, SUM(Girls 2023) AS g23, SUM(Girls 2024) AS g24 FROM \\\"school_enrolment_by_year\\\" WHERE \\\"School Code\\\" IS NOT NULL UNION ALL SELECT 'Boys' AS series, SUM(Boys 2022) AS g22, SUM(Boys 2023) AS g23, SUM(Boys 2024) AS g24 FROM \\\"school_enrolment_by_year\\\" WHERE \\\"School Code\\\" IS NOT NULL\",\n      \"x\": \"series\",\n      \"y\": [\"g22\", \"g23\", \"g24\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Functional Toilets (Girls)\",\n      \"sql\": \"SELECT SUM(CASE WHEN \\\"Toilets functional (girls)\\\" = 'Yes' THEN 1 ELSE 0 END) AS yes, SUM(CASE WHEN \\\"Toilets functional (girls)\\\" = 'No' THEN 1 ELSE 0 END) AS no FROM \\\"school_infrastructure\\\" WHERE \\\"School Code\\\" IS NOT NULL\",\n      \"x\": \"yes\",\n      \"y\": [\"no\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"bar\",\n      \"title\": \"Drinking Water Availability\",\n      \"sql\": \"SELECT SUM(CASE WHEN \\\"Drinking water\\\" = 'Yes' THEN 1 ELSE 0 END) AS yes, SUM(CASE WHEN \\\"Drinking water\\\" = 'No' THEN 1 ELSE 0 END) AS no FROM \\\"school_infrastructure\\\" WHERE \\\"School Code\\\" IS NOT NULL\",\n      \"x\": \"yes\",\n      \"y\": [\"no\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Electricity Availability\",\n      \"sql\": \"SELECT SUM(CASE WHEN \\\"Electricity\\\" = 'Yes' THEN 1 ELSE 0 END) AS yes, SUM(CASE WHEN \\\"Electricity\\\" = 'No' THEN 1 ELSE 0 END) AS no FROM \\\"school_infrastructure\\\" WHERE \\\"School Code\\\" IS NOT NULL\",\n      \"x\": \"yes\",\n      \"y\": [\"no\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Schools by Girls Enrolment\",\n      \"sql\": \"SELECT \\\"School Name\\\", SUM(Girls 2024) AS girls_2024, SUM(Boys 2024) AS boys_2024 FROM \\\"school_enrolment_by_year\\\" WHERE \\\"School Code\\\" IS NOT NULL GROUP BY \\\"School Name\\\" ORDER BY girls_2024 DESC LIMIT 10\"\n    }\n  ],\n  \"narrative\": \"The dashboard tracks student enrolment across selected schools, highlighting a total student count of {{p1}} for the most recent year. Trends show how the number of girls and boys has evolved from 2022 to 2024, with the girls' series reaching {{p2.g24}} in 2024 compared to {{p2.g22}} in 2022.\\n\\nInfrastructure gaps are visualized through the availability of essential facilities. The number of schools with functional toilets for girls is {{p3.yes}}, while {{p3.no}} schools lack this facility. Similarly, {{p4.yes}} schools have access to drinking water, leaving {{p4.no}} without. Electricity is available in {{p5.yes}} schools but missing in {{p5.no}}.\\n\\nA detailed table lists the top 10 schools by girls' enrolment, showing specific counts for 2024. This allows for a direct comparison of performance across institutions.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": [
+      "p1: ParseError: Expecting ). Line 1, Col: 21.\n  SELECT SUM(Girls \u001b[4m2024\u001b[0m) + SUM(Boys 2024) AS total FROM \"school_enrolment_by_year\" WHERE \"School Code\" IS NOT NULL",
+      "p2: ParseError: Expecting ). Line 1, Col: 40.\n  SELECT 'Girls' AS series, SUM(Girls \u001b[4m2022\u001b[0m) AS g22, SUM(Girls 2023) AS g23, SUM(Girls 2024) AS g24 FROM \"school_enrolment_by_year\" WHERE \"Scho",
+      "p6: ParseError: Expecting ). Line 1, Col: 36.\n  SELECT \"School Name\", SUM(Girls \u001b[4m2024\u001b[0m) AS girls_2024, SUM(Boys 2024) AS boys_2024 FROM \"school_enrolment_by_year\" WHERE \"School Code\" IS "
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787421934-x8zc7IseLoJMCOHC4tsH",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2607,
+       "completion_tokens": 808,
+       "total_tokens": 3415,
+       "cost": 0.0003819,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 2112,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0003819,
+        "upstream_inference_prompt_cost": 0.0002607,
+        "upstream_inference_completions_cost": 0.0001212
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 6.03
+     },
+     "raw": "{\n  \"title\": \"School Dashboard: Enrolment & Infrastructure\",\n  \"subtitle\": \"Tracks enrolment trends, gender gaps, and facility status across schools\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Enrolment (2024)\",\n      \"sql\": \"SELECT SUM(\\\"Girls 2024\\\") + SUM(\\\"Boys 2024\\\") AS total FROM \\\"school_enrolment_by_year\\\" WHERE \\\"School Code\\\" IS NOT NULL\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"line\",\n      \"title\": \"Enrolment Trend (Girls vs Boys)\",\n      \"sql\": \"WITH yearly_totals AS (SELECT 'Girls' AS series, SUM(\\\"Girls 2022\\\") AS g22, SUM(\\\"Girls 2023\\\") AS g23, SUM(\\\"Girls 2024\\\") AS g24 FROM \\\"school_enrolment_by_year\\\" WHERE \\\"School Code\\\" IS NOT NULL UNION ALL SELECT 'Boys' AS series, SUM(\\\"Boys 2022\\\") AS g22, SUM(\\\"Boys 2023\\\") AS g23, SUM(\\\"Boys 2024\\\") AS g24 FROM \\\"school_enrolment_by_year\\\" WHERE \\\"School Code\\\" IS NOT NULL) SELECT series, g22, g23, g24 FROM yearly_totals ORDER BY series, g24 DESC\",\n      \"x\": \"series\",\n      \"y\": [\"g22\", \"g23\", \"g24\"],\n      \"series\": \"series\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Girls vs Boys Enrolment (2024)\",\n      \"sql\": \"SELECT SUM(\\\"Girls 2024\\\") AS girls_2024, SUM(\\\"Boys 2024\\\") AS boys_2024 FROM \\\"school_enrolment_by_year\\\" WHERE \\\"School Code\\\" IS NOT NULL\",\n      \"x\": \"girls_2024\",\n      \"y\": [\"boys_2024\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Schools with Infrastructure Gaps\",\n      \"sql\": \"SELECT \\\"School Name\\\", SUM(CASE WHEN \\\"Toilets functional (girls)\\\" = 'No' THEN 1 ELSE 0 END) AS no_girls_toilets, SUM(CASE WHEN \\\"Drinking water\\\" = 'No' THEN 1 ELSE 0 END) AS no_water, SUM(CASE WHEN \\\"Electricity\\\" = 'No' THEN 1 ELSE 0 END) AS no_electricity FROM \\\"school_infrastructure\\\" GROUP BY \\\"School Name\\\" ORDER BY no_girls_toilets DESC, no_water DESC, no_electricity DESC LIMIT 10\",\n      \"x\": \"School Name\",\n      \"y\": [\"no_girls_toilets\", \"no_water\", \"no_electricity\"]\n    }\n  ],\n  \"narrative\": \"The dashboard highlights the total student population in 2024, which is the sum of girls and boys enrolled across all schools. By comparing the enrolment trends from 2022 to 2024, we can observe the growth trajectory for both genders. The bar chart specifically isolates the 2024 figures to visualize the current gender gap in attendance.\",\n  \"missing\": []\n}",
+     "problems": [],
+     "panel_problems": [
+      "p4: BinderException: Binder Error: Referenced column \"School Name\" not found in FROM clause!\nCandidate bindings: \"School Code\", \"Classrooms\"\n\nLINE 1: ... END) AS no_electricity FROM \"school_infrastructure\" GROUP BY \"School Name\" ORDER BY no_girls_toilets DESC, no_water DESC...\n                          "
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 4,
+   "panels_ok": 3,
+   "panel_problems": [
+    "p4: BinderException: Binder Error: Referenced column \"School Name\" not found in FROM clause!\nCandidate bindings: \"School Code\", \"Classrooms\"\n\nLINE 1: ... END) AS no_electricity FROM \"school_infrastructure\" GROUP BY \"School Name\" ORDER BY no_girls_toilets DESC, no_water DESC...\n                          "
+   ],
+   "kinds": [
+    "kpi",
+    "line",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [
+    "2024,",
+    "2024,"
+   ],
+   "lint_unresolved": [],
+   "duration_seconds": 26.38,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/holdout-schools.html",
+   "wall_seconds": 26.39
+  },
+  {
+   "id": "holdout-shg",
+   "dataset": "holdout",
+   "mode": "report",
+   "request": "report on the SHG loan register - repayment, overdue, purpose of loans",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421940-dRYOSsLhiJnEJ9XL7hX4",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2319,
+       "completion_tokens": 704,
+       "total_tokens": 3023,
+       "cost": 0.0003375,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 2112,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0003375,
+        "upstream_inference_prompt_cost": 0.0002319,
+        "upstream_inference_completions_cost": 0.0001056
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 5.471
+     },
+     "raw": "{\n  \"title\": \"SHG Loan Repayment & Purpose\",\n  \"subtitle\": \"Overview of loan status and usage across blocks\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total loans disbursed\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"shg_loan_register\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total amount repaid\",\n      \"sql\": \"SELECT COALESCE(SUM(\\\"Amount Repaid (Rs)\\\"), 0) AS n FROM \\\"shg_loan_register\\\"\",\n      \"unit\": \"Rs\"\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total loan amount\",\n      \"sql\": \"SELECT COALESCE(SUM(\\\"Loan Amount (Rs)\\\"), 0) AS n FROM \\\"shg_loan_register\\\"\",\n      \"unit\": \"Rs\"\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"bar\",\n      \"title\": \"Repayment status distribution\",\n      \"sql\": \"SELECT \\\"Repayment Status\\\" AS status, COUNT(*) AS count FROM \\\"shg_loan_register\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"status\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Loan purpose breakdown\",\n      \"sql\": \"SELECT \\\"Purpose\\\" AS purpose, COUNT(*) AS count FROM \\\"shg_loan_register\\\" GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"purpose\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"table\",\n      \"title\": \"Repayment performance by block\",\n      \"sql\": \"SELECT \\\"Block\\\", COUNT(*) AS total_loans, SUM(\\\"Amount Repaid (Rs)\\\") AS repaid, SUM(\\\"Loan Amount (Rs)\\\") AS total, COALESCE(SUM(\\\"Amount Repaid (Rs)\\\"), 0) * 100.0 / NULLIF(SUM(\\\"Loan Amount (Rs)\\\"), 0) AS recovery_pct FROM \\\"shg_loan_register\\\" GROUP BY 1 ORDER BY 3 DESC LIMIT 10\",\n      \"x\": \"block\",\n      \"y\": [\"total_loans\", \"repaid\", \"total\", \"recovery_pct\"]\n    }\n  ],\n  \"narrative\": \"The dashboard displays the total number of loans disbursed and the aggregate amounts involved. It highlights the recovery rate by comparing total repaid against total loaned.\\n\\nThe bar charts break down the portfolio by repayment status and loan purpose, showing where the majority of funds are directed and how many loans are currently overdue or regular.\\n\\nThe final table details performance at the block level, listing the top blocks by total loan volume and their specific recovery percentages.\",\n  \"missing\": [\"average loan size\", \"overdue amount\"]\n}",
+     "problems": [],
+     "panel_problems": []
+    }
+   ],
+   "repair_used": false,
+   "plan_valid": true,
+   "panels_total": 6,
+   "panels_ok": 6,
+   "panel_problems": [],
+   "kinds": [
+    "kpi",
+    "kpi",
+    "kpi",
+    "bar",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 5.47,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/holdout-shg.html",
+   "wall_seconds": 5.48
+  },
+  {
+   "id": "holdout-health",
+   "dataset": "holdout",
+   "mode": "dashboard",
+   "request": "district health dashboard comparing districts on the key indicators",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787421945-2VLiQqNmORlPb7liK0K7",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2313,
+       "completion_tokens": 798,
+       "total_tokens": 3111,
+       "cost": 0.000351,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 2112,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.000351,
+        "upstream_inference_prompt_cost": 0.0002313,
+        "upstream_inference_completions_cost": 0.0001197
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 6.866
+     },
+     "raw": "{\n  \"title\": \"District Health Indicators\",\n  \"subtitle\": \"Compare vaccination, literacy, and sanitation across districts\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Households Surveyed\",\n      \"sql\": \"SELECT SUM(\\\"Households surveyed\\\") AS n FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total'\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Vaccination Coverage by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Children age 12-23 months fully vaccinated (%)\\\" AS \\\"vaccination\\\" FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY \\\"vaccination\\\" DESC\",\n      \"x\": \"District\",\n      \"y\": [\"vaccination\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Literacy Rate by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Women age 15-49 years who are literate (%)\\\" AS \\\"literacy\\\" FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY \\\"literacy\\\" DESC\",\n      \"x\": \"District\",\n      \"y\": [\"literacy\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"bar\",\n      \"title\": \"Institutional Births by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Institutional births (%)\\\" AS \\\"births\\\" FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY \\\"births\\\" DESC\",\n      \"x\": \"District\",\n      \"y\": [\"births\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Sanitation Coverage by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Households with improved sanitation facility (%)\\\" AS \\\"sanitation\\\" FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY \\\"sanitation\\\" DESC\",\n      \"x\": \"District\",\n      \"y\": [\"sanitation\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"bar\",\n      \"title\": \"Stunting Rates by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Children under 5 years who are stunted (%)\\\" AS \\\"stunting\\\" FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY \\\"stunting\\\" DESC\",\n      \"x\": \"District\",\n      \"y\": [\"stunting\"]\n    }\n  ],\n  \"narrative\": \"The dashboard aggregates data from district health factsheets to highlight key developmental indicators. The total number of households surveyed provides the baseline for all percentage calculations. Vaccination coverage varies significantly, with some districts showing higher adherence to immunization schedules than others. Literacy rates among women aged 15-49 years serve as a proxy for long-term educational attainment in these regions. Institutional births indicate the level of access to formal healthcare facilities during delivery. Sanitation coverage reflects the proportion of households with improved facilities, a critical determinant of public health. Finally, stunting rates among children under five years highlight nutritional challenges and early childhood development gaps.\",\n  \"missing\": [\"disbursed amount\", \"loan repayment status\", \"school enrollment numbers\", \"infrastructure details\"]\n}",
+     "problems": [],
+     "panel_problems": [
+      "p2: 40 categories is unreadable",
+      "p3: 40 categories is unreadable",
+      "p4: 40 categories is unreadable",
+      "p5: 40 categories is unreadable",
+      "p6: 40 categories is unreadable"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787421952-Ooo53cl08kVM8Qv0QNGB",
+      "model": "qwen/qwen3.5-9b",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2409,
+       "completion_tokens": 805,
+       "total_tokens": 3214,
+       "cost": 0.00036165,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 2112,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00036165,
+        "upstream_inference_prompt_cost": 0.0002409,
+        "upstream_inference_completions_cost": 0.00012075
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 7.712
+     },
+     "raw": "{\n  \"title\": \"District Health Indicators\",\n  \"subtitle\": \"Compare vaccination, literacy, and sanitation across districts\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Households Surveyed\",\n      \"sql\": \"SELECT SUM(\\\"Households surveyed\\\") AS n FROM \\\"district_health_factsheet\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Vaccination Rate by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Children age 12-23 months fully vaccinated (%)\\\" AS rate FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY rate DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"rate\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Literacy Rate by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Women age 15-49 years who are literate (%)\\\" AS rate FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY rate DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"rate\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"bar\",\n      \"title\": \"Stunting Rate by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Children under 5 years who are stunted (%)\\\" AS rate FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY rate DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"rate\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Institutional Births by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Institutional births (%)\\\" AS rate FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY rate DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"rate\"]\n    },\n    {\n      \"id\": \"p6\",\n      \"kind\": \"bar\",\n      \"title\": \"Sanitation Coverage by District\",\n      \"sql\": \"SELECT \\\"District\\\", \\\"Households with improved sanitation facility (%)\\\" AS rate FROM \\\"district_health_factsheet\\\" WHERE \\\"District\\\" != 'State Total' ORDER BY rate DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"rate\"]\n    }\n  ],\n  \"narrative\": \"This dashboard aggregates household survey data to highlight key health metrics across selected districts. The first panel shows the total number of households included in the survey, providing context for the rates below.\\n\\nThe subsequent panels break down specific indicators: vaccination coverage for children aged 12-23 months, literacy rates among women aged 15-49, and stunting rates among children under five. Each bar chart is limited to the top 10 districts by the respective metric to ensure readability and focus on the most significant variations.\\n\\nAdditional metrics include the percentage of institutional births and households with improved sanitation facilities. By comparing these six indicators side-by-side, users can quickly identify which districts are performing well and which require targeted intervention.\",\n  \"missing\": [\n    \"Disbursed loan amounts\",\n    \"School enrollment numbers\",\n    \"Infrastructure details (toilets, water, electricity)\"\n  ]\n}",
+     "problems": [],
+     "panel_problems": []
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 6,
+   "panels_ok": 6,
+   "panel_problems": [],
+   "kinds": [
+    "kpi",
+    "bar",
+    "bar",
+    "bar",
+    "bar",
+    "bar"
+   ],
+   "has_narrative": true,
+   "lint_literals": [
+    "12",
+    "23",
+    "15",
+    "49,"
+   ],
+   "lint_unresolved": [],
+   "duration_seconds": 14.58,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/qwen_qwen3.5-9b-c2/holdout-health.html",
+   "wall_seconds": 14.6
+  }
+ ]
+}

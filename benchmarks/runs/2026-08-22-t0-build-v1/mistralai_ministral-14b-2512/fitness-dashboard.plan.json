@@ -1,0 +1,505 @@
+{
+ "plan": {
+  "title": "Child Performance Improvement: Baseline vs Endline",
+  "subtitle": "Track physical progress by location and coach across key metrics",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total children tracked",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM baseline",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Average height gain (cm)",
+    "sql": "WITH baseline_avg AS (SELECT AVG(\"Height cm\") AS avg FROM baseline), endline_avg AS (SELECT AVG(\"Height cm\") AS avg FROM endline) SELECT ROUND(endline_avg.avg - baseline_avg.avg, 1) AS n FROM baseline_avg, endline_avg",
+    "unit": "cm"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Shuttle run improvement (%)",
+    "sql": "WITH baseline_avg AS (SELECT AVG(\"Shuttle run sec\") AS avg FROM baseline), endline_avg AS (SELECT AVG(\"Shuttle run sec\") AS avg FROM endline) SELECT ROUND(100 * (1 - NULLIF(endline_avg.avg, 0) / NULLIF(baseline_avg.avg, 0)), 1) AS n FROM baseline_avg, endline_avg",
+    "unit": "%"
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Height improvement by location",
+    "sql": "WITH baseline AS (SELECT \"Location\", AVG(\"Height cm\") AS baseline FROM baseline GROUP BY 1), endline AS (SELECT \"Location\", AVG(\"Height cm\") AS endline FROM endline GROUP BY 1) SELECT b.\"Location\", ROUND(endline.endline - b.baseline, 1) AS height_gain FROM baseline b JOIN endline USING (\"Location\") ORDER BY 2 DESC LIMIT 20",
+    "x": "Location",
+    "y": [
+     "height_gain"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Shuttle run improvement by coach",
+    "sql": "WITH baseline AS (SELECT \"Coach\", AVG(\"Shuttle run sec\") AS baseline FROM baseline GROUP BY 1), endline AS (SELECT \"Coach\", AVG(\"Shuttle run sec\") AS endline FROM endline GROUP BY 1) SELECT b.\"Coach\", ROUND(100 * (1 - NULLIF(endline.endline, 0) / NULLIF(b.baseline, 0)), 1) AS improvement_pct FROM baseline b JOIN endline USING (\"Coach\") ORDER BY 2 DESC LIMIT 20",
+    "x": "Coach",
+    "y": [
+     "improvement_pct"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "line",
+    "title": "Sit-ups progress by location",
+    "sql": "WITH baseline AS (SELECT \"Location\", AVG(\"Sit ups\") AS baseline FROM baseline GROUP BY 1), endline AS (SELECT \"Location\", AVG(\"Sit ups\") AS endline FROM endline GROUP BY 1) SELECT b.\"Location\", endline.endline - b.baseline AS improvement FROM baseline b JOIN endline USING (\"Location\") ORDER BY 1",
+    "x": "Location",
+    "y": [
+     "improvement"
+    ],
+    "series": "Location"
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Top 10 locations by shuttle run improvement",
+    "sql": "WITH baseline AS (SELECT \"Location\", AVG(\"Shuttle run sec\") AS baseline FROM baseline GROUP BY 1), endline AS (SELECT \"Location\", AVG(\"Shuttle run sec\") AS endline FROM endline GROUP BY 1) SELECT b.\"Location\", ROUND(100 * (1 - NULLIF(endline.endline, 0) / NULLIF(b.baseline, 0)), 1) AS improvement_pct FROM baseline b JOIN endline USING (\"Location\") ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "This dashboard tracks physical improvements across {{p1}} children from baseline to endline measurements. On average, children grew {{p2}} taller, with shuttle run times improving by {{p3}}%. Location-based analysis shows {{p4}} had the most significant height gains, while coach {{p5}} led shuttle run improvements. The sit-ups progress chart reveals consistent gains across most locations, with {{p6}} showing the highest average improvement. The top 10 locations by shuttle run improvement demonstrate that targeted coaching yields measurable results, particularly in areas like {{p7}} where improvements exceeded 20%."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 3.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 0.1
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Location",
+    "height_gain"
+   ],
+   "rows": [
+    {
+     "Location": "Nira",
+     "height_gain": 21.7
+    },
+    {
+     "Location": "Kalyanpur",
+     "height_gain": 20.9
+    },
+    {
+     "Location": "Alandi",
+     "height_gain": 20.3
+    },
+    {
+     "Location": "Paroo",
+     "height_gain": 20.0
+    },
+    {
+     "Location": "Dehu",
+     "height_gain": 19.7
+    },
+    {
+     "Location": "Bakhtiyarpur Tola",
+     "height_gain": 18.5
+    },
+    {
+     "Location": "Manjari",
+     "height_gain": 17.0
+    },
+    {
+     "Location": "Barachatti",
+     "height_gain": 15.1
+    },
+    {
+     "Location": "Sahebganj",
+     "height_gain": 15.0
+    },
+    {
+     "Location": "Chandwara",
+     "height_gain": 11.8
+    },
+    {
+     "Location": "Wadgaon",
+     "height_gain": 10.2
+    },
+    {
+     "Location": "Supa",
+     "height_gain": 8.4
+    },
+    {
+     "Location": "Rampur Sokho",
+     "height_gain": 8.2
+    },
+    {
+     "Location": "Bishunpur",
+     "height_gain": 8.2
+    },
+    {
+     "Location": "Ambegaon Budruk",
+     "height_gain": 7.4
+    },
+    {
+     "Location": "Fatehpur",
+     "height_gain": 6.0
+    },
+    {
+     "Location": "Uruli Kanchan",
+     "height_gain": 5.3
+    },
+    {
+     "Location": "Deopur",
+     "height_gain": 5.2
+    },
+    {
+     "Location": "Kharadi",
+     "height_gain": 5.0
+    },
+    {
+     "Location": "Nanded Phata",
+     "height_gain": 4.8
+    }
+   ],
+   "rowcount": 20,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Coach",
+    "improvement_pct"
+   ],
+   "rows": [
+    {
+     "Coach": "Salman Rao",
+     "improvement_pct": 7.2
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "improvement_pct": 6.7
+    },
+    {
+     "Coach": "Bapu Yadav",
+     "improvement_pct": 6.0
+    },
+    {
+     "Coach": "P. T. Pereira",
+     "improvement_pct": 5.0
+    },
+    {
+     "Coach": "Rupali Kumar",
+     "improvement_pct": 4.1
+    },
+    {
+     "Coach": "Bhagyashree",
+     "improvement_pct": 3.2
+    },
+    {
+     "Coach": "Jaspreet George",
+     "improvement_pct": 2.0
+    },
+    {
+     "Coach": "sunil thakur",
+     "improvement_pct": 0.2
+    },
+    {
+     "Coach": "AAKASH ZENDE",
+     "improvement_pct": -0.8
+    },
+    {
+     "Coach": "Vimla",
+     "improvement_pct": -0.9
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "improvement_pct": -3.2
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "improvement_pct": -5.3
+    },
+    {
+     "Coach": "indira chandra",
+     "improvement_pct": -6.5
+    },
+    {
+     "Coach": "Rosy",
+     "improvement_pct": -9.6
+    },
+    {
+     "Coach": "T. S. Fernandez",
+     "improvement_pct": -9.9
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Location",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Location": "Alandi",
+     "improvement": -1.75
+    },
+    {
+     "Location": "Amawan",
+     "improvement": -6.0
+    },
+    {
+     "Location": "Ambegaon Budruk",
+     "improvement": -8.0
+    },
+    {
+     "Location": "Atri",
+     "improvement": 11.333333333333334
+    },
+    {
+     "Location": "Bakhtiyarpur Tola",
+     "improvement": 6.375
+    },
+    {
+     "Location": "Barachatti",
+     "improvement": 8.2
+    },
+    {
+     "Location": "Bariarpur",
+     "improvement": -4.0
+    },
+    {
+     "Location": "Basaith",
+     "improvement": 2.444444444444443
+    },
+    {
+     "Location": "Bhor",
+     "improvement": -1.8571428571428559
+    },
+    {
+     "Location": "Bishunpur",
+     "improvement": 8.428571428571429
+    },
+    {
+     "Location": "Chakan",
+     "improvement": 6.0
+    },
+    {
+     "Location": "Chandpur",
+     "improvement": -2.0
+    },
+    {
+     "Location": "Chandwara",
+     "improvement": -3.75
+    },
+    {
+     "Location": "Chikhali",
+     "improvement": -7.666666666666668
+    },
+    {
+     "Location": "Dehu",
+     "improvement": -3.666666666666668
+    },
+    {
+     "Location": "Deopur",
+     "improvement": 3.571428571428571
+    },
+    {
+     "Location": "Devipur",
+     "improvement": -8.666666666666668
+    },
+    {
+     "Location": "Dobhi",
+     "improvement": -2.0
+    },
+    {
+     "Location": "Fatehpur",
+     "improvement": 2.6000000000000014
+    },
+    {
+     "Location": "Guraru",
+     "improvement": 6.0
+    },
+    {
+     "Location": "Harnaut Tola",
+     "improvement": 7.600000000000001
+    },
+    {
+     "Location": "Imamganj",
+     "improvement": 7.875
+    },
+    {
+     "Location": "Kadus",
+     "improvement": 24.0
+    },
+    {
+     "Location": "Kalyanpur",
+     "improvement": -6.333333333333332
+    },
+    {
+     "Location": "Karpi",
+     "improvement": -5.0
+    },
+    {
+     "Location": "Kesnand",
+     "improvement": -2.0
+    },
+    {
+     "Location": "Kharadi",
+     "improvement": 3.8000000000000007
+    },
+    {
+     "Location": "Loni Kalbhor",
+     "improvement": 3.0
+    },
+    {
+     "Location": "Mahuar",
+     "improvement": 1.5999999999999979
+    },
+    {
+     "Location": "Manjari",
+     "improvement": 10.666666666666666
+    },
+    {
+     "Location": "Motipur",
+     "improvement": 8.375
+    },
+    {
+     "Location": "Nanded Phata",
+     "improvement": 4.666666666666668
+    },
+    {
+     "Location": "Nira",
+     "improvement": -9.0
+    },
+    {
+     "Location": "Paraiya",
+     "improvement": -2.833333333333332
+    },
+    {
+     "Location": "Paroo",
+     "improvement": 7.800000000000001
+    },
+    {
+     "Location": "Rajgurunagar",
+     "improvement": 4.666666666666666
+    },
+    {
+     "Location": "Rampur",
+     "improvement": 7.166666666666668
+    },
+    {
+     "Location": "Rampur Sokho",
+     "improvement": 6.000000000000002
+    },
+    {
+     "Location": "Sahebganj",
+     "improvement": 2.400000000000002
+    },
+    {
+     "Location": "Saswad",
+     "improvement": 13.0
+    },
+    {
+     "Location": "Shirur",
+     "improvement": 4.333333333333336
+    },
+    {
+     "Location": "Supa",
+     "improvement": 2.8000000000000007
+    },
+    {
+     "Location": "Talegaon Dhamdhere",
+     "improvement": 2.666666666666666
+    },
+    {
+     "Location": "Uruli Kanchan",
+     "improvement": 8.666666666666664
+    },
+    {
+     "Location": "Wadgaon",
+     "improvement": 6.5
+    }
+   ],
+   "rowcount": 45,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "Location",
+    "improvement_pct"
+   ],
+   "rows": [
+    {
+     "Location": "Nira",
+     "improvement_pct": 30.7
+    },
+    {
+     "Location": "Kadus",
+     "improvement_pct": 23.9
+    },
+    {
+     "Location": "Guraru",
+     "improvement_pct": 17.9
+    },
+    {
+     "Location": "Motipur",
+     "improvement_pct": 17.9
+    },
+    {
+     "Location": "Barachatti",
+     "improvement_pct": 17.7
+    },
+    {
+     "Location": "Dobhi",
+     "improvement_pct": 13.8
+    },
+    {
+     "Location": "Rampur",
+     "improvement_pct": 12.0
+    },
+    {
+     "Location": "Dehu",
+     "improvement_pct": 11.6
+    },
+    {
+     "Location": "Mahuar",
+     "improvement_pct": 11.1
+    },
+    {
+     "Location": "Chandwara",
+     "improvement_pct": 10.8
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

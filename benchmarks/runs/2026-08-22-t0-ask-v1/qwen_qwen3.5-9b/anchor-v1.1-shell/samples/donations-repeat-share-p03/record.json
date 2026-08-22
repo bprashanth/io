@@ -1,0 +1,67 @@
+{
+  "id": "donations-repeat-share-p03",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "out of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH donor_counts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM \"donations\" GROUP BY \"Donor\"), multi_donors AS (SELECT \"Donor\" FROM donor_counts WHERE donation_count > 1), total_amount AS (SELECT SUM(\"Amount\") AS total_collected FROM \"donations\"), multi_amount AS (SELECT SUM(\"Amount\") AS multi_amount FROM \"donations\" WHERE \"Donor\" IN (SELECT \"Donor\" FROM multi_donors)) SELECT (ma.multi_amount * 100.0 / NULLIF(NULLIF(ta.total_collected, 0), 0)) AS percent, (SELECT COUNT(*) FROM multi_donors) AS number_of_donors FROM multi_amount AS ma CROSS JOIN total_amount AS ta",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nout of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors",
+      "response": "WITH donor_counts AS (\n  SELECT \n    \"Donor\",\n    COUNT(*) AS donation_count\n  FROM \"donations\"\n  GROUP BY \"Donor\"\n),\nmulti_donors AS (\n  SELECT \"Donor\"\n  FROM donor_counts\n  WHERE donation_count > 1\n),\ntotal_amount AS (\n  SELECT SUM(\"Amount\") AS total_collected\n  FROM \"donations\"\n),\nmulti_amount AS (\n  SELECT SUM(\"Amount\") AS multi_amount\n  FROM \"donations\"\n  WHERE \"Donor\" IN (SELECT \"Donor\" FROM multi_donors)\n)\nSELECT \n  (ma.multi_amount * 100.0 / NULLIF(ta.total_collected, 0)) AS percent,\n  (SELECT COUNT(*) FROM multi_donors) AS number_of_donors\nFROM multi_amount ma, total_amount ta;",
+      "api": {
+        "id": "gen-1787424525-TH4WgjSuKdNBBv2bFHvJ",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 375,
+          "completion_tokens": 191,
+          "total_tokens": 566,
+          "cost": 6.615e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.615e-05,
+            "upstream_inference_prompt_cost": 3.75e-05,
+            "upstream_inference_completions_cost": 2.865e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.034
+      },
+      "duration_seconds": 7.042,
+      "sql_duckdb": "WITH donor_counts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM \"donations\" GROUP BY \"Donor\"), multi_donors AS (SELECT \"Donor\" FROM donor_counts WHERE donation_count > 1), total_amount AS (SELECT SUM(\"Amount\") AS total_collected FROM \"donations\"), multi_amount AS (SELECT SUM(\"Amount\") AS multi_amount FROM \"donations\" WHERE \"Donor\" IN (SELECT \"Donor\" FROM multi_donors)) SELECT (ma.multi_amount * 100.0 / NULLIF(NULLIF(ta.total_collected, 0), 0)) AS percent, (SELECT COUNT(*) FROM multi_donors) AS number_of_donors FROM multi_amount AS ma CROSS JOIN total_amount AS ta",
+      "rows": [
+        [
+          53.51468988030468,
+          55
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

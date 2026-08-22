@@ -1,0 +1,67 @@
+{
+  "id": "attendance-biggest-drop-p03",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "where did attendance percentage decline the most year on year - average the monthly rates per centre and show the decline in percentage points as a positive figure",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359312
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH attendance_2023 AS (SELECT \"Centre\" AS centre, \"Month\", \"Enrolled Kids\" AS enrolled_kids, \"Avg Daily Present\" AS avg_daily_present FROM attendance_2023), attendance_2024 AS (SELECT centre_name AS centre, month, enrolment AS enrolled_kids, average_attendance AS avg_daily_present FROM attendance_2024), combined AS (SELECT a2023.centre, a2023.month, a2023.enrolled_kids, a2023.avg_daily_present, a2024.enrolled_kids AS enrolled_kids_2024, a2024.avg_daily_present AS avg_daily_present_2024 FROM attendance_2023 AS a2023 JOIN attendance_2024 AS a2024 ON a2023.centre = a2024.centre AND a2023.month = a2024.month), rates AS (SELECT centre, month, (avg_daily_present * 1.0) / NULLIF(NULLIF(enrolled_kids, 0), 0) * 100 AS attendance_rate_2023, (avg_daily_present_2024 * 1.0) / NULLIF(NULLIF(enrolled_kids_2024, 0), 0) * 100 AS attendance_rate_2024 FROM combined), declines AS (SELECT centre, AVG(attendance_rate_2023 - attendance_rate_2024) AS avg_decline_percentage_points FROM rates GROUP BY centre) SELECT centre, avg_decline_percentage_points FROM declines ORDER BY avg_decline_percentage_points DESC LIMIT 1",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nwhere did attendance percentage decline the most year on year - average the monthly rates per centre and show the decline in percentage points as a positive figure",
+      "response": "WITH attendance_2023 AS (\n    SELECT\n        \"Centre\" AS centre,\n        \"Month\",\n        \"Enrolled Kids\" AS enrolled_kids,\n        \"Avg Daily Present\" AS avg_daily_present\n    FROM attendance_2023\n),\nattendance_2024 AS (\n    SELECT\n        centre_name AS centre,\n        month,\n        enrolment AS enrolled_kids,\n        average_attendance AS avg_daily_present\n    FROM attendance_2024\n),\ncombined AS (\n    SELECT\n        a2023.centre,\n        a2023.month,\n        a2023.enrolled_kids,\n        a2023.avg_daily_present,\n        a2024.enrolled_kids AS enrolled_kids_2024,\n        a2024.avg_daily_present AS avg_daily_present_2024\n    FROM attendance_2023 a2023\n    JOIN attendance_2024 a2024\n        ON a2023.centre = a2024.centre\n       AND a2023.month = a2024.month\n),\nrates AS (\n    SELECT\n        centre,\n        month,\n        (avg_daily_present * 1.0) / NULLIF(enrolled_kids, 0) * 100 AS attendance_rate_2023,\n        (avg_daily_present_2024 * 1.0) / NULLIF(enrolled_kids_2024, 0) * 100 AS attendance_rate_2024\n    FROM combined\n),\ndeclines AS (\n    SELECT\n        centre,\n        AVG(attendance_rate_2023 - attendance_rate_2024) AS avg_decline_percentage_points\n    FROM rates\n    GROUP BY centre\n)\nSELECT centre, avg_decline_percentage_points\nFROM declines\nORDER BY avg_decline_percentage_points DESC\nLIMIT 1;",
+      "api": {
+        "id": "gen-1787421721-Fbo1CHjEnuPKPs2Dhu3k",
+        "model": "ibm-granite/granite-4.1-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 628,
+          "completion_tokens": 363,
+          "total_tokens": 991,
+          "cost": 6.77e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 592,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.77e-05,
+            "upstream_inference_prompt_cost": 3.14e-05,
+            "upstream_inference_completions_cost": 3.63e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.991
+      },
+      "duration_seconds": 3.0,
+      "sql_duckdb": "WITH attendance_2023 AS (SELECT \"Centre\" AS centre, \"Month\", \"Enrolled Kids\" AS enrolled_kids, \"Avg Daily Present\" AS avg_daily_present FROM attendance_2023), attendance_2024 AS (SELECT centre_name AS centre, month, enrolment AS enrolled_kids, average_attendance AS avg_daily_present FROM attendance_2024), combined AS (SELECT a2023.centre, a2023.month, a2023.enrolled_kids, a2023.avg_daily_present, a2024.enrolled_kids AS enrolled_kids_2024, a2024.avg_daily_present AS avg_daily_present_2024 FROM attendance_2023 AS a2023 JOIN attendance_2024 AS a2024 ON a2023.centre = a2024.centre AND a2023.month = a2024.month), rates AS (SELECT centre, month, (avg_daily_present * 1.0) / NULLIF(NULLIF(enrolled_kids, 0), 0) * 100 AS attendance_rate_2023, (avg_daily_present_2024 * 1.0) / NULLIF(NULLIF(enrolled_kids_2024, 0), 0) * 100 AS attendance_rate_2024 FROM combined), declines AS (SELECT centre, AVG(attendance_rate_2023 - attendance_rate_2024) AS avg_decline_percentage_points FROM rates GROUP BY centre) SELECT centre, avg_decline_percentage_points FROM declines ORDER BY avg_decline_percentage_points DESC LIMIT 1",
+      "rows": [
+        [
+          "Kurla Balwadi",
+          20.509871180359312
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

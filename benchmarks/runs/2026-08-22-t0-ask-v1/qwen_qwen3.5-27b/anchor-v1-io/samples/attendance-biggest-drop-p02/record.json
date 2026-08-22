@@ -1,0 +1,92 @@
+{
+  "id": "attendance-biggest-drop-p02",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "rank centres by how much their turnout percentage dropped between the two years, worst first",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": true,
+  "sql_duckdb": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nrank centres by how much their turnout percentage dropped between the two years, worst first",
+      "response": "WITH cte_2023 AS (\n  SELECT\n    \"Centre\" AS centre,\n    \"Month\" AS month,\n    CAST(\"Avg Daily Present\" AS DOUBLE) / NULLIF(CAST(\"Enrolled Kids\" AS DOUBLE), 0) * 100 AS turnout_pct\n  FROM \"attendance_2023\"\n),\ncte_2024 AS (\n  SELECT\n    \"centre_name\" AS centre,\n    \"month\" AS month,\n    CAST(\"average_attendance\" AS DOUBLE) / NULLIF(CAST(\"enrolment\" AS DOUBLE), 0) * 100 AS turnout_pct\n  FROM \"attendance_2024\"\n),\ncombined AS (\n  SELECT\n    c2023.centre,\n    c2023.month,\n    c2023.turnout_pct AS pct_2023,\n    c2024.turnout_pct AS pct_2024\n  FROM cte_2023 c2023\n  JOIN cte_2024 c2024\n    ON c2023.centre = c2024.centre\n    AND c2023.month = c2024.month\n),\nyearly_avg AS (\n  SELECT\n    centre,\n    AVG(pct_2023) AS avg_pct_2023,\n    AVG(pct_2024) AS avg_pct_2024\n  FROM combined\n  GROUP BY centre\n),\ndrop_calc AS (\n  SELECT\n    centre,\n    avg_pct_2023,\n    avg_pct_2024,\n    avg_pct_2024 - avg_pct_2023 AS drop\n  FROM yearly_avg\n)\nSELECT\n  centre,\n  drop\nFROM drop_calc\nORDER BY drop ASC;",
+      "api": {
+        "id": "gen-1787421569-uKXNlgZaBQsJ4awPUfiY",
+        "model": "qwen/qwen3.5-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 611,
+          "completion_tokens": 422,
+          "total_tokens": 1033,
+          "cost": 0.00099675,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00099675,
+            "upstream_inference_prompt_cost": 0.00015275,
+            "upstream_inference_completions_cost": 0.000844
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 11.688
+      },
+      "duration_seconds": 11.69,
+      "error": "ParseError: Invalid expression / Unexpected token. Line 44, Col: 6.\n  3,\n    avg_pct_2024,\n    avg_pct_2024 - avg_pct_2023 AS drop\n  FROM yearly_avg\n)\nSELECT\n  centre,\n  \u001b[4mdrop\u001b[0m\nFROM drop_calc\nORDER BY drop ASC;"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nrank centres by how much their turnout percentage dropped between the two years, worst first\n\nREJECTED QUERY ERROR:\nParseError: Invalid expression / Unexpected token. Line 44, Col: 6.\n  3,\n    avg_pct_2024,\n    avg_pct_2024 - avg_pct_2023 AS drop\n  FROM yearly_avg\n)\nSELECT\n  centre,\n  \u001b[4mdrop\u001b[0m\nFROM drop_calc\nORDER BY drop ASC;\nReturn a complete corrected query.",
+      "response": "WITH unified_2023 AS (\n  SELECT \n    \"Centre\" AS centre,\n    \"Month\",\n    CAST(\"Enrolled Kids\" AS DOUBLE) AS enrolled,\n    CAST(\"Avg Daily Present\" AS DOUBLE) AS present\n  FROM \"attendance_2023\"\n),\nunified_2024 AS (\n  SELECT \n    \"centre_name\" AS centre,\n    \"month\",\n    CAST(\"enrolment\" AS DOUBLE) AS enrolled,\n    CAST(\"average_attendance\" AS DOUBLE) AS present\n  FROM \"attendance_2024\"\n),\nyearly_avg_2023 AS (\n  SELECT \n    centre,\n    AVG(present / NULLIF(enrolled, 0)) * 100 AS avg_pct\n  FROM unified_2023\n  GROUP BY centre\n),\nyearly_avg_2024 AS (\n  SELECT \n    centre,\n    AVG(present / NULLIF(enrolled, 0)) * 100 AS avg_pct\n  FROM unified_2024\n  GROUP BY centre\n),\ncombined AS (\n  SELECT \n    COALESCE(a2023.centre, a2024.centre) AS centre,\n    a2023.avg_pct AS avg_pct_2023,\n    a2024.avg_pct AS avg_pct_2024\n  FROM yearly_avg_2023 a2023\n  FULL OUTER JOIN yearly_avg_2024 a2024 ON a2023.centre = a2024.centre\n),\ndrop_calc AS (\n  SELECT \n    centre,\n    avg_pct_2023,\n    avg_pct_2024,\n    avg_pct_2024 - avg_pct_2023 AS drop\n  FROM combined\n  WHERE avg_pct_2023 IS NOT NULL AND avg_pct_2024 IS NOT NULL\n)\nSELECT \n  centre,\n  drop\nFROM drop_calc\nORDER BY drop ASC;",
+      "api": {
+        "id": "gen-1787421581-ZQ7Fl2HYtTTrTKB9uQa3",
+        "model": "qwen/qwen3.5-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 711,
+          "completion_tokens": 461,
+          "total_tokens": 1172,
+          "cost": 0.0013197,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0013197,
+            "upstream_inference_prompt_cost": 0.0002133,
+            "upstream_inference_completions_cost": 0.0011064
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 6.192
+      },
+      "duration_seconds": 6.195,
+      "error": "ParseError: Invalid expression / Unexpected token. Line 50, Col: 6.\n    FROM combined\n  WHERE avg_pct_2023 IS NOT NULL AND avg_pct_2024 IS NOT NULL\n)\nSELECT \n  centre,\n  \u001b[4mdrop\u001b[0m\nFROM drop_calc\nORDER BY drop ASC;"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

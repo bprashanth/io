@@ -1,0 +1,233 @@
+{
+ "plan": {
+  "title": "SHG Loan Repayment & Purpose Analysis",
+  "subtitle": "Overview of loan repayment status, overdue amounts, and distribution by purpose",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Loans Disbursed",
+    "sql": "SELECT COUNT(*) AS n FROM \"shg_loan_register\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Amount Repaid",
+    "sql": "SELECT SUM(\"Amount Repaid (Rs)\") AS total_repaid FROM \"shg_loan_register\" WHERE \"Repayment Status\" != 'Overdue'",
+    "unit": "Rs"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Overdue Loan Count",
+    "sql": "SELECT COUNT(*) AS n FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue'",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Loans by Repayment Status",
+    "sql": "SELECT \"Repayment Status\" AS status, COUNT(*) AS count FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "status",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Loan Amount by Purpose",
+    "sql": "SELECT \"Purpose\" AS purpose, SUM(\"Loan Amount (Rs)\") AS total_amount FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "purpose",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top Overdue Loans by Amount",
+    "sql": "SELECT \"Loan ID\", \"Block\", \"Purpose\", \"Loan Amount (Rs)\", \"Amount Repaid (Rs)\" FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue' ORDER BY \"Loan Amount (Rs)\" DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The SHG loan portfolio currently consists of {{p1}} total loans. Of these, {{p3}} loans are marked as overdue, indicating a need for closer monitoring.\n\nIn terms of financial recovery, the total amount repaid stands at {{p2}} Rs. This figure represents the cumulative sum of repayments from loans that are not in an overdue state.\n\nThe distribution of loans across different purposes reveals where capital is being directed. The bar chart highlights which sectors receive the highest funding volume.\n\nFinally, the table lists the top 10 overdue loans by principal amount, providing specific details on the blocks and purposes associated with the highest risk exposures."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "total_repaid"
+   ],
+   "rows": [
+    {
+     "total_repaid": 10553000.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 60
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "status",
+    "count"
+   ],
+   "rows": [
+    {
+     "status": "Regular",
+     "count": 156
+    },
+    {
+     "status": "Closed",
+     "count": 144
+    },
+    {
+     "status": "Overdue",
+     "count": 60
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "purpose",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "purpose": "Agriculture",
+     "total_amount": 5335000
+    },
+    {
+     "purpose": "Livestock",
+     "total_amount": 3565000
+    },
+    {
+     "purpose": "Petty trade",
+     "total_amount": 2795000
+    },
+    {
+     "purpose": "Housing",
+     "total_amount": 2740000
+    },
+    {
+     "purpose": "Health",
+     "total_amount": 1890000
+    },
+    {
+     "purpose": "Education",
+     "total_amount": 1490000
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Loan ID",
+    "Block",
+    "Purpose",
+    "Loan Amount (Rs)",
+    "Amount Repaid (Rs)"
+   ],
+   "rows": [
+    {
+     "Loan ID": "LN-2022-0329",
+     "Block": "Atri",
+     "Purpose": "Housing",
+     "Loan Amount (Rs)": 120000,
+     "Amount Repaid (Rs)": 49900.0
+    },
+    {
+     "Loan ID": "LN-2023-0042",
+     "Block": "Wazirganj",
+     "Purpose": "Housing",
+     "Loan Amount (Rs)": 120000,
+     "Amount Repaid (Rs)": 51700.0
+    },
+    {
+     "Loan ID": "LN-2024-0357",
+     "Block": "Fatehpur",
+     "Purpose": "Housing",
+     "Loan Amount (Rs)": 120000,
+     "Amount Repaid (Rs)": 17400.0
+    },
+    {
+     "Loan ID": "LN-2022-0112",
+     "Block": "Barachatti",
+     "Purpose": "Agriculture",
+     "Loan Amount (Rs)": 100000,
+     "Amount Repaid (Rs)": 48600.0
+    },
+    {
+     "Loan ID": "LN-2022-0174",
+     "Block": "Fatehpur",
+     "Purpose": "Agriculture",
+     "Loan Amount (Rs)": 100000,
+     "Amount Repaid (Rs)": 12000.0
+    },
+    {
+     "Loan ID": "LN-2023-0077",
+     "Block": "Belaganj",
+     "Purpose": "Housing",
+     "Loan Amount (Rs)": 100000,
+     "Amount Repaid (Rs)": 22300.0
+    },
+    {
+     "Loan ID": "LN-2023-0266",
+     "Block": "Belaganj",
+     "Purpose": "Agriculture",
+     "Loan Amount (Rs)": 100000,
+     "Amount Repaid (Rs)": 37200.0
+    },
+    {
+     "Loan ID": "LN-2023-0057",
+     "Block": "Fatehpur",
+     "Purpose": "Housing",
+     "Loan Amount (Rs)": 100000,
+     "Amount Repaid (Rs)": 4000.0
+    },
+    {
+     "Loan ID": "LN-2024-0113",
+     "Block": "Belaganj",
+     "Purpose": "Livestock",
+     "Loan Amount (Rs)": 100000,
+     "Amount Repaid (Rs)": 15400.0
+    },
+    {
+     "Loan ID": "LN-2024-0132",
+     "Block": "Atri",
+     "Purpose": "Livestock",
+     "Loan Amount (Rs)": 100000,
+     "Amount Repaid (Rs)": 33300.0
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

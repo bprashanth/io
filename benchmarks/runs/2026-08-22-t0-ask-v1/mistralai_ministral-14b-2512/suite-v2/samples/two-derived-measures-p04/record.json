@@ -1,0 +1,127 @@
+{
+  "id": "two-derived-measures-p04",
+  "task_id": "two-derived-measures",
+  "pattern": "filter two periods and groups, derive two percentages",
+  "question": "for Gaya and Nalanda in 2022 and 2023 give two percentages: institutional deliveries and 48 hour checks over registrations",
+  "gold_sql": "SELECT district, year, ROUND(100.0 * institutional_deliveries / pregnancies_registered, 1) AS delivery_percent, ROUND(100.0 * postnatal_check_48h / pregnancies_registered, 1) AS postnatal_percent FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) ORDER BY district, year",
+  "expected_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH yearly_data AS (SELECT district, year, institutional_deliveries, postnatal_check_48h, pregnancies_registered FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023)) SELECT district, year, (institutional_deliveries * 100.0) / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS institutional_deliveries_percentage, (postnatal_check_48h * 100.0) / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS postnatal_check_48h_percentage FROM yearly_data ORDER BY district NULLS FIRST, year NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"maternal_services\": {\"district\": [\"Gaya\", \"Nalanda\", \"Purnia\"]}}\n\nCURRENT QUESTION:\nfor Gaya and Nalanda in 2022 and 2023 give two percentages: institutional deliveries and 48 hour checks over registrations",
+      "response": "```sql\nWITH\nyearly_data AS (\n  SELECT\n    district,\n    year,\n    institutional_deliveries,\n    postnatal_check_48h,\n    pregnancies_registered\n  FROM maternal_services\n  WHERE district IN ('Gaya', 'Nalanda')\n    AND year IN (2022, 2023)\n)\nSELECT\n  district,\n  year,\n  (institutional_deliveries * 100.0) / NULLIF(pregnancies_registered, 0) AS institutional_deliveries_percentage,\n  (postnatal_check_48h * 100.0) / NULLIF(pregnancies_registered, 0) AS postnatal_check_48h_percentage\nFROM yearly_data\nORDER BY district, year;\n```",
+      "api": {
+        "id": "gen-1787421116-CyqeZ8bLHsu6uEnqq5wL",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 311,
+          "completion_tokens": 170,
+          "total_tokens": 481,
+          "cost": 5.012e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.012e-05,
+            "upstream_inference_prompt_cost": 1.612e-05,
+            "upstream_inference_completions_cost": 3.4e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.764
+      },
+      "duration_seconds": 1.77,
+      "sql_duckdb": "WITH yearly_data AS (SELECT district, year, institutional_deliveries, postnatal_check_48h, pregnancies_registered FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023)) SELECT district, year, (institutional_deliveries * 100.0) / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS institutional_deliveries_percentage, (postnatal_check_48h * 100.0) / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS postnatal_check_48h_percentage FROM yearly_data ORDER BY district NULLS FIRST, year NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          2022,
+          72.0,
+          63.0
+        ],
+        [
+          "Gaya",
+          2023,
+          75.0,
+          68.0
+        ],
+        [
+          "Nalanda",
+          2022,
+          78.0,
+          72.0
+        ],
+        [
+          "Nalanda",
+          2023,
+          80.0,
+          75.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

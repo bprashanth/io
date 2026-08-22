@@ -1,0 +1,201 @@
+{
+ "plan": {
+  "title": "Fitness Program Results Summary",
+  "subtitle": "Overview of children's performance and participation",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Participants",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM baseline UNION ALL SELECT COUNT(DISTINCT \"Child ID\") AS n FROM endline",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Average Shuttle Run Time by Coach",
+    "sql": "SELECT \"Coach\", AVG(NULLIF(\"Shuttle run sec\", 0)) AS avg_time FROM baseline GROUP BY 1 UNION ALL SELECT \"Coach\", AVG(NULLIF(\"Shuttle run sec\", 0)) AS avg_time FROM endline GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Coach",
+    "y": [
+     "avg_time"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "line",
+    "title": "Monthly Participation Trend",
+    "sql": "SELECT strftime('%Y-%m', \"DOB\") AS month, COUNT(*) AS total FROM baseline GROUP BY 1 UNION ALL SELECT strftime('%Y-%m', \"DOB\") AS month, COUNT(*) AS total FROM endline GROUP BY 1 ORDER BY 1",
+    "x": "month",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Top 10 Most Improved Children",
+    "sql": "SELECT \"Child name\", (NULLIF(\"endline\".\"Shuttle run sec\", 0) - NULLIF(\"baseline\".\"Shuttle run sec\", 0)) AS improvement FROM baseline JOIN endline ON baseline.\"Child ID\" = endline.\"Child ID\" ORDER BY improvement ASC LIMIT 10"
+   }
+  ],
+  "narrative": "The fitness program has engaged a total of {{p1}} children across various locations. The average shuttle run time, a key performance indicator, varies by coach, with some showing significant improvements in their teams' performance. The monthly participation trend indicates consistent engagement throughout the program duration. Notably, the top 10 most improved children demonstrate the program's effectiveness in enhancing physical fitness."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    },
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "Coach",
+    "avg_time"
+   ],
+   "rows": [
+    {
+     "Coach": "Jaspreet George",
+     "avg_time": 14.44615384615385
+    },
+    {
+     "Coach": "Bapu Yadav",
+     "avg_time": 14.262500000000001
+    },
+    {
+     "Coach": "Jaspreet George",
+     "avg_time": 14.153846153846157
+    },
+    {
+     "Coach": "Rupali Kumar",
+     "avg_time": 14.093333333333334
+    },
+    {
+     "Coach": "Salman Rao",
+     "avg_time": 13.886666666666665
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "avg_time": 13.799999999999999
+    },
+    {
+     "Coach": "indira chandra",
+     "avg_time": 13.761111111111111
+    },
+    {
+     "Coach": "Vimla",
+     "avg_time": 13.646153846153844
+    },
+    {
+     "Coach": "P. T. Pereira",
+     "avg_time": 13.573684210526318
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "avg_time": 13.557142857142859
+    },
+    {
+     "Coach": "Vimla",
+     "avg_time": 13.523076923076925
+    },
+    {
+     "Coach": "Rupali Kumar",
+     "avg_time": 13.519999999999998
+    },
+    {
+     "Coach": "T. S. Fernandez",
+     "avg_time": 13.454545454545455
+    },
+    {
+     "Coach": "Bapu Yadav",
+     "avg_time": 13.4125
+    },
+    {
+     "Coach": "Bhagyashree",
+     "avg_time": 13.392307692307694
+    },
+    {
+     "Coach": "AAKASH ZENDE",
+     "avg_time": 13.29375
+    },
+    {
+     "Coach": "AAKASH ZENDE",
+     "avg_time": 13.193749999999998
+    },
+    {
+     "Coach": "sunil thakur",
+     "avg_time": 13.164705882352942
+    },
+    {
+     "Coach": "sunil thakur",
+     "avg_time": 13.141176470588235
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "avg_time": 13.1
+    },
+    {
+     "Coach": "Bhagyashree",
+     "avg_time": 12.961538461538462
+    },
+    {
+     "Coach": "indira chandra",
+     "avg_time": 12.922222222222219
+    },
+    {
+     "Coach": "P. T. Pereira",
+     "avg_time": 12.894736842105264
+    },
+    {
+     "Coach": "Salman Rao",
+     "avg_time": 12.893333333333334
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "avg_time": 12.811111111111112
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "avg_time": 12.642857142857142
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "avg_time": 12.411111111111111
+    },
+    {
+     "Coach": "T. S. Fernandez",
+     "avg_time": 12.245454545454544
+    },
+    {
+     "Coach": "Rosy",
+     "avg_time": 12.122222222222222
+    },
+    {
+     "Coach": "Rosy",
+     "avg_time": 11.055555555555555
+    }
+   ],
+   "rowcount": 30,
+   "error": null
+  },
+  "p3": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Ambiguous reference to column name \"Child name\" (use: \"baseline.Child name\" or \"endline.Child name\")\n\nLINE 1: SELECT \"Child name\", (NULLIF(\"endline\".\"Shuttle run sec\", 0) -...\n               ^"
+  }
+ }
+}

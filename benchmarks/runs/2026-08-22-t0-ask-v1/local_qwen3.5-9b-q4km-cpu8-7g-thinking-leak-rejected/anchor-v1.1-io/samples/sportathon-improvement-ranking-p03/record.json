@@ -1,0 +1,48 @@
+{
+  "id": "sportathon-improvement-ranking-p03",
+  "task_id": "sportathon-improvement-ranking",
+  "pattern": "join two same-shape tables on an id, compute a delta, rank top five, dropouts fall out via inner join",
+  "question": "rank the top 5 by how much their situp count went up since baseline, best improver first",
+  "gold_sql": "SELECT b.\"Child Name\", e.\"Sit Ups\" - b.\"Sit Ups\" AS situps_improvement FROM sportathon_baseline AS b JOIN sportathon_endline AS e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY situps_improvement DESC, b.\"Child Name\" LIMIT 5",
+  "expected_rows": [
+    [
+      "Aadhya Bansal",
+      16
+    ],
+    [
+      "Suresh Pandey",
+      15
+    ],
+    [
+      "Aryan Reddy",
+      14
+    ],
+    [
+      "Arjun Jadhav",
+      13
+    ],
+    [
+      "Deepak Malik",
+      12
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": true,
+  "sql_duckdb": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"sportathon_baseline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nCREATE TABLE \"sportathon_endline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"sportathon_baseline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}, \"sportathon_endline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}}\n\nCURRENT QUESTION:\nrank the top 5 by how much their situp count went up since baseline, best improver first",
+      "duration_seconds": 0.0,
+      "error": "URLError: <urlopen error [Errno 111] Connection refused>"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"sportathon_baseline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nCREATE TABLE \"sportathon_endline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"sportathon_baseline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}, \"sportathon_endline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}}\n\nCURRENT QUESTION:\nrank the top 5 by how much their situp count went up since baseline, best improver first\n\nREJECTED QUERY ERROR:\nURLError: <urlopen error [Errno 111] Connection refused>\nReturn a complete corrected query.",
+      "duration_seconds": 0.0,
+      "error": "URLError: <urlopen error [Errno 111] Connection refused>"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

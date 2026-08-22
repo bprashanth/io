@@ -1,0 +1,347 @@
+{
+ "plan": {
+  "title": "Household Survey Dashboard",
+  "subtitle": "Overview of survey coverage, enumerator performance, and submission trends",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Households Surveyed",
+    "sql": "SELECT COUNT(*) AS n FROM \"household_survey\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Enumerators",
+    "sql": "SELECT COUNT(DISTINCT \"enumerator_name\") AS n FROM \"household_survey\"",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Total Villages Covered",
+    "sql": "SELECT COUNT(DISTINCT \"village\") AS n FROM \"household_survey\"",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "kpi",
+    "title": "Average Responses per Household",
+    "sql": "SELECT AVG(CAST(\"q01\" AS DOUBLE) + CAST(\"q04\" AS DOUBLE) + CAST(\"q07\" AS DOUBLE) + CAST(\"q10\" AS DOUBLE) + CAST(\"q13\" AS DOUBLE) + CAST(\"q16\" AS DOUBLE) + CAST(\"q19\" AS DOUBLE) + CAST(\"q22\" AS DOUBLE) + CAST(\"q25\" AS DOUBLE)) AS n FROM \"household_survey\" WHERE \"q01\" IS NOT NULL AND \"q04\" IS NOT NULL AND \"q07\" IS NOT NULL AND \"q10\" IS NOT NULL AND \"q13\" IS NOT NULL AND \"q16\" IS NOT NULL AND \"q19\" IS NOT NULL AND \"q22\" IS NOT NULL AND \"q25\" IS NOT NULL",
+    "unit": ""
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Households by Village",
+    "sql": "SELECT \"village\", COUNT(*) AS \"count\" FROM \"household_survey\" GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+    "x": "village",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "bar",
+    "title": "Households by Enumerator",
+    "sql": "SELECT \"enumerator_name\", COUNT(*) AS \"count\" FROM \"household_survey\" GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+    "x": "enumerator_name",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "line",
+    "title": "Submissions Over Time",
+    "sql": "SELECT DATE_TRUNC('day', \"_submission_time\") AS \"date\", COUNT(*) AS \"count\" FROM \"household_survey\" GROUP BY 1 ORDER BY 1",
+    "x": "date",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p8",
+    "kind": "table",
+    "title": "Top 10 Villages by Response Rate",
+    "sql": "SELECT \"village\", COUNT(*) AS \"total\", SUM(CASE WHEN \"q01\" IS NOT NULL THEN 1 ELSE 0 END) AS \"q01_count\", SUM(CASE WHEN \"q04\" IS NOT NULL THEN 1 ELSE 0 END) AS \"q04_count\" FROM \"household_survey\" GROUP BY 1 ORDER BY \"total\" DESC LIMIT 10",
+    "x": "village",
+    "y": [
+     "total",
+     "q01_count",
+     "q04_count"
+    ]
+   }
+  ],
+  "narrative": "This dashboard provides a comprehensive view of the household survey data, focusing on coverage, enumerator performance, and submission trends. The first row of key performance indicators highlights the total number of households surveyed, the distinct enumerators involved, the number of villages covered, and the average number of responses per household. These metrics offer a quick snapshot of the survey's scale and data completeness.\n\nThe bar charts delve deeper into the distribution of responses. The first chart breaks down the total households by village, revealing which areas have been most thoroughly surveyed. The second chart analyzes the workload distribution among enumerators, identifying who has collected the most data. This helps in assessing the efficiency and reach of the field team.\n\nFinally, the line chart tracks the number of submissions over time, allowing for the observation of trends in data collection speed and consistency. The table at the bottom provides a detailed look at the top 10 villages, showing the total number of households and the count of specific responses for questions q01 and q04, offering granular insights into data quality and coverage in key areas."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 150
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 10
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 44
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 44.473333333333336
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "village",
+    "count"
+   ],
+   "rows": [
+    {
+     "village": "Kalyanpur",
+     "count": 9
+    },
+    {
+     "village": "Bariarpur",
+     "count": 9
+    },
+    {
+     "village": "Chandwara",
+     "count": 8
+    },
+    {
+     "village": "Deopur",
+     "count": 7
+    },
+    {
+     "village": "Sahebganj",
+     "count": 7
+    },
+    {
+     "village": "Harnaut Tola",
+     "count": 6
+    },
+    {
+     "village": "Rampur Sokho",
+     "count": 6
+    },
+    {
+     "village": "Nira",
+     "count": 6
+    },
+    {
+     "village": "Guraru",
+     "count": 6
+    },
+    {
+     "village": "Fatehpur",
+     "count": 6
+    },
+    {
+     "village": "Motipur",
+     "count": 5
+    },
+    {
+     "village": "Paroo",
+     "count": 4
+    },
+    {
+     "village": "Alandi",
+     "count": 4
+    },
+    {
+     "village": "Bishunpur",
+     "count": 4
+    },
+    {
+     "village": "Mahuar",
+     "count": 4
+    },
+    {
+     "village": "Wadgaon",
+     "count": 4
+    },
+    {
+     "village": "Karpi",
+     "count": 3
+    },
+    {
+     "village": "Imamganj",
+     "count": 3
+    },
+    {
+     "village": "Uruli Kanchan",
+     "count": 3
+    },
+    {
+     "village": "Chikhali",
+     "count": 3
+    }
+   ],
+   "rowcount": 20,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "enumerator_name",
+    "count"
+   ],
+   "rows": [
+    {
+     "enumerator_name": "SUSHMA ANSARI",
+     "count": 18
+    },
+    {
+     "enumerator_name": "REHANA GAIKWAD",
+     "count": 18
+    },
+    {
+     "enumerator_name": "Sudha Fernandez",
+     "count": 18
+    },
+    {
+     "enumerator_name": "D. S. Gaikwad",
+     "count": 17
+    },
+    {
+     "enumerator_name": "V. G. Sheikh",
+     "count": 17
+    },
+    {
+     "enumerator_name": "Arjun Krishnan",
+     "count": 14
+    },
+    {
+     "enumerator_name": "Rohit",
+     "count": 13
+    },
+    {
+     "enumerator_name": "Ravi Chougule",
+     "count": 12
+    },
+    {
+     "enumerator_name": "Vimla Mirza",
+     "count": 12
+    },
+    {
+     "enumerator_name": "Balasaheb Pillai",
+     "count": 11
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p7": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: No function matches the given name and argument types 'date_trunc(STRING_LITERAL, VARCHAR)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tdate_trunc(VARCHAR, DATE) -> TIMESTAMP\n\tdate_trunc(VARCHAR, INTERVAL) -> INTERVAL\n\tdate_trunc(VARCHAR, TIMESTA"
+  },
+  "p8": {
+   "columns": [
+    "village",
+    "total",
+    "q01_count",
+    "q04_count"
+   ],
+   "rows": [
+    {
+     "village": "Kalyanpur",
+     "total": 9,
+     "q01_count": 9,
+     "q04_count": 9
+    },
+    {
+     "village": "Bariarpur",
+     "total": 9,
+     "q01_count": 9,
+     "q04_count": 9
+    },
+    {
+     "village": "Chandwara",
+     "total": 8,
+     "q01_count": 8,
+     "q04_count": 8
+    },
+    {
+     "village": "Deopur",
+     "total": 7,
+     "q01_count": 7,
+     "q04_count": 7
+    },
+    {
+     "village": "Sahebganj",
+     "total": 7,
+     "q01_count": 7,
+     "q04_count": 7
+    },
+    {
+     "village": "Guraru",
+     "total": 6,
+     "q01_count": 6,
+     "q04_count": 6
+    },
+    {
+     "village": "Harnaut Tola",
+     "total": 6,
+     "q01_count": 6,
+     "q04_count": 6
+    },
+    {
+     "village": "Nira",
+     "total": 6,
+     "q01_count": 6,
+     "q04_count": 6
+    },
+    {
+     "village": "Rampur Sokho",
+     "total": 6,
+     "q01_count": 6,
+     "q04_count": 6
+    },
+    {
+     "village": "Fatehpur",
+     "total": 6,
+     "q01_count": 6,
+     "q04_count": 6
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

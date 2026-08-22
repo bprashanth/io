@@ -1,0 +1,251 @@
+{
+  "id": "wide-header-pp-change-excluding-total-rows-p03",
+  "task_id": "wide-header-pp-change-excluding-total-rows",
+  "pattern": "percentage-point change between two labelled rounds on messy headers, state filter, detail rows only",
+  "question": "NFHS-5 minus NFHS-4 fully vaccinated percent for every Bihar district, don't include the state total row",
+  "gold_sql": "SELECT \"District\", MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_pp FROM district_health_factsheet WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' GROUP BY \"District\" ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Bhojpur",
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      4.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Bhojpur",
+      60.7
+    ],
+    [
+      "Bhojpur",
+      57.8
+    ],
+    [
+      "Gaya",
+      47.5
+    ],
+    [
+      "Gaya",
+      51.4
+    ],
+    [
+      "Kishanganj",
+      58.6
+    ],
+    [
+      "Kishanganj",
+      60.0
+    ],
+    [
+      "Madhubani",
+      50.1
+    ],
+    [
+      "Madhubani",
+      51.7
+    ],
+    [
+      "Nalanda",
+      56.6
+    ],
+    [
+      "Nalanda",
+      59.45
+    ],
+    [
+      "Purnia",
+      46.8
+    ],
+    [
+      "Purnia",
+      45.099999999999994
+    ],
+    [
+      "Rohtas",
+      68.5
+    ],
+    [
+      "Rohtas",
+      67.55
+    ],
+    [
+      "Saran",
+      66.3
+    ],
+    [
+      "Saran",
+      68.3
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"District\", AVG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\" NULLS FIRST ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_avg FROM \"district_health_factsheet\" WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') ORDER BY \"District\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nNFHS-5 minus NFHS-4 fully vaccinated percent for every Bihar district, don't include the state total row",
+      "response": "SELECT \"District\", \"Children age 12-23 months fully vaccinated (%)\" AS nfhs5_pct,\n       \"Children age 12-23 months fully vaccinated (%)\" OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\") -\n       LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\") AS pct_change\nFROM \"district_health_factsheet\"\nWHERE \"State\" = 'Bihar'\n  AND \"District\" != 'State Total'\n  AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')\nORDER BY \"District\", \"Survey Round\";",
+      "api": {
+        "id": "gen-1787424398-FO7ggeDVg1Umxigsr2jb",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 527,
+          "completion_tokens": 151,
+          "total_tokens": 678,
+          "cost": 7.535e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 7.535e-05,
+            "upstream_inference_prompt_cost": 5.27e-05,
+            "upstream_inference_completions_cost": 2.265e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.308
+      },
+      "duration_seconds": 3.308,
+      "error": "ParseError: Invalid expression / Unexpected token. Line 2, Col: 62.\n  hs fully vaccinated (%)\" AS nfhs5_pct,\n       \"Children age 12-23 months fully vaccinated (%)\" OVER \u001b[4m(\u001b[0mPARTITION BY \"District\" ORDER BY \"Survey Round\") -\n       LAG(\"Children age 12-23 months fully vacci"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nNFHS-5 minus NFHS-4 fully vaccinated percent for every Bihar district, don't include the state total row\n\nREJECTED QUERY ERROR:\nParseError: Invalid expression / Unexpected token. Line 2, Col: 62.\n  hs fully vaccinated (%)\" AS nfhs5_pct,\n       \"Children age 12-23 months fully vaccinated (%)\" OVER \u001b[4m(\u001b[0mPARTITION BY \"District\" ORDER BY \"Survey Round\") -\n       LAG(\"Children age 12-23 months fully vacci\nReturn a complete corrected query.",
+      "response": "SELECT\n  \"District\",\n  AVG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\" ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_avg\nFROM \"district_health_factsheet\"\nWHERE \"State\" = 'Bihar'\n  AND \"District\" != 'State Total'\n  AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')\nORDER BY \"District\";",
+      "api": {
+        "id": "gen-1787424401-sqM5esDPpreCIXP5DxKa",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 628,
+          "completion_tokens": 111,
+          "total_tokens": 739,
+          "cost": 7.945e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 7.945e-05,
+            "upstream_inference_prompt_cost": 6.28e-05,
+            "upstream_inference_completions_cost": 1.665e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.147
+      },
+      "duration_seconds": 3.15,
+      "sql_duckdb": "SELECT \"District\", AVG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\" NULLS FIRST ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_avg FROM \"district_health_factsheet\" WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') ORDER BY \"District\" NULLS FIRST",
+      "rows": [
+        [
+          "Bhojpur",
+          60.7
+        ],
+        [
+          "Bhojpur",
+          57.8
+        ],
+        [
+          "Gaya",
+          47.5
+        ],
+        [
+          "Gaya",
+          51.4
+        ],
+        [
+          "Kishanganj",
+          58.6
+        ],
+        [
+          "Kishanganj",
+          60.0
+        ],
+        [
+          "Madhubani",
+          50.1
+        ],
+        [
+          "Madhubani",
+          51.7
+        ],
+        [
+          "Nalanda",
+          56.6
+        ],
+        [
+          "Nalanda",
+          59.45
+        ],
+        [
+          "Purnia",
+          46.8
+        ],
+        [
+          "Purnia",
+          45.099999999999994
+        ],
+        [
+          "Rohtas",
+          68.5
+        ],
+        [
+          "Rohtas",
+          67.55
+        ],
+        [
+          "Saran",
+          66.3
+        ],
+        [
+          "Saran",
+          68.3
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

@@ -1,0 +1,108 @@
+{
+  "id": "cross-table-join-p02",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "join ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}, \"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\njoin ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side",
+      "response": "```sql\nSELECT\n  a.district,\n  a.year,\n  a.anc4_completed * 1.0 / NULLIF(a.pregnancies_registered,",
+      "api": {
+        "id": "gen-1787421456-5LjWqhkP6wer2pRjN1kO",
+        "model": "google/gemini-3.7-flash",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 421,
+          "completion_tokens": 1020,
+          "total_tokens": 1441,
+          "cost": 0.002070375,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.002070375,
+            "upstream_inference_prompt_cost": 0.000157875,
+            "upstream_inference_completions_cost": 0.0019125
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 980,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.592
+      },
+      "duration_seconds": 7.593,
+      "error": "ParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.functions.Nullif'>. Line 4, Col: 59.\n  SELECT\n  a.district,\n  a.year,\n  a.anc4_completed * 1.0 / NULLIF(a.pregnancies_registered\u001b[4m,\u001b[0m"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}, \"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\njoin ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side\n\nREJECTED QUERY ERROR:\nParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.functions.Nullif'>. Line 4, Col: 59.\n  SELECT\n  a.district,\n  a.year,\n  a.anc4_completed * 1.0 / NULLIF(a.pregnancies_registered\u001b[4m,\u001b[0m\nReturn a complete corrected query.",
+      "response": "```sql\nSELECT\n  a.district,\n  a.year,\n  a.anc4_completed * 1.0 / NULLIF(a.pregnancies_registered, 0) AS anc_rate,\n  l.employed_at_6_months * ",
+      "api": {
+        "id": "gen-1787421464-HqBlShIfFhFgOrfug3Ee",
+        "model": "google/gemini-3.7-flash",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 517,
+          "completion_tokens": 1020,
+          "total_tokens": 1537,
+          "cost": 0.002106375,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.002106375,
+            "upstream_inference_prompt_cost": 0.000193875,
+            "upstream_inference_completions_cost": 0.0019125
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 959,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.345
+      },
+      "duration_seconds": 7.346,
+      "error": "ParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Mul'>. Line 5, Col: 26.\n   a.anc4_completed * 1.0 / NULLIF(a.pregnancies_registered, 0) AS anc_rate,\n  l.employed_at_6_months \u001b[4m*\u001b[0m"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

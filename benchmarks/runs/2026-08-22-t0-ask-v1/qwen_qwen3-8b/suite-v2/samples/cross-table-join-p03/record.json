@@ -1,0 +1,108 @@
+{
+  "id": "cross-table-join-p03",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "for 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, year, pregnancies_registered, anc4_completed, women_enrolled, completed_training, employed_at_6_months FROM anc_visits JOIN livelihoods ON anc_visits.district = livelihoods.district AND anc_visits.year = livelihoods.year WHERE year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}, \"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district",
+      "response": "WITH combined_data AS (\n  SELECT\n    district,\n    year,\n    pregnancies_registered,\n    anc4_completed,\n    women_enrolled,\n    completed_training,\n    employed_at_6_months\n  FROM\n    anc_visits\n  UNION ALL\n  SELECT\n    district,\n    year,\n    pregnancies_registered,\n    anc4_completed,\n    women_enrolled,\n    completed_training,\n    employed_at_6_months\n  FROM\n    livelihoods\n)\nSELECT\n  district,\n  year,\n  pregnancies_registered,\n  anc4_completed,\n  ROUND(anc4_completed * 100.0 / NULLIF(pregnancies_registered, 0), 2) AS anc_coverage_percent,\n  women_enrolled,\n  employed_at_6_months,\n  ROUND(employed_at_6_months * 100.0 / NULLIF(women_enrolled, 0), 2) AS employed_out_of_enrolled_percent\nFROM\n  combined_data\nWHERE\n  year = 2023\n  AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Patna', 'Purnia')",
+      "api": {
+        "id": "gen-1787420604-DvYwCoM6RqHkmZ0P2WYO",
+        "model": "qwen/qwen3-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 405,
+          "completion_tokens": 236,
+          "total_tokens": 641,
+          "cost": 0.000154765,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000154765,
+            "upstream_inference_prompt_cost": 4.7385e-05,
+            "upstream_inference_completions_cost": 0.00010738
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.673
+      },
+      "duration_seconds": 3.676,
+      "error": "BinderException: Binder Error: Referenced column \"women_enrolled\" not found in FROM clause!\nCandidate bindings: \"anc4_completed\", \"year\", \"pregnancies_registered\"\n\nLINE 1: ... district, year, pregnancies_registered, anc4_completed, women_enrolled, completed_training, employed_at_6_months...\n                                                                    ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}, \"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"women_enrolled\" not found in FROM clause!\nCandidate bindings: \"anc4_completed\", \"year\", \"pregnancies_registered\"\n\nLINE 1: ... district, year, pregnancies_registered, anc4_completed, women_enrolled, completed_training, employed_at_6_months...\n                                                                    ^\nReturn a complete corrected query.",
+      "response": "SELECT\n  district,\n  year,\n  pregnancies_registered,\n  anc4_completed,\n  women_enrolled,\n  completed_training,\n  employed_at_6_months\nFROM\n  anc_visits\nJOIN\n  livelihoods\nON\n  anc_visits.district = livelihoods.district\n  AND anc_visits.year = livelihoods.year\nWHERE\n  year = 2023;",
+      "api": {
+        "id": "gen-1787420607-RcSyXGYGu96jPlTMoI2h",
+        "model": "qwen/qwen3-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 485,
+          "completion_tokens": 82,
+          "total_tokens": 567,
+          "cost": 9.4055e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 9.4055e-05,
+            "upstream_inference_prompt_cost": 5.6745e-05,
+            "upstream_inference_completions_cost": 3.731e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.778
+      },
+      "duration_seconds": 1.779,
+      "error": "BinderException: Binder Error: Ambiguous reference to column name \"district\" (use: \"anc_visits.district\" or \"livelihoods.district\")\n\nLINE 1: EXPLAIN SELECT district, year, pregnancies_registered, anc4_completed,...\n                       ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

@@ -1,0 +1,103 @@
+{
+  "id": "wide-year-columns-share-p01",
+  "task_id": "wide-year-columns-share",
+  "pattern": "arithmetic across year-named columns, group sum, share",
+  "question": "block wise what percent of 2024 enrolment is girls",
+  "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ],
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"Block\", (SUM(\"Girls 2024\") * 100.0 / NULLIF(NULLIF(SUM(\"Girls 2024\" + \"Boys 2024\"), 0), 0)) AS \"Percentage of Girls in 2024 Enrolment\" FROM school_enrolment_by_year GROUP BY \"Block\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}}\n\nCURRENT QUESTION:\nblock wise what percent of 2024 enrolment is girls",
+      "response": "SELECT \n  \"Block\", \n  (SUM(\"Girls 2024\") * 100.0 / NULLIF(SUM(\"Girls 2024\" + \"Boys 2024\"), 0)) AS \"Percentage of Girls in 2024 Enrolment\"\nFROM \n  school_enrolment_by_year\nGROUP BY \n  \"Block\";",
+      "api": {
+        "id": "gen-1787420619-KPUC3bDRe2MX3DGoMkXg",
+        "model": "qwen/qwen3-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 755,
+          "completion_tokens": 83,
+          "total_tokens": 838,
+          "cost": 0.0001261,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0001261,
+            "upstream_inference_prompt_cost": 8.8335e-05,
+            "upstream_inference_completions_cost": 3.7765e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.578
+      },
+      "duration_seconds": 1.582,
+      "sql_duckdb": "SELECT \"Block\", (SUM(\"Girls 2024\") * 100.0 / NULLIF(NULLIF(SUM(\"Girls 2024\" + \"Boys 2024\"), 0), 0)) AS \"Percentage of Girls in 2024 Enrolment\" FROM school_enrolment_by_year GROUP BY \"Block\"",
+      "rows": [
+        [
+          "Barachatti",
+          55.376344086021504
+        ],
+        [
+          "Dobhi",
+          48.09971393543114
+        ],
+        [
+          "Atri",
+          53.900375939849624
+        ],
+        [
+          "Belaganj",
+          52.563091482649845
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

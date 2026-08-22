@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>io</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#f6f7fb;--side:#eef0f6;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--ok:#16a34a;--warn:#b45309;--bad:#dc2626}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:var(--bg);display:flex}
+aside{width:290px;flex:none;background:var(--side);border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+aside h1{font-size:20px;margin:0;display:flex;align-items:center;gap:8px}aside h1 small{font-weight:400;color:var(--muted);font-size:12px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.box h2{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--ink)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff}
+label{font-size:12px;color:var(--muted);display:block;margin:8px 0 2px}
+.files{font-size:13px}.files div{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed var(--line);min-width:0}.files div span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.files span.m{color:var(--muted);white-space:nowrap;font-size:12px}
+.dial{display:flex;gap:4px}.dial button{flex:1;font-size:12px}.dial button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+#log{flex:1;overflow:auto;padding:24px 32px;display:flex;flex-direction:column;gap:18px}
+.turn{max-width:1100px}
+.q{background:var(--ink);color:#fff;border-radius:14px 14px 4px 14px;padding:10px 14px;display:inline-block;max-width:70%;float:right}
+.a{clear:both;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:10px}
+.a .meta{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.a .meta b{font-weight:600;color:var(--ink)}.egress{display:inline-flex;gap:6px;align-items:center}.egress i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.err{color:var(--bad)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.kpi{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.kpi-title{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi-value{font-size:28px;font-weight:700;margin:2px 0}.kpi-label{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel{min-width:0}.panel header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}.panel header h3{font-size:14px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.dl{font-size:12px;padding:4px 9px;color:var(--accent)}
+.tablewrap{overflow-x:auto;max-height:420px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{color:var(--muted);font-weight:600;background:#fafafa;position:sticky;top:0}td.num{text-align:right;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-bottom:4px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+.warn{font-size:12px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;margin:8px 0 0}
+.note{font-size:12px;color:var(--muted);margin:6px 0 0}.empty{color:var(--muted);font-style:italic}
+details.receipt{margin-top:8px;font-size:12px;color:var(--muted)}details.receipt pre{white-space:pre-wrap;background:#f3f4f6;padding:8px;border-radius:8px;font-size:11px;color:#374151}
+svg{max-width:760px}svg text{font-family:inherit}
+iframe.page{width:100%;height:640px;border:1px solid var(--line);border-radius:10px;background:#fff}
+form#ask{display:flex;gap:10px;padding:14px 32px 20px;border-top:1px solid var(--line);background:var(--card)}
+form#ask input{flex:1;padding:12px 14px;border-radius:12px;font-size:15px}
+.hint{font-size:12px;color:var(--muted);padding:0 32px 10px;background:var(--card)}
+.thinking{color:var(--muted);font-style:italic}
+.modal{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center}.modal.open{display:flex}
+.modal .box{width:440px}
+</style>
+</head>
+<body>
+<aside>
+  <h1>io <small>private by default</small></h1>
+  <div class="box">
+    <h2>Folder</h2>
+    <div id="folder" style="font-size:13px;color:var(--muted);word-break:break-all">No folder open</div>
+    <div style="display:flex;gap:6px;margin-top:8px"><button id="pick" class="primary">Open folder…</button><button id="typepath">Type a path</button></div>
+    <div class="files" id="files"></div>
+  </div>
+  <div class="box">
+    <h2>Reach</h2>
+    <div class="dial"><button class="on" data-tier="t0">Laptop</button><button data-tier="t1" disabled title="Coming next: T4GC server">T4GC</button><button data-tier="t2" disabled title="Coming next: frontier">Frontier</button></div>
+    <p class="note">Only column names leave this laptop. Rows never do. Every number on screen came from a query that ran here.</p>
+  </div>
+  <div class="box">
+    <h2>Model <button id="settings" style="float:right;font-size:12px;padding:2px 8px">Settings</button></h2>
+    <div id="modelline" style="font-size:13px"></div>
+  </div>
+  <div class="box">
+    <h2>Egress this session</h2>
+    <div id="egress" style="font-size:13px">calls <b id="e-calls">0</b> · rows sent <b id="e-rows">0</b> · bytes <b id="e-bytes">0</b></div>
+  </div>
+  <button id="reset">New conversation</button>
+</aside>
+<main>
+  <div id="log"><p class="thinking" id="welcome">Open a folder of CSV / Excel files, then ask a question ("average marks by taluka") or ask for a page ("build me a dashboard", "write a summary for the board").</p></div>
+  <div class="hint">Ask questions, or say <b>build</b> / <b>dashboard</b> / <b>report</b> for a page. Follow-ups keep the context.</div>
+  <form id="ask"><input id="q" placeholder="Ask about your data…" autocomplete="off"><button class="primary" id="send">Send</button></form>
+</main>
+
+<div class="modal" id="cfg"><div class="box">
+  <h2>Model settings</h2>
+  <label>Source</label>
+  <select id="c-source"><option value="openrouter">OpenRouter (key, remote small model)</option><option value="local">Local server (llama.cpp / Ollama, OpenAI-compatible)</option></select>
+  <div id="c-remote">
+    <label>OpenRouter model</label><input id="c-model" placeholder="qwen/qwen3.5-9b">
+    <label>OpenRouter key <span id="c-keystate"></span></label><input id="c-key" type="password" placeholder="sk-or-…">
+  </div>
+  <div id="c-local" style="display:none">
+    <label>Endpoint</label><input id="c-lep" placeholder="http://127.0.0.1:8080/v1">
+    <label>Model name (as the server knows it)</label><input id="c-lmodel" placeholder="local">
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button id="c-cancel">Cancel</button><button id="c-save" class="primary">Save</button></div>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const log = $('#log');
+let state = {config:{}}, egress = {calls:0, rows:0, bytes:0};
+const fmtB = n => n > 1e6 ? (n/1e6).toFixed(1)+' MB' : n > 1e3 ? (n/1e3).toFixed(1)+' kB' : n+' B';
+
+async function api(path, body){ const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {}); return r.json(); }
+
+function renderState(){
+  $('#folder').textContent = state.folder || 'No folder open';
+  $('#files').innerHTML = (state.tables||[]).map(t => t.error ? `<div><span>${t.file}</span><span class=m style="color:var(--bad)">could not read</span></div>` : `<div><span title="${t.columns.join(', ')}">${t.file}${t.sheet?' › '+t.sheet:''}</span><span class=m>${t.rows}×${t.columns.length}</span></div>`).join('');
+  const c = state.config || {};
+  $('#modelline').textContent = c.source === 'local' ? `Local · ${c.local_model||'local'} @ ${c.local_endpoint}` : `OpenRouter · ${c.model} · key ${c.api_key ? 'set' : 'missing'}`;
+  $('#e-calls').textContent = egress.calls; $('#e-rows').textContent = egress.rows; $('#e-bytes').textContent = fmtB(egress.bytes);
+}
+
+async function load(){ state = await api('/api/state'); if (state.history) for (const t of state.history) if (t.egress) { egress.calls += t.egress.calls || 1; egress.bytes += t.egress.prompt_bytes || 0; } renderState(); }
+
+$('#pick').onclick = async () => {
+  let path = null;
+  if (window.io && window.io.pickFolder) path = await window.io.pickFolder();
+  if (!path) path = prompt('Folder path');
+  if (path) openFolder(path);
+};
+$('#typepath').onclick = () => { const p = prompt('Folder path'); if (p) openFolder(p); };
+async function openFolder(path){
+  const r = await api('/api/folder', {path});
+  if (r.error) { alert(r.error); return; }
+  state.folder = r.folder; state.tables = r.tables; log.innerHTML = ''; renderState();
+  addSystem(`Loaded ${r.tables.filter(t=>!t.error).length} table(s) from ${r.folder}. Nothing was sent anywhere.`);
+}
+function addSystem(text){ const d = document.createElement('p'); d.className = 'thinking'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
+
+$('#ask').onsubmit = async e => {
+  e.preventDefault();
+  const text = $('#q').value.trim(); if (!text) return;
+  $('#q').value = ''; $('#send').disabled = true;
+  const turn = document.createElement('div'); turn.className = 'turn';
+  turn.innerHTML = `<div class=q></div><div class=a><span class=thinking>Working… (the model is writing a query; rows stay here)</span></div>`;
+  turn.querySelector('.q').textContent = text;
+  log.appendChild(turn); log.scrollTop = log.scrollHeight;
+  const r = await api('/api/ask', {text});
+  const a = turn.querySelector('.a');
+  if (r.error) { a.innerHTML = `<span class=err></span>`; a.querySelector('.err').textContent = r.error; }
+  else if (r.lane === 'ask') {
+    a.innerHTML = r.html + (r.scope_note ? `<p class=note style="color:var(--warn)">⚠ ${r.scope_note}</p>` : '') + metaLine(r);
+    a.querySelectorAll('button.dl').forEach(b => b.onclick = () => window.open(`/api/csv/${r.id}/a1`));
+  } else {
+    a.innerHTML = `<iframe class=page src="/api/page/${r.id}"></iframe>` + metaLine(r) + (r.panels_failed && r.panels_failed.length ? `<p class=note>${r.panels_failed.length} panel(s) could not be computed and say so on the page.</p>` : '') + (r.lint_removed && r.lint_removed.length ? `<p class=note>Removed ${r.lint_removed.length} number(s) the model typed itself (not from a query).</p>` : '');
+  }
+  if (r.egress) { egress.calls += r.egress.calls || 1; egress.bytes += r.egress.prompt_bytes || 0; egress.rows += r.egress.rows_sent || 0; renderState(); }
+  $('#send').disabled = false; log.scrollTop = log.scrollHeight; $('#q').focus();
+};
+function metaLine(r){
+  const e = r.egress || {};
+  return `<div class=meta><span class=egress><i></i> sent: column names only · rows: 0 · ${fmtB(e.prompt_bytes||0)}</span><span>model: <b>${e.model||''}</b> · ${e.seconds||0}s${e.calls>1?' · '+e.calls+' calls':''}</span>${r.lane==='ask'?`<span>${r.rowcount} row(s) · from ${(r.tables_used||[]).join(', ')}</span>`:`<span>${r.panels} panel(s)</span>`}${r.attempts>1?`<span>${r.attempts} attempts</span>`:''}</div>`;
+}
+$('#reset').onclick = async () => { await api('/api/reset', {}); log.innerHTML=''; addSystem('New conversation. The tables are still loaded.'); };
+
+// settings
+$('#settings').onclick = () => { const c = state.config||{}; $('#c-source').value = c.source||'openrouter'; $('#c-model').value = c.model||''; $('#c-key').value=''; $('#c-keystate').textContent = c.api_key ? '(a key is saved; leave blank to keep it)' : '(none saved)'; $('#c-lep').value = c.local_endpoint||''; $('#c-lmodel').value = c.local_model||''; toggleSrc(); $('#cfg').classList.add('open'); };
+function toggleSrc(){ const local = $('#c-source').value==='local'; $('#c-remote').style.display = local?'none':''; $('#c-local').style.display = local?'':'none'; }
+$('#c-source').onchange = toggleSrc;
+$('#c-cancel').onclick = () => $('#cfg').classList.remove('open');
+$('#c-save').onclick = async () => {
+  const body = {source:$('#c-source').value, model:$('#c-model').value.trim(), local_endpoint:$('#c-lep').value.trim(), local_model:$('#c-lmodel').value.trim()};
+  if ($('#c-key').value.trim()) body.api_key = $('#c-key').value.trim();
+  const r = await api('/api/config', body); if (r.config) state.config = r.config; renderState(); $('#cfg').classList.remove('open');
+};
+load();
+</script>
+</body>
+</html>

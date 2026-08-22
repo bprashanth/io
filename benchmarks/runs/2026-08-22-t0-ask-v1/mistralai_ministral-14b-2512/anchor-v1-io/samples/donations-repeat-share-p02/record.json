@@ -1,0 +1,92 @@
+{
+  "id": "donations-repeat-share-p02",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "share of money raised from repeat givers versus one-time givers, in percent, plus a count of repeat givers",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH donor_counts AS (SELECT \"Donor\", COUNT(DISTINCT \"Receipt No\") AS \"receipt_count\" FROM \"donations\" GROUP BY \"Donor\"), donor_types AS (SELECT \"Donor\", CASE WHEN \"receipt_count\" > 1 THEN 'Repeat' ELSE 'One-time' END AS \"donor_type\" FROM donor_counts) SELECT \"donor_type\", SUM(\"Amount\") AS \"total_amount\", COUNT(DISTINCT \"Donor\") AS \"repeat_donor_count\", ROUND(SUM(CASE WHEN \"donor_type\" = 'Repeat' THEN \"Amount\" ELSE 0 END) * 100.0 / NULLIF(NULLIF(SUM(\"Amount\"), 0), 0), 2) AS \"repeat_share_percent\" FROM \"donations\" AS d JOIN donor_types AS dt ON d.\"Donor\" = dt.\"Donor\" GROUP BY \"donor_type\"",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nshare of money raised from repeat givers versus one-time givers, in percent, plus a count of repeat givers",
+      "response": "```sql\nWITH donor_counts AS (\n    SELECT\n        \"Donor\",\n        COUNT(DISTINCT \"Receipt No\") AS \"receipt_count\"\n    FROM \"donations\"\n    GROUP BY \"Donor\"\n),\nclassified_donors AS (\n    SELECT\n        \"Donor\",\n        CASE WHEN \"receipt_count\" > 1 THEN 'Repeat' ELSE 'One-time' END AS \"donor_type\"\n    FROM donor_counts\n),\ndonor_shares AS (\n    SELECT\n        \"donor_type\",\n        SUM(\"Amount\") AS \"total_amount\",\n        COUNT(DISTINCT \"Donor\") AS \"donor_count\"\n    FROM \"donations\" d\n    JOIN classified_donors cd ON d.\"Donor\" = cd.\"Donor\"\n    GROUP BY \"donor_type\"\n)\nSELECT\n    \"donor_type\",\n    ROUND(100.0 * NULLIF(\"total_amount\", 0) / SUM(NULLIF(\"total_amount\", 0)) OVER (), 2) AS \"share_of_money_percent\",\n    \"donor_count\" AS \"count_of_donors\"\nFROM donor_shares\nORDER BY \"donor_type\";\n```",
+      "api": {
+        "id": "gen-1787421462-fDGhyQuHm5yxPd5htrPj",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 410,
+          "completion_tokens": 246,
+          "total_tokens": 656,
+          "cost": 6.208e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.208e-05,
+            "upstream_inference_prompt_cost": 1.288e-05,
+            "upstream_inference_completions_cost": 4.92e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.365
+      },
+      "duration_seconds": 2.368,
+      "error": "BinderException: Binder Error: Ambiguous reference to column name \"Donor\" (use: \"d.Donor\" or \"cd.Donor\")\n\nLINE 1: ... \"donor_type\", SUM(\"Amount\") AS \"total_amount\", COUNT(DISTINCT \"Donor\") AS \"donor_count\" FROM \"donations\" AS d JOIN classi...\n                                                                          ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nshare of money raised from repeat givers versus one-time givers, in percent, plus a count of repeat givers\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Ambiguous reference to column name \"Donor\" (use: \"d.Donor\" or \"cd.Donor\")\n\nLINE 1: ... \"donor_type\", SUM(\"Amount\") AS \"total_amount\", COUNT(DISTINCT \"Donor\") AS \"donor_count\" FROM \"donations\" AS d JOIN classi...\n                                                                          ^\nReturn a complete corrected query.",
+      "response": "```sql\nWITH donor_counts AS (\n  SELECT\n    \"Donor\",\n    COUNT(DISTINCT \"Receipt No\") AS \"receipt_count\"\n  FROM \"donations\"\n  GROUP BY \"Donor\"\n),\ndonor_types AS (\n  SELECT\n    \"Donor\",\n    CASE WHEN \"receipt_count\" > 1 THEN 'Repeat' ELSE 'One-time' END AS \"donor_type\"\n  FROM donor_counts\n)\nSELECT\n  \"donor_type\",\n  SUM(\"Amount\") AS \"total_amount\",\n  COUNT(DISTINCT \"Donor\") AS \"repeat_donor_count\",\n  ROUND(SUM(CASE WHEN \"donor_type\" = 'Repeat' THEN \"Amount\" ELSE 0 END) * 100.0 / NULLIF(SUM(\"Amount\"), 0), 2) AS \"repeat_share_percent\"\nFROM \"donations\" AS d\nJOIN donor_types AS dt ON d.\"Donor\" = dt.\"Donor\"\nGROUP BY \"donor_type\"\n```",
+      "api": {
+        "id": "gen-1787421464-4Dze539daRirb1nwCwWn",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 501,
+          "completion_tokens": 213,
+          "total_tokens": 714,
+          "cost": 7.368e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 7.368e-05,
+            "upstream_inference_prompt_cost": 3.108e-05,
+            "upstream_inference_completions_cost": 4.26e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.311
+      },
+      "duration_seconds": 2.314,
+      "error": "BinderException: Binder Error: Ambiguous reference to column name \"Donor\" (use: \"d.Donor\" or \"dt.Donor\")\n\nLINE 1: ... \"donor_type\", SUM(\"Amount\") AS \"total_amount\", COUNT(DISTINCT \"Donor\") AS \"repeat_donor_count\", ROUND(SUM(CASE WHEN \"dono...\n                                                                          ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

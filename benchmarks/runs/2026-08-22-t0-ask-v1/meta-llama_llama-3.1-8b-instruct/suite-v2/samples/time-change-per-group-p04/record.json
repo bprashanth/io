@@ -1,0 +1,175 @@
+{
+  "id": "time-change-per-group-p04",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2020,
+      1200,
+      744,
+      1.6129032258064515
+    ],
+    [
+      "Gaya",
+      2021,
+      1250,
+      825,
+      1.5151515151515151
+    ],
+    [
+      "Gaya",
+      2022,
+      1300,
+      897,
+      1.4492753623188406
+    ],
+    [
+      "Gaya",
+      2023,
+      1350,
+      999,
+      1.3513513513513513
+    ],
+    [
+      "Nalanda",
+      2020,
+      1000,
+      700,
+      1.4285714285714286
+    ],
+    [
+      "Nalanda",
+      2021,
+      1100,
+      803,
+      1.36986301369863
+    ],
+    [
+      "Nalanda",
+      2022,
+      1200,
+      924,
+      1.2987012987012987
+    ],
+    [
+      "Nalanda",
+      2023,
+      1250,
+      1000,
+      1.25
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH anc_coverage AS (SELECT district, year, pregnancies_registered, anc4_completed, source FROM anc_visits), coverage AS (SELECT district, year, pregnancies_registered, anc4_completed, source, pregnancies_registered / NULLIF(anc4_completed, 0) AS percentage FROM anc_coverage) SELECT district, year, pregnancies_registered, anc4_completed, percentage FROM coverage WHERE district IN ('Gaya', 'Nalanda')",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\n2021 to 2023 ANC coverage movement for these two: Gaya, Nalanda",
+      "response": "WITH \n  anc_coverage AS (\n    SELECT \n      district,\n      year,\n      pregnancies_registered,\n      anc4_completed,\n      source\n    FROM \n      anc_visits\n  ),\n  coverage AS (\n    SELECT \n      district,\n      year,\n      pregnancies_registered,\n      anc4_completed,\n      source,\n      pregnancies_registered / anc4_completed AS percentage\n    FROM \n      anc_coverage\n  )\nSELECT \n  district,\n  year,\n  pregnancies_registered,\n  anc4_completed,\n  percentage\nFROM \n  coverage\nWHERE \n  district IN ('Gaya', 'Nalanda')",
+      "api": {
+        "id": "gen-1787421265-gUAMrS05OShurFIaKnrx",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 302,
+          "completion_tokens": 122,
+          "total_tokens": 424,
+          "cost": 1.214e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.214e-05,
+            "upstream_inference_prompt_cost": 6.04e-06,
+            "upstream_inference_completions_cost": 6.1e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.46
+      },
+      "duration_seconds": 1.465,
+      "sql_duckdb": "WITH anc_coverage AS (SELECT district, year, pregnancies_registered, anc4_completed, source FROM anc_visits), coverage AS (SELECT district, year, pregnancies_registered, anc4_completed, source, pregnancies_registered / NULLIF(anc4_completed, 0) AS percentage FROM anc_coverage) SELECT district, year, pregnancies_registered, anc4_completed, percentage FROM coverage WHERE district IN ('Gaya', 'Nalanda')",
+      "rows": [
+        [
+          "Gaya",
+          2020,
+          1200,
+          744,
+          1.6129032258064515
+        ],
+        [
+          "Gaya",
+          2021,
+          1250,
+          825,
+          1.5151515151515151
+        ],
+        [
+          "Gaya",
+          2022,
+          1300,
+          897,
+          1.4492753623188406
+        ],
+        [
+          "Gaya",
+          2023,
+          1350,
+          999,
+          1.3513513513513513
+        ],
+        [
+          "Nalanda",
+          2020,
+          1000,
+          700,
+          1.4285714285714286
+        ],
+        [
+          "Nalanda",
+          2021,
+          1100,
+          803,
+          1.36986301369863
+        ],
+        [
+          "Nalanda",
+          2022,
+          1200,
+          924,
+          1.2987012987012987
+        ],
+        [
+          "Nalanda",
+          2023,
+          1250,
+          1000,
+          1.25
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

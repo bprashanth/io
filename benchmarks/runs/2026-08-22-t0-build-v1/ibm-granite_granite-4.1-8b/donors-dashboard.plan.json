@@ -1,0 +1,150 @@
+{
+ "plan": {
+  "title": "Donation Dashboard",
+  "subtitle": "Monthly trends, top cities, payment modes, and repeat donors",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "line",
+    "title": "Monthly Trend",
+    "sql": "SELECT DATE_FORMAT(\"Date\", \"%Y-%m\") AS month, SUM(Amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 1",
+    "x": "month",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Top Cities by Donation Amount",
+    "sql": "SELECT City, SUM(Amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "City",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Payment Modes Distribution",
+    "sql": "SELECT \"Mode\", COUNT(*) AS cnt FROM donor_transactions GROUP BY 1 ORDER BY cnt DESC",
+    "x": "Mode",
+    "y": [
+     "cnt"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "kpi",
+    "title": "Repeat Donors",
+    "sql": "SELECT COUNT(DISTINCT Donor) AS n FROM donor_transactions WHERE Donor IN (SELECT Donor FROM donor_transactions GROUP BY Donor HAVING COUNT(*) > 1)",
+    "unit": ""
+   }
+  ],
+  "narrative": "The dashboard provides a comprehensive view of donation activity. The monthly trend panel ({{p1}}) visualizes the total donation amount over time, highlighting seasonal patterns. The top cities panel ({{p2}}) identifies the most significant contributors geographically, while the payment modes panel ({{p3}}) shows the distribution of transaction types, aiding in resource allocation for payment infrastructure. Finally, the repeat donors KPI ({{p4}}) quantifies the number of donors who have contributed multiple times, indicating loyalty and potential for sustained engagement."
+ },
+ "results": {
+  "p1": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "CatalogException: Catalog Error: Scalar Function with name date_format does not exist!\nDid you mean \"date_part\"?\n\nLINE 1: SELECT DATE_FORMAT(\"Date\", \"%Y-%m\") AS month, SUM(Amount) AS total...\n               ^"
+  },
+  "p2": {
+   "columns": [
+    "City",
+    "total"
+   ],
+   "rows": [
+    {
+     "City": "Gaya",
+     "total": 787715
+    },
+    {
+     "City": "Bengaluru",
+     "total": 771729
+    },
+    {
+     "City": "Solapur",
+     "total": 729972
+    },
+    {
+     "City": "Thane",
+     "total": 678448
+    },
+    {
+     "City": "Mumbai",
+     "total": 617867
+    },
+    {
+     "City": "Pune",
+     "total": 544876
+    },
+    {
+     "City": "Nashik",
+     "total": 498828
+    },
+    {
+     "City": "Nagpur",
+     "total": 428953
+    },
+    {
+     "City": "Aurangabad",
+     "total": 403921
+    },
+    {
+     "City": "Delhi",
+     "total": 395268
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Mode",
+    "cnt"
+   ],
+   "rows": [
+    {
+     "Mode": "NEFT",
+     "cnt": 56
+    },
+    {
+     "Mode": "DD",
+     "cnt": 45
+    },
+    {
+     "Mode": "Cash",
+     "cnt": 42
+    },
+    {
+     "Mode": "Card",
+     "cnt": 37
+    },
+    {
+     "Mode": "Cheque",
+     "cnt": 37
+    },
+    {
+     "Mode": "UPI",
+     "cnt": 33
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 3
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  }
+ }
+}

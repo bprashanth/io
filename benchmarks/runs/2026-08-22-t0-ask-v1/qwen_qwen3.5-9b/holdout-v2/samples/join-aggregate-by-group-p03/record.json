@@ -1,0 +1,115 @@
+{
+  "id": "join-aggregate-by-group-p03",
+  "task_id": "join-aggregate-by-group",
+  "pattern": "join, filter, count and sum two columns per group",
+  "question": "schools lacking electricity: per block the number of such schools and their 2024 students",
+  "gold_sql": "SELECT e.\"Block\", COUNT(*) AS schools_without_electricity, SUM(e.\"Girls 2024\" + e.\"Boys 2024\") AS students_2024 FROM school_enrolment_by_year AS e JOIN school_infrastructure AS i ON e.\"School Code\" = i.\"School Code\" WHERE i.\"Electricity\" = 'No' GROUP BY e.\"Block\" ORDER BY e.\"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      2,
+      339
+    ],
+    [
+      "Barachatti",
+      3,
+      709
+    ],
+    [
+      "Belaganj",
+      2,
+      433
+    ],
+    [
+      "Dobhi",
+      3,
+      730
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Atri",
+      2,
+      339
+    ],
+    [
+      "Barachatti",
+      3,
+      709
+    ],
+    [
+      "Belaganj",
+      2,
+      433
+    ],
+    [
+      "Dobhi",
+      3,
+      730
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH school_stats AS (SELECT s.\"School Code\", s.\"School Name\", s.\"Block\", s.\"Girls 2024\", s.\"Boys 2024\", (s.\"Girls 2024\" + s.\"Boys 2024\") AS \"Total Students 2024\" FROM \"school_enrolment_by_year\" AS s JOIN \"school_infrastructure\" AS i ON s.\"School Code\" = i.\"School Code\" WHERE i.\"Electricity\" = 'No') SELECT \"Block\", COUNT(*) AS \"Schools Lacking Electricity\", SUM(\"Total Students 2024\") AS \"Total Students 2024\" FROM school_stats GROUP BY \"Block\" ORDER BY \"Block\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nCREATE TABLE \"school_infrastructure\" (\n  \"School Code\" BIGINT,\n  \"Toilets functional (girls)\" VARCHAR,\n  \"Drinking water\" VARCHAR,\n  \"Electricity\" VARCHAR,\n  \"Classrooms\" BIGINT,\n  \"Inspected On\" VARCHAR,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}, \"school_infrastructure\": {\"Toilets functional (girls)\": [\"No\", \"Yes\"], \"Drinking water\": [\"No\", \"Yes\"], \"Electricity\": [\"No\", \"Yes\"], \"Inspected On\": [\"2024-01-10\", \"2024-01-13\", \"2024-02-13\", \"2024-02-15\", \"2024-02-19\", \"2024-02-21\", \"2024-02-26\", \"2024-03-12\", \"2024-03-22\", \"2024-03-27\", \"2024-04-02\", \"2024-04-04\", \"2024-04-13\", \"2024-04-17\", \"2024-04-20\", \"2024-04-21\", \"2024-04-27\", \"2024-05-13\", \"2024-06-01\", \"2024-06-16\", \"2024-06-27\", \"2024-07-09\", \"2024-07-23\", \"2024-08-02\", \"2024-08-04\", \"2024-08-14\", \"2024-08-17\", \"2024-09-02\", \"2024-09-14\", \"2024-09-15\", \"2024-09-21\", \"2024-09-26\", \"2024-10-24\", \"2024-11-12\", \"2024-11-16\", \"2024-11-20\", \"2024-12-03\", \"2024-12-08\", \"2024-12-19\"], \"Source\": [\"Inspection register\"]}}\n\nCURRENT QUESTION:\nschools lacking electricity: per block the number of such schools and their 2024 students",
+      "response": "WITH school_stats AS (\n  SELECT \n    s.\"School Code\",\n    s.\"School Name\",\n    s.\"Block\",\n    s.\"Girls 2024\",\n    s.\"Boys 2024\",\n    (s.\"Girls 2024\" + s.\"Boys 2024\") AS \"Total Students 2024\"\n  FROM \"school_enrolment_by_year\" s\n  JOIN \"school_infrastructure\" i ON s.\"School Code\" = i.\"School Code\"\n  WHERE i.\"Electricity\" = 'No'\n)\nSELECT \n  \"Block\",\n  COUNT(*) AS \"Schools Lacking Electricity\",\n  SUM(\"Total Students 2024\") AS \"Total Students 2024\"\nFROM school_stats\nGROUP BY \"Block\"\nORDER BY \"Block\";",
+      "api": {
+        "id": "gen-1787420547-8AobPmYziKWj3Z24xNsh",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 1370,
+          "completion_tokens": 189,
+          "total_tokens": 1559,
+          "cost": 0.00016535,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00016535,
+            "upstream_inference_prompt_cost": 0.000137,
+            "upstream_inference_completions_cost": 2.835e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.012
+      },
+      "duration_seconds": 2.016,
+      "sql_duckdb": "WITH school_stats AS (SELECT s.\"School Code\", s.\"School Name\", s.\"Block\", s.\"Girls 2024\", s.\"Boys 2024\", (s.\"Girls 2024\" + s.\"Boys 2024\") AS \"Total Students 2024\" FROM \"school_enrolment_by_year\" AS s JOIN \"school_infrastructure\" AS i ON s.\"School Code\" = i.\"School Code\" WHERE i.\"Electricity\" = 'No') SELECT \"Block\", COUNT(*) AS \"Schools Lacking Electricity\", SUM(\"Total Students 2024\") AS \"Total Students 2024\" FROM school_stats GROUP BY \"Block\" ORDER BY \"Block\" NULLS FIRST",
+      "rows": [
+        [
+          "Atri",
+          2,
+          339
+        ],
+        [
+          "Barachatti",
+          3,
+          709
+        ],
+        [
+          "Belaganj",
+          2,
+          433
+        ],
+        [
+          "Dobhi",
+          3,
+          730
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

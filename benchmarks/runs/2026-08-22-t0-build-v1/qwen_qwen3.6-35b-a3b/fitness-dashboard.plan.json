@@ -1,0 +1,285 @@
+{
+ "plan": {
+  "title": "Child Development Impact",
+  "subtitle": "Comparing baseline to endline physical metrics by location and coach",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Children Tracked",
+    "sql": "SELECT COUNT(*) AS n FROM (SELECT \"Child ID\" FROM baseline UNION SELECT \"Child ID\" FROM endline) t",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Avg Height Gain (cm)",
+    "sql": "SELECT ROUND(AVG(gain), 1) AS n FROM (SELECT b.\"Child ID\", b.\"Height cm\" - e.\"Height cm\" AS gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\") t",
+    "unit": "cm"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Avg Sit-ups Gain",
+    "sql": "SELECT ROUND(AVG(gain), 1) AS n FROM (SELECT b.\"Child ID\", b.\"Sit ups\" - e.\"Sit ups\" AS gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\") t",
+    "unit": "reps"
+   },
+   {
+    "id": "p4",
+    "kind": "kpi",
+    "title": "Avg Shuttle Run Improvement (sec)",
+    "sql": "SELECT ROUND(AVG(gain), 1) AS n FROM (SELECT b.\"Child ID\", b.\"Shuttle run sec\" - e.\"Shuttle run sec\" AS gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\") t",
+    "unit": "sec"
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Avg Height Gain by Location",
+    "sql": "SELECT b.\"Location\", ROUND(AVG(b.\"Height cm\" - e.\"Height cm\"), 1) AS avg_gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "Location",
+    "y": [
+     "avg_gain"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "bar",
+    "title": "Avg Sit-ups Gain by Coach",
+    "sql": "SELECT b.\"Coach\", ROUND(AVG(b.\"Sit ups\" - e.\"Sit ups\"), 1) AS avg_gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "Coach",
+    "y": [
+     "avg_gain"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Top 10 Locations by Overall Improvement",
+    "sql": "SELECT b.\"Location\", ROUND(AVG(b.\"Height cm\" - e.\"Height cm\"), 1) AS height_gain, ROUND(AVG(b.\"Sit ups\" - e.\"Sit ups\"), 1) AS situps_gain, ROUND(AVG(b.\"Shuttle run sec\" - e.\"Shuttle run sec\"), 1) AS shuttle_gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY height_gain DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The program engaged {{p1}} children, tracking their physical development from baseline to endline. On average, participants showed a height increase of {{p2}} and improved their sit-up count by {{p3}}. Faster shuttle run times indicated better agility, with an average improvement of {{p4}} seconds.\n\nWhen analyzing by location, the top performers in height growth were led by {{p5.0}} with an average gain of {{p5.1}} cm. For core strength, Coach {{p6.0}} achieved the highest average sit-up improvement of {{p6.1}} reps among their students.\n\nThe table below details the top 10 locations by height gain, providing a comprehensive view of regional performance across all three key metrics."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": -3.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": -2.9
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 0.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Location",
+    "avg_gain"
+   ],
+   "rows": [
+    {
+     "Location": "Dobhi",
+     "avg_gain": 21.0
+    },
+    {
+     "Location": "Kadus",
+     "avg_gain": 16.7
+    },
+    {
+     "Location": "Loni Kalbhor",
+     "avg_gain": 15.1
+    },
+    {
+     "Location": "Mahuar",
+     "avg_gain": 14.5
+    },
+    {
+     "Location": "Chikhali",
+     "avg_gain": 12.1
+    },
+    {
+     "Location": "Rampur",
+     "avg_gain": 8.9
+    },
+    {
+     "Location": "Karpi",
+     "avg_gain": 8.4
+    },
+    {
+     "Location": "Imamganj",
+     "avg_gain": 8.3
+    },
+    {
+     "Location": "Saswad",
+     "avg_gain": 8.0
+    },
+    {
+     "Location": "Bariarpur",
+     "avg_gain": 7.5
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Coach",
+    "avg_gain"
+   ],
+   "rows": [
+    {
+     "Coach": "Bapu Yadav",
+     "avg_gain": 0.3
+    },
+    {
+     "Coach": "P. T. Pereira",
+     "avg_gain": -0.1
+    },
+    {
+     "Coach": "Salman Rao",
+     "avg_gain": -0.2
+    },
+    {
+     "Coach": "Rupali Kumar",
+     "avg_gain": -0.5
+    },
+    {
+     "Coach": "AAKASH ZENDE",
+     "avg_gain": -0.6
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "avg_gain": -0.7
+    },
+    {
+     "Coach": "Rosy",
+     "avg_gain": -1.1
+    },
+    {
+     "Coach": "indira chandra",
+     "avg_gain": -1.3
+    },
+    {
+     "Coach": "Bhagyashree",
+     "avg_gain": -1.7
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "avg_gain": -3.9
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "Location",
+    "height_gain",
+    "situps_gain",
+    "shuttle_gain"
+   ],
+   "rows": [
+    {
+     "Location": "Dobhi",
+     "height_gain": 21.0,
+     "situps_gain": 2.0,
+     "shuttle_gain": 2.2
+    },
+    {
+     "Location": "Kadus",
+     "height_gain": 16.7,
+     "situps_gain": -24.0,
+     "shuttle_gain": 3.7
+    },
+    {
+     "Location": "Loni Kalbhor",
+     "height_gain": 15.1,
+     "situps_gain": -3.0,
+     "shuttle_gain": -4.5
+    },
+    {
+     "Location": "Mahuar",
+     "height_gain": 14.5,
+     "situps_gain": -1.6,
+     "shuttle_gain": 1.5
+    },
+    {
+     "Location": "Chikhali",
+     "height_gain": 12.1,
+     "situps_gain": 7.7,
+     "shuttle_gain": -2.0
+    },
+    {
+     "Location": "Rampur",
+     "height_gain": 8.9,
+     "situps_gain": -7.2,
+     "shuttle_gain": 1.8
+    },
+    {
+     "Location": "Karpi",
+     "height_gain": 8.4,
+     "situps_gain": 5.0,
+     "shuttle_gain": -2.2
+    },
+    {
+     "Location": "Imamganj",
+     "height_gain": 8.3,
+     "situps_gain": -7.9,
+     "shuttle_gain": 0.5
+    },
+    {
+     "Location": "Saswad",
+     "height_gain": 8.0,
+     "situps_gain": -13.0,
+     "shuttle_gain": -6.3
+    },
+    {
+     "Location": "Bariarpur",
+     "height_gain": 7.5,
+     "situps_gain": 4.0,
+     "shuttle_gain": -3.2
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

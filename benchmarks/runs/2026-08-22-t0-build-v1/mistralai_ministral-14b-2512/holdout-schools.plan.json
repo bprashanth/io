@@ -1,0 +1,212 @@
+{
+ "plan": {
+  "title": "School Enrolment & Infrastructure Dashboard",
+  "subtitle": "Trends in student enrolment, gender gaps, and infrastructure readiness across schools",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total students enrolled (2024)",
+    "sql": "SELECT SUM(\"Girls 2024\") + SUM(\"Boys 2024\") AS total_students FROM \"school_enrolment_by_year\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Girls vs Boys ratio (2024)",
+    "sql": "SELECT ROUND((SUM(\"Girls 2024\") * 100.0 / NULLIF(SUM(\"Boys 2024\"), 0)), 1) AS ratio FROM \"school_enrolment_by_year\"",
+    "unit": "%"
+   },
+   {
+    "id": "p3",
+    "kind": "line",
+    "title": "Enrolment trend by gender (2022-2024)",
+    "sql": "WITH yearly_data AS (\n  SELECT 'Girls' AS gender, \"Girls 2022\" AS count, '2022' AS year FROM \"school_enrolment_by_year\"\n  UNION ALL\n  SELECT 'Girls', \"Girls 2023\", '2023' FROM \"school_enrolment_by_year\"\n  UNION ALL\n  SELECT 'Girls', \"Girls 2024\", '2024' FROM \"school_enrolment_by_year\"\n  UNION ALL\n  SELECT 'Boys' AS gender, \"Boys 2022\" AS count, '2022' FROM \"school_enrolment_by_year\"\n  UNION ALL\n  SELECT 'Boys', \"Boys 2023\", '2023' FROM \"school_enrolment_by_year\"\n  UNION ALL\n  SELECT 'Boys', \"Boys 2024\", '2024' FROM \"school_enrolment_by_year\"\n)\nSELECT gender, year, SUM(count) AS total FROM yearly_data GROUP BY 1, 2 ORDER BY 2, 1",
+    "x": "year",
+    "y": [
+     "total"
+    ],
+    "series": "gender"
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Top 10 schools by enrolment growth (2022-2024)",
+    "sql": "WITH growth_data AS (\n  SELECT \n    \"School Name\", \n    \"Block\", \n    (\"Girls 2024\" + \"Boys 2024\") - (\"Girls 2022\" + \"Boys 2022\") AS growth\n  FROM \"school_enrolment_by_year\"\n)\nSELECT \n  \"School Name\", \n  \"Block\", \n  growth\nFROM growth_data\nORDER BY growth DESC\nLIMIT 10",
+    "x": "School Name",
+    "y": [
+     "growth"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Infrastructure gaps by block",
+    "sql": "SELECT \n  \"Block\", \n  COUNT(CASE WHEN \"Toilets functional (girls)\" = 'No' THEN 1 END) AS non_functional_toilets,\n  COUNT(CASE WHEN \"Drinking water\" = 'No' THEN 1 END) AS no_water_supply,\n  COUNT(CASE WHEN \"Electricity\" = 'No' THEN 1 END) AS no_electricity\nFROM \"school_infrastructure\"\nGROUP BY 1\nORDER BY 1"
+   },
+   {
+    "id": "p6",
+    "kind": "pie",
+    "title": "Schools with functional toilets (girls)",
+    "sql": "SELECT \n  CASE WHEN \"Toilets functional (girls)\" = 'Yes' THEN 'Functional' ELSE 'Non-functional' END AS toilet_status,\n  COUNT(*) AS count\nFROM \"school_infrastructure\"\nGROUP BY 1",
+    "x": "toilet_status",
+    "y": [
+     "count"
+    ]
+   }
+  ],
+  "narrative": "This dashboard tracks key metrics for school performance across {{p1.id}} districts. The gender ratio shows {{p2}} girls for every 100 boys in 2024, highlighting persistent gender gaps. Enrolment trends reveal {{p3}} students grew by {{p3.n}} between 2022 and 2024, with {{p4}} schools showing the most significant increases. Infrastructure data exposes critical gaps: {{p5.non_functional_toilets}} schools lack functional girls' toilets, while {{p5.no_water_supply}} and {{p5.no_electricity}} schools face basic service deficiencies. Only {{p6.Functional}}% of schools meet minimum toilet standards, requiring urgent attention to improve learning environments."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_students"
+   ],
+   "rows": [
+    {
+     "total_students": 9343
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "ratio"
+   ],
+   "rows": [
+    {
+     "ratio": 110.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "gender",
+    "year",
+    "total"
+   ],
+   "rows": [
+    {
+     "gender": "Boys",
+     "year": "2022",
+     "total": 4202
+    },
+    {
+     "gender": "Girls",
+     "year": "2022",
+     "total": 4611
+    },
+    {
+     "gender": "Boys",
+     "year": "2023",
+     "total": 4355
+    },
+    {
+     "gender": "Girls",
+     "year": "2023",
+     "total": 4733
+    },
+    {
+     "gender": "Boys",
+     "year": "2024",
+     "total": 4450
+    },
+    {
+     "gender": "Girls",
+     "year": "2024",
+     "total": 4893
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "School Name",
+    "Block",
+    "growth"
+   ],
+   "rows": [
+    {
+     "School Name": "Prathmik Vidyalaya Lodipur",
+     "Block": "Belaganj",
+     "growth": 46
+    },
+    {
+     "School Name": "Adarsh Vidyalaya Lodipur",
+     "Block": "Atri",
+     "growth": 42
+    },
+    {
+     "School Name": "Navin Vidyalaya Chakand",
+     "Block": "Barachatti",
+     "growth": 40
+    },
+    {
+     "School Name": "Buniyadi Vidyalaya Lodipur",
+     "Block": "Dobhi",
+     "growth": 39
+    },
+    {
+     "School Name": "Adarsh Vidyalaya Rampur",
+     "Block": "Atri",
+     "growth": 36
+    },
+    {
+     "School Name": "Rajkiya Vidyalaya Khizarsarai",
+     "Block": "Belaganj",
+     "growth": 36
+    },
+    {
+     "School Name": "Madhya Vidyalaya Khizarsarai",
+     "Block": "Barachatti",
+     "growth": 34
+    },
+    {
+     "School Name": "Madhya Vidyalaya Bhadeya",
+     "Block": "Belaganj",
+     "growth": 33
+    },
+    {
+     "School Name": "Rajkiya Vidyalaya Chakand",
+     "Block": "Barachatti",
+     "growth": 27
+    },
+    {
+     "School Name": "Navin Vidyalaya Amas",
+     "Block": "Belaganj",
+     "growth": 25
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p5": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Referenced column \"Block\" not found in FROM clause!\nCandidate bindings: \"Source\", \"Classrooms\", \"Electricity\", \"School Code\"\n\nLINE 1: SELECT \"Block\", COUNT(CASE WHEN \"Toilets functional (girls)\" =...\n               ^"
+  },
+  "p6": {
+   "columns": [
+    "toilet_status",
+    "count"
+   ],
+   "rows": [
+    {
+     "toilet_status": "Functional",
+     "count": 25
+    },
+    {
+     "toilet_status": "Non-functional",
+     "count": 15
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  }
+ }
+}

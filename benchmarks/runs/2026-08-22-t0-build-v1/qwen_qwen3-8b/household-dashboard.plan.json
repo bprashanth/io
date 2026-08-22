@@ -1,0 +1,262 @@
+{
+ "plan": {
+  "title": "Household Survey Dashboard",
+  "subtitle": "Overview of survey coverage by village, enumerator, and submission trends",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total households surveyed",
+    "sql": "SELECT COUNT(*) AS n FROM \"household_survey\" WHERE \"start\" IS NOT NULL AND \"end\" IS NOT NULL",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Households by village",
+    "sql": "SELECT \"village\", COUNT(*) AS n FROM \"household_survey\" WHERE \"start\" IS NOT NULL AND \"end\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+    "x": "village",
+    "y": [
+     "n"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Households by enumerator",
+    "sql": "SELECT \"enumerator_name\", COUNT(*) AS n FROM \"household_survey\" WHERE \"start\" IS NOT NULL AND \"end\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+    "x": "enumerator_name",
+    "y": [
+     "n"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Monthly submissions trend",
+    "sql": "WITH monthly_submissions AS (SELECT DATE_TRUNC('MONTH', TO_TIMESTAMP(\"_submission_time\", 'YYYY-MM-DD HH:MI:SS')) AS month, COUNT(*) AS total FROM \"household_survey\" WHERE \"start\" IS NOT NULL AND \"end\" IS NOT NULL GROUP BY 1 ORDER BY 1) SELECT month, total FROM monthly_submissions",
+    "x": "month",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top 10 villages by number of households",
+    "sql": "SELECT \"village\", COUNT(*) AS n FROM \"household_survey\" WHERE \"start\" IS NOT NULL AND \"end\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "This dashboard provides an overview of the household survey coverage. {{p1}} households were surveyed across different villages and enumerators. The distribution of households by village is shown in {{p2}}, highlighting the most represented areas. Similarly, {{p3}} displays the distribution by enumerator, showing which enumerators have surveyed the most households. The monthly trend of submissions is visualized in {{p4}}, indicating the volume of data collected over time. For a detailed view of the top 10 villages by number of households, refer to {{p5}}."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 150
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "village",
+    "n"
+   ],
+   "rows": [
+    {
+     "village": "Kalyanpur",
+     "n": 9
+    },
+    {
+     "village": "Bariarpur",
+     "n": 9
+    },
+    {
+     "village": "Chandwara",
+     "n": 8
+    },
+    {
+     "village": "Sahebganj",
+     "n": 7
+    },
+    {
+     "village": "Deopur",
+     "n": 7
+    },
+    {
+     "village": "Guraru",
+     "n": 6
+    },
+    {
+     "village": "Rampur Sokho",
+     "n": 6
+    },
+    {
+     "village": "Fatehpur",
+     "n": 6
+    },
+    {
+     "village": "Nira",
+     "n": 6
+    },
+    {
+     "village": "Harnaut Tola",
+     "n": 6
+    },
+    {
+     "village": "Motipur",
+     "n": 5
+    },
+    {
+     "village": "Mahuar",
+     "n": 4
+    },
+    {
+     "village": "Bishunpur",
+     "n": 4
+    },
+    {
+     "village": "Alandi",
+     "n": 4
+    },
+    {
+     "village": "Wadgaon",
+     "n": 4
+    },
+    {
+     "village": "Paroo",
+     "n": 4
+    },
+    {
+     "village": "Devipur",
+     "n": 3
+    },
+    {
+     "village": "Karpi",
+     "n": 3
+    },
+    {
+     "village": "Chikhali",
+     "n": 3
+    },
+    {
+     "village": "Imamganj",
+     "n": 3
+    }
+   ],
+   "rowcount": 20,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "enumerator_name",
+    "n"
+   ],
+   "rows": [
+    {
+     "enumerator_name": "REHANA GAIKWAD",
+     "n": 18
+    },
+    {
+     "enumerator_name": "SUSHMA ANSARI",
+     "n": 18
+    },
+    {
+     "enumerator_name": "Sudha Fernandez",
+     "n": 18
+    },
+    {
+     "enumerator_name": "V. G. Sheikh",
+     "n": 17
+    },
+    {
+     "enumerator_name": "D. S. Gaikwad",
+     "n": 17
+    },
+    {
+     "enumerator_name": "Arjun Krishnan",
+     "n": 14
+    },
+    {
+     "enumerator_name": "Rohit",
+     "n": 13
+    },
+    {
+     "enumerator_name": "Ravi Chougule",
+     "n": 12
+    },
+    {
+     "enumerator_name": "Vimla Mirza",
+     "n": 12
+    },
+    {
+     "enumerator_name": "Balasaheb Pillai",
+     "n": 11
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: No function matches the given name and argument types '/(VARCHAR, DOUBLE)'. You might need to add explicit type casts.\n\tCandidate functions:\n\t/(FLOAT, FLOAT) -> FLOAT\n\t/(DOUBLE, DOUBLE) -> DOUBLE\n\t/(INTERVAL, DOUBLE) -> INTERVAL\n\n\nLINE 1: ... (SELECT DATE_TRUNC('MONTH'"
+  },
+  "p5": {
+   "columns": [
+    "village",
+    "n"
+   ],
+   "rows": [
+    {
+     "village": "Kalyanpur",
+     "n": 9
+    },
+    {
+     "village": "Bariarpur",
+     "n": 9
+    },
+    {
+     "village": "Chandwara",
+     "n": 8
+    },
+    {
+     "village": "Sahebganj",
+     "n": 7
+    },
+    {
+     "village": "Deopur",
+     "n": 7
+    },
+    {
+     "village": "Guraru",
+     "n": 6
+    },
+    {
+     "village": "Harnaut Tola",
+     "n": 6
+    },
+    {
+     "village": "Nira",
+     "n": 6
+    },
+    {
+     "village": "Fatehpur",
+     "n": 6
+    },
+    {
+     "village": "Rampur Sokho",
+     "n": 6
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

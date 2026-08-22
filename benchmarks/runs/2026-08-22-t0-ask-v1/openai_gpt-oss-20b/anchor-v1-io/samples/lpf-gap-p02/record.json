@@ -1,0 +1,6408 @@
+{
+  "id": "lpf-gap-p02",
+  "task_id": "lpf-gap",
+  "pattern": "fuzzy string join with best-match dedup, group count compared against a stated column, threshold filter",
+  "question": "list schools where actual applications received, fuzzy matched, fall short of half the expected number",
+  "gold_sql": "WITH best AS (SELECT a.\"Applicant\" AS applicant, o.\"School Name\" AS matched_school, jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) AS sim FROM lpf_applications AS a JOIN lpf_outreach AS o ON jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) >= 0.9 QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Applicant\" ORDER BY sim DESC, o.\"School Name\") = 1) SELECT o.\"School Name\", COUNT(b.applicant) AS applications_received, o.\"Applications Expected\" FROM lpf_outreach AS o LEFT JOIN best AS b ON b.matched_school = o.\"School Name\" GROUP BY o.\"School Name\", o.\"Applications Expected\" HAVING COUNT(b.applicant) < o.\"Applications Expected\" / 2.0 ORDER BY o.\"School Name\"",
+  "expected_rows": [
+    [
+      "Amas Madhya Vidyalaya, Zilla Parishad",
+      1,
+      21
+    ],
+    [
+      "Amas Prathmik Vidyalaya",
+      0,
+      26
+    ],
+    [
+      "Amawan Adarsh Vidyalaya, Zilla Parishad",
+      1,
+      8
+    ],
+    [
+      "Amba Buniyadi Vidyalaya, Zilla Parishad",
+      0,
+      11
+    ],
+    [
+      "Amba Kanya Shala",
+      1,
+      20
+    ],
+    [
+      "Amba Kanya Vidyalaya, Zilla Parishad",
+      0,
+      28
+    ],
+    [
+      "Amba Madhyamik Vidyalaya, Zilla Parishad",
+      1,
+      15
+    ],
+    [
+      "Arwal Kanya Shala",
+      1,
+      13
+    ],
+    [
+      "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+      2,
+      16
+    ],
+    [
+      "Atri Kanya Shala",
+      2,
+      29
+    ],
+    [
+      "Atri Prathmik Vidyalaya",
+      0,
+      18
+    ],
+    [
+      "Aurangabad Kanya Shala",
+      0,
+      10
+    ],
+    [
+      "Aurangabad Prathmik Vidyalaya, Zilla Parishad",
+      1,
+      5
+    ],
+    [
+      "Bankat Adarsh Vidyalaya",
+      0,
+      5
+    ],
+    [
+      "Bankat Kanya Vidyalaya, Zilla Parishad",
+      0,
+      7
+    ],
+    [
+      "Bankat Navin Vidyalaya",
+      0,
+      10
+    ],
+    [
+      "Barachatti Kanya Shala",
+      2,
+      13
+    ],
+    [
+      "Barhi Kanya Shala",
+      1,
+      28
+    ],
+    [
+      "Bathani Adarsh Vidyalaya",
+      0,
+      9
+    ],
+    [
+      "Belaganj Kanya Shala",
+      1,
+      9
+    ],
+    [
+      "Belaganj Prathmik Shala (Zilla Parishad)",
+      0,
+      5
+    ],
+    [
+      "Bhadeya Kanya Shala",
+      0,
+      17
+    ],
+    [
+      "Bhadeya Prathmik Vidyalaya",
+      2,
+      27
+    ],
+    [
+      "Bhadeya Uchcha Madhyamik Vidyalaya",
+      0,
+      28
+    ],
+    [
+      "Bishunpur Buniyadi Vidyalaya, Zilla Parishad",
+      1,
+      28
+    ],
+    [
+      "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+      0,
+      5
+    ],
+    [
+      "Bishunpur Navin Vidyalaya",
+      2,
+      12
+    ],
+    [
+      "Bishunpur Prathmik Shala (Zilla Parishad)",
+      0,
+      2
+    ],
+    [
+      "Bodh Gaya Kanya Shala",
+      1,
+      5
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya",
+      2,
+      21
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+      0,
+      3
+    ],
+    [
+      "Bodh Gaya Prathmik Shala (Zilla Parishad)",
+      1,
+      17
+    ],
+    [
+      "Buxar Kanya Vidyalaya, Zilla Parishad",
+      0,
+      14
+    ],
+    [
+      "Buxar Prathmik Shala (Zilla Parishad)",
+      0,
+      17
+    ],
+    [
+      "Buxar Prathmik Vidyalaya, Zilla Parishad",
+      0,
+      24
+    ],
+    [
+      "Chandauti Prathmik Vidyalaya",
+      0,
+      24
+    ],
+    [
+      "Deorhi Kanya Vidyalaya",
+      1,
+      28
+    ],
+    [
+      "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+      3,
+      10
+    ],
+    [
+      "Dobhi Prathmik Shala (Zilla Parishad)",
+      0,
+      23
+    ],
+    [
+      "Dobhi Uchcha Madhyamik Vidyalaya",
+      2,
+      20
+    ],
+    [
+      "Domuhan Kanya Shala",
+      1,
+      4
+    ],
+    [
+      "Dumraon Kanya Shala",
+      0,
+      29
+    ],
+    [
+      "Dumraon Kanya Vidyalaya, Zilla Parishad",
+      1,
+      13
+    ],
+    [
+      "Dumraon Prathmik Shala (Zilla Parishad)",
+      2,
+      17
+    ],
+    [
+      "Fatehpur Kanya Shala",
+      1,
+      5
+    ],
+    [
+      "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+      3,
+      27
+    ],
+    [
+      "Fatehpur Prathmik Shala (Zilla Parishad)",
+      1,
+      7
+    ],
+    [
+      "Guraru Kanya Vidyalaya",
+      3,
+      26
+    ],
+    [
+      "Guraru Uchcha Madhyamik Vidyalaya",
+      0,
+      8
+    ],
+    [
+      "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+      1,
+      28
+    ],
+    [
+      "Imamganj Buniyadi Vidyalaya",
+      0,
+      14
+    ],
+    [
+      "Imamganj Madhya Vidyalaya",
+      0,
+      18
+    ],
+    [
+      "Imamganj Madhya Vidyalaya, Zilla Parishad",
+      1,
+      23
+    ],
+    [
+      "Islampur Kanya Shala",
+      0,
+      4
+    ],
+    [
+      "Islampur Kanya Vidyalaya",
+      2,
+      6
+    ],
+    [
+      "Islampur Madhya Vidyalaya",
+      0,
+      13
+    ],
+    [
+      "Islampur Prathmik Shala (Zilla Parishad)",
+      4,
+      17
+    ],
+    [
+      "Karmauni Kanya Vidyalaya",
+      2,
+      13
+    ],
+    [
+      "Karmauni Madhya Vidyalaya, Zilla Parishad",
+      1,
+      5
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya",
+      1,
+      18
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      0,
+      27
+    ],
+    [
+      "Khizarsarai Adarsh Vidyalaya, Zilla Parishad",
+      0,
+      8
+    ],
+    [
+      "Khizarsarai Buniyadi Vidyalaya",
+      0,
+      13
+    ],
+    [
+      "Konch Adarsh Vidyalaya, Zilla Parishad",
+      2,
+      17
+    ],
+    [
+      "Konch Prathmik Shala (Zilla Parishad)",
+      1,
+      20
+    ],
+    [
+      "Kothi Buniyadi Vidyalaya",
+      0,
+      23
+    ],
+    [
+      "Kothi Navin Vidyalaya",
+      0,
+      16
+    ],
+    [
+      "Kothi Prathmik Shala (Zilla Parishad)",
+      0,
+      9
+    ],
+    [
+      "Lodipur Navin Vidyalaya, Zilla Parishad",
+      1,
+      11
+    ],
+    [
+      "Mahuar Madhya Vidyalaya",
+      1,
+      30
+    ],
+    [
+      "Mahuar Prathmik Shala (Zilla Parishad)",
+      1,
+      12
+    ],
+    [
+      "Manpur Prathmik Shala (Zilla Parishad)",
+      1,
+      27
+    ],
+    [
+      "Manpur Prathmik Vidyalaya",
+      0,
+      9
+    ],
+    [
+      "Modanganj Kanya Shala",
+      0,
+      16
+    ],
+    [
+      "Modanganj Prathmik Vidyalaya",
+      1,
+      10
+    ],
+    [
+      "Modanganj Uchcha Madhyamik Vidyalaya",
+      2,
+      5
+    ],
+    [
+      "Muhra Buniyadi Vidyalaya",
+      1,
+      4
+    ],
+    [
+      "Muhra Prathmik Shala (Zilla Parishad)",
+      3,
+      16
+    ],
+    [
+      "Nawada Buniyadi Vidyalaya, Zilla Parishad",
+      0,
+      22
+    ],
+    [
+      "Nawada Kanya Vidyalaya",
+      2,
+      18
+    ],
+    [
+      "Nawada Madhya Vidyalaya",
+      1,
+      19
+    ],
+    [
+      "Nawada Madhya Vidyalaya, Zilla Parishad",
+      1,
+      4
+    ],
+    [
+      "Nawada Prathmik Vidyalaya, Zilla Parishad",
+      0,
+      6
+    ],
+    [
+      "Nawada Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1,
+      16
+    ],
+    [
+      "Neemchak Prathmik Shala (Zilla Parishad)",
+      0,
+      21
+    ],
+    [
+      "Nimi Kanya Shala",
+      0,
+      28
+    ],
+    [
+      "Nimi Madhya Vidyalaya, Zilla Parishad",
+      2,
+      7
+    ],
+    [
+      "Panchgama Buniyadi Vidyalaya",
+      1,
+      15
+    ],
+    [
+      "Paraiya Adarsh Vidyalaya",
+      0,
+      10
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya",
+      0,
+      26
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+      2,
+      27
+    ],
+    [
+      "Paraiya Kanya Vidyalaya, Zilla Parishad",
+      1,
+      26
+    ],
+    [
+      "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+      1,
+      23
+    ],
+    [
+      "Paraiya Prathmik Shala (Zilla Parishad)",
+      1,
+      23
+    ],
+    [
+      "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+      2,
+      28
+    ],
+    [
+      "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+      1,
+      27
+    ],
+    [
+      "Rampur Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1,
+      24
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Bathani",
+      0,
+      15
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Konch",
+      0,
+      25
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Modanganj",
+      0,
+      19
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Tetariya",
+      1,
+      24
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Nimi",
+      2,
+      13
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      0,
+      16
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Wazirganj",
+      1,
+      21
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Bodh Gaya",
+      2,
+      9
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      0,
+      16
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      1,
+      9
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Bathani",
+      0,
+      26
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Tetariya",
+      1,
+      30
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      1,
+      18
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      1,
+      17
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Manpur",
+      1,
+      17
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Arwal",
+      1,
+      10
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Buxar",
+      2,
+      9
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Karmauni",
+      1,
+      25
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Barhi",
+      0,
+      6
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Belaganj",
+      0,
+      14
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Guraru",
+      0,
+      11
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Nimi",
+      0,
+      7
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+      0,
+      28
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+      0,
+      7
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+      1,
+      8
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+      2,
+      5
+    ],
+    [
+      "Sarwan Madhyamik Vidyalaya",
+      3,
+      9
+    ],
+    [
+      "Sherghati Kanya Vidyalaya, Zilla Parishad",
+      0,
+      4
+    ],
+    [
+      "Sherghati Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      0,
+      26
+    ],
+    [
+      "Sherpur Navin Vidyalaya, Zilla Parishad",
+      2,
+      16
+    ],
+    [
+      "Shri Durga Vidyalaya, Amas",
+      0,
+      15
+    ],
+    [
+      "Shri Durga Vidyalaya, Domuhan",
+      0,
+      10
+    ],
+    [
+      "Shri Durga Vidyalaya, Fatehpur",
+      1,
+      6
+    ],
+    [
+      "Shri Durga Vidyalaya, Karmauni",
+      0,
+      9
+    ],
+    [
+      "Shri Durga Vidyalaya, Sonbarsa",
+      1,
+      11
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      0,
+      10
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      0,
+      8
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      2,
+      15
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      0,
+      3
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      0,
+      23
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      1,
+      10
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      0,
+      9
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      0,
+      4
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      2,
+      17
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Bhadeya",
+      0,
+      28
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Islampur",
+      1,
+      9
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Sherpur",
+      2,
+      21
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      2,
+      5
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      4,
+      17
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      1,
+      13
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      0,
+      16
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      1,
+      26
+    ],
+    [
+      "Shri Ram Vidyalaya, Amba",
+      0,
+      24
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Belaganj",
+      0,
+      16
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Dumraon",
+      0,
+      11
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Rafiganj",
+      0,
+      9
+    ],
+    [
+      "Shri Shiv Vidyalaya, Aurangabad",
+      0,
+      12
+    ],
+    [
+      "Shri Shiv Vidyalaya, Domuhan",
+      1,
+      22
+    ],
+    [
+      "Shri Shiv Vidyalaya, Nimi",
+      0,
+      2
+    ],
+    [
+      "Shri Shiv Vidyalaya, Wazirganj",
+      1,
+      5
+    ],
+    [
+      "Sikaria Buniyadi Vidyalaya",
+      2,
+      27
+    ],
+    [
+      "Sikaria Kanya Vidyalaya, Zilla Parishad",
+      1,
+      5
+    ],
+    [
+      "Sikaria Uchcha Madhyamik Vidyalaya",
+      0,
+      27
+    ],
+    [
+      "Sonbarsa Buniyadi Vidyalaya",
+      1,
+      29
+    ],
+    [
+      "Sonbarsa Kanya Shala",
+      0,
+      30
+    ],
+    [
+      "Sonbarsa Kanya Vidyalaya, Zilla Parishad",
+      0,
+      19
+    ],
+    [
+      "Tekari Buniyadi Vidyalaya, Zilla Parishad",
+      0,
+      26
+    ],
+    [
+      "Tekari Kanya Shala",
+      1,
+      26
+    ],
+    [
+      "Tekari Prathmik Shala (Zilla Parishad)",
+      1,
+      19
+    ],
+    [
+      "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      3,
+      16
+    ],
+    [
+      "Tetariya Kanya Vidyalaya",
+      0,
+      6
+    ],
+    [
+      "Tetariya Madhya Vidyalaya, Zilla Parishad",
+      0,
+      14
+    ],
+    [
+      "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+      2,
+      12
+    ],
+    [
+      "Tetariya Prathmik Shala (Zilla Parishad)",
+      0,
+      6
+    ],
+    [
+      "Wazirganj Prathmik Vidyalaya, Zilla Parishad",
+      0,
+      18
+    ],
+    [
+      "Wazirganj Uchcha Madhyamik Vidyalaya",
+      1,
+      6
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Shri Durga Vidyalaya, Sonbarsa",
+      "Dobhi",
+      148,
+      11,
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Tetariya",
+      "Belaganj",
+      87,
+      30,
+      1
+    ],
+    [
+      "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      39,
+      5,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      "Atri",
+      37,
+      17,
+      2
+    ],
+    [
+      "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      95,
+      16,
+      1
+    ],
+    [
+      "Sikaria Buniyadi Vidyalaya",
+      "Barachatti",
+      30,
+      27,
+      1
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      38,
+      27,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Nimi",
+      "Dobhi",
+      148,
+      13,
+      1
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Islampur",
+      "Fatehpur",
+      113,
+      9,
+      2
+    ],
+    [
+      "Amba Kanya Shala",
+      "Fatehpur",
+      36,
+      20,
+      1
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Guraru",
+      "Barachatti",
+      92,
+      11,
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Tetariya",
+      "Belaganj",
+      87,
+      30,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Wazirganj",
+      "Barachatti",
+      58,
+      21,
+      1
+    ],
+    [
+      "Shri Ram Vidyalaya, Amba",
+      "Belaganj",
+      72,
+      24,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      "Dobhi",
+      119,
+      10,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      "Barachatti",
+      78,
+      3,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      "Barachatti",
+      73,
+      16,
+      1
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Islampur",
+      "Fatehpur",
+      113,
+      9,
+      1
+    ],
+    [
+      "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      68,
+      10,
+      1
+    ],
+    [
+      "Karmauni Kanya Vidyalaya",
+      "Wazirganj",
+      61,
+      13,
+      1
+    ],
+    [
+      "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      39,
+      5,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      "Dobhi",
+      119,
+      10,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      "Atri",
+      96,
+      9,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Domuhan",
+      "Wazirganj",
+      28,
+      10,
+      1
+    ],
+    [
+      "Tekari Prathmik Shala (Zilla Parishad)",
+      "Atri",
+      137,
+      19,
+      1
+    ],
+    [
+      "Rampur Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      25,
+      24,
+      1
+    ],
+    [
+      "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      30,
+      12,
+      1
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya",
+      "Belaganj",
+      131,
+      26,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+      "Fatehpur",
+      85,
+      8,
+      2
+    ],
+    [
+      "Shri Shiv Vidyalaya, Aurangabad",
+      "Wazirganj",
+      125,
+      12,
+      1
+    ],
+    [
+      "Shri Shiv Vidyalaya, Wazirganj",
+      "Fatehpur",
+      45,
+      5,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya",
+      "Dobhi",
+      100,
+      21,
+      1
+    ],
+    [
+      "Sikaria Buniyadi Vidyalaya",
+      "Barachatti",
+      30,
+      27,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      "Belaganj",
+      49,
+      16,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      "Barachatti",
+      122,
+      17,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      "Wazirganj",
+      27,
+      23,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      "Atri",
+      85,
+      8,
+      1
+    ],
+    [
+      "Dumraon Kanya Shala",
+      "Fatehpur",
+      41,
+      29,
+      1
+    ],
+    [
+      "Amba Kanya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      24,
+      28,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      "Fatehpur",
+      27,
+      17,
+      1
+    ],
+    [
+      "Tekari Kanya Shala",
+      "Belaganj",
+      120,
+      26,
+      1
+    ],
+    [
+      "Tekari Kanya Shala",
+      "Belaganj",
+      120,
+      26,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      "Barachatti",
+      45,
+      4,
+      1
+    ],
+    [
+      "Neemchak Prathmik Shala (Zilla Parishad)",
+      "Barachatti",
+      142,
+      21,
+      1
+    ],
+    [
+      "Barachatti Kanya Shala",
+      "Fatehpur",
+      35,
+      13,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      143,
+      13,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Karmauni",
+      "Atri",
+      38,
+      25,
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Tetariya",
+      "Atri",
+      148,
+      24,
+      1
+    ],
+    [
+      "Bishunpur Buniyadi Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      42,
+      28,
+      1
+    ],
+    [
+      "Tetariya Kanya Vidyalaya",
+      "Dobhi",
+      42,
+      6,
+      1
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Belaganj",
+      "Belaganj",
+      108,
+      14,
+      1
+    ],
+    [
+      "Kothi Navin Vidyalaya",
+      "Fatehpur",
+      87,
+      16,
+      1
+    ],
+    [
+      "Chandauti Prathmik Vidyalaya",
+      "Belaganj",
+      122,
+      24,
+      1
+    ],
+    [
+      "Sonbarsa Kanya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      69,
+      19,
+      1
+    ],
+    [
+      "Kothi Buniyadi Vidyalaya",
+      "Wazirganj",
+      109,
+      23,
+      1
+    ],
+    [
+      "Khizarsarai Adarsh Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      95,
+      8,
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Konch",
+      "Barachatti",
+      21,
+      25,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      60,
+      9,
+      1
+    ],
+    [
+      "Sarwan Madhyamik Vidyalaya",
+      "Belaganj",
+      144,
+      9,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      "Barachatti",
+      45,
+      4,
+      1
+    ],
+    [
+      "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+      "Fatehpur",
+      29,
+      23,
+      1
+    ],
+    [
+      "Nawada Madhya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      47,
+      4,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      77,
+      3,
+      1
+    ],
+    [
+      "Paraiya Prathmik Shala (Zilla Parishad)",
+      "Wazirganj",
+      21,
+      23,
+      1
+    ],
+    [
+      "Sarwan Madhyamik Vidyalaya",
+      "Belaganj",
+      144,
+      9,
+      2
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Buxar",
+      "Belaganj",
+      24,
+      9,
+      1
+    ],
+    [
+      "Muhra Prathmik Shala (Zilla Parishad)",
+      "Atri",
+      97,
+      16,
+      2
+    ],
+    [
+      "Shri Durga Vidyalaya, Karmauni",
+      "Belaganj",
+      70,
+      9,
+      1
+    ],
+    [
+      "Paraiya Kanya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      66,
+      26,
+      1
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      38,
+      27,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      "Fatehpur",
+      23,
+      26,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Shala",
+      "Dobhi",
+      139,
+      5,
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Bathani",
+      "Dobhi",
+      30,
+      26,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      77,
+      3,
+      1
+    ],
+    [
+      "Islampur Kanya Vidyalaya",
+      "Atri",
+      111,
+      6,
+      1
+    ],
+    [
+      "Islampur Madhya Vidyalaya",
+      "Fatehpur",
+      114,
+      13,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      143,
+      13,
+      1
+    ],
+    [
+      "Fatehpur Prathmik Shala (Zilla Parishad)",
+      "Belaganj",
+      35,
+      7,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      60,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Bathani",
+      "Dobhi",
+      30,
+      26,
+      1
+    ],
+    [
+      "Bankat Kanya Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      50,
+      7,
+      1
+    ],
+    [
+      "Mahuar Prathmik Shala (Zilla Parishad)",
+      "Belaganj",
+      64,
+      12,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      "Wazirganj",
+      94,
+      15,
+      1
+    ],
+    [
+      "Neemchak Prathmik Shala (Zilla Parishad)",
+      "Barachatti",
+      142,
+      21,
+      1
+    ],
+    [
+      "Paraiya Kanya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      66,
+      26,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      "Atri",
+      96,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Wazirganj",
+      "Barachatti",
+      58,
+      21,
+      1
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Bhadeya",
+      "Wazirganj",
+      55,
+      28,
+      2
+    ],
+    [
+      "Guraru Kanya Vidyalaya",
+      "Atri",
+      139,
+      26,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      "Belaganj",
+      49,
+      16,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Manpur",
+      "Wazirganj",
+      61,
+      17,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Amas",
+      "Wazirganj",
+      48,
+      15,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Nimi",
+      "Dobhi",
+      148,
+      13,
+      1
+    ],
+    [
+      "Amawan Adarsh Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      21,
+      8,
+      1
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Bhadeya",
+      "Wazirganj",
+      55,
+      28,
+      1
+    ],
+    [
+      "Modanganj Uchcha Madhyamik Vidyalaya",
+      "Dobhi",
+      50,
+      5,
+      1
+    ],
+    [
+      "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      30,
+      12,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      "Dobhi",
+      35,
+      10,
+      1
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Belaganj",
+      "Atri",
+      139,
+      16,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      "Atri",
+      37,
+      17,
+      1
+    ],
+    [
+      "Shri Ram Vidyalaya, Amba",
+      "Belaganj",
+      72,
+      24,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      "Dobhi",
+      119,
+      10,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      "Barachatti",
+      78,
+      3,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Shala",
+      "Dobhi",
+      139,
+      5,
+      1
+    ],
+    [
+      "Shri Shiv Vidyalaya, Domuhan",
+      "Belaganj",
+      26,
+      22,
+      1
+    ],
+    [
+      "Wazirganj Uchcha Madhyamik Vidyalaya",
+      "Wazirganj",
+      140,
+      6,
+      1
+    ],
+    [
+      "Sherghati Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      21,
+      26,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      "Atri",
+      37,
+      17,
+      2
+    ],
+    [
+      "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      68,
+      10,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      "Atri",
+      136,
+      16,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Bodh Gaya",
+      "Belaganj",
+      145,
+      9,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      "Fatehpur",
+      23,
+      26,
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Tetariya",
+      "Belaganj",
+      87,
+      30,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+      "Fatehpur",
+      85,
+      8,
+      1
+    ],
+    [
+      "Nawada Prathmik Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      78,
+      6,
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Modanganj",
+      "Fatehpur",
+      117,
+      19,
+      1
+    ],
+    [
+      "Nawada Madhya Vidyalaya",
+      "Dobhi",
+      21,
+      19,
+      2
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      "Barachatti",
+      73,
+      16,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      60,
+      9,
+      1
+    ],
+    [
+      "Nawada Kanya Vidyalaya",
+      "Fatehpur",
+      29,
+      18,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      "Fatehpur",
+      27,
+      17,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      "Belaganj",
+      49,
+      16,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+      "Dobhi",
+      139,
+      5,
+      2
+    ],
+    [
+      "Sonbarsa Buniyadi Vidyalaya",
+      "Atri",
+      94,
+      29,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      77,
+      3,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Fatehpur",
+      "Wazirganj",
+      111,
+      6,
+      1
+    ],
+    [
+      "Bhadeya Prathmik Vidyalaya",
+      "Fatehpur",
+      57,
+      27,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      "Atri",
+      37,
+      17,
+      1
+    ],
+    [
+      "Barachatti Kanya Shala",
+      "Fatehpur",
+      35,
+      13,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      "Atri",
+      96,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Bathani",
+      "Dobhi",
+      30,
+      26,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      "Atri",
+      136,
+      16,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      "Barachatti",
+      45,
+      4,
+      1
+    ],
+    [
+      "Atri Prathmik Vidyalaya",
+      "Wazirganj",
+      106,
+      18,
+      1
+    ],
+    [
+      "Tetariya Prathmik Shala (Zilla Parishad)",
+      "Fatehpur",
+      121,
+      6,
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Bathani",
+      "Fatehpur",
+      52,
+      15,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      "Barachatti",
+      78,
+      3,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      143,
+      13,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      "Fatehpur",
+      79,
+      5,
+      2
+    ],
+    [
+      "Nawada Madhya Vidyalaya",
+      "Dobhi",
+      21,
+      19,
+      1
+    ],
+    [
+      "Arwal Kanya Shala",
+      "Dobhi",
+      23,
+      13,
+      1
+    ],
+    [
+      "Konch Adarsh Vidyalaya, Zilla Parishad",
+      "Fatehpur",
+      71,
+      17,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya",
+      "Dobhi",
+      100,
+      21,
+      1
+    ],
+    [
+      "Kothi Prathmik Shala (Zilla Parishad)",
+      "Dobhi",
+      80,
+      9,
+      1
+    ],
+    [
+      "Shri Shiv Vidyalaya, Domuhan",
+      "Belaganj",
+      26,
+      22,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Arwal",
+      "Atri",
+      79,
+      10,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      "Barachatti",
+      78,
+      3,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      "Dobhi",
+      87,
+      18,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+      "Atri",
+      52,
+      28,
+      1
+    ],
+    [
+      "Paraiya Kanya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      66,
+      26,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      143,
+      13,
+      2
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Islampur",
+      "Fatehpur",
+      113,
+      9,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      "Barachatti",
+      73,
+      16,
+      1
+    ],
+    [
+      "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      128,
+      28,
+      1
+    ],
+    [
+      "Islampur Kanya Shala",
+      "Belaganj",
+      40,
+      4,
+      1
+    ],
+    [
+      "Kothi Prathmik Shala (Zilla Parishad)",
+      "Dobhi",
+      80,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      "Fatehpur",
+      27,
+      17,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      "Belaganj",
+      49,
+      16,
+      1
+    ],
+    [
+      "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      128,
+      28,
+      1
+    ],
+    [
+      "Belaganj Prathmik Shala (Zilla Parishad)",
+      "Barachatti",
+      100,
+      5,
+      1
+    ],
+    [
+      "Kothi Prathmik Shala (Zilla Parishad)",
+      "Dobhi",
+      80,
+      9,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      60,
+      9,
+      1
+    ],
+    [
+      "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      143,
+      28,
+      1
+    ],
+    [
+      "Sherpur Navin Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      128,
+      16,
+      1
+    ],
+    [
+      "Buxar Prathmik Shala (Zilla Parishad)",
+      "Barachatti",
+      117,
+      17,
+      1
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Sherpur",
+      "Wazirganj",
+      25,
+      21,
+      2
+    ],
+    [
+      "Amawan Adarsh Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      21,
+      8,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      60,
+      9,
+      1
+    ],
+    [
+      "Dumraon Prathmik Shala (Zilla Parishad)",
+      "Belaganj",
+      53,
+      17,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      "Wazirganj",
+      27,
+      23,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Sonbarsa",
+      "Dobhi",
+      148,
+      11,
+      1
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Islampur",
+      "Fatehpur",
+      113,
+      9,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      "Dobhi",
+      35,
+      10,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      143,
+      13,
+      1
+    ],
+    [
+      "Karmauni Madhya Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      30,
+      5,
+      1
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Sherpur",
+      "Wazirganj",
+      25,
+      21,
+      1
+    ],
+    [
+      "Modanganj Prathmik Vidyalaya",
+      "Fatehpur",
+      80,
+      10,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Manpur",
+      "Wazirganj",
+      61,
+      17,
+      1
+    ],
+    [
+      "Tetariya Madhya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      95,
+      14,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      "Fatehpur",
+      23,
+      26,
+      1
+    ],
+    [
+      "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      103,
+      27,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Arwal",
+      "Atri",
+      79,
+      10,
+      1
+    ],
+    [
+      "Paraiya Adarsh Vidyalaya",
+      "Dobhi",
+      136,
+      10,
+      1
+    ],
+    [
+      "Amas Prathmik Vidyalaya",
+      "Dobhi",
+      150,
+      26,
+      1
+    ],
+    [
+      "Neemchak Prathmik Shala (Zilla Parishad)",
+      "Barachatti",
+      142,
+      21,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      "Barachatti",
+      45,
+      4,
+      1
+    ],
+    [
+      "Dobhi Uchcha Madhyamik Vidyalaya",
+      "Wazirganj",
+      103,
+      20,
+      1
+    ],
+    [
+      "Aurangabad Prathmik Vidyalaya, Zilla Parishad",
+      "Atri",
+      32,
+      5,
+      1
+    ],
+    [
+      "Atri Kanya Shala",
+      "Dobhi",
+      127,
+      29,
+      1
+    ],
+    [
+      "Tekari Prathmik Shala (Zilla Parishad)",
+      "Atri",
+      137,
+      19,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Karmauni",
+      "Atri",
+      38,
+      25,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      "Barachatti",
+      45,
+      4,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      "Wazirganj",
+      94,
+      15,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya",
+      "Dobhi",
+      100,
+      21,
+      1
+    ],
+    [
+      "Imamganj Madhya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      111,
+      23,
+      1
+    ],
+    [
+      "Manpur Prathmik Shala (Zilla Parishad)",
+      "Belaganj",
+      32,
+      27,
+      1
+    ],
+    [
+      "Imamganj Madhya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      111,
+      23,
+      1
+    ],
+    [
+      "Belaganj Kanya Shala",
+      "Atri",
+      145,
+      9,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      "Atri",
+      37,
+      17,
+      1
+    ],
+    [
+      "Dobhi Uchcha Madhyamik Vidyalaya",
+      "Wazirganj",
+      103,
+      20,
+      1
+    ],
+    [
+      "Tekari Prathmik Shala (Zilla Parishad)",
+      "Atri",
+      137,
+      19,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Manpur",
+      "Wazirganj",
+      61,
+      17,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+      "Dobhi",
+      139,
+      5,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Karmauni",
+      "Belaganj",
+      70,
+      9,
+      1
+    ],
+    [
+      "Shri Ram Vidyalaya, Amba",
+      "Belaganj",
+      72,
+      24,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      "Dobhi",
+      119,
+      10,
+      1
+    ],
+    [
+      "Panchgama Buniyadi Vidyalaya",
+      "Wazirganj",
+      31,
+      15,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Amas",
+      "Wazirganj",
+      48,
+      15,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      "Barachatti",
+      122,
+      17,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      "Wazirganj",
+      27,
+      23,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      "Atri",
+      85,
+      8,
+      1
+    ],
+    [
+      "Paraiya Kanya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      66,
+      26,
+      1
+    ],
+    [
+      "Muhra Prathmik Shala (Zilla Parishad)",
+      "Atri",
+      97,
+      16,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      "Atri",
+      136,
+      16,
+      1
+    ],
+    [
+      "Sikaria Kanya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      58,
+      5,
+      1
+    ],
+    [
+      "Bishunpur Navin Vidyalaya",
+      "Barachatti",
+      141,
+      12,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      "Dobhi",
+      119,
+      10,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Arwal",
+      "Atri",
+      79,
+      10,
+      1
+    ],
+    [
+      "Bodh Gaya Prathmik Shala (Zilla Parishad)",
+      "Atri",
+      50,
+      17,
+      1
+    ],
+    [
+      "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      68,
+      10,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      "Dobhi",
+      87,
+      18,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      "Barachatti",
+      73,
+      16,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      "Fatehpur",
+      79,
+      5,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Karmauni",
+      "Atri",
+      38,
+      25,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      "Dobhi",
+      87,
+      18,
+      1
+    ],
+    [
+      "Modanganj Kanya Shala",
+      "Belaganj",
+      78,
+      16,
+      1
+    ],
+    [
+      "Dobhi Prathmik Shala (Zilla Parishad)",
+      "Fatehpur",
+      125,
+      23,
+      1
+    ],
+    [
+      "Tekari Buniyadi Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      91,
+      26,
+      1
+    ],
+    [
+      "Nawada Madhya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      47,
+      4,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      "Dobhi",
+      35,
+      10,
+      1
+    ],
+    [
+      "Manpur Prathmik Shala (Zilla Parishad)",
+      "Belaganj",
+      32,
+      27,
+      1
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      113,
+      27,
+      1
+    ],
+    [
+      "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      68,
+      10,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+      "Belaganj",
+      59,
+      7,
+      2
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      "Atri",
+      96,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Karmauni",
+      "Atri",
+      38,
+      25,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      "Fatehpur",
+      79,
+      5,
+      1
+    ],
+    [
+      "Deorhi Kanya Vidyalaya",
+      "Dobhi",
+      117,
+      28,
+      1
+    ],
+    [
+      "Modanganj Uchcha Madhyamik Vidyalaya",
+      "Dobhi",
+      50,
+      5,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      "Atri",
+      37,
+      17,
+      1
+    ],
+    [
+      "Islampur Kanya Shala",
+      "Belaganj",
+      40,
+      4,
+      1
+    ],
+    [
+      "Tekari Kanya Shala",
+      "Belaganj",
+      120,
+      26,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      "Wazirganj",
+      94,
+      15,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Arwal",
+      "Atri",
+      79,
+      10,
+      1
+    ],
+    [
+      "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      103,
+      27,
+      1
+    ],
+    [
+      "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      39,
+      5,
+      1
+    ],
+    [
+      "Imamganj Buniyadi Vidyalaya",
+      "Fatehpur",
+      120,
+      14,
+      1
+    ],
+    [
+      "Nimi Kanya Shala",
+      "Atri",
+      135,
+      28,
+      1
+    ],
+    [
+      "Bhadeya Kanya Shala",
+      "Fatehpur",
+      83,
+      17,
+      1
+    ],
+    [
+      "Guraru Uchcha Madhyamik Vidyalaya",
+      "Atri",
+      129,
+      8,
+      1
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Nimi",
+      "Wazirganj",
+      46,
+      7,
+      1
+    ],
+    [
+      "Amba Madhyamik Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      83,
+      15,
+      1
+    ],
+    [
+      "Guraru Kanya Vidyalaya",
+      "Atri",
+      139,
+      26,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Fatehpur",
+      "Wazirganj",
+      111,
+      6,
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Tetariya",
+      "Atri",
+      148,
+      24,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      "Fatehpur",
+      79,
+      5,
+      1
+    ],
+    [
+      "Wazirganj Prathmik Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      125,
+      18,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      143,
+      13,
+      2
+    ],
+    [
+      "Tetariya Madhya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      95,
+      14,
+      1
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya",
+      "Wazirganj",
+      39,
+      18,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Wazirganj",
+      "Barachatti",
+      58,
+      21,
+      1
+    ],
+    [
+      "Guraru Kanya Vidyalaya",
+      "Atri",
+      139,
+      26,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      "Dobhi",
+      87,
+      18,
+      2
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+      "Atri",
+      52,
+      28,
+      2
+    ],
+    [
+      "Barhi Kanya Shala",
+      "Dobhi",
+      103,
+      28,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      "Atri",
+      136,
+      16,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Bodh Gaya",
+      "Belaganj",
+      145,
+      9,
+      1
+    ],
+    [
+      "Arwal Kanya Shala",
+      "Dobhi",
+      23,
+      13,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      "Fatehpur",
+      27,
+      17,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      "Belaganj",
+      49,
+      16,
+      1
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya",
+      "Belaganj",
+      131,
+      26,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      "Fatehpur",
+      79,
+      5,
+      2
+    ],
+    [
+      "Amas Madhya Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      150,
+      21,
+      1
+    ],
+    [
+      "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      128,
+      28,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      "Dobhi",
+      87,
+      18,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      "Barachatti",
+      122,
+      17,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      "Wazirganj",
+      27,
+      23,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      "Atri",
+      85,
+      8,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Sonbarsa",
+      "Dobhi",
+      148,
+      11,
+      1
+    ],
+    [
+      "Sherghati Kanya Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      145,
+      4,
+      1
+    ],
+    [
+      "Buxar Prathmik Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      111,
+      24,
+      1
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Dumraon",
+      "Belaganj",
+      22,
+      11,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      "Wazirganj",
+      94,
+      15,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      "Dobhi",
+      35,
+      10,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      "Barachatti",
+      73,
+      16,
+      1
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      38,
+      27,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      "Dobhi",
+      87,
+      18,
+      1
+    ],
+    [
+      "Sherpur Navin Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      128,
+      16,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      "Dobhi",
+      35,
+      10,
+      1
+    ],
+    [
+      "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      37,
+      16,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Buxar",
+      "Belaganj",
+      24,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Barhi",
+      "Barachatti",
+      55,
+      6,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+      "Dobhi",
+      139,
+      5,
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Bathani",
+      "Dobhi",
+      30,
+      26,
+      1
+    ],
+    [
+      "Muhra Buniyadi Vidyalaya",
+      "Atri",
+      129,
+      4,
+      1
+    ],
+    [
+      "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      128,
+      28,
+      1
+    ],
+    [
+      "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+      "Fatehpur",
+      29,
+      23,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      "Barachatti",
+      73,
+      16,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      "Fatehpur",
+      60,
+      9,
+      1
+    ],
+    [
+      "Shri Ram Vidyalaya, Amba",
+      "Belaganj",
+      72,
+      24,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      "Dobhi",
+      119,
+      10,
+      1
+    ],
+    [
+      "Barhi Kanya Shala",
+      "Dobhi",
+      103,
+      28,
+      1
+    ],
+    [
+      "Barhi Kanya Shala",
+      "Dobhi",
+      103,
+      28,
+      1
+    ],
+    [
+      "Atri Kanya Shala",
+      "Dobhi",
+      127,
+      29,
+      1
+    ],
+    [
+      "Buxar Kanya Vidyalaya, Zilla Parishad",
+      "Fatehpur",
+      112,
+      14,
+      1
+    ],
+    [
+      "Khizarsarai Buniyadi Vidyalaya",
+      "Belaganj",
+      115,
+      13,
+      1
+    ],
+    [
+      "Nawada Buniyadi Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      35,
+      22,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Amas",
+      "Wazirganj",
+      48,
+      15,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      "Fatehpur",
+      23,
+      26,
+      1
+    ],
+    [
+      "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      103,
+      27,
+      1
+    ],
+    [
+      "Islampur Prathmik Shala (Zilla Parishad)",
+      "Fatehpur",
+      98,
+      17,
+      4
+    ],
+    [
+      "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+      "Fatehpur",
+      29,
+      23,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Manpur",
+      "Wazirganj",
+      61,
+      17,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      "Fatehpur",
+      27,
+      17,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      "Belaganj",
+      49,
+      16,
+      1
+    ],
+    [
+      "Shri Shiv Vidyalaya, Aurangabad",
+      "Wazirganj",
+      125,
+      12,
+      1
+    ],
+    [
+      "Shri Shiv Vidyalaya, Wazirganj",
+      "Fatehpur",
+      45,
+      5,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Wazirganj",
+      "Barachatti",
+      58,
+      21,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      "Atri",
+      96,
+      9,
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Shala",
+      "Dobhi",
+      139,
+      5,
+      1
+    ],
+    [
+      "Imamganj Madhya Vidyalaya",
+      "Wazirganj",
+      49,
+      18,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      "Fatehpur",
+      23,
+      26,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      "Dobhi",
+      119,
+      10,
+      1
+    ],
+    [
+      "Atri Kanya Shala",
+      "Dobhi",
+      127,
+      29,
+      1
+    ],
+    [
+      "Atri Kanya Shala",
+      "Dobhi",
+      127,
+      29,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      "Atri",
+      37,
+      17,
+      1
+    ],
+    [
+      "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      143,
+      28,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Buxar",
+      "Belaganj",
+      24,
+      9,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      "Barachatti",
+      78,
+      3,
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Tetariya",
+      "Belaganj",
+      87,
+      30,
+      1
+    ],
+    [
+      "Aurangabad Kanya Shala",
+      "Fatehpur",
+      37,
+      10,
+      1
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Rafiganj",
+      "Barachatti",
+      74,
+      9,
+      1
+    ],
+    [
+      "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      125,
+      27,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      "Barachatti",
+      122,
+      17,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      "Wazirganj",
+      27,
+      23,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      "Atri",
+      85,
+      8,
+      1
+    ],
+    [
+      "Nawada Kanya Vidyalaya",
+      "Fatehpur",
+      29,
+      18,
+      2
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      "Fatehpur",
+      23,
+      26,
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      "Dobhi",
+      119,
+      10,
+      1
+    ],
+    [
+      "Dumraon Prathmik Shala (Zilla Parishad)",
+      "Belaganj",
+      53,
+      17,
+      1
+    ],
+    [
+      "Tekari Prathmik Vidyalaya",
+      "Wazirganj",
+      78,
+      4,
+      1
+    ],
+    [
+      "Nawada Madhya Vidyalaya",
+      "Dobhi",
+      21,
+      19,
+      1
+    ],
+    [
+      "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      125,
+      27,
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      "Dobhi",
+      87,
+      18,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      "Barachatti",
+      122,
+      17,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      "Wazirganj",
+      27,
+      23,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      "Atri",
+      85,
+      8,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Sonbarsa",
+      "Dobhi",
+      148,
+      11,
+      1
+    ],
+    [
+      "Lodipur Navin Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      97,
+      11,
+      1
+    ],
+    [
+      "Imamganj Madhya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      111,
+      23,
+      1
+    ],
+    [
+      "Domuhan Kanya Shala",
+      "Fatehpur",
+      80,
+      4,
+      1
+    ],
+    [
+      "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      95,
+      16,
+      1
+    ],
+    [
+      "Fatehpur Kanya Shala",
+      "Atri",
+      48,
+      5,
+      1
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Barhi",
+      "Barachatti",
+      55,
+      6,
+      1
+    ],
+    [
+      "Islampur Kanya Vidyalaya",
+      "Atri",
+      111,
+      6,
+      1
+    ],
+    [
+      "Islampur Madhya Vidyalaya",
+      "Fatehpur",
+      114,
+      13,
+      1
+    ],
+    [
+      "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      125,
+      27,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      "Atri",
+      96,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+      "Atri",
+      52,
+      28,
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Buxar",
+      "Belaganj",
+      24,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Barhi",
+      "Barachatti",
+      55,
+      6,
+      1
+    ],
+    [
+      "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+      "Wazirganj",
+      143,
+      28,
+      1
+    ],
+    [
+      "Bankat Navin Vidyalaya",
+      "Barachatti",
+      48,
+      10,
+      1
+    ],
+    [
+      "Amba Buniyadi Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      91,
+      11,
+      1
+    ],
+    [
+      "Bathani Adarsh Vidyalaya",
+      "Fatehpur",
+      59,
+      9,
+      1
+    ],
+    [
+      "Bankat Adarsh Vidyalaya",
+      "Wazirganj",
+      58,
+      5,
+      1
+    ],
+    [
+      "Konch Prathmik Shala (Zilla Parishad)",
+      "Barachatti",
+      115,
+      20,
+      1
+    ],
+    [
+      "Karmauni Kanya Vidyalaya",
+      "Wazirganj",
+      61,
+      13,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      "Wazirganj",
+      94,
+      15,
+      1
+    ],
+    [
+      "Mahuar Madhya Vidyalaya",
+      "Belaganj",
+      20,
+      30,
+      1
+    ],
+    [
+      "Bhadeya Prathmik Vidyalaya",
+      "Fatehpur",
+      57,
+      27,
+      1
+    ],
+    [
+      "Dumraon Kanya Vidyalaya, Zilla Parishad",
+      "Dobhi",
+      139,
+      13,
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Nimi",
+      "Dobhi",
+      148,
+      13,
+      1
+    ],
+    [
+      "Konch Adarsh Vidyalaya, Zilla Parishad",
+      "Fatehpur",
+      71,
+      17,
+      1
+    ],
+    [
+      "Nimi Madhya Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      48,
+      7,
+      2
+    ],
+    [
+      "Sikaria Uchcha Madhyamik Vidyalaya",
+      "Dobhi",
+      146,
+      27,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      "Wazirganj",
+      94,
+      15,
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Domuhan",
+      "Wazirganj",
+      28,
+      10,
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      "Barachatti",
+      45,
+      4,
+      1
+    ],
+    [
+      "Amba Madhyamik Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      83,
+      15,
+      1
+    ],
+    [
+      "Bishunpur Navin Vidyalaya",
+      "Barachatti",
+      141,
+      12,
+      1
+    ],
+    [
+      "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      "Barachatti",
+      37,
+      16,
+      2
+    ],
+    [
+      "Nawada Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      "Belaganj",
+      37,
+      16,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      "Fatehpur",
+      79,
+      5,
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      "Barachatti",
+      73,
+      16,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      "Atri",
+      136,
+      16,
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Bodh Gaya",
+      "Belaganj",
+      145,
+      9,
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+      "Belaganj",
+      59,
+      7,
+      1
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Guraru",
+      "Barachatti",
+      92,
+      11,
+      1
+    ],
+    [
+      "Sonbarsa Kanya Shala",
+      "Dobhi",
+      128,
+      30,
+      1
+    ],
+    [
+      "Bhadeya Uchcha Madhyamik Vidyalaya",
+      "Dobhi",
+      147,
+      28,
+      1
+    ],
+    [
+      "Manpur Prathmik Vidyalaya",
+      "Wazirganj",
+      98,
+      9,
+      1
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH matched AS (SELECT o.\"School Name\" AS outreach_school, o.\"Block\", o.\"Students Reached\", o.\"Applications Expected\", a.\"School\" AS app_school, COUNT(*) AS actual_applications FROM lpf_outreach AS o LEFT JOIN lpf_applications AS a ON JARO_WINKLER_SIMILARITY(LOWER(TRIM(o.\"School Name\")), LOWER(TRIM(a.\"School\"))) >= 0.9 GROUP BY o.\"School Name\", o.\"Block\", o.\"Students Reached\", o.\"Applications Expected\", a.\"School\") SELECT outreach_school AS \"School Name\", \"Block\", \"Students Reached\", \"Applications Expected\", actual_applications FROM matched WHERE actual_applications < 0.5 * NULLIF(\"Applications Expected\", 0)",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"lpf_outreach\" (\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Students Reached\" BIGINT,\n  \"Applications Expected\" BIGINT,\n  \"Contact Teacher\" VARCHAR,\n  \"Date\" VARCHAR\n);\n\nCREATE TABLE \"lpf_applications\" (\n  \"Applicant\" VARCHAR,\n  \"School\" VARCHAR,\n  \"Course\" VARCHAR,\n  \"Status\" VARCHAR,\n  \"Marks\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"lpf_outreach\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"]}, \"lpf_applications\": {\"Course\": [\"Beautician\", \"Computer Operator\", \"Diploma Civil Engineering\", \"ITI Electrician\", \"Nursing Assistant\", \"Retail Sales Associate\", \"Tailoring & Fashion Design\"], \"Status\": [\"Incomplete\", \"Rejected\", \"Submitted\", \"Verified\"]}}\n\nCURRENT QUESTION:\nlist schools where actual applications received, fuzzy matched, fall short of half the expected number",
+      "response": "```sql\nWITH matched AS (\n    SELECT\n        o.\"School Name\" AS outreach_school,\n        o.\"Block\",\n        o.\"Students Reached\",\n        o.\"Applications Expected\",\n        a.\"School\" AS app_school,\n        COUNT(*) AS actual_applications\n    FROM\n        lpf_outreach o\n    LEFT JOIN\n        lpf_applications a\n        ON jaro_winkler_similarity(\n                lower(trim(o.\"School Name\")),\n                lower(trim(a.\"School\"))\n            ) >= 0.9\n    GROUP BY\n        o.\"School Name\",\n        o.\"Block\",\n        o.\"Students Reached\",\n        o.\"Applications Expected\",\n        a.\"School\"\n)\nSELECT\n    outreach_school AS \"School Name\",\n    \"Block\",\n    \"Students Reached\",\n    \"Applications Expected\",\n    actual_applications\nFROM\n    matched\nWHERE\n    actual_applications < 0.5 * NULLIF(\"Applications Expected\", 0);\n```",
+      "api": {
+        "id": "gen-1787421420-ANcGTOedmWR5NMyN7oQs",
+        "model": "openai/gpt-oss-20b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 522,
+          "completion_tokens": 262,
+          "total_tokens": 784,
+          "cost": 5e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 496,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5e-05,
+            "upstream_inference_prompt_cost": 1.07e-05,
+            "upstream_inference_completions_cost": 3.93e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 57,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.967
+      },
+      "duration_seconds": 3.984,
+      "sql_duckdb": "WITH matched AS (SELECT o.\"School Name\" AS outreach_school, o.\"Block\", o.\"Students Reached\", o.\"Applications Expected\", a.\"School\" AS app_school, COUNT(*) AS actual_applications FROM lpf_outreach AS o LEFT JOIN lpf_applications AS a ON JARO_WINKLER_SIMILARITY(LOWER(TRIM(o.\"School Name\")), LOWER(TRIM(a.\"School\"))) >= 0.9 GROUP BY o.\"School Name\", o.\"Block\", o.\"Students Reached\", o.\"Applications Expected\", a.\"School\") SELECT outreach_school AS \"School Name\", \"Block\", \"Students Reached\", \"Applications Expected\", actual_applications FROM matched WHERE actual_applications < 0.5 * NULLIF(\"Applications Expected\", 0)",
+      "rows": [
+        [
+          "Shri Durga Vidyalaya, Sonbarsa",
+          "Dobhi",
+          148,
+          11,
+          1
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Tetariya",
+          "Belaganj",
+          87,
+          30,
+          1
+        ],
+        [
+          "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          39,
+          5,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Arwal",
+          "Atri",
+          37,
+          17,
+          2
+        ],
+        [
+          "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          95,
+          16,
+          1
+        ],
+        [
+          "Sikaria Buniyadi Vidyalaya",
+          "Barachatti",
+          30,
+          27,
+          1
+        ],
+        [
+          "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          38,
+          27,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Nimi",
+          "Dobhi",
+          148,
+          13,
+          1
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Islampur",
+          "Fatehpur",
+          113,
+          9,
+          2
+        ],
+        [
+          "Amba Kanya Shala",
+          "Fatehpur",
+          36,
+          20,
+          1
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Guraru",
+          "Barachatti",
+          92,
+          11,
+          1
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Tetariya",
+          "Belaganj",
+          87,
+          30,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Wazirganj",
+          "Barachatti",
+          58,
+          21,
+          1
+        ],
+        [
+          "Shri Ram Vidyalaya, Amba",
+          "Belaganj",
+          72,
+          24,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          "Dobhi",
+          119,
+          10,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Chandauti",
+          "Barachatti",
+          78,
+          3,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Paraiya",
+          "Barachatti",
+          73,
+          16,
+          1
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Islampur",
+          "Fatehpur",
+          113,
+          9,
+          1
+        ],
+        [
+          "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          68,
+          10,
+          1
+        ],
+        [
+          "Karmauni Kanya Vidyalaya",
+          "Wazirganj",
+          61,
+          13,
+          1
+        ],
+        [
+          "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          39,
+          5,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          "Dobhi",
+          119,
+          10,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Sarwan",
+          "Atri",
+          96,
+          9,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Domuhan",
+          "Wazirganj",
+          28,
+          10,
+          1
+        ],
+        [
+          "Tekari Prathmik Shala (Zilla Parishad)",
+          "Atri",
+          137,
+          19,
+          1
+        ],
+        [
+          "Rampur Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          25,
+          24,
+          1
+        ],
+        [
+          "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          30,
+          12,
+          1
+        ],
+        [
+          "Paraiya Buniyadi Vidyalaya",
+          "Belaganj",
+          131,
+          26,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+          "Fatehpur",
+          85,
+          8,
+          2
+        ],
+        [
+          "Shri Shiv Vidyalaya, Aurangabad",
+          "Wazirganj",
+          125,
+          12,
+          1
+        ],
+        [
+          "Shri Shiv Vidyalaya, Wazirganj",
+          "Fatehpur",
+          45,
+          5,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Vidyalaya",
+          "Dobhi",
+          100,
+          21,
+          1
+        ],
+        [
+          "Sikaria Buniyadi Vidyalaya",
+          "Barachatti",
+          30,
+          27,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Sarwan",
+          "Belaganj",
+          49,
+          16,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Tekari",
+          "Barachatti",
+          122,
+          17,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Fatehpur",
+          "Wazirganj",
+          27,
+          23,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bishunpur",
+          "Atri",
+          85,
+          8,
+          1
+        ],
+        [
+          "Dumraon Kanya Shala",
+          "Fatehpur",
+          41,
+          29,
+          1
+        ],
+        [
+          "Amba Kanya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          24,
+          28,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Barhi",
+          "Fatehpur",
+          27,
+          17,
+          1
+        ],
+        [
+          "Tekari Kanya Shala",
+          "Belaganj",
+          120,
+          26,
+          1
+        ],
+        [
+          "Tekari Kanya Shala",
+          "Belaganj",
+          120,
+          26,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Paraiya",
+          "Barachatti",
+          45,
+          4,
+          1
+        ],
+        [
+          "Neemchak Prathmik Shala (Zilla Parishad)",
+          "Barachatti",
+          142,
+          21,
+          1
+        ],
+        [
+          "Barachatti Kanya Shala",
+          "Fatehpur",
+          35,
+          13,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          143,
+          13,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Karmauni",
+          "Atri",
+          38,
+          25,
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Tetariya",
+          "Atri",
+          148,
+          24,
+          1
+        ],
+        [
+          "Bishunpur Buniyadi Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          42,
+          28,
+          1
+        ],
+        [
+          "Tetariya Kanya Vidyalaya",
+          "Dobhi",
+          42,
+          6,
+          1
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Belaganj",
+          "Belaganj",
+          108,
+          14,
+          1
+        ],
+        [
+          "Kothi Navin Vidyalaya",
+          "Fatehpur",
+          87,
+          16,
+          1
+        ],
+        [
+          "Chandauti Prathmik Vidyalaya",
+          "Belaganj",
+          122,
+          24,
+          1
+        ],
+        [
+          "Sonbarsa Kanya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          69,
+          19,
+          1
+        ],
+        [
+          "Kothi Buniyadi Vidyalaya",
+          "Wazirganj",
+          109,
+          23,
+          1
+        ],
+        [
+          "Khizarsarai Adarsh Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          95,
+          8,
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Konch",
+          "Barachatti",
+          21,
+          25,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          60,
+          9,
+          1
+        ],
+        [
+          "Sarwan Madhyamik Vidyalaya",
+          "Belaganj",
+          144,
+          9,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Paraiya",
+          "Barachatti",
+          45,
+          4,
+          1
+        ],
+        [
+          "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+          "Fatehpur",
+          29,
+          23,
+          1
+        ],
+        [
+          "Nawada Madhya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          47,
+          4,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          77,
+          3,
+          1
+        ],
+        [
+          "Paraiya Prathmik Shala (Zilla Parishad)",
+          "Wazirganj",
+          21,
+          23,
+          1
+        ],
+        [
+          "Sarwan Madhyamik Vidyalaya",
+          "Belaganj",
+          144,
+          9,
+          2
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Buxar",
+          "Belaganj",
+          24,
+          9,
+          1
+        ],
+        [
+          "Muhra Prathmik Shala (Zilla Parishad)",
+          "Atri",
+          97,
+          16,
+          2
+        ],
+        [
+          "Shri Durga Vidyalaya, Karmauni",
+          "Belaganj",
+          70,
+          9,
+          1
+        ],
+        [
+          "Paraiya Kanya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          66,
+          26,
+          1
+        ],
+        [
+          "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          38,
+          27,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Tekari",
+          "Fatehpur",
+          23,
+          26,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Shala",
+          "Dobhi",
+          139,
+          5,
+          1
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Bathani",
+          "Dobhi",
+          30,
+          26,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          77,
+          3,
+          1
+        ],
+        [
+          "Islampur Kanya Vidyalaya",
+          "Atri",
+          111,
+          6,
+          1
+        ],
+        [
+          "Islampur Madhya Vidyalaya",
+          "Fatehpur",
+          114,
+          13,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          143,
+          13,
+          1
+        ],
+        [
+          "Fatehpur Prathmik Shala (Zilla Parishad)",
+          "Belaganj",
+          35,
+          7,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          60,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Bathani",
+          "Dobhi",
+          30,
+          26,
+          1
+        ],
+        [
+          "Bankat Kanya Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          50,
+          7,
+          1
+        ],
+        [
+          "Mahuar Prathmik Shala (Zilla Parishad)",
+          "Belaganj",
+          64,
+          12,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bodh Gaya",
+          "Wazirganj",
+          94,
+          15,
+          1
+        ],
+        [
+          "Neemchak Prathmik Shala (Zilla Parishad)",
+          "Barachatti",
+          142,
+          21,
+          1
+        ],
+        [
+          "Paraiya Kanya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          66,
+          26,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Sarwan",
+          "Atri",
+          96,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Wazirganj",
+          "Barachatti",
+          58,
+          21,
+          1
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Bhadeya",
+          "Wazirganj",
+          55,
+          28,
+          2
+        ],
+        [
+          "Guraru Kanya Vidyalaya",
+          "Atri",
+          139,
+          26,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Sarwan",
+          "Belaganj",
+          49,
+          16,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Manpur",
+          "Wazirganj",
+          61,
+          17,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Amas",
+          "Wazirganj",
+          48,
+          15,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Nimi",
+          "Dobhi",
+          148,
+          13,
+          1
+        ],
+        [
+          "Amawan Adarsh Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          21,
+          8,
+          1
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Bhadeya",
+          "Wazirganj",
+          55,
+          28,
+          1
+        ],
+        [
+          "Modanganj Uchcha Madhyamik Vidyalaya",
+          "Dobhi",
+          50,
+          5,
+          1
+        ],
+        [
+          "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          30,
+          12,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Jehanabad",
+          "Dobhi",
+          35,
+          10,
+          1
+        ],
+        [
+          "Shri Saraswati Vidyalaya, Belaganj",
+          "Atri",
+          139,
+          16,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Arwal",
+          "Atri",
+          37,
+          17,
+          1
+        ],
+        [
+          "Shri Ram Vidyalaya, Amba",
+          "Belaganj",
+          72,
+          24,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          "Dobhi",
+          119,
+          10,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Chandauti",
+          "Barachatti",
+          78,
+          3,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Shala",
+          "Dobhi",
+          139,
+          5,
+          1
+        ],
+        [
+          "Shri Shiv Vidyalaya, Domuhan",
+          "Belaganj",
+          26,
+          22,
+          1
+        ],
+        [
+          "Wazirganj Uchcha Madhyamik Vidyalaya",
+          "Wazirganj",
+          140,
+          6,
+          1
+        ],
+        [
+          "Sherghati Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          21,
+          26,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Arwal",
+          "Atri",
+          37,
+          17,
+          2
+        ],
+        [
+          "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          68,
+          10,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Manpur",
+          "Atri",
+          136,
+          16,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Bodh Gaya",
+          "Belaganj",
+          145,
+          9,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Tekari",
+          "Fatehpur",
+          23,
+          26,
+          1
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Tetariya",
+          "Belaganj",
+          87,
+          30,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+          "Fatehpur",
+          85,
+          8,
+          1
+        ],
+        [
+          "Nawada Prathmik Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          78,
+          6,
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Modanganj",
+          "Fatehpur",
+          117,
+          19,
+          1
+        ],
+        [
+          "Nawada Madhya Vidyalaya",
+          "Dobhi",
+          21,
+          19,
+          2
+        ],
+        [
+          "Shri Krishna Vidyalaya, Paraiya",
+          "Barachatti",
+          73,
+          16,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          60,
+          9,
+          1
+        ],
+        [
+          "Nawada Kanya Vidyalaya",
+          "Fatehpur",
+          29,
+          18,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Barhi",
+          "Fatehpur",
+          27,
+          17,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Sarwan",
+          "Belaganj",
+          49,
+          16,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+          "Dobhi",
+          139,
+          5,
+          2
+        ],
+        [
+          "Sonbarsa Buniyadi Vidyalaya",
+          "Atri",
+          94,
+          29,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          77,
+          3,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Fatehpur",
+          "Wazirganj",
+          111,
+          6,
+          1
+        ],
+        [
+          "Bhadeya Prathmik Vidyalaya",
+          "Fatehpur",
+          57,
+          27,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Arwal",
+          "Atri",
+          37,
+          17,
+          1
+        ],
+        [
+          "Barachatti Kanya Shala",
+          "Fatehpur",
+          35,
+          13,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Sarwan",
+          "Atri",
+          96,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Bathani",
+          "Dobhi",
+          30,
+          26,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Manpur",
+          "Atri",
+          136,
+          16,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Paraiya",
+          "Barachatti",
+          45,
+          4,
+          1
+        ],
+        [
+          "Atri Prathmik Vidyalaya",
+          "Wazirganj",
+          106,
+          18,
+          1
+        ],
+        [
+          "Tetariya Prathmik Shala (Zilla Parishad)",
+          "Fatehpur",
+          121,
+          6,
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Bathani",
+          "Fatehpur",
+          52,
+          15,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Chandauti",
+          "Barachatti",
+          78,
+          3,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          143,
+          13,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Amawan",
+          "Fatehpur",
+          79,
+          5,
+          2
+        ],
+        [
+          "Nawada Madhya Vidyalaya",
+          "Dobhi",
+          21,
+          19,
+          1
+        ],
+        [
+          "Arwal Kanya Shala",
+          "Dobhi",
+          23,
+          13,
+          1
+        ],
+        [
+          "Konch Adarsh Vidyalaya, Zilla Parishad",
+          "Fatehpur",
+          71,
+          17,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Vidyalaya",
+          "Dobhi",
+          100,
+          21,
+          1
+        ],
+        [
+          "Kothi Prathmik Shala (Zilla Parishad)",
+          "Dobhi",
+          80,
+          9,
+          1
+        ],
+        [
+          "Shri Shiv Vidyalaya, Domuhan",
+          "Belaganj",
+          26,
+          22,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Arwal",
+          "Atri",
+          79,
+          10,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Chandauti",
+          "Barachatti",
+          78,
+          3,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Atri",
+          "Dobhi",
+          87,
+          18,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+          "Atri",
+          52,
+          28,
+          1
+        ],
+        [
+          "Paraiya Kanya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          66,
+          26,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          143,
+          13,
+          2
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Islampur",
+          "Fatehpur",
+          113,
+          9,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Paraiya",
+          "Barachatti",
+          73,
+          16,
+          1
+        ],
+        [
+          "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          128,
+          28,
+          1
+        ],
+        [
+          "Islampur Kanya Shala",
+          "Belaganj",
+          40,
+          4,
+          1
+        ],
+        [
+          "Kothi Prathmik Shala (Zilla Parishad)",
+          "Dobhi",
+          80,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Barhi",
+          "Fatehpur",
+          27,
+          17,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Sarwan",
+          "Belaganj",
+          49,
+          16,
+          1
+        ],
+        [
+          "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          128,
+          28,
+          1
+        ],
+        [
+          "Belaganj Prathmik Shala (Zilla Parishad)",
+          "Barachatti",
+          100,
+          5,
+          1
+        ],
+        [
+          "Kothi Prathmik Shala (Zilla Parishad)",
+          "Dobhi",
+          80,
+          9,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          60,
+          9,
+          1
+        ],
+        [
+          "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          143,
+          28,
+          1
+        ],
+        [
+          "Sherpur Navin Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          128,
+          16,
+          1
+        ],
+        [
+          "Buxar Prathmik Shala (Zilla Parishad)",
+          "Barachatti",
+          117,
+          17,
+          1
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Sherpur",
+          "Wazirganj",
+          25,
+          21,
+          2
+        ],
+        [
+          "Amawan Adarsh Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          21,
+          8,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          60,
+          9,
+          1
+        ],
+        [
+          "Dumraon Prathmik Shala (Zilla Parishad)",
+          "Belaganj",
+          53,
+          17,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Fatehpur",
+          "Wazirganj",
+          27,
+          23,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Sonbarsa",
+          "Dobhi",
+          148,
+          11,
+          1
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Islampur",
+          "Fatehpur",
+          113,
+          9,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Jehanabad",
+          "Dobhi",
+          35,
+          10,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          143,
+          13,
+          1
+        ],
+        [
+          "Karmauni Madhya Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          30,
+          5,
+          1
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Sherpur",
+          "Wazirganj",
+          25,
+          21,
+          1
+        ],
+        [
+          "Modanganj Prathmik Vidyalaya",
+          "Fatehpur",
+          80,
+          10,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Manpur",
+          "Wazirganj",
+          61,
+          17,
+          1
+        ],
+        [
+          "Tetariya Madhya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          95,
+          14,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Tekari",
+          "Fatehpur",
+          23,
+          26,
+          1
+        ],
+        [
+          "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          103,
+          27,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Arwal",
+          "Atri",
+          79,
+          10,
+          1
+        ],
+        [
+          "Paraiya Adarsh Vidyalaya",
+          "Dobhi",
+          136,
+          10,
+          1
+        ],
+        [
+          "Amas Prathmik Vidyalaya",
+          "Dobhi",
+          150,
+          26,
+          1
+        ],
+        [
+          "Neemchak Prathmik Shala (Zilla Parishad)",
+          "Barachatti",
+          142,
+          21,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Paraiya",
+          "Barachatti",
+          45,
+          4,
+          1
+        ],
+        [
+          "Dobhi Uchcha Madhyamik Vidyalaya",
+          "Wazirganj",
+          103,
+          20,
+          1
+        ],
+        [
+          "Aurangabad Prathmik Vidyalaya, Zilla Parishad",
+          "Atri",
+          32,
+          5,
+          1
+        ],
+        [
+          "Atri Kanya Shala",
+          "Dobhi",
+          127,
+          29,
+          1
+        ],
+        [
+          "Tekari Prathmik Shala (Zilla Parishad)",
+          "Atri",
+          137,
+          19,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Karmauni",
+          "Atri",
+          38,
+          25,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Paraiya",
+          "Barachatti",
+          45,
+          4,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bodh Gaya",
+          "Wazirganj",
+          94,
+          15,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Vidyalaya",
+          "Dobhi",
+          100,
+          21,
+          1
+        ],
+        [
+          "Imamganj Madhya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          111,
+          23,
+          1
+        ],
+        [
+          "Manpur Prathmik Shala (Zilla Parishad)",
+          "Belaganj",
+          32,
+          27,
+          1
+        ],
+        [
+          "Imamganj Madhya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          111,
+          23,
+          1
+        ],
+        [
+          "Belaganj Kanya Shala",
+          "Atri",
+          145,
+          9,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Arwal",
+          "Atri",
+          37,
+          17,
+          1
+        ],
+        [
+          "Dobhi Uchcha Madhyamik Vidyalaya",
+          "Wazirganj",
+          103,
+          20,
+          1
+        ],
+        [
+          "Tekari Prathmik Shala (Zilla Parishad)",
+          "Atri",
+          137,
+          19,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Manpur",
+          "Wazirganj",
+          61,
+          17,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+          "Dobhi",
+          139,
+          5,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Karmauni",
+          "Belaganj",
+          70,
+          9,
+          1
+        ],
+        [
+          "Shri Ram Vidyalaya, Amba",
+          "Belaganj",
+          72,
+          24,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          "Dobhi",
+          119,
+          10,
+          1
+        ],
+        [
+          "Panchgama Buniyadi Vidyalaya",
+          "Wazirganj",
+          31,
+          15,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Amas",
+          "Wazirganj",
+          48,
+          15,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Tekari",
+          "Barachatti",
+          122,
+          17,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Fatehpur",
+          "Wazirganj",
+          27,
+          23,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bishunpur",
+          "Atri",
+          85,
+          8,
+          1
+        ],
+        [
+          "Paraiya Kanya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          66,
+          26,
+          1
+        ],
+        [
+          "Muhra Prathmik Shala (Zilla Parishad)",
+          "Atri",
+          97,
+          16,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Manpur",
+          "Atri",
+          136,
+          16,
+          1
+        ],
+        [
+          "Sikaria Kanya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          58,
+          5,
+          1
+        ],
+        [
+          "Bishunpur Navin Vidyalaya",
+          "Barachatti",
+          141,
+          12,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          "Dobhi",
+          119,
+          10,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Arwal",
+          "Atri",
+          79,
+          10,
+          1
+        ],
+        [
+          "Bodh Gaya Prathmik Shala (Zilla Parishad)",
+          "Atri",
+          50,
+          17,
+          1
+        ],
+        [
+          "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          68,
+          10,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Atri",
+          "Dobhi",
+          87,
+          18,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Paraiya",
+          "Barachatti",
+          73,
+          16,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Amawan",
+          "Fatehpur",
+          79,
+          5,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Karmauni",
+          "Atri",
+          38,
+          25,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Atri",
+          "Dobhi",
+          87,
+          18,
+          1
+        ],
+        [
+          "Modanganj Kanya Shala",
+          "Belaganj",
+          78,
+          16,
+          1
+        ],
+        [
+          "Dobhi Prathmik Shala (Zilla Parishad)",
+          "Fatehpur",
+          125,
+          23,
+          1
+        ],
+        [
+          "Tekari Buniyadi Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          91,
+          26,
+          1
+        ],
+        [
+          "Nawada Madhya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          47,
+          4,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Jehanabad",
+          "Dobhi",
+          35,
+          10,
+          1
+        ],
+        [
+          "Manpur Prathmik Shala (Zilla Parishad)",
+          "Belaganj",
+          32,
+          27,
+          1
+        ],
+        [
+          "Karmauni Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          113,
+          27,
+          1
+        ],
+        [
+          "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          68,
+          10,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+          "Belaganj",
+          59,
+          7,
+          2
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Sarwan",
+          "Atri",
+          96,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Karmauni",
+          "Atri",
+          38,
+          25,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Amawan",
+          "Fatehpur",
+          79,
+          5,
+          1
+        ],
+        [
+          "Deorhi Kanya Vidyalaya",
+          "Dobhi",
+          117,
+          28,
+          1
+        ],
+        [
+          "Modanganj Uchcha Madhyamik Vidyalaya",
+          "Dobhi",
+          50,
+          5,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Arwal",
+          "Atri",
+          37,
+          17,
+          1
+        ],
+        [
+          "Islampur Kanya Shala",
+          "Belaganj",
+          40,
+          4,
+          1
+        ],
+        [
+          "Tekari Kanya Shala",
+          "Belaganj",
+          120,
+          26,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bodh Gaya",
+          "Wazirganj",
+          94,
+          15,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Arwal",
+          "Atri",
+          79,
+          10,
+          1
+        ],
+        [
+          "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          103,
+          27,
+          1
+        ],
+        [
+          "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          39,
+          5,
+          1
+        ],
+        [
+          "Imamganj Buniyadi Vidyalaya",
+          "Fatehpur",
+          120,
+          14,
+          1
+        ],
+        [
+          "Nimi Kanya Shala",
+          "Atri",
+          135,
+          28,
+          1
+        ],
+        [
+          "Bhadeya Kanya Shala",
+          "Fatehpur",
+          83,
+          17,
+          1
+        ],
+        [
+          "Guraru Uchcha Madhyamik Vidyalaya",
+          "Atri",
+          129,
+          8,
+          1
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Nimi",
+          "Wazirganj",
+          46,
+          7,
+          1
+        ],
+        [
+          "Amba Madhyamik Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          83,
+          15,
+          1
+        ],
+        [
+          "Guraru Kanya Vidyalaya",
+          "Atri",
+          139,
+          26,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Fatehpur",
+          "Wazirganj",
+          111,
+          6,
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Tetariya",
+          "Atri",
+          148,
+          24,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Amawan",
+          "Fatehpur",
+          79,
+          5,
+          1
+        ],
+        [
+          "Wazirganj Prathmik Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          125,
+          18,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          143,
+          13,
+          2
+        ],
+        [
+          "Tetariya Madhya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          95,
+          14,
+          1
+        ],
+        [
+          "Karmauni Uchcha Madhyamik Vidyalaya",
+          "Wazirganj",
+          39,
+          18,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Wazirganj",
+          "Barachatti",
+          58,
+          21,
+          1
+        ],
+        [
+          "Guraru Kanya Vidyalaya",
+          "Atri",
+          139,
+          26,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Atri",
+          "Dobhi",
+          87,
+          18,
+          2
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+          "Atri",
+          52,
+          28,
+          2
+        ],
+        [
+          "Barhi Kanya Shala",
+          "Dobhi",
+          103,
+          28,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Manpur",
+          "Atri",
+          136,
+          16,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Bodh Gaya",
+          "Belaganj",
+          145,
+          9,
+          1
+        ],
+        [
+          "Arwal Kanya Shala",
+          "Dobhi",
+          23,
+          13,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Barhi",
+          "Fatehpur",
+          27,
+          17,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Sarwan",
+          "Belaganj",
+          49,
+          16,
+          1
+        ],
+        [
+          "Paraiya Buniyadi Vidyalaya",
+          "Belaganj",
+          131,
+          26,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Amawan",
+          "Fatehpur",
+          79,
+          5,
+          2
+        ],
+        [
+          "Amas Madhya Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          150,
+          21,
+          1
+        ],
+        [
+          "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          128,
+          28,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Atri",
+          "Dobhi",
+          87,
+          18,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Tekari",
+          "Barachatti",
+          122,
+          17,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Fatehpur",
+          "Wazirganj",
+          27,
+          23,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bishunpur",
+          "Atri",
+          85,
+          8,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Sonbarsa",
+          "Dobhi",
+          148,
+          11,
+          1
+        ],
+        [
+          "Sherghati Kanya Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          145,
+          4,
+          1
+        ],
+        [
+          "Buxar Prathmik Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          111,
+          24,
+          1
+        ],
+        [
+          "Shri Saraswati Vidyalaya, Dumraon",
+          "Belaganj",
+          22,
+          11,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bodh Gaya",
+          "Wazirganj",
+          94,
+          15,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Jehanabad",
+          "Dobhi",
+          35,
+          10,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Paraiya",
+          "Barachatti",
+          73,
+          16,
+          1
+        ],
+        [
+          "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          38,
+          27,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Atri",
+          "Dobhi",
+          87,
+          18,
+          1
+        ],
+        [
+          "Sherpur Navin Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          128,
+          16,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Jehanabad",
+          "Dobhi",
+          35,
+          10,
+          1
+        ],
+        [
+          "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          37,
+          16,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Buxar",
+          "Belaganj",
+          24,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Barhi",
+          "Barachatti",
+          55,
+          6,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+          "Dobhi",
+          139,
+          5,
+          1
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Bathani",
+          "Dobhi",
+          30,
+          26,
+          1
+        ],
+        [
+          "Muhra Buniyadi Vidyalaya",
+          "Atri",
+          129,
+          4,
+          1
+        ],
+        [
+          "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          128,
+          28,
+          1
+        ],
+        [
+          "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+          "Fatehpur",
+          29,
+          23,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Paraiya",
+          "Barachatti",
+          73,
+          16,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Khizarsarai",
+          "Fatehpur",
+          60,
+          9,
+          1
+        ],
+        [
+          "Shri Ram Vidyalaya, Amba",
+          "Belaganj",
+          72,
+          24,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          "Dobhi",
+          119,
+          10,
+          1
+        ],
+        [
+          "Barhi Kanya Shala",
+          "Dobhi",
+          103,
+          28,
+          1
+        ],
+        [
+          "Barhi Kanya Shala",
+          "Dobhi",
+          103,
+          28,
+          1
+        ],
+        [
+          "Atri Kanya Shala",
+          "Dobhi",
+          127,
+          29,
+          1
+        ],
+        [
+          "Buxar Kanya Vidyalaya, Zilla Parishad",
+          "Fatehpur",
+          112,
+          14,
+          1
+        ],
+        [
+          "Khizarsarai Buniyadi Vidyalaya",
+          "Belaganj",
+          115,
+          13,
+          1
+        ],
+        [
+          "Nawada Buniyadi Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          35,
+          22,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Amas",
+          "Wazirganj",
+          48,
+          15,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Tekari",
+          "Fatehpur",
+          23,
+          26,
+          1
+        ],
+        [
+          "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          103,
+          27,
+          1
+        ],
+        [
+          "Islampur Prathmik Shala (Zilla Parishad)",
+          "Fatehpur",
+          98,
+          17,
+          4
+        ],
+        [
+          "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+          "Fatehpur",
+          29,
+          23,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Manpur",
+          "Wazirganj",
+          61,
+          17,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Barhi",
+          "Fatehpur",
+          27,
+          17,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Sarwan",
+          "Belaganj",
+          49,
+          16,
+          1
+        ],
+        [
+          "Shri Shiv Vidyalaya, Aurangabad",
+          "Wazirganj",
+          125,
+          12,
+          1
+        ],
+        [
+          "Shri Shiv Vidyalaya, Wazirganj",
+          "Fatehpur",
+          45,
+          5,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Wazirganj",
+          "Barachatti",
+          58,
+          21,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Sarwan",
+          "Atri",
+          96,
+          9,
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Shala",
+          "Dobhi",
+          139,
+          5,
+          1
+        ],
+        [
+          "Imamganj Madhya Vidyalaya",
+          "Wazirganj",
+          49,
+          18,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Tekari",
+          "Fatehpur",
+          23,
+          26,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          "Dobhi",
+          119,
+          10,
+          1
+        ],
+        [
+          "Atri Kanya Shala",
+          "Dobhi",
+          127,
+          29,
+          1
+        ],
+        [
+          "Atri Kanya Shala",
+          "Dobhi",
+          127,
+          29,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Arwal",
+          "Atri",
+          37,
+          17,
+          1
+        ],
+        [
+          "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          143,
+          28,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Buxar",
+          "Belaganj",
+          24,
+          9,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Chandauti",
+          "Barachatti",
+          78,
+          3,
+          1
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Tetariya",
+          "Belaganj",
+          87,
+          30,
+          1
+        ],
+        [
+          "Aurangabad Kanya Shala",
+          "Fatehpur",
+          37,
+          10,
+          1
+        ],
+        [
+          "Shri Saraswati Vidyalaya, Rafiganj",
+          "Barachatti",
+          74,
+          9,
+          1
+        ],
+        [
+          "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          125,
+          27,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Tekari",
+          "Barachatti",
+          122,
+          17,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Fatehpur",
+          "Wazirganj",
+          27,
+          23,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bishunpur",
+          "Atri",
+          85,
+          8,
+          1
+        ],
+        [
+          "Nawada Kanya Vidyalaya",
+          "Fatehpur",
+          29,
+          18,
+          2
+        ],
+        [
+          "Shri Krishna Vidyalaya, Tekari",
+          "Fatehpur",
+          23,
+          26,
+          2
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          "Dobhi",
+          119,
+          10,
+          1
+        ],
+        [
+          "Dumraon Prathmik Shala (Zilla Parishad)",
+          "Belaganj",
+          53,
+          17,
+          1
+        ],
+        [
+          "Tekari Prathmik Vidyalaya",
+          "Wazirganj",
+          78,
+          4,
+          1
+        ],
+        [
+          "Nawada Madhya Vidyalaya",
+          "Dobhi",
+          21,
+          19,
+          1
+        ],
+        [
+          "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          125,
+          27,
+          1
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Atri",
+          "Dobhi",
+          87,
+          18,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Tekari",
+          "Barachatti",
+          122,
+          17,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Fatehpur",
+          "Wazirganj",
+          27,
+          23,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bishunpur",
+          "Atri",
+          85,
+          8,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Sonbarsa",
+          "Dobhi",
+          148,
+          11,
+          1
+        ],
+        [
+          "Lodipur Navin Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          97,
+          11,
+          1
+        ],
+        [
+          "Imamganj Madhya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          111,
+          23,
+          1
+        ],
+        [
+          "Domuhan Kanya Shala",
+          "Fatehpur",
+          80,
+          4,
+          1
+        ],
+        [
+          "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          95,
+          16,
+          1
+        ],
+        [
+          "Fatehpur Kanya Shala",
+          "Atri",
+          48,
+          5,
+          1
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Barhi",
+          "Barachatti",
+          55,
+          6,
+          1
+        ],
+        [
+          "Islampur Kanya Vidyalaya",
+          "Atri",
+          111,
+          6,
+          1
+        ],
+        [
+          "Islampur Madhya Vidyalaya",
+          "Fatehpur",
+          114,
+          13,
+          1
+        ],
+        [
+          "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          125,
+          27,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Sarwan",
+          "Atri",
+          96,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+          "Atri",
+          52,
+          28,
+          1
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Buxar",
+          "Belaganj",
+          24,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Barhi",
+          "Barachatti",
+          55,
+          6,
+          1
+        ],
+        [
+          "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+          "Wazirganj",
+          143,
+          28,
+          1
+        ],
+        [
+          "Bankat Navin Vidyalaya",
+          "Barachatti",
+          48,
+          10,
+          1
+        ],
+        [
+          "Amba Buniyadi Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          91,
+          11,
+          1
+        ],
+        [
+          "Bathani Adarsh Vidyalaya",
+          "Fatehpur",
+          59,
+          9,
+          1
+        ],
+        [
+          "Bankat Adarsh Vidyalaya",
+          "Wazirganj",
+          58,
+          5,
+          1
+        ],
+        [
+          "Konch Prathmik Shala (Zilla Parishad)",
+          "Barachatti",
+          115,
+          20,
+          1
+        ],
+        [
+          "Karmauni Kanya Vidyalaya",
+          "Wazirganj",
+          61,
+          13,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bodh Gaya",
+          "Wazirganj",
+          94,
+          15,
+          1
+        ],
+        [
+          "Mahuar Madhya Vidyalaya",
+          "Belaganj",
+          20,
+          30,
+          1
+        ],
+        [
+          "Bhadeya Prathmik Vidyalaya",
+          "Fatehpur",
+          57,
+          27,
+          1
+        ],
+        [
+          "Dumraon Kanya Vidyalaya, Zilla Parishad",
+          "Dobhi",
+          139,
+          13,
+          1
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Nimi",
+          "Dobhi",
+          148,
+          13,
+          1
+        ],
+        [
+          "Konch Adarsh Vidyalaya, Zilla Parishad",
+          "Fatehpur",
+          71,
+          17,
+          1
+        ],
+        [
+          "Nimi Madhya Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          48,
+          7,
+          2
+        ],
+        [
+          "Sikaria Uchcha Madhyamik Vidyalaya",
+          "Dobhi",
+          146,
+          27,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bodh Gaya",
+          "Wazirganj",
+          94,
+          15,
+          1
+        ],
+        [
+          "Shri Durga Vidyalaya, Domuhan",
+          "Wazirganj",
+          28,
+          10,
+          1
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Paraiya",
+          "Barachatti",
+          45,
+          4,
+          1
+        ],
+        [
+          "Amba Madhyamik Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          83,
+          15,
+          1
+        ],
+        [
+          "Bishunpur Navin Vidyalaya",
+          "Barachatti",
+          141,
+          12,
+          1
+        ],
+        [
+          "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          "Barachatti",
+          37,
+          16,
+          2
+        ],
+        [
+          "Nawada Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          "Belaganj",
+          37,
+          16,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Amawan",
+          "Fatehpur",
+          79,
+          5,
+          1
+        ],
+        [
+          "Shri Krishna Vidyalaya, Paraiya",
+          "Barachatti",
+          73,
+          16,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Manpur",
+          "Atri",
+          136,
+          16,
+          1
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Bodh Gaya",
+          "Belaganj",
+          145,
+          9,
+          1
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+          "Belaganj",
+          59,
+          7,
+          1
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Guraru",
+          "Barachatti",
+          92,
+          11,
+          1
+        ],
+        [
+          "Sonbarsa Kanya Shala",
+          "Dobhi",
+          128,
+          30,
+          1
+        ],
+        [
+          "Bhadeya Uchcha Madhyamik Vidyalaya",
+          "Dobhi",
+          147,
+          28,
+          1
+        ],
+        [
+          "Manpur Prathmik Vidyalaya",
+          "Wazirganj",
+          98,
+          9,
+          1
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

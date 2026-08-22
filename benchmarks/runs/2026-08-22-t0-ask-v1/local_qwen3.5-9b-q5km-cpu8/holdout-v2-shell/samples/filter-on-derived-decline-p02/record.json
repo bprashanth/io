@@ -1,0 +1,50 @@
+{
+  "id": "filter-on-derived-decline-p02",
+  "task_id": "filter-on-derived-decline",
+  "pattern": "keep groups whose derived change is negative, null rounds drop out",
+  "question": "list the districts where literate women percent is lower in NFHS-5 than in NFHS-4",
+  "gold_sql": "SELECT \"District\" FROM district_health_factsheet WHERE \"District\" <> 'State Total' GROUP BY \"District\" HAVING MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Women age 15-49 years who are literate (%)\" END) < MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Women age 15-49 years who are literate (%)\" END) ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Cuttack"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ]
+  ],
+  "actual_rows": [],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"District\" FROM \"district_health_factsheet\" WHERE \"State\" = 'State Total' AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') AND NOT \"Women age 15-49 years who are literate (%)\" IS NULL AND \"Survey Round\" = 'NFHS-5' AND \"Women age 15-49 years who are literate (%)\" < (SELECT AVG(\"Women age 15-49 years who are literate (%)\") FROM \"district_health_factsheet\" WHERE \"State\" = 'State Total' AND \"Survey Round\" = 'NFHS-4' AND NOT \"Women age 15-49 years who are literate (%)\" IS NULL)",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nlist the districts where literate women percent is lower in NFHS-5 than in NFHS-4",
+      "response": "SELECT \"District\"\nFROM \"district_health_factsheet\"\nWHERE \"State\" = 'State Total'\n  AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')\n  AND \"Women age 15-49 years who are literate (%)\" IS NOT NULL\n  AND \"Survey Round\" = 'NFHS-5'\n  AND \"Women age 15-49 years who are literate (%)\" < (\n    SELECT AVG(\"Women age 15-49 years who are literate (%)\")\n    FROM \"district_health_factsheet\"\n    WHERE \"State\" = 'State Total'\n      AND \"Survey Round\" = 'NFHS-4'\n      AND \"Women age 15-49 years who are literate (%)\" IS NOT NULL\n  );",
+      "api": {
+        "id": "chatcmpl-6jVYe1XbKTPUvjLLOmb3fLYgqqw6hznZ",
+        "model": "/models/Qwen3.5-9B-Q5_K_M.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 181,
+          "prompt_tokens": 524,
+          "total_tokens": 705,
+          "prompt_tokens_details": {
+            "cached_tokens": 273
+          }
+        },
+        "duration_seconds": 14.517
+      },
+      "duration_seconds": 14.521,
+      "sql_duckdb": "SELECT \"District\" FROM \"district_health_factsheet\" WHERE \"State\" = 'State Total' AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') AND NOT \"Women age 15-49 years who are literate (%)\" IS NULL AND \"Survey Round\" = 'NFHS-5' AND \"Women age 15-49 years who are literate (%)\" < (SELECT AVG(\"Women age 15-49 years who are literate (%)\") FROM \"district_health_factsheet\" WHERE \"State\" = 'State Total' AND \"Survey Round\" = 'NFHS-4' AND NOT \"Women age 15-49 years who are literate (%)\" IS NULL)",
+      "rows": []
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

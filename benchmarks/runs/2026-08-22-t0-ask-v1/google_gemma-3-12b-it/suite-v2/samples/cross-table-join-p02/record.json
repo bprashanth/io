@@ -1,0 +1,123 @@
+{
+  "id": "cross-table-join-p02",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "join ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2023,
+      135.13513513513513,
+      178.57142857142858
+    ],
+    [
+      "Nalanda",
+      2023,
+      125.0,
+      153.84615384615387
+    ],
+    [
+      "Purnia",
+      2023,
+      149.2537313432836,
+      217.39130434782606
+    ],
+    [
+      "Kishanganj",
+      2023,
+      163.9344262295082,
+      263.15789473684214
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT T1.district, T1.year, T1.pregnancies_registered / NULLIF(NULLIF(T1.anc4_completed, 0), 0) * 100 AS anc_visits_rate, T2.women_enrolled / NULLIF(NULLIF(T2.employed_at_6_months, 0), 0) * 100 AS livelihoods_rate FROM anc_visits AS T1 JOIN livelihoods AS T2 ON T1.district = T2.district AND T1.year = T2.year WHERE T1.year = 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}, \"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\njoin ANC visits and livelihoods by district and year, 2023 ANC and employment rates side by side",
+      "response": "```sql\nSELECT\n  T1.district,\n  T1.year,\n  T1.pregnancies_registered / NULLIF(T1.anc4_completed, 0) * 100 AS anc_visits_rate,\n  T2.women_enrolled / NULLIF(T2.employed_at_6_months, 0) * 100 AS livelihoods_rate\nFROM anc_visits AS T1\nJOIN livelihoods AS T2\n  ON T1.district = T2.district\n  AND T1.year = T2.year\nWHERE\n  T1.year = 2023;\n```",
+      "api": {
+        "id": "gen-1787420950-0svpWW9wk6SeTPHrJUQA",
+        "model": "google/gemma-3-12b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 430,
+          "completion_tokens": 146,
+          "total_tokens": 576,
+          "cost": 4.34e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.34e-05,
+            "upstream_inference_prompt_cost": 2.15e-05,
+            "upstream_inference_completions_cost": 2.19e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.921
+      },
+      "duration_seconds": 2.924,
+      "sql_duckdb": "SELECT T1.district, T1.year, T1.pregnancies_registered / NULLIF(NULLIF(T1.anc4_completed, 0), 0) * 100 AS anc_visits_rate, T2.women_enrolled / NULLIF(NULLIF(T2.employed_at_6_months, 0), 0) * 100 AS livelihoods_rate FROM anc_visits AS T1 JOIN livelihoods AS T2 ON T1.district = T2.district AND T1.year = T2.year WHERE T1.year = 2023",
+      "rows": [
+        [
+          "Gaya",
+          2023,
+          135.13513513513513,
+          178.57142857142858
+        ],
+        [
+          "Nalanda",
+          2023,
+          125.0,
+          153.84615384615387
+        ],
+        [
+          "Purnia",
+          2023,
+          149.2537313432836,
+          217.39130434782606
+        ],
+        [
+          "Kishanganj",
+          2023,
+          163.9344262295082,
+          263.15789473684214
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

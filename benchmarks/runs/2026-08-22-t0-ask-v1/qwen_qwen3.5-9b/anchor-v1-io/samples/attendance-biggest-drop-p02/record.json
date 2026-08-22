@@ -1,0 +1,92 @@
+{
+  "id": "attendance-biggest-drop-p02",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "rank centres by how much their turnout percentage dropped between the two years, worst first",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": true,
+  "sql_duckdb": "WITH year_2023 AS (SELECT \"Centre\" AS centre, \"Month\" AS month, \"Enrolled Kids\" AS enrolled, \"Avg Daily Present\" AS present, CAST(\"Avg Daily Present\" AS DOUBLE) / NULLIF(NULLIF(CAST(\"Enrolled Kids\" AS DOUBLE), 0), 0) * 100 AS turnout_pct FROM \"attendance_2023\"), year_2024 AS (SELECT \"centre_name\" AS centre, \"month\" AS month, \"enrolment\" AS enrolled, \"average_attendance\" AS present, CAST(\"average_attendance\" AS DOUBLE) / NULLIF(NULLIF(CAST(\"enrolment\" AS DOUBLE), 0), 0) * 100 AS turnout_pct FROM \"attendance_2024\"), combined AS (SELECT * FROM year_2023 UNION ALL SELECT * FROM year_2024), pivoted AS (SELECT centre, MAX(CASE WHEN month = 'April' THEN turnout_pct END) AS apr_2023, MAX(CASE WHEN month = 'April' THEN turnout_pct END) AS apr_2024, MAX(CASE WHEN month = 'August' THEN turnout_pct END) AS aug_2023, MAX(CASE WHEN month = 'August' THEN turnout_pct END) AS aug_2024, MAX(CASE WHEN month = 'December' THEN turnout_pct END) AS dec_2023, MAX(CASE WHEN month = 'December' THEN turnout_pct END) AS dec_2024, MAX(CASE WHEN month = 'February' THEN turnout_pct END) AS feb_2023, MAX(CASE WHEN month = 'February' THEN turnout_pct END) AS feb_2024, MAX(CASE WHEN month = 'January' THEN turnout_pct END) AS jan_2023, MAX(CASE WHEN month = 'January' THEN turnout_pct END) AS jan_2024, MAX(CASE WHEN month = 'July' THEN turnout_pct END) AS jul_2023, MAX(CASE WHEN month = 'July' THEN turnout_pct END) AS jul_2024, MAX(CASE WHEN month = 'June' THEN turnout_pct END) AS jun_2023, MAX(CASE WHEN month = 'June' THEN turnout_pct END) AS jun_2024, MAX(CASE WHEN month = 'March' THEN turnout_pct END) AS mar_2023, MAX(CASE WHEN month = 'March' THEN turnout_pct END) AS mar_2024, MAX(CASE WHEN month = 'May' THEN turnout_pct END) AS may_2023, MAX(CASE WHEN month = 'May' THEN turnout_pct END) AS may_2024, MAX(CASE WHEN month = 'November' THEN turnout_pct END) AS nov_2023, MAX(CASE WHEN month = 'November' THEN turnout_pct END) AS nov_2024, MAX(CASE WHEN month = 'October' THEN turnout_pct END) AS oct_2023, MAX(CASE WHEN month = 'October' THEN turnout_pct END) AS oct_2024, MAX(CASE WHEN month = 'September' THEN turnout_pct END) AS sep_2023, MAX(CASE WHEN month = 'September' THEN turnout_pct END) AS sep_2024 FROM combined GROUP BY centre) SELECT centre, apr_2023, apr_2024, aug_2023, aug_2024, dec_2023, dec_2024, feb_2023, feb_2024, jan_2023, jan_2024, jul_2023, jul_2024, jun_2023, jun_2024, mar_2023, mar_2024, may_2023, may_2024, nov_2023, nov_2024, oct_2023, oct_2024, sep_2023, sep_2024",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nrank centres by how much their turnout percentage dropped between the two years, worst first",
+      "response": "WITH year_2023 AS (\n  SELECT \n    \"Centre\" AS centre,\n    \"Month\" AS month,\n    \"Enrolled Kids\" AS enrolled,\n    \"Avg Daily Present\" AS present,\n    CAST(\"Avg Daily Present\" AS DOUBLE) / NULLIF(CAST(\"Enrolled Kids\" AS DOUBLE), 0) * 100 AS turnout_pct\n  FROM \"attendance_2023\"\n),\nyear_2024 AS (\n  SELECT \n    \"centre_name\" AS centre,\n    \"month\" AS month,\n    \"enrolment\" AS enrolled,\n    \"average_attendance\" AS present,\n    CAST(\"average_attendance\" AS DOUBLE) / NULLIF(CAST(\"enrolment\" AS DOUBLE), 0) * 100 AS turnout_pct\n  FROM \"attendance_2024\"\n),\ncombined AS (\n  SELECT * FROM year_2023\n  UNION ALL\n  SELECT * FROM year_2024\n),\npivoted AS (\n  SELECT \n    centre,\n    MAX(CASE WHEN month = 'April' THEN turnout_pct END) AS apr_2023,\n    MAX(CASE WHEN month = 'April' THEN turnout_pct END) AS apr_2024,\n    MAX(CASE WHEN month = 'August' THEN turnout_pct END) AS aug_2023,\n    MAX(CASE WHEN month = 'August' THEN turnout_pct END) AS aug_2024,\n    MAX(CASE WHEN month = 'December' THEN turnout_pct END) AS dec_2023,\n    MAX(CASE WHEN month = 'December' THEN turnout_pct END) AS dec_2024,\n    MAX(CASE WHEN month = 'February' THEN turnout_pct END) AS feb_2023,\n    MAX(CASE WHEN month = 'February' THEN turnout_pct END) AS feb_2024,\n    MAX(CASE WHEN month = 'January' THEN turnout_pct END) AS jan_2023,\n    MAX(CASE WHEN month = 'January' THEN turnout_pct END) AS jan_2024,\n    MAX(CASE WHEN month = 'July' THEN turnout_pct END) AS jul_2023,\n    MAX(CASE WHEN month = 'July' THEN turnout_pct END) AS jul_2024,\n    MAX(CASE WHEN month = 'June' THEN turnout_pct END) AS jun_2023,\n    MAX(CASE WHEN month = 'June' THEN turnout_pct END) AS jun_2024,\n    MAX(CASE WHEN month = 'March' THEN turnout_pct END) AS mar_2023,\n    MAX(CASE WHEN month = 'March' THEN turnout_pct END) AS mar_2024,\n    MAX(CASE WHEN month = 'May' THEN turnout_pct END) AS may_2023,\n    MAX(CASE WHEN month = 'May' THEN turnout_pct END) AS may_2024,\n    MAX(CASE WHEN month = 'November' THEN turnout_pct END) AS nov_2023,\n    MAX(CASE WHEN month = 'November' THEN turnout_pct END) AS nov_2024,\n    MAX(CASE WHEN month = 'October' THEN turnout_pct END) AS oct_2023,\n    MAX(CASE WHEN month = 'October' THEN turnout_pct END) AS oct_2024,\n    MAX(CASE WHEN month = 'September' THEN turnout_pct END) AS sep_2023,\n    MAX(CASE WHEN month = 'September' THEN turnout_pct END) AS sep_2024\n  FROM combined\n  GROUP BY centre\n)\nSELECT \n  centre,\n  apr_2023, apr_2024,\n  aug_2023, aug_2024,\n  dec_2023, dec_2024,\n  feb_2023, feb_2024,\n  jan_2023, jan_2024,\n  jul_2023, jul_2024,\n  jun_2023, jun_2024,\n  mar_2023, mar_2024,\n  may_2023, may_2024,\n  nov_2023, nov_2024,\n  oct_2023, oct_2024,\n  sep_2023, sep_2024,\n ",
+      "api": {
+        "id": "gen-1787421475-uxO0jXnreL3GE3YgmsnN",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 611,
+          "completion_tokens": 1024,
+          "total_tokens": 1635,
+          "cost": 0.0002147,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002147,
+            "upstream_inference_prompt_cost": 6.11e-05,
+            "upstream_inference_completions_cost": 0.0001536
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 42.865
+      },
+      "duration_seconds": 42.873,
+      "error": "BinderException: Binder Error: Referenced column \"centre\" was not found because the FROM clause is missing\n\nLINE 1: ... END) AS sep_2024 FROM combined GROUP BY centre) SELECT centre, apr_2023, apr_2024, aug_2023, aug_2024, dec_2023...\n                                                                   ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nrank centres by how much their turnout percentage dropped between the two years, worst first\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"centre\" was not found because the FROM clause is missing\n\nLINE 1: ... END) AS sep_2024 FROM combined GROUP BY centre) SELECT centre, apr_2023, apr_2024, aug_2023, aug_2024, dec_2023...\n                                                                   ^\nReturn a complete corrected query.",
+      "response": "WITH combined AS (\n    SELECT \n        \"Centre\" AS centre,\n        \"Month\" AS month,\n        \"Enrolled Kids\" AS enrolled,\n        \"Avg Daily Present\" AS present,\n        2023 AS year\n    FROM \"attendance_2023\"\n    UNION ALL\n    SELECT \n        \"centre_name\" AS centre,\n        \"month\" AS month,\n        \"enrolment\" AS enrolled,\n        \"average_attendance\" AS present,\n        2024 AS year\n    FROM \"attendance_2024\"\n),\npivot AS (\n    SELECT \n        centre,\n        MAX(CASE WHEN year = 2023 AND month = 'April' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS apr_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'April' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS apr_2024,\n        MAX(CASE WHEN year = 2023 AND month = 'August' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS aug_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'August' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS aug_2024,\n        MAX(CASE WHEN year = 2023 AND month = 'December' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS dec_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'December' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS dec_2024,\n        MAX(CASE WHEN year = 2023 AND month = 'February' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS feb_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'February' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS feb_2024,\n        MAX(CASE WHEN year = 2023 AND month = 'January' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS jan_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'January' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS jan_2024,\n        MAX(CASE WHEN year = 2023 AND month = 'July' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS jul_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'July' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS jul_2024,\n        MAX(CASE WHEN year = 2023 AND month = 'June' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS jun_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'June' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS jun_2024,\n        MAX(CASE WHEN year = 2023 AND month = 'March' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS mar_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'March' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS mar_2024,\n        MAX(CASE WHEN year = 2023 AND month = 'May' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS may_2023,\n        MAX(CASE WHEN year = 2024 AND month = 'May' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS may_2024,\n       ",
+      "api": {
+        "id": "gen-1787421517-naVHGZF1hYJejwflMRW7",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 708,
+          "completion_tokens": 1024,
+          "total_tokens": 1732,
+          "cost": 0.0002244,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002244,
+            "upstream_inference_prompt_cost": 7.08e-05,
+            "upstream_inference_completions_cost": 0.0001536
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 18.47
+      },
+      "duration_seconds": 18.475,
+      "error": "ParseError: Expecting ). Line 38, Col: 122.\n   year = 2024 AND month = 'May' THEN present * 100.0 / NULLIF(enrolled, 0) ELSE NULL END) AS may_2024\u001b[4m,\u001b[0m"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

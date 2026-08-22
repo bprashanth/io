@@ -1,0 +1,102 @@
+{
+ "plan": {
+  "title": "SHG Loan Register Overview",
+  "subtitle": "Details on loan repayment status and purpose.",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Loans Disbursed",
+    "sql": "SELECT COUNT(*) AS n FROM shg_loan_register",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Loan Repayment Status",
+    "sql": "SELECT 'Closed' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Closed' UNION ALL SELECT 'Overdue' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Overdue' UNION ALL SELECT 'Regular' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Regular' ORDER BY 2 DESC LIMIT 10",
+    "x": "RepaymentStatus",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "pie",
+    "title": "Loan Purpose",
+    "sql": "SELECT Purpose, COUNT(*) AS count FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC LIMIT 8",
+    "x": "Purpose",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Loan Amount Distribution",
+    "sql": "SELECT Purpose, AVG(Loan Amount (Rs)) AS avg_amount FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The SHG loan register tracks disbursements and repayments.  {{p1}} loans have been disbursed. The repayment status distribution is as follows: {{p2}}.  The most common loan purpose is {{p3}}.  The average loan amount for each purpose is detailed in {{p4}}."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Invalid expression / Unexpected token. Line 1, Col: 99.\n  SELECT 'Closed' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment \u001b[4mStatus\u001b[0m = 'Closed' UNION ALL SELECT 'Overdue' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register "
+  },
+  "p3": {
+   "columns": [
+    "Purpose",
+    "count"
+   ],
+   "rows": [
+    {
+     "Purpose": "Agriculture",
+     "count": 106
+    },
+    {
+     "Purpose": "Livestock",
+     "count": 79
+    },
+    {
+     "Purpose": "Petty trade",
+     "count": 66
+    },
+    {
+     "Purpose": "Health",
+     "count": 46
+    },
+    {
+     "Purpose": "Housing",
+     "count": 32
+    },
+    {
+     "Purpose": "Education",
+     "count": 31
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expecting ). Line 1, Col: 31.\n  SELECT Purpose, AVG(Loan \u001b[4mAmount\u001b[0m (Rs)) AS avg_amount FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+  }
+ }
+}

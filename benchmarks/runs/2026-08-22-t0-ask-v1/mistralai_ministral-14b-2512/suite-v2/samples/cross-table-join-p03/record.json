@@ -1,0 +1,125 @@
+{
+  "id": "cross-table-join-p03",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "for 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Patna",
+      86.0,
+      null
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH anc_data AS (SELECT district, year, pregnancies_registered, anc4_completed, NULLIF(pregnancies_registered, 0) AS pregnancies_denom, NULLIF(anc4_completed, 0) AS anc4_denom FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Patna', 'Purnia') AND source = 'synthetic Bihar ANC fixture'), livelihood_data AS (SELECT district, year, women_enrolled, employed_at_6_months, NULLIF(women_enrolled, 0) AS women_enrolled_denom, NULLIF(employed_at_6_months, 0) AS employed_denom FROM livelihoods WHERE year = 2023 AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Purnia') AND source = 'synthetic women livelihood outcomes fixture') SELECT COALESCE(anc_data.district, livelihood_data.district) AS district, CASE WHEN NOT anc_data.district IS NULL THEN (CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0)) * 100 ELSE NULL END AS anc_coverage, CASE WHEN NOT livelihood_data.district IS NULL THEN (CAST(employed_at_6_months AS REAL) / NULLIF(NULLIF(women_enrolled, 0), 0)) * 100 ELSE NULL END AS employed_out_of_enrolled_percentage FROM anc_data FULL OUTER JOIN livelihood_data ON anc_data.district = livelihood_data.district ORDER BY district NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}, \"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\nfor 2023 combine both files and calculate ANC coverage and employed out of enrolled percentage for each district",
+      "response": "```sql\nWITH anc_data AS (\n    SELECT\n        district,\n        year,\n        pregnancies_registered,\n        anc4_completed,\n        NULLIF(pregnancies_registered, 0) AS pregnancies_denom,\n        NULLIF(anc4_completed, 0) AS anc4_denom\n    FROM anc_visits\n    WHERE year = 2023\n    AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Patna', 'Purnia')\n    AND source = 'synthetic Bihar ANC fixture'\n),\nlivelihood_data AS (\n    SELECT\n        district,\n        year,\n        women_enrolled,\n        employed_at_6_months,\n        NULLIF(women_enrolled, 0) AS women_enrolled_denom,\n        NULLIF(employed_at_6_months, 0) AS employed_denom\n    FROM livelihoods\n    WHERE year = 2023\n    AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Purnia')\n    AND source = 'synthetic women livelihood outcomes fixture'\n)\nSELECT\n    COALESCE(anc_data.district, livelihood_data.district) AS district,\n    CASE\n        WHEN anc_data.district IS NOT NULL THEN\n            (anc4_completed::FLOAT / NULLIF(pregnancies_registered, 0)) * 100\n        ELSE NULL\n    END AS anc_coverage,\n    CASE\n        WHEN livelihood_data.district IS NOT NULL THEN\n            (employed_at_6_months::FLOAT / NULLIF(women_enrolled, 0)) * 100\n        ELSE NULL\n    END AS employed_out_of_enrolled_percentage\nFROM anc_data\nFULL OUTER JOIN livelihood_data ON anc_data.district = livelihood_data.district\nORDER BY district;\n```",
+      "api": {
+        "id": "gen-1787421125-d4xKlKbdNCTXz6Y3foca",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 409,
+          "completion_tokens": 402,
+          "total_tokens": 811,
+          "cost": 9.308e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 9.308e-05,
+            "upstream_inference_prompt_cost": 1.268e-05,
+            "upstream_inference_completions_cost": 8.04e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.521
+      },
+      "duration_seconds": 3.526,
+      "sql_duckdb": "WITH anc_data AS (SELECT district, year, pregnancies_registered, anc4_completed, NULLIF(pregnancies_registered, 0) AS pregnancies_denom, NULLIF(anc4_completed, 0) AS anc4_denom FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Patna', 'Purnia') AND source = 'synthetic Bihar ANC fixture'), livelihood_data AS (SELECT district, year, women_enrolled, employed_at_6_months, NULLIF(women_enrolled, 0) AS women_enrolled_denom, NULLIF(employed_at_6_months, 0) AS employed_denom FROM livelihoods WHERE year = 2023 AND district IN ('Gaya', 'Kishanganj', 'Nalanda', 'Purnia') AND source = 'synthetic women livelihood outcomes fixture') SELECT COALESCE(anc_data.district, livelihood_data.district) AS district, CASE WHEN NOT anc_data.district IS NULL THEN (CAST(anc4_completed AS REAL) / NULLIF(NULLIF(pregnancies_registered, 0), 0)) * 100 ELSE NULL END AS anc_coverage, CASE WHEN NOT livelihood_data.district IS NULL THEN (CAST(employed_at_6_months AS REAL) / NULLIF(NULLIF(women_enrolled, 0), 0)) * 100 ELSE NULL END AS employed_out_of_enrolled_percentage FROM anc_data FULL OUTER JOIN livelihood_data ON anc_data.district = livelihood_data.district ORDER BY district NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          74.0,
+          56.0
+        ],
+        [
+          "Kishanganj",
+          61.0,
+          38.0
+        ],
+        [
+          "Nalanda",
+          80.0,
+          65.0
+        ],
+        [
+          "Patna",
+          86.0,
+          null
+        ],
+        [
+          "Purnia",
+          67.0,
+          46.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

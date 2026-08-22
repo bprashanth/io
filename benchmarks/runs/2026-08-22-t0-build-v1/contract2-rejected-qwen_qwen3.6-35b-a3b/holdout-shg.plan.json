@@ -1,0 +1,165 @@
+{
+ "plan": {
+  "title": "SHG Loan Register: Repayment & Purpose Analysis",
+  "subtitle": "Overview of loan disbursements, repayment status distribution, and purpose breakdown across SHGs.",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Loans Disbursed",
+    "sql": "SELECT COUNT(*) AS n FROM \"shg_loan_register\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Disbursed Amount (Rs)",
+    "sql": "SELECT SUM(\"Loan Amount (Rs)\") AS total_amount FROM \"shg_loan_register\"",
+    "unit": "Rs"
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Loans by Repayment Status",
+    "sql": "SELECT \"Repayment Status\", COUNT(*) AS cnt FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Repayment Status",
+    "y": [
+     "cnt"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Disbursed Amount by Loan Purpose",
+    "sql": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amt FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Purpose",
+    "y": [
+     "total_amt"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top Blocks by Number of Overdue Loans",
+    "sql": "SELECT \"Block\", COUNT(*) AS overdue_count FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue' GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The SHG loan register contains {{p1}} total loans disbursed, amounting to {{p2}} in total value. The majority of these loans are currently in a 'Regular' or 'Closed' state, with the remaining classified as 'Overdue'. Specifically, the bar chart for repayment status shows that {{p3.cnt}} loans are overdue, indicating potential liquidity challenges for some groups.\n\nLooking at the utilization of funds, the largest share of disbursed capital goes towards {{p4.Purpose}}, followed by other key sectors like Agriculture and Housing. This distribution highlights the primary economic activities supported by these microfinance interventions. For deeper operational oversight, the table below lists the blocks with the highest concentration of overdue loans, which may require targeted intervention or restructuring support."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "total_amount": 17815000
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Repayment Status",
+    "cnt"
+   ],
+   "rows": [
+    {
+     "Repayment Status": "Regular",
+     "cnt": 156
+    },
+    {
+     "Repayment Status": "Closed",
+     "cnt": 144
+    },
+    {
+     "Repayment Status": "Overdue",
+     "cnt": 60
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Purpose",
+    "total_amt"
+   ],
+   "rows": [
+    {
+     "Purpose": "Agriculture",
+     "total_amt": 5335000
+    },
+    {
+     "Purpose": "Livestock",
+     "total_amt": 3565000
+    },
+    {
+     "Purpose": "Petty trade",
+     "total_amt": 2795000
+    },
+    {
+     "Purpose": "Housing",
+     "total_amt": 2740000
+    },
+    {
+     "Purpose": "Health",
+     "total_amt": 1890000
+    },
+    {
+     "Purpose": "Education",
+     "total_amt": 1490000
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Block",
+    "overdue_count"
+   ],
+   "rows": [
+    {
+     "Block": "Fatehpur",
+     "overdue_count": 15
+    },
+    {
+     "Block": "Wazirganj",
+     "overdue_count": 13
+    },
+    {
+     "Block": "Belaganj",
+     "overdue_count": 13
+    },
+    {
+     "Block": "Barachatti",
+     "overdue_count": 8
+    },
+    {
+     "Block": "Atri",
+     "overdue_count": 8
+    },
+    {
+     "Block": "Dobhi",
+     "overdue_count": 3
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  }
+ }
+}

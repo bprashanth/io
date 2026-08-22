@@ -1,0 +1,67 @@
+{
+  "id": "donations-repeat-share-p02",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "share of money raised from repeat givers versus one-time givers, in percent, plus a count of repeat givers",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": [
+    [
+      53.51,
+      164
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH donor_counts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM donations GROUP BY \"Donor\"), donor_type AS (SELECT d.*, CASE WHEN dc.donation_count > 1 THEN 'Repeat Giver' ELSE 'One-Time Giver' END AS giver_type FROM donations AS d JOIN donor_counts AS dc ON d.\"Donor\" = dc.\"Donor\") SELECT ROUND((SUM(CASE WHEN giver_type = 'Repeat Giver' THEN Amount ELSE 0 END) * 100.0) / NULLIF(NULLIF(SUM(Amount), 0), 0), 2) AS repeat_giver_share_percent, COUNT(CASE WHEN giver_type = 'Repeat Giver' THEN 1 END) AS repeat_giver_count FROM donor_type",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nshare of money raised from repeat givers versus one-time givers, in percent, plus a count of repeat givers",
+      "response": "To calculate the share of money raised from repeat givers versus one-time givers in percent, along with a count of repeat givers, we need to first identify repeat givers and one-time givers based on the \"Donor\" column. A repeat giver is a donor who has made more than one donation, while a one-time giver has made exactly one donation.\n\nHere's the SQL query to achieve this:\n\n```sql\nWITH donor_counts AS (\n    SELECT \n        \"Donor\",\n        COUNT(*) AS donation_count\n    FROM \n        donations\n    GROUP BY \n        \"Donor\"\n),\ndonor_type AS (\n    SELECT \n        d.*,\n        CASE \n            WHEN dc.donation_count > 1 THEN 'Repeat Giver'\n            ELSE 'One-Time Giver'\n        END AS giver_type\n    FROM \n        donations d\n    JOIN \n        donor_counts dc ON d.\"Donor\" = dc.\"Donor\"\n)\nSELECT \n    ROUND(\n        (SUM(CASE WHEN giver_type = 'Repeat Giver' THEN Amount ELSE 0 END) * 100.0) \n        / NULLIF(SUM(Amount), 0)\n    , 2) AS repeat_giver_share_percent,\n    COUNT(CASE WHEN giver_type = 'Repeat Giver' THEN 1 END) AS repeat_giver_count\nFROM \n    donor_type;\n```\n\nExplanation:\n1. **donor_counts**: This CTE counts the number of donations per donor.\n2. **donor_type**: This CTE classifies each donation as either from a \"Repeat Giver\" or a \"One-Time Giver\" based on the donation count.\n3. The final `SELECT` calculates:\n   - `repeat_giver_share_percent`: The percentage of total money raised from repeat givers.\n   - `repeat_giver_count`: The count of repeat givers (distinct donors with more than one donation). \n\nThe `NULLIF` function ensures that division by zero is handled gracefully by returning `NULL` if the total amount is zero. The `ROUND` function is used to round the percentage to two decimal places for readability.",
+      "api": {
+        "id": "gen-1787421425-feChaP2qeCFiomBJfHxh",
+        "model": "ibm-granite/granite-4.1-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 404,
+          "completion_tokens": 438,
+          "total_tokens": 842,
+          "cost": 6.4e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 368,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.4e-05,
+            "upstream_inference_prompt_cost": 2.02e-05,
+            "upstream_inference_completions_cost": 4.38e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.539
+      },
+      "duration_seconds": 3.546,
+      "sql_duckdb": "WITH donor_counts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM donations GROUP BY \"Donor\"), donor_type AS (SELECT d.*, CASE WHEN dc.donation_count > 1 THEN 'Repeat Giver' ELSE 'One-Time Giver' END AS giver_type FROM donations AS d JOIN donor_counts AS dc ON d.\"Donor\" = dc.\"Donor\") SELECT ROUND((SUM(CASE WHEN giver_type = 'Repeat Giver' THEN Amount ELSE 0 END) * 100.0) / NULLIF(NULLIF(SUM(Amount), 0), 0), 2) AS repeat_giver_share_percent, COUNT(CASE WHEN giver_type = 'Repeat Giver' THEN 1 END) AS repeat_giver_count FROM donor_type",
+      "rows": [
+        [
+          53.51,
+          164
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

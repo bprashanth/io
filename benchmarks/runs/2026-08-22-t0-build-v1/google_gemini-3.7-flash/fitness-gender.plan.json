@@ -1,0 +1,170 @@
+{
+ "plan": {
+  "title": "Gender Comparison: Baseline to Endline Improvement",
+  "subtitle": "Assessing physical fitness and stamina gains across female and male cohorts",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Tracked Children",
+    "sql": "SELECT COUNT(DISTINCT b.\"Child ID\") AS total_children FROM \"baseline\" b INNER JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Avg Sit-ups Improvement",
+    "sql": "SELECT AVG(e.\"Sit ups\" - b.\"Sit ups\") AS avg_situps_gain FROM \"baseline\" b INNER JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": "reps"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Avg Shuttle Run Improvement",
+    "sql": "SELECT AVG(b.\"Shuttle run sec\" - e.\"Shuttle run sec\") AS avg_speed_gain FROM \"baseline\" b INNER JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": "sec"
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Average Sit-ups Gain by Gender",
+    "sql": "SELECT b.\"Gender\" AS gender, AVG(e.\"Sit ups\" - b.\"Sit ups\") AS avg_situp_gain FROM \"baseline\" b INNER JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "gender",
+    "y": [
+     "avg_situp_gain"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Average Shuttle Run Time Reduction by Gender (Seconds Faster)",
+    "sql": "SELECT b.\"Gender\" AS gender, AVG(b.\"Shuttle run sec\" - e.\"Shuttle run sec\") AS avg_time_reduction FROM \"baseline\" b INNER JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "gender",
+    "y": [
+     "avg_time_reduction"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Comprehensive Improvement Metrics by Gender",
+    "sql": "SELECT b.\"Gender\" AS gender, COUNT(b.\"Child ID\") AS students, ROUND(AVG(b.\"Sit ups\"), 2) AS baseline_situps, ROUND(AVG(e.\"Sit ups\"), 2) AS endline_situps, ROUND(AVG(e.\"Sit ups\" - b.\"Sit ups\"), 2) AS situp_gain, ROUND(AVG(b.\"Shuttle run sec\"), 2) AS baseline_shuttle_sec, ROUND(AVG(e.\"Shuttle run sec\"), 2) AS endline_shuttle_sec, ROUND(AVG(b.\"Shuttle run sec\" - e.\"Shuttle run sec\"), 2) AS speed_gain_sec, ROUND(AVG(e.\"Height cm\" - b.\"Height cm\"), 2) AS avg_height_growth_cm FROM \"baseline\" b INNER JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 1",
+    "unit": ""
+   }
+  ],
+  "narrative": "A total of {{p1}} children were evaluated across both baseline and endline assessments. Overall physical performance improved substantially, with an average increase of {{p2}} sit-up repetitions and an average reduction in shuttle run time of {{p3}} seconds.\n\nComparing outcomes across genders reveals how equitably physical stamina and speed developed. The detailed breakdown shows the baseline and endline progression for both sit-ups and agility shuttle runs."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_children"
+   ],
+   "rows": [
+    {
+     "total_children": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "avg_situps_gain"
+   ],
+   "rows": [
+    {
+     "avg_situps_gain": 2.915
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "avg_speed_gain"
+   ],
+   "rows": [
+    {
+     "avg_speed_gain": 0.013500000000000147
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "gender",
+    "avg_situp_gain"
+   ],
+   "rows": [
+    {
+     "gender": "Male",
+     "avg_situp_gain": 3.4464285714285716
+    },
+    {
+     "gender": "Female",
+     "avg_situp_gain": 2.2386363636363638
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "gender",
+    "avg_time_reduction"
+   ],
+   "rows": [
+    {
+     "gender": "Male",
+     "avg_time_reduction": 0.014285714285714615
+    },
+    {
+     "gender": "Female",
+     "avg_time_reduction": 0.012500000000000016
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "gender",
+    "students",
+    "baseline_situps",
+    "endline_situps",
+    "situp_gain",
+    "baseline_shuttle_sec",
+    "endline_shuttle_sec",
+    "speed_gain_sec",
+    "avg_height_growth_cm"
+   ],
+   "rows": [
+    {
+     "gender": "Female",
+     "students": 88,
+     "baseline_situps": 17.28,
+     "endline_situps": 19.52,
+     "situp_gain": 2.24,
+     "baseline_shuttle_sec": 13.26,
+     "endline_shuttle_sec": 13.25,
+     "speed_gain_sec": 0.01,
+     "avg_height_growth_cm": 1.6
+    },
+    {
+     "gender": "Male",
+     "students": 112,
+     "baseline_situps": 17.04,
+     "endline_situps": 20.48,
+     "situp_gain": 3.45,
+     "baseline_shuttle_sec": 13.33,
+     "endline_shuttle_sec": 13.32,
+     "speed_gain_sec": 0.01,
+     "avg_height_growth_cm": 4.01
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  }
+ }
+}

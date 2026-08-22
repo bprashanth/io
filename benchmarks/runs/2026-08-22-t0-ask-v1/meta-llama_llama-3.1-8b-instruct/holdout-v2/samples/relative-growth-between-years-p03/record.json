@@ -1,0 +1,56 @@
+{
+  "id": "relative-growth-between-years-p03",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "how much more money was given out in 2024 than in 2023, in percent terms",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": [],
+  "row_order_required": false,
+  "sql_duckdb": "WITH year_change AS (SELECT \"Disbursement Date\" AS year, \"Loan Amount (Rs)\" AS loan_amount_2023, NULLIF(\"Loan Amount (Rs)\", 0) AS loan_amount_2024 FROM \"shg_loan_register\" WHERE \"Disbursement Date\" IN ('2023', '2024')), percent_change AS (SELECT year, (loan_amount_2024 - loan_amount_2023) * 100 / NULLIF(loan_amount_2023, 0) AS percent_change FROM year_change) SELECT year, percent_change FROM percent_change WHERE year = '2024'",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nhow much more money was given out in 2024 than in 2023, in percent terms",
+      "response": "```sql\nWITH \n  year_change AS (\n    SELECT \n      \"Disbursement Date\" AS year,\n      \"Loan Amount (Rs)\" AS loan_amount_2023,\n      NULLIF(\"Loan Amount (Rs)\", 0) AS loan_amount_2024\n    FROM \n      \"shg_loan_register\"\n    WHERE \n      \"Disbursement Date\" IN ('2023', '2024')\n  ),\n  percent_change AS (\n    SELECT \n      year,\n      (loan_amount_2024 - loan_amount_2023) * 100 / loan_amount_2023 AS percent_change\n    FROM \n      year_change\n  )\nSELECT \n  year,\n  percent_change\nFROM \n  percent_change\nWHERE \n  year = '2024';\n```",
+      "api": {
+        "id": "gen-1787421325-2QUm87fIjRKAHyQyCBjK",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 392,
+          "completion_tokens": 158,
+          "total_tokens": 550,
+          "cost": 1.416e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.416e-05,
+            "upstream_inference_prompt_cost": 7.84e-06,
+            "upstream_inference_completions_cost": 6.32e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 5.337
+      },
+      "duration_seconds": 5.339,
+      "sql_duckdb": "WITH year_change AS (SELECT \"Disbursement Date\" AS year, \"Loan Amount (Rs)\" AS loan_amount_2023, NULLIF(\"Loan Amount (Rs)\", 0) AS loan_amount_2024 FROM \"shg_loan_register\" WHERE \"Disbursement Date\" IN ('2023', '2024')), percent_change AS (SELECT year, (loan_amount_2024 - loan_amount_2023) * 100 / NULLIF(loan_amount_2023, 0) AS percent_change FROM year_change) SELECT year, percent_change FROM percent_change WHERE year = '2024'",
+      "rows": []
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

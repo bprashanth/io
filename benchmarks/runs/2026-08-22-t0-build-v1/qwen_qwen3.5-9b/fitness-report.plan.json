@@ -1,0 +1,347 @@
+{
+ "plan": {
+  "title": "Fitness Programme Impact Summary",
+  "subtitle": "Comparing baseline and endline fitness metrics by coach and location",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Children Tracked",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM \"baseline\" UNION ALL SELECT COUNT(DISTINCT \"Child ID\") AS n FROM \"endline\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Average Sit-ups by Coach",
+    "sql": "WITH b AS (SELECT \"Coach\", AVG(\"Sit ups\") AS avg_situps FROM \"baseline\" GROUP BY 1), e AS (SELECT \"Coach\", AVG(\"Sit ups\") AS avg_situps FROM \"endline\" GROUP BY 1) SELECT b.\"Coach\", COALESCE(b.avg_situps, e.avg_situps) AS avg_situps FROM b FULL OUTER JOIN e ON b.\"Coach\" = e.\"Coach\" ORDER BY avg_situps DESC NULLS LAST LIMIT 15",
+    "x": "Coach",
+    "y": [
+     "avg_situps"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Average Weight Gain by Location",
+    "sql": "WITH b AS (SELECT \"Location\", AVG(\"Weight kg\") AS base_weight FROM \"baseline\" GROUP BY 1), e AS (SELECT \"Location\", AVG(\"Weight kg\") AS end_weight FROM \"endline\" GROUP BY 1) SELECT b.\"Location\", (e.end_weight - b.base_weight) AS weight_change FROM b FULL OUTER JOIN e ON b.\"Location\" = e.\"Location\" WHERE weight_change IS NOT NULL ORDER BY weight_change DESC NULLS LAST LIMIT 15",
+    "x": "Location",
+    "y": [
+     "weight_change"
+    ],
+    "unit": "kg"
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Shuttle Run Improvement Trend",
+    "sql": "WITH b AS (SELECT \"Location\", AVG(\"Shuttle run sec\") AS base_time FROM \"baseline\" GROUP BY 1), e AS (SELECT \"Location\", AVG(\"Shuttle run sec\") AS end_time FROM \"endline\" GROUP BY 1) SELECT b.\"Location\", (b.base_time - e.end_time) AS improvement FROM b FULL OUTER JOIN e ON b.\"Location\" = e.\"Location\" WHERE improvement IS NOT NULL ORDER BY improvement DESC NULLS LAST LIMIT 15",
+    "x": "Location",
+    "y": [
+     "improvement"
+    ],
+    "unit": "sec"
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top 10 Individual Improvements",
+    "sql": "WITH b AS (SELECT \"Child ID\", \"Sit ups\" AS base_situps, \"Shuttle run sec\" AS base_run FROM \"baseline\"), e AS (SELECT \"Child ID\", \"Sit ups\" AS end_situps, \"Shuttle run sec\" AS end_run FROM \"endline\") SELECT b.\"Child ID\", (e.end_situps - b.base_situps) AS situp_change, (b.base_run - e.end_run) AS run_change FROM b INNER JOIN e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY situp_change DESC, run_change DESC LIMIT 10",
+    "x": "Child ID",
+    "y": [
+     "situp_change",
+     "run_change"
+    ]
+   }
+  ],
+  "narrative": "This dashboard tracks the progress of children enrolled in the fitness programme by comparing their baseline measurements against their endline results. The first panel shows the total number of unique children recorded in both datasets, ensuring we have a clear headcount of the programme's reach.\n\nThe second panel breaks down the average sit-up performance by coach, highlighting which instructors are seeing the most significant gains in their groups. This helps in identifying best practices or areas where additional coaching support might be beneficial.\n\nThe third and fourth panels focus on physical changes at the location level. We look at weight gain and improvements in shuttle run times (where a lower time is better, so the metric shows positive improvement). These aggregate views help donors understand the geographical impact of the programme.\n\nFinally, the table lists the top 10 individual children who showed the most dramatic improvements in both sit-ups and shuttle runs. This personalizes the data, showing specific success stories that demonstrate the tangible health benefits of the intervention."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    },
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "Coach",
+    "avg_situps"
+   ],
+   "rows": [
+    {
+     "Coach": "Salman Rao",
+     "avg_situps": 20.666666666666668
+    },
+    {
+     "Coach": "Bapu Yadav",
+     "avg_situps": 20.25
+    },
+    {
+     "Coach": "P. T. Pereira",
+     "avg_situps": 19.842105263157894
+    },
+    {
+     "Coach": "indira chandra",
+     "avg_situps": 19.555555555555557
+    },
+    {
+     "Coach": "AAKASH ZENDE",
+     "avg_situps": 18.9375
+    },
+    {
+     "Coach": "Rosy",
+     "avg_situps": 18.88888888888889
+    },
+    {
+     "Coach": "Rupali Kumar",
+     "avg_situps": 18.8
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "avg_situps": 18.0
+    },
+    {
+     "Coach": "sunil thakur",
+     "avg_situps": 16.176470588235293
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "avg_situps": 15.588235294117647
+    },
+    {
+     "Coach": "Jaspreet George",
+     "avg_situps": 15.384615384615385
+    },
+    {
+     "Coach": "Bhagyashree",
+     "avg_situps": 14.0
+    },
+    {
+     "Coach": "Vimla",
+     "avg_situps": 13.76923076923077
+    },
+    {
+     "Coach": "T. S. Fernandez",
+     "avg_situps": 12.090909090909092
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "avg_situps": 11.0
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Location",
+    "weight_change"
+   ],
+   "rows": [
+    {
+     "Location": "Amawan",
+     "weight_change": 14.125
+    },
+    {
+     "Location": "Manjari",
+     "weight_change": 13.799999999999997
+    },
+    {
+     "Location": "Ambegaon Budruk",
+     "weight_change": 12.55
+    },
+    {
+     "Location": "Bakhtiyarpur Tola",
+     "weight_change": 8.325
+    },
+    {
+     "Location": "Dobhi",
+     "weight_change": 8.133333333333333
+    },
+    {
+     "Location": "Devipur",
+     "weight_change": 5.333333333333339
+    },
+    {
+     "Location": "Nira",
+     "weight_change": 5.199999999999999
+    },
+    {
+     "Location": "Karpi",
+     "weight_change": 5.166666666666668
+    },
+    {
+     "Location": "Barachatti",
+     "weight_change": 4.520000000000003
+    },
+    {
+     "Location": "Bishunpur",
+     "weight_change": 4.128571428571433
+    },
+    {
+     "Location": "Uruli Kanchan",
+     "weight_change": 3.966666666666672
+    },
+    {
+     "Location": "Chakan",
+     "weight_change": 3.8750000000000036
+    },
+    {
+     "Location": "Mahuar",
+     "weight_change": 2.640000000000004
+    },
+    {
+     "Location": "Kharadi",
+     "weight_change": 2.240000000000002
+    },
+    {
+     "Location": "Alandi",
+     "weight_change": 2.0
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Location",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Location": "Nira",
+     "improvement": 5.100000000000001
+    },
+    {
+     "Location": "Kadus",
+     "improvement": 3.6999999999999993
+    },
+    {
+     "Location": "Guraru",
+     "improvement": 2.9499999999999993
+    },
+    {
+     "Location": "Motipur",
+     "improvement": 2.4875000000000007
+    },
+    {
+     "Location": "Barachatti",
+     "improvement": 2.24
+    },
+    {
+     "Location": "Dobhi",
+     "improvement": 2.166666666666668
+    },
+    {
+     "Location": "Rampur",
+     "improvement": 1.799999999999999
+    },
+    {
+     "Location": "Dehu",
+     "improvement": 1.6333333333333346
+    },
+    {
+     "Location": "Chandwara",
+     "improvement": 1.575000000000001
+    },
+    {
+     "Location": "Mahuar",
+     "improvement": 1.4800000000000004
+    },
+    {
+     "Location": "Ambegaon Budruk",
+     "improvement": 1.3999999999999986
+    },
+    {
+     "Location": "Manjari",
+     "improvement": 1.0666666666666664
+    },
+    {
+     "Location": "Amawan",
+     "improvement": 1.0
+    },
+    {
+     "Location": "Kharadi",
+     "improvement": 0.9200000000000017
+    },
+    {
+     "Location": "Kesnand",
+     "improvement": 0.8000000000000007
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Child ID",
+    "situp_change",
+    "run_change"
+   ],
+   "rows": [
+    {
+     "Child ID": "CFS0006",
+     "situp_change": 25,
+     "run_change": -4.5
+    },
+    {
+     "Child ID": "CFS0130",
+     "situp_change": 24,
+     "run_change": 3.6999999999999993
+    },
+    {
+     "Child ID": "CFS0027",
+     "situp_change": 23,
+     "run_change": 1.799999999999999
+    },
+    {
+     "Child ID": "CFS0010",
+     "situp_change": 22,
+     "run_change": 0.7999999999999972
+    },
+    {
+     "Child ID": "CFS0122",
+     "situp_change": 22,
+     "run_change": 0.7000000000000011
+    },
+    {
+     "Child ID": "CFS0073",
+     "situp_change": 22,
+     "run_change": -1.5
+    },
+    {
+     "Child ID": "CFS0104",
+     "situp_change": 22,
+     "run_change": -2.799999999999999
+    },
+    {
+     "Child ID": "CFS0030",
+     "situp_change": 21,
+     "run_change": -0.29999999999999893
+    },
+    {
+     "Child ID": "CFS0171",
+     "situp_change": 21,
+     "run_change": -4.300000000000001
+    },
+    {
+     "Child ID": "CFS0152",
+     "situp_change": 21,
+     "run_change": -6.799999999999999
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

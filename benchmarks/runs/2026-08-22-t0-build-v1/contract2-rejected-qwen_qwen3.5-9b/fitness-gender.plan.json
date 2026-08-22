@@ -1,0 +1,111 @@
+{
+ "plan": {
+  "title": "Gender Gap Analysis",
+  "subtitle": "Comparing improvement in physical fitness metrics between girls and boys",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total participants",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM (SELECT * FROM \"baseline\" UNION ALL SELECT * FROM \"endline\")",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Average Sit-ups improvement by gender",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", AVG(\"Sit ups\") AS b_sit FROM \"baseline\" GROUP BY 1), endline AS (SELECT \"Child ID\", AVG(\"Sit ups\") AS e_sit FROM \"endline\" GROUP BY 1), joined AS (SELECT b.\"Child ID\", b.b_sit, e.e_sit FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"), gender AS (SELECT \"Child ID\", CASE WHEN b.\"Gender\" = 'Female' THEN 'Girls' ELSE 'Boys' END AS gender FROM joined b JOIN baseline b ON b.\"Child ID\" = b.\"Child ID\"), improvement AS (SELECT gender, AVG(e_sit - b_sit) AS diff FROM gender GROUP BY 1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), SELECT gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+    "x": "gender",
+    "y": [
+     "diff"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Average Shuttle run improvement by gender",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", AVG(\"Shuttle run sec\") AS b_run FROM \"baseline\" GROUP BY 1), endline AS (SELECT \"Child ID\", AVG(\"Shuttle run sec\") AS e_run FROM \"endline\" GROUP BY 1), joined AS (SELECT b.\"Child ID\", b.b_run, e.e_run FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"), gender AS (SELECT \"Child ID\", CASE WHEN b.\"Gender\" = 'Female' THEN 'Girls' ELSE 'Boys' END AS gender FROM joined b JOIN baseline b ON b.\"Child ID\" = b.\"Child ID\"), improvement AS (SELECT gender, AVG(e_run - b_run) AS diff FROM gender GROUP BY 1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), SELECT gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+    "x": "gender",
+    "y": [
+     "diff"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Average Height improvement by gender",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", AVG(\"Height cm\") AS b_hgt FROM \"baseline\" GROUP BY 1), endline AS (SELECT \"Child ID\", AVG(\"Height cm\") AS e_hgt FROM \"endline\" GROUP BY 1), joined AS (SELECT b.\"Child ID\", b.b_hgt, e.e_hgt FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"), gender AS (SELECT \"Child ID\", CASE WHEN b.\"Gender\" = 'Female' THEN 'Girls' ELSE 'Boys' END AS gender FROM joined b JOIN baseline b ON b.\"Child ID\" = b.\"Child ID\"), improvement AS (SELECT gender, AVG(e_hgt - b_hgt) AS diff FROM gender GROUP BY 1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), SELECT gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn",
+    "x": "gender",
+    "y": [
+     "diff"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top 5 Girls by Sit-ups gain",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", \"Sit ups\" AS b_sit FROM \"baseline\" WHERE \"Gender\" = 'Female'), endline AS (SELECT \"Child ID\", \"Sit ups\" AS e_sit FROM \"endline\" WHERE \"Gender\" = 'Female'), joined AS (SELECT b.\"Child ID\", b.b_sit, e.e_sit FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"), improvement AS (SELECT \"Child ID\", (e_sit - b_sit) AS gain FROM joined WHERE e_sit IS NOT NULL AND b_sit IS NOT NULL), ranked AS (SELECT \"Child ID\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), SELECT \"Child ID\", gain FROM ranked WHERE rn <= 5 ORDER BY rn",
+    "x": "Child ID",
+    "y": [
+     "gain"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top 5 Boys by Sit-ups gain",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", \"Sit ups\" AS b_sit FROM \"baseline\" WHERE \"Gender\" = 'Male'), endline AS (SELECT \"Child ID\", \"Sit ups\" AS e_sit FROM \"endline\" WHERE \"Gender\" = 'Male'), joined AS (SELECT b.\"Child ID\", b.b_sit, e.e_sit FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"), improvement AS (SELECT \"Child ID\", (e_sit - b_sit) AS gain FROM joined WHERE e_sit IS NOT NULL AND b_sit IS NOT NULL), ranked AS (SELECT \"Child ID\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), SELECT \"Child ID\", gain FROM ranked WHERE rn <= 5 ORDER BY rn",
+    "x": "Child ID",
+    "y": [
+     "gain"
+    ]
+   }
+  ],
+  "narrative": "This dashboard compares the average improvement in sit-ups, shuttle run times, and height between girls and boys. The first bar chart shows the average gain in sit-ups, while the second displays the change in shuttle run seconds (where a negative value indicates improvement). The third panel tracks height growth for both groups.\n\nDetailed tables list the top five performers for each gender based on sit-ups improvement. These tables help identify specific individuals who have shown the most significant gains in strength and endurance.\n\nBy comparing the average differences across the bar charts, you can determine if one gender is outperforming the other in specific metrics. The data allows for a direct comparison of progress rates between the two groups.",
+  "missing": []
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected CTE to have alias. Line 1, Col: 635.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn"
+  },
+  "p3": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected CTE to have alias. Line 1, Col: 651.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn"
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected CTE to have alias. Line 1, Col: 639.\n  1), ranked AS (SELECT gender, diff, ROW_NUMBER() OVER (ORDER BY diff DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m gender, diff FROM ranked WHERE rn <= 2 ORDER BY rn"
+  },
+  "p5": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected CTE to have alias. Line 1, Col: 531.\n  ranked AS (SELECT \"Child ID\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m \"Child ID\", gain FROM ranked WHERE rn <= 5 ORDER BY rn"
+  },
+  "p6": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected CTE to have alias. Line 1, Col: 527.\n  ranked AS (SELECT \"Child ID\", gain, ROW_NUMBER() OVER (ORDER BY gain DESC) AS rn FROM improvement), \u001b[4mSELECT\u001b[0m \"Child ID\", gain FROM ranked WHERE rn <= 5 ORDER BY rn"
+  }
+ }
+}

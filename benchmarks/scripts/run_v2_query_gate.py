@@ -119,9 +119,10 @@ def known_categories(db: duckdb.DuckDBPyConnection, manifest: dict[str, Any], li
 
 
 def make_shell_prompt(question: str, schema: str, categories: dict[str, Any], repair: str | None = None,
-                      plus: bool = False) -> str:
+                      plus: bool = False, io: bool | str = False) -> str:
     """The prompt family used by run_local_first_insight.py (single turn, no prior turns).
-    ``plus`` adds one generic aggregate-row rule that the live shell does not have yet."""
+    ``plus`` adds one generic aggregate-row rule that the live shell does not have yet.
+    ``io`` adds the two rules the io desktop app ships with (quoting/UNION alignment, fuzzy matching hint)."""
     sections = [
         "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.",
         "Return SQL only. Never write files, install software, calculate values yourself, or invent columns.",
@@ -132,6 +133,8 @@ def make_shell_prompt(question: str, schema: str, categories: dict[str, Any], re
         "When several known category values are named, filter them separately with IN rather than concatenating them.",
         *(["Aggregate or total rows that sit inside a detail table (for example a 'Total' label in a district column) are not detail rows; exclude them when the user asks about the detail level."] if plus else []),
         "Use NULLIF for denominators. Missing values remain missing and are not zero.",
+        *(["Quote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases."] if io else []),
+        *(["For approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept."] if io == "full" else []),
         f"SCHEMA:\n{schema}",
         f"KNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{json.dumps(categories, ensure_ascii=False)}",
         f"CURRENT QUESTION:\n{question}",
@@ -173,6 +176,7 @@ def call_model(
     max_tokens: int,
     reasoning_effort: str | None,
     temperature: float,
+    no_think_template: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     started = time.monotonic()
     body: dict[str, Any] = {
@@ -188,6 +192,9 @@ def call_model(
         body["reasoning"] = {"enabled": False}
     elif reasoning_effort:
         body["reasoning"] = {"effort": reasoning_effort}
+    if no_think_template:
+        # llama.cpp / vLLM honour the chat-template switch, not the OpenRouter field.
+        body["chat_template_kwargs"] = {"enable_thinking": False}
     raw = endpoint_json(
         endpoint.rstrip("/") + "/chat/completions",
         body,
@@ -339,11 +346,12 @@ def main() -> int:
     parser.add_argument("--max-tokens", type=int, default=1024)
     parser.add_argument("--reasoning-effort", choices=("none", "low", "medium", "high", "xhigh"))
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--no-think-template", action="store_true", help="send chat_template_kwargs.enable_thinking=false (local llama.cpp/vLLM servers)")
     parser.add_argument("--only-task", action="append", default=[])
     parser.add_argument("--only-sample", action="append", default=[])
     parser.add_argument("--max-samples", type=int)
-    parser.add_argument("--prompt-style", choices=("gate", "shell", "shell-plus"), default="gate",
-                        help="gate: frozen v2 SQLite-expert prompt (default); shell: the live shell's DuckDB prompt with known categorical values; shell-plus: shell plus one generic aggregate-row rule")
+    parser.add_argument("--prompt-style", choices=("gate", "shell", "shell-plus", "io", "io-quote"), default="gate",
+                        help="gate: frozen v2 SQLite-expert prompt (default); shell: the live shell's DuckDB prompt with known categorical values; shell-plus: shell plus one generic aggregate-row rule; io: shell plus the io desktop app's two rules (quoting/UNION alignment, jaro_winkler hint); io-quote: shell plus the quoting/UNION rule only")
     args = parser.parse_args()
     api_key = None
     if args.api_key_file:
@@ -389,9 +397,9 @@ def main() -> int:
             "reference",
             "Percent means 100.0 times numerator divided by the stated denominator. Percentage-point change means later rate minus earlier rate.",
         )
-        if args.prompt_style.startswith("shell"):
+        if args.prompt_style.startswith("shell") or args.prompt_style.startswith("io"):
             categories = known_categories(db, scoped_manifest)
-            prompt = make_shell_prompt(sample["question"], schema, categories, plus=args.prompt_style == "shell-plus")
+            prompt = make_shell_prompt(sample["question"], schema, categories, plus=args.prompt_style == "shell-plus", io={"io": "full", "io-quote": True}.get(args.prompt_style, False))
         else:
             prompt = make_prompt(sample["question"], schema, reference)
         attempts = []
@@ -410,6 +418,7 @@ def main() -> int:
                     args.max_tokens,
                     args.reasoning_effort,
                     args.temperature,
+                    args.no_think_template,
                 )
                 request_record.update({"response": response, "api": api})
                 final_sql = extract_sql(response)
@@ -425,9 +434,9 @@ def main() -> int:
                 if attempt == 2:
                     break
                 if not isinstance(error, TimeoutError):
-                    if args.prompt_style.startswith("shell"):
+                    if args.prompt_style.startswith("shell") or args.prompt_style.startswith("io"):
                         prompt = make_shell_prompt(sample["question"], schema, categories, request_record["error"],
-                                                   plus=args.prompt_style == "shell-plus")
+                                                   plus=args.prompt_style == "shell-plus", io={"io": "full", "io-quote": True}.get(args.prompt_style, False))
                     else:
                         prompt = make_prompt(sample["question"], schema, reference, request_record["error"])
         order_matters = bool(sample["task"].get("order_matters", False))

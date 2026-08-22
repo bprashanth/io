@@ -31,10 +31,13 @@ separate qualification run, giving a 30/30 routed replay on the frozen suite.
 The larger Arctic BF16 checkpoint scored 26/30 and passed a separate 15/15
 holdout, but is a server/high-end option rather than the intended laptop tier.
 
-**Stage ledger:** the work is now three additive stages — see
+**Stage ledger:** the work is now four additive stages — see
 [`docs/stages/`](docs/stages/README.md) (Cline vs Antigravity; local-first
 ladder and its re-verification; the Antigravity privacy shield, verified in
-the real IDE). The shield is `extension/privacy-shield-0.2.3.vsix`.
+the real IDE; the laptop-tier model choice for the custom io app). The shield
+is `extension/privacy-shield-0.2.3.vsix`; the io desktop shim is
+[`app/io-desktop/`](app/io-desktop/README.md) (T0 = Qwen 3.5 9B, Ask and
+Build lanes under a plan/receipt contract).
 
 **Re-verification note (2026-08-21 evening):** the model ranking above
 reproduces, but the router's "accepted no wrong answers" and the "30/30 routed

@@ -1,0 +1,145 @@
+{
+  "id": "conditional-count-share-by-group-p02",
+  "task_id": "conditional-count-share-by-group",
+  "pattern": "count rows matching a text status per group and its percent of all rows in the group, rank",
+  "question": "for each block count overdue loans and overdue percentage out of all its loans, highest percentage first",
+  "gold_sql": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, 100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / COUNT(*) AS overdue_percent FROM shg_loan_register GROUP BY \"Block\" ORDER BY overdue_percent DESC, \"Block\"",
+  "expected_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH block_stats AS (SELECT \"Block\", COUNT(*) AS total_loans, SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) * 100.0 / NULLIF(NULLIF(COUNT(*), 0), 0) AS overdue_percentage FROM \"shg_loan_register\" GROUP BY \"Block\") SELECT \"Block\", overdue_loans, overdue_percentage FROM block_stats ORDER BY overdue_percentage DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nfor each block count overdue loans and overdue percentage out of all its loans, highest percentage first",
+      "response": "WITH block_stats AS (\n    SELECT\n        \"Block\",\n        COUNT(*) AS total_loans,\n        SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans,\n        SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS overdue_percentage\n    FROM \"shg_loan_register\"\n    GROUP BY \"Block\"\n)\nSELECT\n    \"Block\",\n    overdue_loans,\n    overdue_percentage\nFROM block_stats\nORDER BY overdue_percentage DESC;",
+      "api": {
+        "id": "gen-1787420926-LV5EWyaHqGwSPVX3TpVA",
+        "model": "qwen/qwen3.6-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 418,
+          "completion_tokens": 142,
+          "total_tokens": 560,
+          "cost": 0.0002047,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002047,
+            "upstream_inference_prompt_cost": 6.27e-05,
+            "upstream_inference_completions_cost": 0.000142
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.011
+      },
+      "duration_seconds": 2.014,
+      "sql_duckdb": "WITH block_stats AS (SELECT \"Block\", COUNT(*) AS total_loans, SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) * 100.0 / NULLIF(NULLIF(COUNT(*), 0), 0) AS overdue_percentage FROM \"shg_loan_register\" GROUP BY \"Block\") SELECT \"Block\", overdue_loans, overdue_percentage FROM block_stats ORDER BY overdue_percentage DESC",
+      "rows": [
+        [
+          "Fatehpur",
+          15,
+          23.4375
+        ],
+        [
+          "Belaganj",
+          13,
+          20.0
+        ],
+        [
+          "Wazirganj",
+          13,
+          19.696969696969695
+        ],
+        [
+          "Atri",
+          8,
+          15.384615384615385
+        ],
+        [
+          "Barachatti",
+          8,
+          14.285714285714286
+        ],
+        [
+          "Dobhi",
+          3,
+          5.2631578947368425
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

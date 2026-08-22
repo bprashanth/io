@@ -1,0 +1,1254 @@
+{
+ "summary": {
+  "model": "google/gemma-3n-e4b-it",
+  "endpoint": "https://openrouter.ai/api/v1",
+  "manifest": "benchmarks/t0/build-suite-v1.json",
+  "requests": 12,
+  "plan_valid": 12,
+  "panels_total": 53,
+  "panels_ok": 25,
+  "fully_clean": 1,
+  "repairs": 11,
+  "lint_literal_requests": 1,
+  "mean_model_seconds": 17.3
+ },
+ "records": [
+  {
+   "id": "scholarship-dashboard",
+   "dataset": "scholarship",
+   "mode": "dashboard",
+   "request": "build me a dashboard for this scholarship sheet - status, marks, income, which talukas, that kind of thing",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420379-yxtAan9zRB5L8Tna0mwD",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1219,
+       "completion_tokens": 526,
+       "total_tokens": 1745,
+       "cost": 0.00013626,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00013626,
+        "upstream_inference_prompt_cost": 7.314e-05,
+        "upstream_inference_completions_cost": 6.312e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 9.531
+     },
+     "raw": "```json\n{\n  \"title\": \"Scholarship Applicant Overview\",\n  \"subtitle\": \"A snapshot of scholarship applications by status, marks, and location.\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Applications\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM scholarship_applicants\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Applications by Status\",\n      \"sql\": \"SELECT Status, COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"Status\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"line\",\n      \"title\": \"Average Marks by Category\",\n      \"sql\": \"SELECT Category, AVG(Marks %) AS avg_marks FROM scholarship_applicants GROUP BY 1\",\n      \"x\": \"Category\",\n      \"y\": [\"avg_marks\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Talukas\",\n      \"sql\": \"SELECT Taluka, COUNT(*) AS application_count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"title\": \"Top 10 Talukas\",\n      \"columns\": [\"Taluka\", \"application_count\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Family Income Distribution\",\n      \"sql\": \"SELECT Family Income, COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 1\",\n      \"x\": \"Family Income\",\n      \"y\": [\"count\"]\n    }\n  ],\n  \"narrative\": \"This dashboard provides an overview of scholarship applications. The total number of applications is {{p1}}.  {{p2}} shows the distribution of applications across different statuses.  {{p3}} displays the average marks for each category, offering insights into academic performance.  {{p4}} highlights the top 10 talukas with the most applications, indicating geographical distribution.  {{p5}} illustrates the distribution of family incomes among applicants.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p3: ParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Mod'>. Line 1, Col: 29.\n  SELECT Category, AVG(Marks %\u001b[4m)\u001b[0m AS avg_marks FROM scholarship_applicants GROUP BY 1",
+      "p5: BinderException: Binder Error: Referenced column \"Family\" not found in FROM clause!\nCandidate bindings: \"Family Income\", \"Naam\", \"Taluka\", \"Category\"\n\nLINE 1: SELECT Family AS Income, COUNT(*) AS count FROM scholarship_applic...\n               ^"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420389-aM7Azd6jdJ3xxKNKJktS",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1386,
+       "completion_tokens": 418,
+       "total_tokens": 1804,
+       "cost": 0.00013332,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00013332,
+        "upstream_inference_prompt_cost": 8.316e-05,
+        "upstream_inference_completions_cost": 5.016e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 6.743
+     },
+     "raw": "```json\n{\n  \"title\": \"Scholarship Applicant Overview\",\n  \"subtitle\": \"A snapshot of scholarship applicants by status, marks, and income.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total Applicants\", \"sql\": \"SELECT COUNT(*) AS n FROM scholarship_applicants\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Applicants by Status\", \"sql\": \"SELECT Status, COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Status\", \"y\": [\"count\"]},\n    {\"id\": \"p3\", \"kind\": \"line\", \"title\": \"Average Marks %\", \"sql\": \"SELECT AVG(Marks %) AS avg_marks FROM scholarship_applicants\", \"x\": null, \"y\": [\"avg_marks\"]},\n    {\"id\": \"p4\", \"kind\": \"bar\", \"title\": \"Average Family Income by Taluka\", \"sql\": \"SELECT Taluka, AVG(Family Income) AS avg_income FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC LIMIT 10\", \"x\": \"Taluka\", \"y\": [\"avg_income\"]},\n    {\"id\": \"p5\", \"kind\": \"table\", \"title\": \"Top 10 Applicants by Marks %\", \"sql\": \"SELECT Name, Marks % FROM scholarship_applicants ORDER BY 2 DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"This dashboard provides an overview of scholarship applicants. The total number of applicants is {{p1}}.  The distribution of applicants across different statuses is shown in {{p2}}. The average marks percentage across all applicants is {{p3}}.  {{p4}} shows the average family income for the top talukas.  {{p5}} lists the top 10 applicants based on their marks percentage.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p3: ParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Mod'>. Line 1, Col: 19.\n  SELECT AVG(Marks %\u001b[4m)\u001b[0m AS avg_marks FROM scholarship_applicants",
+      "p4: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Taluka, AVG(Family \u001b[4mIncome\u001b[0m) AS avg_income FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+      "p5: ParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Mod'>. Line 1, Col: 25.\n  SELECT Name, Marks % \u001b[4mFROM\u001b[0m scholarship_applicants ORDER BY 2 DESC LIMIT 10"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 5,
+   "panels_ok": 3,
+   "panel_problems": [
+    "p3: ParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.Mod'>. Line 1, Col: 29.\n  SELECT Category, AVG(Marks %\u001b[4m)\u001b[0m AS avg_marks FROM scholarship_applicants GROUP BY 1",
+    "p5: BinderException: Binder Error: Referenced column \"Family\" not found in FROM clause!\nCandidate bindings: \"Family Income\", \"Naam\", \"Taluka\", \"Category\"\n\nLINE 1: SELECT Family AS Income, COUNT(*) AS count FROM scholarship_applic...\n               ^"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "line",
+    "table",
+    "bar"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [
+    "p3",
+    "p5"
+   ],
+   "duration_seconds": 16.27,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/scholarship-dashboard.html",
+   "wall_seconds": 16.3
+  },
+  {
+   "id": "scholarship-report",
+   "dataset": "scholarship",
+   "mode": "report",
+   "request": "write me a short report summarising the scholarship applications for our board",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420395-TuW1LDmPY2AZNyZv2DxC",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1209,
+       "completion_tokens": 536,
+       "total_tokens": 1745,
+       "cost": 0.00013686,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00013686,
+        "upstream_inference_prompt_cost": 7.254e-05,
+        "upstream_inference_completions_cost": 6.432e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 9.74
+     },
+     "raw": "```json\n{\n  \"title\": \"Scholarship Application Overview\",\n  \"subtitle\": \"A summary of applications received across various categories and locations.\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Applications\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM scholarship_applicants;\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Applications by Category\",\n      \"sql\": \"SELECT \\\"Category\\\", COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC;\",\n      \"x\": \"Category\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"line\",\n      \"title\": \"Monthly Application Trend\",\n      \"sql\": \"SELECT strftime('%Y-%m', \\\"DOB\\\") AS month, COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 1;\",\n      \"x\": \"month\",\n      \"y\": [\"count\"],\n      \"series\": \"applications\"\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Districts\",\n      \"sql\": \"SELECT \\\"District\\\", COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC LIMIT 10;\",\n      \"columns\": [\"District\", \"count\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"bar\",\n      \"title\": \"Application Status\",\n      \"sql\": \"SELECT \\\"Status\\\", COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 ASC;\",\n      \"x\": \"Status\",\n      \"y\": [\"count\"]\n    }\n  ],\n  \"narrative\": \"This report provides a snapshot of the recent scholarship applications.  The total number of applications received is {{p1}}.  {{p2.count}} applications were submitted across different categories, with {{p2.y[0]}} being the most common.  The application trend over the months shows {{p3.y[0]}}.  {{p4.title}} shows the districts with the highest number of applications.  The distribution of application statuses is as follows: {{p5.title}}\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p3: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420405-tMh9gkYnlWgWmJaTpdEv",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1322,
+       "completion_tokens": 424,
+       "total_tokens": 1746,
+       "cost": 0.0001302,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0001302,
+        "upstream_inference_prompt_cost": 7.932e-05,
+        "upstream_inference_completions_cost": 5.088e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 7.023
+     },
+     "raw": "```json\n{\n  \"title\": \"Scholarship Application Summary\",\n  \"subtitle\": \"An overview of scholarship applications across different categories and locations.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total Applications\", \"sql\": \"SELECT COUNT(*) AS n FROM scholarship_applicants\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Applications by Category\", \"sql\": \"SELECT \\\"Category\\\", COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Category\", \"y\": [\"count\"]},\n    {\"id\": \"p3\", \"kind\": \"line\", \"title\": \"Monthly Application Trend\", \"sql\": \"SELECT strftime('%Y-%m', \\\"DOB\\\") AS month, COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"count\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Top 10 Districts\", \"sql\": \"SELECT \\\"District\\\", COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"},\n    {\"id\": \"p5\", \"kind\": \"bar\", \"title\": \"Applications by Scheme\", \"sql\": \"SELECT \\\"Name of scheme\\\", COUNT(*) AS count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Name of scheme\", \"y\": [\"count\"]}\n  ],\n  \"narrative\": \"This report provides a summary of scholarship applications. The total number of applications is {{p1}}.  {{p2}} shows the distribution of applications across different categories. The {{p3}} chart illustrates the trend in applications over the months.  {{p4}} highlights the districts with the highest number of applications. {{p5}} details the number of applications for each scholarship scheme.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p3: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 5,
+   "panels_ok": 4,
+   "panel_problems": [
+    "p3: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "line",
+    "table",
+    "bar"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [
+    "p3"
+   ],
+   "duration_seconds": 16.76,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/scholarship-report.html",
+   "wall_seconds": 16.78
+  },
+  {
+   "id": "scholarship-website",
+   "dataset": "scholarship",
+   "mode": "dashboard",
+   "request": "make a website page showing the scholarship scheme progress district wise with pending cases",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420412-40MFRUZIfkWwLnwOd3Wy",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1210,
+       "completion_tokens": 353,
+       "total_tokens": 1563,
+       "cost": 0.00011496,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00011496,
+        "upstream_inference_prompt_cost": 7.26e-05,
+        "upstream_inference_completions_cost": 4.236e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 5.756
+     },
+     "raw": "```json\n{\n  \"title\": \"Scholarship Scheme Progress by District\",\n  \"subtitle\": \"An overview of pending scholarship applications across different districts.\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Applications\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM scholarship_applicants\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Pending Applications by District\",\n      \"sql\": \"SELECT District, COUNT(*) AS pending_count FROM scholarship_applicants WHERE Status = 'Pending' GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"pending_count\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Districts with Most Applications\",\n      \"sql\": \"SELECT District, COUNT(*) AS application_count FROM scholarship_applicants GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"District\",\n      \"y\": [\"application_count\"]\n    }\n  ],\n  \"narrative\": \"This page provides a snapshot of scholarship application progress across various districts. The total number of applications received is {{p1}}.  {{p2}} shows the number of pending applications in each district, highlighting areas requiring attention.  {{p3}} details the districts with the highest volume of applications, offering insights into demand.\"\n}\n```",
+     "problems": [],
+     "panel_problems": []
+    }
+   ],
+   "repair_used": false,
+   "plan_valid": true,
+   "panels_total": 3,
+   "panels_ok": 3,
+   "panel_problems": [],
+   "kinds": [
+    "kpi",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 5.76,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/scholarship-website.html",
+   "wall_seconds": 5.76
+  },
+  {
+   "id": "fitness-dashboard",
+   "dataset": "fitness",
+   "mode": "dashboard",
+   "request": "dashboard showing how the kids improved from baseline to endline, by location and coach",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420418-NLTJqfYwtZ1WwebyCZGC",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2945,
+       "completion_tokens": 558,
+       "total_tokens": 3503,
+       "cost": 0.00024366,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00024366,
+        "upstream_inference_prompt_cost": 0.0001767,
+        "upstream_inference_completions_cost": 6.696e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 10.295
+     },
+     "raw": "```json\n{\n  \"title\": \"Child Development Progress\",\n  \"subtitle\": \"Comparing baseline and endline data by location and coach.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total children\", \"sql\": \"SELECT COUNT(*) AS n FROM baseline\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Average score by location - Baseline\", \"sql\": \"SELECT Location, AVG(Shuttle run sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Location\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p3\", \"kind\": \"bar\", \"title\": \"Average score by location - Endline\", \"sql\": \"SELECT Location, AVG(Shuttle run sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Location\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p4\", \"kind\": \"line\", \"title\": \"Average Shuttle Run Time Trend\", \"sql\": \"SELECT strftime('%Y-%m', DOB) AS month, AVG(Shuttle run sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p5\", \"kind\": \"table\", \"title\": \"Top 10 Children by Shuttle Run Improvement\", \"sql\": \"SELECT b.\\\"Child name\\\" AS child_name, b.Shuttle run sec AS baseline_shuttle_run, e.Shuttle run sec AS endline_shuttle_run, (e.Shuttle run sec - b.Shuttle run sec) AS shuttle_run_improvement FROM baseline b JOIN endline e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\" ORDER BY shuttle_run_improvement DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"This page compares the progress of children between the baseline and endline assessments. The first panel shows the total number of children in the baseline survey. Panels 2 and 3 display the average shuttle run time for each location in both the baseline and endline assessments, respectively. Panel 4 shows the trend of average shuttle run time over time. Panel 5 lists the top 10 children with the greatest improvement in shuttle run time. The data is aggregated and presented to highlight key trends and individual improvements.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Location, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 2 DESC",
+      "p3: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Location, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 2 DESC",
+      "p4: ParseError: Expecting ). Line 1, Col: 55.\n  SELECT strftime('%Y-%m', DOB) AS month, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 1",
+      "p5: ParseError: Invalid expression / Unexpected token. Line 1, Col: 54.\n  SELECT b.\"Child name\" AS child_name, b.Shuttle run \u001b[4msec\u001b[0m AS baseline_shuttle_run, e.Shuttle run sec AS endline_shuttle_run, (e.Shuttle run sec - b.Shuttle r"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420428-c75SRSvvnEW4JHUJO9VQ",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3250,
+       "completion_tokens": 665,
+       "total_tokens": 3915,
+       "cost": 0.0002748,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0002748,
+        "upstream_inference_prompt_cost": 0.000195,
+        "upstream_inference_completions_cost": 7.98e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 12.555
+     },
+     "raw": "```json\n{\n  \"title\": \"Shuttle Run Improvement\",\n  \"subtitle\": \"Average shuttle run time comparison between baseline and endline\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total children\", \"sql\": \"SELECT COUNT(*) AS n FROM baseline\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Average shuttle run time by location (baseline)\", \"sql\": \"SELECT Location, AVG(Shuttle run sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Location\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p3\", \"kind\": \"bar\", \"title\": \"Average shuttle run time by location (endline)\", \"sql\": \"SELECT Location, AVG(Shuttle run sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Location\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p4\", \"kind\": \"line\", \"title\": \"Monthly trend in shuttle run time (baseline)\", \"sql\": \"SELECT strftime('%Y-%m', DOB) AS month, AVG(Shuttle run sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p5\", \"kind\": \"line\", \"title\": \"Monthly trend in shuttle run time (endline)\", \"sql\": \"SELECT strftime('%Y-%m', DOB) AS month, AVG(Shuttle run sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p6\", \"kind\": \"table\", \"title\": \"Top 10 children with greatest improvement\", \"sql\": \"SELECT b.\\\"Child name\\\", b.Shuttle run sec AS baseline_shuttle_run, e.Shuttle run sec AS endline_shuttle_run FROM baseline b JOIN endline e ON b.\\\"Child ID\\\" = e.\\\"Child ID\\\" WHERE b.Shuttle run sec IS NOT NULL AND e.Shuttle run sec IS NOT NULL ORDER BY (e.Shuttle run sec - b.Shuttle run sec) DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"The dashboard shows the average shuttle run time for each location, comparing baseline and endline data.  {{p1}} children were included in the analysis. The bar charts in panels {{p2}} and {{p3}} highlight the differences in average shuttle run times between the two time periods for each location. Panels {{p4}} and {{p5}} show the monthly trends in shuttle run times for both baseline and endline data. Panel {{p6}} lists the top 10 children who showed the greatest improvement in shuttle run time.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Location, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 2 DESC",
+      "p3: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Location, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 2 DESC",
+      "p4: ParseError: Expecting ). Line 1, Col: 55.\n  SELECT strftime('%Y-%m', DOB) AS month, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 1",
+      "p5: ParseError: Expecting ). Line 1, Col: 55.\n  SELECT strftime('%Y-%m', DOB) AS month, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 1",
+      "p6: ParseError: Invalid expression / Unexpected token. Line 1, Col: 40.\n  SELECT b.\"Child name\", b.Shuttle run \u001b[4msec\u001b[0m AS baseline_shuttle_run, e.Shuttle run sec AS endline_shuttle_run FROM baseline b JOIN endline e ON"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 6,
+   "panels_ok": 1,
+   "panel_problems": [
+    "p2: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Location, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 2 DESC",
+    "p3: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Location, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 2 DESC",
+    "p4: ParseError: Expecting ). Line 1, Col: 55.\n  SELECT strftime('%Y-%m', DOB) AS month, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 1",
+    "p5: ParseError: Expecting ). Line 1, Col: 55.\n  SELECT strftime('%Y-%m', DOB) AS month, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 1",
+    "p6: ParseError: Invalid expression / Unexpected token. Line 1, Col: 40.\n  SELECT b.\"Child name\", b.Shuttle run \u001b[4msec\u001b[0m AS baseline_shuttle_run, e.Shuttle run sec AS endline_shuttle_run FROM baseline b JOIN endline e ON"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "bar",
+    "line",
+    "line",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [
+    "p2",
+    "p3",
+    "p4",
+    "p5",
+    "p6"
+   ],
+   "duration_seconds": 22.85,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/fitness-dashboard.html",
+   "wall_seconds": 22.86
+  },
+  {
+   "id": "fitness-report",
+   "dataset": "fitness",
+   "mode": "report",
+   "request": "write me a summary of the fitness programme results for the donor",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420441-aCXMYTaoe0jpq8H4OcbL",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2941,
+       "completion_tokens": 396,
+       "total_tokens": 3337,
+       "cost": 0.00022398,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00022398,
+        "upstream_inference_prompt_cost": 0.00017646,
+        "upstream_inference_completions_cost": 4.752e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 7.472
+     },
+     "raw": "```json\n{\n  \"title\": \"Fitness Programme Results\",\n  \"subtitle\": \"An overview of the programme's impact.\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total children\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM baseline\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Average score by site\",\n      \"sql\": \"SELECT site, AVG(score) AS avg_score FROM endline GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"site\",\n      \"y\": [\"avg_score\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"line\",\n      \"title\": \"Monthly trend\",\n      \"sql\": \"SELECT month, SUM(amount) AS total FROM endline GROUP BY 1 ORDER BY 1\",\n      \"x\": \"month\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Participants\",\n      \"sql\": \"SELECT Child ID, Child name, Age, Shuttle run sec, Sit ups FROM endline ORDER BY Shuttle run sec DESC LIMIT 10\"\n    }\n  ],\n  \"narrative\": \"The programme has engaged {{p1}} children.  The average score across different sites varies, with {{p2.1}} being the highest.  The overall trend in activity levels shows {{p3.1}} over the reporting period.  Here's a look at the top performers: {{p4.1}}\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: BinderException: Binder Error: Referenced column \"site\" not found in FROM clause!\nCandidate bindings: \"Notes\", \"Sit ups\", \"Height cm\", \"Weight kg\", \"Shuttle run sec\"\n\nLINE 1: SELECT site, AVG(score) AS avg_score FROM endline GROUP BY 1 ORDER...\n               ^",
+      "p3: BinderException: Binder Error: Referenced column \"month\" not found in FROM clause!\nCandidate bindings: \"Coach\", \"Notes\", \"Location\", \"Parent contact\"\n\nLINE 1: SELECT month, SUM(amount) AS total FROM endline GROUP BY 1 ORDER...\n               ^",
+      "p4: ParseError: Invalid expression / Unexpected token. Line 1, Col: 49.\n  SELECT Child ID, Child name, Age, Shuttle run \u001b[4msec\u001b[0m, Sit ups FROM endline ORDER BY Shuttle run sec DESC LIMIT 10"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420448-0kPfDwO5dTIcJrslmSD2",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3178,
+       "completion_tokens": 362,
+       "total_tokens": 3540,
+       "cost": 0.00023412,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00023412,
+        "upstream_inference_prompt_cost": 0.00019068,
+        "upstream_inference_completions_cost": 4.344e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 5.639
+     },
+     "raw": "```json\n{\n  \"title\": \"Fitness Programme Results\",\n  \"subtitle\": \"An overview of the programme's impact.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total children\", \"sql\": \"SELECT COUNT(*) AS n FROM endline\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Average score by location\", \"sql\": \"SELECT Location, AVG(Shuttle run sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Location\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p3\", \"kind\": \"line\", \"title\": \"Monthly trend\", \"sql\": \"SELECT strftime('%Y-%m', DOB) AS month, SUM(Shuttle run sec) AS total FROM endline GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"total\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Top 10 fastest shuttle run times\", \"sql\": \"SELECT Child name, Shuttle run sec FROM endline ORDER BY Shuttle run sec ASC LIMIT 10\"}\n  ],\n  \"narrative\": \"The programme has reached {{p1}} children. The average shuttle run time varies across locations, with the fastest times observed in {{p4.Child name}}.  The trend in average shuttle run time over the months is shown in {{p3.month}}.  Overall, the programme appears to be having a positive impact on the children's fitness.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Location, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 2 DESC",
+      "p3: ParseError: Expecting ). Line 1, Col: 55.\n  SELECT strftime('%Y-%m', DOB) AS month, SUM(Shuttle \u001b[4mrun\u001b[0m sec) AS total FROM endline GROUP BY 1 ORDER BY 1",
+      "p4: ParseError: Invalid expression / Unexpected token. Line 1, Col: 34.\n  SELECT Child name, Shuttle run \u001b[4msec\u001b[0m FROM endline ORDER BY Shuttle run sec ASC LIMIT 10"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 4,
+   "panels_ok": 1,
+   "panel_problems": [
+    "p2: ParseError: Expecting ). Line 1, Col: 32.\n  SELECT Location, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM endline GROUP BY 1 ORDER BY 2 DESC",
+    "p3: ParseError: Expecting ). Line 1, Col: 55.\n  SELECT strftime('%Y-%m', DOB) AS month, SUM(Shuttle \u001b[4mrun\u001b[0m sec) AS total FROM endline GROUP BY 1 ORDER BY 1",
+    "p4: ParseError: Invalid expression / Unexpected token. Line 1, Col: 34.\n  SELECT Child name, Shuttle run \u001b[4msec\u001b[0m FROM endline ORDER BY Shuttle run sec ASC LIMIT 10"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "line",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [
+    "p4.Child name",
+    "p3.month"
+   ],
+   "duration_seconds": 13.11,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/fitness-report.html",
+   "wall_seconds": 13.11
+  },
+  {
+   "id": "fitness-gender",
+   "dataset": "fitness",
+   "mode": "dashboard",
+   "request": "are girls and boys improving equally? show me",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420454-M66g9qs5YX5JuzqNpsTv",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2938,
+       "completion_tokens": 399,
+       "total_tokens": 3337,
+       "cost": 0.00022416,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00022416,
+        "upstream_inference_prompt_cost": 0.00017628,
+        "upstream_inference_completions_cost": 4.788e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 8.214
+     },
+     "raw": "```json\n{\n  \"title\": \"Child Development Progress\",\n  \"subtitle\": \"A snapshot of progress across the program.\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total children\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM baseline\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Average score by site\",\n      \"sql\": \"SELECT site, AVG(score) AS avg_score FROM baseline GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"site\",\n      \"y\": [\"avg_score\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"line\",\n      \"title\": \"Monthly trend\",\n      \"sql\": \"SELECT month, SUM(amount) AS total FROM baseline GROUP BY 1 ORDER BY 1\",\n      \"x\": \"month\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 children by shuttle run\",\n      \"sql\": \"SELECT \\\"Child name\\\", \\\"Shuttle run sec\\\" FROM baseline ORDER BY 2 LIMIT 10\"\n    }\n  ],\n  \"narrative\": \"The program aims to foster holistic development in all participants.  {{p1}} children are currently enrolled.  The average score varies by site, with {{p2.0}} being the highest.  Overall progress is tracked monthly, as shown in {{p3.0}}.  Here's a look at the top performers in shuttle run: {{p4.0}}\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: BinderException: Binder Error: Referenced column \"site\" not found in FROM clause!\nCandidate bindings: \"Notes\", \"Sit ups\", \"Height cm\", \"Weight kg\", \"Shuttle run sec\"\n\nLINE 1: SELECT site, AVG(score) AS avg_score FROM baseline GROUP BY 1 ORDER...\n               ^",
+      "p3: BinderException: Binder Error: Referenced column \"month\" not found in FROM clause!\nCandidate bindings: \"Coach\", \"Notes\", \"Location\", \"Parent contact\"\n\nLINE 1: SELECT month, SUM(amount) AS total FROM baseline GROUP BY 1 ORDER...\n               ^"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420462-kdw4WbGPKF1xtYKXupQs",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 3113,
+       "completion_tokens": 345,
+       "total_tokens": 3458,
+       "cost": 0.00022818,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00022818,
+        "upstream_inference_prompt_cost": 0.00018678,
+        "upstream_inference_completions_cost": 4.14e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 5.939
+     },
+     "raw": "```json\n{\n  \"title\": \"Child Progress\",\n  \"subtitle\": \"Comparing progress between genders\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total children\", \"sql\": \"SELECT COUNT(*) AS n FROM baseline\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Average shuttle run time by gender\", \"sql\": \"SELECT Gender, AVG(Shuttle run sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Gender\", \"y\": [\"avg_shuttle_run\"]},\n    {\"id\": \"p3\", \"kind\": \"bar\", \"title\": \"Average sit ups by gender\", \"sql\": \"SELECT Gender, AVG(Sit ups) AS avg_sit_ups FROM baseline GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Gender\", \"y\": [\"avg_sit_ups\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Gender demographics\", \"sql\": \"SELECT Gender, COUNT(*) AS count FROM baseline GROUP BY 1\"}\n  ],\n  \"narrative\": \"This page compares the progress of boys and girls. The first panel shows the total number of children. The second panel displays the average shuttle run time for each gender, allowing for a comparison of cardiovascular fitness. The third panel shows the average number of sit-ups for each gender, indicating strength. The fourth panel provides a breakdown of the number of children by gender.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Expecting ). Line 1, Col: 30.\n  SELECT Gender, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 2 DESC",
+      "p3: ParseError: Expecting ). Line 1, Col: 26.\n  SELECT Gender, AVG(Sit \u001b[4mups\u001b[0m) AS avg_sit_ups FROM baseline GROUP BY 1 ORDER BY 2 DESC"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 4,
+   "panels_ok": 2,
+   "panel_problems": [
+    "p2: ParseError: Expecting ). Line 1, Col: 30.\n  SELECT Gender, AVG(Shuttle \u001b[4mrun\u001b[0m sec) AS avg_shuttle_run FROM baseline GROUP BY 1 ORDER BY 2 DESC",
+    "p3: ParseError: Expecting ). Line 1, Col: 26.\n  SELECT Gender, AVG(Sit \u001b[4mups\u001b[0m) AS avg_sit_ups FROM baseline GROUP BY 1 ORDER BY 2 DESC"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 14.15,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/fitness-gender.html",
+   "wall_seconds": 14.16
+  },
+  {
+   "id": "donors-dashboard",
+   "dataset": "donors",
+   "mode": "dashboard",
+   "request": "donation dashboard - monthly trend, top cities, payment modes, repeat donors",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420468-9bc6qoW9REXSaqFHgUKK",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 773,
+       "completion_tokens": 431,
+       "total_tokens": 1204,
+       "cost": 9.81e-05,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 9.81e-05,
+        "upstream_inference_prompt_cost": 4.638e-05,
+        "upstream_inference_completions_cost": 5.172e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 7.508
+     },
+     "raw": "```json\n{\n  \"title\": \"Donation Dashboard\",\n  \"subtitle\": \"An overview of donation activity.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total Donations\", \"sql\": \"SELECT sum(amount) AS total FROM donor_transactions\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Donations by City\", \"sql\": \"SELECT City, sum(amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC LIMIT 10\", \"x\": \"City\", \"y\": [\"total\"]},\n    {\"id\": \"p3\", \"kind\": \"line\", \"title\": \"Monthly Donation Trend\", \"sql\": \"SELECT strftime('%Y-%m', Date) AS month, sum(amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"total\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Top 10 Donors\", \"sql\": \"SELECT Donor, sum(amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"},\n    {\"id\": \"p5\", \"kind\": \"bar\", \"title\": \"Payment Mode Distribution\", \"sql\": \"SELECT Mode, sum(amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Mode\", \"y\": [\"total\"]}\n  ],\n  \"narrative\": \"This dashboard provides a snapshot of donation activity. The monthly trend shows donation amounts over time, helping to identify patterns and seasonality.  {{p1.total}} represents the total amount donated.  {{p2.total}} shows the top cities contributing to donations.  {{p5.total}} illustrates the distribution of payment methods used for donations.  The top donors are listed in panel {{p4}}.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p3: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420476-kD7BA9w1j6DIq70eahhV",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 886,
+       "completion_tokens": 356,
+       "total_tokens": 1242,
+       "cost": 9.588e-05,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 9.588e-05,
+        "upstream_inference_prompt_cost": 5.316e-05,
+        "upstream_inference_completions_cost": 4.272e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 6.789
+     },
+     "raw": "```json\n{\n  \"title\": \"Donation Dashboard\",\n  \"subtitle\": \"An overview of donation trends and donor activity.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total Donations\", \"sql\": \"SELECT sum(amount) AS total FROM donor_transactions\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"line\", \"title\": \"Monthly Donations Trend\", \"sql\": \"SELECT strftime('%Y-%m', Date) AS month, sum(amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"total\"]},\n    {\"id\": \"p3\", \"kind\": \"bar\", \"title\": \"Donations by Payment Mode\", \"sql\": \"SELECT Mode, sum(amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"Mode\", \"y\": [\"total\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Top 10 Donors\", \"sql\": \"SELECT Donor, sum(amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"This dashboard provides a snapshot of donation activity. The monthly trend shows donation amounts over time, helping to identify patterns and seasonality.  {{p1}} represents the total amount donated.  {{p3}} breaks down donations by payment mode, highlighting the most popular methods. {{p4}} lists the top 10 donors based on total contributions.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 5,
+   "panels_ok": 4,
+   "panel_problems": [
+    "p3: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "line",
+    "table",
+    "bar"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 14.3,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/donors-dashboard.html",
+   "wall_seconds": 14.31
+  },
+  {
+   "id": "donors-report",
+   "dataset": "donors",
+   "mode": "report",
+   "request": "summarise our donations this year in a page I can paste into the annual report",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420483-ICxa7IIeWcpqyRdEoRJH",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 775,
+       "completion_tokens": 391,
+       "total_tokens": 1166,
+       "cost": 9.342e-05,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 9.342e-05,
+        "upstream_inference_prompt_cost": 4.65e-05,
+        "upstream_inference_completions_cost": 4.692e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 7.453
+     },
+     "raw": "```json\n{\n  \"title\": \"Donation Summary\",\n  \"subtitle\": \"An overview of donation activity for the year.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total Donations\", \"sql\": \"SELECT sum(amount) AS total FROM donor_transactions WHERE Date LIKE '%this year%'\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Donations by City\", \"sql\": \"SELECT City, sum(amount) AS total FROM donor_transactions WHERE Date LIKE '%this year%' GROUP BY 1 ORDER BY 2 DESC LIMIT 10\", \"x\": \"City\", \"y\": [\"total\"]},\n    {\"id\": \"p3\", \"kind\": \"line\", \"title\": \"Monthly Donation Trend\", \"sql\": \"SELECT strftime('%m', Date) AS month, sum(amount) AS total FROM donor_transactions WHERE Date LIKE '%this year%' GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"total\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Top Donors\", \"sql\": \"SELECT Donor, sum(amount) AS total FROM donor_transactions WHERE Date LIKE '%this year%' GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"This page summarizes donation activity for the current year.  The total amount donated is {{p1}}.  Donations are distributed across various cities, with {{p2.City[0]}} receiving the highest amount.  A line chart shows the monthly trend in donations, indicating periods of higher and lower activity.  The top {{p4.title}} are listed, highlighting key contributors.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p1: kpi needs one row with a number",
+      "p2: empty",
+      "p3: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr",
+      "p4: empty"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420490-oxwsFAkdzYZQJjG1lXsO",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 910,
+       "completion_tokens": 399,
+       "total_tokens": 1309,
+       "cost": 0.00010248,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00010248,
+        "upstream_inference_prompt_cost": 5.46e-05,
+        "upstream_inference_completions_cost": 4.788e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 7.298
+     },
+     "raw": "```json\n{\n  \"title\": \"Donation Summary\",\n  \"subtitle\": \"An overview of donation activity for the year.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total Donations\", \"sql\": \"SELECT sum(amount) AS total FROM donor_transactions WHERE Date >= strftime('%Y-01-01', 'now')\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Donations by City\", \"sql\": \"SELECT City, sum(amount) AS total FROM donor_transactions WHERE Date >= strftime('%Y-01-01', 'now') GROUP BY 1 ORDER BY 2 DESC\"},\n    {\"id\": \"p3\", \"kind\": \"line\", \"title\": \"Monthly Donations\", \"sql\": \"SELECT strftime('%Y-%m', Date) AS month, sum(amount) AS total FROM donor_transactions WHERE Date >= strftime('%Y-01-01', 'now') GROUP BY 1 ORDER BY 1\"},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Top Donors\", \"sql\": \"SELECT Donor, sum(amount) AS total FROM donor_transactions WHERE Date >= strftime('%Y-01-01', 'now') GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"This page provides a summary of donation activity for the current year.  {{p1.total}} represents the total amount donated.  Donations are distributed across various cities, with {{p2.total}} being the highest.  The monthly trend shows {{p3.total}} in each month. The top {{p4.limit}} donors are listed, contributing to the overall success.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p1: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, STRING_LITERAL)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCH",
+      "p2: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, STRING_LITERAL)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCH",
+      "p3: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, STRING_LITERAL)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCH",
+      "p4: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, STRING_LITERAL)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCH"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 4,
+   "panels_ok": 0,
+   "panel_problems": [
+    "p1: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, STRING_LITERAL)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCH",
+    "p2: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, STRING_LITERAL)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCH",
+    "p3: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, STRING_LITERAL)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCH",
+    "p4: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, STRING_LITERAL)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCH"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "line",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [
+    "p1.total",
+    "p2.total",
+    "p3.total",
+    "p4.limit"
+   ],
+   "duration_seconds": 14.75,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/donors-report.html",
+   "wall_seconds": 14.76
+  },
+  {
+   "id": "household-dashboard",
+   "dataset": "household",
+   "mode": "dashboard",
+   "request": "build a dashboard of the household survey - coverage by village and by enumerator, submissions over time",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420497-r3DW2Q9c5UhiHaXcsbEV",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 1930,
+       "completion_tokens": 541,
+       "total_tokens": 2471,
+       "cost": 0.00018072,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00018072,
+        "upstream_inference_prompt_cost": 0.0001158,
+        "upstream_inference_completions_cost": 6.492e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 8.859
+     },
+     "raw": "```json\n{\n  \"title\": \"Household Survey Overview\",\n  \"subtitle\": \"Coverage and Submission Trends\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Surveys\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM \\\"household_survey\\\"\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Surveys by Enumerator\",\n      \"sql\": \"SELECT enumerator_name, COUNT(*) AS count FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"enumerator_name\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Surveys by Village\",\n      \"sql\": \"SELECT village, COUNT(*) AS count FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"x\": \"village\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"line\",\n      \"title\": \"Monthly Submission Trend\",\n      \"sql\": \"SELECT strftime('%Y-%m', _submission_time) AS month, COUNT(*) AS count FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 1\",\n      \"x\": \"month\",\n      \"y\": [\"count\"],\n      \"series\": [\"count\"]\n    },\n    {\n      \"id\": \"p5\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 Responses to Q02\",\n      \"sql\": \"SELECT q02, COUNT(*) AS count FROM \\\"household_survey\\\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"columns\": [\"q02\", \"count\"]\n    }\n  ],\n  \"narrative\": \"The dashboard provides an overview of the household survey data.  {{p1}} total surveys have been completed.  {{p2}} surveys have been collected by Arjun Krishnan.  {{p3}} surveys have been collected in the village of Alandi.  The monthly submission trend shows {{p4}}. The most common responses to question {{q02}} are listed in {{p5}}.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p4: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420506-kTqhZVoXWmUQTKHuXv69",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2043,
+       "completion_tokens": 450,
+       "total_tokens": 2493,
+       "cost": 0.00017658,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00017658,
+        "upstream_inference_prompt_cost": 0.00012258,
+        "upstream_inference_completions_cost": 5.4e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 7.876
+     },
+     "raw": "```json\n{\n  \"title\": \"Household Survey Overview\",\n  \"subtitle\": \"Coverage and Submission Trends\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total households surveyed\", \"sql\": \"SELECT COUNT(*) AS n FROM household_survey\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Households by Enumerator\", \"sql\": \"SELECT enumerator_name, COUNT(*) AS count FROM household_survey GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"enumerator_name\", \"y\": [\"count\"]},\n    {\"id\": \"p3\", \"kind\": \"bar\", \"title\": \"Households by Village\", \"sql\": \"SELECT village, COUNT(*) AS count FROM household_survey GROUP BY 1 ORDER BY 2 DESC LIMIT 20\", \"x\": \"village\", \"y\": [\"count\"]},\n    {\"id\": \"p4\", \"kind\": \"line\", \"title\": \"Monthly Submission Trend\", \"sql\": \"SELECT strftime('%Y-%m', _submission_time) AS month, COUNT(*) AS count FROM household_survey GROUP BY 1 ORDER BY 1\", \"x\": \"month\", \"y\": [\"count\"]},\n    {\"id\": \"p5\", \"kind\": \"table\", \"title\": \"Top 10 Responses to Q02\", \"sql\": \"SELECT q02, COUNT(*) AS count FROM household_survey GROUP BY 1 ORDER BY 2 DESC LIMIT 10\", \"columns\": [\"q02\", \"count\"]}\n  ],\n  \"narrative\": \"This dashboard provides an overview of the household survey data. Panel {{p1}} shows the total number of households surveyed. Panel {{p2}} displays the number of households covered by each enumerator. Panel {{p3}} shows the distribution of surveyed households across different villages. Panel {{p4}} illustrates the trend in survey submissions over time. Panel {{p5}} highlights the most frequent responses to question Q02.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p4: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 5,
+   "panels_ok": 4,
+   "panel_problems": [
+    "p4: BinderException: Binder Error: Could not choose a best candidate function for the function call \"strftime(STRING_LITERAL, VARCHAR)\". In order to select one, please add explicit type casts.\n\tCandidate functions:\n\tstrftime(TIMESTAMP, VARCHAR) -> VARCHAR\n\tstrftime(TIMESTAMP_NS, VARCHAR) -> VARCHAR\n\tstr"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "bar",
+    "line",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [
+    "p4"
+   ],
+   "duration_seconds": 16.73,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/household-dashboard.html",
+   "wall_seconds": 16.75
+  },
+  {
+   "id": "holdout-schools",
+   "dataset": "holdout",
+   "mode": "dashboard",
+   "request": "build me a school dashboard - enrolment trend over years, infrastructure gaps, girls vs boys",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420514-EnaJdRGeEhdt4p43CHjt",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2158,
+       "completion_tokens": 859,
+       "total_tokens": 3017,
+       "cost": 0.00023256,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00023256,
+        "upstream_inference_prompt_cost": 0.00012948,
+        "upstream_inference_completions_cost": 0.00010308
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 14.323
+     },
+     "raw": "```json\n{\n  \"title\": \"School Education Dashboard\",\n  \"subtitle\": \"Tracking school enrolment and infrastructure across different school types.\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"line\",\n      \"title\": \"School Enrolment Trend\",\n      \"sql\": \"SELECT School Name, DATE(Inspected On) AS Inspection Date, SUM(Girls 2022) AS Girls_2022, SUM(Girls 2023) AS Girls_2023, SUM(Girls 2024) AS Girls_2024, SUM(Boys 2022) AS Boys_2022, SUM(Boys 2023) AS Boys_2023, SUM(Boys 2024) AS Boys_2024 FROM school_enrolment_by_year GROUP BY 1, 2 ORDER BY 2\",\n      \"x\": \"Inspection Date\",\n      \"y\": [\n        \"Girls_2022\",\n        \"Girls_2023\",\n        \"Girls_2024\",\n        \"Boys_2022\",\n        \"Boys_2023\",\n        \"Boys_2024\"\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Infrastructure Gaps - Girls vs Boys\",\n      \"sql\": \"SELECT School Name, 'Girls' AS Gender, SUM(Toilets functional (girls)) AS Toilets_functional_girls, SUM(Drinking water) AS Drinking_water_girls, SUM(Electricity) AS Electricity_girls FROM school_infrastructure WHERE Toilets functional (girls) = 'No' OR Drinking water = 'No' OR Electricity = 'No' UNION ALL SELECT School Name, 'Boys' AS Gender, SUM(Toilets functional (girls)) AS Toilets_functional_boys, SUM(Drinking water) AS Drinking_water_boys, SUM(Electricity) AS Electricity_boys FROM school_infrastructure WHERE Toilets functional (girls) = 'No' OR Drinking water = 'No' OR Electricity = 'No' GROUP BY 1\",\n      \"x\": \"School Name\",\n      \"y\": [\n        \"Toilets_functional_girls\",\n        \"Drinking_water_girls\",\n        \"Electricity_girls\",\n        \"Toilets_functional_boys\",\n        \"Drinking_water_boys\",\n        \"Electricity_boys\"\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"table\",\n      \"title\": \"School Infrastructure Details\",\n      \"sql\": \"SELECT School Name, 'Toilets functional (girls)' AS Toilet, SUM(Toilets functional (girls)) AS count UNION ALL SELECT School Name, 'Drinking water' AS Water, SUM(Drinking water) AS count UNION ALL SELECT School Name, 'Electricity' AS Elec, SUM(Electricity) AS count FROM school_infrastructure\",\n      \"x\": \"School Name\",\n      \"y\": [\n        \"Toilet\",\n        \"Water\",\n        \"Elec\"\n      ]\n    }\n  ],\n  \"narrative\": \"The school enrolment trend shows the number of students enrolled in different school types over the years. {{p1.Girls_2022}} girls were enrolled in {{p1.Girls_2023}} and {{p1.Girls_2024}}.  Infrastructure gaps are evident in several schools, particularly concerning toilet facilities and access to drinking water.  {{p2.Toilets_functional_girls}} girls lack access to functional toilets.  {{p2.Drinking_water_girls}} girls do not have access to drinking water.  {{p2.Electricity_girls}} schools lack electricity.  A detailed breakdown of infrastructure status for each school can be found in the table.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p1: ParseError: Expecting ). Line 1, Col: 37.\n  SELECT School Name, DATE(Inspected \u001b[4mOn\u001b[0m) AS Inspection Date, SUM(Girls 2022) AS Girls_2022, SUM(Girls 2023) AS Girls_2023, SUM(Girls 2024) ",
+      "p2: ParseError: Expecting ). Line 1, Col: 61.\n  SELECT School Name, 'Girls' AS Gender, SUM(Toilets \u001b[4mfunctional\u001b[0m (girls)) AS Toilets_functional_girls, SUM(Drinking water) AS Drinking_water_girls, SUM(Electricity)",
+      "p3: ParseError: Expecting ). Line 1, Col: 82.\n  SELECT School Name, 'Toilets functional (girls)' AS Toilet, SUM(Toilets \u001b[4mfunctional\u001b[0m (girls)) AS count UNION ALL SELECT School Name, 'Drinking water' AS Water, SUM(Drinking water) AS c"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420529-2MG5WKI7XIZrCBV3sv7n",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2428,
+       "completion_tokens": 726,
+       "total_tokens": 3154,
+       "cost": 0.0002328,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.0002328,
+        "upstream_inference_prompt_cost": 0.00014568,
+        "upstream_inference_completions_cost": 8.712e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 12.261
+     },
+     "raw": "```json\n{\n  \"title\": \"School Infrastructure and Enrolment\",\n  \"subtitle\": \"Tracking school enrolment trends and infrastructure gaps for girls and boys.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"line\", \"title\": \"School Enrolment Trend\", \"sql\": \"SELECT '2022' AS year, SUM(Girls 2022) AS girls_2022 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_enrolment_by_year GROUP BY School Name HAVING COUNT(*) > 0) UNION ALL SELECT '2023' AS year, SUM(Girls 2023) AS girls_2023 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_enrolment_by_year GROUP BY School Name HAVING COUNT(*) > 0) UNION ALL SELECT '2024' AS year, SUM(Girls 2024) AS girls_2024 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_enrolment_by_year GROUP BY School Name HAVING COUNT(*) > 0) ORDER BY 1\", \"x\": \"year\", \"y\": [\"girls_2022\", \"girls_2023\", \"girls_2024\"]},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Infrastructure Gaps\", \"sql\": \"SELECT School Name, 'Toilets functional (girls)' AS infrastructure_item, SUM(CASE WHEN Toilets functional (girls) = 'No' THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2\", \"x\": \"School Name\", \"y\": [\"count\"]},\n    {\"id\": \"p3\", \"kind\": \"bar\", \"title\": \"Infrastructure Gaps - Water & Electricity\", \"sql\": \"SELECT School Name, 'Drinking water' AS infrastructure_item, SUM(CASE WHEN Drinking water = 'No' THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2\", \"x\": \"School Name\", \"y\": [\"count\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Top 10 Schools by Enrolment\", \"sql\": \"SELECT School Name, SUM(Girls 2024) AS total_enrolment FROM school_enrolment_by_year GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"School enrolment has shown a steady increase from 2022 to 2024, with {{p1.girls_2022}} students enrolled in 2022, {{p1.girls_2023}} in 2023, and {{p1.girls_2024}} in 2024.  There are infrastructure gaps in several schools, particularly regarding toilet facilities for girls.  {{p2.count}} schools lack functional toilets for girls.  Similarly, access to drinking water is also a concern for {{p3.count}} schools.  The top 10 schools with the highest enrolment are listed in the table.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p1: ParseError: Expecting ). Line 1, Col: 37.\n  SELECT '2022' AS year, SUM(Girls \u001b[4m2022\u001b[0m) AS girls_2022 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_e",
+      "p2: ParseError: Expected END after CASE. Line 1, Col: 120.\n  me, 'Toilets functional (girls)' AS infrastructure_item, SUM(CASE WHEN Toilets functional (girls) = \u001b[4m'No'\u001b[0m THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2",
+      "p3: ParseError: Expected END after CASE. Line 1, Col: 96.\n  SELECT School Name, 'Drinking water' AS infrastructure_item, SUM(CASE WHEN Drinking water = \u001b[4m'No'\u001b[0m THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2",
+      "p4: ParseError: Expecting ). Line 1, Col: 34.\n  SELECT School Name, SUM(Girls \u001b[4m2024\u001b[0m) AS total_enrolment FROM school_enrolment_by_year GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 4,
+   "panels_ok": 0,
+   "panel_problems": [
+    "p1: ParseError: Expecting ). Line 1, Col: 37.\n  SELECT '2022' AS year, SUM(Girls \u001b[4m2022\u001b[0m) AS girls_2022 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_e",
+    "p2: ParseError: Expected END after CASE. Line 1, Col: 120.\n  me, 'Toilets functional (girls)' AS infrastructure_item, SUM(CASE WHEN Toilets functional (girls) = \u001b[4m'No'\u001b[0m THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2",
+    "p3: ParseError: Expected END after CASE. Line 1, Col: 96.\n  SELECT School Name, 'Drinking water' AS infrastructure_item, SUM(CASE WHEN Drinking water = \u001b[4m'No'\u001b[0m THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2",
+    "p4: ParseError: Expecting ). Line 1, Col: 34.\n  SELECT School Name, SUM(Girls \u001b[4m2024\u001b[0m) AS total_enrolment FROM school_enrolment_by_year GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   ],
+   "kinds": [
+    "line",
+    "bar",
+    "bar",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [
+    "2024,",
+    "2022,",
+    "2023,"
+   ],
+   "lint_unresolved": [
+    "p1.girls_2022",
+    "p1.girls_2023",
+    "p1.girls_2024",
+    "p2.count",
+    "p3.count"
+   ],
+   "duration_seconds": 26.58,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/holdout-schools.html",
+   "wall_seconds": 26.59
+  },
+  {
+   "id": "holdout-shg",
+   "dataset": "holdout",
+   "mode": "report",
+   "request": "report on the SHG loan register - repayment, overdue, purpose of loans",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420541-CKtC2a1vMF5h4eTOW9tS",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2156,
+       "completion_tokens": 428,
+       "total_tokens": 2584,
+       "cost": 0.00018072,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00018072,
+        "upstream_inference_prompt_cost": 0.00012936,
+        "upstream_inference_completions_cost": 5.136e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 6.908
+     },
+     "raw": "```json\n{\n  \"title\": \"SHG Loan Register Overview\",\n  \"subtitle\": \"A summary of loan repayment status and loan purposes.\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total Loans Disbursed\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM shg_loan_register\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Repayment Status Distribution\",\n      \"sql\": \"SELECT 'Closed' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Closed' UNION ALL SELECT 'Overdue' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Overdue' UNION ALL SELECT 'Regular' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Regular'\",\n      \"x\": \"RepaymentStatus\",\n      \"y\": [\"count\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"bar\",\n      \"title\": \"Loan Purpose Distribution\",\n      \"sql\": \"SELECT Purpose, COUNT(*) AS count FROM shg_loan_register\",\n      \"x\": \"Purpose\",\n      \"y\": [\"count\"]\n    }\n  ],\n  \"narrative\": \"The SHG loan register tracks disbursements and repayment statuses.  {{p1}} loans have been disbursed in total.  The distribution of repayment statuses shows that {{p2.count}} loans are closed, {{p2.count}} are overdue, and {{p2.count}} are regular.  The most common loan purpose is {{p3.y[0]}} with {{p3.y[1]}}$. The data is sourced from the Block MIS export.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Invalid expression / Unexpected token. Line 1, Col: 99.\n  SELECT 'Closed' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment \u001b[4mStatus\u001b[0m = 'Closed' UNION ALL SELECT 'Overdue' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register ",
+      "p3: BinderException: Binder Error: column \"Purpose\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(Purpose)\" if the exact value of \"Purpose\" is not important.\n\nLINE 1: SELECT Purpose, COUNT(*) AS count FROM shg_loan_regi"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420548-H14n3IItiAbgMSQsWonp",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2360,
+       "completion_tokens": 427,
+       "total_tokens": 2787,
+       "cost": 0.00019284,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00019284,
+        "upstream_inference_prompt_cost": 0.0001416,
+        "upstream_inference_completions_cost": 5.124e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 16.345
+     },
+     "raw": "```json\n{\n  \"title\": \"SHG Loan Register Overview\",\n  \"subtitle\": \"Details on loan repayment status and purpose.\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total Loans Disbursed\", \"sql\": \"SELECT COUNT(*) AS n FROM shg_loan_register\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Loan Repayment Status\", \"sql\": \"SELECT 'Closed' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Closed' UNION ALL SELECT 'Overdue' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Overdue' UNION ALL SELECT 'Regular' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment Status = 'Regular' ORDER BY 2 DESC LIMIT 10\", \"x\": \"RepaymentStatus\", \"y\": [\"count\"]},\n    {\"id\": \"p3\", \"kind\": \"pie\", \"title\": \"Loan Purpose\", \"sql\": \"SELECT Purpose, COUNT(*) AS count FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC LIMIT 8\", \"x\": \"Purpose\", \"y\": [\"count\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Loan Amount Distribution\", \"sql\": \"SELECT Purpose, AVG(Loan Amount (Rs)) AS avg_amount FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"The SHG loan register tracks disbursements and repayments.  {{p1}} loans have been disbursed. The repayment status distribution is as follows: {{p2}}.  The most common loan purpose is {{p3}}.  The average loan amount for each purpose is detailed in {{p4}}.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Invalid expression / Unexpected token. Line 1, Col: 99.\n  SELECT 'Closed' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment \u001b[4mStatus\u001b[0m = 'Closed' UNION ALL SELECT 'Overdue' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register ",
+      "p4: ParseError: Expecting ). Line 1, Col: 31.\n  SELECT Purpose, AVG(Loan \u001b[4mAmount\u001b[0m (Rs)) AS avg_amount FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 4,
+   "panels_ok": 2,
+   "panel_problems": [
+    "p2: ParseError: Invalid expression / Unexpected token. Line 1, Col: 99.\n  SELECT 'Closed' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register WHERE Repayment \u001b[4mStatus\u001b[0m = 'Closed' UNION ALL SELECT 'Overdue' AS RepaymentStatus, COUNT(*) AS count FROM shg_loan_register ",
+    "p4: ParseError: Expecting ). Line 1, Col: 31.\n  SELECT Purpose, AVG(Loan \u001b[4mAmount\u001b[0m (Rs)) AS avg_amount FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "pie",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [
+    "p2",
+    "p4"
+   ],
+   "duration_seconds": 23.25,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/holdout-shg.html",
+   "wall_seconds": 23.26
+  },
+  {
+   "id": "holdout-health",
+   "dataset": "holdout",
+   "mode": "dashboard",
+   "request": "district health dashboard comparing districts on the key indicators",
+   "attempts": [
+    {
+     "meta": {
+      "id": "gen-1787420564-NtDQTKsJTfmdjHBU39OU",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2150,
+       "completion_tokens": 484,
+       "total_tokens": 2634,
+       "cost": 0.00018708,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00018708,
+        "upstream_inference_prompt_cost": 0.000129,
+        "upstream_inference_completions_cost": 5.808e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 8.253
+     },
+     "raw": "```json\n{\n  \"title\": \"District Health Overview\",\n  \"subtitle\": \"A snapshot of key health indicators across districts.\",\n  \"panels\": [\n    {\n      \"id\": \"p1\",\n      \"kind\": \"kpi\",\n      \"title\": \"Total children\",\n      \"sql\": \"SELECT COUNT(*) AS n FROM district_health_factsheet\",\n      \"unit\": \"\"\n    },\n    {\n      \"id\": \"p2\",\n      \"kind\": \"bar\",\n      \"title\": \"Average score by state\",\n      \"sql\": \"SELECT State, AVG(Children age 12-23 months fully vaccinated (%)) AS avg_score FROM district_health_factsheet GROUP BY 1 ORDER BY 2 DESC\",\n      \"x\": \"State\",\n      \"y\": [\"avg_score\"]\n    },\n    {\n      \"id\": \"p3\",\n      \"kind\": \"line\",\n      \"title\": \"Monthly trend\",\n      \"sql\": \"SELECT Survey Round, AVG(Children age 12-23 months fully vaccinated (%)) AS total FROM district_health_factsheet GROUP BY 1 ORDER BY 1\",\n      \"x\": \"Survey Round\",\n      \"y\": [\"total\"]\n    },\n    {\n      \"id\": \"p4\",\n      \"kind\": \"table\",\n      \"title\": \"Top 10 districts by stunting\",\n      \"sql\": \"SELECT District, AVG(Children under 5 years who are stunted (%)) AS avg_stunting FROM district_health_factsheet GROUP BY 1 ORDER BY 2 DESC LIMIT 10\",\n      \"columns\": [\"District\", \"avg_stunting\"]\n    }\n  ],\n  \"narrative\": \"This page provides an overview of key health indicators across different districts. The data is aggregated to show trends and comparisons.  {{p1}} represents the total number of children. The average vaccination rate across states is shown in the bar chart {{p2}}. The monthly trend in vaccination rates is displayed in the line chart {{p3}}. The table {{p4}} lists the top 10 districts with the highest average stunting rates.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Expecting ). Line 1, Col: 30.\n  SELECT State, AVG(Children \u001b[4mage\u001b[0m 12-23 months fully vaccinated (%)) AS avg_score FROM district_health_factsheet GROUP BY 1 ORDER BY ",
+      "p3: ParseError: Expecting ). Line 1, Col: 37.\n  SELECT Survey Round, AVG(Children \u001b[4mage\u001b[0m 12-23 months fully vaccinated (%)) AS total FROM district_health_factsheet GROUP BY 1 ORDER BY 1",
+      "p4: ParseError: Expecting ). Line 1, Col: 35.\n  SELECT District, AVG(Children \u001b[4munder\u001b[0m 5 years who are stunted (%)) AS avg_stunting FROM district_health_factsheet GROUP BY 1 ORDER BY 2 D"
+     ]
+    },
+    {
+     "meta": {
+      "id": "gen-1787420572-8XAnuitSvSHyTieLL1sL",
+      "model": "google/gemma-3n-e4b-it",
+      "finish_reason": "stop",
+      "usage": {
+       "prompt_tokens": 2381,
+       "completion_tokens": 401,
+       "total_tokens": 2782,
+       "cost": 0.00019098,
+       "is_byok": false,
+       "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+       },
+       "cost_details": {
+        "upstream_inference_cost": 0.00019098,
+        "upstream_inference_prompt_cost": 0.00014286,
+        "upstream_inference_completions_cost": 4.812e-05
+       },
+       "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+       }
+      },
+      "duration_seconds": 14.836
+     },
+     "raw": "```json\n{\n  \"title\": \"District Health Overview\",\n  \"subtitle\": \"Key health indicators across districts\",\n  \"panels\": [\n    {\"id\": \"p1\", \"kind\": \"kpi\", \"title\": \"Total children\", \"sql\": \"SELECT COUNT(*) AS n FROM district_health_factsheet\", \"unit\": \"\"},\n    {\"id\": \"p2\", \"kind\": \"bar\", \"title\": \"Average vaccination rate\", \"sql\": \"SELECT State, AVG({{p1.Children age 12-23 months fully vaccinated (%)}}) AS avg_vaccination FROM district_health_factsheet GROUP BY 1 ORDER BY 2 DESC\", \"x\": \"State\", \"y\": [\"avg_vaccination\"]},\n    {\"id\": \"p3\", \"kind\": \"line\", \"title\": \"Monthly trend of stunting\", \"sql\": \"SELECT Survey Round, AVG({{p1.Children under 5 years who are stunted (%)}}) AS avg_stunting FROM district_health_factsheet GROUP BY 1 ORDER BY 1\", \"x\": \"Survey Round\", \"y\": [\"avg_stunting\"]},\n    {\"id\": \"p4\", \"kind\": \"table\", \"title\": \"Top 10 districts by improved sanitation\", \"sql\": \"SELECT District, AVG({{p1.Households with improved sanitation facility (%)}}) AS avg_sanitation FROM district_health_factsheet GROUP BY 1 ORDER BY 2 DESC LIMIT 10\"}\n  ],\n  \"narrative\": \"This page provides an overview of key health indicators across different districts. The data is aggregated at the state level for vaccination rates. The trend of stunting is shown over time. The table displays the top 10 districts based on the average percentage of households with improved sanitation facilities. All values are placeholders and represent aggregated data.\"\n}\n```",
+     "problems": [],
+     "panel_problems": [
+      "p2: ParseError: Expected }. Line 1, Col: 35.\n  SELECT State, AVG({{p1.Children \u001b[4mage\u001b[0m 12-23 months fully vaccinated (%)}}) AS avg_vaccination FROM district_health_factsheet GROUP BY 1 O",
+      "p3: ParseError: Expected }. Line 1, Col: 44.\n  SELECT Survey Round, AVG({{p1.Children \u001b[4munder\u001b[0m 5 years who are stunted (%)}}) AS avg_stunting FROM district_health_factsheet GROUP BY 1 ORDER BY 1",
+      "p4: ParseError: Expected }. Line 1, Col: 41.\n  SELECT District, AVG({{p1.Households \u001b[4mwith\u001b[0m improved sanitation facility (%)}}) AS avg_sanitation FROM district_health_factsheet GROUP BY 1 ORD"
+     ]
+    }
+   ],
+   "repair_used": true,
+   "plan_valid": true,
+   "panels_total": 4,
+   "panels_ok": 1,
+   "panel_problems": [
+    "p2: ParseError: Expected }. Line 1, Col: 35.\n  SELECT State, AVG({{p1.Children \u001b[4mage\u001b[0m 12-23 months fully vaccinated (%)}}) AS avg_vaccination FROM district_health_factsheet GROUP BY 1 O",
+    "p3: ParseError: Expected }. Line 1, Col: 44.\n  SELECT Survey Round, AVG({{p1.Children \u001b[4munder\u001b[0m 5 years who are stunted (%)}}) AS avg_stunting FROM district_health_factsheet GROUP BY 1 ORDER BY 1",
+    "p4: ParseError: Expected }. Line 1, Col: 41.\n  SELECT District, AVG({{p1.Households \u001b[4mwith\u001b[0m improved sanitation facility (%)}}) AS avg_sanitation FROM district_health_factsheet GROUP BY 1 ORD"
+   ],
+   "kinds": [
+    "kpi",
+    "bar",
+    "line",
+    "table"
+   ],
+   "has_narrative": true,
+   "lint_literals": [],
+   "lint_unresolved": [],
+   "duration_seconds": 23.09,
+   "page": "benchmarks/runs/2026-08-22-t0-build-v1/google_gemma-3n-e4b-it/holdout-health.html",
+   "wall_seconds": 23.09
+  }
+ ]
+}

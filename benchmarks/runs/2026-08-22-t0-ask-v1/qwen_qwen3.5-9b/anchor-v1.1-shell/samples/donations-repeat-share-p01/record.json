@@ -1,0 +1,67 @@
+{
+  "id": "donations-repeat-share-p01",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "what percent of total donation value comes from people who gave more than once, and how many repeat donors are there",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH donor_counts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM \"donations\" GROUP BY \"Donor\"), repeat_donors AS (SELECT \"Donor\" FROM donor_counts WHERE donation_count > 1), total_donations AS (SELECT SUM(\"Amount\") AS total_amount FROM \"donations\"), repeat_donation_value AS (SELECT SUM(d.\"Amount\") AS repeat_amount FROM \"donations\" AS d INNER JOIN repeat_donors AS rd ON d.\"Donor\" = rd.\"Donor\") SELECT (r.repeat_amount * 100.0 / NULLIF(t.total_amount, 0)) AS percent_from_repeat_donors, (SELECT COUNT(*) FROM repeat_donors) AS repeat_donor_count FROM repeat_donation_value AS r CROSS JOIN total_donations AS t",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nwhat percent of total donation value comes from people who gave more than once, and how many repeat donors are there",
+      "response": "WITH donor_counts AS (\n  SELECT \n    \"Donor\",\n    COUNT(*) AS donation_count\n  FROM \"donations\"\n  GROUP BY \"Donor\"\n),\nrepeat_donors AS (\n  SELECT \"Donor\"\n  FROM donor_counts\n  WHERE donation_count > 1\n),\ntotal_donations AS (\n  SELECT SUM(\"Amount\") AS total_amount FROM \"donations\"\n),\nrepeat_donation_value AS (\n  SELECT SUM(d.\"Amount\") AS repeat_amount\n  FROM \"donations\" d\n  INNER JOIN repeat_donors rd ON d.\"Donor\" = rd.\"Donor\"\n)\nSELECT \n  (r.repeat_amount * 100.0 / t.total_amount) AS percent_from_repeat_donors,\n  (SELECT COUNT(*) FROM repeat_donors) AS repeat_donor_count\nFROM repeat_donation_value r, total_donations t;",
+      "api": {
+        "id": "gen-1787424516-dgpQkoXcLABwofiWU2Eq",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 368,
+          "completion_tokens": 194,
+          "total_tokens": 562,
+          "cost": 6.59e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.59e-05,
+            "upstream_inference_prompt_cost": 3.68e-05,
+            "upstream_inference_completions_cost": 2.91e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.074
+      },
+      "duration_seconds": 2.081,
+      "sql_duckdb": "WITH donor_counts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM \"donations\" GROUP BY \"Donor\"), repeat_donors AS (SELECT \"Donor\" FROM donor_counts WHERE donation_count > 1), total_donations AS (SELECT SUM(\"Amount\") AS total_amount FROM \"donations\"), repeat_donation_value AS (SELECT SUM(d.\"Amount\") AS repeat_amount FROM \"donations\" AS d INNER JOIN repeat_donors AS rd ON d.\"Donor\" = rd.\"Donor\") SELECT (r.repeat_amount * 100.0 / NULLIF(t.total_amount, 0)) AS percent_from_repeat_donors, (SELECT COUNT(*) FROM repeat_donors) AS repeat_donor_count FROM repeat_donation_value AS r CROSS JOIN total_donations AS t",
+      "rows": [
+        [
+          53.51468988030468,
+          55
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

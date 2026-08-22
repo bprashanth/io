@@ -1,0 +1,127 @@
+{
+  "id": "sportathon-site-average-change-p03",
+  "task_id": "sportathon-site-average-change",
+  "pattern": "join on id, compute per-row delta, average by group",
+  "question": "average shuttle run improvement or decline per location, endline minus baseline",
+  "gold_sql": "SELECT b.\"Location\", AVG(e.\"Shuttle Run sec\" - b.\"Shuttle Run sec\") AS avg_shuttle_change FROM sportathon_baseline AS b JOIN sportathon_endline AS e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY b.\"Location\" ORDER BY b.\"Location\"",
+  "expected_rows": [
+    [
+      "Chembur",
+      -0.8297297297297296
+    ],
+    [
+      "Dharavi",
+      -0.6914285714285713
+    ],
+    [
+      "Govandi",
+      -0.8575757575757578
+    ],
+    [
+      "Kurla",
+      -0.6923076923076923
+    ],
+    [
+      "Mankhurd",
+      -0.6392857142857143
+    ],
+    [
+      "Wadala",
+      -0.9363636363636365
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Chembur",
+      -0.8954054054054045
+    ],
+    [
+      "Dharavi",
+      -0.6914285714285713
+    ],
+    [
+      "Govandi",
+      -0.9825974025974004
+    ],
+    [
+      "Kurla",
+      -0.8032967032967037
+    ],
+    [
+      "Mankhurd",
+      -0.6958128078817745
+    ],
+    [
+      "Wadala",
+      -0.9363636363636363
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH baseline AS (SELECT \"Location\", \"Shuttle Run sec\" AS baseline_time FROM \"sportathon_baseline\"), endline AS (SELECT \"Location\", \"Shuttle Run sec\" AS endline_time FROM \"sportathon_endline\"), combined AS (SELECT b.\"Location\", e.endline_time - b.baseline_time AS improvement FROM baseline AS b JOIN endline AS e ON b.\"Location\" = e.\"Location\") SELECT \"Location\", AVG(improvement) AS avg_improvement FROM combined GROUP BY \"Location\" ORDER BY \"Location\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"sportathon_baseline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nCREATE TABLE \"sportathon_endline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"sportathon_baseline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}, \"sportathon_endline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}}\n\nCURRENT QUESTION:\naverage shuttle run improvement or decline per location, endline minus baseline",
+      "response": "WITH baseline AS (\n  SELECT \"Location\", \"Shuttle Run sec\" AS baseline_time\n  FROM \"sportathon_baseline\"\n),\nendline AS (\n  SELECT \"Location\", \"Shuttle Run sec\" AS endline_time\n  FROM \"sportathon_endline\"\n),\ncombined AS (\n  SELECT \n    b.\"Location\",\n    e.endline_time - b.baseline_time AS improvement\n  FROM baseline b\n  JOIN endline e ON b.\"Location\" = e.\"Location\"\n)\nSELECT \n  \"Location\",\n  AVG(improvement) AS avg_improvement\nFROM combined\nGROUP BY \"Location\"\nORDER BY \"Location\";",
+      "api": {
+        "id": "gen-1787421378-vka0DL5g4TspSj1f3EfW",
+        "model": "qwen/qwen3.5-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 764,
+          "completion_tokens": 145,
+          "total_tokens": 909,
+          "cost": 0.00025196,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00025196,
+            "upstream_inference_prompt_cost": 0.00010696,
+            "upstream_inference_completions_cost": 0.000145
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.901
+      },
+      "duration_seconds": 1.904,
+      "sql_duckdb": "WITH baseline AS (SELECT \"Location\", \"Shuttle Run sec\" AS baseline_time FROM \"sportathon_baseline\"), endline AS (SELECT \"Location\", \"Shuttle Run sec\" AS endline_time FROM \"sportathon_endline\"), combined AS (SELECT b.\"Location\", e.endline_time - b.baseline_time AS improvement FROM baseline AS b JOIN endline AS e ON b.\"Location\" = e.\"Location\") SELECT \"Location\", AVG(improvement) AS avg_improvement FROM combined GROUP BY \"Location\" ORDER BY \"Location\" NULLS FIRST",
+      "rows": [
+        [
+          "Chembur",
+          -0.8954054054054045
+        ],
+        [
+          "Dharavi",
+          -0.6914285714285713
+        ],
+        [
+          "Govandi",
+          -0.9825974025974004
+        ],
+        [
+          "Kurla",
+          -0.8032967032967037
+        ],
+        [
+          "Mankhurd",
+          -0.6958128078817745
+        ],
+        [
+          "Wadala",
+          -0.9363636363636363
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

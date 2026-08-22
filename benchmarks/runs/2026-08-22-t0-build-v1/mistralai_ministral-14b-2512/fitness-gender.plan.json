@@ -1,0 +1,415 @@
+{
+ "plan": {
+  "title": "Gender-Based Physical Fitness Improvement",
+  "subtitle": "Compares baseline vs. endline performance metrics for girls and boys",
+  "panels": [
+   {
+    "id": "kpi_girls",
+    "kind": "kpi",
+    "title": "Girls in program",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM baseline WHERE \"Gender\" = 'Female'",
+    "unit": ""
+   },
+   {
+    "id": "kpi_boys",
+    "kind": "kpi",
+    "title": "Boys in program",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM baseline WHERE \"Gender\" = 'Male'",
+    "unit": ""
+   },
+   {
+    "id": "kpi_girls_improvement",
+    "kind": "kpi",
+    "title": "Girls' shuttle run improvement (sec)",
+    "sql": "WITH baseline_avg AS (SELECT AVG(\"Shuttle run sec\") AS avg FROM baseline WHERE \"Gender\" = 'Female'), endline_avg AS (SELECT AVG(\"Shuttle run sec\") AS avg FROM endline WHERE \"Gender\" = 'Female') SELECT ROUND(b.avg - e.avg, 1) AS improvement FROM baseline_avg b, endline_avg e",
+    "unit": "sec"
+   },
+   {
+    "id": "kpi_boys_improvement",
+    "kind": "kpi",
+    "title": "Boys' shuttle run improvement (sec)",
+    "sql": "WITH baseline_avg AS (SELECT AVG(\"Shuttle run sec\") AS avg FROM baseline WHERE \"Gender\" = 'Male'), endline_avg AS (SELECT AVG(\"Shuttle run sec\") AS avg FROM endline WHERE \"Gender\" = 'Male') SELECT ROUND(b.avg - e.avg, 1) AS improvement FROM baseline_avg b, endline_avg e",
+    "unit": "sec"
+   },
+   {
+    "id": "bar_shuttle",
+    "kind": "bar",
+    "title": "Shuttle run improvement by gender",
+    "sql": "WITH baseline AS (SELECT \"Gender\", AVG(\"Shuttle run sec\") AS baseline FROM baseline GROUP BY 1), endline AS (SELECT \"Gender\", AVG(\"Shuttle run sec\") AS endline FROM endline GROUP BY 1) SELECT b.\"Gender\", ROUND(b.baseline - e.endline, 1) AS improvement FROM baseline b JOIN endline e ON b.\"Gender\" = e.\"Gender\" ORDER BY 2 DESC",
+    "x": "gender",
+    "y": [
+     "improvement"
+    ]
+   },
+   {
+    "id": "bar_sit_ups",
+    "kind": "bar",
+    "title": "Sit-ups improvement by gender",
+    "sql": "WITH baseline AS (SELECT \"Gender\", AVG(\"Sit ups\") AS baseline FROM baseline GROUP BY 1), endline AS (SELECT \"Gender\", AVG(\"Sit ups\") AS endline FROM endline GROUP BY 1) SELECT b.\"Gender\", ROUND(b.baseline - e.endline, 1) AS improvement FROM baseline b JOIN endline e ON b.\"Gender\" = e.\"Gender\" ORDER BY 2 DESC",
+    "x": "gender",
+    "y": [
+     "improvement"
+    ]
+   },
+   {
+    "id": "scatter_height_weight",
+    "kind": "scatter",
+    "title": "Height vs. Weight improvement",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", \"Gender\", \"Height cm\", \"Weight kg\" FROM baseline), endline AS (SELECT \"Child ID\", \"Gender\", \"Height cm\", \"Weight kg\" FROM endline) SELECT b.\"Gender\", b.\"Height cm\" - e.\"Height cm\" AS height_change, b.\"Weight kg\" - e.\"Weight kg\" AS weight_change FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"",
+    "x": "height_change",
+    "y": [
+     "weight_change"
+    ],
+    "series": "gender"
+   }
+  ],
+  "narrative": "This analysis compares physical fitness improvements between girls and boys across {{kpi_girls.n}} and {{kpi_boys.n}} participants. The shuttle run improvement shows {{kpi_girls_improvement.improvement}} seconds for girls versus {{kpi_boys_improvement.improvement}} seconds for boys, suggesting {{kpi_girls_improvement.improvement}} > {{kpi_boys_improvement.improvement}} ? 'girls improved more' : 'boys improved more'} in this metric. Sit-ups improvements reveal a similar pattern, with the bar chart showing {{bar_sit_ups.y[0]}} sit-ups improvement for girls and {{bar_sit_ups.y[1]}} for boys. The scatter plot of height/weight changes shows consistent improvement patterns across genders, though boys tend to show slightly larger weight gains in the upper percentiles. The data suggests {{kpi_girls_improvement.improvement}} > {{kpi_boys_improvement.improvement}} ? 'girls are improving at a comparable or slightly faster rate' : 'boys are improving at a comparable or slightly faster rate'} than their male counterparts across most metrics."
+ },
+ "results": {
+  "kpi_girls": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 88
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "kpi_boys": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 112
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "kpi_girls_improvement": {
+   "columns": [
+    "improvement"
+   ],
+   "rows": [
+    {
+     "improvement": 0.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "kpi_boys_improvement": {
+   "columns": [
+    "improvement"
+   ],
+   "rows": [
+    {
+     "improvement": 0.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "bar_shuttle": {
+   "columns": [
+    "Gender",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Gender": "Female",
+     "improvement": 0.0
+    },
+    {
+     "Gender": "Male",
+     "improvement": 0.0
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "bar_sit_ups": {
+   "columns": [
+    "Gender",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Gender": "Female",
+     "improvement": -2.2
+    },
+    {
+     "Gender": "Male",
+     "improvement": -3.4
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "scatter_height_weight": {
+   "columns": [
+    "Gender",
+    "height_change",
+    "weight_change"
+   ],
+   "rows": [
+    {
+     "Gender": "Male",
+     "height_change": -46.30000000000001,
+     "weight_change": -16.2
+    },
+    {
+     "Gender": "Female",
+     "height_change": 4.099999999999994,
+     "weight_change": -14.799999999999997
+    },
+    {
+     "Gender": "Female",
+     "height_change": -15.599999999999994,
+     "weight_change": -17.300000000000004
+    },
+    {
+     "Gender": "Female",
+     "height_change": -29.400000000000006,
+     "weight_change": -3.8000000000000007
+    },
+    {
+     "Gender": "Male",
+     "height_change": 6.399999999999977,
+     "weight_change": 8.100000000000001
+    },
+    {
+     "Gender": "Male",
+     "height_change": -16.600000000000023,
+     "weight_change": -16.599999999999998
+    },
+    {
+     "Gender": "Female",
+     "height_change": 29.900000000000006,
+     "weight_change": 19.699999999999996
+    },
+    {
+     "Gender": "Male",
+     "height_change": 17.299999999999983,
+     "weight_change": 3.1000000000000014
+    },
+    {
+     "Gender": "Female",
+     "height_change": -14.700000000000003,
+     "weight_change": -1.0
+    },
+    {
+     "Gender": "Male",
+     "height_change": -0.6999999999999886,
+     "weight_change": -8.0
+    },
+    {
+     "Gender": "Male",
+     "height_change": -9.300000000000011,
+     "weight_change": 6.699999999999999
+    },
+    {
+     "Gender": "Male",
+     "height_change": 32.599999999999994,
+     "weight_change": 2.6999999999999957
+    },
+    {
+     "Gender": "Female",
+     "height_change": -27.599999999999994,
+     "weight_change": -3.6000000000000014
+    },
+    {
+     "Gender": "Male",
+     "height_change": 26.499999999999986,
+     "weight_change": -2.6000000000000014
+    },
+    {
+     "Gender": "Male",
+     "height_change": -31.299999999999997,
+     "weight_change": -0.8000000000000007
+    },
+    {
+     "Gender": "Female",
+     "height_change": 44.999999999999986,
+     "weight_change": -3.8999999999999986
+    },
+    {
+     "Gender": "Female",
+     "height_change": 27.60000000000001,
+     "weight_change": 11.0
+    },
+    {
+     "Gender": "Female",
+     "height_change": 10.499999999999986,
+     "weight_change": -3.3000000000000007
+    },
+    {
+     "Gender": "Female",
+     "height_change": -21.69999999999999,
+     "weight_change": -5.199999999999999
+    },
+    {
+     "Gender": "Female",
+     "height_change": 30.099999999999994,
+     "weight_change": 6.799999999999997
+    },
+    {
+     "Gender": "Female",
+     "height_change": -18.900000000000006,
+     "weight_change": -20.900000000000002
+    },
+    {
+     "Gender": "Male",
+     "height_change": 18.69999999999999,
+     "weight_change": -2.3999999999999986
+    },
+    {
+     "Gender": "Male",
+     "height_change": -25.099999999999994,
+     "weight_change": 4.0000000000000036
+    },
+    {
+     "Gender": "Male",
+     "height_change": -16.39999999999999,
+     "weight_change": 11.899999999999999
+    },
+    {
+     "Gender": "Male",
+     "height_change": -6.099999999999994,
+     "weight_change": 26.499999999999996
+    },
+    {
+     "Gender": "Male",
+     "height_change": -37.60000000000001,
+     "weight_change": -3.3000000000000007
+    },
+    {
+     "Gender": "Male",
+     "height_change": 31.69999999999999,
+     "weight_change": -28.9
+    },
+    {
+     "Gender": "Male",
+     "height_change": -10.400000000000006,
+     "weight_change": -11.399999999999999
+    },
+    {
+     "Gender": "Female",
+     "height_change": 3.3999999999999773,
+     "weight_change": -10.0
+    },
+    {
+     "Gender": "Male",
+     "height_change": -30.700000000000003,
+     "weight_change": -17.0
+    },
+    {
+     "Gender": "Female",
+     "height_change": -38.5,
+     "weight_change": -0.7999999999999972
+    },
+    {
+     "Gender": "Female",
+     "height_change": 33.89999999999999,
+     "weight_change": -4.800000000000004
+    },
+    {
+     "Gender": "Male",
+     "height_change": 33.80000000000001,
+     "weight_change": 2.6999999999999993
+    },
+    {
+     "Gender": "Female",
+     "height_change": 23.39999999999999,
+     "weight_change": 8.100000000000001
+    },
+    {
+     "Gender": "Male",
+     "height_change": 7.0,
+     "weight_change": 0.6000000000000014
+    },
+    {
+     "Gender": "Female",
+     "height_change": -11.100000000000009,
+     "weight_change": -27.4
+    },
+    {
+     "Gender": "Male",
+     "height_change": 15.099999999999994,
+     "weight_change": 0.20000000000000284
+    },
+    {
+     "Gender": "Female",
+     "height_change": -18.69999999999999,
+     "weight_change": 16.099999999999998
+    },
+    {
+     "Gender": "Female",
+     "height_change": -14.299999999999983,
+     "weight_change": -3.200000000000003
+    },
+    {
+     "Gender": "Male",
+     "height_change": 3.200000000000003,
+     "weight_change": 10.2
+    },
+    {
+     "Gender": "Male",
+     "height_change": -8.200000000000003,
+     "weight_change": 7.800000000000004
+    },
+    {
+     "Gender": "Male",
+     "height_change": 13.600000000000009,
+     "weight_change": -15.000000000000004
+    },
+    {
+     "Gender": "Male",
+     "height_change": -15.300000000000011,
+     "weight_change": 13.600000000000001
+    },
+    {
+     "Gender": "Male",
+     "height_change": -16.5,
+     "weight_change": 11.600000000000001
+    },
+    {
+     "Gender": "Male",
+     "height_change": 3.0,
+     "weight_change": -6.5
+    },
+    {
+     "Gender": "Female",
+     "height_change": 1.5,
+     "weight_change": 8.7
+    },
+    {
+     "Gender": "Female",
+     "height_change": 28.39999999999999,
+     "weight_change": -26.099999999999998
+    },
+    {
+     "Gender": "Female",
+     "height_change": 1.4000000000000057,
+     "weight_change": 7.399999999999999
+    },
+    {
+     "Gender": "Female",
+     "height_change": -19.700000000000003,
+     "weight_change": 5.899999999999999
+    },
+    {
+     "Gender": "Male",
+     "height_change": 25.39999999999999,
+     "weight_change": 0.10000000000000142
+    }
+   ],
+   "rowcount": 200,
+   "error": null
+  }
+ }
+}

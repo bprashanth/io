@@ -1,0 +1,96 @@
+{
+  "id": "time-change-per-group-p03",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "give district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, year, pregnancies_registered, anc4_completed, source, (SELECT (anc4_completed_2023 - anc4_completed_2021) * 100.0 / NULLIF(NULLIF(anc4_completed_2021, 0), 0) FROM (SELECT district, year, pregnancies_registered, anc4_completed, source, CASE WHEN year = 2021 THEN anc4_completed ELSE anc4_completed / NULLIF(pregnancies_registered, 0) * 100 END AS percentage FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) AS subquery WHERE district IN ('Gaya', 'Nalanda') AND year = 2023) AS percentage_point_increase FROM (SELECT district, year, pregnancies_registered, anc4_completed, source, CASE WHEN year = 2021 THEN anc4_completed ELSE anc4_completed / NULLIF(pregnancies_registered, 0) * 100 END AS percentage FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) AS subquery",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ngive district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda",
+      "response": "WITH \n  anc_visits AS (\n    SELECT \n      district, \n      year, \n      pregnancies_registered, \n      anc4_completed, \n      source \n    FROM \n      \"anc_visits\"\n  ),\n  increase AS (\n    SELECT \n      district, \n      year, \n      pregnancies_registered, \n      anc4_completed, \n      source, \n      NULLIF(anc4_completed, 0) / pregnancies_registered * 100 AS percentage\n    FROM \n      anc_visits\n    WHERE \n      year IN (2021, 2023)\n  )\nSELECT \n  district, \n  2023 AS year, \n  pregnancies_registered, \n  anc4_completed, \n  source, \n  percentage - (SELECT percentage FROM increase WHERE district = anc_visits.district AND year = 2021) AS percentage_point_increase\nFROM \n  anc_visits\nWHERE \n  district IN ('Gaya', 'Nalanda')",
+      "api": {
+        "id": "gen-1787421257-mXMYxWrtJLtOZgPyvMpK",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 304,
+          "completion_tokens": 197,
+          "total_tokens": 501,
+          "cost": 1.396e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.396e-05,
+            "upstream_inference_prompt_cost": 6.08e-06,
+            "upstream_inference_completions_cost": 7.88e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 6.047
+      },
+      "duration_seconds": 6.05,
+      "error": "BinderException: Binder Error: Referenced column \"percentage\" not found in FROM clause!\nCandidate bindings: \"pregnancies_registered\", \"year\", \"anc4_completed\"\n\nLINE 1: ... 2023 AS year, pregnancies_registered, anc4_completed, source, percentage - (SELECT percentage FROM increase WHERE district...\n                                                                          ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ngive district wise ANC percentage-point increase between 2021 and 2023 only Gaya and Nalanda\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"percentage\" not found in FROM clause!\nCandidate bindings: \"pregnancies_registered\", \"year\", \"anc4_completed\"\n\nLINE 1: ... 2023 AS year, pregnancies_registered, anc4_completed, source, percentage - (SELECT percentage FROM increase WHERE district...\n                                                                          ^\nReturn a complete corrected query.",
+      "response": "SELECT \n  district, \n  year, \n  pregnancies_registered, \n  anc4_completed, \n  source, \n  (SELECT \n     (anc4_completed_2023 - anc4_completed_2021) * 100.0 / NULLIF(anc4_completed_2021, 0) \n   FROM \n     (SELECT \n        district, \n        year, \n        pregnancies_registered, \n        anc4_completed, \n        source, \n        CASE \n          WHEN year = 2021 THEN anc4_completed \n          ELSE anc4_completed / pregnancies_registered * 100 \n        END AS percentage \n      FROM \n        anc_visits \n      WHERE \n        district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) AS subquery \n   WHERE \n     district IN ('Gaya', 'Nalanda') AND year = 2023) AS percentage_point_increase \nFROM \n  (SELECT \n     district, \n     year, \n     pregnancies_registered, \n     anc4_completed, \n     source, \n     CASE \n       WHEN year = 2021 THEN anc4_completed \n       ELSE anc4_completed / pregnancies_registered * 100 \n     END AS percentage \n   FROM \n     anc_visits \n   WHERE \n     district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) AS subquery",
+      "api": {
+        "id": "gen-1787421263-H4MFFWnHsQ1zOWZsXpsf",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 384,
+          "completion_tokens": 291,
+          "total_tokens": 675,
+          "cost": 2.223e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 2.223e-05,
+            "upstream_inference_prompt_cost": 7.68e-06,
+            "upstream_inference_completions_cost": 1.455e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.187
+      },
+      "duration_seconds": 2.19,
+      "error": "BinderException: Binder Error: Referenced column \"anc4_completed_2023\" not found in FROM clause!\nCandidate bindings: \"anc4_completed\", \"percentage\", \"pregnancies_registered\"\n\nLINE 1: ..., pregnancies_registered, anc4_completed, source, (SELECT (anc4_completed_2023 - anc4_completed_2021) * 100.0 / NULLIF...\n                                                                      ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

@@ -1,0 +1,92 @@
+{
+  "id": "donations-repeat-share-p03",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "out of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH TotalDonations AS (SELECT SUM(Amount) AS TotalAmount FROM donations), RepeatDonors AS (SELECT Donor, SUM(Amount) AS RepeatDonorAmount FROM donations GROUP BY Donor HAVING COUNT(DISTINCT Receipt_No) > 1) SELECT (SUM(RepeatDonorAmount) / NULLIF(NULLIF(TotalAmount, 0), 0)) * 100 AS Percentage, COUNT(DISTINCT Donor) AS NumberOfRepeatDonors FROM RepeatDonors CROSS JOIN TotalDonations",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nout of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors",
+      "response": "To solve this problem, we need to identify donors who have donated more than once and calculate the fraction of total donations they contributed. Here's the SQL query to achieve this:\n\n```sql\nWITH DonorDonations AS (\n    SELECT \n        \"Donor\",\n        COUNT(*) AS DonationCount,\n        SUM(\"Amount\") AS TotalDonation\n    FROM \n        \"donations\"\n    GROUP BY \n        \"Donor\"\n),\nRepeatDonors AS (\n    SELECT \n        \"Donor\",\n        TotalDonation\n    FROM \n        DonorDonations\n    WHERE \n        DonationCount > 1\n),\nTotalDonations AS (\n    SELECT \n        SUM(\"Amount\") AS TotalAmount\n    FROM \n        \"donations\"\n),\nRepeatDonorContributions AS (\n    SELECT \n        SUM(TotalDonation) AS RepeatDonorAmount\n    FROM \n        RepeatDonors\n)\nSELECT \n    (RepeatDonorAmount / NULLIF(TotalAmount, 0)) * 100 AS PercentContribution,\n    COUNT(DISTINCT \"Donor\") AS NumberOfRepeatDonors\nFROM \n    RepeatDonors, TotalDonations, RepeatDonorContributions;\n```\n\nThis query does the following:\n1. `DonorDonations`: Aggregates donations by donor to count the number of donations and sum the total amount donated by each donor.\n2. `RepeatDonors`: Filters donors who have donated more than once.\n3. `TotalDonations`: Calculates the total amount of all donations.\n4. `RepeatDonorContributions`: Sums the total donations from repeat donors.\n5. The final `SELECT` calculates the percentage of total donations contributed by repeat donors and counts the number of such donors.",
+      "api": {
+        "id": "gen-1787422026-CgwD9lM5ywBKKPjLx605",
+        "model": "microsoft/phi-4",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 348,
+          "completion_tokens": 355,
+          "total_tokens": 703,
+          "cost": 7.406e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 7.406e-05,
+            "upstream_inference_prompt_cost": 2.436e-05,
+            "upstream_inference_completions_cost": 4.97e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.567
+      },
+      "duration_seconds": 4.571,
+      "error": "BinderException: Binder Error: column \"RepeatDonorAmount\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(RepeatDonorAmount)\" if the exact value of \"RepeatDonorAmount\" is not important.\n\nLINE 1: ...lDonation) AS RepeatDonorAmount FROM RepeatDonors) SELECT (RepeatDonorAmount / NULLIF(NULLIF(TotalAmount, 0), 0)) ...\n                                                                      ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nout of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: column \"RepeatDonorAmount\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(RepeatDonorAmount)\" if the exact value of \"RepeatDonorAmount\" is not important.\n\nLINE 1: ...lDonation) AS RepeatDonorAmount FROM RepeatDonors) SELECT (RepeatDonorAmount / NULLIF(NULLIF(TotalAmount, 0), 0)) ...\n                                                                      ^\nReturn a complete corrected query.",
+      "response": "To solve the problem, we need to identify donors who have donated more than once and calculate the total amount they contributed. Then, we'll compare this to the total amount collected from all donations to find the fraction and percentage.\n\nHere's the corrected SQL query:\n\n```sql\nWITH TotalDonations AS (\n    SELECT SUM(Amount) AS TotalAmount\n    FROM donations\n),\nRepeatDonors AS (\n    SELECT Donor, SUM(Amount) AS RepeatDonorAmount\n    FROM donations\n    GROUP BY Donor\n    HAVING COUNT(DISTINCT Receipt_No) > 1\n)\nSELECT \n    (SUM(RepeatDonorAmount) / NULLIF(TotalAmount, 0)) * 100 AS Percentage,\n    COUNT(DISTINCT Donor) AS NumberOfRepeatDonors\nFROM RepeatDonors, TotalDonations;\n```\n\n### Explanation:\n\n1. **TotalDonations CTE**: Calculates the total amount of all donations.\n2. **RepeatDonors CTE**: Identifies donors who have donated more than once by counting distinct `Receipt_No` for each `Donor` and sums their donation amounts.\n3. **Final SELECT**: \n   - Calculates the percentage of total donations that came from repeat donors.\n   - Counts the number of repeat donors. \n\nThis query ensures that the calculations are correct and adheres to SQL standards by using `NULLIF` to prevent division by zero.",
+      "api": {
+        "id": "gen-1787422031-zlAMmgCtoELA5p8IlUCp",
+        "model": "microsoft/phi-4",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 467,
+          "completion_tokens": 288,
+          "total_tokens": 755,
+          "cost": 7.301e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 7.301e-05,
+            "upstream_inference_prompt_cost": 3.269e-05,
+            "upstream_inference_completions_cost": 4.032e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.897
+      },
+      "duration_seconds": 3.9,
+      "error": "BinderException: Binder Error: Referenced column \"Receipt_No\" not found in FROM clause!\nCandidate bindings: \"Receipt No\", \"City\"\n\nLINE 1: ...Amount FROM donations GROUP BY Donor HAVING COUNT(DISTINCT Receipt_No) > 1) SELECT (SUM(RepeatDonorAmount) / NULLIF...\n                                                                      ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

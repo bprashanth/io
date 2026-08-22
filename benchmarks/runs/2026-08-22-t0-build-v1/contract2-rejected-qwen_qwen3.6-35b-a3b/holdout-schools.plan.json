@@ -1,0 +1,207 @@
+{
+ "plan": {
+  "title": "School Dashboard",
+  "subtitle": "Enrolment trends, infrastructure gaps, and gender parity across blocks",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Girls Enrolled 2024",
+    "sql": "SELECT SUM(\"Girls 2024\") AS n FROM \"school_enrolment_by_year\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Boys Enrolled 2024",
+    "sql": "SELECT SUM(\"Boys 2024\") AS n FROM \"school_enrolment_by_year\"",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Schools with Functional Girls' Toilets",
+    "sql": "SELECT COUNT(*) AS n FROM \"school_infrastructure\" WHERE \"Toilets functional (girls)\" = 'Yes'",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "kpi",
+    "title": "Schools with Electricity",
+    "sql": "SELECT COUNT(*) AS n FROM \"school_infrastructure\" WHERE \"Electricity\" = 'Yes'",
+    "unit": ""
+   },
+   {
+    "id": "p5",
+    "kind": "line",
+    "title": "Enrolment Trend by Gender",
+    "sql": "SELECT 'Girls' AS gender, SUM(\"Girls 2022\") AS total FROM \"school_enrolment_by_year\" UNION ALL SELECT 'Girls' AS gender, SUM(\"Girls 2023\") AS total FROM \"school_enrolment_by_year\" UNION ALL SELECT 'Girls' AS gender, SUM(\"Girls 2024\") AS total FROM \"school_enrolment_by_year\" UNION ALL SELECT 'Boys' AS gender, SUM(\"Boys 2022\") AS total FROM \"school_enrolment_by_year\" UNION ALL SELECT 'Boys' AS gender, SUM(\"Boys 2023\") AS total FROM \"school_enrolment_by_year\" UNION ALL SELECT 'Boys' AS gender, SUM(\"Boys 2024\") AS total FROM \"school_enrolment_by_year\"",
+    "x": "year",
+    "y": [
+     "total"
+    ],
+    "series": "gender"
+   },
+   {
+    "id": "p6",
+    "kind": "bar",
+    "title": "Infrastructure Gaps by Block",
+    "sql": "SELECT \"Block\", COUNT(*) AS total_schools, SUM(CASE WHEN \"Toilets functional (girls)\" = 'No' THEN 1 ELSE 0 END) AS no_toilets, SUM(CASE WHEN \"Electricity\" = 'No' THEN 1 ELSE 0 END) AS no_electricity, SUM(CASE WHEN \"Drinking water\" = 'No' THEN 1 ELSE 0 END) AS no_water FROM \"school_infrastructure\" GROUP BY 1 ORDER BY 1",
+    "x": "Block",
+    "y": [
+     "no_toilets",
+     "no_electricity",
+     "no_water"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Enrolment by Block and Year",
+    "sql": "SELECT \"Block\", SUM(\"Girls 2022\") AS girls_2022, SUM(\"Girls 2023\") AS girls_2023, SUM(\"Girls 2024\") AS girls_2024, SUM(\"Boys 2022\") AS boys_2022, SUM(\"Boys 2023\") AS boys_2023, SUM(\"Boys 2024\") AS boys_2024 FROM \"school_enrolment_by_year\" GROUP BY 1 ORDER BY 1"
+   }
+  ],
+  "narrative": "In 2024, total girls enrolment stood at {{p1}} and boys at {{p2}}. Infrastructure remains a challenge: only {{p3}} schools have functional toilets for girls, and {{p4}} have electricity. The line chart shows the enrolment trajectory over the last three years, highlighting gender disparities. The bar chart breaks down infrastructure gaps by block, showing where interventions are most needed. The table provides a detailed view of enrolment figures per block."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 4893
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 4450
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 25
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 30
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "gender",
+    "total"
+   ],
+   "rows": [
+    {
+     "gender": "Girls",
+     "total": 4611
+    },
+    {
+     "gender": "Girls",
+     "total": 4733
+    },
+    {
+     "gender": "Girls",
+     "total": 4893
+    },
+    {
+     "gender": "Boys",
+     "total": 4202
+    },
+    {
+     "gender": "Boys",
+     "total": 4355
+    },
+    {
+     "gender": "Boys",
+     "total": 4450
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p6": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Referenced column \"Block\" not found in FROM clause!\nCandidate bindings: \"Source\", \"Classrooms\", \"Electricity\", \"School Code\"\n\nLINE 1: SELECT \"Block\", COUNT(*) AS total_schools, SUM(CASE WHEN \"Toilets...\n               ^"
+  },
+  "p7": {
+   "columns": [
+    "Block",
+    "girls_2022",
+    "girls_2023",
+    "girls_2024",
+    "boys_2022",
+    "boys_2023",
+    "boys_2024"
+   ],
+   "rows": [
+    {
+     "Block": "Atri",
+     "girls_2022": 1093,
+     "girls_2023": 1087,
+     "girls_2024": 1147,
+     "boys_2022": 935,
+     "boys_2023": 972,
+     "boys_2024": 981
+    },
+    {
+     "Block": "Barachatti",
+     "girls_2022": 1150,
+     "girls_2023": 1198,
+     "girls_2024": 1236,
+     "boys_2022": 932,
+     "boys_2023": 964,
+     "boys_2024": 996
+    },
+    {
+     "Block": "Belaganj",
+     "girls_2022": 1250,
+     "girls_2023": 1284,
+     "girls_2024": 1333,
+     "boys_2022": 1115,
+     "boys_2023": 1180,
+     "boys_2024": 1203
+    },
+    {
+     "Block": "Dobhi",
+     "girls_2022": 1118,
+     "girls_2023": 1164,
+     "girls_2024": 1177,
+     "boys_2022": 1220,
+     "boys_2023": 1239,
+     "boys_2024": 1270
+    }
+   ],
+   "rowcount": 4,
+   "error": null
+  }
+ }
+}

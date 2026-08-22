@@ -1,0 +1,92 @@
+{
+  "id": "attendance-biggest-drop-p02",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "rank centres by how much their turnout percentage dropped between the two years, worst first",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": true,
+  "sql_duckdb": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nrank centres by how much their turnout percentage dropped between the two years, worst first",
+      "response": "```sql\nWITH \n  attendance_2023 AS (\n    SELECT * FROM \"attendance_2023\"\n  ),\n  attendance_2024 AS (\n    SELECT * FROM \"attendance_2024\"\n  ),\n  centre_turnout AS (\n    SELECT \n      Centre,\n      AVG(Avg Daily Present) AS avg_turnout_2023,\n      AVG(Average attendance) AS avg_turnout_2024\n    FROM attendance_2023\n    JOIN attendance_2024 ON Centre = centre_name\n    GROUP BY Centre\n  ),\n  turnout_change AS (\n    SELECT \n      Centre,\n      (avg_turnout_2024 - avg_turnout_2023) * 100 / NULLIF(avg_turnout_2023, 0) AS turnout_change\n    FROM centre_turnout\n  )\nSELECT \n  Centre,\n  turnout_change\nFROM turnout_change\nORDER BY turnout_change DESC;\n```",
+      "api": {
+        "id": "gen-1787421576-7hXprQDTdq0enEHVacP8",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 514,
+          "completion_tokens": 186,
+          "total_tokens": 700,
+          "cost": 1.772e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.772e-05,
+            "upstream_inference_prompt_cost": 1.028e-05,
+            "upstream_inference_completions_cost": 7.44e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.429
+      },
+      "duration_seconds": 7.43,
+      "error": "ParseError: Expecting ). Line 11, Col: 19.\n   SELECT * FROM \"attendance_2024\"\n  ),\n  centre_turnout AS (\n    SELECT \n      Centre,\n      AVG(Avg \u001b[4mDaily\u001b[0m Present) AS avg_turnout_2023,\n      AVG(Average attendance) AS avg_turnout_2024\n    FROM attendance"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nrank centres by how much their turnout percentage dropped between the two years, worst first\n\nREJECTED QUERY ERROR:\nParseError: Expecting ). Line 11, Col: 19.\n   SELECT * FROM \"attendance_2024\"\n  ),\n  centre_turnout AS (\n    SELECT \n      Centre,\n      AVG(Avg \u001b[4mDaily\u001b[0m Present) AS avg_turnout_2023,\n      AVG(Average attendance) AS avg_turnout_2024\n    FROM attendance\nReturn a complete corrected query.",
+      "response": "WITH centre_turnout AS (\n  SELECT \n    Centre,\n    AVG(Avg Daily Present) AS avg_turnout_2023,\n    AVG(Average attendance) AS avg_turnout_2024\n  FROM \"attendance_2023\"\n  WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n  UNION ALL\n  SELECT \n    centre_name,\n    NULLIF(AVG(Average attendance), 0) AS avg_turnout_2024,\n    NULLIF(AVG(enrolment), 0) AS avg_turnout_2023\n  FROM \"attendance_2024\"\n  WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n)\nSELECT \n  Centre,\n  avg_turnout_2023,\n  avg_turnout_2024,\n  (avg_turnout_2023 - avg_turnout_2024) / NULLIF(avg_turnout_2024, 0) * 100 AS turnout_change\nFROM centre_turnout\nORDER BY turnout_change DESC",
+      "api": {
+        "id": "gen-1787421583-xeN5hIDOmN4ubjUE4Xtc",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 605,
+          "completion_tokens": 316,
+          "total_tokens": 921,
+          "cost": 2.474e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 2.474e-05,
+            "upstream_inference_prompt_cost": 1.21e-05,
+            "upstream_inference_completions_cost": 1.264e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 8.982
+      },
+      "duration_seconds": 8.983,
+      "error": "ParseError: Expecting ). Line 4, Col: 17.\n  WITH centre_turnout AS (\n  SELECT \n    Centre,\n    AVG(Avg \u001b[4mDaily\u001b[0m Present) AS avg_turnout_2023,\n    AVG(Average attendance) AS avg_turnout_2024\n  FROM \"attendance_20"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}
