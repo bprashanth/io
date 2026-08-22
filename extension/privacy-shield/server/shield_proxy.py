@@ -60,6 +60,14 @@ DIRECT = {"person_name", "phone", "email", "aadhaar", "pan", "bank_account", "if
 # In prose the span model may only propose these; every other identifier class has a
 # validator (regex/checksum) and the model's guesses for them are mostly junk.
 MODEL_PROSE_CLASSES = {"person_name", "village", "address"}
+# Validator-backed identifier classes that are hidden even inside columns the user
+# kept: keeping a column means keeping its subject matter, not leaking checksummed
+# identifiers that ended up there (mangled headers, nested tables, notes columns).
+KEPT_SWEEP = {"email", "aadhaar", "pan", "ifsc", "upi_id", "phone", "voter_id", "vehicle_number"}
+
+
+def KEPT_SWEEP_ENGINE(text):
+    return [s for s in regex_engine(text) if s[2] in KEPT_SWEEP]
 NAME_SHAPE = re.compile(r"^[A-Za-z][a-z]+(?:\s[A-Za-z]\.?)*(?:\s[A-Za-z][a-z]+){1,3}$")
 LINE_NO = re.compile(r"^(\d+): ", re.M)
 FOOTER = re.compile(r"\n*_shield: [^\n]*_\s*$")
@@ -190,7 +198,7 @@ class Shield:
                 self.kept.update(vals)
                 self.kept_long.update(v for v in vals if len(v) >= 4 and not v.replace(".", "").isdigit())
         before = len(self.vault.display)
-        shadow = pseudonymise_frame(frame, classes, self.vault, self.data_engine)
+        shadow = pseudonymise_frame(frame, classes, self.vault, self.data_engine, kept_validator=KEPT_SWEEP_ENGINE)
         if self.numbers:
             shadow = shadow.map(lambda v: re.sub(rf"(?<!\d)(?:\d[ -]?){{{self.numbers - 1},}}\d(?!\d)",
                                                  lambda m: self.vault.token(m.group(0), "long_number"), v)
@@ -221,7 +229,10 @@ class Shield:
                         run += 1
                     else:
                         break
-                header_known = stripped[start].casefold().strip().split(sep)[0].strip('"') in self.headers
+                header_cells = [c.strip().strip('"') for c in stripped[start].split(sep)]
+                if any(len(c) > 40 for c in header_cells):
+                    continue   # sentence fragments with commas are not a table header
+                header_known = header_cells[0].casefold() in self.headers
                 if run < 3 and not header_known:
                     continue
                 end = start + run
@@ -236,6 +247,17 @@ class Shield:
                 return "\n".join(lines[:start]) + ("\n" if start else ""), "\n".join(lines[start:end]), \
                     ("\n" if end < len(lines) else "") + "\n".join(lines[end:])
         return None
+
+    # A capitalised run right before a bracket of already-hidden identifiers is a
+    # contact line ("Surveyor: Anita Kulkarni (EMAIL_004, PHONE_019)"): the span
+    # model sometimes misses the name in noisy extractor output, but the shape is
+    # deterministic once the identifiers next to it are tokens.
+    CONTACT_NAME = re.compile(
+        r"([A-Z][\w'.-]+(?:\s+[A-Z][\w'.-]+){1,3})"
+        r"(?=\s*[(\[][^()\[\]]{0,60}(?:EMAIL|PHONE|AADHAAR|PAN|ACCOUNT|VOTER)\\?_\d)")
+
+    def _hide_contact_names(self, text: str) -> str:
+        return self.CONTACT_NAME.sub(lambda m: self.vault.token(m.group(1), "person_name"), text)
 
     def redact_string(self, text: str) -> tuple[str, int, bool]:
         if len(text) < 3:
@@ -253,7 +275,7 @@ class Shield:
                 redacted, spans = self.redact_table(table, classes)
                 pre_r, e1 = redact_text(pre, self.vault, self.data_engine, classes=DIRECT | {"long_number"})
                 rest_r, e2 = redact_text(rest, self.vault, self.data_engine, classes=DIRECT | {"long_number"})
-                out = pre_r + redacted + rest_r
+                out = self._hide_contact_names(pre_r + redacted + rest_r)
                 self.cache[key] = out
                 return out, spans + len(e1) + len(e2), False
             except Exception:
@@ -261,10 +283,15 @@ class Shield:
         kind = kind_of(text)
         engine = self.data_engine if kind == "data" else self.code_engine
         redacted, events = redact_text(text, self.vault, engine, classes=DIRECT | {"long_number"})
+        if kind == "data":
+            redacted = self._hide_contact_names(redacted)
         self.cache[key] = redacted
         return redacted, len(events), False
 
     def walk(self, node: Any, counters: dict[str, int], mint: bool = True, walked: list[str] | None = None) -> Any:
+        """Redact every string in a request tree. `parts` lists are tidied afterwards
+        (see tidy_parts): Antigravity replays our own footer back as model text and
+        stripping it leaves an empty part the Claude backends reject."""
         if isinstance(node, dict):
             out = {}
             if node.get("role") == "model":
@@ -276,6 +303,8 @@ class Shield:
                     out[k] = self.walk(v, counters, True, walked)
                 elif k in ("functionCall", "thought"):
                     out[k] = self.walk(v, counters, False, walked)
+                elif k == "parts" and isinstance(v, list):
+                    out[k] = tidy_parts(self.walk(v, counters, mint, walked))
                 else:
                     out[k] = self.walk(v, counters, mint, walked)
             return out
@@ -314,6 +343,12 @@ class Shield:
             if key not in self.cache:
                 split = self.split_table(text)
                 if split and self.header_key(split[1]) not in self.decisions:
+                    # A table that already carries vault tokens is our own redacted
+                    # output echoed back (summaries, checkpoints): nothing real can
+                    # leave, and asking the user about NAME_001/PHONE_002 is noise.
+                    tokens = {m.group(0) for m in TOKEN_RE.finditer(split[1])}
+                    if sum(1 for t in tokens if t in self.vault.display) >= 2:
+                        return
                     found.append((self.header_key(split[1]), split[1]))
 
     def latest_user_request(self, contents: Any) -> str | None:
@@ -332,35 +367,56 @@ class Shield:
         low = reply.strip().casefold()
         classes = dict(self.pending["classes"])
         columns = {c.casefold(): c for c in classes}
-        if low in {"ok", "okay", "yes", "fine", "go", "go ahead", "proceed", "ok go"}:
-            pass
-        elif low.startswith(("also hide", "hide", "don't hide", "dont hide", "do not hide", "unhide")):
-            adding = not low.startswith(("don't", "dont", "do not", "unhide"))
-            names = re.split(r"[,;]|\band\b", re.sub(r"^(also hide|hide|don't hide|dont hide|do not hide|unhide)", "", low))
-            for n in names:
-                n = n.strip().strip("`'\"")
-                if n in columns:
-                    classes[columns[n]] = "person_name" if adding else "none"
-        else:
+        extra_values: list[str] = []
+        DIRECTIVE = re.compile(r"(also\s+hide|don'?t\s+hide|do\s+not\s+hide|unhide|hide)", re.I)
+        parts = DIRECTIVE.split(reply.strip())
+        # The reply is a review answer when it is a bare acknowledgement, or when any
+        # directives start right after one ("ok, also hide status and Ujjwala").
+        if parts[0].strip().rstrip(" .!,").casefold() not in {"ok", "okay", "yes", "fine", "go", "go ahead", "proceed", "ok go", ""}:
             return None
+        if len(parts) == 1 and not parts[0].strip():
+            return None
+        for i in range(1, len(parts) - 1, 2):
+            adding = not re.match(r"(don'?t|do\s+not|unhide)", parts[i].strip(), re.I)
+            for n in re.split(r"[,;]|\band\b", parts[i + 1], flags=re.I):
+                n = n.strip().strip("`'\"").rstrip(" .!")
+                if not n:
+                    continue
+                if n.casefold() in columns:
+                    classes[columns[n.casefold()]] = "person_name" if adding else "none"
+                elif adding and len(n) >= 3:
+                    # Not a column: a literal value to hide everywhere from now on
+                    # (matched case-insensitively wherever it appears in content).
+                    self.vault.token(n, "custom")
+                    extra_values.append(n)
+        if extra_values:
+            self.vault.save()
         self.decisions[self.pending["key"]] = classes
         self.decisions_path.write_text(json.dumps(self.decisions, indent=1))
         self.pending = None
         hidden = [c for c, k in classes.items() if k not in ("none", "record_id_non_pii", "age")]
-        return f"Understood. Hiding {len(hidden)} columns: {', '.join(hidden)}. Continuing."
+        note = f"Understood. Hiding {len(hidden)} columns: {', '.join(hidden)}."
+        if extra_values:
+            note += " Also hiding these values wherever they appear: " + ", ".join(extra_values) + "."
+        return note + " Continuing."
 
-    def review_message(self, key: str, text: str) -> str:
+    def review_message(self, key: str, text: str) -> str | None:
         proposal = self.propose(text)
         classes = {c: v["class"] for c, v in proposal.items()}
-        self.pending = {"key": key, "classes": classes}
         hidden = [f"{c} ({v['class']}, {v['rule']})" for c, v in proposal.items()
                   if v["class"] not in ("none", "record_id_non_pii", "age")]
+        if not hidden:
+            # Nothing would be replaced: asking the user is noise. Record and continue.
+            self.decisions[key] = classes
+            self.decisions_path.write_text(json.dumps(self.decisions, indent=1))
+            return None
+        self.pending = {"key": key, "classes": classes}
         kept = [c for c, v in proposal.items() if v["class"] in ("none", "record_id_non_pii", "age")]
         return (
             "🛡️ Privacy shield: a table is about to leave your laptop. I will replace these columns with tokens "
             f"before sending:\n- " + "\n- ".join(hidden) +
             f"\n\nKept as-is: {', '.join(kept) or 'none'}.\n\nReply **ok** to continue, **also hide X, Y** to hide more "
-            "columns, or **don't hide Z** to keep one."
+            "(a column name, or any word/value to hide everywhere), or **don't hide Z** to keep a column."
         )
 
     WRITE_TOOLS = {"write_to_file", "replace_file_content", "multi_replace_file_content", "edit_file", "create_file"}
@@ -419,10 +475,10 @@ class Shield:
                 # fall through: forward this same request so the model continues the task
             found: list[tuple[str, str]] = []
             self.find_unreviewed_tables(req["contents"], found)
-            if found:
-                key, text = found[0]
+            for key, text in found:
                 self.pending_prompt = self.review_message(key, text)
-                return None, counters, self.pending_prompt
+                if self.pending_prompt is not None:
+                    return None, counters, self.pending_prompt
         fixed_files = self.rehydrate_written_files(req["contents"])
         if fixed_files:
             with open("shield.log", "a") as log:
@@ -445,10 +501,16 @@ class Rehydrator:
     ("...AADHAAR_" + "050") is still replaced. Non-text fields pass through."""
     HOLD = 24
 
-    def __init__(self, vault: PseudonymMap) -> None:
+    def __init__(self, vault: PseudonymMap, note: str | None = None) -> None:
         self.vault = vault
         self.raw = b""
         self.tail = ""
+        # Optional one-line summary. It is folded into the stream's own finish event
+        # (the one carrying finishReason) rather than sent as an extra event after it:
+        # Antigravity's language server stores a trailing extra event as an empty
+        # model part, and the Claude backends then reject the replayed history
+        # (400 "text: Field required"). Measured on the laptop, 2026-08-22.
+        self.note = note
 
     def _fix(self, text: str, final: bool) -> str:
         joined = self.tail + text
@@ -461,17 +523,27 @@ class Rehydrator:
         out, self.tail = joined[:cut], joined[cut:]
         return self.vault.rehydrate(out)
 
+    def _partial_token(self, text: str) -> str:
+        """The trailing fragment of `text` that could still grow into a vault token
+        ("...NAME_0" of NAME_012), or "" when the text ends cleanly."""
+        m = re.search(r"[A-Z][A-Z_\\\d]*$", text)
+        if not m:
+            return ""
+        frag = m.group(0).replace("\\_", "_")
+        return m.group(0) if any(t != frag and t.startswith(frag) for t in self.vault.display) else ""
+
     def _fix_arg(self, key: str, text: str, final: bool) -> str:
-        """Streamed tool-call argument strings: same tail carry, keyed by argument name."""
+        """Streamed tool-call argument strings: same tail carry, keyed by argument name.
+        Tool calls usually arrive whole in one event and a held tail can never be
+        appended to a finished call, so only a fragment that is a strict prefix of
+        an existing token is held back; ordinary text is never truncated."""
         tails = self.__dict__.setdefault("arg_tails", {})
         joined = tails.get(key, "") + text
         if final:
             tails[key] = ""
             return self.vault.rehydrate(joined)
-        cut = max(0, len(joined) - self.HOLD)
-        while cut > 0 and (joined[cut - 1].isalnum() or joined[cut - 1] in "_\\"):
-            cut -= 1
-        out, tails[key] = joined[:cut], joined[cut:]
+        hold = self._partial_token(joined)
+        out, tails[key] = joined[:len(joined) - len(hold)], hold
         return self.vault.rehydrate(out)
 
     def _walk(self, node, final, in_args=False):
@@ -525,7 +597,47 @@ class Rehydrator:
         except json.JSONDecodeError:
             return event
         fixed = self._walk(payload, final)
+        try:
+            cand = fixed["response"]["candidates"][0]
+            parts = cand.get("content", {}).get("parts")
+        except (KeyError, IndexError, TypeError, AttributeError):
+            cand, parts = None, None
+        if isinstance(parts, list):
+            # Empty text parts (Google's own stream markers, or a short chunk held back
+            # whole by the tail carry) are dropped: Antigravity's language server keeps
+            # an empty part that arrives through a proxy, and the Claude backends then
+            # reject the replayed history (400 "text: Field required").
+            parts[:] = [p for p in parts if not (isinstance(p, dict) and set(p) == {"text"} and p["text"] == "")]
+            if cand.get("finishReason"):
+                extra = self.vault.rehydrate(self.tail) + (self.note or "")
+                self.tail, self.note = "", None
+                if extra:
+                    if parts and isinstance(parts[-1].get("text"), str) and not parts[-1].get("thought"):
+                        parts[-1]["text"] += extra
+                    else:
+                        parts.append({"text": extra})
+            if not parts:
+                del cand["content"]
+                if not cand and len(fixed["response"]) == 1 and len(fixed["response"]["candidates"]) == 1:
+                    return b""            # nothing left to say
         return b"data: " + json.dumps(fixed, ensure_ascii=False).encode() + getattr(self, "sep", b"\r\n\r\n")
+
+
+def tidy_parts(parts: list[Any]) -> list[Any]:
+    """Drop text parts that are empty after redaction (Anthropic models, reached
+    through Antigravity, reject them with 400 "text: Field required") and hang an
+    orphaned thoughtSignature on the thought part it belongs to."""
+    out: list[Any] = []
+    for part in parts:
+        if isinstance(part, dict) and part.get("text") == "" and not (part.keys() & {"functionCall", "functionResponse"}):
+            sig = part.get("thoughtSignature")
+            if sig and out and isinstance(out[-1], dict) and out[-1].get("thought") and "thoughtSignature" not in out[-1]:
+                out[-1]["thoughtSignature"] = sig
+                continue
+            if not sig:
+                continue
+        out.append(part)
+    return out
 
 
 def sse_text_event(text: str, finish: bool = False) -> bytes:
@@ -630,6 +742,7 @@ def make_handler(shield: Shield, annotate: bool):
                 lowered = getattr(shield, "last_walked", "").casefold()
                 leak = next((v for t, v in shield.vault.display.items()
                              if len(v) >= 4 and not t.startswith(("NUMBER", "AGE"))
+                             and not re.fullmatch(TOKEN_RE.pattern, v.strip().strip("'\"`"), re.I)
                              and re.search(rf"(?<![\w@.]){re.escape(v.casefold())}(?![\w@.])", lowered)), None)
                 if leak:
                     with LOCK:
@@ -656,7 +769,11 @@ def make_handler(shield: Shield, annotate: bool):
                     self.send_header(k, v)
             self.send_header("Transfer-Encoding", "chunked")
             self.end_headers()
-            rehydrator = Rehydrator(shield.vault)
+            note = None
+            if is_model_call and annotate:
+                note = (f"\n\n_shield: {counters['spans']} new spans, {counters['misses']} new parts, "
+                        f"{redact_ms:.0f} ms redaction, vault {len(shield.vault.display)}_")
+            rehydrator = Rehydrator(shield.vault, note)
             total = 0
 
             def emit(data: bytes) -> None:
@@ -671,10 +788,6 @@ def make_handler(shield: Shield, annotate: bool):
                 total += len(chunk)
                 emit(rehydrator.feed(chunk) if is_model_call else chunk)
             tail = rehydrator.feed(b"", final=True) if is_model_call else b""
-            if is_model_call and annotate:
-                note = (f"\n\n_shield: {counters['spans']} new spans, {counters['misses']} new parts, "
-                        f"{redact_ms:.0f} ms redaction, vault {len(shield.vault.display)}_")
-                tail += sse_text_event(note)
             emit(tail)
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
