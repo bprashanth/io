@@ -30,7 +30,7 @@ PREFIX = {
     "bank_account": "ACCOUNT", "ifsc": "IFSC", "upi_id": "UPI", "ration_card": "RATION", "voter_id": "VOTER",
     "vehicle_number": "VEHICLE", "address": "ADDRESS", "village": "PLACE", "long_number": "NUMBER",
 }
-TOKEN_RE = re.compile(r"\b(?:" + "|".join(sorted(PREFIX.values())) + r"|CASTE_CATEGORY)\\?_\d{3,}\b")
+TOKEN_RE = re.compile(r"\b[A-Z][A-Z_]{1,24}\\?_\d{3,}\b")   # any vault-style token; lookup decides
 
 
 def normalise(value: str) -> str:

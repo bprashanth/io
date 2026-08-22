@@ -57,6 +57,9 @@ SKIP_KEYS = {"thoughtSignature", "id", "name", "role", "model", "project", "requ
              "PathToDelete", "mimeType"}
 DIRECT = {"person_name", "phone", "email", "aadhaar", "pan", "bank_account", "ifsc", "upi_id",
           "ration_card", "voter_id", "vehicle_number", "address", "village", "gps"}
+# In prose the span model may only propose these; every other identifier class has a
+# validator (regex/checksum) and the model's guesses for them are mostly junk.
+MODEL_PROSE_CLASSES = {"person_name", "village", "address"}
 NAME_SHAPE = re.compile(r"^[A-Za-z][a-z]+(?:\s[A-Za-z]\.?)*(?:\s[A-Za-z][a-z]+){1,3}$")
 LINE_NO = re.compile(r"^(\d+): ", re.M)
 FOOTER = re.compile(r"\n*_shield: [^\n]*_\s*$")
@@ -131,7 +134,7 @@ class Shield:
         for variant in (text, text.title()):
             for start, end, label, score in self.span_engine(variant):
                 value = text[start:end]
-                if label not in DIRECT or score < 0.45 or (start, end) in seen or end - start < 4:
+                if label not in MODEL_PROSE_CLASSES or score < 0.45 or (start, end) in seen or end - start < 4:
                     continue
                 if "\n" in value or "\r" in value:
                     continue
@@ -148,7 +151,7 @@ class Shield:
                 spans.append((start, end, label, score))
         if self.numbers:
             spans += [(m.start(), m.end(), "long_number", 1.0)
-                      for m in re.finditer(rf"(?<!\d)\d{{{self.numbers},}}(?!\d)", text)]
+                      for m in re.finditer(rf"(?<!\d)(?:\d[ -]?){{{self.numbers - 1},}}\d(?!\d)", text)]
         return spans
 
     def code_engine(self, text: str):
@@ -161,6 +164,15 @@ class Shield:
         sep = "\t" if raw.count("\t") > raw.count(",") else ","
         frame = pd.read_csv(io.StringIO(raw), dtype=str, keep_default_na=False, sep=sep, skip_blank_lines=False)
         return frame, prefixes, sep
+
+    def header_key(self, text: str) -> str:
+        """Decisions are keyed by the column-header signature, so an approved table is
+        never re-asked when it reappears inside other text (a page, a log, a reread)."""
+        try:
+            frame, _, _ = self.parse_table(text)
+            return "hdr:" + hashlib.sha256("|".join(str(c).casefold().strip() for c in frame.columns).encode()).hexdigest()
+        except Exception:
+            return "hdr:" + hashlib.sha256(text[:200].encode()).hexdigest()
 
     def propose(self, text: str) -> dict[str, dict[str, Any]]:
         frame, _, _ = self.parse_table(text)
@@ -180,7 +192,7 @@ class Shield:
         before = len(self.vault.display)
         shadow = pseudonymise_frame(frame, classes, self.vault, self.data_engine)
         if self.numbers:
-            shadow = shadow.map(lambda v: re.sub(rf"(?<!\d)\d{{{self.numbers},}}(?!\d)",
+            shadow = shadow.map(lambda v: re.sub(rf"(?<!\d)(?:\d[ -]?){{{self.numbers - 1},}}\d(?!\d)",
                                                  lambda m: self.vault.token(m.group(0), "long_number"), v)
                                 if isinstance(v, str) else v)
         out = shadow.to_csv(index=False, sep=sep, lineterminator="\n")
@@ -203,13 +215,22 @@ class Shield:
                     continue
                 if not widths or widths[0] < 3:
                     continue
-                ok = [i for i, w in enumerate(widths) if w == widths[0]]
+                run = 0
+                for w in widths:
+                    if w == widths[0]:
+                        run += 1
+                    else:
+                        break
                 header_known = stripped[start].casefold().strip().split(sep)[0].strip('"') in self.headers
-                if (len(ok) < 3 and not header_known) or len(ok) < 0.8 * len(widths):
+                if run < 3 and not header_known:
                     continue
-                end = start
-                for i, l in enumerate(stripped[start:], start):
-                    if not l.strip():
+                end = start + run
+                # extend through remaining consistent lines beyond the 40-line probe
+                for i, l in enumerate(stripped[end:], end):
+                    try:
+                        if not l.strip() or len(next(csv.reader([l], delimiter=sep))) != widths[0]:
+                            break
+                    except csv.Error:
                         break
                     end = i + 1
                 return "\n".join(lines[:start]) + ("\n" if start else ""), "\n".join(lines[start:end]), \
@@ -228,7 +249,7 @@ class Shield:
         if split:
             pre, table, rest = split
             try:
-                classes = self.decisions.get(key) or {c: v["class"] for c, v in self.propose(table).items()}
+                classes = self.decisions.get(self.header_key(table)) or {c: v["class"] for c, v in self.propose(table).items()}
                 redacted, spans = self.redact_table(table, classes)
                 pre_r, e1 = redact_text(pre, self.vault, self.data_engine, classes=DIRECT | {"long_number"})
                 rest_r, e2 = redact_text(rest, self.vault, self.data_engine, classes=DIRECT | {"long_number"})
@@ -290,10 +311,10 @@ class Shield:
         elif isinstance(node, str) and len(node) >= 3:
             text = FOOTER.sub("", node)
             key = hashlib.sha256(text.encode()).hexdigest()
-            if key not in self.cache and key not in self.decisions:
+            if key not in self.cache:
                 split = self.split_table(text)
-                if split:
-                    found.append((key, split[1]))
+                if split and self.header_key(split[1]) not in self.decisions:
+                    found.append((self.header_key(split[1]), split[1]))
 
     def latest_user_request(self, contents: Any) -> str | None:
         last = None
@@ -342,6 +363,34 @@ class Shield:
             "columns, or **don't hide Z** to keep one."
         )
 
+    WRITE_TOOLS = {"write_to_file", "replace_file_content", "multi_replace_file_content", "edit_file", "create_file"}
+    PATH_KEYS = ("TargetFile", "AbsolutePath", "FilePath", "path")
+
+    def rehydrate_written_files(self, contents: Any) -> list[str]:
+        """Any file a write tool touched may still contain tokens (streamed arguments
+        split across events). Fix it on disk; the user's copy must never show tokens."""
+        fixed: list[str] = []
+        if not isinstance(contents, list):
+            return fixed
+        for item in contents[-6:]:
+            for part in item.get("parts", []) if isinstance(item, dict) else []:
+                call = part.get("functionCall") if isinstance(part, dict) else None
+                if not call or call.get("name") not in self.WRITE_TOOLS:
+                    continue
+                args = call.get("args") or {}
+                target = next((args[k] for k in self.PATH_KEYS if isinstance(args.get(k), str)), None)
+                if not target or not os.path.isfile(target):
+                    continue
+                try:
+                    raw = open(target, encoding="utf8").read()
+                except (OSError, UnicodeDecodeError):
+                    continue
+                new = self.vault.rehydrate(raw)
+                if new != raw:
+                    open(target, "w", encoding="utf8").write(new)
+                    fixed.append(target)
+        return fixed
+
     def redact_request(self, body: bytes) -> tuple[bytes | None, dict[str, int], str | None]:
         """Returns (redacted body, counters, synthetic reply). If synthetic reply is
         set, the body is None and the proxy must answer the IDE itself."""
@@ -374,6 +423,10 @@ class Shield:
                 key, text = found[0]
                 self.pending_prompt = self.review_message(key, text)
                 return None, counters, self.pending_prompt
+        fixed_files = self.rehydrate_written_files(req["contents"])
+        if fixed_files:
+            with open("shield.log", "a") as log:
+                log.write(json.dumps({"t": time.time(), "rehydrated_files": fixed_files}) + "\n")
         walked: list[str] = []
         before = len(self.vault.display)
         req["contents"] = self.walk(req["contents"], counters, True, walked)
@@ -408,13 +461,32 @@ class Rehydrator:
         out, self.tail = joined[:cut], joined[cut:]
         return self.vault.rehydrate(out)
 
-    def _walk(self, node, final):
+    def _fix_arg(self, key: str, text: str, final: bool) -> str:
+        """Streamed tool-call argument strings: same tail carry, keyed by argument name."""
+        tails = self.__dict__.setdefault("arg_tails", {})
+        joined = tails.get(key, "") + text
+        if final:
+            tails[key] = ""
+            return self.vault.rehydrate(joined)
+        cut = max(0, len(joined) - self.HOLD)
+        while cut > 0 and (joined[cut - 1].isalnum() or joined[cut - 1] in "_\\"):
+            cut -= 1
+        out, tails[key] = joined[:cut], joined[cut:]
+        return self.vault.rehydrate(out)
+
+    def _walk(self, node, final, in_args=False):
         if isinstance(node, dict):
-            return {k: (self._fix(v, final) if k == "text" and isinstance(v, str) and not node.get("thought")
-                        else (self.vault.rehydrate(json.dumps(v)) and json.loads(self.vault.rehydrate(json.dumps(v))) if k == "args" else self._walk(v, final)))
-                    for k, v in node.items()}
+            out = {}
+            for k, v in node.items():
+                if k == "text" and isinstance(v, str) and not node.get("thought"):
+                    out[k] = self._fix(v, final)
+                elif in_args and isinstance(v, str):
+                    out[k] = self._fix_arg(k, v, final) if len(v) > 200 else self.vault.rehydrate(v)
+                else:
+                    out[k] = self._walk(v, final, in_args or k == "args")
+            return out
         if isinstance(node, list):
-            return [self._walk(v, final) for v in node]
+            return [self._walk(v, final, in_args) for v in node]
         return node
 
     def feed(self, chunk: bytes, final: bool = False) -> bytes:
@@ -438,6 +510,10 @@ class Rehydrator:
             if self.tail:
                 out += sse_text_event(self.vault.rehydrate(self.tail))
                 self.tail = ""
+            for key, tail in list(self.__dict__.get("arg_tails", {}).items()):
+                if tail:   # cannot append to a finished tool call: flushed via the on-disk backstop
+                    self.__dict__.setdefault("arg_leftovers", []).append((key, tail))
+                    self.arg_tails[key] = ""
         return out
 
     def _event(self, event: bytes, final: bool) -> bytes:
@@ -513,6 +589,10 @@ def make_handler(shield: Shield, annotate: bool):
                 return self.send_local(200, html.encode(), "text/html")
             if url.path == "/shield/vault":
                 return self.send_local(200, json.dumps(shield.vault.display, indent=1, ensure_ascii=False).encode())
+            if url.path == "/shield/quit":
+                self.send_local(200, b'{"bye": true}')
+                threading.Timer(0.3, lambda: os._exit(0)).start()
+                return
             if url.path == "/shield/peek":
                 PEEK["on"] = parse_qs(url.query).get("on", ["0"])[0] == "1"
                 return self.send_local(200, json.dumps({"peek": PEEK["on"]}).encode())
@@ -533,6 +613,8 @@ def make_handler(shield: Shield, annotate: bool):
 
         def _fwd(self):
             body = self.read_body()
+            with open("shield-requests.log", "a") as log:
+                log.write(json.dumps({"t": time.time(), "path": self.path, "bytes": len(body)}) + "\n")
             counters = {"spans": 0, "hits": 0, "misses": 0}
             redact_ms = 0.0
             is_model_call = "streamGenerateContent" in self.path or "generateContent" in self.path

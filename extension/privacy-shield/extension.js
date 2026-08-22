@@ -1,10 +1,10 @@
 // Privacy Shield for Antigravity: starts/stops the local redacting proxy and
 // points Antigravity's language server at it through CLOUD_CODE_URL.
 //
-// The language server reads CLOUD_CODE_URL when it starts, so enabling or
-// disabling the shield needs one Antigravity restart. The extension sets the
-// variable for the user's login session (launchctl on macOS, setx on Windows,
-// ~/.config/environment.d on Linux) and tells the user to restart.
+// Antigravity resolves its backend from the user setting `jetski.cloudCodeUrl`
+// and restarts its language server when that setting changes, so enabling or
+// disabling the shield is a settings write: no environment variables, no
+// manual restart.
 const vscode = require("vscode");
 const cp = require("child_process");
 const fs = require("fs");
@@ -52,35 +52,71 @@ function getJson(url) {
   });
 }
 
-// ---- CLOUD_CODE_URL for the login session -----------------------------------
-function setSessionEnv(value) {
-  const plat = os.platform();
-  try {
-    if (plat === "darwin") {
-      cp.execFileSync("launchctl", value ? ["setenv", "CLOUD_CODE_URL", value] : ["unsetenv", "CLOUD_CODE_URL"]);
-      return "launchctl (applies to apps started from the Dock after this)";
-    }
-    if (plat === "win32") {
-      cp.execFileSync("setx", ["CLOUD_CODE_URL", value || ""]);
-      return "setx (applies to apps started after this)";
-    }
-    const dir = path.join(os.homedir(), ".config", "environment.d");
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, "privacy-shield.conf");
-    if (value) fs.writeFileSync(file, `CLOUD_CODE_URL=${value}\n`); else if (fs.existsSync(file)) fs.unlinkSync(file);
-    return "~/.config/environment.d/privacy-shield.conf (systemd user sessions; or launch with CLOUD_CODE_URL=... antigravity)";
-  } catch (e) {
-    return `could not set automatically (${e.message}); set CLOUD_CODE_URL=${value || ""} yourself before launching Antigravity`;
-  }
-}
-
+// ---- connecting Antigravity to the shield -----------------------------------
+// Antigravity's agent traffic is sent by a language server that honours the
+// CLOUD_CODE_URL environment variable (and nothing else we can set), read when
+// the app starts. The daemon must already be listening at that moment or the
+// window never finishes loading. So: the daemon runs detached (it survives a
+// quit), and enabling/disabling relaunches Antigravity with/without the
+// variable through a small detached helper.
 function languageServerUsesProxy() {
   return process.env.CLOUD_CODE_URL === proxyUrl();
 }
 
+// Antigravity also reads `jetski.cloudCodeUrl` (core setting, not registered, so
+// written straight into settings.json). Measured: the agent routes through the
+// shield only when the daemon is already listening, CLOUD_CODE_URL is in the
+// app's environment, and this setting is applied right after launch. The setting
+// must not survive a session (a dead port at startup stalls the window).
+function userSettingsPath() {
+  return path.join(path.dirname(path.dirname(ctx.globalStorageUri.fsPath)), "settings.json");
+}
+
+function readUserSettings() {
+  const file = userSettingsPath();
+  if (!fs.existsSync(file)) return {};
+  const raw = fs.readFileSync(file, "utf8");
+  try { return JSON.parse(raw); } catch { /* comments or trailing commas */ }
+  try { return JSON.parse(raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/,\s*([}\]])/g, "$1")); } catch { return null; }
+}
+
+function setCloudCodeUrlSetting(value) {
+  const settings = readUserSettings();
+  if (settings === null) return false;
+  if ((settings["jetski.cloudCodeUrl"] || null) === (value || null)) return true;
+  if (value) settings["jetski.cloudCodeUrl"] = value; else delete settings["jetski.cloudCodeUrl"];
+  const file = userSettingsPath();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(settings, null, 2) + "\n");
+  return true;
+}
+
+function relaunch(withShield) {
+  const folder = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
+    ? vscode.workspace.workspaceFolders[0].uri.fsPath : "";
+  const extra = (cfg().get("relaunchArgs") || []).join(" ");
+  const exe = process.execPath;
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  delete env.CLOUD_CODE_URL;
+  if (os.platform() === "win32") {
+    const setLine = withShield ? `set "CLOUD_CODE_URL=${proxyUrl()}" && ` : `set "CLOUD_CODE_URL=" && `;
+    cp.spawn("cmd.exe", ["/c", `timeout /t 4 /nobreak >nul && ${setLine}start "" "${exe}" ${extra} "${folder}"`],
+      { detached: true, stdio: "ignore", windowsHide: true, env }).unref();
+  } else {
+    const line = `sleep 4; ${withShield ? `CLOUD_CODE_URL="${proxyUrl()}"` : ""} "${exe}" ${extra} "${folder}" >/dev/null 2>&1 &`;
+    cp.spawn("/bin/sh", ["-c", line], { detached: true, stdio: "ignore", env }).unref();
+  }
+  setTimeout(() => vscode.commands.executeCommand("workbench.action.quit"), 500);
+}
+
 // ---- daemon ------------------------------------------------------------------
+async function daemonAlive() {
+  return !!(await getJson(`${proxyUrl()}/shield/status.json`));
+}
+
 async function startDaemon() {
-  if (daemon) return true;
+  if (await daemonAlive()) return true;   // adopt a daemon left running from a previous session
   const py = pythonPath();
   if (!py) {
     const pick = await vscode.window.showErrorMessage(
@@ -98,11 +134,11 @@ async function startDaemon() {
   const env = { ...process.env, PII_THREADS: String(cfg().get("threads") || 4),
     HF_HOME: path.join(serverDir(), "hf-cache"), PYTHONUNBUFFERED: "1" };
   delete env.CLOUD_CODE_URL; // the daemon itself must talk to Google directly
-  const out = vscode.window.createOutputChannel("Privacy Shield");
-  daemon = cp.spawn(py, args, { cwd: stateDir(), env });
-  daemon.stdout.on("data", (d) => out.append(d.toString()));
-  daemon.stderr.on("data", (d) => out.append(d.toString()));
-  daemon.on("exit", (code) => { out.appendLine(`daemon exited (${code})`); daemon = null; refresh(); });
+  const logFile = path.join(stateDir(), "daemon.out");
+  const fd = fs.openSync(logFile, "a");
+  daemon = cp.spawn(py, args, { cwd: stateDir(), env, detached: true, stdio: ["ignore", fd, fd], windowsHide: true });
+  daemon.unref();
+  daemon.on("exit", (code) => { daemon = null; refresh(); });
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 1000));
     if (await getJson(`${proxyUrl()}/shield/status.json`)) return true;
@@ -113,34 +149,38 @@ async function startDaemon() {
 }
 
 function stopDaemon() {
-  if (daemon) { daemon.kill(); daemon = null; }
+  getJson(`${proxyUrl()}/shield/quit`);
+  if (daemon) { try { daemon.kill(); } catch { /* already gone */ } daemon = null; }
 }
 
 // ---- commands -----------------------------------------------------------------
 async function enable() {
   if (!(await startDaemon())) return;
   await ctx.globalState.update("enabled", true);
-  const how = setSessionEnv(proxyUrl());
   refresh();
-  if (!languageServerUsesProxy()) {
-    const pick = await vscode.window.showWarningMessage(
-      `Privacy Shield daemon is running. Antigravity must be restarted once so its model traffic goes through it (set via ${how}).`,
-      "Restart now", "Later");
-    if (pick === "Restart now") vscode.commands.executeCommand("workbench.action.reloadWindow");
-  } else {
+  if (languageServerUsesProxy()) {
+    setCloudCodeUrlSetting(proxyUrl());
     vscode.window.showInformationMessage("🛡️ Privacy Shield is active: personal data is replaced before anything leaves this laptop.");
+    return;
   }
+  const pick = await vscode.window.showWarningMessage(
+    "Privacy Shield is running. Antigravity has to be relaunched once so its model traffic goes through it. Relaunch now?",
+    { modal: true }, "Relaunch now");
+  if (pick === "Relaunch now") relaunch(true);
 }
 
 async function disable() {
+  setCloudCodeUrlSetting(null);
   stopDaemon();
   await ctx.globalState.update("enabled", false);
-  const how = setSessionEnv("");
   refresh();
+  if (!process.env.CLOUD_CODE_URL) {
+    vscode.window.showInformationMessage("Privacy Shield is off.");
+    return;
+  }
   const pick = await vscode.window.showWarningMessage(
-    `Privacy Shield stopped. Restart Antigravity so it talks to Google directly again (cleared via ${how}).`,
-    "Restart now", "Later");
-  if (pick === "Restart now") vscode.commands.executeCommand("workbench.action.reloadWindow");
+    "Privacy Shield stopped. Relaunch Antigravity so it talks to Google directly again?", { modal: true }, "Relaunch now");
+  if (pick === "Relaunch now") relaunch(false);
 }
 
 async function install() {
@@ -170,6 +210,7 @@ async function reset() {
     const p = path.join(stateDir(), f);
     if (fs.existsSync(p)) fs.unlinkSync(p);
   }
+  await new Promise((r) => setTimeout(r, 1500));
   if (ctx.globalState.get("enabled")) await startDaemon();
   vscode.window.showInformationMessage("Privacy Shield: vault and decisions forgotten.");
   refresh();
@@ -178,7 +219,7 @@ async function reset() {
 // ---- status bar -------------------------------------------------------------------
 async function refresh() {
   const enabled = ctx.globalState.get("enabled");
-  const s = daemon ? await getJson(`${proxyUrl()}/shield/status.json`) : null;
+  const s = enabled ? await getJson(`${proxyUrl()}/shield/status.json`) : null;
   if (!enabled) {
     statusBar.text = "$(shield) Shield off";
     statusBar.tooltip = "Privacy Shield is off. Click to enable.";
@@ -187,8 +228,8 @@ async function refresh() {
     statusBar.text = "$(shield) Shield starting…";
     statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
   } else if (!languageServerUsesProxy()) {
-    statusBar.text = "$(shield) Shield ready – restart Antigravity";
-    statusBar.tooltip = "Daemon is running but this Antigravity was started without CLOUD_CODE_URL. Restart it.";
+    statusBar.text = "$(shield) Shield ready – relaunch Antigravity";
+    statusBar.tooltip = "The shield is running but this Antigravity was started without it. Run 'Privacy Shield: Enable' and choose Relaunch.";
     statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
   } else {
     const peek = s.peek ? " · PEEK" : "";
@@ -217,13 +258,22 @@ function activate(context) {
     vscode.commands.registerCommand("privacyShield.peek", peek),
     vscode.commands.registerCommand("privacyShield.reset", reset),
     vscode.commands.registerCommand("privacyShield.install", install),
+    vscode.commands.registerCommand("privacyShield.openServerFolder", () => vscode.env.openExternal(vscode.Uri.file(serverDir()))),
+    vscode.commands.registerCommand("privacyShield.showLog", () => vscode.commands.executeCommand("workbench.action.output.show.extension-output-insight-out.privacy-shield-#1-Privacy Shield").then(undefined, () => vscode.commands.executeCommand("workbench.action.output.toggleOutput"))),
     { dispose: stopDaemon });
-  if (ctx.globalState.get("enabled")) startDaemon().then(refresh);
+  setCloudCodeUrlSetting(null);   // never let a stale override survive a crash
+  if (ctx.globalState.get("enabled")) {
+    startDaemon().then((ok) => { if (ok && languageServerUsesProxy()) setCloudCodeUrlSetting(proxyUrl()); refresh(); });
+  }
   poller = setInterval(refresh, 2000);
   context.subscriptions.push({ dispose: () => clearInterval(poller) });
   refresh();
 }
 
-function deactivate() { stopDaemon(); }
+function deactivate() {
+  // The daemon stays up on purpose (the relaunched Antigravity needs it listening);
+  // the setting must not survive the session.
+  try { setCloudCodeUrlSetting(null); } catch { /* shutting down */ }
+}
 
 module.exports = { activate, deactivate };
