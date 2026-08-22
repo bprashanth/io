@@ -82,13 +82,29 @@ function readUserSettings() {
 
 function setCloudCodeUrlSetting(value) {
   const settings = readUserSettings();
-  if (settings === null) return false;
-  if ((settings["jetski.cloudCodeUrl"] || null) === (value || null)) return true;
+  if (settings === null) return null;
+  if ((settings["jetski.cloudCodeUrl"] || null) === (value || null)) return "same";
   if (value) settings["jetski.cloudCodeUrl"] = value; else delete settings["jetski.cloudCodeUrl"];
   const file = userSettingsPath();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(settings, null, 2) + "\n");
-  return true;
+  return "written";
+}
+
+// Antigravity resolves its backend as: jetski.cloudCodeUrl setting if set, else the
+// default host. Two language servers exist: the app-level one that serves the agent
+// (owned by the main process) and the extension-host one. The app-level server
+// learns the URL only (a) as a launch flag or (b) via a push that fires when the
+// app's own loadCodeAssist completes — a few seconds after launch, BEFORE our
+// activation (onStartupFinished) can write the setting. A value written later is
+// never delivered and the agent keeps talking to Google directly while the status
+// bar says the shield is on. Measured on Antigravity 1.107.0, 2026-08-22.
+// antigravity.handleAuthRefresh re-runs the auth/user-status flow, whose
+// loadCodeAssist completion re-pushes the (new) URL to the app-level server;
+// antigravity.restartLanguageServer re-reads it for the extension-host server.
+function pushCloudCodeUrlToLanguageServers() {
+  const run = (cmd) => vscode.commands.executeCommand(cmd).then(() => true, () => false);
+  return Promise.all([run("antigravity.handleAuthRefresh"), run("antigravity.restartLanguageServer")]);
 }
 
 function relaunch(withShield) {
@@ -159,18 +175,31 @@ async function enable() {
   await ctx.globalState.update("enabled", true);
   refresh();
   if (languageServerUsesProxy()) {
-    setCloudCodeUrlSetting(proxyUrl());
+    if (setCloudCodeUrlSetting(proxyUrl()) === "written") await pushCloudCodeUrlToLanguageServers();
     vscode.window.showInformationMessage("🛡️ Privacy Shield is active: personal data is replaced before anything leaves this laptop.");
     return;
   }
   const pick = await vscode.window.showWarningMessage(
     "Privacy Shield is running. Antigravity has to be relaunched once so its model traffic goes through it. Relaunch now?",
     { modal: true }, "Relaunch now");
-  if (pick === "Relaunch now") relaunch(true);
+  if (pick === "Relaunch now") {
+    // The app-level language server reads jetski.cloudCodeUrl only at app launch
+    // (or from a push that races our activation), so the setting must already be
+    // in settings.json when the relaunched app starts. The daemon is confirmed
+    // listening, so pointing the launch at it is safe; deactivate() skips its
+    // usual cleanup exactly once.
+    setCloudCodeUrlSetting(proxyUrl());
+    await ctx.globalState.update("keepSettingOnQuit", true);
+    relaunch(true);
+  } else if (setCloudCodeUrlSetting(proxyUrl()) === "written") {
+    // No relaunch: the running language server only learns the URL from the next
+    // loadCodeAssist push, typically within a minute. Nudge it.
+    await pushCloudCodeUrlToLanguageServers();
+  }
 }
 
 async function disable() {
-  setCloudCodeUrlSetting(null);
+  if (setCloudCodeUrlSetting(null) === "written") await pushCloudCodeUrlToLanguageServers();
   stopDaemon();
   await ctx.globalState.update("enabled", false);
   refresh();
@@ -261,9 +290,22 @@ function activate(context) {
     vscode.commands.registerCommand("privacyShield.openServerFolder", () => vscode.env.openExternal(vscode.Uri.file(serverDir()))),
     vscode.commands.registerCommand("privacyShield.showLog", () => vscode.commands.executeCommand("workbench.action.output.show.extension-output-insight-out.privacy-shield-#1-Privacy Shield").then(undefined, () => vscode.commands.executeCommand("workbench.action.output.toggleOutput"))),
     { dispose: stopDaemon });
-  setCloudCodeUrlSetting(null);   // never let a stale override survive a crash
-  if (ctx.globalState.get("enabled")) {
-    startDaemon().then((ok) => { if (ok && languageServerUsesProxy()) setCloudCodeUrlSetting(proxyUrl()); refresh(); });
+  ctx.globalState.update("keepSettingOnQuit", false);
+  if (!ctx.globalState.get("enabled")) {
+    if (setCloudCodeUrlSetting(null) === "written") {
+      pushCloudCodeUrlToLanguageServers();  // never let a stale override survive a crash
+    }
+  } else {
+    startDaemon().then(async (ok) => {
+      if (ok) {
+        if (setCloudCodeUrlSetting(proxyUrl()) === "written") {
+          await pushCloudCodeUrlToLanguageServers();   // the launch-time push has already passed
+        }
+      } else if (setCloudCodeUrlSetting(null) === "written") {
+        await pushCloudCodeUrlToLanguageServers();     // daemon gone: stop pointing at a dead port
+      }
+      refresh();
+    });
   }
   poller = setInterval(refresh, 2000);
   context.subscriptions.push({ dispose: () => clearInterval(poller) });
@@ -271,8 +313,12 @@ function activate(context) {
 }
 
 function deactivate() {
-  // The daemon stays up on purpose (the relaunched Antigravity needs it listening);
-  // the setting must not survive the session.
+  // The daemon stays up on purpose (the relaunched Antigravity needs it listening).
+  // The setting normally must not survive the session (a dead proxy port at the
+  // next launch breaks auth validation until the daemon is adopted), except for
+  // the one quit that an Enable-relaunch just scheduled: the relaunched app must
+  // see it at launch so its language server starts on the proxy endpoint.
+  if (ctx && ctx.globalState.get("keepSettingOnQuit")) return;
   try { setCloudCodeUrlSetting(null); } catch { /* shutting down */ }
 }
 

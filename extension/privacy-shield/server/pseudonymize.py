@@ -51,6 +51,8 @@ class PseudonymMap:
         key = normalise(value)
         if key in self.forward:
             return self.forward[key]
+        if TOKEN_RE.fullmatch(value.strip()):
+            return value.strip()       # already one of our tokens (echoed back in a summary): never re-mint
         prefix = PREFIX.get(pii_class, pii_class.upper())
         self.counters[prefix] = self.counters.get(prefix, 0) + 1
         token = f"{prefix}_{self.counters[prefix]:03d}"

@@ -265,6 +265,9 @@ class Shield:
         return redacted, len(events), False
 
     def walk(self, node: Any, counters: dict[str, int], mint: bool = True, walked: list[str] | None = None) -> Any:
+        """Redact every string in a request tree. `parts` lists are tidied afterwards
+        (see tidy_parts): Antigravity replays our own footer back as model text and
+        stripping it leaves an empty part the Claude backends reject."""
         if isinstance(node, dict):
             out = {}
             if node.get("role") == "model":
@@ -276,6 +279,8 @@ class Shield:
                     out[k] = self.walk(v, counters, True, walked)
                 elif k in ("functionCall", "thought"):
                     out[k] = self.walk(v, counters, False, walked)
+                elif k == "parts" and isinstance(v, list):
+                    out[k] = tidy_parts(self.walk(v, counters, mint, walked))
                 else:
                     out[k] = self.walk(v, counters, mint, walked)
             return out
@@ -445,10 +450,16 @@ class Rehydrator:
     ("...AADHAAR_" + "050") is still replaced. Non-text fields pass through."""
     HOLD = 24
 
-    def __init__(self, vault: PseudonymMap) -> None:
+    def __init__(self, vault: PseudonymMap, note: str | None = None) -> None:
         self.vault = vault
         self.raw = b""
         self.tail = ""
+        # Optional one-line summary. It is folded into the stream's own finish event
+        # (the one carrying finishReason) rather than sent as an extra event after it:
+        # Antigravity's language server stores a trailing extra event as an empty
+        # model part, and the Claude backends then reject the replayed history
+        # (400 "text: Field required"). Measured on the laptop, 2026-08-22.
+        self.note = note
 
     def _fix(self, text: str, final: bool) -> str:
         joined = self.tail + text
@@ -461,17 +472,27 @@ class Rehydrator:
         out, self.tail = joined[:cut], joined[cut:]
         return self.vault.rehydrate(out)
 
+    def _partial_token(self, text: str) -> str:
+        """The trailing fragment of `text` that could still grow into a vault token
+        ("...NAME_0" of NAME_012), or "" when the text ends cleanly."""
+        m = re.search(r"[A-Z][A-Z_\\\d]*$", text)
+        if not m:
+            return ""
+        frag = m.group(0).replace("\\_", "_")
+        return m.group(0) if any(t != frag and t.startswith(frag) for t in self.vault.display) else ""
+
     def _fix_arg(self, key: str, text: str, final: bool) -> str:
-        """Streamed tool-call argument strings: same tail carry, keyed by argument name."""
+        """Streamed tool-call argument strings: same tail carry, keyed by argument name.
+        Tool calls usually arrive whole in one event and a held tail can never be
+        appended to a finished call, so only a fragment that is a strict prefix of
+        an existing token is held back; ordinary text is never truncated."""
         tails = self.__dict__.setdefault("arg_tails", {})
         joined = tails.get(key, "") + text
         if final:
             tails[key] = ""
             return self.vault.rehydrate(joined)
-        cut = max(0, len(joined) - self.HOLD)
-        while cut > 0 and (joined[cut - 1].isalnum() or joined[cut - 1] in "_\\"):
-            cut -= 1
-        out, tails[key] = joined[:cut], joined[cut:]
+        hold = self._partial_token(joined)
+        out, tails[key] = joined[:len(joined) - len(hold)], hold
         return self.vault.rehydrate(out)
 
     def _walk(self, node, final, in_args=False):
@@ -525,7 +546,47 @@ class Rehydrator:
         except json.JSONDecodeError:
             return event
         fixed = self._walk(payload, final)
+        try:
+            cand = fixed["response"]["candidates"][0]
+            parts = cand.get("content", {}).get("parts")
+        except (KeyError, IndexError, TypeError, AttributeError):
+            cand, parts = None, None
+        if isinstance(parts, list):
+            # Empty text parts (Google's own stream markers, or a short chunk held back
+            # whole by the tail carry) are dropped: Antigravity's language server keeps
+            # an empty part that arrives through a proxy, and the Claude backends then
+            # reject the replayed history (400 "text: Field required").
+            parts[:] = [p for p in parts if not (isinstance(p, dict) and set(p) == {"text"} and p["text"] == "")]
+            if cand.get("finishReason"):
+                extra = self.vault.rehydrate(self.tail) + (self.note or "")
+                self.tail, self.note = "", None
+                if extra:
+                    if parts and isinstance(parts[-1].get("text"), str) and not parts[-1].get("thought"):
+                        parts[-1]["text"] += extra
+                    else:
+                        parts.append({"text": extra})
+            if not parts:
+                del cand["content"]
+                if not cand and len(fixed["response"]) == 1 and len(fixed["response"]["candidates"]) == 1:
+                    return b""            # nothing left to say
         return b"data: " + json.dumps(fixed, ensure_ascii=False).encode() + getattr(self, "sep", b"\r\n\r\n")
+
+
+def tidy_parts(parts: list[Any]) -> list[Any]:
+    """Drop text parts that are empty after redaction (Anthropic models, reached
+    through Antigravity, reject them with 400 "text: Field required") and hang an
+    orphaned thoughtSignature on the thought part it belongs to."""
+    out: list[Any] = []
+    for part in parts:
+        if isinstance(part, dict) and part.get("text") == "" and not (part.keys() & {"functionCall", "functionResponse"}):
+            sig = part.get("thoughtSignature")
+            if sig and out and isinstance(out[-1], dict) and out[-1].get("thought") and "thoughtSignature" not in out[-1]:
+                out[-1]["thoughtSignature"] = sig
+                continue
+            if not sig:
+                continue
+        out.append(part)
+    return out
 
 
 def sse_text_event(text: str, finish: bool = False) -> bytes:
@@ -656,7 +717,11 @@ def make_handler(shield: Shield, annotate: bool):
                     self.send_header(k, v)
             self.send_header("Transfer-Encoding", "chunked")
             self.end_headers()
-            rehydrator = Rehydrator(shield.vault)
+            note = None
+            if is_model_call and annotate:
+                note = (f"\n\n_shield: {counters['spans']} new spans, {counters['misses']} new parts, "
+                        f"{redact_ms:.0f} ms redaction, vault {len(shield.vault.display)}_")
+            rehydrator = Rehydrator(shield.vault, note)
             total = 0
 
             def emit(data: bytes) -> None:
@@ -671,10 +736,6 @@ def make_handler(shield: Shield, annotate: bool):
                 total += len(chunk)
                 emit(rehydrator.feed(chunk) if is_model_call else chunk)
             tail = rehydrator.feed(b"", final=True) if is_model_call else b""
-            if is_model_call and annotate:
-                note = (f"\n\n_shield: {counters['spans']} new spans, {counters['misses']} new parts, "
-                        f"{redact_ms:.0f} ms redaction, vault {len(shield.vault.display)}_")
-                tail += sse_text_event(note)
             emit(tail)
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
