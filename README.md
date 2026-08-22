@@ -1,4 +1,4 @@
-# Local-first NGO data insights
+# Prototypes for io
 
 <p align="center">
   <img src="assets/io.jpg" alt="Jupiter and Io" width="360">
