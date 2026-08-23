@@ -1,0 +1,1 @@
+Done. Across all 16 villages in June 2025, a total of **2,724 households** were reached.

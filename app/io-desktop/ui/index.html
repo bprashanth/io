@@ -42,6 +42,7 @@ form#ask{display:flex;gap:10px;padding:14px 32px 20px;border-top:1px solid var(-
 form#ask input{flex:1;padding:12px 14px;border-radius:12px;font-size:15px}
 .hint{font-size:12px;color:var(--muted);padding:0 32px 10px;background:var(--card)}
 .thinking{color:var(--muted);font-style:italic}
+.steps{font-size:13px;color:var(--muted)}.step{padding:2px 0}.step.now{color:var(--ink)}
 .modal{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center}.modal.open{display:flex}
 .modal .box{width:440px}
 </style>
@@ -129,10 +130,17 @@ $('#ask').onsubmit = async e => {
   const text = $('#q').value.trim(); if (!text) return;
   $('#q').value = ''; $('#send').disabled = true;
   const turn = document.createElement('div'); turn.className = 'turn';
-  turn.innerHTML = `<div class=q></div><div class=a><span class=thinking>Working… (the model is writing a query; rows stay here)</span></div>`;
+  turn.innerHTML = `<div class=q></div><div class=a><div class=steps><span class=thinking>Starting…</span></div></div>`;
   turn.querySelector('.q').textContent = text;
   log.appendChild(turn); log.scrollTop = log.scrollHeight;
+  const stepsEl = turn.querySelector('.steps'); const t0 = Date.now();
+  const ticker = setInterval(async () => {
+    try { const p = await api('/api/progress'); const secs = Math.round((Date.now() - t0) / 1000);
+      stepsEl.innerHTML = p.steps.map((s, i) => `<div class="${i === p.steps.length - 1 ? 'step now' : 'step'}">${i === p.steps.length - 1 ? '⏳' : '✓'} ${s.text}</div>`).join('') + `<div class=step style="color:var(--muted)">${secs}s · small local-tier model, thanks for waiting</div>`;
+    } catch (e) {}
+  }, 700);
   const r = await api('/api/ask', {text});
+  clearInterval(ticker);
   const a = turn.querySelector('.a');
   if (r.id) { turn.dataset.id = r.id; turn.dataset.lane = r.lane; }
   if (r.error) { a.innerHTML = `<span class=err></span>`; a.querySelector('.err').textContent = r.error; }

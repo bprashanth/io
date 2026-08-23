@@ -59,6 +59,13 @@ Headless use without Electron: `python3 server/io_service.py 8791` and open
   reported back for one repair, and a page that shows none of your real
   values is called out as made up. "Download the page" saves the file.
 
+## While you wait
+
+The answer card lists what the app is doing (reading files, asking the
+model, running queries, checking, rendering, repairing) with elapsed seconds.
+A small model takes 2–40 s hosted and longer on a laptop CPU; the steps are
+real, not decoration.
+
 ## Live
 
 Save a file in the folder and the app reloads it: pages re-run their

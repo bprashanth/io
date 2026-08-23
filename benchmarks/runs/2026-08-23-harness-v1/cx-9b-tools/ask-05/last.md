@@ -1,0 +1,1 @@
+Done. There are **15 SHGs** registered in Manchar village.

@@ -1,0 +1,1 @@
+Total student attendance (days present) across all classes in June 2025 was **5,641 days**.

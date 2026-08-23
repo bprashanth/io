@@ -82,6 +82,19 @@ live re-run on file change (pages re-execute their receipts, last answers
 recompute, no model call) — the FW edit-and-reorder demo works inside io;
 exported pages are still static (duckdb-wasm is the next item).
 
+**Harness question (2026-08-23 14:00, `chronology/2026-08-23T1400-…`).**
+Codex CLI (and by extension the DeepSeek harness) around the same 9B was
+measured against io on a new 40-case NGO-sector corpus (8 synthetic orgs,
+16 real-world data shapes: stacked blocks, merged headers, Zoho/Razorpay/Kobo
+exports, WhatsApp chat, month-wide ledgers, header drift). Ask lane, 22
+cases: io 20/22 at 2.5 s with 0 rows to the model; Codex 19–20/22 at 24–34 s,
+20–35× the tokens, raw rows read in 21/22 free runs. Build: io 10/10 pages;
+Codex thrashes (450k tokens). **Decision: no agent harness in io at T0.**
+Harnesses mature through written skills, and io is that skill layer
+compiled deterministically; the `harness-skill/` (`AGENTS.md` + `io.py`) is
+kept for T1/T2 agents (27B with it: 22/22, 0 raw reads). The loader grew the
+sector shapes; the UI now shows live progress steps while the model works.
+
 **Left open.** A ~4 GB quant for 8 GB laptops with the OS resident; Windows install of the shim;
 packaging as an installer; T1/T2 dial positions; sheltering (vault, lazy
 review, egress monitor from the shield) — the next steps of the proposal.
