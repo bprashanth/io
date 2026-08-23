@@ -20,6 +20,7 @@ Endpoints
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -39,13 +40,15 @@ from sqlglot import exp
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import render_plan  # noqa: E402
+import skills as skillmod  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 UI = HERE.parent / "ui"
 CONFIG_DIR = Path(os.environ.get("IO_CONFIG_DIR") or (Path.home() / ".config" / "io-desktop"))
 CONFIG_FILE = CONFIG_DIR / "config.json"
 DEFAULT_CONFIG = {"source": "openrouter", "endpoint": "https://openrouter.ai/api/v1", "model": "qwen/qwen3.5-9b", "api_key": "",
-                  "local_endpoint": "http://127.0.0.1:8080/v1", "local_model": "local"}
+                  "local_endpoint": "http://127.0.0.1:8080/v1", "local_model": "local",
+                  "astronaut": False, "t1_model": "qwen/qwen3.8-27b", "t2_model": "google/gemini-3.7-flash", "telegram_token": ""}
 
 PAGE_WORDS = re.compile(r"\b(pwa|web ?app|an? app|app for|form|website|homepage|landing page|quiz|sign ?up|tracker|collector|offline|game|calculator|checklist)\b", re.I)
 BUILD_WORDS = re.compile(r"\b(build|dashboard|website|web ?page|report|summary|summari[sz]e|write me|make me a page|one.?pager|brief)\b", re.I)
@@ -213,6 +216,8 @@ def _clean_block(raw: pd.DataFrame, h: int, end: int) -> pd.DataFrame | None:
         headers.append(name)
     body = raw.iloc[h + 1:end].copy()
     body.columns = headers
+    body.attrs["header_row"] = int(h) + 1
+    body.attrs["rows_before_header"] = int(h)
     body = body.dropna(how="all")
 
     def is_footer(row) -> bool:
@@ -239,6 +244,7 @@ def _clean_block(raw: pd.DataFrame, h: int, end: int) -> pd.DataFrame | None:
             if as_num.notna().mean() >= 0.95 and nonblank.map(lambda v: isinstance(v, str) and bool(re.search(r"\d", v))).mean() >= 0.9 \
                     and not nonblank.map(lambda v: isinstance(v, str) and bool(re.fullmatch(r"\d{4}\s\d{4}\s\d{4}|\d{10,}|[A-Z]{5}\d{4}[A-Z]", v.strip()))).mean() >= 0.5:
                 body[c] = pd.to_numeric(stripped.map(lambda v: re.sub(r"[,\s₹]|%$", "", v) if isinstance(v, str) else v), errors="coerce")
+                body.attrs.setdefault("numbers_from_text", []).append(c)
                 continue
             if nonblank.map(lambda v: isinstance(v, str) and bool(GPS_PAIR.match(v))).mean() >= 0.9:
                 body[f"{c} lat"] = stripped.map(lambda v: float(GPS_PAIR.match(v).group(1)) if isinstance(v, str) and GPS_PAIR.match(v) else None)
@@ -252,6 +258,7 @@ def _clean_block(raw: pd.DataFrame, h: int, end: int) -> pd.DataFrame | None:
                 if len(nn) and (nn % 1 == 0).all():
                     if (nn.abs() >= 1e9).mean() >= 0.5 and nn.nunique() >= 0.9 * len(nn):
                         body[c] = col.map(lambda v: str(int(v)) if v == v and v is not None else None)  # long unique integers are identifiers
+                        body.attrs.setdefault("ids_kept_as_text", []).append(c)
                     else:
                         body[c] = col.astype("Int64")
             except Exception:  # noqa: BLE001
@@ -292,7 +299,10 @@ def tidy_frames(raw: pd.DataFrame) -> list[tuple[str | None, pd.DataFrame]]:
                 frame = frame.copy()
                 frame.insert(0, "block", title or f"block {len(frames) + 1}")
                 frames.append(frame)
-            out.append((None, pd.concat(frames, ignore_index=True)))
+            merged = pd.concat(frames, ignore_index=True)
+            merged.attrs = dict(parts[0][1].attrs)
+            merged.attrs["blocks"] = [title or f"block {i + 1}" for i, (title, _) in enumerate(parts)]
+            out.append((None, merged))
     return out
 
 
@@ -390,6 +400,7 @@ def coerce_dates(frame: pd.DataFrame) -> pd.DataFrame:
         if parsed is not None:
             has_time = bool(((parsed.dt.hour != 0) | (parsed.dt.minute != 0)).any())
             frame[col] = parsed if has_time else parsed.dt.date
+            frame.attrs.setdefault("dates_typed", []).append(f"{col} ({'day first' if dayfirst else 'month first'})")
     return frame
 
 
@@ -399,6 +410,7 @@ class Workspace:
         self.db = duckdb.connect(":memory:", config={"enable_external_access": "false"})
         self.tables: list[dict] = []
         self.bridges: list[dict] = []
+        self.skills: list[dict] = []
         self.schema = ""
         self.categories: dict = {}
         self.history: list[dict] = []
@@ -457,8 +469,13 @@ class Workspace:
                 self.db.register("tmp_frame", frame)
                 self.db.execute(f'CREATE TABLE "{name}" AS SELECT * FROM tmp_frame')
                 self.db.unregister("tmp_frame")
-                self.tables.append({"file": f.name, "sheet": sheet, "table": name, "rows": len(frame), "columns": list(frame.columns), "merged_case": merged})
+                why = {k: v for k, v in frame.attrs.items() if k in ("header_row", "rows_before_header", "blocks", "numbers_from_text", "ids_kept_as_text", "dates_typed")}
+                if merged:
+                    why["merged_case"] = merged
+                self.tables.append({"file": f.name, "sheet": sheet, "table": name, "rows": len(frame), "columns": list(frame.columns), "merged_case": merged, "why": why, "sha256": skillmod.file_sha256(f)})
         self.folder = folder
+        self.skills = skillmod.load_skills(folder)
+        self._apply_mappings()
         self.bridges = self._build_bridges()
         self.schema = self._ddl()
         self.categories = self._categories()
@@ -532,6 +549,65 @@ class Workspace:
                         bridges.append({"src": src, "src_col": sc, "ref": ref, "ref_col": rc, "col": col, "matched": matched, "of": n_src, "exact": exact})
         return bridges
 
+    def _apply_mappings(self) -> None:
+        """mapping skills: derive columns (expressions over existing ones) and unify differently-named
+        columns across files under one name. Originals are kept; SEE WHY records what was added."""
+        for sk in self.skills:
+            if sk["kind"] != "mapping":
+                continue
+            m = sk.get("mapping", {})
+            for t in self.tables:
+                if "table" not in t or not skillmod.table_matches(sk.get("trigger", {}) or {"table_regex": "."}, {**t, "folder": self.folder.name if self.folder else ""}):
+                    continue
+                cols = {c.casefold(): c for c in t["columns"]}
+                added = []
+                for new, variants in (m.get("unify") or {}).items():
+                    src = next((cols[v.casefold()] for v in variants if v.casefold() in cols), None)
+                    if src and new.casefold() not in cols:
+                        try:
+                            self.db.execute(f'ALTER TABLE "{t["table"]}" ADD COLUMN "{new}" AS ("{src}")')
+                        except Exception:  # noqa: BLE001
+                            try:
+                                self.db.execute(f'ALTER TABLE "{t["table"]}" ADD COLUMN "{new}" VARCHAR')
+                                self.db.execute(f'UPDATE "{t["table"]}" SET "{new}" = "{src}"')
+                            except Exception:  # noqa: BLE001
+                                continue
+                        t["columns"].append(new)
+                        added.append(f'{new} = "{src}"')
+                for new, expr in (m.get("derive") or {}).items():
+                    if new.casefold() in cols:
+                        continue
+                    try:
+                        typ = self.db.execute(f'SELECT typeof({expr}) FROM "{t["table"]}" LIMIT 1').fetchone()
+                        typ = typ[0] if typ else "DOUBLE"
+                        self.db.execute(f'ALTER TABLE "{t["table"]}" ADD COLUMN "{new}" {typ}')
+                        self.db.execute(f'UPDATE "{t["table"]}" SET "{new}" = {expr}')
+                        t["columns"].append(new)
+                        added.append(f"{new} = {expr}")
+                    except Exception:  # noqa: BLE001
+                        continue
+                if added:
+                    t.setdefault("why", {}).setdefault("mappings", []).append({"skill": sk["name"], "added": added})
+
+    def protected_values(self) -> set[str]:
+        """Cell values of high-cardinality text columns (names, phones, ids) — never allowed inside a skill."""
+        vals: set[str] = set()
+        for t in self.tables:
+            if "table" not in t:
+                continue
+            cats = self.categories.get(t["table"], {}) if hasattr(self, "categories") else {}
+            for c in t["columns"]:
+                if c in cats:
+                    continue
+                try:
+                    rows = self.db.execute(f'SELECT DISTINCT "{c.replace(chr(34), chr(34) * 2)}" FROM "{t["table"]}" LIMIT 2000').fetchall()
+                except Exception:  # noqa: BLE001
+                    continue
+                for (v,) in rows:
+                    if isinstance(v, str) and len(v.strip()) >= 4 and not re.fullmatch(r"[\d.,\-/ ]+", v.strip()):
+                        vals.add(v.strip())
+        return vals
+
     def _ddl(self) -> str:
         out = []
         for t in self.tables:
@@ -547,22 +623,24 @@ class Workspace:
                 if br["ref"] == t["table"]:
                     note += f'-- {t["table"]}."{br["ref_col"]}" is the master spelling; {br["src"]} carries a matching column "{br["col"]}".\n'
             months = month_columns([c for c, _ in cols])
-            if len(months) >= 4:
-                qm = ", ".join(chr(34) + m + chr(34) for m in months)
-                note += (f'-- columns {qm} are months of one measure laid side by side; a blank month means nothing that month, so add them as '
-                         f'{" + ".join("COALESCE(" + chr(34) + m + chr(34) + ", 0)" for m in months[:2])} + ... ; to rank months use '
-                         f'UNPIVOT "{t["table"]}" ON {qm} INTO NAME month VALUE amount.\n')
+            t["months"] = len(months) >= 4
             lc = [c.lower() for c, _ in cols]
-            if {"amount", "currency", "status"} <= set(lc) and any(c in lc for c in ("created_at", "method", "fee")):
-                note += (f'-- {t["table"]} looks like a Razorpay payments export: "amount", "fee" and "tax" are in PAISE (divide by 100.0 for rupees); '
-                         f'"status" = captured means money received; "created_at" is a unix epoch (to_timestamp("created_at")).\n')
-            if any("balance" in c for c in lc) and any(re.search(r"date|time", c) for c in lc) and any(re.search(r"\b(in|out|txn|type|qty|quantity)\b", c) for c in lc):
+            t["ledger"] = bool(any("balance" in c for c in lc) and any(re.search(r"date|time", c) for c in lc) and any(re.search(r"\b(in|out|txn|type|qty|quantity)\b", c) for c in lc))
+            if t["months"]:
+                note += f'-- month columns: {", ".join(chr(34) + m + chr(34) for m in months)}.\n'
+            if t["ledger"]:
                 bal = next(c for c, _ in cols if "balance" in c.lower())
-                note += (f'-- {t["table"]} is a running ledger: each row is a movement and "{bal}" is the balance AFTER that row. '
-                         f'The current stock/balance of an item is "{bal}" on its LATEST row (by date, then row order), not MIN/MAX/SUM over rows.\n')
-            if t.get("whatsapp"):
-                note += (f'-- {t["table"]} is a WhatsApp group chat export, one row per message: "sender", "message" (Hinglish), "first_number" = the first small number written in the message '
-                         f'(e.g. "total 29 bacche aaye" -> 29), "media" = photo/file placeholder. Counts reported in chat live in first_number; filter by words in message (e.g. bacche, aaye, update).\n')
+                note += f'-- "{bal}" is a balance column that changes row by row.\n'
+            # skills: declarative claims with triggers (built-in, user, folder); recorded in SEE WHY
+            fired = []
+            for sk in self.skills:
+                if sk["kind"] in ("hint", "mapping") and skillmod.table_matches(sk.get("trigger", {}), {**t, "folder": self.folder.name if self.folder else ""}):
+                    if sk["kind"] == "hint":
+                        note += f'-- {sk["claim"]} (skill: {sk["name"]})\n'
+                    fired.append(sk["name"])
+            t.setdefault("why", {})["skills"] = fired
+            if any(b["src"] == t["table"] for b in self.bridges):
+                t["why"]["normalised_join_columns"] = [b["col"] for b in self.bridges if b["src"] == t["table"]]
             if t.get("merged_case"):
                 note += f'-- spelling variants differing only by case/spaces were merged in: {", ".join(chr(34) + c + chr(34) for c in t["merged_case"])}.\n'
             out.append(note + f'CREATE TABLE "{t["table"]}" (\n  ' + ",\n  ".join(f'"{c}" {k}' for c, k in cols) + "\n);")
@@ -586,6 +664,28 @@ class Workspace:
 
 WS = Workspace()
 PROGRESS: list[dict] = []
+FIRED: list[str] = []   # rule/template skills that fired for the turn in flight
+LOG_DIR = CONFIG_DIR / "logs"
+
+
+def log_turn(turn: dict) -> None:
+    """Interaction log for COMPACT: questions, schema notes that fired, SQL, errors, retries — never rows."""
+    if not WS.folder:
+        return
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        key = hashlib.sha256(str(WS.folder).encode()).hexdigest()[:12]
+        rec = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "folder": WS.folder.name, "lane": turn.get("lane"), "question": turn.get("text"),
+               "tables_used": turn.get("tables_used"), "sql": turn.get("sql") if turn.get("lane") == "ask" else None,
+               "plan_sql": [p.get("sql") for p in (turn.get("plan") or {}).get("panels", [])] if turn.get("lane") == "build" else None,
+               "rowcount": turn.get("rowcount"), "attempts": turn.get("attempts") if isinstance(turn.get("attempts"), int) else None,
+               "error": turn.get("error"), "panels_failed": turn.get("panels_failed"), "scope_note": turn.get("scope_note"),
+               "invented_numbers": turn.get("invented_numbers"), "skills_fired": turn.get("skills_fired"), "model": (turn.get("egress") or {}).get("model"),
+               "seconds": (turn.get("egress") or {}).get("seconds"), "tables": [{"table": t["table"], "columns": t["columns"], "why": t.get("why")} for t in WS.tables if "table" in t]}
+        with open(LOG_DIR / f"{key}.jsonl", "a") as f:
+            f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
 
 
 def step(text: str) -> None:
@@ -605,7 +705,8 @@ def call_model(cfg: dict, prompt: str, max_tokens: int = 2500, timeout: int = 18
             raise RuntimeError("No OpenRouter key set. Open Settings and paste a key, or switch to a local model.")
     body = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0, "max_tokens": max_tokens}
     if cfg.get("source") != "local":
-        body["reasoning"] = {"enabled": False}
+        # thinking-only models (Gemini, gpt-oss) refuse reasoning.enabled=false; ask for low effort instead
+        body["reasoning"] = {"effort": "low"} if re.match(r"google/gemini|openai/gpt-oss|openai/o", model) else {"enabled": False}
     else:
         body["chat_template_kwargs"] = {"enable_thinking": False}
     headers = {"Content-Type": "application/json"}
@@ -738,6 +839,10 @@ def prior_turns(question: str, limit: int = 4) -> list[dict]:
 def ask_prompt(question: str, repair: str | None) -> str:
     prior = [{"question": t["text"], "sql": t.get("sql"), "output_columns": t.get("columns")} for t in prior_turns(question)]
     rules = list(ASK_RULES)
+    for sk in WS.skills:
+        if sk["kind"] == "rule" and skillmod.question_matches(sk.get("trigger", {}), question):
+            rules.append(f'{sk["claim"]} (skill: {sk["name"]})')
+            FIRED.append(sk["name"])
     if WS.bridges:
         rules.append("Approximate name matching is ALREADY DONE for you: the '(as in ...)' columns hold each name in the other file's spelling; join on them with a plain = (LEFT JOIN from the table whose every row must be kept). "
                      "Never call jaro_winkler_similarity yourself.")
@@ -849,40 +954,54 @@ KINDS = {"kpi", "bar", "stacked_bar", "line", "scatter", "pie", "table"}
 def run_build(text: str, cfg: dict) -> dict:
     repair = None
     plan, results, metas = None, {}, []
-    for attempt in range(2):
-        step("Asking the model for a page plan: panels with SQL, no numbers" if not attempt else "Some panels failed; asking the model to fix only those")
-        raw, meta = call_model(cfg, build_prompt(text, repair), max_tokens=3000)
-        metas.append(meta)
-        step("Running every panel's query on your laptop")
-        try:
-            cand = extract_json(raw)
-            panels = cand.get("panels")
-            if not isinstance(panels, list) or not panels:
-                raise ValueError("plan has no panels")
-            for i, p in enumerate(panels):
-                p["id"] = p.get("id") or f"p{i + 1}"
-                if p.get("kind") not in KINDS:
-                    p["kind"] = "table"
-        except Exception as exc:  # noqa: BLE001
-            repair = f"Your previous answer could not be used: {exc}"
-            continue
-        res = {}
-        bad = []
-        for p in panels:
-            try:
-                res[p["id"]] = execute(safe_sql(p.get("sql", "")))
-                if not res[p["id"]]["rows"]:
-                    bad.append(f'{p["id"]}: query returned no rows')
-                elif p.get("kind") == "kpi" and len(res[p["id"]]["rows"]) > 1:
-                    p["kind"] = "table"  # a KPI must be one number; several rows read better as a table
-            except Exception as exc:  # noqa: BLE001
-                res[p["id"]] = {"columns": [], "rows": [], "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
-                bad.append(f'{p["id"]}: {res[p["id"]]["error"]}')
-        if plan is None or len(bad) < sum(1 for r in results.values() if r["error"] or not r["rows"]):
-            plan, results = cand, res
-        if not bad:
+    for sk in WS.skills:
+        if sk["kind"] == "template" and skillmod.question_matches(sk.get("trigger", {}), text) and isinstance(sk.get("template", {}).get("plan"), dict):
+            FIRED.append(sk["name"])
+            plan = json.loads(json.dumps(sk["template"]["plan"]))
+            step(f"A saved page template matched this request (skill: {sk['name']}); no model call needed")
+            results = {}
+            for p in plan["panels"]:
+                try:
+                    results[p["id"]] = execute(safe_sql(p.get("sql", "")))
+                except Exception as exc:  # noqa: BLE001
+                    results[p["id"]] = {"columns": [], "rows": [], "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+            metas.append({"model": "template:" + sk["name"], "seconds": 0.0, "prompt_bytes": 0, "rows_sent": 0, "usage": None})
             break
-        repair = "These panels failed when the laptop ran them:\n" + "\n".join(bad) + "\nFix only what is needed and return the full plan again."
+    if plan is None:
+      for attempt in range(2):
+          step("Asking the model for a page plan: panels with SQL, no numbers" if not attempt else "Some panels failed; asking the model to fix only those")
+          raw, meta = call_model(cfg, build_prompt(text, repair), max_tokens=3000)
+          metas.append(meta)
+          step("Running every panel's query on your laptop")
+          try:
+              cand = extract_json(raw)
+              panels = cand.get("panels")
+              if not isinstance(panels, list) or not panels:
+                  raise ValueError("plan has no panels")
+              for i, p in enumerate(panels):
+                  p["id"] = p.get("id") or f"p{i + 1}"
+                  if p.get("kind") not in KINDS:
+                      p["kind"] = "table"
+          except Exception as exc:  # noqa: BLE001
+              repair = f"Your previous answer could not be used: {exc}"
+              continue
+          res = {}
+          bad = []
+          for p in panels:
+              try:
+                  res[p["id"]] = execute(safe_sql(p.get("sql", "")))
+                  if not res[p["id"]]["rows"]:
+                      bad.append(f'{p["id"]}: query returned no rows')
+                  elif p.get("kind") == "kpi" and len(res[p["id"]]["rows"]) > 1:
+                      p["kind"] = "table"  # a KPI must be one number; several rows read better as a table
+              except Exception as exc:  # noqa: BLE001
+                  res[p["id"]] = {"columns": [], "rows": [], "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+                  bad.append(f'{p["id"]}: {res[p["id"]]["error"]}')
+          if plan is None or len(bad) < sum(1 for r in results.values() if r["error"] or not r["rows"]):
+              plan, results = cand, res
+          if not bad:
+              break
+          repair = "These panels failed when the laptop ran them:\n" + "\n".join(bad) + "\nFix only what is needed and return the full plan again."
     if plan is None:
         return {"lane": "build", "text": text, "error": f"I couldn't produce a page plan. {repair}", "egress": metas[-1] if metas else None}
     narrative = plan.get("narrative") or ""
@@ -1037,6 +1156,75 @@ def page_with_data(turn: dict) -> str:
     return html_doc
 
 
+# ---------------------------------------------------------------- Astronaut: skills, compaction, authoring
+
+SKILL_CONTRACT = """A SKILL is one JSON object the kernel applies deterministically (no model involved when it fires):
+{"name": "kebab-case", "kind": "hint"|"mapping"|"rule"|"template", "description": "one plain-English line for the user",
+ "trigger": {  // structural only; every present key must match
+    "columns_all": ["exact column names that must all exist"], "columns_any": [..], "table_regex": "regex on table name",
+    "file_glob": "*.csv", "folder_name": "this folder only", "whatsapp": true, "months": true, "ledger": true,
+    "question_regex": "for rule/template: regex the user's question must match" },
+ "claim": "hint: a sentence added to that table's schema notes so the model reads it before writing SQL | rule: a sentence added to the rules for matching questions",
+ "mapping": {"unify": {"new_column": ["Variant A", "Variant B"]}, "derive": {"new_column": "SQL expression over existing columns"}},
+ "template": {"plan": {...panel plan JSON...}},
+ "evidence": [log line numbers], "confidence": 0.0-1.0 }
+Hard rules: a skill must never contain a data value (a person's name, phone, id, email, a specific village or donor); only column names, table names, structure and method.
+Prefer mapping/unify for differently-named columns across files, hint for how a table should be read (units, which row is current, what blank means),
+rule for how a kind of question should be answered (sign conventions, aggregation level, tie handling, which file to reach for), template only for a page plan that was requested repeatedly.
+Do not propose what the built-in skills already say. Skip anything you are not confident about."""
+
+
+def compact_prompt(log_lines: list[dict], builtin: list[dict]) -> str:
+    trimmed = []
+    for i, r in enumerate(log_lines):
+        trimmed.append({"n": i, "q": r.get("question"), "lane": r.get("lane"), "sql": (r.get("sql") or "")[:600], "plan_sql": [x[:200] for x in (r.get("plan_sql") or [])][:6],
+                        "error": r.get("error"), "attempts": r.get("attempts"), "panels_failed": r.get("panels_failed"), "scope_note": r.get("scope_note"),
+                        "invented_numbers": r.get("invented_numbers"), "skills_fired": r.get("skills_fired"), "tables_used": r.get("tables_used")})
+    tables = {}
+    for r in log_lines:
+        for t in r.get("tables") or []:
+            tables[t["table"]] = {"columns": t["columns"], "why": t.get("why")}
+    return ("You review the interaction log of a small local model answering questions over an NGO's spreadsheets, and propose SKILLS that would make future answers correct on the first try. "
+            "You see questions, the SQL written, errors, retries and how files were parsed — never data rows.\n\n" + SKILL_CONTRACT +
+            "\n\nTABLES (name, columns, how they were read):\n" + json.dumps(tables, ensure_ascii=False)[:12000] +
+            "\n\nBUILT-IN SKILLS ALREADY ACTIVE:\n" + json.dumps([{k: v for k, v in b.items() if k in ("name", "kind", "description", "trigger")} for b in builtin], ensure_ascii=False) +
+            "\n\nLOG:\n" + json.dumps(trimmed, ensure_ascii=False)[:40000] +
+            "\n\nReturn ONLY a JSON array of 0-8 skill objects. Each must cite evidence line numbers from the log.")
+
+
+def run_compact(cfg: dict, tier: str) -> dict:
+    if not WS.folder:
+        raise RuntimeError("open a folder first")
+    key = hashlib.sha256(str(WS.folder).encode()).hexdigest()[:12]
+    path = LOG_DIR / f"{key}.jsonl"
+    lines = [json.loads(l) for l in path.read_text().splitlines() if l.strip()] if path.exists() else []
+    if not lines:
+        raise RuntimeError("no interaction log for this folder yet — ask a few questions first")
+    model = cfg.get("t2_model") if tier == "t2" else cfg.get("t1_model")
+    remote = {**cfg, "source": "openrouter", "model": model}
+    step(f"Sending {len(lines)} log lines (questions, SQL, parse notes — no rows) to {model}")
+    raw, meta = call_model(remote, compact_prompt(lines, [s for s in WS.skills if s.get("origin") == "builtin"]), max_tokens=6000, timeout=300)
+    m = re.search(r"\[.*\]", raw, re.S)
+    cards = json.loads(m.group(0)) if m else []
+    protected = WS.protected_values()
+    out = []
+    for c in cards:
+        if not isinstance(c, dict) or c.get("kind") not in skillmod.KINDS or not c.get("name"):
+            continue
+        c["origin"] = "compacted"
+        c["leaks"] = skillmod.value_leak(c, protected)
+        c["fires_on"] = [t["table"] for t in WS.tables if "table" in t and skillmod.table_matches(c.get("trigger", {}), {**t, "folder": WS.folder.name})] if c["kind"] in ("hint", "mapping") else []
+        out.append(c)
+    step("Done")
+    return {"cards": out, "log_lines": len(lines), "model": meta.get("model"), "seconds": meta.get("seconds"), "usage": meta.get("usage"), "raw": raw[:4000]}
+
+
+def preview_skill(skill: dict) -> dict:
+    protected = WS.protected_values()
+    fires = [t["table"] for t in WS.tables if "table" in t and skillmod.table_matches(skill.get("trigger", {}), {**t, "folder": WS.folder.name if WS.folder else ""})] if skill.get("kind") in ("hint", "mapping") else []
+    return {"leaks": skillmod.value_leak(skill, protected), "fires_on": fires, "question_trigger": bool((skill.get("trigger") or {}).get("question_regex"))}
+
+
 # ---------------------------------------------------------------- HTTP
 
 def csv_text(result: dict) -> str:
@@ -1069,12 +1257,14 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
             return self._send(200, (UI / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if path == "/api/skills":
+            return self._json({"skills": [{k: v for k, v in sk.items() if k != "_path"} | {"fires_on": [t["table"] for t in WS.tables if "table" in t and sk["kind"] in ("hint", "mapping") and skillmod.table_matches(sk.get("trigger", {}), {**t, "folder": WS.folder.name if WS.folder else ""})]} for sk in WS.skills]})
         if path == "/api/progress":
             return self._json({"steps": PROGRESS[-8:]})
         if path == "/api/state":
             cfg = load_config()
             return self._json({"folder": str(WS.folder) if WS.folder else None, "tables": WS.tables, "version": getattr(WS, "version", 0), "changed_at": getattr(WS, "changed_at", None),
-                               "config": {**cfg, "api_key": ("set" if cfg.get("api_key") else "")},
+                               "config": {**cfg, "api_key": ("set" if cfg.get("api_key") else ""), "telegram_token": ("set" if cfg.get("telegram_token") else "")},
                                "history": [{k: v for k, v in t.items() if k not in ("_full", "page", "rows")} for t in WS.history]})
         m = re.match(r"^/api/page/(\d+)$", path)
         if m:
@@ -1147,7 +1337,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"folder": str(folder), "tables": WS.tables})
             if self.path == "/api/config":
                 cfg = load_config()
-                for k in ("source", "endpoint", "model", "local_endpoint", "local_model"):
+                for k in ("source", "endpoint", "model", "local_endpoint", "local_model", "astronaut", "t1_model", "t2_model", "telegram_token"):
                     if k in body:
                         cfg[k] = body[k]
                 if body.get("api_key") and body["api_key"] != "set":
@@ -1164,6 +1354,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"error": "Open a folder with CSV or Excel files first."}, 400)
                 cfg = load_config()
                 PROGRESS.clear()
+                FIRED.clear()
                 lane = body.get("lane")
                 if not lane:
                     if PAGE_WORDS.search(text) and not re.search(r"\b(dashboard|report|summar\w*)\b", text, re.I):
@@ -1178,8 +1369,10 @@ class Handler(BaseHTTPRequestHandler):
                     step("Done")
                     turn["id"] = str(len(WS.history) + 1)
                     turn["at"] = time.strftime("%H:%M:%S")
+                    turn["skills_fired"] = sorted(set(FIRED) | {n for t in WS.tables for n in (t.get("why") or {}).get("skills", []) if t.get("table") in (turn.get("tables_used") or [])})
                     WS.history.append(turn)
                     WS.turns[turn["id"]] = turn
+                    log_turn(turn)
                 return self._json({k: v for k, v in turn.items() if k not in ("_full", "page", "page_html", "attempts")})
             m = re.match(r"^/api/page-repair/(\d+)$", self.path)
             if m:
@@ -1208,6 +1401,38 @@ class Handler(BaseHTTPRequestHandler):
                     except Exception as exc:  # noqa: BLE001
                         return self._json({"repaired": False, "error": str(exc)[:200]})
                 return self._json({"repaired": False})
+            if self.path == "/api/skills/preview":
+                with WS.lock:
+                    return self._json(preview_skill(body.get("skill") or {}))
+            if self.path == "/api/skills/save":
+                sk = body.get("skill") or {}
+                if sk.get("kind") not in skillmod.KINDS or not sk.get("name"):
+                    return self._json({"error": "a skill needs a name and a kind"}, 400)
+                with WS.lock:
+                    leaks = skillmod.value_leak(sk, WS.protected_values())
+                    if leaks:
+                        return self._json({"error": f"this skill contains data values and was not saved: {', '.join(leaks[:3])}"}, 400)
+                    sk.setdefault("origin", "authored")
+                    p = skillmod.save_skill(sk, body.get("layer", "folder"), WS.folder)
+                    if WS.folder:
+                        WS.load(WS.folder, keep_history=True)
+                return self._json({"saved": str(p), "skills": [x["name"] for x in WS.skills]})
+            if self.path == "/api/skills/delete":
+                with WS.lock:
+                    ok = skillmod.delete_skill(body.get("name", ""), WS.folder)
+                    if WS.folder:
+                        WS.load(WS.folder, keep_history=True)
+                return self._json({"deleted": ok})
+            if self.path == "/api/astronaut/compact":
+                cfg = load_config()
+                if not cfg.get("astronaut"):
+                    return self._json({"error": "Astronaut mode is off"}, 400)
+                PROGRESS.clear()
+                try:
+                    with WS.lock:
+                        return self._json(run_compact(cfg, body.get("tier", "t1")))
+                except Exception as exc:  # noqa: BLE001
+                    return self._json({"error": str(exc)[:300]}, 500)
             if self.path == "/api/reset":
                 with WS.lock:
                     WS.history, WS.turns = [], {}

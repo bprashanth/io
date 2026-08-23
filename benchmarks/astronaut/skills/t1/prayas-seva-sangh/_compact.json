@@ -1,0 +1,71 @@
+{
+ "cards": [
+  {
+   "name": "vehicle-log-monthly-filter",
+   "kind": "rule",
+   "description": "Use date range or month extraction for monthly vehicle log queries instead of listing individual days.",
+   "trigger": {
+    "table_regex": "vehicle_log",
+    "question_regex": "(total|sum|distance|km|travelled).*(month|june|july|august|september|october|november|december|january|february|march|april|may)"
+   },
+   "claim": "When filtering vehicle_log by month, use a date range (e.g., date >= '2025-06-01' AND date < '2025-07-01') or strftime/EXTRACT functions, not a list of individual day conditions.",
+   "evidence": [
+    2
+   ],
+   "confidence": 0.95,
+   "origin": "compacted",
+   "leaks": [],
+   "fires_on": []
+  },
+  {
+   "name": "attendance-absence-interpretation",
+   "kind": "hint",
+   "description": "The 'A' column in staff attendance sheets represents the total count of absent days for the month.",
+   "trigger": {
+    "columns_all": [
+     "Staff ID",
+     "Name",
+     "A"
+    ],
+    "table_regex": "staff_attendance"
+   },
+   "claim": "The column 'A' contains the pre-calculated total number of absent days for the period. Do not sum the daily columns (1-31) to find absences; use the 'A' column directly for totals and rankings.",
+   "evidence": [
+    1
+   ],
+   "confidence": 0.85,
+   "origin": "compacted",
+   "leaks": [],
+   "fires_on": [
+    "staff_attendance_aug"
+   ]
+  }
+ ],
+ "log_lines": 3,
+ "model": "qwen/qwen3.8-27b",
+ "seconds": 5.19,
+ "usage": {
+  "prompt_tokens": 1644,
+  "completion_tokens": 378,
+  "total_tokens": 2022,
+  "cost": 0.0019494,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0019494,
+   "upstream_inference_prompt_cost": 0.0007398,
+   "upstream_inference_completions_cost": 0.0012096
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "raw": "```json\n[\n  {\n    \"name\": \"vehicle-log-monthly-filter\",\n    \"kind\": \"rule\",\n    \"description\": \"Use date range or month extraction for monthly vehicle log queries instead of listing individual days.\",\n    \"trigger\": {\n      \"table_regex\": \"vehicle_log\",\n      \"question_regex\": \"(total|sum|distance|km|travelled).*(month|june|july|august|september|october|november|december|january|february|march|april|may)\"\n    },\n    \"claim\": \"When filtering vehicle_log by month, use a date range (e.g., date >= '2025-06-01' AND date < '2025-07-01') or strftime/EXTRACT functions, not a list of individual day conditions.\",\n    \"evidence\": [2],\n    \"confidence\": 0.95\n  },\n  {\n    \"name\": \"attendance-absence-interpretation\",\n    \"kind\": \"hint\",\n    \"description\": \"The 'A' column in staff attendance sheets represents the total count of absent days for the month.\",\n    \"trigger\": {\n      \"columns_all\": [\"Staff ID\", \"Name\", \"A\"],\n      \"table_regex\": \"staff_attendance\"\n    },\n    \"claim\": \"The column 'A' contains the pre-calculated total number of absent days for the period. Do not sum the daily columns (1-31) to find absences; use the 'A' column directly for totals and rankings.\",\n    \"evidence\": [1],\n    \"confidence\": 0.85\n  }\n]\n```"
+}
