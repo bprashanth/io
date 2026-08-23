@@ -1,0 +1,147 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Beneficiary Registration</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Beneficiary Registration</h1></header>
+<main>
+  <div class="card">
+    <h2 style="font-size:18px;margin:0 0 12px 0">Register New Beneficiary</h2>
+    <form id="regForm">
+      <div class="grid">
+        <div>
+          <label for="name">Full Name *</label>
+          <input type="text" id="name" name="name" required placeholder="e.g. John Doe">
+        </div>
+        <div>
+          <label for="age">Age *</label>
+          <input type="number" id="age" name="age" min="0" max="120" required placeholder="e.g. 34">
+        </div>
+        <div>
+          <label for="village">Village / Ward *</label>
+          <input type="text" id="village" name="village" required placeholder="e.g. Green Valley">
+        </div>
+        <div>
+          <label for="phone">Phone Number *</label>
+          <input type="tel" id="phone" name="phone" pattern="[0-9+() -]{6,20}" required placeholder="e.g. 555-0199">
+        </div>
+        <div style="grid-column: 1 / -1;">
+          <label for="category">Category *</label>
+          <select id="category" name="category" required>
+            <option value="">Select Category...</option>
+            <option value="Healthcare Assistance">Healthcare Assistance</option>
+            <option value="Education Support">Education Support</option>
+            <option value="Livelihood & Skills">Livelihood & Skills</option>
+            <option value="Nutrition / Food Relief">Nutrition / Food Relief</option>
+            <option value="Elderly / Disability Care">Elderly / Disability Care</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:16px">
+        <button type="submit">Save Beneficiary</button>
+        <button type="reset" class="secondary">Reset</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <h2 style="font-size:18px;margin:0">Registered Beneficiaries</h2>
+        <span class="muted" id="countLabel">0 records saved</span>
+      </div>
+      <button id="downloadBtn" class="secondary">Download CSV</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Age</th>
+            <th>Village</th>
+            <th>Phone</th>
+            <th>Category</th>
+            <th>Date Registered</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="6" class="muted" style="text-align:center">No beneficiaries registered yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+offlineReady();
+
+const STORAGE_KEY = 'beneficiaries_data';
+const form = document.getElementById('regForm');
+const tableBody = document.getElementById('tableBody');
+const countLabel = document.getElementById('countLabel');
+const downloadBtn = document.getElementById('downloadBtn');
+
+let records = store.get(STORAGE_KEY, []);
+
+function renderTable() {
+  countLabel.textContent = `${records.length} record${records.length === 1 ? '' : 's'} saved`;
+  if (!records.length) {
+    tableBody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center">No beneficiaries registered yet.</td></tr>';
+    return;
+  }
+  tableBody.innerHTML = records.map(r => `
+    <tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${escapeHtml(String(r.age))}</td>
+      <td>${escapeHtml(r.village)}</td>
+      <td>${escapeHtml(r.phone)}</td>
+      <td>${escapeHtml(r.category)}</td>
+      <td class="muted">${escapeHtml(r.registeredAt)}</td>
+    </tr>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const formData = new FormData(form);
+  const entry = {
+    name: formData.get('name').trim(),
+    age: formData.get('age').trim(),
+    village: formData.get('village').trim(),
+    phone: formData.get('phone').trim(),
+    category: formData.get('category'),
+    registeredAt: new Date().toISOString().split('T')[0]
+  };
+
+  records.unshift(entry);
+  store.set(STORAGE_KEY, records);
+  renderTable();
+  form.reset();
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (!records.length) {
+    alert('No beneficiary records to download.');
+    return;
+  }
+  const csv = toCSV(records);
+  download('beneficiaries.csv', csv, 'text/csv');
+});
+
+renderTable();
+</script>
+</body></html>

@@ -308,6 +308,21 @@ def plausibility(result: dict) -> list[str]:
     return flags
 
 
+SQL_SMELLS = [
+    (re.compile(r"(SUM|AVG|COUNT)\s*\([^()]*\)\s*\*\s*(SUM|AVG|COUNT)\s*\(", re.I), "multiplies two totals/averages together (a total of products is usually what is meant)"),
+    (re.compile(r"AVG\s*\(\s*AVG\s*\(", re.I), "averages an average"),
+    (re.compile(r"SUM\s*\([^()]*\bAVG\b", re.I), "sums an average"),
+    (re.compile(r"(?:[*/+-]\s*(?!100(?:\.0+)?\b|1000\b)\d{2,}(?:\.\d+)?(?![\w.])|(?<![\w.])(?!100(?:\.0+)?\b|1000\b)\d{2,}(?:\.\d+)?\s*[*/])", re.I), "uses a fixed number of its own in the arithmetic"),
+]
+
+
+def sql_smells(sql: str) -> list[str]:
+    body = re.sub(r"'[^']*'|\"[^\"]*\"", " ", sql or "")
+    body = re.sub(r"\b(LIMIT|OFFSET)\s+\d+", " ", body, flags=re.I)
+    body = re.sub(r"\b\d{4}-\d{2}-\d{2}\b", " ", body)
+    return [why for rx, why in SQL_SMELLS if rx.search(body)]
+
+
 def panel_html(panel: dict, result: dict) -> str:
     kind = panel.get("kind", "table")
     rows, cols = result["rows"], result["columns"]
@@ -339,7 +354,7 @@ def panel_html(panel: dict, result: dict) -> str:
         body = svg_pie(rows, x, ys[0]) if x and ys else table_html(cols, rows, panel["id"])
     else:
         body = table_html(cols, rows, panel["id"])
-    warn = "".join(f'<p class=warn>⚠ Check this: {esc(f)}</p>' for f in plausibility(result))
+    warn = "".join(f'<p class=warn>⚠ Check this: {esc(f)}</p>' for f in plausibility(result) + [f"the query {w} — open the receipt" for w in sql_smells(panel.get("sql", ""))])
     return (f'<section class="panel" data-receipt="{esc(panel["id"])}"><header><h3>{esc(panel.get("title", panel["id"]))}</h3>'
             f'<button class=dl data-panel="{esc(panel["id"])}">Download CSV</button></header>{body}{warn}'
             f'<details class=receipt><summary>How this was computed · {len(rows)} rows</summary><pre>{esc(panel.get("sql", ""))}</pre>{("<pre>" + esc(result["error"]) + "</pre>") if result.get("error") else ""}</details></section>')

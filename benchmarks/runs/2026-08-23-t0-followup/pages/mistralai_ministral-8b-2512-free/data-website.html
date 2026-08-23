@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scholarship Progress Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        select, button {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .status {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .pending {
+            background-color: #ffeb3b;
+            color: #333;
+        }
+        .approved {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .rejected {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .summary {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        @media (max-width: 600px) {
+            th, td {
+                padding: 8px 10px;
+                font-size: 14px;
+            }
+            .controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Scholarship Scheme Progress</h1>
+
+        <div class="controls">
+            <select id="districtFilter">
+                <option value="">All Districts</option>
+            </select>
+            <select id="statusFilter">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+            </select>
+            <button id="refreshBtn">Refresh Data</button>
+        </div>
+
+        <div id="loading" class="loading">Loading data...</div>
+        <div id="tableContainer"></div>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <div id="summaryPending">Total Pending Cases: <span id="pendingCount">0</span></div>
+            <div id="summaryApproved">Total Approved: <span id="approvedCount">0</span></div>
+            <div id="summaryRejected">Total Rejected: <span id="rejectedCount">0</span></div>
+        </div>
+    </div>
+
+    <script>
+        // Service Worker registration (inline Blob URL)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(new Blob([
+                `self.addEventListener('install', (event) => {
+                    event.waitUntil(
+                        caches.open('scholarship-tracker-v1')
+                            .then((cache) => {
+                                return cache.addAll([
+                                    self.location.href
+                                ]);
+                            })
+                    );
+                });
+
+                self.addEventListener('fetch', (event) => {
+                    event.respondWith(
+                        caches.match(event.request)
+                            .then((response) => {
+                                return response || fetch(event.request);
+                            })
+                    );
+                });`
+            ], { type: 'application/javascript' }));
+        }
+
+        // Main application
+        document.addEventListener('DOMContentLoaded', function() {
+            const tableContainer = document.getElementById('tableContainer');
+            const loading = document.getElementById('loading');
+            const districtFilter = document.getElementById('districtFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const pendingCount = document.getElementById('pendingCount');
+            const approvedCount = document.getElementById('approvedCount');
+            const rejectedCount = document.getElementById('rejectedCount');
+
+            // Initialize with data if available
+            if (window.data && Array.isArray(window.data)) {
+                renderTable(window.data);
+                updateSummary(window.data);
+                populateFilters(window.data);
+            } else {
+                loading.textContent = 'No data available. Please check your connection or refresh.';
+            }
+
+            // Refresh button
+            refreshBtn.addEventListener('click', function() {
+                if (window.data && Array.isArray(window.data)) {
+                    renderTable(window.data);
+                    updateSummary(window.data);
+                } else {
+                    loading.textContent = 'No data available. Please check your connection or refresh.';
+                }
+            });
+
+            // Filter change handlers
+            districtFilter.addEventListener('change', function() {
+                const filteredData = filterData(window.data, this.value, statusFilter.value);
+                renderTable(filteredData);
+                updateSummary(filteredData);
+            });
+
+            statusFilter.addEventListener('change', function() {
+                const filteredData = filterData(window.data, districtFilter.value, this.value);
+                renderTable(filteredData);
+                updateSummary(filteredData);
+            });
+
+            function filterData(data, district, status) {
+                return data.filter(row => {
+                    return (!district || row.District === district) &&
+                           (!status || row.Status === status);
+                });
+            }
+
+            function populateFilters(data) {
+                // Get unique districts
+                const districts = [...new Set(data.map(row => row.District))].sort();
+                districts.forEach(district => {
+                    const option = document.createElement('option');
+                    option.value = district;
+                    option.textContent = district;
+                    districtFilter.appendChild(option);
+                });
+
+                // Get unique statuses
+                const statuses = [...new Set(data.map(row => row.Status))];
+                statuses.forEach(status => {
+                    const option = document.createElement('option');
+                    option.value = status;
+                    option.textContent = status;
+                    statusFilter.appendChild(option);
+                });
+            }
+
+            function updateSummary(data) {
+                const pending = data.filter(row => row.Status === 'pending').length;
+                const approved = data.filter(row => row.Status === 'approved').length;
+                const rejected = data.filter(row => row.Status === 'rejected').length;
+
+                pendingCount.textContent = pending;
+                approvedCount.textContent = approved;
+                rejectedCount.textContent = rejected;
+            }
+
+            function renderTable(data) {
+                if (!data || data.length === 0) {
+                    tableContainer.innerHTML = '<div class="no-data">No matching records found</div>';
+                    return;
+                }
+
+                loading.style.display = 'none';
+
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>District</th>
+                            <th>Taluka</th>
+                            <th>Status</th>
+                            <th>Marks %</th>
+                            <th>Family Income</th>
+                            <th>Scheme Name</th>
+                            <th>Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(row => `
+                            <tr>
+                                <td>${row.District}</td>
+                                <td>${row.Taluka}</td>
+                                <td><span class="status ${row.Status.toLowerCase()}">${row.Status}</span></td>
+                                <td>${row['Marks %']}</td>
+                                <td>${row['Family Income']}</td>
+                                <td>${row['Name of scheme']}</td>
+                                <td>${row.Name}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                `;
+
+                tableContainer.innerHTML = '';
+                tableContainer.appendChild(table);
+            }
+        });
+    </script>
+</body>
+</html>

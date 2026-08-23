@@ -1,0 +1,150 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Water Point Survey</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Water Point Survey</h1></header>
+<main>
+  <div class="card">
+    <h2>Water Point Information</h2>
+    <form id="surveyForm">
+      <div class="row">
+        <div>
+          <label for="habitation">Habitation Name</label>
+          <input type="text" id="habitation" name="habitation" required>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="pumpType">Pump Type</label>
+          <select id="pumpType" name="pumpType" required>
+            <option value="">Select pump type</option>
+            <option value="handpump">Handpump</option>
+            <option value="motorized">Motorized</option>
+            <option value="spring">Spring</option>
+            <option value="rainwater">Rainwater Collection</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="working">Is the pump working?</label>
+          <select id="working" name="working" required>
+            <option value="">Select status</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+            <option value="partially">Partially</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="users">Number of Users</label>
+          <input type="number" id="users" name="users" min="1" required>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="location">Location (GPS)</label>
+          <input type="text" id="location" name="location" placeholder="Click to get GPS coordinates" readonly>
+          <button type="button" onclick="getLocation()">Get GPS</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <button type="submit">Save Response</button>
+        <button type="button" class="secondary" onclick="exportData()">Export All Responses</button>
+      </div>
+    </form>
+
+    <div id="results" class="card" style="display:none;">
+      <h2>Survey Results</h2>
+      <div id="responseList"></div>
+    </div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// YOUR CODE HERE
+const surveyData = store.get('waterSurveyData', []);
+const responseList = document.getElementById('responseList');
+
+function getLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        document.getElementById('location').value = `${position.coords.latitude}, ${position.coords.longitude}`;
+      },
+      (error) => {
+        alert('Error getting location: ' + error.message);
+      }
+    );
+  } else {
+    alert('Geolocation is not supported by this browser.');
+  }
+}
+
+document.getElementById('surveyForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  const formData = {
+    id: Date.now(),
+    habitation: document.getElementById('habitation').value,
+    pumpType: document.getElementById('pumpType').value,
+    working: document.getElementById('working').value,
+    users: document.getElementById('users').value,
+    location: document.getElementById('location').value,
+    timestamp: new Date().toISOString()
+  };
+
+  surveyData.push(formData);
+  store.set('waterSurveyData', surveyData);
+
+  document.getElementById('surveyForm').reset();
+  showResults();
+});
+
+function showResults() {
+  responseList.innerHTML = '';
+  surveyData.forEach(response => {
+    const responseDiv = document.createElement('div');
+    responseDiv.className = 'card';
+    responseDiv.innerHTML = `
+      <h3>Survey #${response.id}</h3>
+      <p><strong>Habitation:</strong> ${response.habitation}</p>
+      <p><strong>Pump Type:</strong> ${response.pumpType}</p>
+      <p><strong>Working:</strong> ${response.working}</p>
+      <p><strong>Users:</strong> ${response.users}</p>
+      <p><strong>Location:</strong> ${response.location || 'Not recorded'}</p>
+      <p class="muted"><small>Recorded: ${new Date(response.timestamp).toLocaleString()}</small></p>
+    `;
+    responseList.appendChild(responseDiv);
+  });
+
+  document.getElementById('results').style.display = 'block';
+}
+
+function exportData() {
+  const csv = toCSV(surveyData);
+  download('water_survey_data.csv', csv, 'text/csv');
+
+  const json = JSON.stringify(surveyData, null, 2);
+  download('water_survey_data.json', json, 'application/json');
+}
+
+offlineReady();
+</script>
+</body></html>

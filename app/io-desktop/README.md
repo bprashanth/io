@@ -47,6 +47,24 @@ Click **Settings** in the sidebar.
 Headless use without Electron: `python3 server/io_service.py 8791` and open
 `http://127.0.0.1:8791/` in a browser.
 
+## Three lanes
+
+- **Ask** — question → one SQL query → table / auto chart, receipted.
+- **Build** (say *dashboard* / *report*) — the model returns a plan of panels;
+  every figure is a query result; narrative numbers are receipts.
+- **Page** (say *app* / *form* / *website* / *PWA*) — the model writes the
+  page itself; rows never go to it. If the request points at loaded data the
+  laptop pours the rows in as `window.data` (snake_case keys) when the page
+  opens. The page is syntax-checked before it is shown, runtime errors are
+  reported back for one repair, and a page that shows none of your real
+  values is called out as made up. "Download the page" saves the file.
+
+## Live
+
+Save a file in the folder and the app reloads it: pages re-run their
+receipts on the next view ("data as of …"), the last answers recompute, no
+model call. Edit a value in the sheet, watch the ranking reorder.
+
 ## What the sidebar tells a participant
 
 - **Files**: what was loaded, rows × columns; the spelling-normalised columns

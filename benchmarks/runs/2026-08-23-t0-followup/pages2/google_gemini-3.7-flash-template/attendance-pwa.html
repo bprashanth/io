@@ -1,0 +1,388 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tuition Attendance Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Tuition Attendance Tracker","short_name":"Attendance","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Tuition Attendance Tracker</h1></header>
+<main>
+  <div class="row" style="margin-bottom: 12px; justify-content: space-between; align-items: center;">
+    <div class="row" style="gap: 8px;">
+      <button id="tabDaily" onclick="switchView('daily')">Daily Attendance</button>
+      <button id="tabMonthly" class="secondary" onclick="switchView('monthly')">Monthly Summary</button>
+      <button id="tabRoster" class="secondary" onclick="switchView('roster')">Students (<span id="rosterCount">0</span>)</button>
+    </div>
+    <div class="row" style="gap: 8px;">
+      <button class="secondary" onclick="exportData()" title="Download attendance CSV">Export CSV</button>
+    </div>
+  </div>
+
+  <!-- VIEW: DAILY ATTENDANCE -->
+  <div id="viewDaily" class="card">
+    <div class="row" style="justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
+      <div style="flex: 1; min-width: 180px;">
+        <label for="attDate">Attendance Date</label>
+        <input type="date" id="attDate" onchange="loadDateAttendance()">
+      </div>
+      <div class="row" style="gap: 8px; align-items: center; margin-top: 8px;">
+        <button class="secondary" onclick="markAll(true)">All Present</button>
+        <button class="secondary" onclick="markAll(false)">All Absent</button>
+      </div>
+    </div>
+
+    <div id="dailyStats" class="grid" style="margin-bottom: 16px;">
+      <div style="background: var(--bg); padding: 10px; border-radius: 8px; text-align: center;">
+        <div class="muted" style="font-size: 12px;">Total Students</div>
+        <strong id="statTotal" style="font-size: 18px;">0</strong>
+      </div>
+      <div style="background: #ecfdf5; border: 1px solid #a7f3d0; padding: 10px; border-radius: 8px; text-align: center; color: #065f46;">
+        <div style="font-size: 12px;">Present</div>
+        <strong id="statPresent" style="font-size: 18px;">0</strong>
+      </div>
+      <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 10px; border-radius: 8px; text-align: center; color: #991b1b;">
+        <div style="font-size: 12px;">Absent</div>
+        <strong id="statAbsent" style="font-size: 18px;">0</strong>
+      </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 40px;">#</th>
+            <th>Student Name</th>
+            <th style="text-align: center; width: 150px;">Status</th>
+          </tr>
+        </thead>
+        <tbody id="attendanceTableBody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+    <div id="noStudentsDailyMsg" class="muted" style="text-align: center; padding: 20px; display: none;">
+      No students added yet. Please add students in the "Students" tab first.
+    </div>
+  </div>
+
+  <!-- VIEW: MONTHLY SUMMARY -->
+  <div id="viewMonthly" class="card" style="display: none;">
+    <div class="row" style="justify-content: space-between; align-items: flex-end; margin-bottom: 16px;">
+      <div style="flex: 1; min-width: 180px;">
+        <label for="summaryMonth">Select Month</label>
+        <input type="month" id="summaryMonth" onchange="renderMonthlySummary()">
+      </div>
+      <div>
+        <span class="muted" id="totalSessionsCount" style="font-size: 14px;"></span>
+      </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 40px;">#</th>
+            <th>Student Name</th>
+            <th style="text-align: right;">Days Present</th>
+            <th style="text-align: right;">Days Absent</th>
+            <th style="text-align: right;">Total Days</th>
+            <th style="text-align: right;">Attendance %</th>
+          </tr>
+        </thead>
+        <tbody id="monthlyTableBody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+    <div id="noStudentsMonthlyMsg" class="muted" style="text-align: center; padding: 20px; display: none;">
+      No attendance recorded for this month.
+    </div>
+  </div>
+
+  <!-- VIEW: STUDENTS ROSTER -->
+  <div id="viewRoster" class="card" style="display: none;">
+    <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <div>
+        <h2 style="font-size: 16px; margin: 0;">Manage Student Roster</h2>
+        <span class="muted" style="font-size: 12px;">Add your tuition kids once to track attendance daily</span>
+      </div>
+    </div>
+
+    <div class="row" style="margin-bottom: 16px; align-items: flex-end;">
+      <div style="flex: 1; min-width: 200px;">
+        <label for="newStudentName">Add New Student Name</label>
+        <input type="text" id="newStudentName" placeholder="e.g. Rahul Sharma" onkeydown="if(event.key==='Enter') addStudent()">
+      </div>
+      <button onclick="addStudent()">Add Kid</button>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 40px;">#</th>
+            <th>Student Name</th>
+            <th style="width: 100px; text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rosterTableBody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+
+let students = store.get('tuition_students', []);
+let attendance = store.get('tuition_attendance', {}); // format: { "YYYY-MM-DD": { "studentId": "P" | "A" } }
+
+// Set initial dates
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('attDate').value = today;
+document.getElementById('summaryMonth').value = today.slice(0, 7);
+
+function saveStudents() {
+  store.set('tuition_students', students);
+  updateRosterCount();
+}
+
+function saveAttendance() {
+  store.set('tuition_attendance', attendance);
+}
+
+function updateRosterCount() {
+  document.getElementById('rosterCount').innerText = students.length;
+}
+
+function switchView(view) {
+  ['daily', 'monthly', 'roster'].forEach(v => {
+    const btn = document.getElementById('tab' + v.charAt(0).toUpperCase() + v.slice(1));
+    const section = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
+    if (v === view) {
+      btn.className = '';
+      section.style.display = 'block';
+    } else {
+      btn.className = 'secondary';
+      section.style.display = 'none';
+    }
+  });
+
+  if (view === 'daily') loadDateAttendance();
+  if (view === 'monthly') renderMonthlySummary();
+  if (view === 'roster') renderRoster();
+}
+
+function addStudent() {
+  const input = document.getElementById('newStudentName');
+  const name = input.value.trim();
+  if (!name) return;
+  const newStudent = {
+    id: 's_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    name: name
+  };
+  students.push(newStudent);
+  saveStudents();
+  input.value = '';
+  renderRoster();
+}
+
+function deleteStudent(id) {
+  if (!confirm('Remove this student from the list?')) return;
+  students = students.filter(s => s.id !== id);
+  saveStudents();
+  renderRoster();
+}
+
+function renderRoster() {
+  const tbody = document.getElementById('rosterTableBody');
+  tbody.innerHTML = '';
+  if (students.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="muted" style="text-align:center; padding: 15px;">No students added yet. Type a name above to add.</td></tr>';
+    return;
+  }
+  students.forEach((s, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="muted">${idx + 1}</td>
+      <td><strong>${escapeHtml(s.name)}</strong></td>
+      <td style="text-align: right;">
+        <button class="secondary" style="color: #dc2626; border-color: #fca5a5; padding: 4px 8px; font-size: 12px;" onclick="deleteStudent('${s.id}')">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function loadDateAttendance() {
+  const date = document.getElementById('attDate').value;
+  if (!date) return;
+  if (!attendance[date]) {
+    attendance[date] = {};
+  }
+  renderAttendanceTable();
+}
+
+function setStatus(studentId, status) {
+  const date = document.getElementById('attDate').value;
+  if (!date) return;
+  if (!attendance[date]) attendance[date] = {};
+  attendance[date][studentId] = status;
+  saveAttendance();
+  renderAttendanceTable();
+}
+
+function markAll(present) {
+  const date = document.getElementById('attDate').value;
+  if (!date || students.length === 0) return;
+  if (!attendance[date]) attendance[date] = {};
+  const status = present ? 'P' : 'A';
+  students.forEach(s => {
+    attendance[date][s.id] = status;
+  });
+  saveAttendance();
+  renderAttendanceTable();
+}
+
+function renderAttendanceTable() {
+  const date = document.getElementById('attDate').value;
+  const tbody = document.getElementById('attendanceTableBody');
+  const emptyMsg = document.getElementById('noStudentsDailyMsg');
+  tbody.innerHTML = '';
+
+  if (students.length === 0) {
+    emptyMsg.style.display = 'block';
+    document.getElementById('statTotal').innerText = '0';
+    document.getElementById('statPresent').innerText = '0';
+    document.getElementById('statAbsent').innerText = '0';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+
+  const dayData = attendance[date] || {};
+  let pCount = 0;
+  let aCount = 0;
+
+  students.forEach((s, idx) => {
+    const status = dayData[s.id] || 'P'; // default present
+    if (!dayData[s.id]) {
+      // populate default
+      dayData[s.id] = 'P';
+    }
+    if (dayData[s.id] === 'P') pCount++;
+    else if (dayData[s.id] === 'A') aCount++;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="muted">${idx + 1}</td>
+      <td>${escapeHtml(s.name)}</td>
+      <td style="text-align: center;">
+        <div class="row" style="gap: 4px; justify-content: center;">
+          <button 
+            style="padding: 4px 10px; font-size: 13px; ${dayData[s.id] === 'P' ? 'background:#10b981;border-color:#10b981;color:#fff;' : 'background:#fff;color:#10b981;border-color:#a7f3d0;'}" 
+            onclick="setStatus('${s.id}', 'P')">Present</button>
+          <button 
+            style="padding: 4px 10px; font-size: 13px; ${dayData[s.id] === 'A' ? 'background:#ef4444;border-color:#ef4444;color:#fff;' : 'background:#fff;color:#ef4444;border-color:#fecaca;'}" 
+            onclick="setStatus('${s.id}', 'A')">Absent</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  attendance[date] = dayData;
+  saveAttendance();
+
+  document.getElementById('statTotal').innerText = students.length;
+  document.getElementById('statPresent').innerText = pCount;
+  document.getElementById('statAbsent').innerText = aCount;
+}
+
+function renderMonthlySummary() {
+  const month = document.getElementById('summaryMonth').value;
+  const tbody = document.getElementById('monthlyTableBody');
+  const emptyMsg = document.getElementById('noStudentsMonthlyMsg');
+  const countSpan = document.getElementById('totalSessionsCount');
+  tbody.innerHTML = '';
+
+  if (!month) return;
+
+  const datesInMonth = Object.keys(attendance).filter(d => d.startsWith(month));
+  countSpan.innerText = `Sessions conducted: ${datesInMonth.length} day(s)`;
+
+  if (students.length === 0 || datesInMonth.length === 0) {
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+
+  students.forEach((s, idx) => {
+    let present = 0;
+    let absent = 0;
+
+    datesInMonth.forEach(d => {
+      const rec = attendance[d];
+      if (rec && rec[s.id] === 'P') present++;
+      else if (rec && rec[s.id] === 'A') absent++;
+    });
+
+    const totalDays = present + absent;
+    const rate = totalDays > 0 ? Math.round((present / totalDays) * 100) : 0;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="muted">${idx + 1}</td>
+      <td><strong>${escapeHtml(s.name)}</strong></td>
+      <td style="text-align: right; color: #059669; font-weight: bold;">${present}</td>
+      <td style="text-align: right; color: #dc2626;">${absent}</td>
+      <td style="text-align: right;">${totalDays}</td>
+      <td style="text-align: right; font-weight: bold;">${rate}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function exportData() {
+  const rows = [];
+  const dates = Object.keys(attendance).sort();
+  if (!dates.length) {
+    alert('No attendance data available to export.');
+    return;
+  }
+
+  dates.forEach(date => {
+    students.forEach(s => {
+      const status = attendance[date] ? attendance[date][s.id] || 'Not Marked' : 'Not Marked';
+      rows.push({
+        'Date': date,
+        'Student ID': s.id,
+        'Student Name': s.name,
+        'Status': status === 'P' ? 'Present' : status === 'A' ? 'Absent' : status
+      });
+    });
+  });
+
+  const csv = toCSV(rows);
+  download(`tuition_attendance_${new Date().toISOString().split('T')[0]}.csv`, csv, 'text/csv');
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/[&<>"']/g, function(m) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+  });
+}
+
+// Initial setup
+updateRosterCount();
+loadDateAttendance();
+</script>
+</body></html>

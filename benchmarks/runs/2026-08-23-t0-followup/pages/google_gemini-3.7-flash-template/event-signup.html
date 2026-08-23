@@ -1,0 +1,227 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>14 September Health Camp - Event Signup</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Community Health Camp — 14 September</h1></header>
+<main>
+<div class="card" style="text-align:center;">
+  <h2 style="margin:0 0 4px;font-size:18px;">Event Countdown</h2>
+  <p class="muted" style="margin:0 0 12px;font-size:14px;">Target Date: September 14, 2025 • 09:00 AM</p>
+  <div class="row" style="justify-content:center;font-weight:bold;font-size:20px;gap:16px;" id="countdown-display">
+    <div><span id="cd-days">0</span> <span class="muted" style="font-size:12px;display:block;font-weight:normal;">Days</span></div>
+    <div><span id="cd-hours">0</span> <span class="muted" style="font-size:12px;display:block;font-weight:normal;">Hours</span></div>
+    <div><span id="cd-mins">0</span> <span class="muted" style="font-size:12px;display:block;font-weight:normal;">Mins</span></div>
+    <div><span id="cd-secs">0</span> <span class="muted" style="font-size:12px;display:block;font-weight:normal;">Secs</span></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:18px;">Register for Free Checkup</h2>
+    <form id="signup-form">
+      <div>
+        <label for="fullName">Full Name *</label>
+        <input type="text" id="fullName" required placeholder="e.g. Jane Doe">
+      </div>
+      <div>
+        <label for="contact">Phone / Email *</label>
+        <input type="text" id="contact" required placeholder="e.g. 555-0199 or jane@example.org">
+      </div>
+      <div class="row" style="gap:10px;">
+        <div style="flex:1;">
+          <label for="age">Age</label>
+          <input type="number" id="age" min="1" max="120" placeholder="e.g. 34">
+        </div>
+        <div style="flex:1;">
+          <label for="category">Service Needed</label>
+          <select id="category">
+            <option value="General Health">General Health</option>
+            <option value="Eye Screening">Eye Screening</option>
+            <option value="Dental Check">Dental Check</option>
+            <option value="Pediatrics">Pediatrics</option>
+            <option value="Volunteer Doctor/Staff">Volunteer Doctor/Staff</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <button type="submit" style="width:100%;">Confirm Signup</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;">
+    <div>
+      <h2 style="margin:0 0 8px;font-size:18px;">Camp Details</h2>
+      <p style="margin:0 0 8px;font-size:14px;"><strong>Location:</strong> Community Center, Main Hall</p>
+      <p style="margin:0 0 8px;font-size:14px;"><strong>Timing:</strong> 9:00 AM – 4:00 PM</p>
+      <p class="muted" style="font-size:13px;margin:0 0 12px;">Free consultations, basic blood tests, eye refraction tests, and essential medicines distribution provided by partner medical volunteers.</p>
+    </div>
+    <div style="border-top:1px solid var(--line);padding-top:12px;">
+      <span class="muted" style="font-size:13px;">Total Registered:</span>
+      <span id="reg-count" style="font-size:20px;font-weight:bold;margin-left:6px;">0</span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h2 style="margin:0;font-size:18px;">Registered Attendees</h2>
+    <div class="row">
+      <button type="button" class="secondary" id="export-csv">Export CSV</button>
+      <button type="button" class="secondary" id="export-json">Export JSON</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Contact</th>
+          <th>Age</th>
+          <th>Service</th>
+          <th>Registered At</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="attendee-table-body">
+        <tr><td colspan="7" class="muted" style="text-align:center;">No registrations yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+offlineReady();
+
+const initialData = (typeof window.data !== 'undefined' && Array.isArray(window.data)) 
+  ? window.data 
+  : store.get('health_camp_signups', [
+      { id: 1, name: "Maria Garcia", contact: "maria@example.org", age: "42", category: "General Health", registeredAt: "2025-08-10 10:30" },
+      { id: 2, name: "Ahmed Khan", contact: "ahmed.k@example.com", age: "65", category: "Eye Screening", registeredAt: "2025-08-11 14:15" },
+      { id: 3, name: "Dr. Sarah Chen", contact: "dr.chen@clinic.org", age: "38", category: "Volunteer Doctor/Staff", registeredAt: "2025-08-12 09:00" }
+    ]);
+
+let signups = store.get('health_camp_signups', initialData);
+
+function updateCountdown() {
+  const now = new Date();
+  let targetYear = now.getFullYear();
+  let targetDate = new Date(targetYear, 8, 14, 9, 0, 0); // 8 is September
+  if (now > targetDate) {
+    targetYear += 1;
+    targetDate = new Date(targetYear, 8, 14, 9, 0, 0);
+  }
+  const diff = targetDate - now;
+
+  if (diff <= 0) {
+    document.getElementById('countdown-display').innerHTML = '<div style="color:var(--accent);">Camp is underway or completed today!</div>';
+    return;
+  }
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const mins = Math.floor((diff / (1000 * 60)) % 60);
+  const secs = Math.floor((diff / 1000) % 60);
+
+  document.getElementById('cd-days').textContent = days;
+  document.getElementById('cd-hours').textContent = hours;
+  document.getElementById('cd-mins').textContent = mins;
+  document.getElementById('cd-secs').textContent = secs;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('attendee-table-body');
+  const countEl = document.getElementById('reg-count');
+  countEl.textContent = signups.length;
+
+  if (signups.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align:center;">No registrations yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = signups.map((item, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td><strong>${escapeHTML(item.name)}</strong></td>
+      <td>${escapeHTML(item.contact)}</td>
+      <td>${item.age ? escapeHTML(String(item.age)) : '-'}</td>
+      <td><span style="font-size:12px;padding:2px 6px;background:var(--line);border-radius:4px;">${escapeHTML(item.category)}</span></td>
+      <td class="muted" style="font-size:12px;">${escapeHTML(item.registeredAt)}</td>
+      <td><button type="button" class="secondary" style="padding:2px 8px;font-size:12px;" onclick="deleteSignup(${item.id})">Remove</button></td>
+    </tr>
+  `).join('');
+}
+
+function escapeHTML(str) {
+  return String(str).replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;'
+  }[tag] || tag));
+}
+
+window.deleteSignup = function(id) {
+  signups = signups.filter(s => s.id !== id);
+  store.set('health_camp_signups', signups);
+  renderTable();
+};
+
+document.getElementById('signup-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const nameInput = document.getElementById('fullName');
+  const contactInput = document.getElementById('contact');
+  const ageInput = document.getElementById('age');
+  const catInput = document.getElementById('category');
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
+
+  const newEntry = {
+    id: Date.now(),
+    name: nameInput.value.trim(),
+    contact: contactInput.value.trim(),
+    age: ageInput.value.trim(),
+    category: catInput.value,
+    registeredAt: dateStr
+  };
+
+  signups.unshift(newEntry);
+  store.set('health_camp_signups', signups);
+  renderTable();
+
+  nameInput.value = '';
+  contactInput.value = '';
+  ageInput.value = '';
+  catInput.selectedIndex = 0;
+  nameInput.focus();
+});
+
+document.getElementById('export-csv').addEventListener('click', function() {
+  if (!signups.length) return;
+  const csvData = toCSV(signups.map(({ id, ...rest }) => rest));
+  download('health-camp-signups.csv', csvData, 'text/csv');
+});
+
+document.getElementById('export-json').addEventListener('click', function() {
+  if (!signups.length) return;
+  download('health-camp-signups.json', JSON.stringify(signups, null, 2), 'application/json');
+});
+
+setInterval(updateCountdown, 1000);
+updateCountdown();
+renderTable();
+</script>
+</body></html>

@@ -1,0 +1,209 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field Expense Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Field Expense Tracker","short_name":"Expenses","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Field Expense Tracker</h1></header>
+<main>
+  <div class="card">
+    <h2 style="margin-top:0;font-size:18px">Add Expense</h2>
+    <form id="expense-form">
+      <div class="row">
+        <div style="flex:1;min-width:140px">
+          <label for="f-date">Date</label>
+          <input type="date" id="f-date" required>
+        </div>
+        <div style="flex:1;min-width:140px">
+          <label for="f-head">Head</label>
+          <input type="text" id="f-head" list="head-list" placeholder="e.g. Transport" required>
+          <datalist id="head-list"></datalist>
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label for="f-amount">Amount</label>
+          <input type="number" id="f-amount" step="0.01" min="0" placeholder="0.00" required>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button type="submit">Add Expense</button>
+        <button type="button" class="secondary" id="export-csv">Export CSV</button>
+        <button type="button" class="secondary" id="export-json">Export JSON</button>
+        <button type="button" class="secondary" id="clear-all">Clear All</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="grid">
+    <div class="card" style="margin:0">
+      <div class="muted" style="font-size:13px">Running Total</div>
+      <div id="stat-total" style="font-size:28px;font-weight:700">0.00</div>
+    </div>
+    <div class="card" style="margin:0">
+      <div class="muted" style="font-size:13px">Entries</div>
+      <div id="stat-count" style="font-size:28px;font-weight:700">0</div>
+    </div>
+    <div class="card" style="margin:0">
+      <div class="muted" style="font-size:13px">Heads</div>
+      <div id="stat-heads" style="font-size:28px;font-weight:700">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0;font-size:18px">Totals by Head</h2>
+    <table id="head-table">
+      <thead><tr><th>Head</th><th>Entries</th><th>Total</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="muted" id="head-empty" style="margin-bottom:0">No expenses yet.</p>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0;font-size:18px">Expenses</h2>
+    <table id="expense-table">
+      <thead><tr><th>Date</th><th>Head</th><th>Amount</th><th>Running Total</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="muted" id="expense-empty" style="margin-bottom:0">No expenses recorded yet.</p>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+(function () {
+  const KEY = 'field-expenses';
+  const fmt = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const money = n => fmt.format(n);
+  const $ = id => document.getElementById(id);
+
+  let expenses = store.get(KEY, []);
+  if (!Array.isArray(expenses)) expenses = [];
+
+  function save() { store.set(KEY, expenses); }
+
+  function sorted() {
+    return expenses.slice().sort((a, b) => {
+      const d = String(a.date).localeCompare(String(b.date));
+      if (d !== 0) return d;
+      return (a.id || 0) - (b.id || 0);
+    });
+  }
+
+  function render() {
+    const list = sorted();
+    // running total
+    let running = 0;
+    const rows = list.map(e => {
+      running += Number(e.amount) || 0;
+      return { e, running };
+    });
+
+    $('stat-total').textContent = money(running);
+    $('stat-count').textContent = String(list.length);
+
+    // totals by head
+    const byHead = {};
+    list.forEach(e => {
+      const h = String(e.head || 'Unspecified');
+      if (!byHead[h]) byHead[h] = { count: 0, total: 0 };
+      byHead[h].count += 1;
+      byHead[h].total += Number(e.amount) || 0;
+    });
+    const heads = Object.keys(byHead).sort((a, b) => byHead[b].total - byHead[a].total);
+    $('stat-heads').textContent = String(heads.length);
+
+    const hBody = $('head-table').querySelector('tbody');
+    hBody.innerHTML = '';
+    heads.forEach(h => {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td'); td1.textContent = h;
+      const td2 = document.createElement('td'); td2.textContent = String(byHead[h].count);
+      const td3 = document.createElement('td'); td3.textContent = money(byHead[h].total);
+      tr.append(td1, td2, td3);
+      hBody.appendChild(tr);
+    });
+    $('head-empty').style.display = heads.length ? 'none' : 'block';
+
+    // expense rows
+    const eBody = $('expense-table').querySelector('tbody');
+    eBody.innerHTML = '';
+    rows.forEach(({ e, running: r }) => {
+      const tr = document.createElement('tr');
+      const tdDate = document.createElement('td'); tdDate.textContent = e.date;
+      const tdHead = document.createElement('td'); tdHead.textContent = e.head;
+      const tdAmt = document.createElement('td'); tdAmt.textContent = money(Number(e.amount) || 0);
+      const tdRun = document.createElement('td'); tdRun.textContent = money(r);
+      const tdAct = document.createElement('td');
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'secondary';
+      del.textContent = 'Delete';
+      del.addEventListener('click', () => {
+        expenses = expenses.filter(x => x.id !== e.id);
+        save();
+        render();
+      });
+      tdAct.appendChild(del);
+      tr.append(tdDate, tdHead, tdAmt, tdRun, tdAct);
+      eBody.appendChild(tr);
+    });
+    $('expense-empty').style.display = list.length ? 'none' : 'block';
+
+    // datalist of heads
+    const dl = $('head-list');
+    dl.innerHTML = '';
+    heads.forEach(h => {
+      const o = document.createElement('option');
+      o.value = h;
+      dl.appendChild(o);
+    });
+  }
+
+  $('expense-form').addEventListener('submit', ev => {
+    ev.preventDefault();
+    const date = $('f-date').value;
+    const head = $('f-head').value.trim();
+    const amount = parseFloat($('f-amount').value);
+    if (!date || !head || isNaN(amount) || amount < 0) return;
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    expenses.push({ id, date, head, amount });
+    save();
+    $('f-head').value = '';
+    $('f-amount').value = '';
+    render();
+  });
+
+  $('export-csv').addEventListener('click', () => {
+    const rows = sorted().map(e => ({ date: e.date, head: e.head, amount: e.amount }));
+    download('expenses.csv', toCSV(rows), 'text/csv');
+  });
+
+  $('export-json').addEventListener('click', () => {
+    download('expenses.json', JSON.stringify(sorted(), null, 2), 'application/json');
+  });
+
+  $('clear-all').addEventListener('click', () => {
+    if (!expenses.length) return;
+    if (confirm('Delete all expenses? This cannot be undone.')) {
+      expenses = [];
+      save();
+      render();
+    }
+  });
+
+  // default date to today
+  const today = new Date();
+  const iso = today.toISOString().slice(0, 10);
+  $('f-date').value = iso;
+
+  render();
+})();
+</script>
+</body></html>

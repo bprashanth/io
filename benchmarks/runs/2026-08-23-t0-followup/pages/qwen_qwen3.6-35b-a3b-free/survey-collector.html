@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Water Point Survey</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --bg: #f4f6f9;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --border: #dddddd;
+            --success: #28a745;
+            --danger: #dc3545;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0 0 10px 0;
+            color: var(--primary);
+        }
+
+        p.subtitle {
+            font-size: 0.9rem;
+            color: #666;
+            margin: 0;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+            background-color: #fff;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        .radio-label input {
+            margin-right: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+            margin-top: 10px;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+            margin-top: 10px;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .status-msg {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            min-height: 1.5em;
+        }
+
+        .status-success { color: var(--success); }
+        .status-error { color: var(--danger); }
+
+        /* List Styles */
+        .data-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .data-item {
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            padding: 10px;
+            font-size: 0.85rem;
+        }
+
+        .data-item:last-child {
+            border-bottom: none;
+        }
+
+        .data-header {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: var(--primary);
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+        }
+
+        .hidden { display: none; }
+
+        .gps-status {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .gps-btn {
+            background: #e9ecef;
+            color: #333;
+            border: 1px solid #ced4da;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Water Point Survey</h1>
+        <p class="subtitle">Collect data offline and export later.</p>
+    </header>
+
+    <!-- FORM SECTION -->
+    <div id="form-section" class="card">
+        <form id="surveyForm">
+            
+            <div class="form-group">
+                <label for="habitation">Habitation / Village Name</label>
+                <input type="text" id="habitation" required placeholder="Enter village name">
+            </div>
+
+            <div class="form-group">
+                <label>Pump Type</label>
+                <select id="pumpType" required>
+                    <option value="" disabled selected>Select pump type...</option>
+                    <option value="Hand Pump (India Mark II)">Hand Pump (India Mark II)</option>
+                    <option value="Deep Tube Well">Deep Tube Well</option>
+                    <option value="Borewell with Motor">Borewell with Motor</option>
+                    <option value="Rainwater Harvesting">Rainwater Harvesting</option>
+                    <option value="Tap Water Supply">Tap Water Supply</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Status</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="workingStatus" value="Yes" checked> Working
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="workingStatus" value="No"> Not Working
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="users">Estimated Daily Users</label>
+                <input type="number" id="users" min="0" placeholder="Number of people">
+            </div>
+
+            <div class="form-group">
+                <label for="gpsCoords">GPS Location</label>
+                <button type="button" class="gps-btn" onclick="getGPS()">📍 Get Current Location</button>
+                <div id="gpsStatus" class="gps-status">Waiting for location...</div>
+                <input type="hidden" id="gpsCoords">
+            </div>
+
+            <button type="submit" class="btn-primary">Save Response</button>
+        </form>
+        <div id="formStatus" class="status-msg"></div>
+    </div>
+
+    <!-- DATA LIST SECTION -->
+    <div id="list-section" class="card hidden">
+        <h3 style="margin-top:0;">Saved Responses (<span id="count">0</span>)</h3>
+        <ul id="responsesList" class="data-list">
+            <!-- Items injected here -->
+        </ul>
+        <button class="btn-success" onclick="exportJSON()">Download JSON</button>
+        <button class="btn-danger" onclick="clearData()">Clear All Data</button>
+    </div>
+</div>
+
+<script>
+    // --- State Management ---
+    const STORAGE_KEY = 'water_survey_data';
+    let surveyData = [];
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadData();
+        renderList();
+    });
+
+    // --- GPS Logic ---
+    function getGPS() {
+        const statusEl = document.getElementById('gpsStatus');
+        const coordsInput = document.getElementById('gpsCoords');
+
+        if (!navigator.geolocation) {
+            statusEl.textContent = "Geolocation is not supported by your browser.";
+            statusEl.className = "gps-status status-error";
+            return;
+        }
+
+        statusEl.textContent = "Locating...";
+        statusEl.className = "gps-status";
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                coordsInput.value = `${lat}, ${lng}`;
+                statusEl.textContent = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+                statusEl.className = "gps-status status-success";
+            },
+            (error) => {
+                let msg = "Unable to retrieve location.";
+                switch(error.code) {
+                    case error.PERMISSION_DENIED: msg = "Location permission denied."; break;
+                    case error.POSITION_UNAVAILABLE: msg = "Location unavailable."; break;
+                    case error.TIMEOUT: msg = "Location request timed out."; break;
+                }
+                statusEl.textContent = msg;
+                statusEl.className = "gps-status status-error";
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    }
+
+    // --- Form Handling ---
+    const form = document.getElementById('surveyForm');
+    
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const habitation = document.getElementById('habitation').value.trim();
+        const pumpType = document.getElementById('pumpType').value;
+        const workingStatus = document.querySelector('input[name="workingStatus"]:checked').value;
+        const users = document.getElementById('users').value;
+        const gps = document.getElementById('gpsCoords').value;
+
+        if(!habitation || !pumpType) {
+            showStatus("Please fill in all required fields.", "error");
+            return;
+        }
+
+        const entry = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            habitation,
+            pumpType,
+            workingStatus,
+            users: users ? parseInt(users) : null,
+            gps: gps || "Not provided"
+        };
+
+        surveyData.push(entry);
+        saveData();
+        renderList();
+        
+        // Reset form
+        form.reset();
+        document.getElementById('gpsCoords').value = "";
+        document.getElementById('gpsStatus').textContent = "Waiting for location...";
+        document.getElementById('gpsStatus').className = "gps-status";
+        
+        showStatus("Response saved successfully!", "success");
+    });
+
+    function showStatus(msg, type) {
+        const el = document.getElementById('formStatus');
+        el.textContent = msg;
+        el.className = `status-msg status-${type}`;
+        setTimeout(() => { el.textContent = ''; }, 3000);
+    }
+
+    // --- Storage & Rendering ---
+    function loadData() {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                surveyData = JSON.parse(stored);
+            }
+        } catch (e) {
+            console.error("Error loading data", e);
+            surveyData = [];
+        }
+    }
+
+    function saveData() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(surveyData));
+        } catch (e) {
+            console.error("Error saving data", e);
+            alert("Storage full or unavailable. Data might be lost on refresh.");
+        }
+    }
+
+    function renderList() {
+        const listEl = document.getElementById('responsesList');
+        const sectionEl = document.getElementById('list-section');
+        const countEl = document.getElementById('count');
+        
+        listEl.innerHTML = '';
+        countEl.textContent = surveyData.length;
+
+        if (surveyData.length > 0) {
+            sectionEl.classList.remove('hidden');
+            
+            // Show newest first
+            [...surveyData].reverse().forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'data-item';
+                
+                const date = new Date(item.timestamp).toLocaleString();
+                
+                li.innerHTML = `
+                    <div class="data-header">${item.habitation} (${date})</div>
+                    <div class="data-row"><span>Type:</span> <strong>${item.pumpType}</strong></div>
+                    <div class="data-row"><span>Status:</span> <strong>${item.workingStatus}</strong></div>
+                    <div class="data-row"><span>Users:</span> <strong>${item.users || '-'}</strong></div>
+                    <div class="data-row"><span>GPS:</span> <a href="https://maps.google.com/?q=${item.gps.replace(',','+')}" target="_blank" style="color:#007bff">${item.gps}</a></div>
+                `;
+                listEl.appendChild(li);
+            });
+        } else {
+            sectionEl.classList.add('hidden');
+        }
+    }
+
+    function clearData() {
+        if(confirm("Are you sure you want to delete all saved responses?")) {
+            surveyData = [];
+            saveData();
+            renderList();
+        }
+    }
+
+    // --- Export Logic ---
+    function exportJSON() {
+        if (surveyData.length === 0) {
+            alert("No data to export.");
+            return;
+        }
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(surveyData, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "water_point_survey_" + new Date().getTime() + ".json");
+        document.body.appendChild(downloadAnchorNode); // required for firefox
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+</script>
+
+</body>
+</html>

@@ -107,7 +107,7 @@ laptop it is best on Build by a wide margin and within two answers of the
 best on Ask; no lane-specific second model is justified (the user's "20 %
 gap" rule is not met by any laptop-sized pair). T1 stays Qwen 3.5 27B
 (holdout 29/30, anchor 25/30). If T0 is served from OpenRouter on event day
-anyway, Qwen 3.6 35B-A3B is the strongest cheap hosted option (Ask 27/25/23,
+anyway, Qwen 3.6 35B-A3B is the strongest cheap hosted option (Ask 27/25/23; also the best hosted option for the generic page lane, 7/8 vs the 9B 5/8;
 Build 71/76, ~10 s), but calling it "laptop" would misdescribe the tier.
 
 Local feasibility of the pick: `unsloth/Qwen3.5-9B-GGUF` Q4_K_M served by

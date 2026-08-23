@@ -1,0 +1,215 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field Expense Tracker</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Field Expense Tracker</h1></header>
+<main>
+<div class="card">
+<h2 style="margin-top:0;font-size:18px">Add an expense</h2>
+<form id="expense-form">
+<div class="row">
+<div style="flex:1;min-width:140px"><label for="date">Date</label><input type="date" id="date" required></div>
+<div style="flex:1;min-width:140px"><label for="head">Head</label><input type="text" id="head" list="heads" placeholder="e.g. Travel" required></div>
+<div style="flex:1;min-width:140px"><label for="amount">Amount</label><input type="number" id="amount" min="0" step="0.01" placeholder="0.00" required></div>
+</div>
+<datalist id="heads"></datalist>
+<div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+<button type="submit">Add expense</button>
+<span id="form-msg" class="muted" role="status" aria-live="polite"></span>
+</div>
+</form>
+</div>
+
+<div class="grid">
+<div class="card"><div class="muted" style="font-size:13px">Running total</div><div id="running-total" style="font-size:26px;font-weight:700">—</div></div>
+<div class="card"><div class="muted" style="font-size:13px">Entries</div><div id="entry-count" style="font-size:26px;font-weight:700">—</div></div>
+<div class="card"><div class="muted" style="font-size:13px">Heads tracked</div><div id="head-count" style="font-size:26px;font-weight:700">—</div></div>
+</div>
+
+<div class="card">
+<h2 style="margin-top:0;font-size:18px">Totals by head</h2>
+<table id="by-head-table">
+<thead><tr><th>Head</th><th>Entries</th><th>Total</th></tr></thead>
+<tbody></tbody>
+</table>
+<p id="by-head-empty" class="muted">No expenses yet.</p>
+</div>
+
+<div class="card">
+<div class="row" style="justify-content:space-between;align-items:center">
+<h2 style="margin:0;font-size:18px">Expenses (newest first)</h2>
+<div class="row">
+<button type="button" class="secondary" id="export-csv">Export CSV</button>
+<button type="button" class="secondary" id="export-json">Export JSON</button>
+<button type="button" class="secondary" id="clear-all">Clear all</button>
+</div>
+</div>
+<table id="expense-table" style="margin-top:12px">
+<thead><tr><th>Date</th><th>Head</th><th>Amount</th><th>Running total</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+<p id="expense-empty" class="muted">No expenses recorded yet. Add one above to get started.</p>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+(function () {
+  offlineReady();
+  var KEY = 'field-expenses';
+  var data = window.data && Array.isArray(window.data) ? window.data.slice() : store.get(KEY, []);
+  // normalize any incoming rows so the page never throws on odd shapes
+  data = data.filter(function (r) { return r && typeof r === 'object'; }).map(function (r) {
+    return { id: r.id != null ? r.id : null, date: r.date || '', head: r.head || '', amount: Number(r.amount) || 0 };
+  });
+  function persist() { store.set(KEY, data); }
+  function money(n) { return '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtDate(d) { if (!d) return '—'; var p = String(d).split('-'); if (p.length !== 3) return d; return p[2] + '/' + p[1] + '/' + p[0]; }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  var form = document.getElementById('expense-form');
+  var dateEl = document.getElementById('date');
+  var headEl = document.getElementById('head');
+  var amountEl = document.getElementById('amount');
+  var msgEl = document.getElementById('form-msg');
+  var headsList = document.getElementById('heads');
+  var runningTotalEl = document.getElementById('running-total');
+  var entryCountEl = document.getElementById('entry-count');
+  var headCountEl = document.getElementById('head-count');
+  var byHeadBody = document.querySelector('#by-head-table tbody');
+  var byHeadEmpty = document.getElementById('by-head-empty');
+  var expBody = document.querySelector('#expense-table tbody');
+  var expEmpty = document.getElementById('expense-empty');
+
+  // default date to today
+  var t = new Date();
+  dateEl.value = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+
+  function render() {
+    // chronological order for running totals
+    var chrono = data.slice().sort(function (a, b) {
+      if (a.date < b.date) return -1;
+      if (a.date > b.date) return 1;
+      return 0;
+    });
+    var running = 0;
+    var runMap = {};
+    chrono.forEach(function (e) { running += e.amount; runMap[e.id] = running; });
+
+    // datalist of known heads
+    var heads = [];
+    data.forEach(function (e) { if (e.head && heads.indexOf(e.head) === -1) heads.push(e.head); });
+    heads.sort(function (a, b) { return a.localeCompare(b); });
+    headsList.innerHTML = '';
+    heads.forEach(function (h) { var o = document.createElement('option'); o.value = h; headsList.appendChild(o); });
+
+    // summary cards
+    runningTotalEl.textContent = money(running);
+    entryCountEl.textContent = String(data.length);
+    headCountEl.textContent = String(heads.length);
+
+    // totals by head
+    var byHead = {};
+    data.forEach(function (e) {
+      var k = e.head || '(unspecified)';
+      if (!byHead[k]) byHead[k] = { head: k, count: 0, total: 0 };
+      byHead[k].count += 1;
+      byHead[k].total += e.amount;
+    });
+    var headRows = Object.keys(byHead).map(function (k) { return byHead[k]; })
+      .sort(function (a, b) { return b.total - a.total || a.head.localeCompare(b.head); });
+    byHeadBody.innerHTML = '';
+    headRows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var tdH = document.createElement('td'); tdH.textContent = r.head;
+      var tdC = document.createElement('td'); tdC.textContent = String(r.count);
+      var tdT = document.createElement('td'); tdT.textContent = money(r.total);
+      tr.appendChild(tdH); tr.appendChild(tdC); tr.appendChild(tdT);
+      byHeadBody.appendChild(tr);
+    });
+    byHeadEmpty.style.display = headRows.length ? 'none' : 'block';
+
+    // expense table, newest first
+    var newest = data.slice().sort(function (a, b) {
+      if (a.date > b.date) return -1;
+      if (a.date < b.date) return 1;
+      return 0;
+    });
+    expBody.innerHTML = '';
+    newest.forEach(function (e) {
+      var tr = document.createElement('tr');
+      var tdD = document.createElement('td'); tdD.textContent = fmtDate(e.date);
+      var tdH = document.createElement('td'); tdH.textContent = e.head || '—';
+      var tdA = document.createElement('td'); tdA.textContent = money(e.amount);
+      var tdR = document.createElement('td'); tdR.textContent = money(runMap[e.id] != null ? runMap[e.id] : 0);
+      var tdX = document.createElement('td');
+      var del = document.createElement('button');
+      del.type = 'button'; del.className = 'secondary'; del.textContent = 'Delete';
+      del.setAttribute('aria-label', 'Delete expense ' + (e.head || '') + ' ' + fmtDate(e.date));
+      del.addEventListener('click', function () { removeExpense(e.id); });
+      tdX.appendChild(del);
+      tr.appendChild(tdD); tr.appendChild(tdH); tr.appendChild(tdA); tr.appendChild(tdR); tr.appendChild(tdX);
+      expBody.appendChild(tr);
+    });
+    expEmpty.style.display = newest.length ? 'none' : 'block';
+  }
+
+  function addExpense(date, head, amount) {
+    data.push({ id: uid(), date: date, head: head, amount: amount });
+    persist();
+    render();
+  }
+  function removeExpense(id) {
+    data = data.filter(function (e) { return e.id !== id; });
+    persist();
+    render();
+  }
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var date = dateEl.value;
+    var head = headEl.value.trim();
+    var amount = parseFloat(amountEl.value);
+    if (!date || !head || isNaN(amount) || amount < 0) {
+      msgEl.textContent = 'Please fill in a valid date, head and amount.';
+      return;
+    }
+    addExpense(date, head, amount);
+    msgEl.textContent = 'Added ' + money(amount) + ' under “' + head + '”.';
+    headEl.value = '';
+    amountEl.value = '';
+    headEl.focus();
+  });
+
+  document.getElementById('export-csv').addEventListener('click', function () {
+    if (!data.length) { msgEl.textContent = 'Nothing to export yet.'; return; }
+    var rows = data.slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; })
+      .map(function (e) { return { date: e.date, head: e.head, amount: e.amount }; });
+    download('expenses.csv', toCSV(rows), 'text/csv');
+  });
+  document.getElementById('export-json').addEventListener('click', function () {
+    if (!data.length) { msgEl.textContent = 'Nothing to export yet.'; return; }
+    download('expenses.json', JSON.stringify(data, null, 2), 'application/json');
+  });
+  document.getElementById('clear-all').addEventListener('click', function () {
+    if (!data.length) { msgEl.textContent = 'Nothing to clear.'; return; }
+    if (confirm('Delete all ' + data.length + ' expense entries? This cannot be undone.')) {
+      data = [];
+      persist();
+      render();
+      msgEl.textContent = 'All expenses cleared.';
+    }
+  });
+
+  render();
+})();
+</script>
+</body></html>

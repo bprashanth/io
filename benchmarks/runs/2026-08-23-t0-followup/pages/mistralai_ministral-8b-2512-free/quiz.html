@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Washing Quiz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .quiz-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .question {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f0f7ff;
+            border-radius: 5px;
+        }
+        .question-text {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .options {
+            margin-top: 10px;
+        }
+        .option {
+            margin: 8px 0;
+            padding: 8px;
+            background-color: #e3f2fd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .option:hover {
+            background-color: #bbdefb;
+        }
+        .option.selected {
+            background-color: #42a5f5;
+            color: white;
+        }
+        .progress {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4caf50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .score-container {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            background-color: #e8f5e9;
+            border-radius: 8px;
+        }
+        .score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+        .percentage {
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .try-again {
+            background-color: #f44336;
+        }
+        .try-again:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hand Washing Quiz</h1>
+
+    <div class="quiz-container">
+        <div class="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div id="progress-text">Question 1 of 5</div>
+        </div>
+
+        <div class="question" id="question-container">
+            <div class="question-text" id="question-text"></div>
+            <div class="options" id="options-container">
+                <!-- Options will be added here -->
+            </div>
+        </div>
+
+        <div class="score-container" id="score-container">
+            <div class="score" id="score-text">Your Score:</div>
+            <div class="percentage" id="percentage-text"></div>
+            <button id="try-again-btn" class="try-again">Try Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Quiz data - loaded from window.data if available, otherwise default
+        const quizData = window.data && window.data.quizData ? window.data.quizData : {
+            questions: [
+                {
+                    text: "How long should you wash your hands?",
+                    options: [
+                        "10 seconds",
+                        "30 seconds",
+                        "1 minute",
+                        "2 minutes"
+                    ],
+                    correctAnswer: 1
+                },
+                {
+                    text: "What should you use to wash your hands?",
+                    options: [
+                        "Soap and water",
+                        "Hand sanitizer only",
+                        "Nothing, they're clean",
+                        "Dish soap"
+                    ],
+                    correctAnswer: 0
+                },
+                {
+                    text: "When should you wash your hands?",
+                    options: [
+                        "After using the bathroom",
+                        "Before eating",
+                        "After playing outside",
+                        "All of the above"
+                    ],
+                    correctAnswer: 3
+                },
+                {
+                    text: "What part of your hands should you scrub?",
+                    options: [
+                        "Just your palms",
+                        "Your palms, backs of hands, and between fingers",
+                        "Only your fingertips",
+                        "Just your wrists"
+                    ],
+                    correctAnswer: 1
+                },
+                {
+                    text: "What should you do after washing your hands?",
+                    options: [
+                        "Rub them dry with a towel",
+                        "Shake them dry",
+                        "Let them air dry",
+                        "Wash them again"
+                    ],
+                    correctAnswer: 0
+                }
+            ]
+        };
+
+        // Quiz state
+        let currentQuestion = 0;
+        let score = 0;
+        let userAnswers = [];
+
+        // DOM elements
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const progressText = document.getElementById('progress-text');
+        const progressFill = document.getElementById('progress-fill');
+        const scoreContainer = document.getElementById('score-container');
+        const scoreText = document.getElementById('score-text');
+        const percentageText = document.getElementById('percentage-text');
+        const tryAgainBtn = document.getElementById('try-again-btn');
+
+        // Initialize the quiz
+        function initQuiz() {
+            showQuestion(currentQuestion);
+            updateProgress();
+        }
+
+        // Show a specific question
+        function showQuestion(questionIndex) {
+            const question = quizData.questions[questionIndex];
+            questionText.textContent = question.text;
+            optionsContainer.innerHTML = '';
+
+            question.options.forEach((option, index) => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'option';
+                optionElement.textContent = option;
+                optionElement.addEventListener('click', () => selectOption(index, questionIndex));
+                optionsContainer.appendChild(optionElement);
+            });
+        }
+
+        // Select an option
+        function selectOption(optionIndex, questionIndex) {
+            const options = document.querySelectorAll('.option');
+            options.forEach(option => option.classList.remove('selected'));
+
+            options[optionIndex].classList.add('selected');
+            userAnswers[questionIndex] = optionIndex;
+
+            if (optionIndex === quizData.questions[questionIndex].correctAnswer) {
+                score++;
+            }
+
+            if (questionIndex < quizData.questions.length - 1) {
+                currentQuestion++;
+                showQuestion(currentQuestion);
+                updateProgress();
+            } else {
+                showScore();
+            }
+        }
+
+        // Update progress bar and text
+        function updateProgress() {
+            const progressPercentage = ((currentQuestion + 1) / quizData.questions.length) * 100;
+            progressFill.style.width = `${progressPercentage}%`;
+            progressText.textContent = `Question ${currentQuestion + 1} of ${quizData.questions.length}`;
+        }
+
+        // Show the final score
+        function showScore() {
+            const percentage = (score / quizData.questions.length) * 100;
+            scoreText.textContent = `You got ${score} out of ${quizData.questions.length}`;
+            percentageText.textContent = `${Math.round(percentage)}%`;
+
+            scoreContainer.style.display = 'block';
+            tryAgainBtn.addEventListener('click', resetQuiz);
+        }
+
+        // Reset the quiz
+        function resetQuiz() {
+            currentQuestion = 0;
+            score = 0;
+            userAnswers = [];
+
+            scoreContainer.style.display = 'none';
+            initQuiz();
+        }
+
+        // Initialize the quiz when the page loads
+        window.addEventListener('load', initQuiz);
+
+        // Register service worker if supported
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(new URL('data:application/javascript,(' +
+                    'self.addEventListener("install", event => event.waitUntil(' +
+                    'self.skipWaiting()));' +
+                    'self.addEventListener("activate", event => event.waitUntil(' +
+                    'self.clients.claim()));' +
+                    'self.addEventListener("fetch", event => event.respondWith(' +
+                    'fetch(event.request).catch(() => new Response("Offline", {' +
+                    '"status": 200, "headers": {"Content-Type": "text/plain"}' +
+                    '}))));' +
+                    ')'))
+                .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>

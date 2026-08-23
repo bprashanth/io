@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beneficiary Registration</title>
+    <style>
+        :root {
+            --primary: #2c5e4f;
+            --secondary: #e8f5e9;
+            --accent: #d32f2f;
+            --text: #333;
+            --border: #ccc;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        h1 {
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 1.5rem;
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 10px;
+        }
+        form-group {
+            margin-bottom: 1.2rem;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            font-size: 0.9rem;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--secondary);
+        }
+        btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 1.5rem;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        button:active {
+            transform: translateY(1px);
+        }
+        btn-submit {
+            background-color: var(--primary);
+            color: white;
+        }
+        btn-download {
+            background-color: #607d8b;
+            color: white;
+        }
+        status-msg {
+            margin-top: 1rem;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        success {
+            display: block;
+            background-color: #c8e6c9;
+            color: #2e7d32;
+        }
+        error {
+            display: block;
+            background-color: #ffcdd2;
+            color: #c62828;
+        }
+        count-display {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 10px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Beneficiary Registration</h1>
+    <form id="registrationForm">
+        <div class="form-group">
+            <label for="fullName">Full Name</label>
+            <input type="text" id="fullName" required>
+        </div>
+        <div class="form-group">
+            <label for="age">Age</label>
+            <input type="number" id="age" min="0" max="120" required>
+        </div>
+        <div class="form-group">
+            <label for="village">Village / Locality</label>
+            <input type="text" id="village" required>
+        </div>
+        <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" pattern="[0-9]{7,15}" title="Please enter a valid phone number" required>
+        </div>
+        <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" required>
+                <option value="">Select Category</option>
+                <option value="General">General</option>
+                <option value="Scheduled Caste">Scheduled Caste</option>
+                <option value="Scheduled Tribe">Scheduled Tribe</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+
+        <div class="btn-group">
+            <button type="submit" class="btn-submit">Save Entry</button>
+            <button type="button" id="downloadBtn" class="btn-download">Download CSV</button>
+        </div>
+    </form>
+
+    <div id="statusMsg" class="status-msg"></div>
+    <div id="entryCount" class="count-display">Entries saved: 0</div>
+</div>
+
+<script>
+    (function() {
+        const STORAGE_KEY = 'ngo_beneficiaries_data';
+        const form = document.getElementById('registrationForm');
+        const statusMsg = document.getElementById('statusMsg');
+        const countDisplay = document.getElementById('entryCount');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // Initialize data from window.data if available, otherwise from localStorage
+        let beneficiaries = [];
+        if (window.data && Array.isArray(window.data)) {
+            beneficiaries = window.data;
+        } else {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    beneficiaries = JSON.parse(saved);
+                } catch (e) {
+                    beneficiaries = [];
+                }
+            }
+        }
+
+        function updateUI() {
+            countDisplay.textContent = `Entries saved: ${beneficiaries.length}`;
+        }
+
+        function showStatus(text, isError = false) {
+            statusMsg.textContent = text;
+            statusMsg.className = 'tatus-msg ' (isError? 'error' : 'uccess');
+            setTimeout(() => {
+                statusMsg.className = 'tatus-msg';
+            }, 3000);
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const newEntry = {
+                name: document.getElementById('fullName').value.trim(),
+                age: document.getElementById('age').value,
+                village: document.getElementById('village').value.trim(),
+                phone: document.getElementById('phone').value.trim(),
+                category: document.getElementById('category').value,
+                timestamp: new Date().toISOString()
+            };
+
+            // Basic validation check
+            if (!newEntry.name ||!newEntry.age ||!newEntry.village ||!newEntry.phone ||!newEntry.category) {
+                showStatus('Please fill all fields correctly.', true);
+                return;
+            }
+
+            beneficiaries.push(newEntry);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(beneficiaries));
+            
+            form.reset();
+            updateUI();
+            showStatus('Beneficiary registered successfully!');
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (beneficiaries.length === 0) {
+                showStatus('No data available to download.', true);
+                return;
+            }
+
+            const headers = ['Name', 'Age', 'Village', 'Phone', 'Category', 'Registration Date'];
+            const csvRows = [headers.join(',')];
+
+            beneficiaries.forEach(b => {
+                const row = [
+                    `"${b.name.replace(/"/g, '""')}"`,
+                    b.age,
+                    `"${b.village.replace(/"/g, '""')}"`,
+                    `"${b.phone.replace(/"/g, '""')}"`,
+                    `"${b.category.replace(/"/g, '""')}"`,
+                    b.timestamp
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `beneficiaries_${new Date().getTime()}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Initial Load
+        updateUI();
+
+        // Service Worker Registration (Offline Support)
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', (e) => self.skipWaiting());
+                self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => Promise.reject())));
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW failed', err));
+        }
+    })();
+</script>
+
+</body>
+</html>

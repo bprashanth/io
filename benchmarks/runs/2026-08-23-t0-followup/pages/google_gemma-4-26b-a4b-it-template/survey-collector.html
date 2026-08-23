@@ -1,0 +1,165 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Water Point Survey</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1 id="header-title">Water Point Survey</h1></header>
+<main>
+<section id="form-section">
+<div class="card">
+<form id="survey-form">
+<label for="habitation">Habitation / Village Name</label>
+<input type="text" id="habitation" required>
+
+<label for="pump_type">Pump Type</label>
+<select id="pump_type" required>
+<option value="">Select type...</option>
+<option value="Handpump">Handpump</option>
+<option value="Borehole">Borehole</option>
+<option value="Well">Open Well</option>
+<option value="Solar">Solar Pump</option>
+<option value="Other">Other</option>
+</select>
+
+<label for="working">Is the pump working?</label>
+<select id="working" required>
+<option value="Yes">Yes</option>
+<option value="No">No</option>
+</select>
+
+<label for="users">Estimated Daily Users</label>
+<input type="number" id="users" required>
+
+<label for="notes">Additional Notes</label>
+<textarea id="notes" rows="3"></textarea>
+
+<div class="row" style="margin-top:15px">
+<button type="submit" id="save-btn">Save Response</button>
+<button type="button" class="secondary" id="gps-btn">Get GPS Location</button>
+</div>
+</form>
+<p id="gps-status" class="muted" style="font-size:12px; margin-top:8px;"></p>
+</div>
+</section>
+
+<section id="data-section">
+<div class="card">
+<div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 10px;">
+<h2 style="font-size:18px; margin:0">Stored Responses</h2>
+<button class="secondary" id="export-btn">Export JSON</button>
+</div>
+<div style="overflow-x: auto;">
+<table id="results-table">
+<thead>
+<tr>
+<th>Habitation</th>
+<th>Type</th>
+<th>Status</th>
+<th>Users</th>
+<th>GPS</th>
+</tr>
+</thead>
+<tbody>
+<!-- Rows injected here -->
+</tbody>
+</table>
+</div>
+<p id="empty-msg" class="muted" style="text-align:center; padding:20px;">No responses saved yet.</p>
+</div>
+</section>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k))?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null? '' : String(v); return /[",\n]/.test(s)? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// YOUR CODE HERE
+const STORAGE_KEY = 'water_survey_data';
+let currentCoords = "Not captured";
+
+const form = document.getElementById('survey-form');
+const gpsBtn = document.getElementById('gps-btn');
+const gpsStatus = document.getElementById('gps-status');
+const resultsTable = document.getElementById('results-table').querySelector('tbody');
+const emptyMsg = document.getElementById('empty-msg');
+const exportBtn = document.getElementById('export-btn');
+
+function renderTable() {
+    const data = store.get(STORAGE_KEY, []);
+    resultsTable.innerHTML = '';
+    if (data.length === 0) {
+        emptyMsg.style.display = 'block';
+        return;
+    }
+    emptyMsg.style.display = 'none';
+    data.forEach(entry => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${entry.habitation}</td>
+            <td>${entry.pump_type}</td>
+            <td>${entry.working}</td>
+            <td>${entry.users}</td>
+            <td class="muted" style="font-size:11px">${entry.gps}</td>
+        `;
+        resultsTable.appendChild(row);
+    });
+}
+
+gpsBtn.addEventListener('click', () => {
+    gpsStatus.textContent = "Locating...";
+    if (!navigator.geolocation) {
+        gpsStatus.textContent = "Geolocation not supported by browser.";
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            currentCoords = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+            gpsStatus.textContent = "Location captured: " + currentCoords;
+        },
+        (err) => {
+            gpsStatus.textContent = "Error: " + err.message;
+        }
+    );
+});
+
+form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const newData = {
+        habitation: document.getElementById('habitation').value,
+        pump_type: document.getElementById('pump_type').value,
+        working: document.getElementById('working').value,
+        users: document.getElementById('users').value,
+        notes: document.getElementById('notes').value,
+        gps: currentCoords,
+        timestamp: new Date().toISOString()
+    };
+
+    const existingData = store.get(STORAGE_KEY, []);
+    existingData.push(newData);
+    store.set(STORAGE_KEY, existingData);
+    
+    form.reset();
+    currentCoords = "Not captured";
+    gpsStatus.textContent = "Response saved successfully.";
+    renderTable();
+});
+
+exportBtn.addEventListener('click', () => {
+    const data = store.get(STORAGE_KEY, []);
+    if (data.length === 0) {
+        alert("No data to export.");
+        return;
+    }
+    download('water_survey_export.json', JSON.stringify(data, null, 2), 'application/json');
+});
+
+// Init
+renderTable();
+offlineReady();
+</script>
+</body></html>

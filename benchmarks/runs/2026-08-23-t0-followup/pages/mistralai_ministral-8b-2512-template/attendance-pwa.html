@@ -1,0 +1,287 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tuition Attendance Tracker</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Tuition Attendance Tracker</h1></header>
+<main>
+  <div class="card">
+    <h2>Add/Edit Students</h2>
+    <div class="row">
+      <input type="text" id="new-student-name" placeholder="Student name">
+      <button id="add-student">Add Student</button>
+    </div>
+    <div id="student-list"></div>
+  </div>
+
+  <div class="card">
+    <h2>Daily Attendance</h2>
+    <div class="row">
+      <select id="date-select"></select>
+      <button id="mark-attendance">Mark Attendance</button>
+    </div>
+    <div id="attendance-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Monthly Summary</h2>
+    <div class="row">
+      <select id="month-select"></select>
+      <button id="export-summary">Export Summary</button>
+    </div>
+    <div id="summary-table"></div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// Initialize data
+let students = store.get('students', []);
+let attendance = store.get('attendance', {});
+
+// DOM elements
+const elements = {
+  newStudentName: document.getElementById('new-student-name'),
+  addStudent: document.getElementById('add-student'),
+  studentList: document.getElementById('student-list'),
+  dateSelect: document.getElementById('date-select'),
+  markAttendance: document.getElementById('mark-attendance'),
+  attendanceGrid: document.getElementById('attendance-grid'),
+  monthSelect: document.getElementById('month-select'),
+  exportSummary: document.getElementById('export-summary'),
+  summaryTable: document.getElementById('summary-table')
+};
+
+// Initialize the app
+function init() {
+  offlineReady();
+  loadStudents();
+  loadAttendance();
+  updateDateSelect();
+  updateMonthSelect();
+  renderStudentList();
+  renderAttendanceGrid();
+  renderSummaryTable();
+}
+
+// Load data from storage
+function loadStudents() {
+  students = store.get('students', []);
+}
+
+function loadAttendance() {
+  attendance = store.get('attendance', {});
+}
+
+// Save data to storage
+function saveStudents() {
+  store.set('students', students);
+}
+
+function saveAttendance() {
+  store.set('attendance', attendance);
+}
+
+// Render student list
+function renderStudentList() {
+  elements.studentList.innerHTML = '';
+  students.forEach(student => {
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = `
+      <span>${student}</span>
+      <button class="secondary" data-id="${student}">Remove</button>
+    `;
+    elements.studentList.appendChild(div);
+  });
+
+  // Add event listeners to remove buttons
+  elements.studentList.querySelectorAll('button[data-id]').forEach(button => {
+    button.addEventListener('click', (e) => {
+      const student = e.target.getAttribute('data-id');
+      students = students.filter(s => s !== student);
+      saveStudents();
+      renderStudentList();
+      renderAttendanceGrid();
+    });
+  });
+}
+
+// Render attendance grid
+function renderAttendanceGrid() {
+  const selectedDate = elements.dateSelect.value;
+  if (!selectedDate) return;
+
+  elements.attendanceGrid.innerHTML = '';
+  if (!attendance[selectedDate]) {
+    attendance[selectedDate] = {};
+    students.forEach(student => attendance[selectedDate][student] = 'absent');
+    saveAttendance();
+  }
+
+  const dateAttendance = attendance[selectedDate];
+  students.forEach(student => {
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = `
+      <span>${student}</span>
+      <button ${dateAttendance[student] === 'present' ? 'disabled' : ''} data-student="${student}" data-date="${selectedDate}">Present</button>
+      <button ${dateAttendance[student] === 'absent' ? 'disabled' : ''} data-student="${student}" data-date="${selectedDate}">Absent</button>
+    `;
+    elements.attendanceGrid.appendChild(div);
+  });
+
+  // Add event listeners to attendance buttons
+  elements.attendanceGrid.querySelectorAll('button:not([disabled])').forEach(button => {
+    button.addEventListener('click', (e) => {
+      const student = e.target.getAttribute('data-student');
+      const date = e.target.getAttribute('data-date');
+      attendance[date][student] = e.target.textContent.toLowerCase();
+      saveAttendance();
+      renderAttendanceGrid();
+    });
+  });
+}
+
+// Render summary table
+function renderSummaryTable() {
+  const selectedMonth = elements.monthSelect.value;
+  if (!selectedMonth) return;
+
+  const summary = {};
+  students.forEach(student => {
+    summary[student] = { present: 0, absent: 0 };
+  });
+
+  // Count attendance for the selected month
+  Object.entries(attendance).forEach(([date, records]) => {
+    const dateObj = new Date(date);
+    if (dateObj.toLocaleString('default', { month: 'long' }) === selectedMonth) {
+      students.forEach(student => {
+        if (records[student] === 'present') {
+          summary[student].present++;
+        } else {
+          summary[student].absent++;
+        }
+      });
+    }
+  });
+
+  // Create table rows
+  elements.summaryTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Present</th>
+          <th>Absent</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Object.entries(summary).map(([student, counts]) => `
+          <tr>
+            <td>${student}</td>
+            <td>${counts.present}</td>
+            <td>${counts.absent}</td>
+            <td>${counts.present + counts.absent}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// Update date select dropdown
+function updateDateSelect() {
+  elements.dateSelect.innerHTML = '';
+  const today = new Date();
+  const dates = [];
+
+  // Add today and previous 30 days
+  for (let i = 0; i <= 30; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    dates.push(date.toISOString().split('T')[0]);
+  }
+
+  dates.forEach(date => {
+    const option = document.createElement('option');
+    option.value = date;
+    option.textContent = new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    elements.dateSelect.appendChild(option);
+  });
+
+  // Set today as default
+  elements.dateSelect.value = today.toISOString().split('T')[0];
+}
+
+// Update month select dropdown
+function updateMonthSelect() {
+  elements.monthSelect.innerHTML = '';
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  months.forEach(month => {
+    const option = document.createElement('option');
+    option.value = month;
+    option.textContent = month;
+    elements.monthSelect.appendChild(option);
+  });
+
+  // Set current month as default
+  elements.monthSelect.value = new Date().toLocaleString('default', { month: 'long' });
+}
+
+// Event listeners
+elements.addStudent.addEventListener('click', () => {
+  const name = elements.newStudentName.value.trim();
+  if (name && !students.includes(name)) {
+    students.push(name);
+    saveStudents();
+    elements.newStudentName.value = '';
+    renderStudentList();
+    renderAttendanceGrid();
+  }
+});
+
+elements.markAttendance.addEventListener('click', () => {
+  renderAttendanceGrid();
+});
+
+elements.exportSummary.addEventListener('click', () => {
+  const selectedMonth = elements.monthSelect.value;
+  const summary = [];
+
+  students.forEach(student => {
+    const counts = { Student: student, Present: 0, Absent: 0 };
+    Object.entries(attendance).forEach(([date, records]) => {
+      const dateObj = new Date(date);
+      if (dateObj.toLocaleString('default', { month: 'long' }) === selectedMonth) {
+        if (records[student] === 'present') {
+          counts.Present++;
+        } else {
+          counts.Absent++;
+        }
+      }
+    });
+    summary.push(counts);
+  });
+
+  const csv = toCSV(summary);
+  download(`Attendance_Summary_${selectedMonth}.csv`, csv, 'text/csv');
+});
+
+// Initialize the app when the page loads
+window.addEventListener('load', init);
+</script>
+</body></html>

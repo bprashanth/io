@@ -1,0 +1,599 @@
+{
+ "plan": {
+  "title": "Child Fitness Improvement Dashboard",
+  "subtitle": "Tracking physical performance changes from baseline to endline by location and coach",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Children Tracked",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM \"baseline\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Avg Shuttle Run Improvement (sec)",
+    "sql": "SELECT AVG(b.\"Shuttle run sec\" - e.\"Shuttle run sec\") AS avg_improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": "sec"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Avg Sit-ups Improvement",
+    "sql": "SELECT AVG(e.\"Sit ups\" - b.\"Sit ups\") AS avg_improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": "reps"
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Avg Shuttle Run Improvement by Location",
+    "sql": "SELECT b.\"Location\" AS location, AVG(b.\"Shuttle run sec\" - e.\"Shuttle run sec\") AS avg_improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC LIMIT 15",
+    "x": "location",
+    "y": [
+     "avg_improvement"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Avg Sit-ups Improvement by Coach",
+    "sql": "SELECT b.\"Coach\" AS coach, AVG(e.\"Sit ups\" - b.\"Sit ups\") AS avg_improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC LIMIT 15",
+    "x": "coach",
+    "y": [
+     "avg_improvement"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "scatter",
+    "title": "Shuttle Run vs Sit-ups Improvement",
+    "sql": "SELECT b.\"Child name\" AS child, (b.\"Shuttle run sec\" - e.\"Shuttle run sec\") AS shuttle_improvement, (e.\"Sit ups\" - b.\"Sit ups\") AS situps_improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"",
+    "x": "shuttle_improvement",
+    "y": [
+     "situps_improvement"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Top 10 Improvers (Shuttle Run)",
+    "sql": "SELECT b.\"Child name\" AS child, b.\"Location\" AS location, b.\"Coach\" AS coach, b.\"Shuttle run sec\" AS baseline_shuttle, e.\"Shuttle run sec\" AS endline_shuttle, (b.\"Shuttle run sec\" - e.\"Shuttle run sec\") AS improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY 6 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "This dashboard highlights the physical development of children across various locations and coaching groups. The total number of children tracked is {{p1}}, providing a baseline for the scope of the program.\n\nIn terms of speed, the average improvement in shuttle run time is {{p2}} seconds, indicating a general trend toward faster performance. The top performing location in terms of shuttle run improvement is {{p4}}, while the most effective coach for sit-ups is {{p5}}.\n\nThe scatter plot reveals the relationship between speed and strength improvements, with the top individual improver being {{p7}}. This data helps identify which coaching strategies and locations are yielding the best results."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "avg_improvement": 0.013500000000000147
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "avg_improvement": 2.915
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "location",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "location": "Nira",
+     "avg_improvement": 5.100000000000001
+    },
+    {
+     "location": "Kadus",
+     "avg_improvement": 3.6999999999999993
+    },
+    {
+     "location": "Guraru",
+     "avg_improvement": 2.95
+    },
+    {
+     "location": "Motipur",
+     "avg_improvement": 2.4875
+    },
+    {
+     "location": "Barachatti",
+     "avg_improvement": 2.2399999999999998
+    },
+    {
+     "location": "Dobhi",
+     "avg_improvement": 2.166666666666668
+    },
+    {
+     "location": "Rampur",
+     "avg_improvement": 1.8
+    },
+    {
+     "location": "Dehu",
+     "avg_improvement": 1.6333333333333335
+    },
+    {
+     "location": "Chandwara",
+     "avg_improvement": 1.5749999999999993
+    },
+    {
+     "location": "Mahuar",
+     "avg_improvement": 1.48
+    },
+    {
+     "location": "Ambegaon Budruk",
+     "avg_improvement": 1.3999999999999995
+    },
+    {
+     "location": "Manjari",
+     "avg_improvement": 1.0666666666666675
+    },
+    {
+     "location": "Amawan",
+     "avg_improvement": 1.0
+    },
+    {
+     "location": "Kharadi",
+     "avg_improvement": 0.9200000000000003
+    },
+    {
+     "location": "Kesnand",
+     "avg_improvement": 0.8000000000000007
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "coach",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "coach": "T. S. Fernandez",
+     "avg_improvement": 11.090909090909092
+    },
+    {
+     "coach": "Vimla",
+     "avg_improvement": 8.615384615384615
+    },
+    {
+     "coach": "Jaspreet George",
+     "avg_improvement": 7.461538461538462
+    },
+    {
+     "coach": "Manjhi Lata",
+     "avg_improvement": 6.285714285714286
+    },
+    {
+     "coach": "sunil thakur",
+     "avg_improvement": 5.117647058823529
+    },
+    {
+     "coach": "Ranjan Nasir",
+     "avg_improvement": 3.888888888888889
+    },
+    {
+     "coach": "Bhagyashree",
+     "avg_improvement": 1.6923076923076923
+    },
+    {
+     "coach": "indira chandra",
+     "avg_improvement": 1.2777777777777777
+    },
+    {
+     "coach": "Rosy",
+     "avg_improvement": 1.1111111111111112
+    },
+    {
+     "coach": "Geeta Bhagat",
+     "avg_improvement": 0.7058823529411765
+    },
+    {
+     "coach": "AAKASH ZENDE",
+     "avg_improvement": 0.5625
+    },
+    {
+     "coach": "Rupali Kumar",
+     "avg_improvement": 0.4666666666666667
+    },
+    {
+     "coach": "Salman Rao",
+     "avg_improvement": 0.2
+    },
+    {
+     "coach": "P. T. Pereira",
+     "avg_improvement": 0.10526315789473684
+    },
+    {
+     "coach": "Bapu Yadav",
+     "avg_improvement": -0.25
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "child",
+    "shuttle_improvement",
+    "situps_improvement"
+   ],
+   "rows": [
+    {
+     "child": "Vinod Mishra",
+     "shuttle_improvement": 0.5,
+     "situps_improvement": 16
+    },
+    {
+     "child": "Kavya Pawar",
+     "shuttle_improvement": 4.199999999999999,
+     "situps_improvement": 1
+    },
+    {
+     "child": "Snehal Chettiar",
+     "shuttle_improvement": -4.699999999999999,
+     "situps_improvement": -14
+    },
+    {
+     "child": "Sheela Kale",
+     "shuttle_improvement": 7.299999999999999,
+     "situps_improvement": -2
+    },
+    {
+     "child": "Namdev Kaur",
+     "shuttle_improvement": -2.6999999999999993,
+     "situps_improvement": -9
+    },
+    {
+     "child": "Anthony Thomas",
+     "shuttle_improvement": -4.5,
+     "situps_improvement": 25
+    },
+    {
+     "child": "Sarita",
+     "shuttle_improvement": 2.8000000000000007,
+     "situps_improvement": -11
+    },
+    {
+     "child": "Pathan Amit",
+     "shuttle_improvement": 0.5999999999999996,
+     "situps_improvement": 0
+    },
+    {
+     "child": "SWATI NIKAM",
+     "shuttle_improvement": 0.1999999999999993,
+     "situps_improvement": 4
+    },
+    {
+     "child": "Shivaji More",
+     "shuttle_improvement": 0.7999999999999972,
+     "situps_improvement": 22
+    },
+    {
+     "child": "Patil Gurmeet",
+     "shuttle_improvement": 3.1999999999999993,
+     "situps_improvement": 1
+    },
+    {
+     "child": "Singh Ramu",
+     "shuttle_improvement": 0.6999999999999993,
+     "situps_improvement": 20
+    },
+    {
+     "child": "Iyengar Radha",
+     "shuttle_improvement": -6.1,
+     "situps_improvement": 6
+    },
+    {
+     "child": "Shivaji Salunkhe",
+     "shuttle_improvement": 6.6,
+     "situps_improvement": 20
+    },
+    {
+     "child": "Harpreet Shinde",
+     "shuttle_improvement": -5.899999999999999,
+     "situps_improvement": 13
+    },
+    {
+     "child": "sita rai",
+     "shuttle_improvement": 1.5,
+     "situps_improvement": 14
+    },
+    {
+     "child": "Krishnan Sunita",
+     "shuttle_improvement": 2.9000000000000004,
+     "situps_improvement": 4
+    },
+    {
+     "child": "Vaishali Sawant",
+     "shuttle_improvement": -4.199999999999999,
+     "situps_improvement": 18
+    },
+    {
+     "child": "Simran Pathan",
+     "shuttle_improvement": 5.100000000000001,
+     "situps_improvement": -9
+    },
+    {
+     "child": "Vaishali",
+     "shuttle_improvement": 1.4000000000000004,
+     "situps_improvement": -2
+    },
+    {
+     "child": "sudha thomas",
+     "shuttle_improvement": -4.300000000000001,
+     "situps_improvement": 0
+    },
+    {
+     "child": "sachin thomas",
+     "shuttle_improvement": 2.5999999999999996,
+     "situps_improvement": -5
+    },
+    {
+     "child": "anil rao",
+     "shuttle_improvement": 4.0,
+     "situps_improvement": 1
+    },
+    {
+     "child": "Yashwant Mahato",
+     "shuttle_improvement": 2.3000000000000007,
+     "situps_improvement": 0
+    },
+    {
+     "child": "Aslam Singh",
+     "shuttle_improvement": 2.4000000000000004,
+     "situps_improvement": 0
+    },
+    {
+     "child": "Francis Prasad",
+     "shuttle_improvement": 1.1999999999999993,
+     "situps_improvement": 18
+    },
+    {
+     "child": "Mathew Vijay",
+     "shuttle_improvement": 1.799999999999999,
+     "situps_improvement": 23
+    },
+    {
+     "child": "Vikram Rao",
+     "shuttle_improvement": 0.3000000000000007,
+     "situps_improvement": 17
+    },
+    {
+     "child": "Padma Singh",
+     "shuttle_improvement": -4.0,
+     "situps_improvement": 6
+    },
+    {
+     "child": "Bapu Rai",
+     "shuttle_improvement": -0.29999999999999893,
+     "situps_improvement": 21
+    },
+    {
+     "child": "Iyengar Sudha",
+     "shuttle_improvement": 1.200000000000001,
+     "situps_improvement": 1
+    },
+    {
+     "child": "Radha Rao",
+     "shuttle_improvement": 0.0,
+     "situps_improvement": 12
+    },
+    {
+     "child": "George Baliram",
+     "shuttle_improvement": 0.20000000000000107,
+     "situps_improvement": 0
+    },
+    {
+     "child": "Lakshmi Sawant",
+     "shuttle_improvement": -7.800000000000001,
+     "situps_improvement": 2
+    },
+    {
+     "child": "VINOD MATHEW",
+     "shuttle_improvement": 2.5,
+     "situps_improvement": 5
+    },
+    {
+     "child": "Chaudhary Bhagyashree",
+     "shuttle_improvement": 2.8000000000000007,
+     "situps_improvement": -12
+    },
+    {
+     "child": "Ashok Bhosale",
+     "shuttle_improvement": -0.6999999999999993,
+     "situps_improvement": 6
+    },
+    {
+     "child": "Fatima",
+     "shuttle_improvement": 3.3000000000000007,
+     "situps_improvement": 18
+    },
+    {
+     "child": "Mary Nair",
+     "shuttle_improvement": -6.799999999999999,
+     "situps_improvement": -20
+    },
+    {
+     "child": "Zakir Pandey",
+     "shuttle_improvement": -2.299999999999999,
+     "situps_improvement": -1
+    },
+    {
+     "child": "Rakesh Thomas",
+     "shuttle_improvement": 2.5999999999999996,
+     "situps_improvement": 2
+    },
+    {
+     "child": "Xavier Bajwa",
+     "shuttle_improvement": 4.200000000000001,
+     "situps_improvement": 10
+    },
+    {
+     "child": "Jaspreet Mathew",
+     "shuttle_improvement": 3.3000000000000007,
+     "situps_improvement": 7
+    },
+    {
+     "child": "Rohit Reddy",
+     "shuttle_improvement": 1.5999999999999996,
+     "situps_improvement": -16
+    },
+    {
+     "child": "I. B. Kaur",
+     "shuttle_improvement": -0.7000000000000011,
+     "situps_improvement": -16
+    },
+    {
+     "child": "Kaur Deepa",
+     "shuttle_improvement": 0.8000000000000007,
+     "situps_improvement": -2
+    },
+    {
+     "child": "Kavya Sheikh",
+     "shuttle_improvement": 3.0999999999999996,
+     "situps_improvement": -18
+    },
+    {
+     "child": "Sarojini Siddiqui",
+     "shuttle_improvement": -1.1999999999999993,
+     "situps_improvement": -1
+    },
+    {
+     "child": "sudha deshmukh",
+     "shuttle_improvement": 5.4,
+     "situps_improvement": -4
+    },
+    {
+     "child": "Deepak Sayyed",
+     "shuttle_improvement": 0.1999999999999993,
+     "situps_improvement": -6
+    }
+   ],
+   "rowcount": 200,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "child",
+    "location",
+    "coach",
+    "baseline_shuttle",
+    "endline_shuttle",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "child": "Irfan Lobo",
+     "location": "Motipur",
+     "coach": "sunil thakur",
+     "baseline_shuttle": 18.0,
+     "endline_shuttle": 9.6,
+     "improvement": 8.4
+    },
+    {
+     "child": "Sunil Deshpande",
+     "location": "Dobhi",
+     "coach": "Rupali Kumar",
+     "baseline_shuttle": 17.6,
+     "endline_shuttle": 9.6,
+     "improvement": 8.000000000000002
+    },
+    {
+     "child": "Dattatray Prasad",
+     "location": "Paroo",
+     "coach": "Geeta Bhagat",
+     "baseline_shuttle": 17.0,
+     "endline_shuttle": 9.1,
+     "improvement": 7.9
+    },
+    {
+     "child": "Sheela Kale",
+     "location": "Chandpur",
+     "coach": "Salman Rao",
+     "baseline_shuttle": 16.9,
+     "endline_shuttle": 9.6,
+     "improvement": 7.299999999999999
+    },
+    {
+     "child": "Shivaji Prasad",
+     "location": "Amawan",
+     "coach": "Salman Rao",
+     "baseline_shuttle": 16.0,
+     "endline_shuttle": 9.3,
+     "improvement": 6.699999999999999
+    },
+    {
+     "child": "Shivaji Salunkhe",
+     "location": "Motipur",
+     "coach": "Manjhi Lata",
+     "baseline_shuttle": 15.5,
+     "endline_shuttle": 8.9,
+     "improvement": 6.6
+    },
+    {
+     "child": "Shankar Sharma",
+     "location": "Paroo",
+     "coach": "Vimla",
+     "baseline_shuttle": 17.8,
+     "endline_shuttle": 11.9,
+     "improvement": 5.9
+    },
+    {
+     "child": "Dhillon Pooja",
+     "location": "Barachatti",
+     "coach": "Jaspreet George",
+     "baseline_shuttle": 14.4,
+     "endline_shuttle": 8.9,
+     "improvement": 5.5
+    },
+    {
+     "child": "sudha deshmukh",
+     "location": "Barachatti",
+     "coach": "P. T. Pereira",
+     "baseline_shuttle": 14.5,
+     "endline_shuttle": 9.1,
+     "improvement": 5.4
+    },
+    {
+     "child": "padma iyengar",
+     "location": "Mahuar",
+     "coach": "Salman Rao",
+     "baseline_shuttle": 16.6,
+     "endline_shuttle": 11.4,
+     "improvement": 5.200000000000001
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

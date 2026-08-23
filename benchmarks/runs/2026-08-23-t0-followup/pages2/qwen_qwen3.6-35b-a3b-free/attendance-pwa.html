@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="description" content="Offline Attendance Tracker for NGO Tuition">
+    <title>Class Attendance</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #27ae60;
+            --absent: #c0392b;
+            --bg: #f4f6f7;
+            --card: #ffffff;
+            --text: #333333;
+            --border: #e0e0e0;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 80px; /* Space for fixed footer */
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; font-weight: 600; }
+        h2 { margin: 0 0 10px 0; font-size: 1.1rem; color: var(--primary); }
+
+        .container { padding: 15px; max-width: 600px; margin: 0 auto; }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: var(--card);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        input[type="date"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.8; }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-success { background-color: var(--accent); color: white; }
+        .btn-outline { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); }
+
+        /* Student List */
+        .student-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .student-card {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border-left: 5px solid var(--border);
+        }
+
+        .student-card.present { border-left-color: var(--accent); }
+        .student-card.absent { border-left-color: var(--absent); }
+
+        .student-info { flex: 1; }
+        .student-name { font-weight: 600; font-size: 1.1rem; display: block; }
+        .student-id { font-size: 0.8rem; color: #7f8c8d; }
+
+        .status-toggle {
+            display: flex;
+            background: #eee;
+            border-radius: 20px;
+            padding: 2px;
+        }
+
+        .status-btn {
+            padding: 8px 16px;
+            border-radius: 18px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: #7f8c8d;
+        }
+
+        .status-btn.active-present { background-color: var(--accent); color: white; }
+        .status-btn.active-absent { background-color: var(--absent); color: white; }
+
+        /* Summary Section */
+        .summary-section {
+            margin-top: 30px;
+            background: var(--card);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .summary-table th, .summary-table td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .summary-table th { color: #7f8c8d; font-weight: 500; }
+        .summary-table tr:last-child td { border-bottom: none; }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.open { display: flex; }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+        }
+        .modal-actions { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; }
+        textarea { width: 100%; height: 100px; padding: 10px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; }
+
+        /* Toast */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 16px;
+            position: fixed;
+            z-index: 300;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+        }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+        .empty-state { text-align: center; color: #7f8c8d; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Attendance</h1>
+    <button class="btn-outline" style="color:white; border-color:rgba(255,255,255,0.5);" onclick="app.openManageModal()">Manage</button>
+</header>
+
+<div class="container">
+    <div class="controls">
+        <input type="date" id="datePicker">
+        <button class="btn-primary" onclick="app.saveDay()">Save</button>
+    </div>
+
+    <div id="studentList" class="student-list">
+        <!-- Students injected here -->
+    </div>
+
+    <div class="summary-section">
+        <h2>Monthly Summary</h2>
+        <div style="margin-bottom: 10px; font-size: 0.9rem; color: #666;">
+            Showing: <span id="summaryMonthLabel"></span>
+        </div>
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Present</th>
+                    <th>%</th>
+                </tr>
+            </thead>
+            <tbody id="summaryBody">
+                <!-- Summary rows injected here -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Manage Modal -->
+<div id="manageModal" class="modal">
+    <div class="modal-content">
+        <h2>Manage Students</h2>
+        <p style="font-size: 0.9rem; color: #666;">Enter names (one per line). Existing names will be kept.</p>
+        <textarea id="nameInput" placeholder="John Doe&#10;Jane Smith"></textarea>
+        <div class="modal-actions">
+            <button class="btn-outline" onclick="app.closeManageModal()">Cancel</button>
+            <button class="btn-success" onclick="app.saveStudents()">Save List</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast">Saved successfully</div>
+
+<script>
+/**
+ * App Logic
+ * Uses LocalStorage for persistence.
+ * Data Structure:
+ * {
+ *   students: ["Name 1", "Name 2"],
+ *   attendance: { "YYYY-MM-DD": { "Name 1": "present", "Name 2": "absent" } }
+ * }
+ */
+const app = {
+    data: {
+        students: [],
+        attendance: {}
+    },
+    currentStatus: {}, // Temporary state for current view
+
+    init: function() {
+        this.loadData();
+        
+        // Set date picker to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('datePicker').value = today;
+        
+        // Listen for date change
+        document.getElementById('datePicker').addEventListener('change', () => {
+            this.renderDay();
+        });
+
+        this.renderDay();
+        this.renderSummary();
+        
+        // Register Service Worker for PWA
+        this.registerSW();
+    },
+
+    loadData: function() {
+        const stored = localStorage.getItem('ngo_attendance_data');
+        if (stored) {
+            this.data = JSON.parse(stored);
+        } else {
+            // Default empty state
+            this.data.students = [];
+            this.data.attendance = {};
+        }
+    },
+
+    saveData: function() {
+        localStorage.setItem('ngo_attendance_data', JSON.stringify(this.data));
+    },
+
+    registerSW: function() {
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                const CACHE_NAME = 'attendance-v1';
+                self.addEventListener('install', e => {
+                    e.waitUntil(
+                        caches.open(CACHE_NAME).then(cache => {
+                            return cache.addAll(['/']);
+                        })
+                    );
+                });
+                self.addEventListener('fetch', e => {
+                    e.respondWith(
+                        caches.match(e.request).then(response => {
+                            return response || fetch(e.request);
+                        })
+                    );
+                });
+            `;
+            const blob = new Blob([swCode], {type: 'application/javascript'});
+            const swUrl = URL.createObjectURL(blob);
+            
+            navigator.serviceWorker.register(swUrl)
+                .then(() => console.log('Service Worker Registered'))
+                .catch(err => console.error('SW Error:', err));
+        }
+    },
+
+    renderDay: function() {
+        const date = document.getElementById('datePicker').value;
+        const list = document.getElementById('studentList');
+        list.innerHTML = '';
+
+        if (this.data.students.length === 0) {
+            list.innerHTML = '<div class="empty-state">No students added. Click "Manage" to add names.</div>';
+            return;
+        }
+
+        // Get existing data for this day
+        const dayData = this.data.attendance[date] || {};
+
+        this.data.students.forEach((name, index) => {
+            const status = dayData[name] || 'absent'; // Default to absent if not set
+            this.currentStatus[name] = status;
+
+            const card = document.createElement('div');
+            card.className = `student-card ${status}`;
+            card.innerHTML = `
+                <div class="student-info">
+                    <span class="student-name">${name}</span>
+                    <span class="student-id">ID: ${index + 1}</span>
+                </div>
+                <div class="status-toggle">
+                    <button class="status-btn ${status === 'present' ? 'active-present' : ''}" 
+                        onclick="app.setStatus('${name}', 'present')">Present</button>
+                    <button class="status-btn ${status === 'absent' ? 'active-absent' : ''}" 
+                        onclick="app.setStatus('${name}', 'absent')">Absent</button>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    },
+
+    setStatus: function(name, status) {
+        this.currentStatus[name] = status;
+        this.renderDay(); // Re-render to update UI classes
+    },
+
+    saveDay: function() {
+        const date = document.getElementById('datePicker').value;
+        if (!date) return;
+
+        if (!this.data.attendance[date]) {
+            this.data.attendance[date] = {};
+        }
+
+        // Save current status
+        Object.keys(this.currentStatus).forEach(name => {
+            this.data.attendance[date][name] = this.currentStatus[name];
+        });
+
+        this.saveData();
+        this.showToast('Attendance Saved');
+        this.renderSummary(); // Update summary in background
+    },
+
+    renderSummary: function() {
+        const tbody = document.getElementById('summaryBody');
+        tbody.innerHTML = '';
+        
+        const dateInput = document.getElementById('datePicker').value;
+        const dateObj = new Date(dateInput);
+        const month = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+        document.getElementById('summaryMonthLabel').textContent = month;
+
+        // Calculate stats for the current month
+        const [year, monthStr] = dateInput.split('-');
+        const monthIndex = parseInt(monthStr) - 1; // 0-based
+
+        this.data.students.forEach(name => {
+            let presentCount = 0;
+            let totalDays = 0;
+
+            // Iterate through all attendance records
+            Object.keys(this.data.attendance).forEach(dateKey => {
+                const [y, m, d] = dateKey.split('-');
+                if (parseInt(y) === parseInt(year) && parseInt(m) - 1 === monthIndex) {
+                    totalDays++;
+                    if (this.data.attendance[dateKey][name] === 'present') {
+                        presentCount++;
+                    }
+                }
+            });
+
+            const percentage = totalDays === 0 ? 0 : Math.round((presentCount / totalDays) * 100);
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${name}</td>
+                <td>${presentCount} / ${totalDays}</td>
+                <td>${percentage}%</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    },
+
+    // Modal Logic
+    openManageModal: function() {
+        const modal = document.getElementById('manageModal');
+        const textarea = document.getElementById('nameInput');
+        textarea.value = this.data.students.join('\n');
+        modal.classList.add('open');
+    },
+
+    closeManageModal: function() {
+        document.getElementById('manageModal').classList.remove('open');
+    },
+
+    saveStudents: function() {
+        const textarea = document.getElementById('nameInput');
+        const names = textarea.value.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+        
+        // Merge: keep existing, add new, remove deleted
+        const newSet = new Set(names);
+        const oldSet = new Set(this.data.students);
+        
+        // Keep old students that are still in the list
+        const kept = this.data.students.filter(n => newSet.has(n));
+        // Add new students
+        const added = names.filter(n => !oldSet.has(n));
+        
+        this.data.students = [...kept, ...added];
+        this.saveData();
+        this.closeManageModal();
+        this.renderDay();
+        this.renderSummary();
+        this.showToast('Student list updated');
+    },
+
+    showToast: function(msg) {
+        const x = document.getElementById("toast");
+        x.textContent = msg;
+        x.className = "show";
+        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+    }
+};
+
+// Initialize App
+window.addEventListener('DOMContentLoaded', () => {
+    app.init();
+});
+</script>
+</body>
+</html>

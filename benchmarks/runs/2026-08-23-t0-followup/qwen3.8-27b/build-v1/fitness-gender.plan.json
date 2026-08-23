@@ -1,0 +1,141 @@
+{
+ "plan": {
+  "title": "Gender Parity in Fitness Improvement",
+  "subtitle": "Comparing baseline and endline performance metrics for boys and girls",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Participants",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM (SELECT \"Child ID\" FROM \"baseline\" UNION SELECT \"Child ID\" FROM \"endline\")",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Average Shuttle Run Time (sec)",
+    "sql": "SELECT \"Gender\", AVG(\"Shuttle run sec\") AS avg_time FROM \"baseline\" GROUP BY 1 UNION ALL SELECT \"Gender\", AVG(\"Shuttle run sec\") AS avg_time FROM \"endline\" GROUP BY 1",
+    "x": "Gender",
+    "y": [
+     "avg_time"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Average Sit-ups",
+    "sql": "SELECT \"Gender\", AVG(\"Sit ups\") AS avg_situps FROM \"baseline\" GROUP BY 1 UNION ALL SELECT \"Gender\", AVG(\"Sit ups\") AS avg_situps FROM \"endline\" GROUP BY 1",
+    "x": "Gender",
+    "y": [
+     "avg_situps"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Improvement by Gender",
+    "sql": "WITH b AS (SELECT \"Gender\", AVG(\"Shuttle run sec\") AS base_shuttle, AVG(\"Sit ups\") AS base_situps FROM \"baseline\" GROUP BY 1), e AS (SELECT \"Gender\", AVG(\"Shuttle run sec\") AS end_shuttle, AVG(\"Sit ups\") AS end_situps FROM \"endline\" GROUP BY 1) SELECT b.\"Gender\" AS gender, b.base_shuttle, e.end_shuttle, (b.base_shuttle - e.end_shuttle) AS shuttle_improvement, b.base_situps, e.end_situps, (e.end_situps - b.base_situps) AS situps_improvement FROM b JOIN e ON b.\"Gender\" = e.\"Gender\" ORDER BY 1"
+   }
+  ],
+  "narrative": "This report examines whether boys and girls are improving at the same rate in physical fitness. We compare the average shuttle run times and sit-up counts from the baseline to the endline assessment.\n\nThe total number of participants tracked is {{p1}}. The bar charts show the average performance for each gender at both time points. A decrease in shuttle run time indicates improvement, while an increase in sit-ups indicates improvement.\n\nThe table below details the specific improvement metrics for each gender. The 'shuttle_improvement' column shows the reduction in time (positive is better), and 'situps_improvement' shows the increase in count (positive is better). By comparing these values, we can see if one gender is outpacing the other in specific areas."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "Gender",
+    "avg_time"
+   ],
+   "rows": [
+    {
+     "Gender": "Male",
+     "avg_time": 13.33392857142857
+    },
+    {
+     "Gender": "Female",
+     "avg_time": 13.261363636363637
+    },
+    {
+     "Gender": "Female",
+     "avg_time": 13.248863636363632
+    },
+    {
+     "Gender": "Male",
+     "avg_time": 13.319642857142862
+    }
+   ],
+   "rowcount": 4,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Gender",
+    "avg_situps"
+   ],
+   "rows": [
+    {
+     "Gender": "Female",
+     "avg_situps": 17.28409090909091
+    },
+    {
+     "Gender": "Male",
+     "avg_situps": 17.035714285714285
+    },
+    {
+     "Gender": "Female",
+     "avg_situps": 19.522727272727273
+    },
+    {
+     "Gender": "Male",
+     "avg_situps": 20.482142857142858
+    }
+   ],
+   "rowcount": 4,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "gender",
+    "base_shuttle",
+    "end_shuttle",
+    "shuttle_improvement",
+    "base_situps",
+    "end_situps",
+    "situps_improvement"
+   ],
+   "rows": [
+    {
+     "gender": "Female",
+     "base_shuttle": 13.261363636363637,
+     "end_shuttle": 13.248863636363632,
+     "shuttle_improvement": 0.012500000000004619,
+     "base_situps": 17.28409090909091,
+     "end_situps": 19.522727272727273,
+     "situps_improvement": 2.2386363636363633
+    },
+    {
+     "gender": "Male",
+     "base_shuttle": 13.33392857142857,
+     "end_shuttle": 13.319642857142862,
+     "shuttle_improvement": 0.014285714285708906,
+     "base_situps": 17.035714285714285,
+     "end_situps": 20.482142857142858,
+     "situps_improvement": 3.446428571428573
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  }
+ }
+}

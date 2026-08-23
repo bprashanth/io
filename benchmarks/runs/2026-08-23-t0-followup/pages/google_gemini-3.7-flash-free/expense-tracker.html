@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Field Expense Tracker</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card-bg: #ffffff;
+      --primary: #1b4d3e;
+      --primary-hover: #143a2f;
+      --text: #222222;
+      --text-muted: #666666;
+      --border: #dcdfe3;
+      --accent: #e8f0ec;
+      --danger: #a82a2a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px 16px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 20px;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    @media (min-width: 600px) {
+      .summary-grid {
+        grid-template-columns: 1fr 2fr;
+      }
+    }
+
+    .total-card {
+      background: var(--accent);
+      border-left: 4px solid var(--primary);
+      padding: 16px;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .total-label {
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .total-amount {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: 4px;
+    }
+
+    .heads-breakdown {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .head-item {
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 12px;
+    }
+
+    .head-name {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .head-val {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-top: 2px;
+      display: block;
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    @media (min-width: 600px) {
+      form {
+        grid-template-columns: 1fr 1fr 1fr auto;
+        align-items: end;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    input, select, button {
+      padding: 9px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      width: 100%;
+    }
+
+    input:focus, select:focus {
+      outline: 2px solid var(--primary);
+      border-color: transparent;
+    }
+
+    button.btn-primary {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      height: 42px;
+      padding: 0 20px;
+    }
+
+    button.btn-primary:hover {
+      background-color: var(--primary-hover);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background-color: #fafafa;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    td.num, th.num {
+      text-align: right;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: var(--danger);
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      text-align: center;
+      width: auto;
+    }
+
+    .btn-delete:hover {
+      background-color: #fce8e8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Field Expense Tracker</h1>
+      <p class="subtitle">Record project expenses and track headwise spending</p>
+    </header>
+
+    <!-- Summary Section -->
+    <div class="card">
+      <h2>Summary Overview</h2>
+      <div class="summary-grid">
+        <div class="total-card">
+          <span class="total-label">Total Running Expense</span>
+          <span class="total-amount" id="grandTotal">0.00</span>
+        </div>
+        <div class="heads-breakdown" id="headBreakdown">
+          <!-- Dynamic breakdown items will appear here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Expense Form -->
+    <div class="card">
+      <h2>Add New Expense</h2>
+      <form id="expenseForm">
+        <div class="form-group">
+          <label for="expDate">Date</label>
+          <input type="date" id="expDate" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="expHead">Expense Head</label>
+          <select id="expHead" required>
+            <option value="">-- Select Head --</option>
+            <option value="Travel">Travel</option>
+            <option value="Food & Meals">Food & Meals</option>
+            <option value="Accommodation">Accommodation</option>
+            <option value="Community Activity">Community Activity</option>
+            <option value="Stationery & Supplies">Stationery & Supplies</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="expAmount">Amount</label>
+          <input type="number" id="expAmount" step="0.01" min="0.01" placeholder="0.00" required>
+        </div>
+
+        <div>
+          <button type="submit" class="btn-primary">Add Entry</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Expense Log Table -->
+    <div class="card">
+      <h2>Expense History</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Head</th>
+              <th class="num">Amount</th>
+              <th style="width: 60px;"></th>
+            </tr>
+          </thead>
+          <tbody id="expenseTableBody">
+            <!-- Dynamic rows will appear here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize data array from window.data if provided, else empty
+    var expenses = Array.isArray(window.data) ? window.data.slice() : [];
+
+    var headOptions = [
+      "Travel",
+      "Food & Meals",
+      "Accommodation",
+      "Community Activity",
+      "Stationery & Supplies",
+      "Other"
+    ];
+
+    function formatNumber(num) {
+      return Number(num).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function render() {
+      var tbody = document.getElementById("expenseTableBody");
+      var grandTotalEl = document.getElementById("grandTotal");
+      var breakdownEl = document.getElementById("headBreakdown");
+
+      tbody.innerHTML = "";
+      breakdownEl.innerHTML = "";
+
+      var grandTotal = 0;
+      var totalsByHead = {};
+
+      headOptions.forEach(function(h) {
+        totalsByHead[h] = 0;
+      });
+
+      if (expenses.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No expenses recorded yet.</td></tr>';
+      } else {
+        expenses.forEach(function(item, index) {
+          var amount = parseFloat(item.amount) || 0;
+          grandTotal += amount;
+
+          var headKey = item.head;
+          if (!totalsByHead[headKey] && totalsByHead[headKey] !== 0) {
+            totalsByHead[headKey] = 0;
+          }
+          totalsByHead[headKey] += amount;
+
+          var tr = document.createElement("tr");
+
+          var tdDate = document.createElement("td");
+          tdDate.textContent = item.date || "-";
+
+          var tdHead = document.createElement("td");
+          tdHead.textContent = item.head || "General";
+
+          var tdAmount = document.createElement("td");
+          tdAmount.className = "num";
+          tdAmount.textContent = formatNumber(amount);
+
+          var tdAction = document.createElement("td");
+          var delBtn = document.createElement("button");
+          delBtn.className = "btn-delete";
+          delBtn.textContent = "Remove";
+          delBtn.onclick = function() {
+            expenses.splice(index, 1);
+            render();
+          };
+          tdAction.appendChild(delBtn);
+
+          tr.appendChild(tdDate);
+          tr.appendChild(tdHead);
+          tr.appendChild(tdAmount);
+          tr.appendChild(tdAction);
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      grandTotalEl.textContent = formatNumber(grandTotal);
+
+      // Render Headwise cards
+      Object.keys(totalsByHead).forEach(function(head) {
+        var card = document.createElement("div");
+        card.className = "head-item";
+
+        var nameSpan = document.createElement("span");
+        nameSpan.className = "head-name";
+        nameSpan.textContent = head;
+
+        var valSpan = document.createElement("span");
+        valSpan.className = "head-val";
+        valSpan.textContent = formatNumber(totalsByHead[head]);
+
+        card.appendChild(nameSpan);
+        card.appendChild(valSpan);
+        breakdownEl.appendChild(card);
+      });
+    }
+
+    // Set default date to today
+    document.getElementById("expDate").valueAsDate = new Date();
+
+    // Form submission
+    document.getElementById("expenseForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      var dateInput = document.getElementById("expDate");
+      var headInput = document.getElementById("expHead");
+      var amountInput = document.getElementById("expAmount");
+
+      var newExpense = {
+        date: dateInput.value,
+        head: headInput.value,
+        amount: parseFloat(amountInput.value) || 0
+      };
+
+      expenses.push(newExpense);
+      render();
+
+      amountInput.value = "";
+      headInput.value = "";
+    });
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>

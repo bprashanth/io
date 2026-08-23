@@ -1,0 +1,112 @@
+{
+  "id": "null-aware-average-by-group-p03",
+  "task_id": "null-aware-average-by-group",
+  "pattern": "average of a column with blanks per group for one year, blanks excluded not zero",
+  "question": "average repayment so far per block for 2024 disbursements, ignore loans with no repaid figure",
+  "gold_sql": "SELECT \"Block\", AVG(\"Amount Repaid (Rs)\") AS average_repaid FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      30016.666666666668
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ],
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Wazirganj",
+      22673.684210526317
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dobhi",
+      33642.857142857145
+    ],
+    [
+      "Fatehpur",
+      28382.608695652172
+    ],
+    [
+      "Atri",
+      30016.666666666668
+    ],
+    [
+      "Wazirganj",
+      22673.684210526317
+    ],
+    [
+      "Belaganj",
+      25352.0
+    ],
+    [
+      "Barachatti",
+      35004.34782608696
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT Block, AVG(\"Amount Repaid (Rs)\") AS Average_Repayment FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%' AND NOT \"Amount Repaid (Rs)\" IS NULL GROUP BY Block",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\naverage repayment so far per block for 2024 disbursements, ignore loans with no repaid figure",
+      "response": "To translate the natural language question into an executable SQLite query, we need to carefully parse the requirements and map them to the appropriate SQL constructs. Here's a step-by-step breakdown:\n\n1. **Identify the Relevant Table and Columns**:\n   - The question is about loan repayments, so we will use the `shg_loan_register` table.\n   - We need the `Block` column to group the results by block.\n   - The `Amount Repaid (Rs)` column is required to calculate the average repayment.\n   - The `Disbursement Date` column is needed to filter loans disbursed in 2024.\n\n2. **Filter Conditions**:\n   - We need to filter the records to include only those where the `Disbursement Date` falls within the year 2024. This can be achieved using the `LIKE` operator or by extracting the year from the date string.\n   - We also need to ignore loans with no repaid figure, which means we should exclude records where `Amount Repaid (Rs)` is `NULL`.\n\n3. **Aggregation**:\n   - The question asks for the average repayment per block, so we will use the `AVG()` function on the `Amount Repaid (Rs)` column.\n   - We will group the results by the `Block` column using the `GROUP BY` clause.\n\n4. **Construct the SQL Query**:\n   - Start with the `SELECT` statement to specify the columns we need: `Block` and the average of `Amount Repaid (Rs)`.\n   - Use the `FROM` clause to specify the `shg_loan_register` table.\n   - Apply the `WHERE` clause to filter the records based on the disbursement date and non-null repaid amounts.\n   - Use the `GROUP BY` clause to group the results by `Block`.\n\nHere is the final SQL query:\n\n```sql\nSELECT \n    Block, \n    AVG(`Amount Repaid (Rs)`) AS Average_Repayment\nFROM \n    shg_loan_register\nWHERE \n    `Disbursement Date` LIKE '2024%' \n    AND `Amount Repaid (Rs)` IS NOT NULL\nGROUP BY \n    Block;\n```\n\n### Explanation:\n- **SELECT Block, AVG(`Amount Repaid (Rs)`) AS Average_Repayment**: This selects the block and calculates the average repayment amount for each block.\n- **FROM shg_loan_register**: This specifies the table from which to retrieve the data.\n- **WHERE `Disbursement Date` LIKE '2024%' AND `Amount Repaid (Rs)` IS NOT NULL**: This filters the records to include only those disbursed in 2024 and with a non-null repaid amount.\n- **GROUP BY Block**: This groups the results by block to calculate the average repayment per block.",
+      "api": {
+        "id": "chatcmpl-eJLYsEixEGwVSWrVs0MKlRqCORFoAtu5",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 583,
+          "prompt_tokens": 417,
+          "total_tokens": 1000,
+          "prompt_tokens_details": {
+            "cached_tokens": 389
+          }
+        },
+        "duration_seconds": 21.733
+      },
+      "duration_seconds": 21.735,
+      "sql_duckdb": "SELECT Block, AVG(\"Amount Repaid (Rs)\") AS Average_Repayment FROM shg_loan_register WHERE \"Disbursement Date\" LIKE '2024%' AND NOT \"Amount Repaid (Rs)\" IS NULL GROUP BY Block",
+      "rows": [
+        [
+          "Dobhi",
+          33642.857142857145
+        ],
+        [
+          "Fatehpur",
+          28382.608695652172
+        ],
+        [
+          "Atri",
+          30016.666666666668
+        ],
+        [
+          "Wazirganj",
+          22673.684210526317
+        ],
+        [
+          "Belaganj",
+          25352.0
+        ],
+        [
+          "Barachatti",
+          35004.34782608696
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

@@ -1,0 +1,710 @@
+{
+ "summary": {
+  "label": "qwen_qwen3.6-35b-a3b",
+  "ask_passed": 7,
+  "ask_total": 12,
+  "builds": []
+ },
+ "records": [
+  {
+   "sector": "agri",
+   "question": "average yield per acre by crop",
+   "seconds": 2.1,
+   "passed": true,
+   "why": "5 rows got, 5 expected",
+   "sql": "SELECT \"Crop\", AVG(\"Yield (qtl/acre)\") AS \"average_yield_per_acre\" FROM \"kharif_2025_yield_yield\" GROUP BY \"Crop\"",
+   "got": [
+    {
+     "Crop": "SOYABEAN",
+     "average_yield_per_acre": 10.316315789473686
+    },
+    {
+     "Crop": "Tur",
+     "average_yield_per_acre": 5.486521739130435
+    },
+    {
+     "Crop": "Groundnut",
+     "average_yield_per_acre": 7.298000000000001
+    },
+    {
+     "Crop": "cotton",
+     "average_yield_per_acre": 5.013658536585364
+    },
+    {
+     "Crop": "maize",
+     "average_yield_per_acre": 19.07125
+    }
+   ],
+   "expected": [
+    [
+     "Cotton",
+     5.01
+    ],
+    [
+     "Groundnut",
+     7.3
+    ],
+    [
+     "Maize",
+     19.07
+    ],
+    [
+     "Soyabean",
+     10.32
+    ],
+    [
+     "Tur",
+     5.49
+    ]
+   ]
+  },
+  {
+   "sector": "agri",
+   "question": "top 5 villages by total soyabean area",
+   "seconds": 1.0,
+   "passed": true,
+   "why": "5 rows got, 5 expected",
+   "sql": "SELECT \"Village\", SUM(\"Area (acre)\") AS total_soyabean_area FROM \"kharif_2025_yield_yield\" WHERE \"Crop\" = 'SOYABEAN' GROUP BY \"Village\" ORDER BY total_soyabean_area DESC LIMIT 5",
+   "got": [
+    {
+     "Village": "Dhanora",
+     "total_soyabean_area": 22.270000000000003
+    },
+    {
+     "Village": "Kathi",
+     "total_soyabean_area": 20.8
+    },
+    {
+     "Village": "Bilgaon",
+     "total_soyabean_area": 18.19
+    },
+    {
+     "Village": "Waki",
+     "total_soyabean_area": 14.369999999999997
+    },
+    {
+     "Village": "Manibeli",
+     "total_soyabean_area": 13.49
+    }
+   ],
+   "expected": [
+    [
+     "Dhanora",
+     22.27
+    ],
+    [
+     "Kathi",
+     20.8
+    ],
+    [
+     "Bilgaon",
+     18.19
+    ],
+    [
+     "Waki",
+     14.37
+    ],
+    [
+     "Manibeli",
+     13.49
+    ]
+   ]
+  },
+  {
+   "sector": "agri",
+   "question": "which irrigated plots yielded below the crop average",
+   "seconds": 1.8,
+   "passed": false,
+   "why": "50 rows got, 50 expected",
+   "sql": "WITH crop_averages AS (SELECT \"Crop\", AVG(\"Yield (qtl/acre)\") AS avg_yield FROM \"kharif_2025_yield_yield\" GROUP BY \"Crop\") SELECT y.\"Farmer ID\", y.\"Farmer Name\", y.\"Village\", y.\"Crop\", y.\"Variety\", y.\"Area (acre)\", y.\"Yield (qtl/acre)\", y.\"Sowing Date (dd-mm-yyyy)\", y.\"Harvest Date\", y.\"Irrigated (Y/N)\", y.\"Remarks\" FROM \"kharif_2025_yield_yield\" AS y JOIN crop_averages AS ca ON y.\"Crop\" = ca.\"Crop\" WHERE y.\"Irrigated (Y/N)\" = 'Y' AND y.\"Yield (qtl/acre)\" < ca.avg_yield",
+   "got": [
+    {
+     "Farmer ID": "NDB-0004",
+     "Farmer Name": "Sunita Vasave",
+     "Village": "Dab",
+     "Crop": "Groundnut",
+     "Variety": "TAG 24",
+     "Area (acre)": 5.83,
+     "Yield (qtl/acre)": 5.0,
+     "Sowing Date (dd-mm-yyyy)": "2025-07-10",
+     "Harvest Date": "2025-10-25",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": "pest damage"
+    },
+    {
+     "Farmer ID": "NDB-0007",
+     "Farmer Name": "Suman Dhangar",
+     "Village": "Bilgaon",
+     "Crop": "Groundnut",
+     "Variety": "TAG 24",
+     "Area (acre)": 2.6,
+     "Yield (qtl/acre)": 5.79,
+     "Sowing Date (dd-mm-yyyy)": "2025-07-01",
+     "Harvest Date": "2025-10-15",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": "pest damage"
+    },
+    {
+     "Farmer ID": "NDB-0011",
+     "Farmer Name": "Tulsiram Valvi",
+     "Village": "Dab",
+     "Crop": "SOYABEAN",
+     "Variety": "MAUS 71",
+     "Area (acre)": 2.69,
+     "Yield (qtl/acre)": 6.44,
+     "Sowing Date (dd-mm-yyyy)": "2025-06-16",
+     "Harvest Date": "2025-10-28",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": null
+    },
+    {
+     "Farmer ID": "NDB-0013",
+     "Farmer Name": "Kavita Valvi",
+     "Village": "Kathi",
+     "Crop": "SOYABEAN",
+     "Variety": "MAUS 71",
+     "Area (acre)": 4.27,
+     "Yield (qtl/acre)": 8.99,
+     "Sowing Date (dd-mm-yyyy)": "2025-07-09",
+     "Harvest Date": "2025-11-11",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": null
+    },
+    {
+     "Farmer ID": "NDB-0017",
+     "Farmer Name": "Bhagwan Valvi",
+     "Village": "Dhanora",
+     "Crop": "maize",
+     "Variety": "African Tall",
+     "Area (acre)": 1.58,
+     "Yield (qtl/acre)": 13.16,
+     "Sowing Date (dd-mm-yyyy)": "2025-07-03",
+     "Harvest Date": "2025-11-08",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": null
+    }
+   ],
+   "expected": [
+    [
+     "NDB-0004",
+     "Sunita Vasave",
+     "Dab",
+     "Groundnut",
+     5.0,
+     7.3
+    ],
+    [
+     "NDB-0007",
+     "Suman Dhangar",
+     "Bilgaon",
+     "Groundnut",
+     5.79,
+     7.3
+    ],
+    [
+     "NDB-0011",
+     "Tulsiram Valvi",
+     "Dab",
+     "Soyabean",
+     6.44,
+     10.32
+    ],
+    [
+     "NDB-0013",
+     "Kavita Valvi",
+     "Kathi",
+     "Soyabean",
+     8.99,
+     10.32
+    ],
+    [
+     "NDB-0017",
+     "Bhagwan Valvi",
+     "Dhanora",
+     "Maize",
+     13.16,
+     19.07
+    ]
+   ]
+  },
+  {
+   "sector": "agri",
+   "question": "total input cost per farmer, highest first (join the two sheets)",
+   "seconds": 1.4,
+   "passed": true,
+   "why": "220 rows got, 220 expected",
+   "sql": "SELECT y.\"Farmer ID\", y.\"Farmer Name\", i.\"Seed Cost Rs\" + i.\"Fertiliser Cost Rs\" AS total_input_cost FROM \"kharif_2025_yield_yield\" AS y JOIN \"kharif_2025_yield_inputs\" AS i ON y.\"Farmer ID\" = i.\"Farmer ID\" ORDER BY total_input_cost DESC",
+   "got": [
+    {
+     "Farmer ID": "NDB-0079",
+     "Farmer Name": "Kamla Valvi",
+     "total_input_cost": 9860
+    },
+    {
+     "Farmer ID": "NDB-0028",
+     "Farmer Name": "Ashok Gavit",
+     "total_input_cost": 9679
+    },
+    {
+     "Farmer ID": "NDB-0149",
+     "Farmer Name": "Suman Valvi",
+     "total_input_cost": 9494
+    },
+    {
+     "Farmer ID": "NDB-0091",
+     "Farmer Name": "Kamla Vasave",
+     "total_input_cost": 9296
+    },
+    {
+     "Farmer ID": "NDB-0101",
+     "Farmer Name": "Kamla Padvi",
+     "total_input_cost": 9270
+    }
+   ],
+   "expected": [
+    [
+     "NDB-0079",
+     "Kamla Valvi",
+     9860
+    ],
+    [
+     "NDB-0028",
+     "Ashok Gavit",
+     9679
+    ],
+    [
+     "NDB-0149",
+     "Suman Valvi",
+     9494
+    ],
+    [
+     "NDB-0091",
+     "Kamla Vasave",
+     9296
+    ],
+    [
+     "NDB-0101",
+     "Kamla Padvi",
+     9270
+    ]
+   ]
+  },
+  {
+   "sector": "mfi",
+   "question": "total repaid per block from the monthly columns",
+   "seconds": 9.0,
+   "passed": true,
+   "why": "6 rows got, 6 expected",
+   "sql": "WITH unpivoted AS (SELECT \"SHG Name\", \"Block\", \"Members\", \"Loan Amount\", month, amount FROM shg_repayment_ledger UNPIVOT(amount FOR month IN (\"Apr-25\", \"May-25\", \"Jun-25\", \"Jul-25\", \"Aug-25\", \"Sep-25\", \"Oct-25\", \"Nov-25\", \"Dec-25\", \"Jan-26\", \"Feb-26\", \"Mar-26\"))), monthly_totals AS (SELECT \"Block\", month, SUM(amount) AS monthly_repaid FROM unpivoted GROUP BY \"Block\", month) SELECT \"Block\", SUM(monthly_repaid) AS total_repaid_per_block FROM monthly_totals GROUP BY \"Block\"",
+   "got": [
+    {
+     "Block": "Hisua",
+     "total_repaid_per_block": 1643810.0
+    },
+    {
+     "Block": "Warisaliganj",
+     "total_repaid_per_block": 1732430.0
+    },
+    {
+     "Block": "Pakribarawan",
+     "total_repaid_per_block": 1228350.0
+    },
+    {
+     "Block": "Rajauli",
+     "total_repaid_per_block": 2248990.0
+    },
+    {
+     "Block": "Gobindpur",
+     "total_repaid_per_block": 1752200.0
+    }
+   ],
+   "expected": [
+    [
+     "Gobindpur",
+     1752200
+    ],
+    [
+     "Hisua",
+     1643810
+    ],
+    [
+     "Nawada Sadar",
+     970530
+    ],
+    [
+     "Pakribarawan",
+     1228350
+    ],
+    [
+     "Rajauli",
+     2248990
+    ]
+   ]
+  },
+  {
+   "sector": "mfi",
+   "question": "SHGs whose typed total does not match the sum of months",
+   "seconds": 6.5,
+   "passed": false,
+   "why": "I couldn't turn that into a query I can run. Last problem: ParserException: Parser Error: syntax error at or near \",\"\n\nLINE 8:   UNPIVOT (\"Apr-25\", \"May-25\", \"Jun-25\", \"Jul-25\", \"Aug-25\", \"Sep-25\", \"O"
+  },
+  {
+   "sector": "mfi",
+   "question": "months with the lowest collections overall",
+   "seconds": 1.6,
+   "passed": false,
+   "why": "1 rows got, 12 expected",
+   "sql": "WITH monthly_totals AS (SELECT 'Apr-25' AS month, COALESCE(SUM(\"Apr-25\"), 0) AS total_amount FROM \"shg_repayment_ledger\" UNION ALL SELECT 'May-25', COALESCE(SUM(\"May-25\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Jun-25', COALESCE(SUM(\"Jun-25\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Jul-25', COALESCE(SUM(\"Jul-25\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Aug-25', COALESCE(SUM(\"Aug-25\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Sep-25', COALESCE(SUM(\"Sep-25\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Oct-25', COALESCE(SUM(\"Oct-25\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Nov-25', COALESCE(SUM(\"Nov-25\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Dec-25', COALESCE(SUM(\"Dec-25\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Jan-26', COALESCE(SUM(\"Jan-26\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Feb-26', COALESCE(SUM(\"Feb-26\"), 0) FROM \"shg_repayment_ledger\" UNION ALL SELECT 'Mar-26', COALESCE(SUM(\"Mar-26\"), 0) FROM \"shg_repayment_ledger\") SELECT month, total_amount FROM monthly_totals ORDER BY total_amount ASC LIMIT 1",
+   "got": [
+    {
+     "month": "Jan-26",
+     "total_amount": 738090.0
+    }
+   ],
+   "expected": [
+    [
+     "Jan-26",
+     738090
+    ],
+    [
+     "Oct-25",
+     754110
+    ],
+    [
+     "May-25",
+     757590
+    ],
+    [
+     "Jul-25",
+     763110
+    ],
+    [
+     "Feb-26",
+     776540
+    ]
+   ]
+  },
+  {
+   "sector": "mfi",
+   "question": "repayment rate = repaid/loan amount per SHG, lowest 5",
+   "seconds": 1.6,
+   "passed": false,
+   "why": "5 rows got, 5 expected",
+   "sql": "WITH repayment_rates AS (SELECT \"SHG Name\", CAST(\"Total Repaid\" AS DOUBLE) / NULLIF(CAST(\"Loan Amount\" AS DOUBLE), 0) AS repayment_rate FROM shg_repayment_ledger) SELECT \"SHG Name\", repayment_rate FROM repayment_rates ORDER BY repayment_rate ASC LIMIT 5",
+   "got": [
+    {
+     "SHG Name": "Maa Durga Mahila Sangh",
+     "repayment_rate": 0.25239745688830295
+    },
+    {
+     "SHG Name": "Navjyoti Mahila Sangh",
+     "repayment_rate": 0.2529081445140557
+    },
+    {
+     "SHG Name": "Krishna SHG",
+     "repayment_rate": 0.2546916890080429
+    },
+    {
+     "SHG Name": "Jyoti Swayam Sahayata Samuh",
+     "repayment_rate": 0.25507586307996777
+    },
+    {
+     "SHG Name": "Ambika Mahila SHG",
+     "repayment_rate": 0.26028540568847575
+    }
+   ],
+   "expected": [
+    [
+     "Krishna SHG",
+     "Nawada Sadar",
+     0.25
+    ],
+    [
+     "Maa Durga Mahila Sangh",
+     "Rajauli",
+     0.25
+    ],
+    [
+     "Navjyoti Mahila Sangh",
+     "Hisua",
+     0.25
+    ],
+    [
+     "Ambika Mahila SHG",
+     "Nawada Sadar",
+     0.26
+    ],
+    [
+     "Jyoti Swayam Sahayata Samuh",
+     "Warisaliganj",
+     0.26
+    ]
+   ]
+  },
+  {
+   "sector": "wash",
+   "question": "how many handpumps are not functional per block",
+   "seconds": 1.3,
+   "passed": true,
+   "why": "12 rows got, 12 expected",
+   "sql": "SELECT \"Block\", COUNT(*) AS \"Not Functional Count\" FROM handpump_survey WHERE \"Status\" = 'Not Functional' GROUP BY \"Block\"",
+   "got": [
+    {
+     "Block": "Narla",
+     "Not Functional Count": 3
+    },
+    {
+     "Block": "Bhawanipatna",
+     "Not Functional Count": 4
+    },
+    {
+     "Block": "Boipariguda",
+     "Not Functional Count": 8
+    },
+    {
+     "Block": "Kashipur",
+     "Not Functional Count": 6
+    },
+    {
+     "Block": "Dabugaon",
+     "Not Functional Count": 5
+    }
+   ],
+   "expected": [
+    [
+     "Bhawanipatna",
+     4
+    ],
+    [
+     "Boipariguda",
+     8
+    ],
+    [
+     "Dabugaon",
+     5
+    ],
+    [
+     "Gunupur",
+     3
+    ],
+    [
+     "Junagarh",
+     2
+    ]
+   ]
+  },
+  {
+   "sector": "wash",
+   "question": "average TDS by district for functional pumps",
+   "seconds": 1.1,
+   "passed": true,
+   "why": "4 rows got, 4 expected",
+   "sql": "SELECT \"District\", AVG(\"TDS (ppm)\") AS average_tds FROM \"handpump_survey\" WHERE \"Status\" = 'Functional' GROUP BY \"District\"",
+   "got": [
+    {
+     "District": "Kalahandi",
+     "average_tds": 649.8846153846154
+    },
+    {
+     "District": "Nabarangpur",
+     "average_tds": 606.3333333333334
+    },
+    {
+     "District": "Koraput",
+     "average_tds": 740.575
+    },
+    {
+     "District": "Rayagada",
+     "average_tds": 673.2051282051282
+    }
+   ],
+   "expected": [
+    [
+     "Kalahandi",
+     649.88
+    ],
+    [
+     "Koraput",
+     740.58
+    ],
+    [
+     "Nabarangpur",
+     606.33
+    ],
+    [
+     "Rayagada",
+     673.21
+    ]
+   ]
+  },
+  {
+   "sector": "wash",
+   "question": "pumps deeper than 200 ft not repaired since 2023",
+   "seconds": 1.3,
+   "passed": false,
+   "why": "91 rows got, 91 expected",
+   "sql": "SELECT * FROM \"handpump_survey\" WHERE \"Depth (ft)\" > 200 AND (\"Last Repair\" IS NULL OR EXTRACT(YEAR FROM \"Last Repair\") < 2023)",
+   "got": [
+    {
+     "Habitation": "Padmapadar",
+     "Block": "Junagarh",
+     "District": "Kalahandi",
+     "Pump Type": "India Mark III",
+     "Installed Year": 2016,
+     "Users (HH)": 590,
+     "Depth (ft)": 319,
+     "Last Repair": null,
+     "Status": "Functional",
+     "Status (2)": "Safe",
+     "TDS (ppm)": 395.0,
+     "Lat, Long": "19.7, 83.05"
+    },
+    {
+     "Habitation": "Similipadar",
+     "Block": "Kashipur",
+     "District": "Rayagada",
+     "Pump Type": "India Mark II",
+     "Installed Year": 2015,
+     "Users (HH)": 897,
+     "Depth (ft)": 349,
+     "Last Repair": "2017-08-17",
+     "Status": "Functional",
+     "Status (2)": "Safe",
+     "TDS (ppm)": 420.0,
+     "Lat, Long": "19.59, 83.02"
+    },
+    {
+     "Habitation": "Kenduguda",
+     "Block": "Koraput Sadar",
+     "District": "Koraput",
+     "Pump Type": "Tara Pump",
+     "Installed Year": 2000,
+     "Users (HH)": 295,
+     "Depth (ft)": 221,
+     "Last Repair": "2005-07-28",
+     "Status": "Functional",
+     "Status (2)": "Safe",
+     "TDS (ppm)": 288.0,
+     "Lat, Long": "18.27, 83.85"
+    },
+    {
+     "Habitation": "Dudumapadar",
+     "Block": "Koraput Sadar",
+     "District": "Koraput",
+     "Pump Type": "Tara Pump",
+     "Installed Year": 2001,
+     "Users (HH)": 558,
+     "Depth (ft)": 346,
+     "Last Repair": "2019-04-07",
+     "Status": "Functional",
+     "Status (2)": "Safe",
+     "TDS (ppm)": 229.0,
+     "Lat, Long": "18.17, 82.02"
+    },
+    {
+     "Habitation": "Rangapur",
+     "Block": "Semiliguda",
+     "District": "Koraput",
+     "Pump Type": "Tara Pump",
+     "Installed Year": 2006,
+     "Users (HH)": 225,
+     "Depth (ft)": 270,
+     "Last Repair": "2008-02-15",
+     "Status": "Functional",
+     "Status (2)": "Unsafe",
+     "TDS (ppm)": 1034.0,
+     "Lat, Long": "19.23, 82.76"
+    }
+   ],
+   "expected": [
+    [
+     "Padmapadar",
+     "Semiliguda",
+     "Koraput",
+     349,
+     "Never repaired"
+    ],
+    [
+     "Similipadar",
+     "Kashipur",
+     "Rayagada",
+     349,
+     "2017-08-17"
+    ],
+    [
+     "Tentabasti",
+     "Nabarangpur Sadar",
+     "Nabarangpur",
+     347,
+     "2015-04-06"
+    ],
+    [
+     "Dudumapadar",
+     "Koraput Sadar",
+     "Koraput",
+     346,
+     "2019-04-07"
+    ],
+    [
+     "Kumulisahi",
+     "Nabarangpur Sadar",
+     "Nabarangpur",
+     346,
+     "2022-05-14"
+    ]
+   ]
+  },
+  {
+   "sector": "wash",
+   "question": "total users served by block",
+   "seconds": 1.6,
+   "passed": true,
+   "why": "12 rows got, 12 expected",
+   "sql": "SELECT \"Block\", SUM(\"Users (HH)\") AS total_users FROM \"handpump_survey\" GROUP BY \"Block\"",
+   "got": [
+    {
+     "Block": "Bhawanipatna",
+     "total_users": 14573
+    },
+    {
+     "Block": "Kashipur",
+     "total_users": 12759
+    },
+    {
+     "Block": "Boipariguda",
+     "total_users": 11753
+    },
+    {
+     "Block": "Dabugaon",
+     "total_users": 9746
+    },
+    {
+     "Block": "Junagarh",
+     "total_users": 16400
+    }
+   ],
+   "expected": [
+    [
+     "Bhawanipatna",
+     14573
+    ],
+    [
+     "Boipariguda",
+     11753
+    ],
+    [
+     "Dabugaon",
+     9746
+    ],
+    [
+     "Gunupur",
+     9802
+    ],
+    [
+     "Junagarh",
+     16400
+    ]
+   ]
+  }
+ ]
+}

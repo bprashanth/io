@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beneficiary Registration</title>
+    <style>
+        :root {
+            --primary: #2c7a7b;
+            --primary-hover: #234e52;
+            --bg: #f7fafc;
+            --card-bg: #ffffff;
+            --text: #2d3748;
+            --text-light: #718096;
+            --border: #e2e8f0;
+            --error: #e53e3e;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        p.subtitle {
+            color: var(--text-light);
+            margin-top: 0;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+
+        input, select {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(44, 122, 123, 0.1);
+        }
+
+        .error-msg {
+            color: var(--error);
+            font-size: 0.8rem;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .input-error {
+            border-color: var(--error) !important;
+        }
+
+        .btn-group {
+            margin-top: 25px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: #edf2f7;
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background-color: #e2e8f0;
+        }
+
+        .btn-danger {
+            background-color: #fff5f5;
+            color: var(--error);
+            border: 1px solid #feb2b2;
+        }
+
+        .btn-danger:hover {
+            background-color: #fed7d7;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: var(--text-light);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        tr:hover {
+            background-color: #f7fafc;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #2d3748;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Beneficiary Registration</h1>
+        <p class="subtitle">Social Sector NGO Data Entry</p>
+    </header>
+
+    <!-- Registration Form -->
+    <div class="card">
+        <form id="regForm" novalidate>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" placeholder="e.g. Jane Doe" required>
+                    <span class="error-msg" id="err-name">Name is required</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" placeholder="e.g. 34" min="0" max="120" required>
+                    <span class="error-msg" id="err-age">Enter a valid age (0-120)</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="village">Village / Location</label>
+                    <input type="text" id="village" placeholder="e.g. Green Valley" required>
+                    <span class="error-msg" id="err-village">Location is required</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" placeholder="e.g. 555-0123" required>
+                    <span class="error-msg" id="err-phone">Phone number is required</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select id="category" required>
+                        <option value="" disabled selected>Select a category...</option>
+                        <option value="General">General</option>
+                        <option value="Senior Citizen">Senior Citizen</option>
+                        <option value="Widow">Widow</option>
+                        <option value="Disabled">Disabled</option>
+                        <option value="Orphan">Orphan</option>
+                        <option value="Student">Student</option>
+                    </select>
+                    <span class="error-msg" id="err-category">Please select a category</span>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button type="submit" class="btn-primary">Register Beneficiary</button>
+                <button type="button" id="btnDownload" class="btn-secondary">Download CSV</button>
+                <button type="button" id="btnClear" class="btn-danger">Clear All Data</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Data Table -->
+    <div class="card">
+        <h3 style="margin-top: 0; color: var(--text);">Registered Beneficiaries</h3>
+        <div style="overflow-x: auto;">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Age</th>
+                        <th>Village</th>
+                        <th>Phone</th>
+                        <th>Category</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- Rows injected here -->
+                </tbody>
+            </table>
+            <div id="emptyState" class="empty-state">No beneficiaries registered yet.</div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast">Action Successful</div>
+
+<script>
+    (function() {
+        // --- Data Management ---
+        const STORAGE_KEY = 'ngo_beneficiaries_v1';
+        let beneficiaries = [];
+
+        // Initialize data: Check window.data first, then LocalStorage, then empty
+        function initData() {
+            if (window.data && Array.isArray(window.data)) {
+                beneficiaries = window.data;
+            } else {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    try {
+                        beneficiaries = JSON.parse(stored);
+                    } catch (e) {
+                        console.error("Failed to parse local storage data", e);
+                        beneficiaries = [];
+                    }
+                }
+            }
+            renderTable();
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(beneficiaries));
+            renderTable();
+        }
+
+        // --- DOM Elements ---
+        const form = document.getElementById('regForm');
+        const tableBody = document.getElementById('tableBody');
+        const emptyState = document.getElementById('emptyState');
+        const toast = document.getElementById('toast');
+
+        // --- Validation & Submission ---
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Reset errors
+            document.querySelectorAll('.error-msg').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('input, select').forEach(el => el.classList.remove('input-error'));
+
+            const name = document.getElementById('name').value.trim();
+            const age = document.getElementById('age').value;
+            const village = document.getElementById('village').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const category = document.getElementById('category').value;
+
+            let isValid = true;
+
+            if (!name) {
+                showError('name', 'Name is required');
+                isValid = false;
+            }
+            if (!age || age < 0 || age > 120) {
+                showError('age', 'Enter a valid age (0-120)');
+                isValid = false;
+            }
+            if (!village) {
+                showError('village', 'Location is required');
+                isValid = false;
+            }
+            if (!phone) {
+                showError('phone', 'Phone number is required');
+                isValid = false;
+            }
+            if (!category) {
+                showError('category', 'Please select a category');
+                isValid = false;
+            }
+
+            if (isValid) {
+                const newEntry = {
+                    id: Date.now(),
+                    name: name,
+                    age: parseInt(age, 10),
+                    village: village,
+                    phone: phone,
+                    category: category,
+                    registeredAt: new Date().toISOString()
+                };
+
+                beneficiaries.push(newEntry);
+                saveData();
+                form.reset();
+                showToast('Beneficiary registered successfully');
+            }
+        });
+
+        function showError(fieldId, message) {
+            const input = document.getElementById(fieldId);
+            const errorSpan = document.getElementById('err-' + fieldId);
+            input.classList.add('input-error');
+            errorSpan.textContent = message;
+            errorSpan.style.display = 'block';
+        }
+
+        // --- Rendering ---
+        function renderTable() {
+            tableBody.innerHTML = '';
+            
+            if (beneficiaries.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+
+            beneficiaries.forEach(person => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${escapeHtml(person.name)}</td>
+                    <td>${person.age}</td>
+                    <td>${escapeHtml(person.village)}</td>
+                    <td>${escapeHtml(person.phone)}</td>
+                    <td>${escapeHtml(person.category)}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // --- CSV Export ---
+        document.getElementById('btnDownload').addEventListener('click', function() {
+            if (beneficiaries.length === 0) {
+                showToast('No data to download');
+                return;
+            }
+
+            const headers = ['Name', 'Age', 'Village', 'Phone', 'Category', 'Registration Date'];
+            const csvRows = [headers.join(',')];
+
+            beneficiaries.forEach(p => {
+                const row = [
+                    `"${p.name}"`,
+                    p.age,
+                    `"${p.village}"`,
+                    `"${p.phone}"`,
+                    `"${p.category}"`,
+                    `"${new Date(p.registeredAt).toLocaleDateString()}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'beneficiaries_export.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('CSV downloaded');
+        });
+
+        // --- Clear Data ---
+        document.getElementById('btnClear').addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete all registered data? This cannot be undone.')) {
+                beneficiaries = [];
+                saveData();
+                showToast('All data cleared');
+            }
+        });
+
+        // --- Utilities ---
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // --- Init ---
+        initData();
+
+    })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field Team Expense Tracker</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Field Team Expense Tracker</h1></header>
+<main>
+  <div class="card">
+    <h2>Add New Expense</h2>
+    <form id="expenseForm">
+      <div class="row">
+        <div>
+          <label for="date">Date</label>
+          <input type="date" id="date" required>
+        </div>
+        <div>
+          <label for="head">Expense Head</label>
+          <select id="head" required>
+            <option value="">Select category</option>
+            <option value="Travel">Travel</option>
+            <option value="Food">Food</option>
+            <option value="Accommodation">Accommodation</option>
+            <option value="Miscellaneous">Miscellaneous</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="amount">Amount (₹)</label>
+        <input type="number" id="amount" min="1" step="0.01" required>
+      </div>
+      <button type="submit">Add Expense</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Expenses Summary</h2>
+    <div id="runningTotal" class="muted"></div>
+    <table id="expensesTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Head</th>
+          <th>Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody id="expensesBody">
+        <!-- Expenses will appear here -->
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Category Totals</h2>
+    <table id="categoryTotals">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Total (₹)</th>
+        </tr>
+      </thead>
+      <tbody id="totalsBody">
+        <!-- Totals will appear here -->
+      </tbody>
+    </table>
+    <div class="row">
+      <button id="exportBtn">Export to CSV</button>
+      <button id="clearBtn" class="secondary">Clear All</button>
+    </div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// Expense tracker implementation
+const expensesKey = 'fieldTeamExpenses';
+let expenses = store.get(expensesKey, []);
+
+function updateExpenses() {
+  const body = document.getElementById('expensesBody');
+  body.innerHTML = '';
+
+  if (!expenses.length) {
+    body.innerHTML = '<tr><td colspan="3" class="muted">No expenses recorded yet</td></tr>';
+    return;
+  }
+
+  expenses.sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(expense => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${new Date(expense.date).toLocaleDateString()}</td>
+      <td>${expense.head}</td>
+      <td>₹${expense.amount.toFixed(2)}</td>
+    `;
+    body.appendChild(row);
+  });
+}
+
+function updateTotals() {
+  const totalsBody = document.getElementById('totalsBody');
+  totalsBody.innerHTML = '';
+
+  if (!expenses.length) {
+    totalsBody.innerHTML = '<tr><td colspan="2" class="muted">No expenses recorded yet</td></tr>';
+    return;
+  }
+
+  const categoryTotals = {};
+  expenses.forEach(expense => {
+    categoryTotals[expense.head] = (categoryTotals[expense.head] || 0) + expense.amount;
+  });
+
+  const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+
+  sortedCategories.forEach(([category, total]) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${category}</td>
+      <td>₹${total.toFixed(2)}</td>
+    `;
+    totalsBody.appendChild(row);
+  });
+}
+
+function updateRunningTotal() {
+  const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  document.getElementById('runningTotal').textContent = `Running Total: ₹${total.toFixed(2)}`;
+}
+
+function saveExpenses() {
+  store.set(expensesKey, expenses);
+}
+
+document.getElementById('expenseForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  const date = new Date(document.getElementById('date').value);
+  if (isNaN(date.getTime())) {
+    alert('Please select a valid date');
+    return;
+  }
+
+  const head = document.getElementById('head').value;
+  if (!head) {
+    alert('Please select an expense category');
+    return;
+  }
+
+  const amount = parseFloat(document.getElementById('amount').value);
+  if (isNaN(amount) || amount <= 0) {
+    alert('Please enter a valid amount');
+    return;
+  }
+
+  expenses.push({
+    date: date.toISOString().split('T')[0],
+    head,
+    amount
+  });
+
+  saveExpenses();
+  updateExpenses();
+  updateTotals();
+  updateRunningTotal();
+
+  // Reset form
+  this.reset();
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const csv = toCSV(expenses);
+  download('field-team-expenses.csv', csv, 'text/csv');
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (confirm('Are you sure you want to clear all expenses?')) {
+    expenses = [];
+    saveExpenses();
+    updateExpenses();
+    updateTotals();
+    updateRunningTotal();
+  }
+});
+
+// Initialize
+if (window.data && window.data.expenses) {
+  expenses = window.data.expenses;
+} else {
+  expenses = store.get(expensesKey, []);
+}
+
+updateExpenses();
+updateTotals();
+updateRunningTotal();
+</script>
+</body></html>

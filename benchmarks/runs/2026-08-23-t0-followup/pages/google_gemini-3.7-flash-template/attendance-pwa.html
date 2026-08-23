@@ -1,0 +1,271 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tuition Daily Attendance & Monthly Tracker</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><div style="display:flex;justify-content:space-between;align-items:center;"><h1>Tuition Attendance</h1><span id="offline-badge" style="font-size:12px;background:#e0f2fe;color:#0369a1;padding:4px 8px;border-radius:6px;">Offline Ready</span></div></header>
+<main>
+  <div class="card">
+    <div class="row" style="align-items:flex-end;">
+      <div style="flex:1;min-width:180px;">
+        <label for="att-date">Select Date</label>
+        <input type="date" id="att-date">
+      </div>
+      <div style="display:flex;gap:8px;padding-top:4px;">
+        <button type="button" id="btn-all-p" class="secondary">All Present</button>
+        <button type="button" id="btn-all-a" class="secondary">All Absent</button>
+        <button type="button" id="btn-save-day">Save Today</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h2 style="font-size:18px;margin:0;">Daily Roll Call (<span id="count-display">0</span> Students)</h2>
+      <div style="font-size:13px;font-weight:bold;color:var(--accent);" id="today-stats">0 Present | 0 Absent</div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table id="daily-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Student Name</th>
+            <th style="width:140px;text-align:center;">Status</th>
+          </tr>
+        </thead>
+        <tbody id="daily-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <h2 style="font-size:18px;margin:0;">Monthly Summary</h2>
+      <div class="row" style="align-items:center;">
+        <input type="month" id="summary-month" style="width:auto;">
+        <button type="button" id="btn-export-csv" class="secondary">Export CSV</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Student Name</th>
+            <th>Present</th>
+            <th>Absent</th>
+            <th>Total Days</th>
+            <th>Attendance %</th>
+          </tr>
+        </thead>
+        <tbody id="summary-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:18px;margin:0 0 4px 0;">Manage Student Roster</h2>
+    <p class="muted" style="font-size:13px;margin:0 0 10px 0;">Type student names once (one per line). Default is 25 kids. Updates reflect automatically.</p>
+    <textarea id="roster-input" rows="8" placeholder="Student Name 1&#10;Student Name 2&#10;..."></textarea>
+    <div style="margin-top:10px;text-align:right;">
+      <button type="button" id="btn-save-roster">Update Roster</button>
+    </div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+offlineReady();
+
+const DEFAULT_STUDENTS = [
+  "Aarav Sharma", "Aditi Patel", "Ananya Singh", "Ayush Verma", "Bhavya Gupta",
+  "Devansh Joshi", "Diya Mehta", "Ishaan Roy", "Kavya Nair", "Manish Kumar",
+  "Meera Iyer", "Neha Choudhury", "Pooja Das", "Pranav Rao", "Priya Sen",
+  "Rahul Yadav", "Riya Mukherjee", "Rohan Malhotra", "Sahil Khan", "Sanya Kapoor",
+  "Shreya Mishra", "Sneha Ghosh", "Tanvi Bhat", "Varun Tiwari", "Yash Reddy"
+];
+
+let students = store.get('tuition_students', DEFAULT_STUDENTS);
+let attendance = store.get('tuition_attendance', {});
+
+const todayStr = new Date().toISOString().split('T')[0];
+const dateInput = document.getElementById('att-date');
+const monthInput = document.getElementById('summary-month');
+const rosterInput = document.getElementById('roster-input');
+const dailyTbody = document.getElementById('daily-tbody');
+const summaryTbody = document.getElementById('summary-tbody');
+const countDisplay = document.getElementById('count-display');
+const todayStats = document.getElementById('today-stats');
+
+dateInput.value = todayStr;
+monthInput.value = todayStr.substring(0, 7);
+rosterInput.value = students.join('\n');
+
+function getDayRecords(date) {
+  if (!attendance[date]) {
+    attendance[date] = {};
+  }
+  return attendance[date];
+}
+
+function updateStats() {
+  const date = dateInput.value;
+  const dayData = getDayRecords(date);
+  let p = 0, a = 0;
+  students.forEach(s => {
+    if (dayData[s] === 'P') p++;
+    else if (dayData[s] === 'A') a++;
+  });
+  todayStats.textContent = `${p} Present | ${a} Absent`;
+}
+
+function renderDaily() {
+  const date = dateInput.value;
+  countDisplay.textContent = students.length;
+  dailyTbody.innerHTML = '';
+  const dayData = getDayRecords(date);
+
+  if (students.length === 0) {
+    dailyTbody.innerHTML = '<tr><td colspan="3" class="muted" style="text-align:center;">No students added. Add names below.</td></tr>';
+    updateStats();
+    return;
+  }
+
+  students.forEach((name, idx) => {
+    const status = dayData[name] || '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="muted">${idx + 1}</td>
+      <td style="font-weight:500;">${name}</td>
+      <td style="text-align:center;">
+        <label style="display:inline-flex;align-items:center;margin:0 8px 0 0;cursor:pointer;">
+          <input type="radio" name="att_${idx}" value="P" ${status === 'P' ? 'checked' : ''} style="width:auto;margin-right:4px;"> P
+        </label>
+        <label style="display:inline-flex;align-items:center;margin:0;cursor:pointer;">
+          <input type="radio" name="att_${idx}" value="A" ${status === 'A' ? 'checked' : ''} style="width:auto;margin-right:4px;"> A
+        </label>
+      </td>
+    `;
+    tr.querySelectorAll(`input[name="att_${idx}"]`).forEach(r => {
+      r.addEventListener('change', (e) => {
+        dayData[name] = e.target.value;
+        store.set('tuition_attendance', attendance);
+        updateStats();
+        renderSummary();
+      });
+    });
+    dailyTbody.appendChild(tr);
+  });
+  updateStats();
+}
+
+function renderSummary() {
+  const m = monthInput.value;
+  summaryTbody.innerHTML = '';
+  if (!m) return;
+
+  const datesInMonth = Object.keys(attendance).filter(d => d.startsWith(m));
+  
+  if (students.length === 0) {
+    summaryTbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No student records found.</td></tr>';
+    return;
+  }
+
+  students.forEach((name, idx) => {
+    let p = 0, a = 0;
+    datesInMonth.forEach(d => {
+      const rec = attendance[d];
+      if (rec && rec[name] === 'P') p++;
+      else if (rec && rec[name] === 'A') a++;
+    });
+    const total = p + a;
+    const pct = total > 0 ? Math.round((p / total) * 100) + '%' : '-';
+    
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="muted">${idx + 1}</td>
+      <td style="font-weight:500;">${name}</td>
+      <td style="color:#16a34a;font-weight:600;">${p}</td>
+      <td style="color:#dc2626;font-weight:600;">${a}</td>
+      <td>${total}</td>
+      <td style="font-weight:600;">${pct}</td>
+    `;
+    summaryTbody.appendChild(tr);
+  });
+}
+
+document.getElementById('btn-all-p').addEventListener('click', () => {
+  const date = dateInput.value;
+  const dayData = getDayRecords(date);
+  students.forEach(s => { dayData[s] = 'P'; });
+  store.set('tuition_attendance', attendance);
+  renderDaily();
+  renderSummary();
+});
+
+document.getElementById('btn-all-a').addEventListener('click', () => {
+  const date = dateInput.value;
+  const dayData = getDayRecords(date);
+  students.forEach(s => { dayData[s] = 'A'; });
+  store.set('tuition_attendance', attendance);
+  renderDaily();
+  renderSummary();
+});
+
+document.getElementById('btn-save-day').addEventListener('click', () => {
+  store.set('tuition_attendance', attendance);
+  const btn = document.getElementById('btn-save-day');
+  const orig = btn.textContent;
+  btn.textContent = 'Saved!';
+  setTimeout(() => { btn.textContent = orig; }, 1200);
+});
+
+document.getElementById('btn-save-roster').addEventListener('click', () => {
+  const lines = rosterInput.value.split('\n').map(s => s.trim()).filter(Boolean);
+  students = lines;
+  store.set('tuition_students', students);
+  renderDaily();
+  renderSummary();
+  alert('Roster updated successfully (' + students.length + ' students).');
+});
+
+document.getElementById('btn-export-csv').addEventListener('click', () => {
+  const m = monthInput.value;
+  const datesInMonth = Object.keys(attendance).filter(d => d.startsWith(m));
+  const rows = students.map((name, idx) => {
+    let p = 0, a = 0;
+    datesInMonth.forEach(d => {
+      const rec = attendance[d];
+      if (rec && rec[name] === 'P') p++;
+      else if (rec && rec[name] === 'A') a++;
+    });
+    const total = p + a;
+    const pct = total > 0 ? Math.round((p / total) * 100) + '%' : '0%';
+    return {
+      'Roll No': idx + 1,
+      'Student Name': name,
+      'Month': m,
+      'Present Days': p,
+      'Absent Days': a,
+      'Total Recorded Days': total,
+      'Attendance Percentage': pct
+    };
+  });
+  const csv = toCSV(rows);
+  download(`attendance_summary_${m}.csv`, csv, 'text/csv');
+});
+
+dateInput.addEventListener('change', renderDaily);
+monthInput.addEventListener('change', renderSummary);
+
+renderDaily();
+renderSummary();
+</script>
+</body></html>

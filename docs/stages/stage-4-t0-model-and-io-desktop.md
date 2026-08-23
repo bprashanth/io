@@ -68,6 +68,20 @@ results, rendered pages, screenshots for the top candidates, the rejected
 contract-2 runs), `benchmarks/v2/query-anchor-v1{,.1}.json` +
 `benchmarks/v2/anchor-v1/` fixtures, `benchmarks/t0/`.
 
+**Follow-up (2026-08-23 09:00, `chronology/2026-08-23T0900-…`).** Challenged
+on overfitting, specialists, the T1 reference, generic builds and live data;
+answered with runs. Unseen messy sectors (agri xlsx with title/footer rows,
+WASH CSV with duplicate headers and comma numbers, MFI month-wide ledger):
+loader hardened, 9B 8/12 vs Qwen 3.8 27B 9/12 through the real app; Arctic
+7B Q8 19/30 holdout, 13/30 anchor (below the 9B, no Build); **T1 reference is
+Qwen 3.8 27B** (holdout 30/30, 73/73 panels); a third *page* lane (webpage /
+form / PWA, rows injected as `window.data` at view time, syntax + runtime +
+"shows real data" checks with one repair) — 9B 5/8 on the page gate, Qwen 3.6
+35B-A3B 7/8, so that lane is where a stronger hosted model is worth naming;
+live re-run on file change (pages re-execute their receipts, last answers
+recompute, no model call) — the FW edit-and-reorder demo works inside io;
+exported pages are still static (duckdb-wasm is the next item).
+
 **Left open.** A ~4 GB quant for 8 GB laptops with the OS resident; Windows install of the shim;
 packaging as an installer; T1/T2 dial positions; sheltering (vault, lazy
 review, egress monitor from the shield) — the next steps of the proposal.

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beneficiary Registration</title>
+<style>
+  :root{
+    --paper:#f4f1e8;
+    --paper-2:#ece7d8;
+    --ink:#20241f;
+    --ink-soft:#565b52;
+    --line:#d8d2c0;
+    --green:#2f6b4f;
+    --green-deep:#234f3b;
+    --green-soft:#e3ede6;
+    --amber:#c07d1e;
+    --amber-soft:#f6ead2;
+    --red:#b23a2e;
+    --red-soft:#f6e2de;
+    --shadow:0 1px 2px rgba(32,36,31,.06), 0 10px 26px rgba(32,36,31,.08);
+    --shadow-lg:0 2px 4px rgba(32,36,31,.08), 0 22px 48px rgba(32,36,31,.14);
+    --radius:14px;
+    --font-body:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --font-display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    font-family:var(--font-body);
+    color:var(--ink);
+    background:var(--paper);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  /* ambient background */
+  .bg{
+    position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(1100px 620px at 88% -12%, rgba(47,107,79,.12), transparent 60%),
+      radial-gradient(900px 520px at -8% 112%, rgba(192,125,30,.10), transparent 55%),
+      var(--paper);
+  }
+  .bg::after{
+    content:""; position:absolute; inset:0;
+    background-image:radial-gradient(rgba(32,36,31,.05) 1px, transparent 1.4px);
+    background-size:22px 22px;
+    -webkit-mask-image:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.15));
+    mask-image:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.15));
+  }
+
+  .wrap{max-width:1120px; margin:0 auto; padding:0 20px 64px;}
+
+  /* masthead */
+  .masthead{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:16px; flex-wrap:wrap;
+    padding:22px 0 18px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; gap:14px;}
+  .mark{
+    width:46px; height:46px; flex:0 0 auto;
+    display:grid; place-items:center;
+    background:var(--green); color:#fff;
+    border-radius:12px;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.14), var(--shadow);
+  }
+  .mark svg{width:26px; height:26px;}
+  .brand h1{
+    font-family:var(--font-display);
+    font-size:1.35rem; line-height:1.1; margin:0;
+    letter-spacing:.2px;
+  }
+  .brand p{margin:2px 0 0; font-size:.82rem; color:var(--ink-soft);}
+  .status{
+    display:flex; align-items:center; gap:10px;
+    background:var(--paper-2);
+    border:1px solid var(--line);
+    padding:8px 14px; border-radius:999px;
+    font-size:.82rem; color:var(--ink-soft);
+  }
+  .status .dot{
+    width:9px; height:9px; border-radius:50%;
+    background:var(--green);
+    box-shadow:0 0 0 0 rgba(47,107,79,.5);
+    animation:pulse 2.4s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(47,107,79,.45);}
+    70%{box-shadow:0 0 0 8px rgba(47,107,79,0);}
+    100%{box-shadow:0 0 0 0 rgba(47,107,79,0);}
+  }
+  .status b{color:var(--ink); font-weight:700;}
+
+  /* layout */
+  .grid{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:26px;
+    margin-top:26px;
+    align-items:start;
+  }
+  @media (max-width:860px){ .grid{grid-template-columns:1fr;} }
+
+  .card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .card-head{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px;
+    padding:16px 20px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#fff, #fbfaf5);
+  }
+  .card-head h2{
+    font-family:var(--font-display);
+    font-size:1.12rem; margin:0;
+  }
+  .card-head .sub{font-size:.78rem; color:var(--ink-soft); margin-top:2px;}
+  .count-pill{
+    font-size:.78rem; font-weight:700;
+    background:var(--green-soft); color:var(--green-deep);
+    border:1px solid #cfe0d5;
+    padding:5px 12px; border-radius:999px;
+    white-space:nowrap;
+  }
+
+  /* form */
+  form{padding:20px;}
+  .field{margin-bottom:16px;}
+  .field label{
+    display:block; font-size:.82rem; font-weight:600;
+    margin-bottom:6px; color:var(--ink);
+  }
+  .field label .req{color:var(--red); margin-left:2px;}
+  .field .hint{font-weight:400; color:var(--ink-soft); font-size:.74rem;}
+  .control{
+    width:100%;
+    font:inherit; font-size:.95rem;
+    color:var(--ink);
+    background:#fff;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    padding:11px 12px;
+    transition:border-color .15s, box-shadow .15s, background .15s;
+  }
+  .control::placeholder{color:#a7a294;}
+  .control:hover{border-color:#c3bda9;}
+  .control:focus{
+    outline:none;
+    border-color:var(--green);
+    box-shadow:0 0 0 4px rgba(47,107,79,.14);
+    background:#fff;
+  }
+  select.control{
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23565b52' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 12px center;
+    padding-right:38px;
+    cursor:pointer;
+  }
+  .field.invalid .control{
+    border-color:var(--red);
+    box-shadow:0 0 0 4px rgba(178,58,46,.12);
+    background:var(--red-soft);
+  }
+  .field.valid .control{border-color:#8fbfa6;}
+  .error{
+    display:none;
+    font-size:.76rem; color:var(--red);
+    margin-top:6px;
+  }
+  .field.invalid .error{display:block;}
+
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media (max-width:420px){ .row2{grid-template-columns:1fr;} }
+
+  .actions{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    margin-top:20px; padding-top:18px; border-top:1px dashed var(--line);
+  }
+  .btn{
+    font:inherit; font-weight:700; font-size:.92rem;
+    border:none; border-radius:10px;
+    padding:12px 20px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px;
+    transition:transform .12s, box-shadow .15s, background .15s;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{
+    background:var(--green); color:#fff;
+    box-shadow:0 6px 16px rgba(47,107,79,.28);
+  }
+  .btn-primary:hover{background:var(--green-deep); box-shadow:0 8px 20px rgba(47,107,79,.34);}
+  .btn-ghost{
+    background:transparent; color:var(--ink-soft);
+    border:1.5px solid var(--line);
+  }
+  .btn-ghost:hover{background:var(--paper-2); color:var(--ink);}
+  .btn svg{width:17px; height:17px;}
+
+  /* records */
+  .records-body{padding:14px 16px 18px;}
+  .toolbar{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:0 4px 12px;
+  }
+  .search{
+    flex:1 1 180px; min-width:150px;
+    position:relative;
+  }
+  .search svg{
+    position:absolute; left:11px; top:50%; transform:translateY(-50%);
+    width:16px; height:16px; color:#a7a294;
+  }
+  .search input{
+    width:100%; font:inherit; font-size:.88rem;
+    padding:9px 12px 9px 34px;
+    border:1.5px solid var(--line); border-radius:10px;
+    background:#fff; color:var(--ink);
+  }
+  .search input:focus{outline:none; border-color:var(--green); box-shadow:0 0 0 4px rgba(47,107,79,.12);}
+  .btn-download{
+    background:var(--amber); color:#fff;
+    box-shadow:0 6px 16px rgba(192,125,30,.26);
+  }
+  .btn-download:hover{background:#a96c15;}
+  .btn-download:disabled{
+    background:#d9d2c2; color:#8a8577; box-shadow:none; cursor:not-allowed;
+  }
+
+  .list{list-style:none; margin:0; padding:0; max-height:520px; overflow:auto;}
+  .list::-webkit-scrollbar{width:10px;}
+  .list::-webkit-scrollbar-thumb{background:#d8d2c0; border-radius:8px; border:3px solid #fff;}
+  .rec{
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:4px 12px;
+    align-items:center;
+    padding:12px 12px;
+    border:1px solid var(--line);
+    border-radius:11px;
+    margin-bottom:10px;
+    background:#fff;
+    transition:box-shadow .15s, transform .15s, border-color .15s;
+    animation:rise .35s ease both;
+  }
+  @keyframes rise{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+  .rec:hover{box-shadow:var(--shadow); border-color:#c9c3b1; transform:translateY(-1px);}
+  .rec .who{display:flex; align-items:center; gap:11px; min-width:0;}
+  .avatar{
+    width:38px; height:38px; flex:0 0 auto;
+    border-radius:10px; display:grid; place-items:center;
+    font-weight:700; font-size:.9rem; color:#fff;
+    background:var(--green);
+  }
+  .rec .name{font-weight:700; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .rec .meta{font-size:.78rem; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .rec .cat{
+    grid-column:1 / -1;
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:.74rem; font-weight:600;
+    color:var(--green-deep);
+    background:var(--green-soft);
+    border:1px solid #cfe0d5;
+    padding:3px 10px; border-radius:999px;
+    width:fit-content;
+  }
+  .rec .cat .swatch{width:8px; height:8px; border-radius:50%; background:var(--green);}
+  .rec .del{
+    grid-column:2; grid-row:1;
+    width:32px; height:32px; flex:0 0 auto;
+    border:1px solid var(--line); background:#fff;
+    border-radius:9px; cursor:pointer; color:var(--ink-soft);
+    display:grid; place-items:center;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .rec .del:hover{background:var(--red-soft); color:var(--red); border-color:#e6c3bd;}
+  .rec .del svg{width:16px; height:16px;}
+
+  .empty{
+    text-align:center; padding:40px 20px; color:var(--ink-soft);
+  }
+  .empty .ic{
+    width:56px; height:56px; margin:0 auto 12px;
+    display:grid; place-items:center;
+    background:var(--paper-2); border-radius:14px; color:#b3ac99;
+  }
+  .empty .ic svg{width:28px; height:28px;}
+  .empty h3{font-family:var(--font-display); margin:0 0 4px; color:var(--ink); font-size:1.05rem;}
+  .empty p{margin:0; font-size:.85rem;}
+
+  /* toast */
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translate(-50%, 20px);
+    background:var(--ink); color:#fff;
+    padding:12px 18px; border-radius:11px;
+    font-size:.88rem; font-weight:600;
+    box-shadow:var(--shadow-lg);
+    opacity:0; pointer-events:none;
+    transition:opacity .25s, transform .25s;
+    z-index:50;
+    display:flex; align-items:center; gap:9px;
+  }
+  .toast.show{opacity:1; transform:translate(-50%,0);}
+  .toast svg{width:18px; height:18px; color:#8fd6b0;}
+
+  footer{
+    margin-top:34px; padding-top:18px;
+    border-top:1px solid var(--line);
+    font-size:.78rem; color:var(--ink-soft);
+    display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  footer .lock{display:inline-flex; align-items:center; gap:6px;}
+  footer .lock svg{width:14px; height:14px;}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21c-4-3.5-7-6.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 3.5-3 6.5-7 10z"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Beneficiary Registration</h1>
+        <p>Community Support Programme</p>
+      </div>
+    </div>
+    <div class="status">
+      <span class="dot" aria-hidden="true"></span>
+      <span><b id="statusCount">0</b> registered</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- FORM -->
+    <section class="card" aria-labelledby="formTitle">
+      <div class="card-head">
+        <div>
+          <h2 id="formTitle">New registration</h2>
+          <div class="sub">Fill in the details below. Fields marked <span style="color:var(--red)">*</span> are required.</div>
+        </div>
+      </div>
+      <form id="regForm" novalidate>
+        <div class="field" data-field="name">
+          <label for="name">Full name <span class="req">*</span></label>
+          <input class="control" id="name" name="name" type="text" autocomplete="name" placeholder="e.g. Amara Okafor" maxlength="80">
+          <div class="error" id="err-name">Please enter the beneficiary's full name.</div>
+        </div>
+
+        <div class="row2">
+          <div class="field" data-field="age">
+            <label for="age">Age <span class="req">*</span></label>
+            <input class="control" id="age" name="age" type="number" inputmode="numeric" min="0" max="120" placeholder="e.g. 34">
+            <div class="error" id="err-age">Enter an age between 0 and 120.</div>
+          </div>
+          <div class="field" data-field="phone">
+            <label for="phone">Phone <span class="req">*</span></label>
+            <input class="control" id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="e.g. 0801 234 5678" maxlength="20">
+            <div class="error" id="err-phone">Enter a valid phone number (7 to 15 digits).</div>
+          </div>
+        </div>
+
+        <div class="field" data-field="village">
+          <label for="village">Village <span class="req">*</span></label>
+          <input class="control" id="village" name="village" type="text" placeholder="e.g. Kibuye" maxlength="80">
+          <div class="error" id="err-village">Please enter the village name.</div>
+        </div>
+
+        <div class="field" data-field="category">
+          <label for="category">Category <span class="req">*</span></label>
+          <select class="control" id="category" name="category">
+            <option value="" disabled selected>Select a category…</option>
+            <option value="Food security">Food security</option>
+            <option value="Health">Health</option>
+            <option value="Education">Education</option>
+            <option value="Water &amp; sanitation">Water &amp; sanitation</option>
+            <option value="Livelihood">Livelihood</option>
+            <option value="Shelter">Shelter</option>
+            <option value="Other">Other</option>
+          </select>
+          <div class="error" id="err-category">Please choose a category.</div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Register beneficiary
+          </button>
+          <button type="button" class="btn btn-ghost" id="clearBtn">Clear form</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- RECORDS -->
+    <section class="card" aria-labelledby="recTitle">
+      <div class="card-head">
+        <div>
+          <h2 id="recTitle">Registered beneficiaries</h2>
+          <div class="sub">Saved in this browser on this device.</div>
+        </div>
+        <span class="count-pill" id="recCount">0 entries</span>
+      </div>
+      <div class="records-body">
+        <div class="toolbar">
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input id="search" type="search" placeholder="Search name, village or phone…" aria-label="Search records">
+          </div>
+          <button type="button" class="btn btn-download" id="downloadBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            Download CSV
+          </button>
+        </div>
+        <ul class="list" id="list"></ul>
+        <div class="empty" id="empty" hidden>
+          <div class="ic" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/></svg>
+          </div>
+         

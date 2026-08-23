@@ -1,0 +1,183 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Health Camp Signup</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Health Camp Signup","short_name":"HealthCamp","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Health Camp Signup</h1></header>
+<main>
+<div class="card">
+  <div class="grid">
+    <div>
+      <h2 style="margin:0 0 8px 0">14 September Health Camp</h2>
+      <p class="muted">Join us for free checkups and health education.</p>
+      <div id="countdown" style="font-size:24px;font-weight:bold;color:var(--accent);margin-top:10px">Loading...</div>
+    </div>
+    <div>
+      <label>Slots Available</label>
+      <div id="slots-display" style="font-size:20px;font-weight:bold">--</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 12px 0">Sign Up</h2>
+  <form id="signup-form">
+    <div class="row">
+      <div style="flex:1">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" required placeholder="e.g. Jane Doe">
+      </div>
+      <div style="flex:1">
+        <label for="phone">Phone Number</label>
+        <input type="tel" id="phone" required placeholder="e.g. 555-0123">
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:1">
+        <label for="email">Email (Optional)</label>
+        <input type="email" id="email" placeholder="e.g. jane@example.com">
+      </div>
+      <div style="flex:1">
+        <label for="service">Service Needed</label>
+        <select id="service">
+          <option value="General Checkup">General Checkup</option>
+          <option value="Dental">Dental</option>
+          <option value="Eye">Eye</option>
+          <option value="Vaccination">Vaccination</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button type="submit">Register Now</button>
+      <button type="button" class="secondary" id="export-btn" style="margin-left:8px">Export List</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 12px 0">Registered Participants</h2>
+  <div id="participants-list">
+    <p class="muted">No one has signed up yet.</p>
+  </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+(function() {
+  const EVENT_DATE = new Date('2024-09-14T09:00:00');
+  const STORAGE_KEY = 'health_camp_signups';
+  const MAX_SLOTS = 50;
+
+  const form = document.getElementById('signup-form');
+  const participantsList = document.getElementById('participants-list');
+  const countdownEl = document.getElementById('countdown');
+  const slotsDisplay = document.getElementById('slots-display');
+  const exportBtn = document.getElementById('export-btn');
+
+  function getSignups() {
+    return store.get(STORAGE_KEY, []);
+  }
+
+  function saveSignups(data) {
+    store.set(STORAGE_KEY, data);
+  }
+
+  function updateCountdown() {
+    const now = new Date();
+    const diff = EVENT_DATE - now;
+
+    if (diff <= 0) {
+      countdownEl.textContent = "Event Started!";
+      return;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    countdownEl.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  function renderList() {
+    const signups = getSignups();
+    const remaining = MAX_SLOTS - signups.length;
+    slotsDisplay.textContent = `${remaining} / ${MAX_SLOTS}`;
+    slotsDisplay.style.color = remaining < 5 ? '#dc2626' : 'var(--ink)';
+
+    if (signups.length === 0) {
+      participantsList.innerHTML = '<p class="muted">No one has signed up yet.</p>';
+      return;
+    }
+
+    let html = '<table><thead><tr><th>Name</th><th>Phone</th><th>Service</th><th>Date</th></tr></thead><tbody>';
+    signups.forEach(s => {
+      html += `<tr>
+        <td>${s.name}</td>
+        <td>${s.phone}</td>
+        <td>${s.service}</td>
+        <td class="muted">${new Date(s.timestamp).toLocaleDateString()}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    participantsList.innerHTML = html;
+  }
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const signups = getSignups();
+    
+    if (signups.length >= MAX_SLOTS) {
+      alert('Sorry, the health camp is fully booked!');
+      return;
+    }
+
+    const name = document.getElementById('name').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const service = document.getElementById('service').value;
+
+    if (!name || !phone) return;
+
+    const newEntry = {
+      name,
+      phone,
+      email,
+      service,
+      timestamp: new Date().toISOString()
+    };
+
+    signups.push(newEntry);
+    saveSignups(signups);
+    
+    form.reset();
+    renderList();
+    alert('You have successfully signed up!');
+  });
+
+  exportBtn.addEventListener('click', function() {
+    const signups = getSignups();
+    if (signups.length === 0) {
+      alert('No data to export.');
+      return;
+    }
+    const csv = toCSV(signups);
+    download('health_camp_signups.csv', csv, 'text/csv');
+  });
+
+  setInterval(updateCountdown, 1000);
+  updateCountdown();
+  renderList();
+})();
+</script>
+</body></html>

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scholarship Scheme Progress Dashboard</title>
+<style>
+  :root {
+    --bg-page: #f4f7fa;
+    --bg-card: #ffffff;
+    --text-main: #1f2937;
+    --text-muted: #6b7280;
+    --border-color: #e5e7eb;
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --warning: #d97706;
+    --warning-light: #fffbeb;
+    --success: #16a34a;
+    --success-light: #f0fdf4;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-page);
+    color: var(--text-main);
+    line-height: 1.5;
+    padding: 24px;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  header {
+    margin-bottom: 24px;
+  }
+
+  header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+
+  header p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .stat-card .label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-card .value {
+    font-size: 28px;
+    font-weight: 700;
+    margin-top: 8px;
+    color: var(--text-main);
+  }
+
+  .stat-card.pending {
+    border-left: 4px solid var(--warning);
+  }
+  .stat-card.pending .value {
+    color: var(--warning);
+  }
+
+  .stat-card.total {
+    border-left: 4px solid var(--primary);
+  }
+
+  .stat-card.approved {
+    border-left: 4px solid var(--success);
+  }
+
+  .controls-card {
+    margin-bottom: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 200px;
+    flex: 1;
+  }
+
+  .form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  select, input {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: #fff;
+    color: var(--text-main);
+    outline: none;
+  }
+
+  select:focus, input:focus {
+    border-color: var(--primary);
+  }
+
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .table-container {
+    overflow-x: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 24px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    text-align: left;
+  }
+
+  th, td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  th {
+    background-color: #fafafa;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody tr:hover {
+    background-color: #f9fafb;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .badge-pending {
+    background-color: var(--warning-light);
+    color: var(--warning);
+  }
+
+  .badge-approved {
+    background-color: var(--success-light);
+    color: var(--success);
+  }
+
+  .badge-rejected {
+    background-color: var(--danger-light);
+    color: var(--danger);
+  }
+
+  .badge-other {
+    background-color: #f3f4f6;
+    color: var(--text-muted);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  .progress-bar-container {
+    background: #e5e7eb;
+    border-radius: 4px;
+    height: 8px;
+    width: 100%;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .progress-bar-fill {
+    background: var(--warning);
+    height: 100%;
+  }
+
+  .grid-two-col {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  @media (min-width: 900px) {
+    .grid-two-col {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Scholarship Progress &amp; Pending Cases</h1>
+    <p>District-level monitoring dashboard for scholarship application processing</p>
+  </header>
+
+  <section class="stats-grid" id="summaryStats">
+    <div class="card stat-card total">
+      <div class="label">Total Applications</div>
+      <div class="value" id="valTotal">0</div>
+    </div>
+    <div class="card stat-card pending">
+      <div class="label">Pending Review</div>
+      <div class="value" id="valPending">0</div>
+    </div>
+    <div class="card stat-card approved">
+      <div class="label">Approved Cases</div>
+      <div class="value" id="valApproved">0</div>
+    </div>
+    <div class="card stat-card">
+      <div class="label">Districts Covered</div>
+      <div class="value" id="valDistricts">0</div>
+    </div>
+  </section>
+
+  <section class="card controls-card">
+    <div class="form-group">
+      <label for="filterDistrict">Filter by District</label>
+      <select id="filterDistrict">
+        <option value="">All Districts</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="filterScheme">Filter by Scheme</label>
+      <select id="filterScheme">
+        <option value="">All Schemes</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="filterStatus">Filter by Status</label>
+      <select id="filterStatus">
+        <option value="">All Statuses</option>
+      </select>
+    </div>
+  </section>
+
+  <div class="grid-two-col">
+    <div>
+      <div class="section-title">District Progress Summary</div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>District</th>
+              <th>Total Cases</th>
+              <th>Pending Cases</th>
+              <th>Pending Share</th>
+            </tr>
+          </thead>
+          <tbody id="districtSummaryBody">
+            <tr><td colspan="4" class="empty-state">No data available</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Scheme Summary</div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Scheme Name</th>
+              <th>Total Cases</th>
+              <th>Pending</th>
+            </tr>
+          </thead>
+          <tbody id="schemeSummaryBody">
+            <tr><td colspan="3" class="empty-state">No data available</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Detailed Applications List</div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>District</th>
+          <th>Taluka</th>
+          <th>Scheme</th>
+          <th>Status</th>
+          <th>Marks %</th>
+          <th>Family Income</th>
+        </tr>
+      </thead>
+      <tbody id="detailsBody">
+        <tr><td colspan="6" class="empty-state">No records to display</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function() {
+  function getRawData() {
+    return Array.isArray(window.data) ? window.data : [];
+  }
+
+  function getStatusClass(status) {
+    if (!status) return 'badge-other';
+    var s = String(status).trim().toLowerCase();
+    if (s.indexOf('pending') !== -1) return 'badge-pending';
+    if (s.indexOf('approved') !== -1 || s.indexOf('sanction') !== -1) return 'badge-approved';
+    if (s.indexOf('reject') !== -1) return 'badge-rejected';
+    return 'badge-other';
+  }
+
+  function isPending(status) {
+    if (!status) return false;
+    return String(status).trim().toLowerCase().indexOf('pending') !== -1;
+  }
+
+  function isApproved(status) {
+    if (!status) return false;
+    var s = String(status).trim().toLowerCase();
+    return s.indexOf('approved') !== -1 || s.indexOf('sanction') !== -1;
+  }
+
+  function populateDropdown(selectEl, values) {
+    var currentVal = selectEl.value;
+    while (selectEl.options.length > 1) {
+      selectEl.remove(1);
+    }
+    values.sort().forEach(function(v) {
+      if (!v) return;
+      var opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      selectEl.appendChild(opt);
+    });
+    if (values.indexOf(currentVal) !== -1) {
+      selectEl.value = currentVal;
+    }
+  }
+
+  function initFilters(data) {
+    var districts = {};
+    var schemes = {};
+    var statuses = {};
+
+    data.forEach(function(row) {
+      if (row['District']) districts[row['District']] = true;
+      if (row['Name of scheme']) schemes[row['Name of scheme']] = true;
+      if (row['Status']) statuses[row['Status']] = true;
+    });
+
+    populateDropdown(document.getElementById('filterDistrict'), Object.keys(districts));
+    populateDropdown(document.getElementById('filterScheme'), Object.keys(schemes));
+    populateDropdown(document.getElementById('filterStatus'), Object.keys(statuses));
+  }
+
+  function render() {
+    var data = getRawData();
+    var distFilter = document.getElementById('filterDistrict').value;
+    var schemeFilter = document.getElementById('filterScheme').value;
+    var statusFilter = document.getElementById('filterStatus').value;
+
+    var filtered = data.filter(function(row) {
+      if (distFilter && row['District'] !== distFilter) return false;
+      if (schemeFilter && row['Name of scheme'] !== schemeFilter) return false;
+      if (statusFilter && row['Status'] !== statusFilter) return false;
+      return true;
+    });
+
+    var totalCount = filtered.length;
+    var pendingCount = 0;
+    var approvedCount = 0;
+    var districtMap = {};
+    var schemeMap = {};
+    var distinctDistricts = {};
+
+    filtered.forEach(function(row) {
+      var d = row['District'] || 'Unknown';
+      var s = row['Name of scheme'] || 'Unknown';
+      var st = row['Status'] || 'Unknown';
+
+      if (row['District']) distinctDistricts[row['District']] = true;
+
+      var p = isPending(st);
+      var a = isApproved(st);
+
+      if (p) pendingCount++;
+      if (a) approvedCount++;
+
+      if (!districtMap[d]) districtMap[d] = { total: 0, pending: 0 };
+      districtMap[d].total++;
+      if (p) districtMap[d].pending++;
+
+      if (!schemeMap[s]) schemeMap[s] = { total: 0, pending: 0 };
+      schemeMap[s].total++;
+      if (p) schemeMap[s].pending++;
+    });
+
+    document.getElementById('valTotal').textContent = totalCount.toLocaleString();
+    document.getElementById('valPending').textContent = pendingCount.toLocaleString();
+    document.getElementById('valApproved').textContent = approvedCount.toLocaleString();
+    document.getElementById('valDistricts').textContent = Object.keys(distinctDistricts).length.toLocaleString();
+
+    var dBody = document.getElementById('districtSummaryBody');
+    var distKeys = Object.keys(districtMap).sort(function(a, b) {
+      return districtMap[b].pending - districtMap[a].pending;
+    });
+
+    if (distKeys.length === 0) {
+      dBody.innerHTML = '<tr><td colspan="4" class="empty-state">No data available</td></tr>';
+    } else {
+      dBody.innerHTML = distKeys.map(function(k) {
+        var item = districtMap[k];
+        var pct = item.total > 0 ? Math.round((item.pending / item.total) * 100) : 0;
+        return '<tr>' +
+          '<td><strong>' + String(k) + '</strong></td>' +
+          '<td>' + item.total.toLocaleString() + '</td>' +
+          '<td><span class="badge ' + (item.pending > 0 ? 'badge-pending' : 'badge-other') + '">' + item.pending.toLocaleString() + '</span></td>' +
+          '<td>' +
+            '<div>' + pct + '%</div>' +
+            '<div class="progress-bar-container"><div class="progress-bar-fill" style="width: ' + pct + '%"></div></div>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    var sBody = document.getElementById('schemeSummaryBody');
+    var schemeKeys = Object.keys(schemeMap).sort(function(a, b) {
+      return schemeMap[b].pending - schemeMap[a].pending;
+    });
+
+    if (schemeKeys.length === 0) {
+      sBody.innerHTML = '<tr><td colspan="3" class="empty-state">No data available</td></tr>';
+    } else {
+      sBody.innerHTML = schemeKeys.map(function(k) {
+        var item = schemeMap[k];
+        return '<tr>' +
+          '<td>' + String(k) + '</td>' +
+          '<td>' + item.total.toLocaleString() + '</td>' +
+          '<td><span class="badge ' + (item.pending > 0 ? 'badge-pending' : 'badge-other') + '">' + item.pending.toLocaleString() + '</span></td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    var detailsBody = document.getElementById('detailsBody');
+    var sliceData = filtered.slice(0, 200);
+
+    if (sliceData.length === 0) {
+      detailsBody.innerHTML = '<tr><td colspan="6" class="empty-state">No records match the selected filters</td></tr>';
+    } else {
+      detailsBody.innerHTML = sliceData.map(function(row) {
+        var status = row['Status'] || 'N/A';
+        var marks = row['Marks %'] != null && row['Marks %'] !== '' ? row['Marks %'] + '%' : '-';
+        var income = row['Family Income'] != null && row['Family Income'] !== '' ? row['Family Income'] : '-';
+        return '<tr>' +
+          '<td>' + (row['District'] || '-') + '</td>' +
+          '<td>' + (row['Taluka'] || '-') + '</td>' +
+          '<td>' + (row['Name of scheme'] || '-') + '</td>' +
+          '<td><span class="badge ' + getStatusClass(status) + '">' + status + '</span></td>' +
+          '<td>' + marks + '</td>' +
+          '<td>' + income + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+  }
+
+  function setup() {
+    initFilters(getRawData());
+    render();
+
+    document.getElementById('filterDistrict').addEventListener('change', render);
+    document.getElementById('filterScheme').addEventListener('change', render);
+    document.getElementById('filterStatus').addEventListener('change', render);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setup);
+  } else {
+    setup();
+  }
+})();
+</script>
+</body>
+</html>

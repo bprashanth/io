@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Water Point Survey</title>
+<style>
+  :root {
+    --primary: #007bff;
+    --success: #28a745;
+    --danger: #dc3545;
+    --bg: #f4f7f6;
+    --card: #ffffff;
+    --text: #333333;
+    --border: #e0e0e0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+    line-height: 1.5;
+  }
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 15px;
+  }
+  header {
+    background: var(--primary);
+    color: white;
+    padding: 15px;
+    text-align: center;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 15px;
+  }
+  h1 { margin: 0; font-size: 1.2rem; }
+  .card {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+  }
+  .form-group { margin-bottom: 15px; }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 16px;
+    background: #fff;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: 2px solid var(--primary);
+    border-color: transparent;
+  }
+  .radio-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 5px;
+  }
+  .radio-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .radio-option input { margin-right: 8px; }
+  .radio-option.selected {
+    background-color: #e6f2ff;
+    border-color: var(--primary);
+    font-weight: bold;
+  }
+  .gps-status {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+    text-align: center;
+  }
+  .gps-status.error { color: var(--danger); }
+  .gps-status.success { color: var(--success); }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-secondary { background: #6c757d; color: white; }
+  .btn:active { opacity: 0.9; }
+  .btn:disabled { background: #ccc; cursor: not-allowed; }
+  .hidden { display: none; }
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-top: 10px;
+  }
+  .data-table th, .data-table td {
+    border: 1px solid var(--border);
+    padding: 6px;
+    text-align: left;
+  }
+  .data-table th { background: #f8f9fa; }
+  .empty-state { text-align: center; color: #888; padding: 20px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <h1>Water Point Survey</h1>
+  </header>
+
+  <div class="container">
+    <!-- Survey Form -->
+    <div id="survey-section" class="card">
+      <form id="survey-form">
+        <div class="form-group">
+          <label for="habitation">Habitation Type</label>
+          <select id="habitation" required>
+            <option value="">Select...</option>
+            <option value="Rural">Rural</option>
+            <option value="Urban">Urban</option>
+            <option value="Semi-Urban">Semi-Urban</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="pumpType">Pump Type</label>
+          <select id="pumpType" required>
+            <option value="">Select...</option>
+            <option value="Hand Pump">Hand Pump</option>
+            <option value="Solar Pump">Solar Pump</option>
+            <option value="Electric Pump">Electric Pump</option>
+            <option value="Gravity Feed">Gravity Feed</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Working Status</label>
+          <div class="radio-group">
+            <label class="radio-option" id="opt-working">
+              <input type="radio" name="working" value="Yes" required>
+              Yes
+            </label>
+            <label class="radio-option" id="opt-not-working">
+              <input type="radio" name="working" value="No">
+              No
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="users">Number of Users (Daily)</label>
+          <input type="number" id="users" min="0" placeholder="e.g. 50">
+        </div>
+
+        <div class="form-group">
+          <label>GPS Coordinates</label>
+          <div style="display:flex; gap:10px;">
+            <input type="text" id="lat" placeholder="Latitude" readonly>
+            <input type="text" id="lng" placeholder="Longitude" readonly>
+          </div>
+          <div id="gps-status" class="gps-status">Waiting for GPS...</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submit-btn">Save Response</button>
+      </form>
+    </div>
+
+    <!-- Data Management -->
+    <div id="data-section" class="card hidden">
+      <h3>Stored Responses</h3>
+      <div id="data-list">
+        <div class="empty-state">No data stored yet.</div>
+      </div>
+      <button class="btn btn-secondary" id="export-btn">Export JSON</button>
+      <button class="btn btn-danger" id="clear-btn" style="background-color: var(--danger); color: white; margin-top: 10px;">Clear All Data</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast">Message</div>
+
+<script>
+  // --- Configuration & State ---
+  const DB_NAME = 'waterSurveyDB';
+  const DB_VERSION = 1;
+  const STORE_NAME = 'responses';
+  
+  let db;
+  let currentLat = null;
+  let currentLng = null;
+
+  // --- Initialization ---
+  document.addEventListener('DOMContentLoaded', () => {
+    initDB();
+    setupEventListeners();
+    startGPS();
+    loadSurveyData();
+  });
+
+  // --- Database Logic ---
+  function initDB() {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = (event) => {
+      console.error('Database error:', event.target.errorCode);
+    };
+
+    request.onsuccess = (event) => {
+      db = event.target.result;
+      console.log('Database initialized');
+    };
+
+    request.onupgradeneeded = (event) => {
+      const database = event.target.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        const store = database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+    };
+  }
+
+  function saveResponse(response) {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const item = {
+      ...response,
+      timestamp: new Date().toISOString()
+    };
+    store.add(item);
+    transaction.oncomplete = () => {
+      showToast('Response saved successfully');
+      loadSurveyData();
+    };
+    transaction.onerror = (e) => {
+      console.error('Save error:', e);
+      showToast('Error saving data');
+    };
+  }
+
+  function getAllResponses() {
+    return new Promise((resolve) => {
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve([]);
+    });
+  }
+
+  function clearData() {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.clear();
+    transaction.oncomplete = () => {
+      loadSurveyData();
+      showToast('All data cleared');
+    };
+  }
+
+  // --- UI Logic ---
+  function setupEventListeners() {
+    // Form Submit
+    document.getElementById('survey-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      
+      const response = {
+        habitation: formData.get('habitation'),
+        pumpType: formData.get('pumpType'),
+        working: formData.get('working'),
+        users: formData.get('users'),
+        lat: currentLat,
+        lng: currentLng
+      };
+
+      if (!currentLat || !currentLng) {
+        showToast('GPS coordinates are missing. Please wait for signal.');
+        return;
+      }
+
+      saveResponse(response);
+      e.target.reset();
+      resetGPSUI();
+    });
+
+    // Radio Buttons
+    document.querySelectorAll('.radio-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+      });
+    });
+
+    // Export
+    document.getElementById('export-btn').addEventListener('click', exportJSON);
+    
+    // Clear
+    document.getElementById('clear-btn').addEventListener('click', () => {
+      if(confirm('Are you sure you want to delete all stored responses?')) {
+        clearData();
+      }
+    });
+  }
+
+  function loadSurveyData() {
+    getAllResponses().then(data => {
+      const list = document.getElementById('data-list');
+      if (data.length === 0) {
+        list.innerHTML = '<div class="empty-state">No data stored yet.</div>';
+      } else {
+        list.innerHTML = `
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Location</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Users</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(item => `
+                <tr>
+                  <td>${new Date(item.timestamp).toLocaleString()}</td>
+                  <td>${item.lat}, ${item.lng}</td>
+                  <td>${item.pumpType}</td>
+                  <td>${item.working}</td>
+                  <td>${item.users || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+    });
+  }
+
+  function exportJSON() {
+    getAllResponses().then(data => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", "water_survey_" + new Date().toISOString().slice(0,10) + ".json");
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+      showToast('JSON exported');
+    });
+  }
+
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  // --- GPS Logic ---
+  function startGPS() {
+    if (!navigator.geolocation) {
+      document.getElementById('gps-status').textContent = "GPS not supported";
+      document.getElementById('gps-status').classList.add('error');
+      return;
+    }
+
+    const statusEl = document.getElementById('gps-status');
+    const latEl = document.getElementById('lat');
+    const lngEl = document.getElementById('lng');
+
+    navigator.geolocation.watchPosition(
+      (position) => {
+        currentLat = position.coords.latitude.toFixed(6);
+        currentLng = position.coords.longitude.toFixed(6);
+        latEl.value = currentLat;
+        lngEl.value = currentLng;
+        statusEl.textContent = "GPS Active";
+        statusEl.classList.remove('error');
+        statusEl.classList.add('success');
+      },
+      (error) => {
+        console.error("GPS Error:", error);
+        statusEl.textContent = "GPS Error";
+        statusEl.classList.add('error');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  function resetGPSUI() {
+    document.getElementById('lat').value = '';
+    document.getElementById('lng').value = '';
+    document.getElementById('gps-status').textContent = 'Waiting for GPS...';
+    document.getElementById('gps-status').classList.remove('success');
+    document.getElementById('gps-status').classList.remove('error');
+  }
+</script>
+</body>
+</html>

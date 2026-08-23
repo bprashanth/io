@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Riverside Health Camp — 14 September</title>
+<style>
+  :root{
+    --paper:#f3efe6;
+    --ink:#20302a;
+    --ink-soft:#5c6b63;
+    --pine:#173a2e;
+    --pine-deep:#0f2a20;
+    --coral:#e85d3d;
+    --coral-deep:#cf4a2c;
+    --gold:#e9a93b;
+    --sage:#8fb09a;
+    --line:rgba(32,48,42,.14);
+    --card:#fffdf8;
+    --shadow:0 18px 40px -22px rgba(15,42,32,.55);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:"Avenir Next","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:"SFMono-Regular",ui-monospace,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:var(--paper);
+    line-height:1.55;
+    overflow-x:hidden;
+    position:relative;
+    min-height:100vh;
+  }
+  /* ambient layers */
+  .bg-dots{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:radial-gradient(rgba(23,58,46,.06) 1px,transparent 1.4px);
+    background-size:22px 22px;}
+  .bg-glow{position:fixed;top:-18%;right:-12%;width:60vw;height:60vw;z-index:0;pointer-events:none;
+    background:radial-gradient(circle at center,rgba(233,169,59,.16),transparent 62%);}
+  .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+  .wrap{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:0 clamp(18px,4vw,44px)}
+
+  /* top bar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:22px 0 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.02em}
+  .brand .mark{width:38px;height:38px;display:grid;place-items:center;background:var(--pine);color:var(--paper);
+    border-radius:11px;font-size:20px;box-shadow:var(--shadow)}
+  .brand small{display:block;font-weight:500;color:var(--ink-soft);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase}
+  .status-pill{display:inline-flex;align-items:center;gap:9px;font-size:.82rem;font-weight:600;
+    background:var(--card);border:1px solid var(--line);padding:8px 14px;border-radius:999px;box-shadow:var(--shadow)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--coral);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(232,93,61,.5)}70%{box-shadow:0 0 0 9px rgba(232,93,61,0)}100%{box-shadow:0 0 0 0 rgba(232,93,61,0)}}
+
+  /* hero */
+  .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:clamp(24px,4vw,54px);
+    align-items:center;padding:clamp(30px,5vw,60px) 0 clamp(26px,4vw,44px)}
+  .eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:.78rem;font-weight:700;
+    letter-spacing:.22em;text-transform:uppercase;color:var(--coral-deep);margin-bottom:18px}
+  .eyebrow::before{content:"";width:34px;height:2px;background:var(--coral)}
+  h1.title{font-family:var(--serif);font-weight:600;line-height:1.02;letter-spacing:-.01em;
+    font-size:clamp(2.6rem,6.4vw,4.6rem);color:var(--pine-deep)}
+  h1.title em{font-style:italic;color:var(--coral)}
+  .lede{margin-top:20px;max-width:46ch;font-size:clamp(1rem,1.4vw,1.12rem);color:var(--ink-soft)}
+  .facts{list-style:none;display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .facts li{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);
+    padding:9px 14px;border-radius:10px;font-size:.86rem;font-weight:600;box-shadow:var(--shadow)}
+  .facts li svg{width:16px;height:16px;color:var(--pine);flex:none}
+
+  /* countdown card */
+  .count-card{background:linear-gradient(160deg,var(--pine),var(--pine-deep));color:var(--paper);
+    border-radius:22px;padding:clamp(22px,3vw,32px);box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .count-card::after{content:"";position:absolute;right:-40px;bottom:-40px;width:180px;height:180px;border-radius:50%;
+    background:radial-gradient(circle,rgba(233,169,59,.28),transparent 70%)}
+  .count-label{font-size:.76rem;letter-spacing:.2em;text-transform:uppercase;color:var(--sage);font-weight:700}
+  .count-date{font-family:var(--serif);font-size:1.35rem;margin:6px 0 20px;color:#fff}
+  .count-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;position:relative;z-index:1}
+  .unit{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:14px;
+    padding:14px 6px;text-align:center;backdrop-filter:blur(2px)}
+  .unit .num{font-family:var(--mono);font-size:clamp(1.7rem,4.4vw,2.5rem);font-weight:700;line-height:1;
+    color:#fff;font-variant-numeric:tabular-nums}
+  .unit .lab{font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--sage);margin-top:8px}
+  .count-note{margin-top:18px;font-size:.82rem;color:var(--sage);position:relative;z-index:1}
+  .count-note strong{color:var(--gold)}
+
+  /* section heads */
+  .section{padding:clamp(30px,5vw,56px) 0}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:26px;flex-wrap:wrap}
+  .sec-head .idx{font-family:var(--mono);font-size:.8rem;color:var(--coral);font-weight:700}
+  .sec-head h2{font-family:var(--serif);font-weight:600;font-size:clamp(1.7rem,3.6vw,2.5rem);color:var(--pine-deep)}
+  .sec-head p{color:var(--ink-soft);font-size:.95rem;flex-basis:100%;max-width:52ch}
+
+  /* services strip */
+  .services{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .svc{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);
+    transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .3s}
+  .svc:hover{transform:translateY(-5px);border-color:var(--sage);box-shadow:0 24px 44px -24px rgba(15,42,32,.5)}
+  .svc .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:rgba(23,58,46,.08);
+    color:var(--pine);margin-bottom:12px}
+  .svc .ic svg{width:22px;height:22px}
+  .svc h3{font-size:1rem;font-weight:700;color:var(--pine-deep)}
+  .svc span{font-size:.82rem;color:var(--ink-soft)}
+
+  /* signup + list layout */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,3vw,34px);align-items:start}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:clamp(20px,3vw,30px);box-shadow:var(--shadow)}
+  .panel h3{font-family:var(--serif);font-size:1.4rem;color:var(--pine-deep);margin-bottom:4px}
+  .panel .sub{color:var(--ink-soft);font-size:.9rem;margin-bottom:20px}
+
+  form .field{margin-bottom:16px}
+  label{display:block;font-size:.8rem;font-weight:700;letter-spacing:.04em;color:var(--pine);margin-bottom:7px}
+  label .req{color:var(--coral)}
+  input[type=text],input[type=email],select{
+    width:100%;font-family:inherit;font-size:.98rem;color:var(--ink);background:#fff;
+    border:1.5px solid var(--line);border-radius:11px;padding:12px 13px;transition:border-color .2s,box-shadow .2s}
+  input:focus,select:focus{outline:none;border-color:var(--pine);box-shadow:0 0 0 4px rgba(23,58,46,.12)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .err{color:var(--coral-deep);font-size:.78rem;margin-top:6px;display:none}
+  .field.invalid .err{display:block}
+  .field.invalid input,.field.invalid select{border-color:var(--coral)}
+  .btn{width:100%;margin-top:6px;font-family:inherit;font-size:1rem;font-weight:700;cursor:pointer;
+    background:var(--coral);color:#fff;border:none;border-radius:12px;padding:15px;letter-spacing:.02em;
+    transition:background .2s,transform .12s,box-shadow .2s;box-shadow:0 12px 24px -12px rgba(232,93,61,.7)}
+  .btn:hover{background:var(--coral-deep)}
+  .btn:active{transform:translateY(1px)}
+  .form-msg{margin-top:14px;font-size:.9rem;font-weight:600;color:var(--pine);display:none;
+    background:rgba(143,176,154,.18);border:1px solid var(--sage);border-radius:11px;padding:12px 14px}
+  .form-msg.show{display:block;animation:pop .4s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* roster */
+  .roster-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+  .live-count{font-family:var(--mono);font-weight:700;font-size:.9rem;color:var(--pine);
+    background:rgba(23,58,46,.08);padding:6px 12px;border-radius:999px}
+  .live-count b{color:var(--coral-deep)}
+  .roster-list{list-style:none;display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;padding-right:4px}
+  .roster-list::-webkit-scrollbar{width:8px}
+  .roster-list::-webkit-scrollbar-thumb{background:var(--sage);border-radius:8px}
+  .person{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);
+    border-radius:13px;padding:12px 14px;transition:transform .25s,box-shadow .25s}
+  .person:hover{transform:translateX(4px);box-shadow:var(--shadow)}
+  .person.new{animation:slideIn .5s cubic-bezier(.2,.8,.2,1)}
+  @keyframes slideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+  .avatar{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:#fff;
+    font-weight:700;font-size:1rem;flex:none;letter-spacing:.02em}
+  .p-main{min-width:0;flex:1}
+  .p-name{font-weight:700;color:var(--pine-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p-meta{font-size:.8rem;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p-time{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft);flex:none}
+  .empty{text-align:center;color:var(--ink-soft);padding:30px 10px;font-size:.92rem}
+  .empty svg{width:40px;height:40px;color:var(--sage);margin-bottom:10px}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);margin-top:20px;padding:34px 0 46px;color:var(--ink-soft);font-size:.86rem}
+  footer .foot-grid{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  footer a{color:var(--pine);text-decoration:none;font-weight:600}
+  footer a:hover{text-decoration:underline}
+  .fineprint{margin-top:16px;font-size:.78rem;opacity:.8}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  @media(max-width:860px){
+    .hero{grid-template-columns:1fr}
+    .duo{grid-template-columns:1fr}
+  }
+  @media(max-width:480px){
+    .row2{grid-template-columns:1fr}
+    .count-grid{gap:7px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+    .reveal{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+<div class="bg-dots"></div>
+<div class="bg-glow"></div>
+<div class="grain"></div>
+
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark">✚</span>
+      <span>Riverside Community Trust<small>Free health &amp; wellbeing</small></span>
+    </div>
+    <div class="status-pill"><span class="dot"></span><span id="statusText">Signups open</span></div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="reveal">
+      <span class="eyebrow">Community Health Day</span>
+      <h1 class="title">The Riverside<br><em>Health Camp</em></h1>
+      <p class="lede">One free morning of check-ups, screenings and friendly advice for everyone in the neighbourhood. No appointment needed — just bring yourself (and your family).</p>
+      <ul class="facts">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span id="factDate">Saturday, 14 September</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="factTime">9:00 – 13:00</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg><span id="factPlace">Riverside Community Hall</span></li>
+      </ul>
+    </div>
+
+    <div class="count-card reveal">
+      <div class="count-label">Doors open in</div>
+      <div class="count-date" id="countDate">—</div>
+      <div class="count-grid" id="countGrid">
+        <div class="unit"><div class="num" data-u="days">--</div><div class="lab">Days</div></div>
+        <div class="unit"><div class="num" data-u="hours">--</div><div class="lab">Hours</div></div>
+        <div class="unit"><div class="num" data-u="mins">--</div><div class="lab">Minutes</div></div>
+        <div class="unit"><div class="num" data-u="secs">--</div><div class="lab">Seconds</div></div>
+      </div>
+      <div class="count-note" id="countNote">Counting down to the first check-in.</div>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section class="section">
+    <div class="sec-head reveal">
+      <span class="idx">01</span>
+      <h2>What you can get on the day</h2>
+      <p>Walk up to any station — our volunteers will point you to the right queue. Most checks take under ten minutes.</p>
+    </div>
+    <div class="services" id="services"></div>
+  </section>
+
+  <!-- SIGNUP + ROSTER -->
+  <section class="section">
+    <div class="sec-head reveal">
+      <span class="idx">02</span>
+      <h2>Reserve your spot</h2>
+      <p>Signing up helps us plan enough staff and supplies. It's optional but appreciated — you're welcome even if you don't register.</p>
+    </div>
+
+    <div class="duo">
+      <!-- FORM -->
+      <div class="panel reveal">
+        <h3>Sign up for the camp</h3>
+        <p class="sub">Takes about 20 seconds.</p>
+        <form id="signupForm" novalidate>
+          <div class="field" data-field="name">
+            <label for="name">Full name <span class="req">*</span></label>
+            <input type="text" id="name" name="name" autocomplete="name" placeholder="e.g. Amara Okafor">
+            <div class="err">Please tell us your name.</div>
+          </div>
+          <div class="row2">
+            <div class="field" data-field="email">
+              <label for="email">Email <span class="req">*</span></label>
+              <input type="email" id="email" name="email" autocomplete="email" placeholder="you@example.com">
+              <div class="err">Enter a valid email address.</div>
+            </div>
+            <div class="field" data-field="phone">
+              <label for="phone">Phone <span style="color:var(--ink-soft);font-weight:500">(optional)</span></label>
+              <input type="text" id="phone" name="phone" autocomplete="tel" placeholder="For reminders only">
+            </div>
+          </div>
+          <div class="field" data-field="service">
+            <label for="service">Which check do you want? <span class="req">*</span></label>
+            <select id="service" name="service">
+              <option value="" disabled selected>Choose one…</option>
+            </select>
+            <div class="err">Please pick a service.</div>
+          </div>
+          <button type="submit" class="btn">Add me to the list →</button>
+          <div class="form-msg" id="formMsg"></div>
+        </form>
+      </div>
+
+      <!-- ROSTER -->
+      <div class="panel reveal">
+        <div class="roster-top">
+          <div>
+            <h3>Who's coming</h3>
+            <p class="sub" style="margin-bottom:0">Live list of people who've signed up.</p>
+          </div>
+          <span class="live-count"><b id="rosterNum">0</b> signed up</span>
+        </div>
+        <ul class="roster-list" id="rosterList"></ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot-grid">
+      <div>
+        <strong style="color:var(--pine)">Riverside Community Trust</strong><br>
+        A registered charity bringing free care to the neighbourhood.
+      </div>
+      <div>
+        Questions? Call the front desk or email <a href="mailto:hello@riversidetrust.example">hello@riversidetrust.example</a>.<br>
+        Need help signing up? Ask any volunteer on the day.
+      </div>
+    </div>
+    <p class="fineprint">This page works fully offline. Your details are used only to plan the event and are never shared with third parties.</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- read runtime data (never hardcode numbers) ---------- */
+  var D = window.data || {};
+  var EVENT_DATE = D.eventDate ? new Date(D.eventDate) : null;
+  var SERVICES   = Array.isArray(D.services) ? D.services : [];
+  var SEED       = Array.isArray(D.signups)  ? D.signups  : [];
+
+  /* fallbacks so the page still renders sensibly if data is absent */
+  if(!EVENT_DATE || isNaN(EVENT_DATE.getTime())){
+    var y = new Date().getFullYear();
+    EVENT_DATE = new Date(y, 8

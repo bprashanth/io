@@ -1,0 +1,180 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Clean Hands Champion Quiz</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Clean Hands Champion Quiz","short_name":"HandQuiz","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>🧼 Clean Hands Champion Quiz</h1></header>
+<main>
+  <div id="intro-card" class="card">
+    <h2 style="margin-top:0;">Test Your Handwashing Superpowers!</h2>
+    <p class="muted">Answer 5 fun questions to find out if you are a Handwashing Hero and learn how to keep germs away.</p>
+  </div>
+
+  <form id="quiz-form">
+    <div id="questions-container"></div>
+    <div class="row" style="margin-top: 16px;">
+      <button type="submit" id="submit-btn">Submit Answers</button>
+      <button type="button" id="reset-btn" class="secondary" style="display:none;">Try Again</button>
+    </div>
+  </form>
+
+  <div id="result-card" class="card" style="display:none; margin-top:20px;">
+    <h2 id="result-title" style="margin-top:0;">Quiz Completed!</h2>
+    <p id="result-score" style="font-size: 18px; font-weight: bold;"></p>
+    <p id="result-feedback" class="muted"></p>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+
+const questions = [
+  {
+    id: 1,
+    question: "1. How long should you scrub your hands with soap and water?",
+    options: [
+      { text: "3 seconds", correct: false },
+      { text: "At least 20 seconds (like singing 'Happy Birthday' twice)", correct: true },
+      { text: "1 minute without soap", correct: false },
+      { text: "Only until the bubbles disappear", correct: false }
+    ],
+    explanation: "Scrubbing for at least 20 seconds ensures you remove germs from all parts of your hands!"
+  },
+  {
+    id: 2,
+    question: "2. When is it super important to wash your hands?",
+    options: [
+      { text: "Before eating food", correct: false },
+      { text: "After using the restroom", correct: false },
+      { text: "After blowing your nose, coughing, or sneezing", correct: false },
+      { text: "All of the above!", correct: true }
+    ],
+    explanation: "Washing hands before meals, after the bathroom, and after sneezing stops germs from spreading."
+  },
+  {
+    id: 3,
+    question: "3. Which important spots do kids often forget to wash?",
+    options: [
+      { text: "Only the palms of hands", correct: false },
+      { text: "Between fingers, under nails, and the backs of hands", correct: true },
+      { text: "Only the tips of the thumbs", correct: false },
+      { text: "Elbows only", correct: false }
+    ],
+    explanation: "Germs hide between fingers and under fingernails, so don't forget to scrub those areas!"
+  },
+  {
+    id: 4,
+    question: "4. What is the best combination to clean dirty hands?",
+    options: [
+      { text: "Warm or cold water with soap", correct: true },
+      { text: "Wiping hands on your pants", correct: false },
+      { text: "Cold water only with no soap", correct: false },
+      { text: "Blowing air on them until dry", correct: false }
+    ],
+    explanation: "Soap is essential because it lifts dirt and germs away from the skin so water can wash them off."
+  },
+  {
+    id: 5,
+    question: "5. Why do we dry our hands with a clean towel after washing?",
+    options: [
+      { text: "Wet hands transfer germs more easily than dry hands", correct: true },
+      { text: "Just to make your hands smell nice", correct: false },
+      { text: "Because soap stops working if hands stay wet", correct: false },
+      { text: "You do not need to dry your hands", correct: false }
+    ],
+    explanation: "Germs spread much more easily on wet hands, so drying them thoroughly keeps them clean."
+  }
+];
+
+function renderQuestions() {
+  const container = document.getElementById('questions-container');
+  container.innerHTML = questions.map((q, qIndex) => {
+    const opts = q.options.map((opt, oIndex) => `
+      <div style="margin: 6px 0;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:15px; color:var(--ink); cursor:pointer;">
+          <input type="radio" name="q${qIndex}" value="${oIndex}" style="width:auto; margin:0;" required>
+          <span>${opt.text}</span>
+        </label>
+      </div>
+    `).join('');
+
+    return `
+      <div class="card" id="card-q${qIndex}">
+        <p style="font-weight:600; margin-top:0; margin-bottom:10px;">${q.question}</p>
+        <div>${opts}</div>
+        <div id="feedback-q${qIndex}" style="margin-top:10px; font-size:14px; display:none;"></div>
+      </div>
+    `;
+  }).join('');
+}
+
+function handleQuizSubmit(e) {
+  e.preventDefault();
+  let score = 0;
+  const total = questions.length;
+
+  questions.forEach((q, qIndex) => {
+    const selected = document.querySelector(`input[name="q${qIndex}"]:checked`);
+    const feedbackEl = document.getElementById(`feedback-q${qIndex}`);
+    const selectedIdx = selected ? parseInt(selected.value, 10) : -1;
+    const isCorrect = selectedIdx >= 0 && q.options[selectedIdx].correct;
+
+    feedbackEl.style.display = 'block';
+    if (isCorrect) {
+      score++;
+      feedbackEl.style.color = '#15803d';
+      feedbackEl.innerHTML = `<strong>✓ Correct!</strong> ${q.explanation}`;
+    } else {
+      feedbackEl.style.color = '#b91c1c';
+      const correctOpt = q.options.find(o => o.correct);
+      feedbackEl.innerHTML = `<strong>✗ Not quite.</strong> The correct answer is: "${correctOpt.text}". ${q.explanation}`;
+    }
+
+    const radios = document.querySelectorAll(`input[name="q${qIndex}"]`);
+    radios.forEach(r => r.disabled = true);
+  });
+
+  const resultCard = document.getElementById('result-card');
+  const resultScore = document.getElementById('result-score');
+  const resultFeedback = document.getElementById('result-feedback');
+
+  resultScore.textContent = `You scored ${score} out of ${total}! (${Math.round((score / total) * 100)}%)`;
+  
+  if (score === total) {
+    resultFeedback.textContent = "🌟 Amazing job! You are an Official Clean Hands Champion!";
+  } else if (score >= 3) {
+    resultFeedback.textContent = "👏 Great effort! You know a lot about keeping hands clean and germ-free.";
+  } else {
+    resultFeedback.textContent = "🌱 Good try! Review the tips above to become a handwashing master!";
+  }
+
+  resultCard.style.display = 'block';
+  document.getElementById('submit-btn').style.display = 'none';
+  document.getElementById('reset-btn').style.display = 'inline-block';
+  resultCard.scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetQuiz() {
+  const form = document.getElementById('quiz-form');
+  form.reset();
+  renderQuestions();
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('submit-btn').style.display = 'inline-block';
+  document.getElementById('reset-btn').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('quiz-form').addEventListener('submit', handleQuizSubmit);
+document.getElementById('reset-btn').addEventListener('click', resetQuiz);
+
+renderQuestions();
+</script>
+</body></html>

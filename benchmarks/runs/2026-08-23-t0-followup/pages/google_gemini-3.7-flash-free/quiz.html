@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Hand Washing Quiz!</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --secondary: #38bdf8;
+      --accent: #f59e0b;
+      --bg: #f0f9ff;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-light: #64748b;
+      --success: #16a34a;
+      --error: #dc2626;
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .quiz-container {
+      background: var(--card-bg);
+      max-width: 600px;
+      width: 100%;
+      border-radius: var(--radius);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      padding: 32px 24px;
+      text-align: center;
+      border: 3px solid #bae6fd;
+    }
+
+    .header-icon {
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      color: var(--primary-dark);
+      font-size: 26px;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      color: var(--text-light);
+      font-size: 15px;
+      margin-bottom: 24px;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      background-color: #e2e8f0;
+      height: 12px;
+      border-radius: 999px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--secondary), var(--primary));
+      transition: width 0.3s ease;
+      border-radius: 999px;
+    }
+
+    .question-card {
+      display: none;
+      text-align: left;
+    }
+
+    .question-card.active {
+      display: block;
+    }
+
+    .question-count {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .question-title {
+      font-size: 19px;
+      margin-bottom: 18px;
+      line-height: 1.4;
+    }
+
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .option-btn {
+      background: #f8fafc;
+      border: 2px solid #cbd5e1;
+      padding: 14px 18px;
+      border-radius: 12px;
+      font-size: 16px;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .option-btn:hover {
+      background: #e0f2fe;
+      border-color: var(--secondary);
+    }
+
+    .option-btn:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
+    }
+
+    .option-letter {
+      background: #e2e8f0;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-weight: bold;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .option-btn:hover .option-letter {
+      background: #bae6fd;
+      color: var(--primary-dark);
+    }
+
+    /* Results View */
+    .results-card {
+      display: none;
+    }
+
+    .results-card.active {
+      display: block;
+    }
+
+    .score-circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #e0f2fe;
+      border: 6px solid var(--primary);
+      margin: 0 auto 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .score-number {
+      font-size: 34px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      line-height: 1;
+    }
+
+    .score-total {
+      font-size: 13px;
+      color: var(--text-light);
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    .score-message {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .score-description {
+      color: var(--text-light);
+      font-size: 15px;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .primary-btn {
+      background-color: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.3);
+    }
+
+    .primary-btn:hover {
+      background-color: var(--primary-dark);
+    }
+
+    .tip-box {
+      margin-top: 24px;
+      padding: 12px 16px;
+      background: #fffbeb;
+      border-left: 4px solid var(--accent);
+      border-radius: 4px 8px 8px 4px;
+      font-size: 13px;
+      color: #92400e;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="quiz-container">
+    <div class="header-icon">🧼</div>
+    <h1>Hand Washing Hero Quiz</h1>
+    <p class="subtitle">Test your clean hands knowledge!</p>
+
+    <div class="progress-bar-container" id="progressBarContainer">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- Quiz Questions Container -->
+    <div id="quizArea"></div>
+
+    <!-- Results Container -->
+    <div class="results-card" id="resultsArea">
+      <div class="score-circle">
+        <span class="score-number" id="finalScore">0</span>
+        <span class="score-total">out of 5</span>
+      </div>
+      <div class="score-message" id="scoreMessage">Great Job!</div>
+      <p class="score-description" id="scoreDescription">You really know how to keep those germs away!</p>
+      
+      <button class="primary-btn" id="retryBtn" onclick="restartQuiz()">Try Again</button>
+
+      <div class="tip-box">
+        💡 <strong>Remember:</strong> Wash your hands with clean water and soap for 20 seconds to stay healthy!
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var quizData = [
+      {
+        question: "How long should you wash your hands with soap?",
+        options: ["5 seconds", "20 seconds (sing 'Happy Birthday' twice)", "1 minute", "Just 2 seconds"],
+        correct: 1
+      },
+      {
+        question: "What is the most important item to use with water to remove germs?",
+        options: ["A towel", "Soap", "Dirt", "Leaves"],
+        correct: 1
+      },
+      {
+        question: "When is it SUPER important to wash your hands?",
+        options: ["Before eating food", "After using the bathroom", "After playing outside", "All of these times!"],
+        correct: 3
+      },
+      {
+        question: "Which parts of your hands need washing?",
+        options: ["Only the thumbs", "Only the palms", "Palms, backs of hands, between fingers, and under nails", "Just the fingertips"],
+        correct: 2
+      },
+      {
+        question: "Why do we wash our hands?",
+        options: ["To make them smell nice only", "To wash away invisible germs that make us sick", "To cool down on a hot day", "To play with water bubbles"],
+        correct: 1
+      }
+    ];
+
+    var currentQuestionIndex = 0;
+    var score = 0;
+
+    var quizArea = document.getElementById("quizArea");
+    var resultsArea = document.getElementById("resultsArea");
+    var progressBar = document.getElementById("progressBar");
+    var progressBarContainer = document.getElementById("progressBarContainer");
+    var finalScoreEl = document.getElementById("finalScore");
+    var scoreMessageEl = document.getElementById("scoreMessage");
+    var scoreDescriptionEl = document.getElementById("scoreDescription");
+
+    function renderQuiz() {
+      quizArea.innerHTML = "";
+      quizData.forEach(function(item, index) {
+        var card = document.createElement("div");
+        card.className = "question-card" + (index === 0 ? " active" : "");
+        card.id = "question-" + index;
+
+        var countLabel = document.createElement("span");
+        countLabel.className = "question-count";
+        countLabel.textContent = "Question " + (index + 1) + " of " + quizData.length;
+
+        var title = document.createElement("h2");
+        title.className = "question-title";
+        title.textContent = item.question;
+
+        var optionsGrid = document.createElement("div");
+        optionsGrid.className = "options-grid";
+
+        var letters = ["A", "B", "C", "D"];
+        item.options.forEach(function(optText, optIndex) {
+          var btn = document.createElement("button");
+          btn.className = "option-btn";
+          btn.type = "button";
+          btn.innerHTML = '<span class="option-letter">' + letters[optIndex] + '</span> <span>' + optText + '</span>';
+          btn.onclick = function() {
+            handleAnswer(index, optIndex);
+          };
+          optionsGrid.appendChild(btn);
+        });
+
+        card.appendChild(countLabel);
+        card.appendChild(title);
+        card.appendChild(optionsGrid);
+        quizArea.appendChild(card);
+      });
+
+      updateProgress();
+    }
+
+    function updateProgress() {
+      var progress = (currentQuestionIndex / quizData.length) * 100;
+      progressBar.style.width = progress + "%";
+    }
+
+    function handleAnswer(questionIndex, chosenIndex) {
+      if (chosenIndex === quizData[questionIndex].correct) {
+        score++;
+      }
+
+      var currentCard = document.getElementById("question-" + questionIndex);
+      currentCard.classList.remove("active");
+
+      currentQuestionIndex++;
+
+      if (currentQuestionIndex < quizData.length) {
+        var nextCard = document.getElementById("question-" + currentQuestionIndex);
+        nextCard.classList.add("active");
+        updateProgress();
+      } else {
+        showResults();
+      }
+    }
+
+    function showResults() {
+      progressBar.style.width = "100%";
+      quizArea.style.display = "none";
+      progressBarContainer.style.display = "none";
+      resultsArea.classList.add("active");
+
+      finalScoreEl.textContent = score;
+
+      if (score === 5) {
+        scoreMessageEl.textContent = "⭐ Clean Hands Champion! ⭐";
+        scoreDescriptionEl.textContent = "Perfect score! You are an absolute master at washing hands and stopping germs!";
+      } else if (score >= 3) {
+        scoreMessageEl.textContent = "👏 Great Effort!";
+        scoreDescriptionEl.textContent = "You did very well! Keep washing with soap to stay safe and healthy.";
+      } else {
+        scoreMessageEl.textContent = "💧 Keep Learning!";
+        scoreDescriptionEl.textContent = "Good try! Hand washing is easy to learn. Give the quiz another go to master it!";
+      }
+    }
+
+    function restartQuiz() {
+      score = 0;
+      currentQuestionIndex = 0;
+      resultsArea.classList.remove("active");
+      quizArea.style.display = "block";
+      progressBarContainer.style.display = "block";
+      renderQuiz();
+    }
+
+    // Initialize on page load
+    renderQuiz();
+  </script>
+</body>
+</html>

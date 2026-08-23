@@ -72,7 +72,7 @@ form#ask input{flex:1;padding:12px 14px;border-radius:12px;font-size:15px}
 </aside>
 <main>
   <div id="log"><p class="thinking" id="welcome">Open a folder of CSV / Excel files, then ask a question ("average marks by taluka") or ask for a page ("build me a dashboard", "write a summary for the board").</p></div>
-  <div class="hint">Ask questions, or say <b>build</b> / <b>dashboard</b> / <b>report</b> for a page. Follow-ups keep the context.</div>
+  <div class="hint">Ask questions; say <b>dashboard</b> / <b>report</b> for a data page; say <b>app</b> / <b>form</b> / <b>website</b> / <b>PWA</b> for a page the model writes. Follow-ups keep the context.</div>
   <form id="ask"><input id="q" placeholder="Ask about your data…" autocomplete="off"><button class="primary" id="send">Send</button></form>
 </main>
 
@@ -134,19 +134,44 @@ $('#ask').onsubmit = async e => {
   log.appendChild(turn); log.scrollTop = log.scrollHeight;
   const r = await api('/api/ask', {text});
   const a = turn.querySelector('.a');
+  if (r.id) { turn.dataset.id = r.id; turn.dataset.lane = r.lane; }
   if (r.error) { a.innerHTML = `<span class=err></span>`; a.querySelector('.err').textContent = r.error; }
   else if (r.lane === 'ask') {
     a.innerHTML = r.html + (r.scope_note ? `<p class=note style="color:var(--warn)">⚠ ${r.scope_note}</p>` : '') + metaLine(r);
     a.querySelectorAll('button.dl').forEach(b => b.onclick = () => window.open(`/api/csv/${r.id}/a1`));
+  } else if (r.lane === 'page') {
+    a.innerHTML = `<iframe class=page src="/api/page/${r.id}" data-probe='${JSON.stringify(r.data_probe||[]).replace(/'/g,"&#39;")}'></iframe><p class=note>Page written by the model${r.data_table ? `; your rows from <b>${r.data_table}</b> are poured in by this laptop when the page opens (the model never saw them). Figures on it are computed by the page's own code, not receipted.` : '.'} <a href="/api/download-page/${r.id}">Download the page</a></p>${r.script_errors && r.script_errors.length ? `<p class=note style="color:var(--warn)">⚠ The page's code still has a syntax error after one repair: ${r.script_errors[0]}</p>` : ''}` + metaLine(r)
   } else {
     a.innerHTML = `<iframe class=page src="/api/page/${r.id}"></iframe>` + metaLine(r) + (r.panels_failed && r.panels_failed.length ? `<p class=note>${r.panels_failed.length} panel(s) could not be computed and say so on the page.</p>` : '') + (r.lint_removed && r.lint_removed.length ? `<p class=note>Removed ${r.lint_removed.length} number(s) the model typed itself (not from a query).</p>` : '');
   }
+  if (r.lane === 'page') watchPage(a.querySelector('iframe.page'), r.id, a);
   if (r.egress) { egress.calls += r.egress.calls || 1; egress.bytes += r.egress.prompt_bytes || 0; egress.rows += r.egress.rows_sent || 0; renderState(); }
   $('#send').disabled = false; log.scrollTop = log.scrollHeight; $('#q').focus();
 };
+// the built page reports runtime errors; one repair round-trip, then reload
+function watchPage(frame, id, a){
+  let tried = false;
+  frame.addEventListener('load', async () => {
+    await new Promise(r => setTimeout(r, 700));
+    let errs = [], noData = false;
+    try {
+      errs = frame.contentWindow.__ioErrors || [];
+      const probe = frame.dataset.probe ? JSON.parse(frame.dataset.probe) : [];
+      if (probe.length) { const txt = frame.contentDocument.body.innerText; noData = !probe.some(v => txt.includes(String(v))); }
+    } catch (e) { return; }
+    if ((!errs.length && !noData) || tried) return;
+    tried = true;
+    const what = errs.length ? `threw an error when it ran (${errs[0]})` : 'does not show your data — it made content up';
+    const note = document.createElement('p'); note.className = 'note'; note.style.color = 'var(--warn)';
+    note.textContent = `The page ${what}. Asking the model to fix it…`; a.appendChild(note);
+    const r = await api('/api/page-repair/' + id, {errors: errs, no_data_shown: noData});
+    if (r.repaired) { note.textContent = 'Repaired once (' + what + '); reloaded.'; frame.src = `/api/page/${id}?v=${Date.now()}`; egress.calls += 1; renderState(); }
+    else note.textContent = 'Still wrong after one repair: the page ' + what + ' — try rephrasing, or raise the dial.';
+  });
+}
 function metaLine(r){
   const e = r.egress || {};
-  return `<div class=meta><span class=egress><i></i> sent: column names only · rows: 0 · ${fmtB(e.prompt_bytes||0)}</span><span>model: <b>${e.model||''}</b> · ${e.seconds||0}s${e.calls>1?' · '+e.calls+' calls':''}</span>${r.lane==='ask'?`<span>${r.rowcount} row(s) · from ${(r.tables_used||[]).join(', ')}</span>`:`<span>${r.panels} panel(s)</span>`}${r.attempts>1?`<span>${r.attempts} attempts</span>`:''}</div>`;
+  return `<div class=meta><span class=egress><i></i> sent: column names only · rows: 0 · ${fmtB(e.prompt_bytes||0)}</span><span>model: <b>${e.model||''}</b> · ${e.seconds||0}s${e.calls>1?' · '+e.calls+' calls':''}</span>${r.lane==='ask'?`<span>${r.rowcount} row(s) · from ${(r.tables_used||[]).join(', ')}</span>`:r.lane==='page'?`<span>${fmtB(r.bytes||0)} page</span>`:`<span>${r.panels} panel(s)</span>`}${r.attempts>1?`<span>${r.attempts} attempts</span>`:''}</div>`;
 }
 $('#reset').onclick = async () => { await api('/api/reset', {}); log.innerHTML=''; addSystem('New conversation. The tables are still loaded.'); };
 
@@ -161,6 +186,25 @@ $('#c-save').onclick = async () => {
   const r = await api('/api/config', body); if (r.config) state.config = r.config; renderState(); $('#cfg').classList.remove('open');
 };
 load();
+
+// live: when a file in the folder is saved, pages re-run their receipts and the last answer is recomputed
+let lastVersion = null;
+setInterval(async () => {
+  try {
+    const st = await api('/api/state');
+    if (lastVersion === null) { lastVersion = st.version; return; }
+    if (st.version !== lastVersion) {
+      lastVersion = st.version; state.tables = st.tables; renderState();
+      document.querySelectorAll('iframe.page').forEach(f => { f.src = f.src.split('?')[0] + '?v=' + st.version; });
+      const asks = [...document.querySelectorAll('.turn')].filter(t => t.dataset.lane === 'ask' && t.dataset.id);
+      for (const t of asks.slice(-3)) {
+        const r = await api('/api/rerun/' + t.dataset.id);
+        if (r.html) { const a = t.querySelector('.a'); const meta = a.querySelector('.meta'); a.innerHTML = r.html + (meta ? meta.outerHTML : ''); }
+      }
+      addSystem(`Files changed on disk at ${st.changed_at} — answers and pages recomputed locally, no model call.`);
+    }
+  } catch (e) {}
+}, 3000);
 </script>
 </body>
 </html>

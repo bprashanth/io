@@ -1,0 +1,190 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field Expense Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Field Expense Tracker","short_name":"Expenses","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Field Expense Tracker</h1></header>
+<main>
+<div class="card">
+  <div class="row">
+    <div style="flex:1"><label>Date</label><input type="date" id="inpDate"></div>
+    <div style="flex:2"><label>Head</label><input type="text" id="inpHead" placeholder="e.g. Transport, Food"></div>
+    <div style="flex:1"><label>Amount</label><input type="number" id="inpAmt" min="0" step="0.01" placeholder="0.00"></div>
+  </div>
+  <div class="row" style="margin-top:12px;justify-content:flex-end">
+    <button id="btnAdd">Add Expense</button>
+    <button id="btnClear" class="secondary">Clear Form</button>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="muted">Running Total</div>
+    <div style="font-size:24px;font-weight:bold" id="dispTotal">0.00</div>
+  </div>
+  <div class="card">
+    <div class="muted">Entries</div>
+    <div style="font-size:24px;font-weight:bold" id="dispCount">0</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin:0 0 10px 0">Totals by Head</h3>
+  <table id="tblHeadTotals">
+    <thead><tr><th>Head</th><th style="text-align:right">Total</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <h3 style="margin:0">Recent Entries</h3>
+    <button id="btnExport" class="secondary">Export CSV</button>
+  </div>
+  <table id="tblEntries">
+    <thead><tr><th>Date</th><th>Head</th><th style="text-align:right">Amount</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+(function() {
+  const STORAGE_KEY = 'field_expenses_v1';
+  const elDate = document.getElementById('inpDate');
+  const elHead = document.getElementById('inpHead');
+  const elAmt = document.getElementById('inpAmt');
+  const btnAdd = document.getElementById('btnAdd');
+  const btnClear = document.getElementById('btnClear');
+  const btnExport = document.getElementById('btnExport');
+  const dispTotal = document.getElementById('dispTotal');
+  const dispCount = document.getElementById('dispCount');
+  const tbodyHead = document.querySelector('#tblHeadTotals tbody');
+  const tbodyEntries = document.querySelector('#tblEntries tbody');
+
+  // Set default date to today
+  elDate.valueAsDate = new Date();
+
+  function loadData() {
+    return store.get(STORAGE_KEY, []);
+  }
+
+  function saveData(data) {
+    store.set(STORAGE_KEY, data);
+  }
+
+  function formatCurrency(num) {
+    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function render() {
+    const data = loadData();
+    
+    // Calculate totals
+    let totalAmount = 0;
+    const headTotals = {};
+    
+    data.forEach(item => {
+      const amt = parseFloat(item.amount) || 0;
+      totalAmount += amt;
+      
+      if (!headTotals[item.head]) {
+        headTotals[item.head] = 0;
+      }
+      headTotals[item.head] += amt;
+    });
+
+    // Update summary cards
+    dispTotal.textContent = formatCurrency(totalAmount);
+    dispCount.textContent = data.length;
+
+    // Update Head Totals Table
+    tbodyHead.innerHTML = '';
+    const sortedHeads = Object.keys(headTotals).sort();
+    if (sortedHeads.length === 0) {
+      tbodyHead.innerHTML = '<tr><td colspan="2" class="muted">No data yet</td></tr>';
+    } else {
+      sortedHeads.forEach(head => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${head}</td><td style="text-align:right">${formatCurrency(headTotals[head])}</td>`;
+        tbodyHead.appendChild(tr);
+      });
+    }
+
+    // Update Entries Table (newest first)
+    tbodyEntries.innerHTML = '';
+    const reversedData = [...data].reverse();
+    if (reversedData.length === 0) {
+      tbodyEntries.innerHTML = '<tr><td colspan="3" class="muted">No entries yet</td></tr>';
+    } else {
+      reversedData.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${item.date}</td><td>${item.head}</td><td style="text-align:right">${formatCurrency(item.amount)}</td>`;
+        tbodyEntries.appendChild(tr);
+      });
+    }
+  }
+
+  function addExpense() {
+    const date = elDate.value;
+    const head = elHead.value.trim();
+    const amount = elAmt.value;
+
+    if (!date || !head || !amount) {
+      alert('Please fill in all fields.');
+      return;
+    }
+
+    const newEntry = {
+      id: Date.now(),
+      date: date,
+      head: head,
+      amount: parseFloat(amount)
+    };
+
+    const data = loadData();
+    data.push(newEntry);
+    saveData(data);
+    
+    // Reset form but keep date
+    elHead.value = '';
+    elAmt.value = '';
+    elHead.focus();
+    
+    render();
+  }
+
+  btnAdd.addEventListener('click', addExpense);
+  
+  btnClear.addEventListener('click', () => {
+    elHead.value = '';
+    elAmt.value = '';
+    elDate.valueAsDate = new Date();
+    elHead.focus();
+  });
+
+  btnExport.addEventListener('click', () => {
+    const data = loadData();
+    if (data.length === 0) {
+      alert('No data to export.');
+      return;
+    }
+    const csv = toCSV(data);
+    download('expenses.csv', csv, 'text/csv');
+  });
+
+  // Initial render
+  render();
+})();
+</script>
+</body></html>

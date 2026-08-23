@@ -1,0 +1,126 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tuition Attendance</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Tuition Attendance","short_name":"Attendance","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Tuition Attendance</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+(function () {
+  'use strict';
+  var K = { kids: 'tuition_kids', att: 'tuition_att', month: 'tuition_month' };
+  var kids = store.get(K.kids, []);
+  var att = store.get(K.att, {});
+  var today = new Date();
+  var month = store.get(K.month, today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0'));
+  var selDate = today.toISOString().slice(0, 10);
+
+  function saveKids() { store.set(K.kids, kids); }
+  function saveAtt() { store.set(K.att, att); }
+  function saveMonth() { store.set(K.month, month); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function monthLabel(m) { var p = m.split('-'); var d = new Date(+p[0], +p[1] - 1, 1); return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); }
+  function daysInMonth(m) { var p = m.split('-'); return new Date(+p[0], +p[1], 0).getDate(); }
+  function monthDates(m) { var p = m.split('-'); var n = daysInMonth(m); var a = []; for (var d = 1; d <= n; d++) a.push(m + '-' + String(d).padStart(2, '0')); return a; }
+  function dayStatus(date) { var rec = att[date] || {}; var p = 0, ab = 0; kids.forEach(function (k) { if (rec[k.id] === 'P') p++; else if (rec[k.id] === 'A') ab++; }); return { p: p, ab: ab, un: kids.length - p - ab }; }
+  function kidMonth(kid) { var p = 0, ab = 0; monthDates(month).forEach(function (d) { var rec = att[d] || {}; if (rec[kid.id] === 'P') p++; else if (rec[kid.id] === 'A') ab++; }); return { p: p, ab: ab, un: daysInMonth(month) - p - ab }; }
+
+  function render() {
+    var todayStr = today.toISOString().slice(0, 10);
+    var st = dayStatus(selDate);
+    var pct = kids.length ? Math.round(st.p / kids.length * 100) : 0;
+    var isToday = selDate === todayStr;
+    var isMonth = selDate.slice(0, 7) === month;
+
+    var dateCard = '<div class="card"><div class="row" style="align-items:center">' +
+      '<div style="flex:1;min-width:150px"><label>Attendance date</label><input type="date" id="date" value="' + selDate + '"></div>' +
+      '<div style="flex:1;min-width:150px"><label>Summary month</label><input type="month" id="month" value="' + month + '"></div>' +
+      '</div>' +
+      '<div class="row" style="margin-top:10px">' +
+      '<button class="secondary" id="todayBtn">Today</button>' +
+      '<button class="secondary" id="allP">All present</button>' +
+      '<button class="secondary" id="allA">All absent</button>' +
+      '<button class="secondary" id="clearDay">Clear day</button>' +
+      '</div>' +
+      '<div class="row" style="margin-top:12px">' +
+      '<div class="card" style="flex:1;margin:0"><div class="muted">Present</div><div style="font-size:26px;font-weight:700">' + st.p + '</div></div>' +
+      '<div class="card" style="flex:1;margin:0"><div class="muted">Absent</div><div style="font-size:26px;font-weight:700">' + st.ab + '</div></div>' +
+      '<div class="card" style="flex:1;margin:0"><div class="muted">Not marked</div><div style="font-size:26px;font-weight:700">' + st.un + '</div></div>' +
+      '</div>' +
+      '<div style="margin-top:10px;height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:var(--accent)"></div></div>' +
+      (isToday ? '<div class="muted" style="margin-top:6px">Marking today&rsquo;s attendance</div>' : '') +
+      '</div>';
+
+    var kidsCard = '<div class="card"><div class="row" style="align-items:center;justify-content:space-between"><h2 style="margin:0;font-size:18px">Kids (' + kids.length + ')</h2><button class="secondary" id="addKid">+ Add kid</button></div>' +
+      '<div id="addRow" style="display:none;margin-top:10px"><div class="row"><input id="newName" placeholder="Type a name and press Add" style="flex:1;min-width:160px"><button id="addKidBtn">Add</button></div></div>' +
+      (kids.length ? '<table style="margin-top:10px"><thead><tr><th>Name</th><th style="width:120px">Today</th><th style="width:120px">This month</th><th style="width:44px"></th></tr></thead><tbody>' +
+      kids.map(function (k) {
+        var rec = att[selDate] || {};
+        var v = rec[k.id];
+        var m = kidMonth(k);
+        var pctM = Math.round(m.p / daysInMonth(month) * 100);
+        return '<tr><td>' + esc(k.name) + '</td>' +
+          '<td><div class="row" style="gap:6px"><button class="secondary" data-p="' + k.id + '" style="padding:4px 10px;' + (v === 'P' ? 'background:var(--accent);color:#fff' : '') + '">P</button><button class="secondary" data-a="' + k.id + '" style="padding:4px 10px;' + (v === 'A' ? 'background:#dc2626;border-color:#dc2626;color:#fff' : '') + '">A</button></div></td>' +
+          '<td><div style="font-size:13px">' + m.p + 'P / ' + m.ab + 'A <span class="muted">(' + pctM + '%)</span></div><div style="height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:3px"><div style="height:100%;width:' + pctM + '%;background:var(--accent)"></div></div></td>' +
+          '<td><button class="secondary" data-del="' + k.id + '" style="padding:4px 8px" title="Remove">&times;</button></td></tr>';
+      }).join('') + '</tbody></table>' : '<p class="muted" style="margin-top:10px">No kids yet. Add your first kid above.</p>') +
+      '</div>';
+
+    var monthCard = '<div class="card"><div class="row" style="align-items:center;justify-content:space-between"><h2 style="margin:0;font-size:18px">Monthly summary &mdash; ' + esc(monthLabel(month)) + '</h2><div class="row"><button class="secondary" id="csv">CSV</button><button class="secondary" id="json">JSON</button></div></div>' +
+      (isMonth ? '' : '<p class="muted" style="margin:8px 0 0">Tip: set the date to ' + esc(month) + '-01 to mark this month.</p>') +
+      '<table style="margin-top:10px"><thead><tr><th>Name</th><th>Present</th><th>Absent</th><th>Unmarked</th><th>Rate</th></tr></thead><tbody>' +
+      kids.map(function (k) {
+        var m = kidMonth(k);
+        var pctM = Math.round(m.p / daysInMonth(month) * 100);
+        return '<tr><td>' + esc(k.name) + '</td><td>' + m.p + '</td><td>' + m.ab + '</td><td>' + m.un + '</td><td>' + pctM + '%</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '</div>';
+
+    document.getElementById('app').innerHTML = dateCard + kidsCard + monthCard;
+    wire();
+  }
+
+  function wire() {
+    var dateEl = document.getElementById('date');
+    var monthEl = document.getElementById('month');
+    if (dateEl) dateEl.addEventListener('change', function () { selDate = dateEl.value || today.toISOString().slice(0, 10); render(); });
+    if (monthEl) monthEl.addEventListener('change', function () { month = monthEl.value || month; saveMonth(); render(); });
+    var tb = document.getElementById('todayBtn'); if (tb) tb.addEventListener('click', function () { selDate = today.toISOString().slice(0, 10); render(); });
+    var ap = document.getElementById('allP'); if (ap) ap.addEventListener('click', function () { setAll('P'); });
+    var aa = document.getElementById('allA'); if (aa) aa.addEventListener('click', function () { setAll('A'); });
+    var cd = document.getElementById('clearDay'); if (cd) cd.addEventListener('click', function () { if (confirm('Clear all marks for ' + selDate + '?')) { delete att[selDate]; saveAtt(); render(); } });
+    var ak = document.getElementById('addKid'); if (ak) ak.addEventListener('click', function () { var r = document.getElementById('addRow'); r.style.display = r.style.display === 'none' ? 'block' : 'none'; var n = document.getElementById('newName'); if (n) n.focus(); });
+    var akb = document.getElementById('addKidBtn'); if (akb) akb.addEventListener('click', addKid);
+    var nn = document.getElementById('newName'); if (nn) nn.addEventListener('keydown', function (e) { if (e.key === 'Enter') addKid(); });
+    var csv = document.getElementById('csv'); if (csv) csv.addEventListener('click', exportCSV);
+    var js = document.getElementById('json'); if (js) js.addEventListener('click', exportJSON);
+
+    document.querySelectorAll('[data-p]').forEach(function (b) { b.addEventListener('click', function () { mark(b.getAttribute('data-p'), 'P'); }); });
+    document.querySelectorAll('[data-a]').forEach(function (b) { b.addEventListener('click', function () { mark(b.getAttribute('data-a'), 'A'); }); });
+    document.querySelectorAll('[data-del]').forEach(function (b) { b.addEventListener('click', function () { delKid(b.getAttribute('data-del')); }); });
+  }
+
+  function mark(id, v) { var rec = att[selDate] || {}; rec[id] = rec[id] === v ? undefined : v; if (rec[id] === undefined) delete rec[id]; att[selDate] = rec; saveAtt(); render(); }
+  function setAll(v) { var rec = att[selDate] || {}; kids.forEach(function (k) { rec[k.id] = v; }); att[selDate] = rec; saveAtt(); render(); }
+  function addKid() { var n = document.getElementById('newName'); var name = (n.value || '').trim(); if (!name) return; kids.push({ id: 'k' + Date.now() + Math.random().toString(36).slice(2, 6), name: name }); saveKids(); render(); }
+  function delKid(id) { var k = kids.filter(function (x) { return x.id === id; })[0]; if (!k) return; if (!confirm('Remove ' + k.name + ' and all their attendance?')) return; kids = kids.filter(function (x) { return x.id !== id; }); Object.keys(att).forEach(function (d) { if (att[d] && att[d][id] !== undefined) { delete att[d][id]; if (!Object.keys(att[d]).length) delete att[d]; } }); saveKids(); saveAtt(); render(); }
+  function exportCSV() { var rows = kids.map(function (k) { var m = kidMonth(k); return { name: k.name, month: month, present: m.p, absent: m.ab, unmarked: m.un, rate: Math.round(m.p / daysInMonth(month) * 100) + '%' }; }); download('attendance-' + month + '.csv', toCSV(rows), 'text/csv'); }
+  function exportJSON() { download('attendance-' + month + '.json', JSON.stringify({ month: month, kids: kids, attendance: att }, null, 2), 'application/json'); }
+
+  render();
+})();
+</script>
+</body></html>

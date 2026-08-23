@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Point Survey</title>
+    <style>
+        :root {
+            --primary: #0077b6;
+            --secondary: #00b4d8;
+            --bg: #f8f9fa;
+            --text: #333;
+            --error: #d9534f;
+            --success: #5cb85c;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        container {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 { font-size: 1.5rem; margin-top: 0; color: var(--primary); border-bottom: 2px solid var(--bg); padding-bottom: 10px; }
+        form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.9rem; }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        radio-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+        }
+        radio-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: normal;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            margin-bottom: 10px;
+        }
+        btn-submit { background-color: var(--primary); color: white; }
+        btn-export { background-color: #6c757d; color: white; }
+        btn-clear { background-color: #f0f0f0; color: #333; font-size: 0.8rem; }
+        button:active { opacity: 0.7; }
+        #status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        status-success { background: #dff0d8; color: #3c763d; display: block!important; }
+        status-error { background: #f2dede; color: #a94444; display: block!important; }
+        gps-info { font-size: 0.75rem; color: #666; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Water Point Survey</h1>
+    
+    <div id="status"></div>
+
+    <form id="surveyForm">
+        <div class="form-group">
+            <label for="habitation">Habitation / Village Name</label>
+            <input type="text" id="habitation" required>
+        </div>
+
+        <div class="form-group">
+            <label for="pumpType">Pump Type</label>
+            <select id="pumpType" required>
+                <option value="">Select type...</option>
+                <option value="hand_pump">Hand Pump</option>
+                <option value="borehole">Borehole</option>
+                <option value="well">Open Well</option>
+                <option value="solar">Solar Pump</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Is the pump working?</label>
+            <div class="radio-group">
+                <label class="radio-option"><input type="radio" name="working" value="yes" required> Yes</label>
+                <label class="radio-option"><input type="radio" name="working" value="no"> No</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="users">Estimated Daily Users</label>
+            <input type="number" id="users" min="0" required>
+        </div>
+
+        <div class="form-group">
+            <label>GPS Location</label>
+            <button type="button" class="btn-export" style="padding: 8px; font-size: 0.8rem;" onclick="getLocation()">Get Current Location</button>
+            <div id="gpsDisplay" class="gps-info">Location not captured</div>
+            <input type="hidden" id="lat">
+            <input type="hidden" id="lng">
+        </div>
+
+        <button type="submit" class="btn-submit">Save Response</button>
+    </form>
+
+    <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
+
+    <button class="btn-export" onclick="exportData()">Export All Data (JSON)</button>
+    <button class="btn-clear" onclick="clearData()">Clear All Stored Data</button>
+</div>
+
+<script>
+    const STORAGE_KEY = 'water_survey_data';
+    const form = document.getElementById('surveyForm');
+    const statusDiv = document.getElementById('status');
+    const gpsDisplay = document.getElementById('gpsDisplay');
+
+    // Helper to show status messages
+    function showStatus(msg, type) {
+        statusDiv.textContent = msg;
+        statusDiv.className = type === 'uccess'? 'tatus-success' : 'tatus-error';
+        setTimeout(() => { statusDiv.className = ''; statusDiv.textContent = ''; }, 3000);
+    }
+
+    // Get GPS Coordinates
+    function getLocation() {
+        if (!navigator.geolocation) {
+            showStatus("Geolocation is not supported by your browser", "error");
+            return;
+        }
+        gpsDisplay.textContent = "Locating...";
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                document.getElementById('lat').value = position.coords.latitude;
+                document.getElementById('lng').value = position.coords.longitude;
+                gpsDisplay.textContent = `Lat: ${position.coords.latitude.toFixed(5)}, Lng: ${position.coords.longitude.toFixed(5)}`;
+            },
+            (error) => {
+                gpsDisplay.textContent = "Error: " + error.message;
+                showStatus("Could not get location", "error");
+            },
+            { enableHighAccuracy: true }
+        );
+    }
+
+    // Save data to LocalStorage
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const workingVal = document.querySelector('input[name="working"]:checked')?.value;
+        const latVal = document.getElementById('lat').value;
+        const lngVal = document.getElementById('lng').value;
+
+        if (!latVal ||!lngVal) {
+            showStatus("Please capture GPS location first", "error");
+            return;
+        }
+
+        const entry = {
+            timestamp: new Date().toISOString(),
+            habitation: document.getElementById('habitation').value,
+            pumpType: document.getElementById('pumpType').value,
+            working: workingVal,
+            users: parseInt(document.getElementById('users').value, 10),
+            latitude: parseFloat(latVal),
+            longitude: parseFloat(lngVal)
+        };
+
+        try {
+            const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            existingData.push(entry);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
+            
+            showStatus("Data saved locally!", "success");
+            form.reset();
+            gpsDisplay.textContent = "Location not captured";
+        } catch (err) {
+            showStatus("Storage error: " + err.message, "error");
+        }
+    });
+
+    // Export data as JSON file
+    function exportData() {
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (!data || data === '[]') {
+            showStatus("No data to export", "error");
+            return;
+        }
+
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `water_survey_${new Date().getTime()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Clear storage
+    function clearData() {
+        if (confirm("Are you sure you want to delete all stored responses? This cannot be undone.")) {
+            localStorage.removeItem(STORAGE_KEY);
+            showStatus("Data cleared", "success");
+        }
+    }
+
+    // Service Worker Registration for Offline Support
+    if ('serviceWorker' in navigator) {
+        const swCode = `
+            const CACHE_NAME = 'water-survey-v1';
+            self.addEventListener('install', (e) => {
+                e.waitUntil(self.skipWaiting());
+            });
+            self.addEventListener('fetch', (e) => {
+                e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+            });
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch(err => console.log('SW failed', err));
+    }
+</script>
+
+</body>
+</html>

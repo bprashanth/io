@@ -1,0 +1,177 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scholarship Scheme Progress</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Scholarship Scheme Progress</h1></header>
+<main>
+<div class="grid">
+  <div class="card">
+    <h3>Total Cases</h3>
+    <div id="statTotal" class="muted">-</div>
+  </div>
+  <div class="card">
+    <h3>Pending Cases</h3>
+    <div id="statPending" class="muted">-</div>
+  </div>
+  <div class="card">
+    <h3>Approved</h3>
+    <div id="statApproved" class="muted">-</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <div style="flex:1">
+      <label for="filterDistrict">Filter by District</label>
+      <select id="filterDistrict"><option value="">All Districts</option></select>
+    </div>
+    <div style="flex:1">
+      <label for="filterStatus">Filter by Status</label>
+      <select id="filterStatus">
+        <option value="">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+    </div>
+    <div style="align-self:flex-end">
+      <button id="exportBtn" class="secondary">Export CSV</button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>District-wise Progress</h3>
+  <table id="districtTable">
+    <thead>
+      <tr>
+        <th>District</th>
+        <th>Total</th>
+        <th>Pending</th>
+        <th>Approved</th>
+        <th>Progress</th>
+      </tr>
+    </thead>
+    <tbody id="districtBody"></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Pending Cases Detail</h3>
+  <table id="pendingTable">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>District</th>
+        <th>Taluka</th>
+        <th>Scheme</th>
+        <th>Marks %</th>
+        <th>Family Income</th>
+      </tr>
+    </thead>
+    <tbody id="pendingBody"></tbody>
+  </table>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+(function() {
+  const rawData = window.data || [];
+  const districtMap = {};
+  const pendingRows = [];
+  let total = 0, pendingCount = 0, approvedCount = 0;
+
+  rawData.forEach(row => {
+    total++;
+    const d = row['District'] || 'Unknown';
+    if (!districtMap[d]) districtMap[d] = { total: 0, pending: 0, approved: 0 };
+    districtMap[d].total++;
+
+    const status = (row['Status'] || '').trim();
+    if (status === 'Pending') {
+      districtMap[d].pending++;
+      pendingCount++;
+      pendingRows.push(row);
+    } else if (status === 'Approved') {
+      districtMap[d].approved++;
+      approvedCount++;
+    }
+  });
+
+  // Stats
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statPending').textContent = pendingCount;
+  document.getElementById('statApproved').textContent = approvedCount;
+
+  // Populate district filter
+  const distSelect = document.getElementById('filterDistrict');
+  Object.keys(districtMap).sort().forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d;
+    distSelect.appendChild(opt);
+  });
+
+  // Render district table
+  const distBody = document.getElementById('districtBody');
+  Object.keys(districtMap).sort().forEach(d => {
+    const info = districtMap[d];
+    const progress = info.total > 0 ? Math.round((info.approved / info.total) * 100) : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${d}</td><td>${info.total}</td><td>${info.pending}</td><td>${info.approved}</td><td>${progress}%</td>`;
+    distBody.appendChild(tr);
+  });
+
+  // Render pending table
+  const pendBody = document.getElementById('pendingBody');
+  pendingRows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row['Name'] || '-'}</td><td>${row['District'] || '-'}</td><td>${row['Taluka'] || '-'}</td><td>${row['Name of scheme'] || '-'}</td><td>${row['Marks %'] || '-'}</td><td>${row['Family Income'] || '-'}</td>`;
+    pendBody.appendChild(tr);
+  });
+
+  // Filter logic
+  function applyFilters() {
+    const distFilter = document.getElementById('filterDistrict').value;
+    const statusFilter = document.getElementById('filterStatus').value;
+
+    const filtered = pendingRows.filter(row => {
+      const matchDist = !distFilter || row['District'] === distFilter;
+      const matchStatus = !statusFilter || row['Status'] === statusFilter;
+      return matchDist && matchStatus;
+    });
+
+    pendBody.innerHTML = '';
+    filtered.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${row['Name'] || '-'}</td><td>${row['District'] || '-'}</td><td>${row['Taluka'] || '-'}</td><td>${row['Name of scheme'] || '-'}</td><td>${row['Marks %'] || '-'}</td><td>${row['Family Income'] || '-'}</td>`;
+      pendBody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('filterDistrict').addEventListener('change', applyFilters);
+  document.getElementById('filterStatus').addEventListener('change', applyFilters);
+
+  // Export
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const distRows = Object.keys(districtMap).sort().map(d => {
+      const info = districtMap[d];
+      const progress = info.total > 0 ? Math.round((info.approved / info.total) * 100) : 0;
+      return { District: d, Total: info.total, Pending: info.pending, Approved: info.approved, 'Progress %': progress };
+    });
+    download('scholarship_progress.csv', toCSV(distRows), 'text/csv');
+  });
+
+  offlineReady();
+})();
+</script>
+</body></html>

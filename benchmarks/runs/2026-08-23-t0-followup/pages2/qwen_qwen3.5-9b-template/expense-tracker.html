@@ -1,0 +1,188 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Expense Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Expense Tracker","short_name":"Tracker","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Expense Tracker</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+<div class="grid">
+  <div class="card">
+    <h2>Add Expense</h2>
+    <form id="expenseForm">
+      <label>Date</label>
+      <input type="date" name="date" required>
+      
+      <label>Head</label>
+      <select name="head" required>
+        <option value="">Select Head</option>
+        <option value="Travel">Travel</option>
+        <option value="Office Supplies">Office Supplies</option>
+        <option value="Training">Training</option>
+        <option value="Communication">Communication</option>
+        <option value="Other">Other</option>
+      </select>
+      
+      <label>Amount ($)</label>
+      <input type="number" name="amount" step="0.01" min="0" required>
+      
+      <button type="submit">Add Expense</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Summary</h2>
+    <div class="row">
+      <div>
+        <label>Total Expenses</label>
+        <strong id="totalDisplay">$0.00</strong>
+      </div>
+      <div>
+        <label>Count</label>
+        <strong id="countDisplay">0</strong>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="secondary" id="exportBtn">Export CSV</button>
+      <button class="secondary" id="clearBtn" style="margin-left:8px; border-color: #ef4444; color: #ef4444;">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Expenses by Head</h2>
+  <div id="summaryTable" class="table">
+    <table>
+      <thead>
+        <tr>
+          <th>Head</th>
+          <th style="text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody id="summaryBody">
+        <!-- Populated by JS -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Recent Expenses</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Head</th>
+        <th style="text-align:right">Amount</th>
+      </tr>
+    </thead>
+    <tbody id="listBody">
+      <!-- Populated by JS -->
+    </tbody>
+  </table>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+const form = document.getElementById('expenseForm');
+const listBody = document.getElementById('listBody');
+const summaryBody = document.getElementById('summaryBody');
+const totalDisplay = document.getElementById('totalDisplay');
+const countDisplay = document.getElementById('countDisplay');
+const exportBtn = document.getElementById('exportBtn');
+const clearBtn = document.getElementById('clearBtn');
+
+const HEADERS = ['Travel', 'Office Supplies', 'Training', 'Communication', 'Other'];
+
+function render() {
+  const expenses = store.get('expenses', []);
+  const today = new Date().toISOString().split('T')[0];
+  form.querySelector('input[name="date"]').value = today;
+
+  // Sort by date desc
+  expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Render List
+  listBody.innerHTML = expenses.map(e => `
+    <tr>
+      <td>${e.date}</td>
+      <td>${e.head}</td>
+      <td style="text-align:right">$${parseFloat(e.amount).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  // Render Summary Table
+  const totals = HEADERS.reduce((acc, h) => {
+    acc[h] = 0;
+    return acc;
+  }, {});
+  
+  expenses.forEach(e => {
+    if (totals[e.head] !== undefined) {
+      totals[e.head] += parseFloat(e.amount);
+    }
+  });
+
+  summaryBody.innerHTML = Object.entries(totals)
+    .filter(([k, v]) => v > 0)
+    .map(([head, total]) => `
+      <tr>
+        <td>${head}</td>
+        <td style="text-align:right">$${total.toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+  // Render Totals
+  const grandTotal = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  totalDisplay.textContent = `$${grandTotal.toFixed(2)}`;
+  countDisplay.textContent = expenses.length;
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const data = new FormData(form);
+  const expense = {
+    id: Date.now(),
+    date: data.get('date'),
+    head: data.get('head'),
+    amount: parseFloat(data.get('amount'))
+  };
+
+  const current = store.get('expenses', []);
+  current.push(expense);
+  store.set('expenses', current);
+  render();
+  form.reset();
+});
+
+exportBtn.addEventListener('click', () => {
+  const expenses = store.get('expenses', []);
+  const rows = expenses.map(e => ({
+    Date: e.date,
+    Head: e.head,
+    Amount: e.amount
+  }));
+  const csv = toCSV(rows);
+  download('expenses.csv', csv, 'text/csv');
+});
+
+clearBtn.addEventListener('click', () => {
+  if (confirm('Are you sure you want to delete all expenses?')) {
+    store.set('expenses', []);
+    render();
+  }
+});
+
+render();
+</script>
+</body></html>

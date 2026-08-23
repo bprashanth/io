@@ -1,0 +1,62 @@
+{
+  "id": "donations-repeat-share-p01",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "what percent of total donation value comes from people who gave more than once, and how many repeat donors are there",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH TotalDonations AS (SELECT SUM(\"Amount\") AS TotalAmount FROM \"donations\"), RepeatDonors AS (SELECT \"Donor\" FROM \"donations\" GROUP BY \"Donor\" HAVING COUNT(*) > 1), RepeatDonations AS (SELECT SUM(\"Amount\") AS RepeatTotalAmount FROM \"donations\" WHERE \"Donor\" IN (SELECT \"Donor\" FROM RepeatDonors)) SELECT (rd.RepeatTotalAmount * 100.0 / NULLIF(NULLIF(td.TotalAmount, 0), 0)) AS PercentageFromRepeatDonors, COUNT(rd2.\"Donor\") AS RepeatDonorCount FROM TotalDonations AS td CROSS JOIN RepeatDonations AS rd CROSS JOIN RepeatDonors AS rd2",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nwhat percent of total donation value comes from people who gave more than once, and how many repeat donors are there",
+      "response": "To translate the natural language question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Step-by-Step Breakdown\n\n1. **Identify Repeat Donors**:\n   - We need to find donors who have made more than one donation. This can be achieved by grouping the donations by the \"Donor\" column and using the `HAVING` clause to filter groups with a count greater than one.\n\n2. **Calculate Total Donation Value from Repeat Donors**:\n   - Once we have identified the repeat donors, we need to sum up the donation amounts for these donors.\n\n3. **Calculate Total Donation Value from All Donors**:\n   - We also need to calculate the total donation value from all donors to determine the percentage.\n\n4. **Compute the Percentage**:\n   - The percentage of total donation value that comes from repeat donors can be calculated by dividing the total donation value from repeat donors by the total donation value from all donors and multiplying by 100.\n\n5. **Count the Number of Repeat Donors**:\n   - Finally, we need to count the number of unique repeat donors.\n\n### Constructing the SQL Query\n\nBased on the above steps, we can construct the SQL query as follows:\n\n```sql\nWITH RepeatDonors AS (\n    SELECT Donor\n    FROM donations\n    GROUP BY Donor\n    HAVING COUNT(*) > 1\n),\nTotalDonations AS (\n    SELECT SUM(Amount) AS TotalAmount\n    FROM donations\n),\nRepeatDonations AS (\n    SELECT SUM(d.Amount) AS RepeatTotalAmount\n    FROM donations d\n    JOIN RepeatDonors r ON d.Donor = r.Donor\n)\nSELECT \n    (rd.RepeatTotalAmount * 100.0 / td.TotalAmount) AS PercentageFromRepeatDonors,\n    COUNT(DISTINCT rd.Donor) AS RepeatDonorsCount\nFROM RepeatDonors rd\nCROSS JOIN TotalDonations td\nCROSS JOIN RepeatDonations rtd;\n```\n\n### Explanation\n\n- **RepeatDonors CTE**: This common table expression (CTE) identifies donors who have made more than one donation.\n- **TotalDonations CTE**: This CTE calculates the total donation amount from all donors.\n- **RepeatDonations CTE**: This CTE calculates the total donation amount from repeat donors.\n- **Final SELECT Statement**: \n  - It calculates the percentage of total donation value that comes from repeat donors.\n  - It counts the number of unique repeat donors.\n  - `CROSS JOIN` is used to combine the results from the CTEs into a single result set.\n\nThis query efficiently calculates the required metrics using CTEs and ensures that the results are accurate and easy to understand.",
+      "api": {
+        "id": "chatcmpl-sqX3irD60XQJqO93RQ41sauHFFfrbFnt",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 568,
+          "prompt_tokens": 366,
+          "total_tokens": 934,
+          "prompt_tokens_details": {
+            "cached_tokens": 192
+          }
+        },
+        "duration_seconds": 21.139
+      },
+      "duration_seconds": 21.142,
+      "error": "BinderException: Binder Error: Values list \"rd\" does not have a column named \"RepeatTotalAmount\"\n\nLINE 1: ... AS d JOIN RepeatDonors AS r ON d.Donor = r.Donor) SELECT (rd.RepeatTotalAmount * 100.0 / NULLIF(td.TotalAmount, 0...\n                                                                      ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nwhat percent of total donation value comes from people who gave more than once, and how many repeat donors are there\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Values list \"rd\" does not have a column named \"RepeatTotalAmount\"\n\nLINE 1: ... AS d JOIN RepeatDonors AS r ON d.Donor = r.Donor) SELECT (rd.RepeatTotalAmount * 100.0 / NULLIF(td.TotalAmount, 0...\n                                                                      ^\nReturn a complete corrected query.",
+      "response": "To translate the natural language question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Requirements Breakdown:\n1. **Calculate the total donation value from all donors.**\n2. **Identify donors who have made more than one donation.**\n3. **Calculate the total donation value from these repeat donors.**\n4. **Compute the percentage of total donation value that comes from repeat donors.**\n5. **Count the number of repeat donors.**\n\n### Step-by-Step Solution:\n\n1. **Calculate Total Donation Value:**\n   - We need to sum up all the donation amounts from the `donations` table.\n\n2. **Identify Repeat Donors:**\n   - We need to find donors who have made more than one donation. This can be achieved by grouping the donations by the `Donor` column and using the `HAVING` clause to filter groups with a count greater than one.\n\n3. **Calculate Total Donation Value from Repeat Donors:**\n   - We need to sum up the donation amounts for the donors identified in the previous step.\n\n4. **Compute the Percentage:**\n   - The percentage of total donation value from repeat donors can be calculated by dividing the total donation amount from repeat donors by the total donation amount and multiplying by 100.\n\n5. **Count the Number of Repeat Donors:**\n   - We need to count the number of unique repeat donors.\n\n### SQL Query Construction:\n\n- **Step 1:** Calculate the total donation value.\n- **Step 2:** Identify repeat donors.\n- **Step 3:** Calculate the total donation value from repeat donors.\n- **Step 4:** Compute the percentage and count the number of repeat donors.\n\nHere is the final SQL query:\n\n```sql\nWITH TotalDonations AS (\n    SELECT SUM(\"Amount\") AS TotalAmount\n    FROM \"donations\"\n),\nRepeatDonors AS (\n    SELECT \"Donor\"\n    FROM \"donations\"\n    GROUP BY \"Donor\"\n    HAVING COUNT(*) > 1\n),\nRepeatDonations AS (\n    SELECT SUM(\"Amount\") AS RepeatTotalAmount\n    FROM \"donations\"\n    WHERE \"Donor\" IN (SELECT \"Donor\" FROM RepeatDonors)\n)\nSELECT \n    (rd.RepeatTotalAmount * 100.0 / NULLIF(td.TotalAmount, 0)) AS PercentageFromRepeatDonors,\n    COUNT(rd2.\"Donor\") AS RepeatDonorCount\nFROM \n    TotalDonations td,\n    RepeatDonations rd,\n    RepeatDonors rd2;\n```\n\n### Explanation:\n- **TotalDonations CTE:** Computes the total donation amount.\n- **RepeatDonors CTE:** Identifies donors who have made more than one donation.\n- **RepeatDonations CTE:** Computes the total donation amount from repeat donors.\n- **Final SELECT Statement:** Calculates the percentage of total donation value from repeat donors and counts the number of repeat donors.\n\nThis query efficiently calculates the required metrics using Common Table Expressions (CTEs) for clarity and separation of concerns.",
+      "api": {
+        "id": "chatcmpl-kJJ1L0qzIijatei4CvlSiHnHPXFct42Q",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 634,
+          "prompt_tokens": 448,
+          "total_tokens": 1082,
+          "prompt_tokens_details": {
+            "cached_tokens": 361
+          }
+        },
+        "duration_seconds": 23.522
+      },
+      "duration_seconds": 23.524,
+      "error": "BinderException: Binder Error: column \"RepeatTotalAmount\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(RepeatTotalAmount)\" if the exact value of \"RepeatTotalAmount\" is not important.\n\nLINE 1: ...\" WHERE \"Donor\" IN (SELECT \"Donor\" FROM RepeatDonors)) SELECT (rd.RepeatTotalAmount * 100.0 / NULLIF(NULLIF(td.TotalAmount...\n                                                                          ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

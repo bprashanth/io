@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#123a2e">
+<meta name="description" content="Offline daily attendance for our tuition kids.">
+<title>Tuition Attendance</title>
+<style>
+  :root{
+    --paper:#f4f1e8; --paper-2:#ece7d8; --card:#fffdf7;
+    --ink:#1c2a24; --ink-soft:#5c6b62;
+    --green:#1f7a4d; --green-deep:#123a2e; --green-soft:#e2efe6;
+    --amber:#c98a1e; --amber-soft:#f6ecd6;
+    --red:#b23a2e; --red-soft:#f4e0dc;
+    --line:#dcd6c6; --line-2:#c9c2ad;
+    --shadow:0 1px 2px rgba(28,42,36,.06), 0 10px 26px rgba(28,42,36,.08);
+    --radius:14px;
+    --font-display:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --font-body:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--font-body); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(1200px 500px at 100% -10%, rgba(31,122,77,.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(201,138,30,.06), transparent 60%);
+    background-attachment:fixed;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:0 16px 60px}
+
+  /* ---------- Masthead ---------- */
+  .masthead{
+    position:relative; overflow:hidden;
+    background:linear-gradient(160deg,#123a2e,#1c5a41 70%,#206a4c);
+    color:#f4f1e8; padding:22px 18px 20px;
+    border-bottom:3px solid var(--amber);
+  }
+  .masthead::before{
+    content:""; position:absolute; inset:0;
+    background-image:radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size:14px 14px; opacity:.5; pointer-events:none;
+  }
+  .mast-top{display:flex; align-items:center; justify-content:space-between; gap:12px; position:relative}
+  .brand{display:flex; align-items:center; gap:12px}
+  .mark{
+    width:46px; height:46px; flex:0 0 auto; border-radius:12px;
+    background:var(--amber); color:#123a2e; display:grid; place-items:center;
+    font-family:var(--font-display); font-weight:700; font-size:26px;
+    box-shadow:inset 0 -3px 0 rgba(0,0,0,.15);
+  }
+  .brand h1{font-family:var(--font-display); font-size:26px; margin:0; letter-spacing:.2px; line-height:1.05}
+  .brand .sub{font-size:12.5px; color:#cfe0d6; margin-top:2px; letter-spacing:.3px}
+  .status{
+    display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600;
+    background:rgba(255,255,255,.12); padding:6px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .status .dot{width:9px; height:9px; border-radius:50%; background:#7fd6a0; box-shadow:0 0 0 3px rgba(127,214,160,.25)}
+  .status.off .dot{background:#f0b45a; box-shadow:0 0 0 3px rgba(240,180,90,.25)}
+  .status.busy .dot{background:#9fb0a8; box-shadow:none; animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+
+  .datebar{
+    position:relative; margin-top:18px; display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap;
+  }
+  .datebar .day{font-family:var(--font-display); font-size:34px; line-height:1; font-weight:700}
+  .datebar .dow{font-size:13px; color:#cfe0d6; letter-spacing:1.5px; text-transform:uppercase; margin-top:4px}
+  .datebar .count{
+    text-align:right; font-family:var(--font-mono); font-size:13px; color:#e9f2ec;
+    background:rgba(0,0,0,.18); padding:8px 12px; border-radius:10px;
+  }
+  .datebar .count b{font-size:20px; color:#fff; display:block; line-height:1}
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    position:sticky; top:0; z-index:20; display:flex; gap:4px;
+    background:var(--paper); padding:10px 0 8px; border-bottom:1px solid var(--line);
+  }
+  .tab{
+    flex:1; border:0; background:transparent; cursor:pointer; font-family:var(--font-body);
+    font-size:14px; font-weight:600; color:var(--ink-soft); padding:10px 6px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center; gap:7px; transition:background .15s,color .15s;
+  }
+  .tab .n{font-family:var(--font-mono); font-size:11px; background:var(--paper-2); color:var(--ink-soft); padding:1px 7px; border-radius:999px}
+  .tab[aria-selected="true"]{background:var(--green-deep); color:#fff}
+  .tab[aria-selected="true"] .n{background:rgba(255,255,255,.18); color:#fff}
+  .tab:active{transform:translateY(1px)}
+
+  .panel{display:none; padding-top:18px}
+  .panel.active{display:block; animation:fade .25s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:16px; margin-bottom:16px;
+  }
+  .card h2{font-family:var(--font-display); font-size:19px; margin:0 0 4px}
+  .card .hint{font-size:13px; color:var(--ink-soft); margin:0 0 14px}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    font-family:var(--font-body); font-size:14px; font-weight:600; cursor:pointer;
+    border:1px solid var(--line-2); background:var(--card); color:var(--ink);
+    padding:10px 14px; border-radius:10px; transition:transform .08s, box-shadow .15s, background .15s;
+  }
+  .btn:hover{box-shadow:0 3px 10px rgba(28,42,36,.12)}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--green); border-color:var(--green); color:#fff}
+  .btn.primary:hover{background:#1a6a43}
+  .btn.ghost{background:transparent}
+  .btn.danger{color:var(--red); border-color:#e2b7b1}
+  .btn.danger:hover{background:var(--red-soft)}
+  .btn.sm{padding:7px 11px; font-size:13px}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .row.spread{justify-content:space-between}
+
+  /* ---------- Attendance list ---------- */
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px}
+  .toolbar .grow{flex:1; min-width:150px}
+  input[type="search"], input[type="text"], input[type="date"], select{
+    font-family:var(--font-body); font-size:15px; color:var(--ink);
+    background:var(--card); border:1px solid var(--line-2); border-radius:10px; padding:10px 12px; width:100%;
+  }
+  input:focus, select:focus{outline:2px solid var(--green); outline-offset:1px; border-color:var(--green)}
+
+  .list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+  .kid{
+    display:flex; align-items:center; gap:12px; background:var(--card);
+    border:1px solid var(--line); border-radius:12px; padding:10px 12px;
+    transition:box-shadow .15s, border-color .15s, transform .08s;
+  }
+  .kid:hover{box-shadow:var(--shadow); border-color:var(--line-2)}
+  .kid .avatar{
+    width:40px; height:40px; flex:0 0 auto; border-radius:50%; display:grid; place-items:center;
+    font-family:var(--font-display); font-weight:700; font-size:16px; color:#fff;
+  }
+  .kid .who{flex:1; min-width:0}
+  .kid .name{font-weight:600; font-size:15.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .kid .meta{font-size:12px; color:var(--ink-soft); font-family:var(--font-mono)}
+  .kid .meta .st{font-family:var(--font-body); font-weight:600}
+  .kid .meta .st.p{color:var(--green)} .kid .meta .st.a{color:var(--red)}
+
+  .seg{display:flex; border:1px solid var(--line-2); border-radius:10px; overflow:hidden; flex:0 0 auto}
+  .seg button{
+    border:0; background:var(--card); cursor:pointer; font-family:var(--font-body);
+    font-size:13px; font-weight:600; padding:9px 12px; color:var(--ink-soft); min-width:52px;
+    transition:background .12s,color .12s;
+  }
+  .seg button + button{border-left:1px solid var(--line-2)}
+  .seg button.p.on{background:var(--green); color:#fff}
+  .seg button.a.on{background:var(--red); color:#fff}
+  .seg button:active{transform:translateY(1px)}
+
+  .empty{
+    text-align:center; padding:40px 20px; color:var(--ink-soft);
+    border:2px dashed var(--line-2); border-radius:var(--radius); background:var(--card);
+  }
+  .empty .big{font-family:var(--font-display); font-size:20px; color:var(--ink); margin-bottom:6px}
+
+  /* ---------- Summary ---------- */
+  .monthnav{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+  .monthnav .label{flex:1; text-align:center; font-family:var(--font-display); font-size:20px; font-weight:700}
+  .monthnav .btn{flex:0 0 auto}
+  .statgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px}
+  .stat{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center}
+  .stat .v{font-family:var(--font-mono); font-size:26px; font-weight:700; line-height:1}
+  .stat .l{font-size:11.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.6px; margin-top:5px}
+  .stat.p .v{color:var(--green)} .stat.a .v{color:var(--red)} .stat.t .v{color:var(--ink)}
+
+  .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--card)}
+  table{border-collapse:collapse; width:100%; font-size:13px; min-width:520px}
+  th,td{padding:8px 6px; text-align:center; border-bottom:1px solid var(--line)}
+  th{font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.4px; background:var(--paper-2); position:sticky; top:0}
+  td.name, th.name{text-align:left; font-weight:600; white-space:nowrap; padding-left:12px; position:sticky; left:0; background:var(--card); z-index:1}
+  th.name{background:var(--paper-2)}
+  td .cell{width:24px; height:24px; border-radius:6px; display:inline-grid; place-items:center; font-size:12px; font-weight:700}
+  .cell.p{background:var(--green-soft); color:var(--green)}
+  .cell.a{background:var(--red-soft); color:var(--red)}
+  .cell.n{color:var(--line-2)}
+  td.rate{font-family:var(--font-mono); font-weight:700}
+  td.rate.good{color:var(--green)} td.rate.mid{color:var(--amber)} td.rate.low{color:var(--red)}
+  tr:last-child td{border-bottom:0}
+
+  /* ---------- Roster ---------- */
+  .addform{display:flex; gap:8px; margin-bottom:14px}
+  .addform input{flex:1}
+  .roster{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+  .roster li{display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px}
+  .roster .avatar{width:38px; height:38px; flex:0 0 auto; border-radius:50%; display:grid; place-items:center; font-family:var(--font-display); font-weight:700; color:#fff}
+  .roster .name{flex:1; font-weight:600; font-size:15px}
+  .roster .idx{font-family:var(--font-mono); font-size:12px; color:var(--ink-soft)}
+  .roster .del{border:0; background:transparent; color:var(--red); cursor:pointer; font-size:13px; font-weight:600; padding:6px 8px; border-radius:8px}
+  .roster .del:hover{background:var(--red-soft)}
+
+  .foot{margin-top:26px; text-align:center; font-size:12px; color:var(--ink-soft)}
+  .foot .lock{display:inline-flex; align-items:center; gap:6px; background:var(--card); border:1px solid var(--line); padding:6px 12px; border-radius:999px}
+
+  @media (max-width:420px){
+    .brand h1{font-size:22px}
+    .datebar .day{font-size:28px}
+    .statgrid{grid-template-columns:repeat(3,1fr)}
+    .stat .v{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="mast-top">
+      <div class="brand">
+        <div class="mark">T</div>
+        <div>
+          <h1>Tuition Attendance</h1>
+          <div class="sub">Daily check-in for our kids</div>
+        </div>
+      </div>
+      <span class="status" id="status"><span class="dot"></span><span id="statusText">Ready</span></span>
+    </div>
+    <div class="datebar">
+      <div>
+        <div class="day" id="todayDay">—</div>
+        <div class="dow" id="todayDow">—</div>
+      </div>
+      <div class="count"><b id="todayCount">0</b>present today</div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" data-tab="today" aria-selected="true">Today <span class="n" id="nToday">0</span></button>
+    <button class="tab" role="tab" data-tab="summary" aria-selected="false">Monthly</button>
+    <button class="tab" role="tab" data-tab="roster" aria-selected="false">Roster <span class="n" id="nRoster">0</span></button>
+  </nav>
+
+  <!-- TODAY -->
+  <section class="panel active" id="panel-today" role="tabpanel">
+    <div class="card">
+      <h2>Mark today's attendance</h2>
+      <p class="hint">Tap <b>Present</b> or <b>Absent</b> for each child. It saves on this phone automatically.</p>
+      <div class="toolbar">
+        <input type="search" id="search" class="grow" placeholder="Search a name…" aria-label="Search a name">
+        <button class="btn primary" id="allPresent">All present</button>
+        <button class="btn ghost" id="clearDay">Clear</button>
+      </div>
+      <ul class="list" id="list"></ul>
+      <div class="empty" id="emptyToday" style="display:none">
+        <div class="big">No children yet</div>
+        Add your kids on the <b>Roster</b> tab, then come back to mark attendance.
+      </div>
+    </div>
+  </section>
+
+  <!-- SUMMARY -->
+  <section class="panel" id="panel-summary" role="tabpanel">
+    <div class="card">
+      <h2>Monthly summary</h2>
+      <p class="hint">Attendance for each child across the month.</p>
+      <div class="monthnav">
+        <button class="btn sm" id="prevMonth" aria-label="Previous month">‹</button>
+        <div class="label" id="monthLabel">—</div>
+        <button class="btn sm" id="nextMonth" aria-label="Next month">›</button>
+      </div>
+      <div class="statgrid">
+        <div class="stat p"><div class="v" id="sPresent">0</div><div class="l">Present</div></div>
+        <div class="stat a"><div class="v" id="sAbsent">0</div><div class="l">Absent</div></div>
+        <div class="stat t"><div class="v" id="sRate">—</div><div class="l">Avg rate</div></div>
+      </div>
+      <div class="tablewrap">
+        <table id="summaryTable">
+          <thead><tr id="sumHead"></tr></thead>
+          <tbody id="sumBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptySummary" style="display:none">
+        <div class="big">Nothing to show</div>
+        Add children on the <b>Roster</b> tab to build a summary.
+      </div>
+    </div>
+  </section>
+
+  <!-- ROSTER -->
+  <section class="panel" id="panel-roster" role="tabpanel">
+    <div class="card">
+      <h2>Children on the roster</h2>
+      <p class="hint">Type each name once. You can add or remove them any time.</p>
+      <form class="addform" id="addForm">
+        <input type="text" id="newName" placeholder="Child's name" autocomplete="off" aria-label="Child's name">
+        <button class="btn primary" type="submit">Add</button>
+      </form>
+      <ul class="roster" id="rosterList"></ul>
+      <div class="empty" id="emptyRoster" style="display:none">
+        <div class="big">Roster is empty</div>
+        Add your first child above.
+      </div>
+    </div>
+    <div class="card">
+      <h2>Your data</h2>
+      <p class="hint">Everything is stored on this phone. Back it up by exporting, or restore from a backup file.</p>
+      <div class="row">
+        <button class="btn" id="exportBtn">Export backup</button>
+        <button class="btn" id="importBtn">Import backup</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none">
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn danger" id="resetBtn">Erase all data</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span class="lock">🔒 Works offline · saved on this device</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Storage ---------- */
+  var KEY = "tuition.attendance.v1";
+  var store = {
+    get: function(){
+      try { return JSON.parse(localStorage.getItem(KEY)) || null; }
+      catch(e){ return null; }
+    },
+    set: function(v){ try { localStorage.setItem(KEY, JSON.stringify(v)); } catch(e){} }
+  };
+
+  // Seed from window.data if provided (names typed once, or a full dataset).
+  function seed(){
+    var d = (typeof window !== "undefined" && window.data) ? window.data : null;
+    if (d && Array.isArray(d.names) && d.names.length){
+      return { kids: d.names.map(function(n){ return { id: uid(), name: String(n) }; }), records: {} };
+    }
+    if (d && Array.isArray(d.kids) && d.kids.length){
+      return { kids: d.kids, records: d.records || {} };
+    }
+    return { kids: [], records: {} };
+  }
+
+  var state = store.get() || seed();
+  if (!store.get()) store.set(state);
+
+  function uid(){
+    return "k" + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+  function save(){ store.set(state); }
+
+  /* ---------- Date helpers ---------- */
+  function pad(n){ return (n < 10 ? "0" : "") + n; }
+  function ymd(d){ return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+  function todayStr(){ return ymd(new Date()); }
+  function monthKey(d){ return d.getFullYear() + "-" + pad(d.getMonth()+1); }
+  function daysInMonth(y, m){ return new Date(y, m+1, 0).getDate(); }
+  function monthLabel(y, m){
+    return new Date(y, m, 1).toLocaleString("

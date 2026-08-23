@@ -1,0 +1,135 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BENEFICIARY REGISTRATION</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"BENEFICIARY REGISTRATION","short_name":"REG","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>BENEFICIARY REGISTRATION</h1></header>
+<main>
+<div class="grid">
+  <div class="card">
+    <h2>Register New Beneficiary</h2>
+    <form id="regForm">
+      <label for="name">Full Name</label>
+      <input type="text" id="name" required>
+
+      <label for="age">Age</label>
+      <input type="number" id="age" min="0" max="120" required>
+
+      <label for="village">Village</label>
+      <input type="text" id="village" required>
+
+      <label for="phone">Phone Number</label>
+      <input type="tel" id="phone" required>
+
+      <label for="category">Category</label>
+      <select id="category" required>
+        <option value="">Select Category</option>
+        <option value="elderly">Elderly</option>
+        <option value="disabled">Disabled</option>
+        <option value="minor">Minor</option>
+        <option value="pregnant">Pregnant Woman</option>
+        <option value="low_income">Low Income</option>
+      </select>
+
+      <div class="row">
+        <button type="submit">Save Entry</button>
+        <button type="button" class="secondary" id="exportBtn">Download CSV</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Registered Beneficiaries</h2>
+    <div id="listContainer"></div>
+  </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+const form = document.getElementById('regForm');
+const listContainer = document.getElementById('listContainer');
+const exportBtn = document.getElementById('exportBtn');
+
+// Load data on startup
+let beneficiaries = store.get('beneficiaries', []);
+renderList();
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  
+  const name = document.getElementById('name').value.trim();
+  const age = parseInt(document.getElementById('age').value, 10);
+  const village = document.getElementById('village').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const category = document.getElementById('category').value;
+
+  // Validation
+  if (!name || !age || !village || !phone || !category) {
+    alert('Please fill in all fields.');
+    return;
+  }
+  if (age < 0 || age > 120) {
+    alert('Please enter a valid age (0-120).');
+    return;
+  }
+  if (!/^\+?[\d\s-]{7,}$/.test(phone)) {
+    alert('Please enter a valid phone number.');
+    return;
+  }
+
+  const entry = {
+    id: Date.now(),
+    name,
+    age,
+    village,
+    phone,
+    category,
+    date: new Date().toLocaleDateString()
+  };
+
+  beneficiaries.push(entry);
+  store.set('beneficiaries', beneficiaries);
+  
+  // Reset form
+  form.reset();
+  renderList();
+});
+
+function renderList() {
+  if (beneficiaries.length === 0) {
+    listContainer.innerHTML = '<p class="muted">No beneficiaries registered yet.</p>';
+    return;
+  }
+
+  let html = '<table><thead><tr><th>Name</th><th>Age</th><th>Village</th><th>Phone</th><th>Category</th><th>Date</th></tr></thead><tbody>';
+  
+  beneficiaries.forEach(b => {
+    html += `<tr>
+      <td>${b.name}</td>
+      <td>${b.age}</td>
+      <td>${b.village}</td>
+      <td>${b.phone}</td>
+      <td><span class="muted">${b.category}</span></td>
+      <td>${b.date}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  listContainer.innerHTML = html;
+}
+
+exportBtn.addEventListener('click', () => {
+  const csvContent = toCSV(beneficiaries);
+  download('beneficiaries.csv', csvContent, 'text/csv');
+});
+</script>
+</body></html>

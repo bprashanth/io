@@ -4,6 +4,6 @@ set -e
 cd "$(dirname "$0")"
 python3 -m venv .venv
 .venv/bin/pip install --quiet --upgrade pip
-.venv/bin/pip install --quiet duckdb pandas openpyxl sqlglot
+.venv/bin/pip install --quiet duckdb pandas openpyxl sqlglot esprima
 npm install --silent
 echo "Done. Start with: npm start"

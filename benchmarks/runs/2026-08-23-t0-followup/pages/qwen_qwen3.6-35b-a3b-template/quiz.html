@@ -1,0 +1,161 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hand Washing Quiz</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.quiz-option { display: block; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: background 0.2s; }
+.quiz-option:hover { background: #f9fafb; }
+.quiz-option input { width: auto; margin-right: 10px; }
+.quiz-option.selected { border-color: var(--accent); background: #eff6ff; }
+.score-box { text-align: center; padding: 20px; }
+.score-number { font-size: 48px; font-weight: bold; color: var(--accent); display: block; margin: 10px 0; }
+</style></head><body>
+<header><h1>Hand Washing Quiz</h1></header>
+<main>
+<div id="quiz-container">
+    <div id="question-area"></div>
+    <div class="row" style="margin-top: 20px; justify-content: flex-end;">
+        <button id="next-btn" class="secondary">Next Question</button>
+        <button id="submit-btn" style="display:none;">Finish Quiz</button>
+    </div>
+</div>
+<div id="result-area" style="display:none;">
+    <div class="card score-box">
+        <h2>Quiz Complete!</h2>
+        <p>You scored:</p>
+        <span class="score-number" id="final-score">0</span>
+        <p id="score-message" class="muted"></p>
+        <button id="retry-btn" style="margin-top: 15px;">Try Again</button>
+    </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+(function() {
+    // Default data if window.data is not provided
+    const defaultQuestions = [
+        { q: "When should you wash your hands?", options: ["Before eating", "After using the toilet", "Both A and B", "Only when dirty"], a: 2 },
+        { q: "How long should you scrub your hands with soap?", options: ["5 seconds", "20 seconds", "1 minute", "10 seconds"], a: 1 },
+        { q: "What helps remove germs from under fingernails?", options: ["Rinsing with water", "Scrubbing with a nail brush", "Using hand sanitizer only", "Blowing on them"], a: 1 },
+        { q: "When is the best time to wash hands after playing outside?", options: ["Never", "Before dinner", "Immediately upon coming in", "Once a week"], a: 2 },
+        { q: "Why is soap important for washing hands?", options: ["It smells good", "It breaks down germs", "It makes hands soft", "It is colorful"], a: 1 }
+    ];
+
+    const questions = window.data && window.data.questions ? window.data.questions : defaultQuestions;
+    
+    let currentIdx = 0;
+    let score = 0;
+    let userAnswers = [];
+
+    const qArea = document.getElementById('question-area');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const quizContainer = document.getElementById('quiz-container');
+    const resultArea = document.getElementById('result-area');
+    const finalScore = document.getElementById('final-score');
+    const scoreMessage = document.getElementById('score-message');
+    const retryBtn = document.getElementById('retry-btn');
+
+    function renderQuestion() {
+        const q = questions[currentIdx];
+        let html = `<div class="card"><h3>Question ${currentIdx + 1} of ${questions.length}</h3>`;
+        html += `<p style="font-size:18px; margin-bottom:15px;">${q.q}</p>`;
+        
+        q.options.forEach((opt, i) => {
+            html += `
+                <label class="quiz-option" onclick="selectOption(this, ${i})">
+                    <input type="radio" name="q${currentIdx}" value="${i}">
+                    ${opt}
+                </label>
+            `;
+        });
+        html += `</div>`;
+        qArea.innerHTML = html;
+        
+        // Reset buttons
+        nextBtn.style.display = 'inline-block';
+        submitBtn.style.display = 'none';
+        
+        if (currentIdx === questions.length - 1) {
+            nextBtn.style.display = 'none';
+            submitBtn.style.display = 'inline-block';
+        }
+    }
+
+    // Exposed to global scope for inline onclick
+    window.selectOption = function(labelEl, val) {
+        // Remove selected class from siblings
+        const parent = labelEl.parentElement;
+        const options = parent.querySelectorAll('.quiz-option');
+        options.forEach(o => o.classList.remove('selected'));
+        
+        // Add to clicked
+        labelEl.classList.add('selected');
+        labelEl.querySelector('input').checked = true;
+    };
+
+    function handleNext() {
+        const selected = document.querySelector(`input[name="q${currentIdx}"]:checked`);
+        if (!selected) {
+            alert("Please select an answer!");
+            return;
+        }
+        
+        const answerVal = parseInt(selected.value);
+        userAnswers[currentIdx] = answerVal;
+        
+        if (answerVal === questions[currentIdx].a) {
+            score++;
+        }
+        
+        currentIdx++;
+        if (currentIdx < questions.length) {
+            renderQuestion();
+        } else {
+            showResults();
+        }
+    }
+
+    function showResults() {
+        quizContainer.style.display = 'none';
+        resultArea.style.display = 'block';
+        finalScore.textContent = `${score} / ${questions.length}`;
+        
+        const percentage = (score / questions.length) * 100;
+        if (percentage === 100) {
+            scoreMessage.textContent = "Perfect! You are a Hand Washing Hero!";
+        } else if (percentage >= 60) {
+            scoreMessage.textContent = "Good job! Keep washing those hands!";
+        } else {
+            scoreMessage.textContent = "Keep practicing! Hygiene is important.";
+        }
+        
+        // Save score to local storage
+        store.set('quiz_last_score', { score, total: questions.length, date: new Date().toISOString() });
+    }
+
+    function resetQuiz() {
+        currentIdx = 0;
+        score = 0;
+        userAnswers = [];
+        quizContainer.style.display = 'block';
+        resultArea.style.display = 'none';
+        renderQuestion();
+    }
+
+    nextBtn.addEventListener('click', handleNext);
+    submitBtn.addEventListener('click', handleNext);
+    retryBtn.addEventListener('click', resetQuiz);
+
+    // Initialize
+    renderQuestion();
+})();
+</script>
+</body></html>

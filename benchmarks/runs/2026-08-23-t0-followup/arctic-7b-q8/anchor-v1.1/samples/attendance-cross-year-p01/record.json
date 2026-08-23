@@ -1,0 +1,98 @@
+{
+  "id": "attendance-cross-year-p01",
+  "task_id": "attendance-cross-year",
+  "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+  "question": "centre wise attendance percentage for 2023 and 2024 side by side - average of the monthly rates",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+  "expected_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH MonthlyAttendance2023 AS (SELECT Centre, (CAST(Avg_Daily_Present AS REAL) / NULLIF(NULLIF(Enrolled_Kids, 0), 0)) * 100 AS Monthly_Attendance_Percentage FROM attendance_2023), MonthlyAttendance2024 AS (SELECT centre_name, (CAST(average_attendance AS REAL) / NULLIF(NULLIF(enrolment, 0), 0)) * 100 AS Monthly_Attendance_Percentage FROM attendance_2024), AverageAttendance2023 AS (SELECT Centre, AVG(Monthly_Attendance_Percentage) AS Average_Attendance_Percentage_2023 FROM MonthlyAttendance2023 GROUP BY Centre), AverageAttendance2024 AS (SELECT centre_name, AVG(Monthly_Attendance_Percentage) AS Average_Attendance_Percentage_2024 FROM MonthlyAttendance2024 GROUP BY centre_name) SELECT a23.Centre, a23.Average_Attendance_Percentage_2023, a24.Average_Attendance_Percentage_2024 FROM AverageAttendance2023 AS a23 JOIN AverageAttendance2024 AS a24 ON a23.Centre = a24.centre_name",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncentre wise attendance percentage for 2023 and 2024 side by side - average of the monthly rates",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to focus on calculating the average attendance percentage for each centre for both 2023 and 2024. The question asks for a side-by-side comparison of the average attendance percentages for each centre across the two years.\n\nHere's the step-by-step reasoning:\n\n1. **Calculate Monthly Attendance Percentage for 2023**: For each centre and month, calculate the attendance percentage as `(Avg Daily Present / Enrolled Kids) * 100`.\n2. **Calculate Monthly Attendance Percentage for 2024**: Similarly, for each centre and month, calculate the attendance percentage as `(Average Attendance / Enrolment) * 100`.\n3. **Aggregate Monthly Percentages**: Compute the average of these monthly percentages for each centre.\n4. **Combine Results**: Join the results from both years on the centre name to present the average attendance percentages side by side.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nWITH MonthlyAttendance2023 AS (\n    SELECT \n        Centre,\n        (CAST(Avg_Daily_Present AS REAL) / Enrolled_Kids) * 100 AS attendance_percentage\n    FROM attendance_2023\n),\nMonthlyAttendance2024 AS (\n    SELECT \n        centre_name,\n        (CAST(average_attendance AS REAL) / enrolment) * 100 AS attendance_percentage\n    FROM attendance_2024\n),\nAverageAttendance2023 AS (\n    SELECT \n        Centre,\n        AVG(attendance_percentage) AS avg_attendance_percentage_2023\n    FROM MonthlyAttendance2023\n    GROUP BY Centre\n),\nAverageAttendance2024 AS (\n    SELECT \n        centre_name,\n        AVG(attendance_percentage) AS avg_attendance_percentage_2024\n    FROM MonthlyAttendance2024\n    GROUP BY centre_name\n)\nSELECT \n    a23.Centre,\n    a23.avg_attendance_percentage_2023,\n    a24.avg_attendance_percentage_2024\nFROM AverageAttendance2023 a23\nJOIN AverageAttendance2024 a24 ON a23.Centre = a24.centre_name\nORDER BY a23.Centre;\n```\n\n### Explanation:\n- **MonthlyAttendance2023**: This CTE calculates the attendance percentage for each month in 2023.\n- **MonthlyAttendance2024**: This CTE calculates the attendance percentage for each month in 2024.\n- **AverageAttendance2023**: This CTE computes the average attendance percentage for each centre in 2023.\n- **AverageAttendance2024**: This CTE computes the average attendance percentage for each centre in 2024.\n- **Final SELECT**: Joins the average attendance percentages from both years on the centre name and orders the results by centre name.\n\nThis query provides a clear and concise solution to the problem, ensuring that the average attendance percentages for each centre are compared side by side for both years.",
+      "api": {
+        "id": "chatcmpl-DQGcfjDpur1JVBY2dQVVYVYeqnmiGvO3",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 651,
+          "prompt_tokens": 553,
+          "total_tokens": 1204,
+          "prompt_tokens_details": {
+            "cached_tokens": 192
+          }
+        },
+        "duration_seconds": 24.201
+      },
+      "duration_seconds": 24.203,
+      "error": "BinderException: Binder Error: Referenced column \"Avg_Daily_Present\" not found in FROM clause!\nCandidate bindings: \"Avg Daily Present\"\n\nLINE 1: ...XPLAIN WITH MonthlyAttendance2023 AS (SELECT Centre, (CAST(Avg_Daily_Present AS REAL) / NULLIF(Enrolled_Kids, 0)) ...\n                                                                      ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncentre wise attendance percentage for 2023 and 2024 side by side - average of the monthly rates\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"Avg_Daily_Present\" not found in FROM clause!\nCandidate bindings: \"Avg Daily Present\"\n\nLINE 1: ...XPLAIN WITH MonthlyAttendance2023 AS (SELECT Centre, (CAST(Avg_Daily_Present AS REAL) / NULLIF(Enrolled_Kids, 0)) ...\n                                                                      ^\nReturn a complete corrected query.",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to focus on calculating the average attendance percentage for each centre for both 2023 and 2024. The question asks for a side-by-side comparison of the average monthly attendance percentages for each centre.\n\nHere's the step-by-step reasoning:\n\n1. **Calculate Monthly Attendance Percentage for 2023**: We need to calculate the average attendance percentage for each centre for each month in 2023. This involves dividing the average daily present by the number of enrolled kids and multiplying by 100.\n\n2. **Calculate Monthly Attendance Percentage for 2024**: Similarly, we need to calculate the average attendance percentage for each centre for each month in 2024.\n\n3. **Aggregate Monthly Percentages**: We then need to average these monthly percentages for each centre.\n\n4. **Combine Results**: Finally, we combine the results for 2023 and 2024 for each centre.\n\nHere is the SQL query that accomplishes this:\n\n```sql\nWITH MonthlyAttendance2023 AS (\n    SELECT \n        Centre,\n        (CAST(Avg_Daily_Present AS REAL) / NULLIF(Enrolled_Kids, 0)) * 100 AS Monthly_Attendance_Percentage\n    FROM attendance_2023\n),\nMonthlyAttendance2024 AS (\n    SELECT \n        centre_name,\n        (CAST(average_attendance AS REAL) / NULLIF(enrolment, 0)) * 100 AS Monthly_Attendance_Percentage\n    FROM attendance_2024\n),\nAverageAttendance2023 AS (\n    SELECT \n        Centre,\n        AVG(Monthly_Attendance_Percentage) AS Average_Attendance_Percentage_2023\n    FROM MonthlyAttendance2023\n    GROUP BY Centre\n),\nAverageAttendance2024 AS (\n    SELECT \n        centre_name,\n        AVG(Monthly_Attendance_Percentage) AS Average_Attendance_Percentage_2024\n    FROM MonthlyAttendance2024\n    GROUP BY centre_name\n)\nSELECT \n    a23.Centre,\n    a23.Average_Attendance_Percentage_2023,\n    a24.Average_Attendance_Percentage_2024\nFROM AverageAttendance2023 a23\nJOIN AverageAttendance2024 a24 ON a23.Centre = a24.centre_name;\n```\n\n### Explanation:\n- **MonthlyAttendance2023**: This CTE calculates the monthly attendance percentage for each centre in 2023.\n- **MonthlyAttendance2024**: This CTE calculates the monthly attendance percentage for each centre in 2024.\n- **AverageAttendance2023**: This CTE calculates the average attendance percentage for each centre over all months in 2023.\n- **AverageAttendance2024**: This CTE calculates the average attendance percentage for each centre over all months in 2024.\n- **Final SELECT**: This combines the average attendance percentages for each centre from both years.\n\nThis query ensures that we correctly calculate and compare the average attendance percentages for each centre between 2023 and 2024.",
+      "api": {
+        "id": "chatcmpl-RzyNcPyzEc74mY0bE4vzf1EbP5WlSKY6",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 686,
+          "prompt_tokens": 640,
+          "total_tokens": 1326,
+          "prompt_tokens_details": {
+            "cached_tokens": 548
+          }
+        },
+        "duration_seconds": 25.454
+      },
+      "duration_seconds": 25.456,
+      "error": "BinderException: Binder Error: Referenced column \"Avg_Daily_Present\" not found in FROM clause!\nCandidate bindings: \"Avg Daily Present\"\n\nLINE 1: ...XPLAIN WITH MonthlyAttendance2023 AS (SELECT Centre, (CAST(Avg_Daily_Present AS REAL) / NULLIF(NULLIF(Enrolled_Kids...\n                                                                      ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

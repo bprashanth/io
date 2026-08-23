@@ -1,0 +1,184 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Health Camp — 14 September</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Health Camp — 14 September</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+offlineReady();
+
+const KEY = 'healthcamp.signups';
+const EVENT = {
+  title: 'Community Health Camp',
+  date: '2025-09-14T09:00:00',
+  venue: 'Community Hall, Main Street',
+  services: ['Blood pressure check', 'Blood sugar test', 'Free general consultation', 'Nutrition advice']
+};
+
+const main = document.querySelector('main');
+main.innerHTML = `
+  <section class="card">
+    <h2 style="margin-top:0">${EVENT.title}</h2>
+    <p class="muted">Saturday, 14 September 2025 · 9:00 AM · ${EVENT.venue}</p>
+    <div class="grid" id="countdown"></div>
+    <p class="muted" id="cd-note"></p>
+    <div class="row" id="services"></div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">Sign up</h2>
+    <form id="signup" novalidate>
+      <div class="grid">
+        <div><label for="name">Full name</label><input id="name" name="name" required autocomplete="name"></div>
+        <div><label for="phone">Phone</label><input id="phone" name="phone" type="tel" required autocomplete="tel"></div>
+        <div><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email"></div>
+        <div><label for="age">Age</label><input id="age" name="age" type="number" min="0" max="120"></div>
+      </div>
+      <label for="service">Service you need</label>
+      <select id="service" name="service"></select>
+      <label for="notes">Notes (optional)</label>
+      <textarea id="notes" name="notes" rows="2"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button type="submit">Sign up</button>
+        <button type="button" class="secondary" id="export">Export CSV</button>
+      </div>
+      <p class="muted" id="msg" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">Who has signed up <span class="muted" id="count"></span></h2>
+    <div id="list"></div>
+  </section>
+`;
+
+const cd = document.getElementById('countdown');
+const cdNote = document.getElementById('cd-note');
+const servicesEl = document.getElementById('services');
+const serviceSel = document.getElementById('service');
+const form = document.getElementById('signup');
+const msg = document.getElementById('msg');
+const listEl = document.getElementById('list');
+const countEl = document.getElementById('count');
+
+EVENT.services.forEach(s => {
+  const chip = document.createElement('span');
+  chip.className = 'muted';
+  chip.textContent = '• ' + s;
+  servicesEl.appendChild(chip);
+  const opt = document.createElement('option');
+  opt.value = s; opt.textContent = s;
+  serviceSel.appendChild(opt);
+});
+
+function load() { return store.get(KEY, []); }
+function save(rows) { store.set(KEY, rows); }
+
+function render() {
+  const rows = load();
+  countEl.textContent = rows.length ? '(' + rows.length + ')' : '';
+  if (!rows.length) {
+    listEl.innerHTML = '<p class="muted">No signups yet — be the first!</p>';
+    return;
+  }
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>Name</th><th>Phone</th><th>Age</th><th>Service</th><th>Notes</th><th></th></tr></thead>';
+  const tb = document.createElement('tbody');
+  rows.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    const cells = [r.name, r.phone, r.age, r.service, r.notes];
+    cells.forEach(v => {
+      const td = document.createElement('td');
+      td.textContent = v == null ? '' : v;
+      tr.appendChild(td);
+    });
+    const act = document.createElement('td');
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'secondary';
+    del.textContent = 'Remove';
+    del.addEventListener('click', () => {
+      const cur = load();
+      cur.splice(i, 1);
+      save(cur);
+      render();
+    });
+    act.appendChild(del);
+    tr.appendChild(act);
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb);
+  listEl.innerHTML = '';
+  listEl.appendChild(table);
+}
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const name = form.name.value.trim();
+  const phone = form.phone.value.trim();
+  if (!name || !phone) { msg.textContent = 'Please enter your name and phone.'; return; }
+  const rows = load();
+  rows.push({
+    name,
+    phone,
+    email: form.email.value.trim(),
+    age: form.age.value,
+    service: form.service.value,
+    notes: form.notes.value.trim(),
+    at: new Date().toISOString()
+  });
+  save(rows);
+  form.reset();
+  msg.textContent = 'Thanks, ' + name + '! You are signed up.';
+  render();
+});
+
+document.getElementById('export').addEventListener('click', () => {
+  const rows = load().map(r => ({ name: r.name, phone: r.phone, email: r.email, age: r.age, service: r.service, notes: r.notes }));
+  if (!rows.length) { msg.textContent = 'Nothing to export yet.'; return; }
+  download('healthcamp-signups.csv', toCSV(rows), 'text/csv');
+});
+
+const target = new Date(EVENT.date).getTime();
+const units = ['Days', 'Hours', 'Minutes', 'Seconds'];
+units.forEach(u => {
+  const box = document.createElement('div');
+  box.className = 'card';
+  box.style.textAlign = 'center';
+  box.style.margin = '0';
+  box.innerHTML = '<div style="font-size:30px;font-weight:700" data-u="' + u + '">--</div><div class="muted">' + u + '</div>';
+  cd.appendChild(box);
+});
+const cdVals = cd.querySelectorAll('[data-u]');
+
+function tick() {
+  let diff = target - Date.now();
+  if (diff <= 0) {
+    cdVals.forEach(v => v.textContent = '0');
+    cdNote.textContent = 'The health camp is on!';
+    return;
+  }
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor(diff / 3600000) % 24;
+  const m = Math.floor(diff / 60000) % 60;
+  const s = Math.floor(diff / 1000) % 60;
+  const vals = [d, h, m, s];
+  cdVals.forEach((v, i) => v.textContent = String(vals[i]).padStart(2, '0'));
+  cdNote.textContent = 'Doors open in ' + d + ' day' + (d === 1 ? '' : 's') + '.';
+}
+tick();
+setInterval(tick, 1000);
+
+render();

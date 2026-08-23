@@ -47,6 +47,7 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 DEFAULT_CONFIG = {"source": "openrouter", "endpoint": "https://openrouter.ai/api/v1", "model": "qwen/qwen3.5-9b", "api_key": "",
                   "local_endpoint": "http://127.0.0.1:8080/v1", "local_model": "local"}
 
+PAGE_WORDS = re.compile(r"\b(pwa|web ?app|an? app|app for|form|website|homepage|landing page|quiz|sign ?up|tracker|collector|offline|game|calculator|checklist)\b", re.I)
 BUILD_WORDS = re.compile(r"\b(build|dashboard|website|web ?page|report|summary|summari[sz]e|write me|make me a page|one.?pager|brief)\b", re.I)
 
 ASK_RULES = [
@@ -119,6 +120,136 @@ def table_name(stem: str, used: set[str]) -> str:
 DATE_SHAPE = re.compile(r"^\s*(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})([T ]\d{1,2}:\d{2}(:\d{2})?)?\s*$")
 
 
+
+FOOTER_WORDS = re.compile(r"^\s*(total|grand total|sub ?total|source|note|notes|remarks?|prepared by|compiled by|\*)\b", re.I)
+MONTH_COL = re.compile(r"^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s'\-/]*\d{2,4}$|^\d{4}[\-/](0?[1-9]|1[0-2])$|^(0?[1-9]|1[0-2])[\-/]\d{4}$", re.I)
+GPS_PAIR = re.compile(r"^\s*(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})\s*$")
+
+
+def _is_blank(v) -> bool:
+    return v is None or (isinstance(v, float) and v != v) or (isinstance(v, str) and not v.strip())
+
+
+def find_header_row(raw: pd.DataFrame) -> int:
+    """Real sheets carry a title and blank rows above the header. The header is the first
+    row that is mostly filled with short labels and is followed by a row that is mostly filled."""
+    n = min(len(raw), 30)
+    width = raw.shape[1]
+    best, best_score = 0, -1.0
+    for i in range(n):
+        row = list(raw.iloc[i])
+        filled = [v for v in row if not _is_blank(v)]
+        if len(filled) < max(2, 0.5 * width):
+            continue
+        labelish = sum(1 for v in filled if isinstance(v, str) and len(v.strip()) <= 48 and not re.fullmatch(r"[\d.,%\-/ ]+", v.strip()))
+        nxt = list(raw.iloc[i + 1]) if i + 1 < len(raw) else []
+        nxt_filled = sum(1 for v in nxt if not _is_blank(v))
+        score = labelish / len(filled) + (0.5 if nxt_filled >= 0.5 * width else 0) - 0.02 * i
+        if labelish / len(filled) >= 0.7 and score > best_score:
+            best, best_score = i, score
+            break  # first credible header wins
+    return best
+
+
+def tidy_frame(raw: pd.DataFrame) -> pd.DataFrame | None:
+    """Turn a raw sheet (header=None) into a clean table: detect the header row, drop title,
+    blank, footer and total rows, fix blank/duplicate headers, parse '1,250' numbers,
+    split 'lat, long' pairs."""
+    raw = raw.dropna(how="all").dropna(axis=1, how="all")
+    if raw.empty or raw.shape[1] < 2:
+        return None
+    raw = raw.reset_index(drop=True)
+    h = find_header_row(raw)
+    headers = []
+    seen: dict[str, int] = {}
+    for j, v in enumerate(raw.iloc[h]):
+        name = str(v).strip() if not _is_blank(v) else f"col_{j + 1}"
+        name = re.sub(r"\s+", " ", name)
+        if name.lower().startswith("unnamed:"):
+            name = f"col_{j + 1}"
+        if name in seen:
+            seen[name] += 1
+            name = f"{name} ({seen[name]})"
+        else:
+            seen[name] = 1
+        headers.append(name)
+    body = raw.iloc[h + 1:].copy()
+    body.columns = headers
+    body = body.dropna(how="all")
+    # footer / total rows: first cell is a footer word, or the row is mostly empty at the tail
+    def is_footer(row) -> bool:
+        first = next((v for v in row if not _is_blank(v)), None)
+        filled = sum(1 for v in row if not _is_blank(v))
+        return (isinstance(first, str) and bool(FOOTER_WORDS.match(first)) and filled <= max(2, 0.5 * len(row))) or (isinstance(first, str) and FOOTER_WORDS.match(first) is not None and first.strip().lower() in ("total", "grand total"))
+    mask = body.apply(lambda r: is_footer(list(r)), axis=1)
+    body = body[~mask]
+    # trailing sparse rows (notes under the table)
+    while len(body) and sum(1 for v in body.iloc[-1] if not _is_blank(v)) < max(2, 0.3 * body.shape[1]):
+        body = body.iloc[:-1]
+    body = body.reset_index(drop=True)
+    for c in list(body.columns):
+        col = body[c]
+        if col.dtype == object or str(col.dtype).startswith("str"):
+            stripped = col.map(lambda v: v.strip() if isinstance(v, str) else v)
+            nonblank = stripped.dropna()
+            nonblank = nonblank[nonblank.map(lambda v: not (isinstance(v, str) and not v))]
+            if len(nonblank) == 0:
+                body[c] = stripped
+                continue
+            # '1,250' / '12.5%' style numbers
+            as_num = pd.to_numeric(nonblank.map(lambda v: re.sub(r"[,\s₹]|%$", "", v) if isinstance(v, str) else v), errors="coerce")
+            if as_num.notna().mean() >= 0.95 and nonblank.map(lambda v: isinstance(v, str) and bool(re.search(r"\d", v))).mean() >= 0.9:
+                body[c] = pd.to_numeric(stripped.map(lambda v: re.sub(r"[,\s₹]|%$", "", v) if isinstance(v, str) else v), errors="coerce")
+                continue
+            # 'lat, long' pairs
+            if nonblank.map(lambda v: isinstance(v, str) and bool(GPS_PAIR.match(v))).mean() >= 0.9:
+                body[f"{c} lat"] = stripped.map(lambda v: float(GPS_PAIR.match(v).group(1)) if isinstance(v, str) and GPS_PAIR.match(v) else None)
+                body[f"{c} long"] = stripped.map(lambda v: float(GPS_PAIR.match(v).group(2)) if isinstance(v, str) and GPS_PAIR.match(v) else None)
+                body[c] = stripped
+                continue
+            body[c] = stripped
+        else:
+            try:
+                if (col.dropna() % 1 == 0).all():
+                    body[c] = col.astype("Int64")
+            except Exception:  # noqa: BLE001
+                pass
+    return body if len(body) else None
+
+
+def canonicalise_variants(frame: pd.DataFrame) -> list[str]:
+    """'Soyabean' / 'soyabean' / 'SOYABEAN ' are one category. In text columns with few distinct
+    values, spellings that differ only by case or spacing are replaced by the most frequent one.
+    Returns the columns touched (the schema tells the model)."""
+    touched = []
+    for c in frame.columns:
+        col = frame[c]
+        if not (col.dtype == object or str(col.dtype).startswith("str")):
+            continue
+        vals = col.dropna()
+        vals = vals[vals.map(lambda v: isinstance(v, str) and bool(v.strip()))]
+        if len(vals) < 5 or vals.nunique() > 60:
+            continue
+        groups: dict[str, dict[str, int]] = {}
+        for v, n in vals.value_counts().items():
+            key = re.sub(r"\s+", " ", v.strip()).casefold()
+            groups.setdefault(key, {})[v] = n
+        if all(len(g) == 1 for g in groups.values()):
+            continue
+        mapping = {}
+        for g in groups.values():
+            canon = max(g.items(), key=lambda kv: (kv[1], sum(ch.islower() for ch in kv[0])))[0].strip()
+            for v in g:
+                if v != canon:
+                    mapping[v] = canon
+        frame[c] = col.map(lambda v: mapping.get(v, v) if isinstance(v, str) else v)
+        touched.append(c)
+    return touched
+
+
+def month_columns(columns: list[str]) -> list[str]:
+    return [c for c in columns if MONTH_COL.match(str(c).strip())]
+
 def coerce_dates(frame: pd.DataFrame) -> pd.DataFrame:
     """Text columns whose values look like dates become real DATE/TIMESTAMP columns,
     so the model does not have to guess the format (dd-mm-yyyy is common in Indian sheets)."""
@@ -156,34 +287,65 @@ class Workspace:
         self.turns: dict[str, dict] = {}
         self.lock = threading.Lock()
 
-    def load(self, folder: Path) -> None:
+    def file_signature(self) -> dict[str, tuple[float, int]]:
+        if not self.folder or not self.folder.is_dir():
+            return {}
+        sig = {}
+        for p in self.folder.iterdir():
+            if p.suffix.lower() in (".csv", ".xlsx", ".xls") and not p.name.startswith("~$"):
+                try:
+                    st = p.stat()
+                    sig[p.name] = (st.st_mtime, st.st_size)
+                except OSError:
+                    pass
+        return sig
+
+    def load(self, folder: Path, keep_history: bool = False) -> None:
         self.db = duckdb.connect(":memory:", config={"enable_external_access": "false"})
-        self.tables, self.history, self.turns = [], [], {}
+        self.tables = []
+        if not keep_history:
+            self.history, self.turns = [], {}
+        self.version = getattr(self, "version", 0) + 1
         used: set[str] = set()
         files = sorted(p for p in folder.iterdir() if p.suffix.lower() in (".csv", ".xlsx", ".xls") and not p.name.startswith("~$"))
         for f in files:
             try:
                 if f.suffix.lower() == ".csv":
-                    frames = {None: pd.read_csv(f)}
+                    frames = {None: pd.read_csv(f, header=None, dtype=object, skip_blank_lines=False, encoding_errors="replace")}
                 else:
-                    frames = pd.read_excel(f, sheet_name=None)
+                    frames = pd.read_excel(f, sheet_name=None, header=None, dtype=object)
             except Exception as exc:  # noqa: BLE001
                 self.tables.append({"file": f.name, "error": str(exc)[:200]})
                 continue
-            for sheet, frame in frames.items():
-                if frame.empty:
+            for sheet, raw in frames.items():
+                frame = tidy_frame(raw)
+                if frame is None:
                     continue
-                frame.columns = [str(c) for c in frame.columns]
                 frame = coerce_dates(frame)
+                merged = canonicalise_variants(frame)
                 name = table_name(f.stem + (f"_{sheet}" if sheet and len(frames) > 1 else ""), used)
                 self.db.register("tmp_frame", frame)
                 self.db.execute(f'CREATE TABLE "{name}" AS SELECT * FROM tmp_frame')
                 self.db.unregister("tmp_frame")
-                self.tables.append({"file": f.name, "sheet": sheet, "table": name, "rows": len(frame), "columns": list(frame.columns)})
+                self.tables.append({"file": f.name, "sheet": sheet, "table": name, "rows": len(frame), "columns": list(frame.columns), "merged_case": merged})
         self.folder = folder
         self.bridges = self._build_bridges()
         self.schema = self._ddl()
         self.categories = self._categories()
+        self.signature = self.file_signature()
+        self.changed_at = time.strftime("%H:%M:%S")
+
+    def watch(self, interval: float = 2.0) -> None:
+        """Reload when a file in the folder is saved; pages re-run their receipts on the next view."""
+        while True:
+            time.sleep(interval)
+            try:
+                if self.folder and self.file_signature() != getattr(self, "signature", {}):
+                    time.sleep(0.5)  # let the editor finish writing
+                    with self.lock:
+                        self.load(self.folder, keep_history=True)
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
 
     def _text_columns(self, table: str, min_distinct: int = 15) -> list[str]:
         cols = self.db.execute("SELECT column_name FROM information_schema.columns WHERE table_name = ? AND data_type IN ('VARCHAR','TEXT') ORDER BY ordinal_position", [table]).fetchall()
@@ -254,6 +416,14 @@ class Workspace:
                              f'To combine {t["table"]} with {br["ref"]}: ... JOIN ON {t["table"]}."{br["col"]}" = {br["ref"]}."{br["ref_col"]}" (never on the raw "{br["src_col"]}").\n')
                 if br["ref"] == t["table"]:
                     note += f'-- {t["table"]}."{br["ref_col"]}" is the master spelling; {br["src"]} carries a matching column "{br["col"]}".\n'
+            months = month_columns([c for c, _ in cols])
+            if len(months) >= 4:
+                qm = ", ".join(chr(34) + m + chr(34) for m in months)
+                note += (f'-- columns {qm} are months of one measure laid side by side; a blank month means nothing that month, so add them as '
+                         f'{" + ".join("COALESCE(" + chr(34) + m + chr(34) + ", 0)" for m in months[:2])} + ... ; to rank months use '
+                         f'UNPIVOT "{t["table"]}" ON {qm} INTO NAME month VALUE amount.\n')
+            if t.get("merged_case"):
+                note += f'-- spelling variants differing only by case/spaces were merged in: {", ".join(chr(34) + c + chr(34) for c in t["merged_case"])}.\n'
             out.append(note + f'CREATE TABLE "{t["table"]}" (\n  ' + ",\n  ".join(f'"{c}" {k}' for c, k in cols) + "\n);")
         return "\n\n".join(out)
 
@@ -311,13 +481,29 @@ def safe_sql(text: str) -> str:
     if not start:
         raise ValueError("no SELECT in answer")
     cand = cand[start.start():].strip().removesuffix("```").strip().rstrip(";")
-    parsed = sqlglot.parse(cand, read="duckdb")
+    try:
+        parsed = sqlglot.parse(cand, read="duckdb")
+    except Exception:  # sqlglot does not know every DuckDB form (UNPIVOT, QUALIFY variants); DuckDB itself decides
+        stmts = duckdb.extract_statements(cand)
+        if len(stmts) != 1 or stmts[0].type != duckdb.StatementType.SELECT:
+            raise ValueError("not exactly one read-only query")
+        if re.search(r"\b(copy|export|install|load|attach|create|insert|update|delete|drop|pragma|set)\b", cand, re.I):
+            raise ValueError("forbidden operation")
+        return cand
     if len(parsed) != 1 or not isinstance(parsed[0], exp.Query):
         raise ValueError("not exactly one read-only query")
     forbidden = (exp.Insert, exp.Update, exp.Delete, exp.Create, exp.Drop, exp.Command, exp.Copy)
     if any(isinstance(n, forbidden) for n in parsed[0].walk()):
         raise ValueError("forbidden operation")
     return parsed[0].sql(dialect="duckdb")
+
+
+def invented_numbers(sql: str, question: str) -> list[str]:
+    """Numbers in the SQL that the user never said (wages, thresholds, conversion factors the model made up)."""
+    said = set(re.findall(r"\d+(?:\.\d+)?", question))
+    body = re.sub(r"'[^']*'|\"[^\"]*\"", " ", sql)  # ignore string literals and quoted identifiers
+    nums = set(re.findall(r"(?<![\w.])\d+(?:\.\d+)?(?![\w.])", body))
+    return sorted(n for n in nums if n not in said and n not in {"0", "1", "2", "100", "1.0", "100.0", "0.0"})
 
 
 def tables_used(sql: str) -> list[str]:
@@ -459,7 +645,10 @@ def run_ask(text: str, cfg: dict) -> dict:
         scope_note = None
         if prev and used and set(used) != set(prev["tables_used"]):
             scope_note = f"This answer uses {', '.join(used)}; the previous one used {', '.join(prev['tables_used'])}."
-        turn = {"lane": "ask", "text": text, "sql": sql, "columns": result["columns"], "rowcount": len(result["rows"]), "tables_used": used, "scope_note": scope_note,
+        invented = invented_numbers(sql, text)
+        if invented:
+            scope_note = (scope_note + " " if scope_note else "") + f"The query uses number(s) you did not mention: {', '.join(invented)} — check the receipt."
+        turn = {"lane": "ask", "text": text, "sql": sql, "columns": result["columns"], "rowcount": len(result["rows"]), "tables_used": used, "scope_note": scope_note, "invented_numbers": invented,
                 "rows": result["rows"][:200], "viz": viz, "attempts": len(attempts), "egress": meta, "html": ask_html(sql, result, viz, text)}
         turn["_full"] = result
         return turn
@@ -553,6 +742,7 @@ def run_build(text: str, cfg: dict) -> dict:
     mode = "report" if re.search(r"report|summar|brief|write", text, re.I) else "dashboard"
     source = ", ".join(sorted({t["file"] for t in WS.tables if "table" in t}))
     html_doc = render_plan.render(plan, results, source, template=mode, question=text)
+    plan["_mode"] = mode
     egress = dict(metas[-1])
     egress["calls"] = len(metas)
     egress["seconds"] = round(sum(m["seconds"] for m in metas), 2)
@@ -560,6 +750,134 @@ def run_build(text: str, cfg: dict) -> dict:
     return {"lane": "build", "text": text, "plan": plan, "page": html_doc, "panels": len(plan["panels"]), "panels_failed": failed,
             "lint_removed": literals, "egress": egress, "sql": plan["panels"][0].get("sql"), "columns": results[plan["panels"][0]["id"]]["columns"],
             "_full": {pid: r for pid, r in results.items()}}
+
+
+def render_page_now(turn: dict) -> str:
+    """Re-execute a stored plan against the current tables and render it; every view is live."""
+    plan = turn["plan"]
+    results = {}
+    for p in plan["panels"]:
+        try:
+            results[p["id"]] = execute(safe_sql(p.get("sql", "")))
+        except Exception as exc:  # noqa: BLE001
+            results[p["id"]] = {"columns": [], "rows": [], "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+    turn["_full"] = results
+    source = ", ".join(sorted({t["file"] for t in WS.tables if "table" in t})) + f" · data as of {WS.changed_at}"
+    return render_plan.render(plan, results, source, template=plan.get("_mode", "dashboard"), question=turn["text"])
+
+
+# ---------------------------------------------------------------- Page lane (generic build)
+
+PAGE_PROMPT = """You build small, self-contained web pages for a social-sector NGO. Return ONE complete HTML document and nothing else (no prose, no code fences). Rules: everything inline (CSS and JS in the file; no external URLs, no CDNs, no frameworks); must work offline from a file; must not throw console errors; clean readable layout; plain English labels. If the request needs a service worker, register it from an inline Blob URL so the single file is enough.{data_clause}
+
+REQUEST:
+{request}
+"""
+
+
+def extract_html(text: str) -> str:
+    fenced = re.search(r"```(?:html)?\s*(<!doctype.*?|<html.*?)```", text, flags=re.I | re.S)
+    cand = fenced.group(1) if fenced else text
+    i = cand.lower().find("<!doctype")
+    if i < 0:
+        i = cand.lower().find("<html")
+    if i < 0:
+        raise ValueError("the model did not return an HTML page")
+    j = cand.lower().rfind("</html>")
+    return cand[i:(j + 7) if j > 0 else None]
+
+
+def script_errors(html_doc: str) -> list[str]:
+    """Syntax-check inline scripts (small models drop quotes and brackets). Needs esprima; silent if absent."""
+    try:
+        import esprima  # type: ignore
+    except ImportError:
+        return []
+    errs = []
+    for i, m in enumerate(re.finditer(r"<script(?![^>]*\bsrc=)(?![^>]*type=\"?(?:application/(?:ld\+)?json|text/template))[^>]*>([\s\S]*?)</script>", html_doc, re.I), 1):
+        src = m.group(1)
+        if not src.strip():
+            continue
+        try:
+            esprima.parseScript(src, {"tolerant": False})
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc)
+            line = re.search(r"Line (\d+)", msg)
+            snippet = ""
+            if line:
+                n = int(line.group(1))
+                lines = src.split("\n")
+                snippet = lines[n - 1].strip()[:160] if 0 < n <= len(lines) else ""
+            errs.append(f"script {i}: {msg[:120]}" + (f" -> {snippet}" if snippet else ""))
+    return errs
+
+
+def js_key(col: str) -> str:
+    k = re.sub(r"[^a-z0-9]+", "_", col.lower()).strip("_")
+    return ("c_" + k) if not k or k[0].isdigit() else k
+
+
+def run_page(text: str, cfg: dict) -> dict:
+    """Generic build: the model writes the page; rows never go to the model. If the request points
+    at loaded data, the page is told the data arrives as window.data with these columns, and the
+    laptop injects the real rows when the page is viewed."""
+    pointed = sorted(likely_tables(text))
+    data_clause = ""
+    data_table = None
+    if pointed:
+        data_table = pointed[0]
+        cols = next(t["columns"] for t in WS.tables if t.get("table") == data_table)
+        keys = {c: js_key(c) for c in cols}
+        data_clause = (" The data will be available at runtime as window.data — an array of row objects with exactly these keys (simple identifiers, use dot access): "
+                       + ", ".join(f"{k} ({c})" for c, k in keys.items())
+                       + ". Compute everything from window.data in the browser; never hardcode numbers or rows; show friendly labels, not the keys.")
+    prompt = PAGE_PROMPT.format(data_clause=data_clause, request=text)
+    raw, meta = call_model(cfg, prompt, max_tokens=8000, timeout=420)
+    html_doc = extract_html(raw)
+    errs = script_errors(html_doc)
+    calls = 1
+    if errs:
+        fix_prompt = prompt + "\n\nYOUR PREVIOUS PAGE HAD JAVASCRIPT SYNTAX ERRORS:\n" + "\n".join(errs) + "\nReturn the complete corrected HTML document."
+        raw2, meta2 = call_model(cfg, fix_prompt, max_tokens=8000, timeout=420)
+        calls = 2
+        try:
+            cand = extract_html(raw2)
+            if not script_errors(cand):
+                html_doc, errs = cand, []
+        except ValueError:
+            pass
+        meta = {**meta2, "seconds": round(meta["seconds"] + meta2["seconds"], 2)}
+    meta["calls"] = calls
+    probe = []
+    if data_table:
+        try:
+            cols = next(t["columns"] for t in WS.tables if t.get("table") == data_table)
+            tcol = next((c for c in cols if c in WS.categories.get(data_table, {}) and 2 <= len(WS.categories[data_table][c]) <= 50), None)
+            if tcol:
+                probe = WS.categories[data_table][tcol][:6]
+        except Exception:  # noqa: BLE001
+            probe = []
+    return {"lane": "page", "text": text, "page_html": html_doc, "data_table": data_table, "egress": meta, "bytes": len(html_doc), "script_errors": errs, "data_probe": probe}
+
+
+CAPTURE = "<script>window.__ioErrors=[];window.addEventListener('error',function(e){window.__ioErrors.push((e.message||'error')+(e.lineno?' (line '+e.lineno+')':''))});window.addEventListener('unhandledrejection',function(e){window.__ioErrors.push('promise: '+String(e.reason).slice(0,160))});</script>"
+
+
+def page_with_data(turn: dict) -> str:
+    html_doc = turn["page_html"]
+    i = html_doc.lower().find("<head>")
+    html_doc = (html_doc[:i + 6] + CAPTURE + html_doc[i + 6:]) if i >= 0 else CAPTURE + html_doc
+    if turn.get("data_table"):
+        try:
+            cur = WS.db.execute(f'SELECT * FROM "{turn["data_table"]}" LIMIT 20000')
+            cols = [js_key(d[0]) for d in cur.description]
+            rows = [{c: clean(v) for c, v in zip(cols, r)} for r in cur.fetchall()]
+        except Exception:  # noqa: BLE001
+            rows = []
+        inject = "<script>window.data = " + json.dumps(rows, default=str).replace("</", "<\\/") + ";</script>"
+        i = html_doc.lower().find("<head>")
+        html_doc = (html_doc[:i + 6] + inject + html_doc[i + 6:]) if i >= 0 else inject + html_doc
+    return html_doc
 
 
 # ---------------------------------------------------------------- HTTP
@@ -596,15 +914,31 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, (UI / "index.html").read_bytes(), "text/html; charset=utf-8")
         if path == "/api/state":
             cfg = load_config()
-            return self._json({"folder": str(WS.folder) if WS.folder else None, "tables": WS.tables,
+            return self._json({"folder": str(WS.folder) if WS.folder else None, "tables": WS.tables, "version": getattr(WS, "version", 0), "changed_at": getattr(WS, "changed_at", None),
                                "config": {**cfg, "api_key": ("set" if cfg.get("api_key") else "")},
                                "history": [{k: v for k, v in t.items() if k not in ("_full", "page", "rows")} for t in WS.history]})
         m = re.match(r"^/api/page/(\d+)$", path)
         if m:
             t = WS.turns.get(m.group(1))
-            if not t or "page" not in t:
+            if not t or ("plan" not in t and "page_html" not in t):
                 return self._send(404, b"no page")
-            return self._send(200, t["page"].encode(), "text/html; charset=utf-8")
+            with WS.lock:
+                page = page_with_data(t) if t.get("lane") == "page" else render_page_now(t)
+            return self._send(200, page.encode(), "text/html; charset=utf-8")
+        m = re.match(r"^/api/rerun/(\d+)$", path)
+        if m:
+            t = WS.turns.get(m.group(1))
+            if not t or t.get("lane") != "ask" or not t.get("sql"):
+                return self._send(404, b"no turn")
+            with WS.lock:
+                try:
+                    result = execute(t["sql"])
+                    t["_full"] = result
+                    t["rowcount"] = len(result["rows"])
+                    html_frag = ask_html(t["sql"], result, auto_viz(result), t["text"])
+                    return self._json({"html": html_frag, "rowcount": len(result["rows"]), "version": WS.version})
+                except Exception as exc:  # noqa: BLE001
+                    return self._json({"error": str(exc)[:300]}, 500)
         m = re.match(r"^/api/csv/(\d+)/([\w-]+)$", path)
         if m:
             t = WS.turns.get(m.group(1))
@@ -619,6 +953,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Disposition", f'attachment; filename="{m.group(2)}.csv"')
             self.end_headers()
             self.wfile.write(csv_text(res).encode())
+            return None
+        m = re.match(r"^/api/download-page/(\d+)$", path)
+        if m:
+            t = WS.turns.get(m.group(1))
+            if not t or "page_html" not in t:
+                return self._send(404, b"no page")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Disposition", 'attachment; filename="io-page.html"')
+            self.end_headers()
+            self.wfile.write(page_with_data(t).encode())
             return None
         if path.startswith("/ui/"):
             f = (UI / path[4:]).resolve()
@@ -659,14 +1004,47 @@ class Handler(BaseHTTPRequestHandler):
                 if not WS.tables:
                     return self._json({"error": "Open a folder with CSV or Excel files first."}, 400)
                 cfg = load_config()
-                lane = body.get("lane") or ("build" if BUILD_WORDS.search(text) else "ask")
+                lane = body.get("lane")
+                if not lane:
+                    if PAGE_WORDS.search(text) and not re.search(r"\b(dashboard|report|summar\w*)\b", text, re.I):
+                        lane = "page"
+                    elif BUILD_WORDS.search(text):
+                        lane = "build"
+                    else:
+                        lane = "ask"
                 with WS.lock:
-                    turn = run_build(text, cfg) if lane == "build" else run_ask(text, cfg)
+                    turn = run_page(text, cfg) if lane == "page" else run_build(text, cfg) if lane == "build" else run_ask(text, cfg)
                     turn["id"] = str(len(WS.history) + 1)
                     turn["at"] = time.strftime("%H:%M:%S")
                     WS.history.append(turn)
                     WS.turns[turn["id"]] = turn
-                return self._json({k: v for k, v in turn.items() if k not in ("_full", "page", "attempts")})
+                return self._json({k: v for k, v in turn.items() if k not in ("_full", "page", "page_html", "attempts")})
+            m = re.match(r"^/api/page-repair/(\d+)$", self.path)
+            if m:
+                t = WS.turns.get(m.group(1))
+                if not t or "page_html" not in t:
+                    return self._json({"error": "no page"}, 404)
+                errors = [str(e)[:200] for e in (body.get("errors") or [])][:5]
+                if body.get("no_data_shown"):
+                    errors.append("The page does not display the real data: none of the values from window.data appear on screen, so it is showing made-up content. Every list, count and label must come from window.data; remove any invented rows or names.")
+                if t.get("repaired") or not errors:
+                    return self._json({"repaired": False})
+                cfg = load_config()
+                with WS.lock:
+                    t["repaired"] = True
+                    prompt = ("You wrote this HTML page:\n\n" + t["page_html"][:60000] + "\n\nWhen it ran in the browser it threw these errors:\n" + "\n".join(errors)
+                              + "\nFix the causes (missing elements, wrong ids, wrong keys) and return the complete corrected HTML document and nothing else.")
+                    try:
+                        raw, meta = call_model(cfg, prompt, max_tokens=8000, timeout=420)
+                        cand = extract_html(raw)
+                        if not script_errors(cand):
+                            t["page_html"] = cand
+                            t["egress"]["seconds"] = round(t["egress"].get("seconds", 0) + meta["seconds"], 2)
+                            t["egress"]["calls"] = t["egress"].get("calls", 1) + 1
+                            return self._json({"repaired": True, "errors": errors})
+                    except Exception as exc:  # noqa: BLE001
+                        return self._json({"repaired": False, "error": str(exc)[:200]})
+                return self._json({"repaired": False})
             if self.path == "/api/reset":
                 with WS.lock:
                     WS.history, WS.turns = [], {}
@@ -682,6 +1060,7 @@ def main() -> None:
     folder = os.environ.get("IO_FOLDER")
     if folder:
         WS.load(Path(folder))
+    threading.Thread(target=WS.watch, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"io service on http://127.0.0.1:{port}", flush=True)
     server.serve_forever()

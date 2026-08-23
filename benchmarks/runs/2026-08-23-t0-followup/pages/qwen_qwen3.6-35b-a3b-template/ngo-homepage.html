@@ -1,0 +1,106 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jagruti Foundation</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+/* Additional styles for homepage specific elements */
+.hero { text-align: center; padding: 40px 20px; background: #fff; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--line); }
+.hero h2 { margin-top: 0; color: var(--accent); }
+.photo-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; }
+.photo-placeholder { min-width: 200px; height: 120px; background: #e5e7eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.contact-info { margin-top: 10px; }
+</style></head><body>
+<header><h1>Jagruti Foundation</h1></header>
+<main>
+    <!-- Hero / What We Do -->
+    <section class="hero">
+        <h2>Empowering Communities, Transforming Lives</h2>
+        <p class="muted">We work at the grassroots level to provide education, healthcare, and sustainable livelihood opportunities to underprivileged communities.</p>
+    </section>
+
+    <!-- Programmes -->
+    <h3>Our Programmes</h3>
+    <div id="programmes-grid" class="grid">
+        <!-- Populated by JS -->
+    </div>
+
+    <!-- Photo Strip -->
+    <h3>Recent Activities</h3>
+    <div id="photo-strip" class="photo-strip">
+        <!-- Populated by JS -->
+    </div>
+
+    <!-- Contact Section -->
+    <h3>Contact Us</h3>
+    <div class="card">
+        <div id="contact-details" class="contact-info">
+            <!-- Populated by JS -->
+        </div>
+        <div class="row" style="margin-top: 15px;">
+            <button onclick="download('jagruti-contact.txt', 'Contact details saved.', 'text/plain')">Save Contact Info</button>
+        </div>
+    </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+(function() {
+    // Default data structure
+    const defaultData = {
+        programmes: [
+            { title: "Education for All", desc: "Providing quality schooling and resources to children in rural areas." },
+            { title: "Health & Hygiene", desc: "Organizing medical camps and sanitation workshops in villages." },
+            { title: "Livelihood Support", desc: "Training women and youth in sustainable skills for self-employment." }
+        ],
+        photos: ["Village School Visit", "Medical Camp", "Skill Training Workshop", "Community Meeting"],
+        contact: {
+            email: "contact@jagrutifoundation.org",
+            phone: "+91 98765 43210",
+            address: "123, Hope Street, Mumbai, India"
+        }
+    };
+
+    // Read from window.data if available, else use default
+    const data = window.data || defaultData;
+
+    // Render Programmes
+    const progContainer = document.getElementById('programmes-grid');
+    if (data.programmes && data.programmes.length) {
+        data.programmes.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `<h4 style="margin:0 0 8px 0">${p.title}</h4><p class="muted" style="margin:0">${p.desc}</p>`;
+            progContainer.appendChild(div);
+        });
+    }
+
+    // Render Photo Strip
+    const photoContainer = document.getElementById('photo-strip');
+    if (data.photos && data.photos.length) {
+        data.photos.forEach((caption, index) => {
+            const div = document.createElement('div');
+            div.className = 'photo-placeholder';
+            div.textContent = `Photo ${index + 1}: ${caption}`;
+            photoContainer.appendChild(div);
+        });
+    }
+
+    // Render Contact Info
+    const contactContainer = document.getElementById('contact-details');
+    if (data.contact) {
+        const c = data.contact;
+        contactContainer.innerHTML = `
+            <p><strong>Email:</strong> ${c.email || 'N/A'}</p>
+            <p><strong>Phone:</strong> ${c.phone || 'N/A'}</p>
+            <p><strong>Address:</strong> ${c.address || 'N/A'}</p>
+        `;
+    }
+})();
+</script>
+</body></html>

@@ -1,0 +1,271 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scholarship Scheme Progress - District-wise Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Scholarship Progress Tracker","short_name":"Scholarships","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Scholarship Scheme Progress Tracker</h1></header>
+<main>
+<div class="grid" id="kpi-grid">
+  <div class="card"><span class="muted" style="font-size:13px;">Total Applications</span><h2 id="kpi-total" style="margin:4px 0 0;font-size:24px;">0</h2></div>
+  <div class="card"><span class="muted" style="font-size:13px;">Pending Cases</span><h2 id="kpi-pending" style="margin:4px 0 0;font-size:24px;color:#d97706;">0</h2></div>
+  <div class="card"><span class="muted" style="font-size:13px;">Approved Cases</span><h2 id="kpi-approved" style="margin:4px 0 0;font-size:24px;color:#16a34a;">0</h2></div>
+  <div class="card"><span class="muted" style="font-size:13px;">Districts Covered</span><h2 id="kpi-districts" style="margin:4px 0 0;font-size:24px;color:var(--accent);">0</h2></div>
+</div>
+
+<div class="card">
+  <div class="row" style="align-items:flex-end;">
+    <div style="flex:1;min-width:180px;">
+      <label for="filter-district">Filter District</label>
+      <select id="filter-district"><option value="">All Districts</option></select>
+    </div>
+    <div style="flex:1;min-width:180px;">
+      <label for="filter-scheme">Filter Scheme</label>
+      <select id="filter-scheme"><option value="">All Schemes</option></select>
+    </div>
+    <div style="flex:1;min-width:180px;">
+      <label for="filter-status">Filter Status</label>
+      <select id="filter-status"><option value="">All Statuses</option></select>
+    </div>
+    <div style="display:flex;gap:8px;padding-top:10px;">
+      <button id="btn-export-summary" class="secondary" type="button">Export Summary</button>
+      <button id="btn-export-cases" type="button">Export Cases</button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin:0 0 12px;font-size:16px;">District-wise Summary & Pending Progress</h3>
+  <div style="overflow-x:auto;">
+    <table id="summary-table">
+      <thead>
+        <tr>
+          <th>District</th>
+          <th>Total</th>
+          <th>Pending</th>
+          <th>Approved</th>
+          <th>Rejected / Other</th>
+          <th>% Pending</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="6" class="muted" style="text-align:center;">No data available</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin:0 0 12px;font-size:16px;">Detailed Case Records</h3>
+  <div style="overflow-x:auto;">
+    <table id="details-table">
+      <thead>
+        <tr>
+          <th>District</th>
+          <th>Taluka</th>
+          <th>Scheme</th>
+          <th>Marks %</th>
+          <th>Family Income</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="6" class="muted" style="text-align:center;">No data available</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+
+const filterDistrict = document.getElementById('filter-district');
+const filterScheme = document.getElementById('filter-scheme');
+const filterStatus = document.getElementById('filter-status');
+const kpiTotal = document.getElementById('kpi-total');
+const kpiPending = document.getElementById('kpi-pending');
+const kpiApproved = document.getElementById('kpi-approved');
+const kpiDistricts = document.getElementById('kpi-districts');
+const summaryTbody = document.querySelector('#summary-table tbody');
+const detailsTbody = document.querySelector('#details-table tbody');
+
+function getRawData() {
+  const data = Array.isArray(window.data) ? window.data : [];
+  return data.map(r => ({
+    District: (r.District || r.district || 'Unassigned').trim(),
+    Taluka: (r.Taluka || r.taluka || '-').trim(),
+    Status: (r.Status || r.status || 'Unknown').trim(),
+    'Marks %': r['Marks %'] ?? r.marks ?? r.Marks ?? '-',
+    'Family Income': r['Family Income'] ?? r.income ?? r['Income'] ?? '-',
+    'Name of scheme': (r['Name of scheme'] || r.scheme || r.Scheme || 'General').trim()
+  }));
+}
+
+let populatedFilters = false;
+function populateFilterOptions(records) {
+  if (populatedFilters || !records.length) return;
+  const dists = Array.from(new Set(records.map(r => r.District))).filter(Boolean).sort();
+  const schemes = Array.from(new Set(records.map(r => r['Name of scheme']))).filter(Boolean).sort();
+  const statuses = Array.from(new Set(records.map(r => r.Status))).filter(Boolean).sort();
+
+  dists.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d;
+    filterDistrict.appendChild(opt);
+  });
+  schemes.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    filterScheme.appendChild(opt);
+  });
+  statuses.forEach(st => {
+    const opt = document.createElement('option');
+    opt.value = st;
+    opt.textContent = st;
+    filterStatus.appendChild(opt);
+  });
+  populatedFilters = true;
+}
+
+function getSummaryRows(records) {
+  const distMap = {};
+  records.forEach(r => {
+    const d = r.District;
+    if (!distMap[d]) {
+      distMap[d] = { District: d, Total: 0, Pending: 0, Approved: 0, Rejected_Other: 0 };
+    }
+    distMap[d].Total += 1;
+    const s = r.Status.toLowerCase();
+    if (s.includes('pend')) {
+      distMap[d].Pending += 1;
+    } else if (s.includes('approv') || s.includes('sanction') || s.includes('disburs')) {
+      distMap[d].Approved += 1;
+    } else {
+      distMap[d].Rejected_Other += 1;
+    }
+  });
+
+  return Object.values(distMap).sort((a, b) => b.Pending - a.Pending || b.Total - a.Total).map(row => {
+    const pendingRate = row.Total > 0 ? ((row.Pending / row.Total) * 100).toFixed(1) + '%' : '0.0%';
+    return { ...row, PendingRate: pendingRate };
+  });
+}
+
+function render() {
+  const raw = getRawData();
+  populateFilterOptions(raw);
+
+  const selDist = filterDistrict.value;
+  const selScheme = filterScheme.value;
+  const selStatus = filterStatus.value;
+
+  const filtered = raw.filter(r => {
+    if (selDist && r.District !== selDist) return false;
+    if (selScheme && r['Name of scheme'] !== selScheme) return false;
+    if (selStatus && r.Status !== selStatus) return false;
+    return true;
+  });
+
+  let totalCount = filtered.length;
+  let pendingCount = 0;
+  let approvedCount = 0;
+  const distSet = new Set();
+
+  filtered.forEach(r => {
+    distSet.add(r.District);
+    const s = r.Status.toLowerCase();
+    if (s.includes('pend')) pendingCount++;
+    else if (s.includes('approv') || s.includes('sanction') || s.includes('disburs')) approvedCount++;
+  });
+
+  kpiTotal.textContent = totalCount.toLocaleString();
+  kpiPending.textContent = pendingCount.toLocaleString();
+  kpiApproved.textContent = approvedCount.toLocaleString();
+  kpiDistricts.textContent = distSet.size.toLocaleString();
+
+  const summary = getSummaryRows(filtered);
+  if (summary.length === 0) {
+    summaryTbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No matching records</td></tr>';
+  } else {
+    summaryTbody.innerHTML = summary.map(s => `
+      <tr>
+        <td><strong>${s.District}</strong></td>
+        <td>${s.Total.toLocaleString()}</td>
+        <td style="color:#d97706;font-weight:600;">${s.Pending.toLocaleString()}</td>
+        <td style="color:#16a34a;">${s.Approved.toLocaleString()}</td>
+        <td>${s.Rejected_Other.toLocaleString()}</td>
+        <td>${s.PendingRate}</td>
+      </tr>
+    `).join('');
+  }
+
+  if (filtered.length === 0) {
+    detailsTbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;">No matching records</td></tr>';
+  } else {
+    detailsTbody.innerHTML = filtered.map(r => {
+      const isPending = r.Status.toLowerCase().includes('pend');
+      const isApproved = r.Status.toLowerCase().includes('approv') || r.Status.toLowerCase().includes('sanction');
+      const colorStyle = isPending ? 'color:#d97706;font-weight:600;' : (isApproved ? 'color:#16a34a;' : '');
+      return `
+        <tr>
+          <td>${r.District}</td>
+          <td>${r.Taluka}</td>
+          <td>${r['Name of scheme']}</td>
+          <td>${r['Marks %']}</td>
+          <td>${r['Family Income']}</td>
+          <td style="${colorStyle}">${r.Status}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+}
+
+filterDistrict.addEventListener('change', render);
+filterScheme.addEventListener('change', render);
+filterStatus.addEventListener('change', render);
+
+document.getElementById('btn-export-summary').addEventListener('click', () => {
+  const raw = getRawData();
+  const selDist = filterDistrict.value;
+  const selScheme = filterScheme.value;
+  const selStatus = filterStatus.value;
+  const filtered = raw.filter(r => {
+    if (selDist && r.District !== selDist) return false;
+    if (selScheme && r['Name of scheme'] !== selScheme) return false;
+    if (selStatus && r.Status !== selStatus) return false;
+    return true;
+  });
+  const summary = getSummaryRows(filtered);
+  download('scholarship_district_summary.csv', toCSV(summary), 'text/csv');
+});
+
+document.getElementById('btn-export-cases').addEventListener('click', () => {
+  const raw = getRawData();
+  const selDist = filterDistrict.value;
+  const selScheme = filterScheme.value;
+  const selStatus = filterStatus.value;
+  const filtered = raw.filter(r => {
+    if (selDist && r.District !== selDist) return false;
+    if (selScheme && r['Name of scheme'] !== selScheme) return false;
+    if (selStatus && r.Status !== selStatus) return false;
+    return true;
+  });
+  download('scholarship_cases.csv', toCSV(filtered), 'text/csv');
+});
+
+window.addEventListener('DOMContentLoaded', render);
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  render();
+}
+</script>
+</body></html>

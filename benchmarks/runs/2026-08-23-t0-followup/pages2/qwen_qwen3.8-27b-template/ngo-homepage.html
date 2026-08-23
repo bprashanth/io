@@ -1,0 +1,136 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jagruti Foundation</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Jagruti Foundation","short_name":"Jagruti","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Jagruti Foundation</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+<section class="card">
+  <h2 style="margin-top:0">What we do</h2>
+  <p>Jagruti Foundation works with communities to build lasting, self-reliant change. We focus on the foundations of a good life — learning, health, and the ability to earn a fair living — and we stay in a place long enough to see the change take root.</p>
+  <p class="muted">Our name, <em>Jagruti</em>, means awakening. We believe every community already holds the answers; our role is to help them find and use them.</p>
+</section>
+
+<section>
+  <h2 style="margin-top:0">Our three programmes</h2>
+  <div class="grid" id="programmes"></div>
+</section>
+
+<section>
+  <h2 style="margin-top:0">From the field</h2>
+  <div class="grid" id="photos"></div>
+</section>
+
+<section class="card">
+  <h2 style="margin-top:0">Contact us</h2>
+  <p class="muted">Questions, partnerships, or a visit? We would love to hear from you.</p>
+  <div class="row">
+    <div style="flex:1;min-width:220px">
+      <label for="c-name">Your name</label>
+      <input id="c-name" type="text" placeholder="Full name">
+      <label for="c-email">Email</label>
+      <input id="c-email" type="email" placeholder="you@example.com">
+      <label for="c-msg">Message</label>
+      <textarea id="c-msg" rows="4" placeholder="How can we help?"></textarea>
+      <div style="margin-top:12px"><button id="send">Send message</button></div>
+      <p id="sent" class="muted" style="margin-top:8px"></p>
+    </div>
+    <div style="flex:1;min-width:220px">
+      <p><strong>Office</strong><br>12 Community Lane, Riverside District</p>
+      <p><strong>Email</strong><br>hello@jagrutifoundation.org</p>
+      <p><strong>Phone</strong><br>+00 000 000 0000</p>
+      <p><strong>Hours</strong><br>Mon–Fri, 9:00–17:00</p>
+    </div>
+  </div>
+</section>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+window.data = {
+  programmes: [
+    { name: 'Learning for Life', icon: '📚', blurb: 'After-school tutoring, reading circles, and digital skills that keep children in school and confident in their abilities.' },
+    { name: 'Healthy Communities', icon: '🩺', blurb: 'Free health camps, nutrition support, and hygiene education that bring care to families who need it most.' },
+    { name: 'Livelihoods & Dignity', icon: '🌱', blurb: 'Micro-grants, vocational training, and market access that help people build a fair and lasting income.' }
+  ],
+  photos: [
+    { label: 'Reading circle' },
+    { label: 'Health camp' },
+    { label: 'Skills workshop' },
+    { label: 'Community garden' }
+  ]
+};
+
+(function () {
+  const data = window.data || { programmes: [], photos: [] };
+
+  const progWrap = document.getElementById('programmes');
+  (data.programmes || []).forEach(function (p) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const icon = document.createElement('div');
+    icon.style.fontSize = '32px';
+    icon.textContent = p.icon || '•';
+    const h = document.createElement('h3');
+    h.style.margin = '8px 0 4px';
+    h.textContent = p.name || '';
+    const pEl = document.createElement('p');
+    pEl.className = 'muted';
+    pEl.style.margin = '0';
+    pEl.textContent = p.blurb || '';
+    card.appendChild(icon);
+    card.appendChild(h);
+    card.appendChild(pEl);
+    progWrap.appendChild(card);
+  });
+
+  const photoWrap = document.getElementById('photos');
+  (data.photos || []).forEach(function (ph) {
+    const fig = document.createElement('figure');
+    fig.style.margin = '0';
+    const box = document.createElement('div');
+    box.style.cssText = 'height:120px;border-radius:8px;background:linear-gradient(135deg,#dbeafe,#eef2ff);display:flex;align-items:center;justify-content:center;color:#93c5fd;font-size:40px;';
+    box.textContent = '📷';
+    const cap = document.createElement('figcaption');
+    cap.className = 'muted';
+    cap.style.fontSize = '13px';
+    cap.style.marginTop = '6px';
+    cap.textContent = ph.label || 'Photo';
+    fig.appendChild(box);
+    fig.appendChild(cap);
+    photoWrap.appendChild(fig);
+  });
+
+  const sendBtn = document.getElementById('send');
+  const sent = document.getElementById('sent');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', function () {
+      const name = document.getElementById('c-name').value.trim();
+      const email = document.getElementById('c-email').value.trim();
+      const msg = document.getElementById('c-msg').value.trim();
+      if (!name || !email || !msg) {
+        sent.textContent = 'Please fill in your name, email, and message.';
+        return;
+      }
+      const list = store.get('jagruti-messages', []);
+      list.push({ name: name, email: email, message: msg, at: new Date().toISOString() });
+      store.set('jagruti-messages', list);
+      document.getElementById('c-name').value = '';
+      document.getElementById('c-email').value = '';
+      document.getElementById('c-msg').value = '';
+      sent.textContent = 'Thank you, ' + name + ' — your message has been saved.';
+    });
+  }
+})();
+</script>
+</body></html>

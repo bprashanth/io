@@ -1,0 +1,213 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field Expense Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Field Expense Tracker","short_name":"Expenses","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Field Expense Tracker</h1></header>
+<main>
+<div class="grid">
+  <div class="card">
+    <div class="muted" style="font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Total Expenses</div>
+    <div id="grand-total" style="font-size:28px;font-weight:700;margin-top:4px">$0.00</div>
+    <div id="total-count" class="muted" style="font-size:13px;margin-top:2px">0 records logged</div>
+  </div>
+  <div class="card">
+    <div class="muted" style="font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Summary by Head</div>
+    <div id="head-summary" style="margin-top:6px;max-height:100px;overflow-y:auto">
+      <span class="muted" style="font-size:13px">No expenses recorded yet.</span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="font-size:17px;margin:0 0 10px">Log New Expense</h2>
+  <form id="expense-form">
+    <div class="grid">
+      <div>
+        <label for="exp-date">Date</label>
+        <input type="date" id="exp-date" required>
+      </div>
+      <div>
+        <label for="exp-head">Expense Head / Category</label>
+        <select id="exp-head" required>
+          <option value="Travel & Fuel">Travel & Fuel</option>
+          <option value="Food & Daily Allowance">Food & Daily Allowance</option>
+          <option value="Supplies & Materials">Supplies & Materials</option>
+          <option value="Community Engagement">Community Engagement</option>
+          <option value="Accommodation">Accommodation</option>
+          <option value="Communication & Internet">Communication & Internet</option>
+          <option value="Miscellaneous">Miscellaneous</option>
+        </select>
+      </div>
+      <div>
+        <label for="exp-amount">Amount</label>
+        <input type="number" id="exp-amount" step="0.01" min="0.01" placeholder="0.00" required>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;justify-content:flex-end">
+      <button type="submit">Add Expense</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h2 style="font-size:17px;margin:0">Expense History</h2>
+    <div class="row">
+      <button type="button" class="secondary" id="btn-export-csv" style="padding:4px 10px;font-size:13px">Export CSV</button>
+      <button type="button" class="secondary" id="btn-clear" style="padding:4px 10px;font-size:13px;color:#dc2626;border-color:#dc2626">Clear All</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Head</th>
+          <th style="text-align:right">Amount</th>
+          <th style="text-align:right">Running Total</th>
+          <th style="text-align:center;width:60px">Action</th>
+        </tr>
+      </thead>
+      <tbody id="expense-list">
+        <tr>
+          <td colspan="5" class="muted" style="text-align:center;padding:16px">No expenses recorded yet.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+
+const STORAGE_KEY = 'ngo_field_expenses';
+let expenses = (window.data && Array.isArray(window.data)) ? window.data : store.get(STORAGE_KEY, []);
+
+const dateInput = document.getElementById('exp-date');
+if (dateInput) {
+  dateInput.value = new Date().toISOString().split('T')[0];
+}
+
+const form = document.getElementById('expense-form');
+const listBody = document.getElementById('expense-list');
+const grandTotalEl = document.getElementById('grand-total');
+const totalCountEl = document.getElementById('total-count');
+const headSummaryEl = document.getElementById('head-summary');
+const exportBtn = document.getElementById('btn-export-csv');
+const clearBtn = document.getElementById('btn-clear');
+
+function formatCurrency(num) {
+  return '$' + Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function render() {
+  if (!window.data) {
+    store.set(STORAGE_KEY, expenses);
+  }
+
+  let grandTotal = 0;
+  const headTotals = {};
+
+  expenses.forEach(e => {
+    const amt = parseFloat(e.amount) || 0;
+    grandTotal += amt;
+    headTotals[e.head] = (headTotals[e.head] || 0) + amt;
+  });
+
+  grandTotalEl.textContent = formatCurrency(grandTotal);
+  totalCountEl.textContent = `${expenses.length} record${expenses.length === 1 ? '' : 's'} logged`;
+
+  const headKeys = Object.keys(headTotals);
+  if (headKeys.length === 0) {
+    headSummaryEl.innerHTML = '<span class="muted" style="font-size:13px">No expenses recorded yet.</span>';
+  } else {
+    headSummaryEl.innerHTML = headKeys.map(h => `
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;border-bottom:1px dashed var(--line)">
+        <span>${h}</span>
+        <span style="font-weight:600">${formatCurrency(headTotals[h])}</span>
+      </div>
+    `).join('');
+  }
+
+  if (expenses.length === 0) {
+    listBody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">No expenses recorded yet.</td></tr>';
+    return;
+  }
+
+  let running = 0;
+  listBody.innerHTML = expenses.map((exp, idx) => {
+    const amt = parseFloat(exp.amount) || 0;
+    running += amt;
+    return `
+      <tr>
+        <td>${exp.date || ''}</td>
+        <td><strong>${exp.head || ''}</strong></td>
+        <td style="text-align:right">${formatCurrency(amt)}</td>
+        <td style="text-align:right;color:var(--accent);font-weight:600">${formatCurrency(running)}</td>
+        <td style="text-align:center">
+          <button type="button" class="secondary" style="padding:2px 6px;font-size:12px;color:#dc2626;border-color:#dc2626" onclick="deleteExpense(${idx})">×</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.deleteExpense = function(index) {
+  expenses.splice(index, 1);
+  render();
+};
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const date = document.getElementById('exp-date').value;
+  const head = document.getElementById('exp-head').value;
+  const amount = parseFloat(document.getElementById('exp-amount').value);
+
+  if (!date || !head || isNaN(amount) || amount <= 0) return;
+
+  expenses.push({ date, head, amount });
+  document.getElementById('exp-amount').value = '';
+  render();
+});
+
+exportBtn.addEventListener('click', () => {
+  if (expenses.length === 0) {
+    alert('No data to export.');
+    return;
+  }
+  let running = 0;
+  const exportData = expenses.map(e => {
+    const amt = parseFloat(e.amount) || 0;
+    running += amt;
+    return {
+      Date: e.date,
+      Head: e.head,
+      Amount: amt.toFixed(2),
+      RunningTotal: running.toFixed(2)
+    };
+  });
+  const csv = toCSV(exportData);
+  download(`field_expenses_${new Date().toISOString().split('T')[0]}.csv`, csv, 'text/csv');
+});
+
+clearBtn.addEventListener('click', () => {
+  if (expenses.length === 0) return;
+  if (confirm('Are you sure you want to clear all expense records?')) {
+    expenses = [];
+    render();
+  }
+});
+
+render();
+</script>
+</body></html>

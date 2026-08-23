@@ -1,0 +1,88 @@
+{
+  "id": "wide-year-columns-share-p02",
+  "task_id": "wide-year-columns-share",
+  "pattern": "arithmetic across year-named columns, group sum, share",
+  "question": "girls as a share of total students in 2024 for each block",
+  "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dobhi",
+      48.09971237182617
+    ],
+    [
+      "Belaganj",
+      52.56309127807617
+    ],
+    [
+      "Atri",
+      53.90037536621094
+    ],
+    [
+      "Barachatti",
+      55.3763427734375
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT Block, (CAST(SUM(\"Girls 2024\") AS REAL) * 100 / NULLIF(NULLIF(SUM(\"Girls 2024\") + SUM(\"Boys 2024\"), 0), 0)) AS \"Percentage of Girls\" FROM \"school_enrolment_by_year\" GROUP BY Block",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}}\n\nCURRENT QUESTION:\ngirls as a share of total students in 2024 for each block",
+      "response": "To translate the natural language question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Step-by-Step Breakdown\n\n1. **Identify the Relevant Data**:\n   - We need data from the `school_enrolment_by_year` table.\n   - Specifically, we need the columns `Block`, `Girls 2024`, and `Boys 2024`.\n\n2. **Calculate the Total Students**:\n   - For each block, we need to calculate the total number of students in 2024, which is the sum of `Girls 2024` and `Boys 2024`.\n\n3. **Calculate the Percentage of Girls**:\n   - For each block, we need to calculate the percentage of girls out of the total students in 2024.\n   - This can be done using the formula: `(Girls 2024 / Total Students) * 100`.\n\n4. **Group the Data by Block**:\n   - We need to group the data by the `Block` column to get the percentage of girls for each block.\n\n5. **Construct the SQL Query**:\n   - Use a `SELECT` statement to specify the columns we need.\n   - Use `SUM` to aggregate the number of girls and boys for each block.\n   - Use `CAST` to ensure proper division and multiplication for percentage calculation.\n   - Use `GROUP BY` to group the results by block.\n\n### SQL Query Construction\n\nBased on the above steps, the SQL query can be constructed as follows:\n\n```sql\nSELECT \n    Block,\n    (CAST(SUM(\"Girls 2024\") AS REAL) * 100 / NULLIF(SUM(\"Girls 2024\") + SUM(\"Boys 2024\"), 0)) AS \"Percentage of Girls\"\nFROM \n    \"school_enrolment_by_year\"\nGROUP BY \n    Block;\n```\n\n### Explanation\n\n- **SELECT Clause**: We select the `Block` and calculate the percentage of girls using the formula `(CAST(SUM(\"Girls 2024\") AS REAL) * 100 / NULLIF(SUM(\"Girls 2024\") + SUM(\"Boys 2024\"), 0))`.\n- **FROM Clause**: We specify the `school_enrolment_by_year` table as the source of our data.\n- **GROUP BY Clause**: We group the results by `Block` to ensure that the percentage of girls is calculated for each block separately.\n\nThis query will provide the percentage of girls as a share of total students in 2024 for each block, as requested in the natural language question.",
+      "api": {
+        "id": "chatcmpl-A82reXGOpbSNVerAScphfrlWsfMbGsbV",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 571,
+          "prompt_tokens": 774,
+          "total_tokens": 1345,
+          "prompt_tokens_details": {
+            "cached_tokens": 753
+          }
+        },
+        "duration_seconds": 21.256
+      },
+      "duration_seconds": 21.261,
+      "sql_duckdb": "SELECT Block, (CAST(SUM(\"Girls 2024\") AS REAL) * 100 / NULLIF(NULLIF(SUM(\"Girls 2024\") + SUM(\"Boys 2024\"), 0), 0)) AS \"Percentage of Girls\" FROM \"school_enrolment_by_year\" GROUP BY Block",
+      "rows": [
+        [
+          "Dobhi",
+          48.09971237182617
+        ],
+        [
+          "Belaganj",
+          52.56309127807617
+        ],
+        [
+          "Atri",
+          53.90037536621094
+        ],
+        [
+          "Barachatti",
+          55.3763427734375
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

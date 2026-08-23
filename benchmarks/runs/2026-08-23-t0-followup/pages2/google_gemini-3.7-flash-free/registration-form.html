@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beneficiary Registration</title>
+  <style>
+    :root {
+      --primary: #1b5e20;
+      --primary-hover: #144716;
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --border: #dcdfe3;
+      --text: #2c3e50;
+      --text-light: #607274;
+      --danger: #c62828;
+      --success: #2e7d32;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--surface);
+      padding: 24px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    p.subtitle {
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    @media (min-width: 768px) {
+      .grid {
+        grid-template-columns: 360px 1fr;
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      padding: 24px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border: 1px solid var(--border);
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-bottom: 6px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.95rem;
+      background-color: #fff;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .error-msg {
+      color: var(--danger);
+      font-size: 0.8rem;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .invalid input, .invalid select {
+      border-color: var(--danger);
+    }
+
+    .invalid .error-msg {
+      display: block;
+    }
+
+    .btn {
+      display: inline-block;
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+      width: auto;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+    }
+
+    .btn-secondary:hover {
+      background: #f0f0f0;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #fafafa;
+      font-weight: 600;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--text-light);
+      padding: 32px 0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: #e8f5e9;
+      color: var(--primary);
+    }
+
+    .action-btn {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .action-btn:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Beneficiary Registration</h1>
+      <p class="subtitle">Social sector field intake and record keeping system</p>
+    </header>
+
+    <div class="grid">
+      <!-- Registration Form -->
+      <div class="card">
+        <h2>New Registration</h2>
+        <form id="regForm" novalidate>
+          
+          <div class="form-group" id="group-name">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" required placeholder="e.g. Jane Doe">
+            <div class="error-msg">Please enter a valid name.</div>
+          </div>
+
+          <div class="form-group" id="group-age">
+            <label for="age">Age</label>
+            <input type="number" id="age" min="1" max="120" required placeholder="e.g. 34">
+            <div class="error-msg">Please enter an age between 1 and 120.</div>
+          </div>
+
+          <div class="form-group" id="group-village">
+            <label for="village">Village / Ward</label>
+            <input type="text" id="village" required placeholder="e.g. Green Valley">
+            <div class="error-msg">Please enter a village or ward.</div>
+          </div>
+
+          <div class="form-group" id="group-phone">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" required placeholder="e.g. 9876543210">
+            <div class="error-msg">Please enter a valid phone number (at least 7 digits).</div>
+          </div>
+
+          <div class="form-group" id="group-category">
+            <label for="category">Support Category</label>
+            <select id="category" required>
+              <option value="">Select category...</option>
+              <option value="Healthcare">Healthcare</option>
+              <option value="Education Support">Education Support</option>
+              <option value="Livelihood & Skills">Livelihood & Skills</option>
+              <option value="Nutrition / Food Aid">Nutrition / Food Aid</option>
+              <option value="Emergency Relief">Emergency Relief</option>
+            </select>
+            <div class="error-msg">Please select a category.</div>
+          </div>
+
+          <button type="submit" class="btn">Save Beneficiary</button>
+        </form>
+      </div>
+
+      <!-- Records Display -->
+      <div class="card">
+        <div class="actions">
+          <h2>Registered (<span id="record-count">0</span>)</h2>
+          <button id="downloadBtn" class="btn-secondary">Download CSV</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Age</th>
+                <th>Village</th>
+                <th>Phone</th>
+                <th>Category</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+          <div id="emptyState" class="empty-state">
+            No beneficiaries registered yet. Fill the form to add entries.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'ngo_beneficiaries_data';
+    let beneficiaries = [];
+
+    // Initialize data
+    function initData() {
+      if (window.data && Array.isArray(window.data)) {
+        beneficiaries = window.data;
+      } else {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            beneficiaries = JSON.parse(stored);
+          } catch (e) {
+            beneficiaries = [];
+          }
+        }
+      }
+      renderTable();
+    }
+
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(beneficiaries));
+      renderTable();
+    }
+
+    function validateField(id, condition) {
+      const group = document.getElementById('group-' + id);
+      if (!condition) {
+        group.classList.add('invalid');
+        return false;
+      } else {
+        group.classList.remove('invalid');
+        return true;
+      }
+    }
+
+    // Form Submission
+    const form = document.getElementById('regForm');
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('name').value.trim();
+      const age = parseInt(document.getElementById('age').value, 10);
+      const village = document.getElementById('village').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const category = document.getElementById('category').value;
+
+      const isNameValid = validateField('name', name.length > 0);
+      const isAgeValid = validateField('age', !isNaN(age) && age >= 1 && age <= 120);
+      const isVillageValid = validateField('village', village.length > 0);
+      const isPhoneValid = validateField('phone', /^[0-9+ -]{7,15}$/.test(phone));
+      const isCategoryValid = validateField('category', category !== '');
+
+      if (isNameValid && isAgeValid && isVillageValid && isPhoneValid && isCategoryValid) {
+        const newBeneficiary = {
+          id: Date.now(),
+          name,
+          age,
+          village,
+          phone,
+          category,
+          registeredAt: new Date().toISOString().split('T')[0]
+        };
+
+        beneficiaries.unshift(newBeneficiary);
+        saveData();
+        form.reset();
+      }
+    });
+
+    // Render Table
+    function renderTable() {
+      const tbody = document.getElementById('recordsBody');
+      const emptyState = document.getElementById('emptyState');
+      const countSpan = document.getElementById('record-count');
+
+      tbody.innerHTML = '';
+      countSpan.textContent = beneficiaries.length;
+
+      if (beneficiaries.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      beneficiaries.forEach((b) => {
+        const tr = document.createElement('tr');
+        
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(b.name)}</strong></td>
+          <td>${escapeHtml(String(b.age))}</td>
+          <td>${escapeHtml(b.village)}</td>
+          <td>${escapeHtml(b.phone)}</td>
+          <td><span class="badge">${escapeHtml(b.category)}</span></td>
+          <td><button class="action-btn" onclick="deleteEntry(${b.id})">Delete</button></td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Delete single entry
+    window.deleteEntry = function(id) {
+      beneficiaries = beneficiaries.filter(item => item.id !== id);
+      saveData();
+    };
+
+    // Escape helper
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Export CSV
+    document.getElementById('downloadBtn').addEventListener('click', function() {
+      if (beneficiaries.length === 0) {
+        alert('No data available to download.');
+        return;
+      }
+
+      const headers = ['ID', 'Full Name', 'Age', 'Village', 'Phone Number', 'Category', 'Registration Date'];
+      
+      const csvRows = [
+        headers.join(',')
+      ];
+
+      beneficiaries.forEach(b => {
+        const row = [
+          b.id,
+          `"${(b.name || '').replace(/"/g, '""')}"`,
+          b.age,
+          `"${(b.village || '').replace(/"/g, '""')}"`,
+          `"${(b.phone || '').replace(/"/g, '""')}"`,
+          `"${(b.category || '').replace(/"/g, '""')}"`,
+          b.registeredAt || ''
+        ];
+        csvRows.push(row.join(','));
+      });
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvRows.join('\n'));
+      const link = document.createElement('a');
+      link.setAttribute('href', csvContent);
+      link.setAttribute('download', `beneficiaries_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+    // Run setup
+    initData();
+  </script>
+</body>
+</html>

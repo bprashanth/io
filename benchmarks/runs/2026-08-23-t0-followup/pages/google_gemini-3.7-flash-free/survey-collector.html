@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Water Point Field Survey</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #cbd5e1;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 16px;
+      padding-bottom: 80px;
+    }
+
+    .container {
+      max-width: 540px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      color: var(--primary-dark);
+      margin-bottom: 4px;
+    }
+
+    header p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+
+    .sub-label {
+      font-weight: normal;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      background: #fff;
+      color: var(--text);
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .radio-label {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.95rem;
+      background: var(--bg);
+    }
+
+    .radio-label input {
+      margin-right: 8px;
+    }
+
+    .radio-label:has(input:checked) {
+      background-color: #e0f2fe;
+      border-color: var(--primary);
+      color: var(--primary-dark);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      background-color: var(--primary);
+      color: white;
+      transition: background-color 0.1s ease;
+    }
+
+    .btn:active {
+      background-color: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background-color: #e2e8f0;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 8px 12px;
+    }
+
+    .btn-secondary:active {
+      background-color: #cbd5e1;
+    }
+
+    .btn-danger {
+      background-color: #fee2e2;
+      color: var(--danger);
+      border: 1px solid #fca5a5;
+    }
+
+    .gps-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .gps-display {
+      font-family: monospace;
+      font-size: 0.85rem;
+      background: var(--bg);
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+    }
+
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .status-msg {
+      padding: 10px;
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+      display: none;
+    }
+
+    .status-success {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+    }
+
+    .status-error {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Water Point Survey</h1>
+    <p>Offline Mobile Data Collection</p>
+  </header>
+
+  <div id="statusAlert" class="status-msg"></div>
+
+  <form id="surveyForm">
+    <div class="card">
+      <div class="form-group">
+        <label for="habitation">Habitation / Village Name *</label>
+        <input type="text" id="habitation" required placeholder="e.g. Maji Safi B">
+      </div>
+
+      <div class="form-group">
+        <label for="pumpType">Water Point / Pump Type *</label>
+        <select id="pumpType" required>
+          <option value="" disabled selected>Select an option</option>
+          <option value="India Mark II">India Mark II</option>
+          <option value="Afridev">Afridev</option>
+          <option value="Solar Submersible">Solar Submersible</option>
+          <option value="Rope Pump">Rope Pump</option>
+          <option value="Protected Dug Well">Protected Dug Well</option>
+          <option value="Public Standpost">Public Standpost</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Is it currently working? *</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="working" value="Yes" required> Yes
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="working" value="No" required> No
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="users">Estimated Households/Users *</label>
+        <input type="number" id="users" min="0" required placeholder="e.g. 45">
+      </div>
+
+      <div class="form-group">
+        <label>GPS Coordinates *</label>
+        <div class="gps-box">
+          <div id="gpsDisplay" class="gps-display">No GPS coordinates captured</div>
+          <button type="button" id="btnGps" class="btn btn-secondary">Capture Current Location</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="notes">Surveyor Notes <span class="sub-label">(Optional)</span></label>
+        <textarea id="notes" rows="2" placeholder="e.g. Needs handle repair, high salinity"></textarea>
+      </div>
+
+      <button type="submit" class="btn" style="margin-top: 8px;">Save Water Point</button>
+    </div>
+  </form>
+
+  <div class="card">
+    <div class="stats-bar">
+      <span>Saved Locally:</span>
+      <span id="recordCount">0 points</span>
+    </div>
+    
+    <div class="actions-grid">
+      <button type="button" id="btnExport" class="btn btn-secondary">Export JSON</button>
+      <button type="button" id="btnClear" class="btn btn-danger">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Simple offline registry via inline Blob Worker
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+      const CACHE_NAME = 'water-survey-v1';
+      self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
+      self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+      self.addEventListener('fetch', e => e.respondWith(
+        fetch(e.request).catch(() => caches.match(e.request))
+      ));
+    `;
+    const blob = new Blob([swCode], { type: 'text/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+  }
+
+  // Application State & DOM
+  const DB_KEY = 'water_survey_data';
+  let currentCoordinates = null;
+
+  const form = document.getElementById('surveyForm');
+  const btnGps = document.getElementById('btnGps');
+  const gpsDisplay = document.getElementById('gpsDisplay');
+  const recordCount = document.getElementById('recordCount');
+  const btnExport = document.getElementById('btnExport');
+  const btnClear = document.getElementById('btnClear');
+  const statusAlert = document.getElementById('statusAlert');
+
+  function showMessage(msg, isError = false) {
+    statusAlert.textContent = msg;
+    statusAlert.className = 'status-msg ' + (isError ? 'status-error' : 'status-success');
+    statusAlert.style.display = 'block';
+    setTimeout(() => {
+      statusAlert.style.display = 'none';
+    }, 4000);
+  }
+
+  function getRecords() {
+    try {
+      return JSON.parse(localStorage.getItem(DB_KEY)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function updateRecordCounter() {
+    const records = getRecords();
+    recordCount.textContent = records.length + (records.length === 1 ? ' point' : ' points');
+  }
+
+  // Prepopulate if window.data is supplied runtime
+  function applyRuntimeData() {
+    if (window.data && typeof window.data === 'object') {
+      if (window.data.habitation) document.getElementById('habitation').value = window.data.habitation;
+      if (window.data.pumpType) document.getElementById('pumpType').value = window.data.pumpType;
+      if (window.data.working) {
+        const rad = document.querySelector(`input[name="working"][value="${window.data.working}"]`);
+        if (rad) rad.checked = true;
+      }
+      if (window.data.users) document.getElementById('users').value = window.data.users;
+    }
+  }
+
+  // GPS Handling
+  btnGps.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      showMessage('Geolocation is not supported by your browser', true);
+      return;
+    }
+    gpsDisplay.textContent = 'Locating...';
+    btnGps.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        currentCoordinates = {
+          latitude: parseFloat(pos.coords.latitude.toFixed(6)),
+          longitude: parseFloat(pos.coords.longitude.toFixed(6)),
+          accuracy_meters: Math.round(pos.coords.accuracy)
+        };
+        gpsDisplay.textContent = `${currentCoordinates.latitude}, ${currentCoordinates.longitude} (±${currentCoordinates.accuracy_meters}m)`;
+        btnGps.disabled = false;
+      },
+      (err) => {
+        gpsDisplay.textContent = 'Failed to get GPS';
+        btnGps.disabled = false;
+        showMessage('GPS error: ' + err.message, true);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+
+  // Submit Handler
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    if (!currentCoordinates) {
+      showMessage('Please capture GPS coordinates before saving.', true);
+      return;
+    }
+
+    const newRecord = {
+      id: 'wp_' + Date.now(),
+      habitation: document.getElementById('habitation').value.trim(),
+      pump_type: document.getElementById('pumpType').value,
+      working: document.querySelector('input[name="working"]:checked').value === 'Yes',
+      estimated_users: parseInt(document.getElementById('users').value, 10),
+      notes: document.getElementById('notes').value.trim(),
+      location: currentCoordinates,
+      timestamp: new Date().toISOString()
+    };
+
+    const records = getRecords();
+    records.push(newRecord);
+    localStorage.setItem(DB_KEY, JSON.stringify(records));
+
+    // Reset Form
+    form.reset();
+    currentCoordinates = null;
+    gpsDisplay.textContent = 'No GPS coordinates captured';
+    updateRecordCounter();
+    showMessage('Water point recorded successfully!');
+  });
+
+  // Export Data
+  btnExport.addEventListener('click', () => {
+    const records = getRecords();
+    if (records.length === 0) {
+      showMessage('No records found to export.', true);
+      return;
+    }
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(records, null, 2));
+    const a = document.createElement('a');
+    a.href = dataStr;
+    a.download = `water_survey_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  // Clear Storage
+  btnClear.addEventListener('click', () => {
+    const records = getRecords();
+    if (records.length === 0) return;
+    if (confirm(`Delete all ${records.length} records saved on this phone?`)) {
+      localStorage.removeItem(DB_KEY);
+      updateRecordCounter();
+      showMessage('All local records cleared.');
+    }
+  });
+
+  // Init
+  updateRecordCounter();
+  applyRuntimeData();
+</script>
+</body>
+</html>

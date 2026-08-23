@@ -1,0 +1,88 @@
+{
+  "id": "wide-year-columns-share-p01",
+  "task_id": "wide-year-columns-share",
+  "pattern": "arithmetic across year-named columns, group sum, share",
+  "question": "block wise what percent of 2024 enrolment is girls",
+  "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Barachatti",
+      55.3763427734375
+    ],
+    [
+      "Belaganj",
+      52.56309127807617
+    ],
+    [
+      "Dobhi",
+      48.09971237182617
+    ],
+    [
+      "Atri",
+      53.90037536621094
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH TotalEnrolment AS (SELECT Block, SUM(\"Girls 2024\") AS TotalGirls2024, SUM(\"Boys 2024\") AS TotalBoys2024 FROM school_enrolment_by_year GROUP BY Block) SELECT Block, (CAST(TotalGirls2024 AS REAL) * 100 / NULLIF(NULLIF(TotalGirls2024 + TotalBoys2024, 0), 0)) AS PercentageGirls2024 FROM TotalEnrolment",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}}\n\nCURRENT QUESTION:\nblock wise what percent of 2024 enrolment is girls",
+      "response": "To translate the natural language question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Step-by-Step Breakdown\n\n1. **Identify the Relevant Table and Columns**:\n   - The question is about school enrolment by year, specifically focusing on the percentage of girls in the year 2024.\n   - Relevant table: `school_enrolment_by_year`\n   - Relevant columns: `Block`, `Girls 2024`, `Boys 2024`\n\n2. **Calculate Total Enrolment for Each Block**:\n   - We need to sum up the enrolment of girls and boys for each block to get the total enrolment per block.\n   - This can be achieved using the `SUM` function and grouping by `Block`.\n\n3. **Calculate the Percentage of Girls for Each Block**:\n   - The percentage of girls can be calculated by dividing the total number of girls by the total enrolment (girls + boys) and multiplying by 100.\n   - Use `NULLIF` to avoid division by zero.\n\n4. **Construct the SQL Query**:\n   - Use a Common Table Expression (CTE) to first calculate the total enrolment for each block.\n   - Then, calculate the percentage of girls in the main query.\n\n### SQL Query Construction\n\n```sql\nWITH TotalEnrolment AS (\n    SELECT \n        Block,\n        SUM(`Girls 2024`) AS TotalGirls2024,\n        SUM(`Boys 2024`) AS TotalBoys2024\n    FROM \n        school_enrolment_by_year\n    GROUP BY \n        Block\n)\nSELECT \n    Block,\n    (CAST(TotalGirls2024 AS REAL) * 100 / NULLIF(TotalGirls2024 + TotalBoys2024, 0)) AS PercentageGirls2024\nFROM \n    TotalEnrolment;\n```\n\n### Explanation\n\n- **CTE (TotalEnrolment)**: This part of the query calculates the total number of girls and boys enrolled in 2024 for each block.\n- **Main Query**: This part calculates the percentage of girls in each block by dividing the total number of girls by the total enrolment and multiplying by 100. The `CAST` function is used to ensure the division is performed as a floating-point operation, and `NULLIF` is used to handle cases where the total enrolment might be zero.\n\nThis query efficiently calculates the required percentage for each block, providing a clear and concise solution to the problem.",
+      "api": {
+        "id": "chatcmpl-7GuCwBC9VA9cEtNEImxewugg4CDNkpim",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 549,
+          "prompt_tokens": 772,
+          "total_tokens": 1321,
+          "prompt_tokens_details": {
+            "cached_tokens": 192
+          }
+        },
+        "duration_seconds": 20.693
+      },
+      "duration_seconds": 20.698,
+      "sql_duckdb": "WITH TotalEnrolment AS (SELECT Block, SUM(\"Girls 2024\") AS TotalGirls2024, SUM(\"Boys 2024\") AS TotalBoys2024 FROM school_enrolment_by_year GROUP BY Block) SELECT Block, (CAST(TotalGirls2024 AS REAL) * 100 / NULLIF(NULLIF(TotalGirls2024 + TotalBoys2024, 0), 0)) AS PercentageGirls2024 FROM TotalEnrolment",
+      "rows": [
+        [
+          "Barachatti",
+          55.3763427734375
+        ],
+        [
+          "Belaganj",
+          52.56309127807617
+        ],
+        [
+          "Dobhi",
+          48.09971237182617
+        ],
+        [
+          "Atri",
+          53.90037536621094
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

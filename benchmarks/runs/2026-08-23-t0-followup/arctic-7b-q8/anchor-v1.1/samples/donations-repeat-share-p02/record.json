@@ -1,0 +1,54 @@
+{
+  "id": "donations-repeat-share-p02",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "share of money raised from repeat givers versus one-time givers, in percent, plus a count of repeat givers",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": [
+    [
+      53.51468988030468,
+      46.48531011969532,
+      164
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH DonorCounts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM donations GROUP BY \"Donor\"), DonorCategories AS (SELECT d.\"Donor\", d.\"Amount\", CASE WHEN dc.donation_count > 1 THEN 'Repeat Donor' ELSE 'One-Time Donor' END AS donor_category FROM donations AS d JOIN DonorCounts AS dc ON d.\"Donor\" = dc.\"Donor\"), DonorAmounts AS (SELECT donor_category, SUM(\"Amount\") AS total_amount FROM DonorCategories GROUP BY donor_category), DonorCountsFinal AS (SELECT donor_category, COUNT(*) AS donor_count FROM DonorCategories GROUP BY donor_category) SELECT (da1.total_amount * 100.0 / NULLIF(NULLIF((da1.total_amount + da2.total_amount), 0), 0)) AS repeat_donors_percentage, (da2.total_amount * 100.0 / NULLIF(NULLIF((da1.total_amount + da2.total_amount), 0), 0)) AS one_time_donors_percentage, dc1.donor_count AS repeat_donors_count FROM DonorAmounts AS da1 JOIN DonorAmounts AS da2 ON da1.donor_category <> da2.donor_category JOIN DonorCountsFinal AS dc1 ON da1.donor_category = dc1.donor_category WHERE da1.donor_category = 'Repeat Donor' AND da2.donor_category = 'One-Time Donor'",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nshare of money raised from repeat givers versus one-time givers, in percent, plus a count of repeat givers",
+      "response": "To translate the natural language question into an executable SQLite query, we need to break down the requirements and construct the query step-by-step.\n\n### Requirements Breakdown:\n1. **Identify Repeat Givers**: These are donors who have made more than one donation.\n2. **Identify One-Time Givers**: These are donors who have made exactly one donation.\n3. **Calculate the Total Amount Raised from Repeat Givers**.\n4. **Calculate the Total Amount Raised from One-Time Givers**.\n5. **Compute the Percentage of Money Raised from Repeat Givers**.\n6. **Compute the Percentage of Money Raised from One-Time Givers**.\n7. **Count the Number of Repeat Givers**.\n8. **Present the Results in a Single Row**.\n\n### Step-by-Step Solution:\n\n1. **Identify Repeat and One-Time Givers**:\n   - Use a subquery to count the number of donations per donor.\n   - Classify donors based on the count of donations.\n\n2. **Calculate Total Amounts**:\n   - Sum the donation amounts for repeat and one-time givers separately.\n\n3. **Compute Percentages**:\n   - Calculate the percentage of total donations raised by repeat and one-time givers.\n\n4. **Count Repeat Givers**:\n   - Count the number of donors classified as repeat givers.\n\n5. **Combine Results**:\n   - Use a `SELECT` statement to combine all the calculated values into a single row.\n\n### SQL Query Construction:\n\n```sql\nWITH DonorCounts AS (\n    SELECT \n        \"Donor\",\n        COUNT(*) AS donation_count\n    FROM \n        donations\n    GROUP BY \n        \"Donor\"\n),\nDonorCategories AS (\n    SELECT \n        d.\"Donor\",\n        d.\"Amount\",\n        CASE \n            WHEN dc.donation_count > 1 THEN 'Repeat Donor'\n            ELSE 'One-Time Donor'\n        END AS donor_category\n    FROM \n        donations d\n    JOIN \n        DonorCounts dc ON d.\"Donor\" = dc.\"Donor\"\n),\nDonorAmounts AS (\n    SELECT \n        donor_category,\n        SUM(\"Amount\") AS total_amount\n    FROM \n        DonorCategories\n    GROUP BY \n        donor_category\n),\nDonorCountsFinal AS (\n    SELECT \n        donor_category,\n        COUNT(*) AS donor_count\n    FROM \n        DonorCategories\n    GROUP BY \n        donor_category\n)\nSELECT \n    (da1.total_amount * 100.0 / NULLIF((da1.total_amount + da2.total_amount), 0)) AS repeat_donors_percentage,\n    (da2.total_amount * 100.0 / NULLIF((da1.total_amount + da2.total_amount), 0)) AS one_time_donors_percentage,\n    dc1.donor_count AS repeat_donors_count\nFROM \n    DonorAmounts da1\nJOIN \n    DonorAmounts da2 ON da1.donor_category <> da2.donor_category\nJOIN \n    DonorCountsFinal dc1 ON da1.donor_category = dc1.donor_category\nWHERE \n    da1.donor_category = 'Repeat Donor' AND da2.donor_category = 'One-Time Donor';\n```\n\n### Explanation:\n- **DonorCounts**: Counts the number of donations per donor.\n- **DonorCategories**: Classifies each donation as from a repeat or one-time donor.\n- **DonorAmounts**: Sums the donation amounts for each category.\n- **DonorCountsFinal**: Counts the number of donors in each category.\n- **Final SELECT**: Computes the percentages and counts, ensuring no division by zero with `NULLIF`.\n\nThis query efficiently calculates the required metrics and presents them in a single row as requested.",
+      "api": {
+        "id": "chatcmpl-WYKNrxKtoLSJfEtGQ9ZiAWlpr6nrNHCU",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 777,
+          "prompt_tokens": 368,
+          "total_tokens": 1145,
+          "prompt_tokens_details": {
+            "cached_tokens": 339
+          }
+        },
+        "duration_seconds": 28.756
+      },
+      "duration_seconds": 28.767,
+      "sql_duckdb": "WITH DonorCounts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM donations GROUP BY \"Donor\"), DonorCategories AS (SELECT d.\"Donor\", d.\"Amount\", CASE WHEN dc.donation_count > 1 THEN 'Repeat Donor' ELSE 'One-Time Donor' END AS donor_category FROM donations AS d JOIN DonorCounts AS dc ON d.\"Donor\" = dc.\"Donor\"), DonorAmounts AS (SELECT donor_category, SUM(\"Amount\") AS total_amount FROM DonorCategories GROUP BY donor_category), DonorCountsFinal AS (SELECT donor_category, COUNT(*) AS donor_count FROM DonorCategories GROUP BY donor_category) SELECT (da1.total_amount * 100.0 / NULLIF(NULLIF((da1.total_amount + da2.total_amount), 0), 0)) AS repeat_donors_percentage, (da2.total_amount * 100.0 / NULLIF(NULLIF((da1.total_amount + da2.total_amount), 0), 0)) AS one_time_donors_percentage, dc1.donor_count AS repeat_donors_count FROM DonorAmounts AS da1 JOIN DonorAmounts AS da2 ON da1.donor_category <> da2.donor_category JOIN DonorCountsFinal AS dc1 ON da1.donor_category = dc1.donor_category WHERE da1.donor_category = 'Repeat Donor' AND da2.donor_category = 'One-Time Donor'",
+      "rows": [
+        [
+          53.51468988030468,
+          46.48531011969532,
+          164
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

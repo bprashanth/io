@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e5a63">
+<title>Water Point Survey</title>
+<style>
+  :root{
+    --ink:#12333a; --ink-soft:#4a6b72; --paper:#eef4f4; --card:#ffffff;
+    --line:#d3e2e2; --line-2:#e7f0f0;
+    --teal:#0e5a63; --teal-2:#12707a; --teal-3:#0a454d;
+    --aqua:#1f9aa8; --aqua-2:#37b6c4; --aqua-soft:#d6eef1;
+    --amber:#e0912a; --amber-soft:#fbe6c6;
+    --good:#2f8f5b; --good-soft:#dcefe2;
+    --bad:#c0492f; --bad-soft:#f6ddd6;
+    --shadow:0 1px 2px rgba(16,50,55,.06), 0 10px 26px rgba(16,50,55,.08);
+    --shadow-lg:0 2px 6px rgba(16,50,55,.08), 0 22px 48px rgba(16,50,55,.16);
+    --r:14px;
+    --font-body:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-display:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --font-mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; font-family:var(--font-body); color:var(--ink);
+    background:var(--paper); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  /* ambient water background */
+  .bg{position:fixed; inset:0; z-index:-1; overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 85% -10%, #eaf6f7 0%, rgba(234,246,247,0) 55%),
+      radial-gradient(120% 90% at 0% 110%, #e6f1f2 0%, rgba(230,241,242,0) 55%),
+      var(--paper);
+  }
+  .bg .wave{position:absolute; left:-20%; width:140%; height:220px; opacity:.5;
+    background-repeat:repeat-x; background-size:140px 220px;
+    animation:drift 26s linear infinite;}
+  .bg .w1{top:14%; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='220' viewBox='0 0 140 220'%3E%3Cpath d='M0 60 Q35 30 70 60 T140 60' fill='none' stroke='%231f9aa8' stroke-width='2' opacity='.18'/%3E%3Cpath d='M0 120 Q35 90 70 120 T140 120' fill='none' stroke='%231f9aa8' stroke-width='2' opacity='.12'/%3E%3Cpath d='M0 180 Q35 150 70 180 T140 180' fill='none' stroke='%231f9aa8' stroke-width='2' opacity='.08'/%3E%3C/svg%3E");}
+  .bg .w2{top:52%; animation-duration:38s; animation-direction:reverse; opacity:.35;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='220' viewBox='0 0 140 220'%3E%3Cpath d='M0 60 Q35 30 70 60 T140 60' fill='none' stroke='%230e5a63' stroke-width='2' opacity='.14'/%3E%3Cpath d='M0 120 Q35 90 70 120 T140 120' fill='none' stroke='%230e5a63' stroke-width='2' opacity='.10'/%3E%3C/svg%3E");}
+  @keyframes drift{from{background-position-x:0}to{background-position-x:140px}}
+
+  .wrap{max-width:640px; margin:0 auto; padding:0 16px 40px}
+
+  /* header */
+  header{padding:22px 0 14px}
+  .brand{display:flex; align-items:center; gap:12px}
+  .mark{width:44px; height:44px; flex:0 0 auto; display:grid; place-items:center;
+    background:linear-gradient(160deg,var(--aqua-2),var(--teal)); border-radius:13px;
+    box-shadow:var(--shadow); color:#fff}
+  .mark svg{width:26px; height:26px}
+  .brand h1{font-family:var(--font-display); font-size:1.5rem; margin:0; letter-spacing:.2px; line-height:1.05}
+  .brand p{margin:2px 0 0; font-size:.82rem; color:var(--ink-soft)}
+  .statusbar{display:flex; align-items:center; gap:8px; margin-top:14px; flex-wrap:wrap}
+  .pill{display:inline-flex; align-items:center; gap:7px; font-size:.78rem; font-weight:600;
+    padding:6px 11px; border-radius:999px; background:var(--card); border:1px solid var(--line);
+    box-shadow:var(--shadow)}
+  .dot{width:9px; height:9px; border-radius:50%; background:var(--aqua); position:relative}
+  .dot::after{content:""; position:absolute; inset:-4px; border-radius:50%;
+    border:2px solid var(--aqua); opacity:.5; animation:ping 2.4s ease-out infinite}
+  @keyframes ping{0%{transform:scale(.6);opacity:.6}80%,100%{transform:scale(1.8);opacity:0}}
+  .pill .num{font-family:var(--font-mono); font-weight:700}
+
+  /* tabs */
+  .tabs{position:sticky; top:0; z-index:20; display:flex; gap:6px; padding:10px 0;
+    background:linear-gradient(var(--paper) 70%, rgba(238,244,244,0)); margin-bottom:14px}
+  .tab{flex:1; appearance:none; border:1px solid var(--line); background:var(--card);
+    color:var(--ink-soft); font:inherit; font-weight:600; font-size:.9rem;
+    padding:11px 8px; border-radius:12px; cursor:pointer; display:flex; align-items:center;
+    justify-content:center; gap:7px; transition:transform .12s, box-shadow .2s, background .2s, color .2s}
+  .tab:active{transform:scale(.97)}
+  .tab[aria-selected="true"]{background:var(--teal); color:#fff; border-color:var(--teal); box-shadow:var(--shadow)}
+  .tab .badge{min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:var(--aqua-soft);
+    color:var(--teal); font-family:var(--font-mono); font-size:.72rem; font-weight:700;
+    display:inline-grid; place-items:center}
+  .tab[aria-selected="true"] .badge{background:rgba(255,255,255,.22); color:#fff}
+
+  .panel{display:none; animation:fade .35s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+
+  /* form card */
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--r);
+    box-shadow:var(--shadow); padding:18px}
+  .card + .card{margin-top:14px}
+  .card h2{font-family:var(--font-display); font-size:1.12rem; margin:0 0 4px; display:flex; align-items:center; gap:9px}
+  .card h2 .step{width:26px; height:26px; border-radius:8px; background:var(--aqua-soft); color:var(--teal);
+    display:grid; place-items:center; font-family:var(--font-mono); font-size:.85rem; font-weight:700}
+  .card .sub{margin:0 0 14px; font-size:.82rem; color:var(--ink-soft)}
+
+  .field{margin-bottom:15px}
+  .field:last-child{margin-bottom:0}
+  label.lbl{display:block; font-weight:600; font-size:.9rem; margin-bottom:7px}
+  label.lbl .req{color:var(--bad); margin-left:2px}
+  .hint{font-size:.76rem; color:var(--ink-soft); margin-top:6px}
+
+  input[type=text], input[type=number], select, textarea{
+    width:100%; font:inherit; font-size:1rem; color:var(--ink);
+    padding:12px 13px; border:1.5px solid var(--line); border-radius:11px; background:#fbfdfd;
+    transition:border-color .18s, box-shadow .18s, background .18s}
+  textarea{resize:vertical; min-height:74px}
+  input:focus, select:focus, textarea:focus{outline:none; border-color:var(--aqua);
+    background:#fff; box-shadow:0 0 0 4px rgba(31,154,168,.16)}
+  input::placeholder, textarea::placeholder{color:#9db6ba}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media (max-width:420px){.row2{grid-template-columns:1fr}}
+
+  /* segmented yes/no */
+  .seg{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .seg button{appearance:none; font:inherit; font-weight:700; font-size:1rem; cursor:pointer;
+    padding:13px; border-radius:11px; border:1.5px solid var(--line); background:#fbfdfd; color:var(--ink-soft);
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    transition:transform .12s, background .2s, border-color .2s, color .2s}
+  .seg button:active{transform:scale(.97)}
+  .seg button .ic{width:20px; height:20px}
+  .seg button[data-val="yes"].on{background:var(--good-soft); border-color:var(--good); color:var(--good)}
+  .seg button[data-val="no"].on{background:var(--bad-soft); border-color:var(--bad); color:var(--bad)}
+
+  /* gps */
+  .gps{display:flex; gap:12px; align-items:stretch}
+  .gps .btn{flex:0 0 auto}
+  .gps .readout{flex:1; min-width:0}
+  .btn{appearance:none; font:inherit; font-weight:700; cursor:pointer; border-radius:11px;
+    padding:12px 16px; border:1.5px solid transparent; transition:transform .12s, box-shadow .2s, background .2s}
+  .btn:active{transform:scale(.97)}
+  .btn-primary{background:var(--teal); color:#fff; box-shadow:var(--shadow)}
+  .btn-primary:hover{background:var(--teal-2)}
+  .btn-ghost{background:var(--card); color:var(--teal); border-color:var(--line)}
+  .btn-ghost:hover{background:var(--aqua-soft)}
+  .btn-danger{background:var(--bad-soft); color:var(--bad); border-color:transparent}
+  .btn-danger:hover{background:#f3d2c9}
+  .btn-block{width:100%}
+  .gpsbox{border:1.5px dashed var(--line); border-radius:11px; padding:12px 13px; background:#fbfdfd}
+  .gpsbox.ok{border-style:solid; border-color:var(--good); background:var(--good-soft)}
+  .gpsbox.err{border-style:solid; border-color:var(--bad); background:var(--bad-soft)}
+  .gpsbox .coord{font-family:var(--font-mono); font-size:.95rem; font-weight:700; word-break:break-all}
+  .gpsbox .meta{font-size:.76rem; color:var(--ink-soft); margin-top:4px}
+  .gpsbox .msg{font-size:.85rem; font-weight:600}
+  .spin{width:16px; height:16px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff;
+    border-radius:50%; display:inline-block; animation:spin .8s linear infinite; vertical-align:-3px; margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .actions{display:flex; gap:10px; margin-top:16px}
+  .actions .btn{flex:1}
+
+  /* records */
+  .rec{display:flex; gap:12px; align-items:flex-start; padding:14px; border:1px solid var(--line);
+    border-radius:12px; background:var(--card); box-shadow:var(--shadow); margin-bottom:10px;
+    animation:fade .3s ease}
+  .rec .thumb{width:42px; height:42px; flex:0 0 auto; border-radius:11px; display:grid; place-items:center;
+    background:var(--aqua-soft); color:var(--teal)}
+  .rec .thumb svg{width:24px; height:24px}
+  .rec .body{flex:1; min-width:0}
+  .rec .top{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .rec .name{font-weight:700; font-size:1rem; word-break:break-word}
+  .chip{font-size:.72rem; font-weight:700; padding:3px 9px; border-radius:999px}
+  .chip.working{background:var(--good-soft); color:var(--good)}
+  .chip.broken{background:var(--bad-soft); color:var(--bad)}
+  .rec .meta{font-size:.8rem; color:var(--ink-soft); margin-top:5px; display:flex; flex-wrap:wrap; gap:4px 14px}
+  .rec .meta b{color:var(--ink); font-weight:600}
+  .rec .del{flex:0 0 auto; appearance:none; border:none; background:transparent; color:var(--ink-soft);
+    cursor:pointer; padding:6px; border-radius:8px; line-height:0}
+  .rec .del:hover{background:var(--bad-soft); color:var(--bad)}
+  .rec .del svg{width:18px; height:18px}
+
+  .empty{text-align:center; padding:34px 16px; color:var(--ink-soft)}
+  .empty .big{width:64px; height:64px; margin:0 auto 12px; color:var(--aqua); opacity:.55}
+  .empty h3{font-family:var(--font-display); margin:0 0 4px; color:var(--ink)}
+  .empty p{margin:0; font-size:.88rem}
+
+  /* export */
+  .statgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px}
+  .stat{border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--card); box-shadow:var(--shadow)}
+  .stat .k{font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); font-weight:700}
+  .stat .v{font-family:var(--font-display); font-size:1.9rem; line-height:1.1; margin-top:4px}
+  .stat .v small{font-size:.9rem; color:var(--ink-soft); font-family:var(--font-body)}
+  .bar{height:10px; border-radius:999px; background:var(--line-2); overflow:hidden; margin-top:10px}
+  .bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--aqua-2),var(--teal)); border-radius:999px; transition:width .5s ease}
+  .export-actions{display:grid; gap:10px}
+  .export-actions .btn{width:100%}
+  .note{font-size:.78rem; color:var(--ink-soft); margin-top:12px; line-height:1.5}
+  .note b{color:var(--ink)}
+
+  /* toast */
+  .toast{position:fixed; left:50%; bottom:22px; transform:translate(-50%,20px);
+    background:var(--ink); color:#fff; padding:12px 18px; border-radius:12px; font-size:.88rem; font-weight:600;
+    box-shadow:var(--shadow-lg); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    max-width:90vw; text-align:center}
+  .toast.show{opacity:1; transform:translate(-50%,0)}
+  .toast.err{background:var(--bad)}
+
+  footer{margin-top:26px; text-align:center; font-size:.76rem; color:var(--ink-soft)}
+  footer .sw{display:inline-flex; align-items:center; gap:6px; margin-top:6px}
+  footer .sw .dot{width:8px; height:8px; background:var(--good); animation:none}
+  footer .sw .dot::after{display:none}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important; transition:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="wave w1"></div><div class="wave w2"></div></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2.5c3.6 4.2 6 7.4 6 10.5a6 6 0 1 1-12 0c0-3.1 2.4-6.3 6-10.5z" fill="#fff"/><path d="M9 13.5a3 3 0 0 0 3 3" stroke="#1f9aa8" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h1>Water Point Survey</h1>
+        <p>Field record · works offline</p>
+      </div>
+    </div>
+    <div class="statusbar">
+      <span class="pill"><span class="dot"></span> <span id="swState">Checking offline storage…</span></span>
+      <span class="pill">Saved: <span class="num" id="countPill">0</span></span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" id="tab-survey" aria-selected="true" aria-controls="panel-survey">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      New survey
+    </button>
+    <button class="tab" role="tab" id="tab-records" aria-selected="false" aria-controls="panel-records">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      Records <span class="badge" id="countBadge">0</span>
+    </button>
+    <button class="tab" role="tab" id="tab-export" aria-selected="false" aria-controls="panel-export">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+      Export
+    </button>
+  </nav>
+
+  <!-- SURVEY -->
+  <section class="panel active" id="panel-survey" role="tabpanel" aria-labelledby="tab-survey">
+    <form id="surveyForm" novalidate>
+      <div class="card">
+        <h2><span class="step">1</span> Location</h2>
+        <p class="sub">Where is this water point?</p>
+        <div class="field">
+          <label class="lbl" for="habitation">Habitation / village name <span class="req">*</span></label>
+          <input type="text" id="habitation" name="habitation" placeholder="e.g. Kibara" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label class="lbl" for="landmark">Nearest landmark <span style="color:var(--ink-soft);font-weight:500">(optional)</span></label>
+          <input type="text" id="landmark" name="landmark" placeholder="e.g. near the primary school" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">2</span> Water point</h2>
+        <p class="sub">What kind of point is it, and is it working?</p>
+        <div class="field">
+          <label class="lbl" for="pumpType">Pump / source type <span class="req">*</span></label>
+          <select id="pumpType" name="pumpType" required>
+            <option value="" disabled selected>Select a type…</option>
+            <option value="Hand pump">Hand pump</option>
+            <option value="Borehole">Borehole</option>
+            <option value="Spring">Spring</option>
+            <option value="Protected well">Protected well</option>
+            <option

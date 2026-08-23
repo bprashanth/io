@@ -1,0 +1,168 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Health Camp Signup</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Health Camp Signup</h1></header>
+<main>
+<div class="card">
+  <div class="grid">
+    <div>
+      <h2>Event Details</h2>
+      <p><strong>Date:</strong> 14 September 2024</p>
+      <p><strong>Time:</strong> 9:00 AM - 4:00 PM</p>
+      <p><strong>Location:</strong> Community Center Hall</p>
+    </div>
+    <div>
+      <h2>Countdown</h2>
+      <div id="countdown" style="font-size:24px;font-weight:bold;color:var(--accent)"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Sign Up</h2>
+  <form id="signupForm">
+    <div class="row">
+      <div style="flex:1">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" required>
+      </div>
+      <div style="flex:1">
+        <label for="email">Email</label>
+        <input type="email" id="email" required>
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:1">
+        <label for="phone">Phone Number</label>
+        <input type="tel" id="phone" required>
+      </div>
+      <div style="flex:1">
+        <label for="service">Service Needed</label>
+        <select id="service" required>
+          <option value="">Select service</option>
+          <option value="General Checkup">General Checkup</option>
+          <option value="Dental">Dental</option>
+          <option value="Eye">Eye</option>
+          <option value="Vaccination">Vaccination</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit">Sign Up</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Registered Participants</h2>
+  <div class="row" style="margin-bottom:12px">
+    <button class="secondary" onclick="exportData()">Export CSV</button>
+    <span class="muted" id="count">0 participants</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Service</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody id="signupList"></tbody>
+  </table>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceStorage' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+const eventDate = new Date('2024-09-14T09:00:00');
+const signupKey = 'healthCampSignups';
+
+function updateCountdown() {
+  const now = new Date();
+  const diff = eventDate - now;
+  
+  if (diff <= 0) {
+    document.getElementById('countdown').textContent = 'Event has started!';
+    return;
+  }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  document.getElementById('countdown').textContent = 
+    `${days}d ${hours}h ${minutes}m ${seconds}s`;
+}
+
+function renderSignupList() {
+  const signups = store.get(signupKey, []);
+  const tbody = document.getElementById('signupList');
+  const countEl = document.getElementById('count');
+  
+  tbody.innerHTML = '';
+  countEl.textContent = `${signups.length} participant${signups.length !== 1 ? 's' : ''}`;
+  
+  signups.forEach(signup => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${signup.name}</td>
+      <td>${signup.email}</td>
+      <td>${signup.phone}</td>
+      <td>${signup.service}</td>
+      <td>${new Date(signup.timestamp).toLocaleTimeString()}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+document.getElementById('signupForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const name = document.getElementById('name').value;
+  const email = document.getElementById('email').value;
+  const phone = document.getElementById('phone').value;
+  const service = document.getElementById('service').value;
+  
+  const signup = {
+    name,
+    email,
+    phone,
+    service,
+    timestamp: new Date().toISOString()
+  };
+  
+  const signups = store.get(signupKey, []);
+  signups.push(signup);
+  store.set(signupKey, signups);
+  
+  this.reset();
+  renderSignupList();
+});
+
+function exportData() {
+  const signups = store.get(signupKey, []);
+  if (signups.length === 0) {
+    alert('No data to export');
+    return;
+  }
+  
+  const csv = toCSV(signups);
+  download('health_camp_signups.csv', csv, 'text/csv');
+}
+
+// Initialize
+updateCountdown();
+setInterval(updateCountdown, 1000);
+renderSignupList();
+</script>
+</body></html>
