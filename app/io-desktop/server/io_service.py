@@ -41,6 +41,7 @@ from sqlglot import exp
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import render_plan  # noqa: E402
 import skills as skillmod  # noqa: E402
+import telegram_shell  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 UI = HERE.parent / "ui"
@@ -378,7 +379,7 @@ def parse_whatsapp(text: str) -> pd.DataFrame | None:
 def month_columns(columns: list[str]) -> list[str]:
     return [c for c in columns if MONTH_COL.match(str(c).strip())]
 
-def coerce_dates(frame: pd.DataFrame) -> pd.DataFrame:
+def coerce_dates(frame: pd.DataFrame, force_dayfirst: bool | None = None) -> pd.DataFrame:
     """Text columns whose values look like dates become real DATE/TIMESTAMP columns,
     so the model does not have to guess the format (dd-mm-yyyy is common in Indian sheets)."""
     for col in frame.columns:
@@ -388,7 +389,7 @@ def coerce_dates(frame: pd.DataFrame) -> pd.DataFrame:
         if len(sample) < 3 or sample.map(lambda v: bool(DATE_SHAPE.match(v))).mean() < 0.9:
             continue
         parsed = None
-        for dayfirst in (True, False):
+        for dayfirst in ((force_dayfirst,) if force_dayfirst is not None else (True, False)):
             try:
                 cand = pd.to_datetime(frame[col], errors="coerce", dayfirst=dayfirst, format="mixed")
             except Exception:  # noqa: BLE001
@@ -438,7 +439,13 @@ class Workspace:
         self.version = getattr(self, "version", 0) + 1
         used: set[str] = set()
         files = sorted(p for p in folder.iterdir() if p.suffix.lower() in (".csv", ".xlsx", ".xls", ".txt") and not p.name.startswith("~$"))
+        self.skills = skillmod.load_skills(folder)
         for f in files:
+            parse = {}
+            for sk in self.skills:
+                if sk["kind"] == "parse" and skillmod.table_matches(sk.get("trigger", {}), {"table": f.stem, "file": f.name, "columns": [], "sha256": skillmod.file_sha256(f), "folder": folder.name}):
+                    parse.update(sk.get("parse") or {})
+                    parse.setdefault("_skills", []).append(sk["name"])
             try:
                 if f.suffix.lower() == ".txt":
                     wa = parse_whatsapp(f.read_text(errors="replace"))
@@ -459,17 +466,23 @@ class Workspace:
                 continue
             parts = []
             for sheet, raw in frames.items():
+                if parse.get("sheet") and sheet and str(sheet) != str(parse["sheet"]):
+                    continue
+                if parse.get("header_row"):
+                    raw = raw.iloc[int(parse["header_row"]) - 1:].reset_index(drop=True)
                 for title, frame in tidy_frames(raw):
                     parts.append((sheet, title, frame))
             for sheet, title, frame in parts:
-                frame = coerce_dates(frame)
+                frame = coerce_dates(frame, force_dayfirst=parse.get("dayfirst"))
+                if parse:
+                    frame.attrs["parse_skills"] = parse.get("_skills", [])
                 merged = canonicalise_variants(frame)
                 suffix = (f"_{sheet}" if sheet and len(frames) > 1 else "") + (f"_{title}" if title else "")
                 name = table_name(f.stem + suffix, used)
                 self.db.register("tmp_frame", frame)
                 self.db.execute(f'CREATE TABLE "{name}" AS SELECT * FROM tmp_frame')
                 self.db.unregister("tmp_frame")
-                why = {k: v for k, v in frame.attrs.items() if k in ("header_row", "rows_before_header", "blocks", "numbers_from_text", "ids_kept_as_text", "dates_typed")}
+                why = {k: v for k, v in frame.attrs.items() if k in ("header_row", "rows_before_header", "blocks", "numbers_from_text", "ids_kept_as_text", "dates_typed", "parse_skills")}
                 if merged:
                     why["merged_case"] = merged
                 self.tables.append({"file": f.name, "sheet": sheet, "table": name, "rows": len(frame), "columns": list(frame.columns), "merged_case": merged, "why": why, "sha256": skillmod.file_sha256(f)})
@@ -638,7 +651,7 @@ class Workspace:
                     if sk["kind"] == "hint":
                         note += f'-- {sk["claim"]} (skill: {sk["name"]})\n'
                     fired.append(sk["name"])
-            t.setdefault("why", {})["skills"] = fired
+            t.setdefault("why", {})["skills"] = fired + list(t.get("why", {}).get("parse_skills") or [])
             if any(b["src"] == t["table"] for b in self.bridges):
                 t["why"]["normalised_join_columns"] = [b["col"] for b in self.bridges if b["src"] == t["table"]]
             if t.get("merged_case"):
@@ -664,7 +677,8 @@ class Workspace:
 
 WS = Workspace()
 PROGRESS: list[dict] = []
-FIRED: list[str] = []   # rule/template skills that fired for the turn in flight
+FIRED: list[str] = []
+TG = {"shell": None}   # rule/template skills that fired for the turn in flight
 LOG_DIR = CONFIG_DIR / "logs"
 
 
@@ -697,6 +711,9 @@ def step(text: str) -> None:
 # ---------------------------------------------------------------- model call
 
 def call_model(cfg: dict, prompt: str, max_tokens: int = 2500, timeout: int = 180) -> tuple[str, dict]:
+    reach = cfg.get("reach", "laptop")
+    if reach in ("t4gc", "frontier") and cfg.get("source") != "local":
+        cfg = {**cfg, "model": cfg.get("t1_model") if reach == "t4gc" else cfg.get("t2_model")}
     if cfg.get("source") == "local":
         endpoint, model, key = cfg.get("local_endpoint") or DEFAULT_CONFIG["local_endpoint"], cfg.get("local_model") or "local", ""
     else:
@@ -1222,6 +1239,8 @@ def run_compact(cfg: dict, tier: str) -> dict:
 def preview_skill(skill: dict) -> dict:
     protected = WS.protected_values()
     fires = [t["table"] for t in WS.tables if "table" in t and skillmod.table_matches(skill.get("trigger", {}), {**t, "folder": WS.folder.name if WS.folder else ""})] if skill.get("kind") in ("hint", "mapping") else []
+    if skill.get("kind") == "parse":
+        fires = sorted({t["file"] for t in WS.tables if "table" in t and skillmod.table_matches(skill.get("trigger", {}), {"table": t["table"], "file": t["file"], "columns": [], "sha256": t.get("sha256"), "folder": WS.folder.name if WS.folder else ""})})
     return {"leaks": skillmod.value_leak(skill, protected), "fires_on": fires, "question_trigger": bool((skill.get("trigger") or {}).get("question_regex"))}
 
 
@@ -1257,6 +1276,9 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
             return self._send(200, (UI / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if path == "/api/telegram/status":
+            sh = TG["shell"]
+            return self._json({"running": bool(sh and sh.running), "username": sh.username if sh else None, "log": (sh.log[-20:] if sh else [])})
         if path == "/api/skills":
             return self._json({"skills": [{k: v for k, v in sk.items() if k != "_path"} | {"fires_on": [t["table"] for t in WS.tables if "table" in t and sk["kind"] in ("hint", "mapping") and skillmod.table_matches(sk.get("trigger", {}), {**t, "folder": WS.folder.name if WS.folder else ""})]} for sk in WS.skills]})
         if path == "/api/progress":
@@ -1433,6 +1455,36 @@ class Handler(BaseHTTPRequestHandler):
                         return self._json(run_compact(cfg, body.get("tier", "t1")))
                 except Exception as exc:  # noqa: BLE001
                     return self._json({"error": str(exc)[:300]}, 500)
+            if self.path == "/api/telegram/start":
+                cfg = load_config()
+                tok = (body.get("token") or cfg.get("telegram_token") or "").strip()
+                if not tok:
+                    return self._json({"error": "paste a bot token from @BotFather first"}, 400)
+                if TG["shell"]:
+                    TG["shell"].stop()
+                try:
+                    shell = telegram_shell.TelegramShell(tok, sys.modules[__name__])
+                    info = shell.start()
+                except Exception as exc:  # noqa: BLE001
+                    return self._json({"error": f"Telegram did not accept that token: {str(exc)[:120]}"}, 400)
+                TG["shell"] = shell
+                cfg["telegram_token"] = tok
+                save_config(cfg)
+                return self._json(info)
+            if self.path == "/api/telegram/inject":
+                # test hook: feed a synthetic Telegram message through the bot without Telegram
+                if not TG["shell"]:
+                    return self._json({"error": "bot not running"}, 400)
+                sent = []
+                shell = TG["shell"]
+                orig_send, orig_doc = shell.send, shell.send_document
+                shell.send = lambda chat_id, text, mono=False: sent.append({"text": text, "mono": mono})
+                shell.send_document = lambda chat_id, name, content, caption="": sent.append({"document": name, "bytes": len(content), "caption": caption})
+                try:
+                    shell.handle(body.get("chat_id", 0), body.get("text", ""), {"first_name": "Test", "username": "test"})
+                finally:
+                    shell.send, shell.send_document = orig_send, orig_doc
+                return self._json({"replies": sent})
             if self.path == "/api/reset":
                 with WS.lock:
                     WS.history, WS.turns = [], {}
@@ -1449,6 +1501,13 @@ def main() -> None:
     if folder:
         WS.load(Path(folder))
     threading.Thread(target=WS.watch, daemon=True).start()
+    cfg0 = load_config()
+    if cfg0.get("telegram_token"):
+        try:
+            TG["shell"] = telegram_shell.TelegramShell(cfg0["telegram_token"], sys.modules[__name__])
+            print("telegram bot:", TG["shell"].start(), flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print("telegram bot not started:", str(exc)[:120], flush=True)
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"io service on http://127.0.0.1:{port}", flush=True)
     server.serve_forever()

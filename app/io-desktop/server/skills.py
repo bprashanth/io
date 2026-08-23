@@ -39,6 +39,7 @@ HERE = Path(__file__).resolve().parent
 BUILTIN_DIR = HERE.parent / "skills" / "builtin"
 USER_DIR = Path(os.environ.get("IO_CONFIG_DIR") or (Path.home() / ".config" / "io-desktop")) / "skills"
 KINDS = {"hint", "mapping", "parse", "rule", "template"}
+PARSE_KEYS = {"header_row", "dayfirst", "sheet"}
 
 
 def load_skills(folder: Path | None) -> list[dict]:
