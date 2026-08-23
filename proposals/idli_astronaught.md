@@ -106,3 +106,29 @@ A couple of questions that we probably need to figure out to guide this design
 2. Current kernel - does it have anything not meant for kernel?
 3. Telegram shell - that will be probably the most important shell to showcase so how can we test it out and use it for further evals?
 4. Does telegram force the use of astronaut? (Meaning the telegram protocol istr - just handling chats etc - was pre built into harnesses like open claw and Hermes). Deep seek also seems possible via composio. 
+
+
+---
+
+## Answers from the overnight run (2026-08-24, see `chronology/2026-08-24T0600-…`)
+
+1. **Harness or not, which.** Not in the laptop path. Hermes is the harness when one is wanted
+   (Telegram/WhatsApp gateway, agent-created skills + curator, local providers, registry) — measured
+   with the 9B and `io.py`: as correct as the kernel, 10–50× slower. Codex is out (no packaging).
+   Astronaut mode at the event = kernel + skills + Telegram shell, no agent loop; Hermes is the
+   T1/T2 agent shell and the remote "harness in a box" later.
+2. **Kernel contamination.** Fixed without regression: the four domain claims are built-in skill
+   files; structural interpretations that remain in code are listed in
+   `backlog/2026-08-24-structural-claims-left-in-kernel.md` and are all visible in SEE WHY.
+3. **Telegram shell.** Built into the io service (thread, long polling, token from the Astronaut
+   box); runs on the participant's laptop while the app is open; replies carry reach + egress.
+   `/reach` switches who answers; `/propose`, `/approve N` do compaction from the phone.
+4. **Does Telegram force astronaut?** No — it is gated behind the astronaut toggle for the event
+   (as decided), but it speaks kernel lanes only; no harness is involved.
+5. **27B vs frontier for skills.** 27B: fewer, correct, enough for the demo; Gemini: more mapping
+   proposals, +1 answer after two rounds. Both offered in the consent popup; default 27B.
+
+Skill model as built: kinds hint / mapping (unify, derive) / rule / parse / template; triggers
+are structural (`columns_all/any`, `table_regex`, `file_glob`, `file_sha256`, `folder_name`,
+loader flags, `question_regex`); layers built-in → user → folder; value-leak assertion on every
+card; misfire suite in `benchmarks/astronaut/`.

@@ -95,6 +95,14 @@ compiled deterministically; the `harness-skill/` (`AGENTS.md` + `io.py`) is
 kept for T1/T2 agents (27B with it: 22/22, 0 raw reads). The loader grew the
 sector shapes; the UI now shows live progress steps while the model works.
 
+**Astronaut (2026-08-24, `chronology/2026-08-24T0600-…`).** Skills layer in the
+kernel (built-in/user/folder JSON: hint, mapping, rule, parse, template; structural
+triggers; value-leak assertion), SEE WHY per table, interaction log, COMPACT (27B or
+frontier by consent) and AUTHOR wizard in the desktop UI, Telegram shell inside the
+service. Measured: bare kernel 17/22 → compacted 18–19/22 → hand built-ins 20/22; Hermes
+as harness with the 9B is as correct but 10–50× slower, so the laptop path stays
+harness-free. Demo flows screenshotted under `benchmarks/runs/2026-08-24-astronaut-flows/`.
+
 **Left open.** A ~4 GB quant for 8 GB laptops with the OS resident; Windows install of the shim;
 packaging as an installer; T1/T2 dial positions; sheltering (vault, lazy
 review, egress monitor from the shield) — the next steps of the proposal.

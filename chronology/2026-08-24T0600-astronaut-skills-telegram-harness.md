@@ -72,9 +72,18 @@ the user's phone code. Hermes' own gateway was left stopped so the two pollers d
 
 Codex: no packaging for any of this (stage-4 follow-up). **Hermes** (`hermes-agent-local`, on this
 box) has everything the proposal wants packaged: Telegram/WhatsApp gateway, agent-created skills +
-curator, local providers, skills registry. Measured in an isolated container with OpenRouter
-qwen/qwen3.5-9b, `AGENTS.md` + `io.py` mounted, `--yolo`: see the table at the end of this entry
-(filled in when the batch finished). Early rows: correct answers, 27–205 s each.
+curator, local providers, skills registry. Measured in an isolated container (`hermes-agent-local`, own
+HERMES_HOME, OpenRouter qwen/qwen3.5-9b, reasoning low, web/browser/memory toolsets off, `--yolo`)
+on the 22 corpus asks:
+
+| leg | correct /22 | mean time | notes |
+|---|---|---|---|
+| io kernel, 9B (no harness) | 20 | 2.5–4 s | 0 rows to the model |
+| Hermes + 9B + `AGENTS.md`/`io.py` | 19 (+1 by inspection: a correct 46-row table cut by the grader) | **83 s** (27–220 s) | on "80G receipts" it answered about "Rs 80,000" and says it "looked at the Excel file directly" — a 9B in a loop ignores the no-raw-reads rule when confused |
+| Hermes + 9B free (pandas) | see `hermes-9b-free/results.json` | | |
+
+Hermes's session files are not persisted in `-z` mode, so tool calls could not be audited; the
+Codex measurement (raw file reads in 21/22 free runs) stands as the privacy evidence.
 
 **Decision.** For the event, astronaut mode = kernel + skills + Telegram shell, **no agent loop in
 the laptop path**: the 9B through io answers in 2–4 s at 20/22; through Hermes it is as correct

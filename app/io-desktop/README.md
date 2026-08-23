@@ -104,3 +104,24 @@ model call. Edit a value in the sheet, watch the ranking reorder.
   amount" with no amount column) it may compute a proxy under that title —
   open the receipt.
 - Dashboards come out complete and clean; prose in reports is generic.
+
+## Astronaut mode (Settings → Astronaut)
+
+io does not self-learn; it asks permission to remember. With astronaut on:
+
+- **Propose skills from my usage** — with your consent, a remote model (the trusted 27B or a
+  frontier model) reads this folder's interaction log (questions, queries, errors — never rows)
+  and proposes skills as cards. Edit, approve or discard; approved skills apply from the next
+  question. Cards that contain data values are blocked.
+- **Add a skill** — a guided form: a hint about a table, a rule for a kind of question, a mapping
+  for differently-named columns across files, or a correction to how a file is read (dates
+  month-first, header on row N). Preview shows where it would fire.
+- **See why** — click any file: header row found, blocks merged, dates typed and which way,
+  numbers parsed from text, ids kept as text, skills fired. "This was read wrong — correct it"
+  opens the wizard on that file.
+- **Telegram** — paste a bot token from @BotFather; the bot runs from this laptop while the app
+  is open. `/reach` changes who answers; every reply says what left the laptop (column names only,
+  rows 0). `/why`, `/skills`, `/propose`, `/approve N`.
+
+Skills are JSON files: built-in (`skills/builtin/`), yours (`~/.config/io-desktop/skills/`), and
+per folder (`<folder>/.io/skills/`).
