@@ -22,8 +22,9 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "benchmarks" / "pii"))
+HERE = Path(__file__).resolve().parent
+os.environ.setdefault("HF_HOME", str(HERE / "hf-cache"))   # model weights live with the app
+sys.path.insert(0, str(HERE / "engine"))                    # the shield's tested modules, vendored unchanged
 
 from columns import classify_columns  # noqa: E402
 from detect import build_engine, regex_engine  # noqa: E402

@@ -10,7 +10,9 @@ const HERE = __dirname;
 let proc = null;
 
 function pythonExe() {
-  // the privacy-shield venv carries the tested engine (GLiNER, torch-cpu); prefer it
+  // own env first (created by install.sh); else the installed privacy-shield extension's venv
+  const own = path.join(HERE, '.venv', process.platform === 'win32' ? 'Scripts\\python.exe' : 'bin/python');
+  if (fs.existsSync(own)) return own;
   const shield = path.join(process.env.HOME || '', '.antigravity', 'extensions');
   if (fs.existsSync(shield)) {
     for (const d of fs.readdirSync(shield)) {
@@ -20,8 +22,6 @@ function pythonExe() {
       }
     }
   }
-  const venv = path.join(HERE, '.venv', process.platform === 'win32' ? 'Scripts\\python.exe' : 'bin/python');
-  if (fs.existsSync(venv)) return venv;
   return process.platform === 'win32' ? 'python' : 'python3';
 }
 
