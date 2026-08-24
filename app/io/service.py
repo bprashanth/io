@@ -369,7 +369,7 @@ def chat(question: str) -> dict:
             mentioned.append(hit)
             q_clean = q_clean.replace("@" + frag, hit)
     use = mentioned if mentioned else all_names
-    blocks, sent_rows, total = [], 0, 0
+    blocks, sent_rows, sent_lines, total = [], 0, 0, 0
     for t in S.tables:
         if t["name"] not in use:
             continue
@@ -397,6 +397,7 @@ def chat(question: str) -> dict:
         else:
             blocks.append(f"--- {d['name']} ---\n{red}")
         total += len(red)
+        sent_lines += red.count("\n") + 1
     q = S.sub_known(redact_question(q_clean, S.pmap, det)["redacted"])
     history = ""
     prior = [x for x in S.turns if x.get("answer")][-3:]
@@ -407,11 +408,11 @@ def chat(question: str) -> dict:
     leaks = S.leak_check(payload)
     if leaks:
         return {"error": f"stopped: {len(leaks)} private value(s) were about to leave, {', '.join(leaks[:3])}"}
-    S.step(f"asking: {sent_rows} rows go as codes")
+    S.step(f"asking: {sent_rows} rows, {sent_lines} lines go as codes")
     raw, meta = call_model(payload)
     S.step("translating codes back")
     turn = {"q": question, "q_sent": q, "answer_sent": raw if "<html" not in raw.lower() else "(page)",
-            "sent_rows": sent_rows, "bytes": len(payload), "files_used": use if mentioned else [], **meta}
+            "sent_rows": sent_rows, "sent_lines": sent_lines, "bytes": len(payload), "files_used": use if mentioned else [], **meta}
     if "<html" in raw.lower() or "<!doctype" in raw.lower():
         i = raw.lower().find("<!doctype")
         i = i if i >= 0 else raw.lower().find("<html")
@@ -478,6 +479,17 @@ class H(BaseHTTPRequestHandler):
             except PermissionError:
                 pass
             return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200], "data_files": count, "chat_files": chats, "pdf_files": pdfs})
+        if p.startswith("/api/vault/find"):
+            from urllib.parse import parse_qs, urlparse
+            qq = parse_qs(urlparse(self.path).query).get("q", [""])[0].strip()
+            out = []
+            if qq and len(qq) >= 2 and S.pmap:
+                cf = qq.casefold()
+                for tok, val in S.pmap.display.items():
+                    if cf in val.casefold():
+                        out.append({"value": val, "token": tok, "cls": tok.rsplit("_", 1)[0].replace("_", " ").lower()})
+                out.sort(key=lambda x: (len(x["value"]), x["value"].casefold()))
+            return self._json({"matches": out[:8]})
         if p == "/api/folders":
             folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
             return self._json({"folders": folders})
@@ -498,6 +510,11 @@ class H(BaseHTTPRequestHandler):
                         if rows:
                             changed[c] = rows
                     out.append({"name": t["name"], "columns": list(grid.columns), "grid": grid.values.tolist(), "changed": changed})
+                for d in S.docs:
+                    red = S.redacted.get(d["name"])
+                    if red is None:
+                        continue
+                    out.append({"name": d["name"], "kind": "doc", "text": red[:200_000]})
             return self._json({"files": out, "vault": len(S.pmap.display) if S.pmap else 0})
         if p == "/api/review":
             return self._json(self.review())
