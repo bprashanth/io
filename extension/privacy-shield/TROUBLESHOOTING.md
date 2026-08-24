@@ -51,6 +51,6 @@ What to audit there:
 - Enable: starts the daemon (its process survives IDE restarts on purpose), points
   Antigravity's model traffic at it (one relaunch needed the first time).
 - Disable: tells the daemon to quit and unroutes Antigravity.
-- Uninstall: on the next start, a cleanup script stops any daemon belonging to this
-  install and removes the routing setting. The vault file stays in the IDE's
-  globalStorage (it is your data); delete it by hand if you want it gone.
+- Uninstall: within the next start or two, a cleanup script stops any daemon belonging to
+  this install, deletes the Python environment from globalStorage, and removes the routing
+  setting. The vault file stays (it is your data); delete it by hand if you want it gone.

@@ -146,6 +146,7 @@ def main():
     score = bm25_chunks(files, 60_000)
     man = manifest(files)
     results = []
+    only = sys.argv[1] if len(sys.argv) > 1 else None
     for q in QS if isinstance(QS, list) else QS["questions"]:
         question = q["q"]; gold = q["gold"]
         red_q = redact_question(question, pm, regex_engine)["redacted"]
@@ -163,7 +164,21 @@ def main():
         picked = score(red_q)
         conds["bm25"] = "\n".join(f"--- {n} (excerpt) ---\n{c}" for n, c in picked)
         conds["bm25man"] = man + "\n\n" + conds["bm25"]
+        # file-level: name match first, then aggregate chunk scores per file; whole files to 300KB
+        fs_scores = defaultdict(float)
+        for n, c in picked: fs_scores[n] += len(c)
+        for n in files:
+            stem = n.rsplit(".", 1)[0].lower()
+            if stem in red_q.lower() or n.lower() in red_q.lower(): fs_scores[n] += 1e9
+        chosen, tot = [], 0
+        for n in sorted(fs_scores, key=lambda x: -fs_scores[x]):
+            if tot + len(files[n]) > 300_000: continue
+            chosen.append(n); tot += len(files[n])
+            if len(chosen) >= 6: break
+        conds["filesel"] = man + "\n\n" + "\n".join(f"--- {n} (complete) ---\n{files[n]}" for n in chosen)
         for cname, payload in conds.items():
+            if only and cname != only:
+                continue
             try:
                 ans, secs = call(payload, red_q)
                 ok = graded(pm.rehydrate(ans), gold)
@@ -173,7 +188,7 @@ def main():
                             "bytes": len(payload), "secs": round(secs, 1), "gold": gold,
                             "answer": pm.rehydrate(ans)[:300]})
             print(f"{q['kind']:<9} {cname:<9} ok={ok} {len(payload)//1024}KB {round(secs,1)}s", flush=True)
-    out = Path(__file__).parent / "results.json"
+    out = Path(__file__).parent / ("results.json" if not only else f"results-{only}.json")
     out.write_text(json.dumps(results, indent=1))
     agg = defaultdict(lambda: [0, 0, 0])
     for r in results:

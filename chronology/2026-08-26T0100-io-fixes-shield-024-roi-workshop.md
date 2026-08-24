@@ -52,7 +52,38 @@ over CDP (screenshots in benchmarks/runs/2026-08-26-ag-plugin-e2e/). What the ru
 
 ## Payload ROI (the size-limit decision)
 
-RESULTS_PLACEHOLDER
+Corpus: a generated 120-file, 18.5 MB NGO shared drive (60 visit CSVs, 24 attendance CSVs,
+12 WhatsApp exports, 12 narrative reports, donor CRM, grant letters; seeded, gold answers
+recomputed independently) and 12 questions in three kinds: single-file, cross-file
+aggregate, needle-in-many-files. Gemini 3.7 Flash, redacted payloads and questions,
+answers rehydrated then graded. Script + raw answers: `benchmarks/runs/2026-08-26-payload-roi/`.
+
+| condition | correct | avg payload |
+|---|---|---|
+| today's io (all files, 150 KB cap) | 0/12 | 147 KB |
+| option 1: naive caps (5 files, 1 MB each) | 0/12 | 34 KB |
+| option 2: BM25 top chunks (60 KB) | 5/12 | 61 KB |
+| BM25 chunks + local manifest | **7/12** | 73 KB |
+| whole-file selection + manifest | 5/12 | 105 KB |
+
+Readings:
+- The complaint is real: on a big folder today's io sends truncated fragments and the model
+  answers "file not provided". Naive caps pick the wrong files and also score zero. Both out.
+- Retrieval is the answer, but the two variants are complementary: chunks find needles,
+  whole files count correctly (the chunk run answered "24" where the whole file says 43).
+- The **local manifest** (per-file row counts and numeric sums, computed on the laptop) is
+  what rescues aggregates - it costs nothing and lifted BM25 from 5 to 7.
+- What stays unsolved by any payload strategy: needles across 60 files and folder-wide
+  computations - those are local-compute questions (the ask lane / the deferred harness
+  discussion), not context questions.
+- Cost is a non-issue at this size: every condition lands under a cent per question on
+  flash; the ROI is quality, not dollars.
+
+Recommendation for io: BM25 selection over the redacted corpus with (a) whole-file
+promotion when a file is named or one file dominates the scores, (b) the local manifest
+always included, (c) the existing @ mention as the explicit override, and (d) a visible
+"searched N files, sent M" line so the user knows what the model saw. Caps only as an
+outer safety bound, not as the selection mechanism.
 
 ## Workshop probe (actions on the laptop)
 
