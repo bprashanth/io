@@ -39,7 +39,9 @@ async function choosePort() {
   const base = cfg().get("port") || 8765;
   for (let p = base; p < base + 20; p++) {
     chosenPort = p;
-    if (await getJson(`http://127.0.0.1:${p}/shield/status.json`)) return p;   // our daemon, adopt
+    const st = await getJson(`http://127.0.0.1:${p}/shield/status.json`);
+    if (st && (!st.server || path.resolve(st.server) === path.resolve(serverDir()))) return p;   // our daemon, adopt
+    if (st) continue;                                            // a foreign shield daemon: leave it alone
     if (await portFree(p)) return p;
   }
   chosenPort = null;
@@ -162,7 +164,10 @@ function relaunch(withShield) {
 
 // ---- daemon ------------------------------------------------------------------
 async function daemonAlive() {
-  return !!(await getJson(`${proxyUrl()}/shield/status.json`));
+  const s = await getJson(`${proxyUrl()}/shield/status.json`);
+  if (!s) return false;
+  if (s.server && path.resolve(s.server) !== path.resolve(serverDir())) return false;  // someone else's daemon (another profile/version): do not adopt
+  return true;
 }
 
 function daemonCommand() {
@@ -208,7 +213,7 @@ async function startDaemon() {
   const py = pythonPath();
   if (!py) {
     const pick = await vscode.window.showErrorMessage(
-      "Privacy Shield: Python environment not found. Run the one-time install (needs internet, ~200 MB).",
+      "Privacy Shield: Python environment not found. Run the one-time install (needs internet, about a 500 MB download, 1.7 GB on disk).",
       "Install now");
     if (pick === "Install now") await install();
     return false;

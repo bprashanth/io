@@ -786,7 +786,9 @@ def make_handler(shield: Shield, annotate: bool):
                 with LOCK:
                     snap = dict(STATS)
                 snap.update(vault_entries=len(shield.vault.display), cache_entries=len(shield.cache),
-                            peek=PEEK["on"], pending_review=bool(shield.pending))
+                            peek=PEEK["on"], pending_review=bool(shield.pending),
+                            tokens_est_out=int(snap.get("bytes_out", 0) / 4),
+                            server=os.path.dirname(os.path.abspath(__file__)))
                 if url.path.endswith(".json"):
                     return self.send_local(200, json.dumps(snap, indent=1).encode())
                 rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in snap.items())
