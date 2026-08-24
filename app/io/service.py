@@ -353,6 +353,51 @@ def call_model(prompt: str) -> tuple[str, dict]:
     return text, {"model": raw.get("model", model), "seconds": round(time.monotonic() - t0, 1)}
 
 
+SHARED: dict = {}
+SHARE_SRV: list = []
+
+def lan_ip() -> str:
+    import socket
+    try:
+        sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sk.connect(("8.8.8.8", 80))
+        ip = sk.getsockname()[0]
+        sk.close()
+        return ip
+    except OSError:
+        return "127.0.0.1"
+
+
+class ShareH(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):  # noqa: N802
+        m = re.match(r"^/p/(\d+)$", self.path.split("?")[0])
+        page = SHARED.get(int(m.group(1))) if m else None
+        body = page.encode() if page else b"nothing shared here"
+        self.send_response(200 if page else 404)
+        self.send_header("Content-Type", "text/html; charset=utf-8" if page else "text/plain")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def ensure_share_server() -> int:
+    if SHARE_SRV:
+        return SHARE_SRV[0]
+    port = 8820
+    for port in range(8820, 8840):
+        try:
+            srv = ThreadingHTTPServer(("0.0.0.0", port), ShareH)
+            break
+        except OSError:
+            continue
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    SHARE_SRV.append(port)
+    return port
+
+
 def chat(question: str) -> dict:
     if not S.redacted:
         S.step("hiding what you marked")
@@ -611,6 +656,13 @@ class H(BaseHTTPRequestHandler):
                 folders = [x for x in folders if x["path"] != body.get("path")]
                 FOLDERS_PATH.write_text(json.dumps(folders, indent=1))
                 return self._json({"folders": folders})
+            if self.path == "/api/share":
+                t = next((x for x in S.turns if x.get("id") == int(body["id"]) and x.get("page")), None)
+                if not t:
+                    return self._json({"error": "no page"}, 404)
+                port = ensure_share_server()
+                SHARED[t["id"]] = t["page"]
+                return self._json({"url": f"http://{lan_ip()}:{port}/p/{t['id']}"})
             if self.path == "/api/accept":
                 with S.lock:
                     if not S.redacted:
