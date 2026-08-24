@@ -60,10 +60,12 @@ td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:po
 #chev{position:absolute;left:14px;top:14px;color:var(--dim)}
 #note{max-width:860px;margin:6px auto 0;font-size:12px;color:var(--dim);padding:0 6px;min-height:16px}
 
-/* settings modal */
-#settings{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
-#settings.on{display:flex}
-#settings .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px;width:400px;display:flex;flex-direction:column;gap:10px}
+/* modals */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+.modal.on{display:flex}
+.modal .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px;width:400px;display:flex;flex-direction:column;gap:10px}
+.br-dir{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px}
+.br-dir:hover{color:var(--hi)}
 </style>
 </head>
 <body>
@@ -102,7 +104,13 @@ td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:po
   <div id="note"></div>
 </div>
 
-<div id="settings"><div class="card">
+<div id="browser" class="modal"><div class="card" style="width:460px">
+  <div id="br-path" class="dim" style="font-size:13px;word-break:break-all"></div>
+  <div id="br-list" style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px"></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button id="br-x">Cancel</button><button class="go" id="br-open">Open</button></div>
+</div></div>
+
+<div id="settings" class="modal"><div class="card">
   <input id="st-key" type="password" placeholder="API key">
   <input id="st-server" placeholder="or server address">
   <input id="st-model" placeholder="model">
@@ -113,7 +121,7 @@ td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:po
 const $ = s => document.querySelector(s);
 let files = [], tab = 0, terms = [], accepted = false;
 const api = (p, b) => fetch(p, b ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(b)} : {}).then(r => r.json());
-(async () => { const st = await api('/api/state'); if (st.provider.set) show(st.files.length ? '#s-chat' : '#s-home'); if (st.files.length) { const r = await api('/api/review'); files = r.files; accepted = true; const t = await api('/api/terms'); terms = t.terms || []; } })();
+(async () => { const st = await api('/api/state'); if (st.provider.set) show('#s-home'); })();
 function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = id === '#s-provider' ? 'none' : ''; }
 
 // provider
@@ -126,13 +134,28 @@ $('#p-go').onclick = async () => {
 
 // settings
 $('#gear').onclick = () => $('#settings').classList.add('on');
+$('#br-x').onclick = () => $('#browser').classList.remove('on');
+$('#br-open').onclick = () => { const p = $('#br-path').dataset.path; if (p) { $('#browser').classList.remove('on'); openFolder(p); } };
 $('#st-x').onclick = () => $('#settings').classList.remove('on');
 $('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-key').value.trim(), server: $('#st-server').value.trim(), model: $('#st-model').value.trim()}); $('#settings').classList.remove('on'); };
 
 // folder
+async function browseTo(path){
+  const r = await api('/api/browse?path=' + encodeURIComponent(path || ''));
+  $('#br-path').textContent = r.path; $('#br-path').dataset.path = r.path;
+  $('#br-open').textContent = r.data_files ? `Open · ${r.data_files} file${r.data_files > 1 ? 's' : ''}` : 'Open';
+  $('#br-list').innerHTML = (r.parent ? `<div class="br-dir" data-p="${encodeURIComponent(r.parent)}">..</div>` : '') +
+    r.dirs.map(d => `<div class="br-dir" data-p="${encodeURIComponent(r.path + '/' + d)}">${d}</div>`).join('');
+  document.querySelectorAll('.br-dir').forEach(el => el.onclick = () => browseTo(decodeURIComponent(el.dataset.p)));
+}
 async function pickFolder(){
-  let path = window.io && window.io.pickFolder ? await window.io.pickFolder() : prompt('Folder');
+  let path = null;
+  if (window.io && window.io.pickFolder) path = await window.io.pickFolder();
+  else { $('#browser').classList.add('on'); await browseTo($('#br-path').dataset.path || ''); return; }
   if (!path) return;
+  openFolder(path);
+}
+async function openFolder(path){
   show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';
   const poll = setInterval(async () => { const st = await api('/api/state'); if (st.progress && st.progress.length) $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">' + st.progress[st.progress.length-1] + '…</p>'; }, 800);
   const r = await api('/api/folder', {path});

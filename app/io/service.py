@@ -271,6 +271,24 @@ class H(BaseHTTPRequestHandler):
         if m:
             t = next((x for x in S.turns if x.get("id") == int(m.group(1)) and x.get("page")), None)
             return self._send(200, t["page"].encode(), "text/html; charset=utf-8") if t else self._send(404, b"")
+        if p.startswith("/api/browse"):
+            from urllib.parse import parse_qs, urlparse
+            q = parse_qs(urlparse(self.path).query)
+            cur = Path(q.get("path", [str(Path.home())])[0]).expanduser().resolve()
+            if not cur.is_dir():
+                cur = Path.home()
+            dirs, count = [], 0
+            try:
+                for e in sorted(cur.iterdir()):
+                    if e.name.startswith("."):
+                        continue
+                    if e.is_dir():
+                        dirs.append(e.name)
+                    elif e.suffix.lower() in (".csv", ".xlsx", ".xls"):
+                        count += 1
+            except PermissionError:
+                pass
+            return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200], "data_files": count})
         if p == "/api/review":
             return self._json(self.review())
         if p == "/api/terms":
