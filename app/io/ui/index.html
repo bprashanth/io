@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>io</title>
+<style>
+:root{--bg:#1a1d21;--panel:#22262b;--line:#33383f;--ink:#e8e6e1;--dim:#8b9096;--hi:#e8b26a;--hibg:rgba(232,178,106,.13)}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column}
+button{font:inherit;color:var(--ink);background:none;border:1px solid var(--line);border-radius:10px;padding:8px 16px;cursor:pointer}
+button.go{border-color:var(--hi);color:var(--hi)}
+input,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;outline:none;width:100%}
+input:focus,textarea:focus{border-color:var(--hi)}
+.dim{color:var(--dim)}
+#gear{position:fixed;top:14px;right:16px;color:var(--dim);cursor:pointer;font-size:17px;z-index:5;background:none;border:none;padding:4px}
+
+/* screens */
+.screen{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px}
+.screen.on{display:flex}
+#s-provider .card{width:400px;display:flex;flex-direction:column;gap:10px}
+#s-provider h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
+#s-provider p{margin:0 0 6px;text-align:center}
+#plus{width:88px;height:88px;border-radius:50%;border:1px solid var(--line);font-size:40px;font-weight:200;color:var(--dim);display:flex;align-items:center;justify-content:center;cursor:pointer}
+#plus:hover{border-color:var(--hi);color:var(--hi)}
+
+/* sheet */
+#s-sheet{justify-content:flex-start;align-items:stretch;padding:0;overflow:hidden}
+#sheet-top{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)}
+#sheet-top .tabs{display:flex;gap:6px;overflow-x:auto}
+#sheet-top .tabs button{padding:5px 12px;font-size:13px;white-space:nowrap}
+#sheet-top .tabs button.on{border-color:var(--hi);color:var(--hi)}
+#sheet-hint{margin-left:auto;font-size:13px;color:var(--dim);white-space:nowrap}
+#gridwrap{flex:1;overflow:auto}
+table{border-collapse:collapse;font-size:13px;min-width:100%}
+th,td{padding:6px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none}
+th .why{display:block;font-weight:400;font-size:11px;color:var(--hi)}
+.hid{background:var(--hibg)}
+th.hid{color:var(--hi)}
+td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:pointer}
+#sheet-bar{display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;border-top:1px solid var(--line)}
+
+/* chat */
+#s-chat{justify-content:flex-start;align-items:stretch;padding:0;overflow:hidden}
+#thread{flex:1;overflow:auto;padding:28px 0}
+.msg{max-width:820px;margin:0 auto 18px;padding:0 24px;width:100%}
+.msg .q{color:var(--hi)}
+.msg .a{white-space:pre-wrap}
+.msg .sent{font-size:12px;color:var(--dim);margin-top:6px}
+.msg iframe{width:100%;height:600px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.msg .working{color:var(--dim)}
+
+/* input bar */
+#bar{padding:16px 24px 22px}
+#barin{max-width:860px;margin:0 auto;position:relative}
+#mirror{position:absolute;inset:0;padding:14px 44px 14px 34px;pointer-events:none;white-space:pre-wrap;overflow:hidden;font:inherit;line-height:1.5;color:var(--ink)}
+#mirror s{color:var(--dim);text-decoration-color:var(--hi)}
+#q{padding:13px 44px 13px 34px;border-radius:16px;resize:none;height:52px;background:var(--panel);color:transparent;caret-color:var(--ink)}
+#q::placeholder{color:var(--dim)}
+#q:disabled{opacity:.45}
+#chev{position:absolute;left:14px;top:14px;color:var(--dim)}
+#clip{position:absolute;right:14px;top:13px;color:var(--dim);cursor:pointer;background:none;border:none;font-size:16px;padding:0}
+#note{max-width:860px;margin:6px auto 0;font-size:12px;color:var(--dim);padding:0 6px;min-height:16px}
+
+/* settings modal */
+#settings{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+#settings.on{display:flex}
+#settings .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px;width:400px;display:flex;flex-direction:column;gap:10px}
+</style>
+</head>
+<body>
+<button id="gear" style="display:none">⚙</button>
+
+<div class="screen on" id="s-provider">
+  <div class="card">
+    <h1>io</h1>
+    <p class="dim">io needs an AI provider.</p>
+    <input id="p-key" type="password" placeholder="API key" autocomplete="off">
+    <input id="p-server" placeholder="or server address" autocomplete="off">
+    <button class="go" id="p-go">Start</button>
+  </div>
+</div>
+
+<div class="screen" id="s-home">
+  <div id="plus" title="Add a folder">+</div>
+</div>
+
+<div class="screen" id="s-sheet">
+  <div id="sheet-top"><div class="tabs" id="tabs"></div><span id="sheet-hint">Highlighted leaves as codes. Click a column to change.</span></div>
+  <div id="gridwrap"></div>
+  <div id="sheet-bar"><button id="sheet-ok" class="go">Looks right</button></div>
+</div>
+
+<div class="screen" id="s-chat">
+  <div id="thread"></div>
+</div>
+
+<div id="bar" style="display:none">
+  <div id="barin">
+    <div id="mirror"></div>
+    <textarea id="q" placeholder="ready when you are..." rows="1"></textarea>
+    <span id="chev">&gt;</span>
+    <button id="clip" title="Add a folder">📎</button>
+  </div>
+  <div id="note"></div>
+</div>
+
+<div id="settings"><div class="card">
+  <input id="st-key" type="password" placeholder="API key">
+  <input id="st-server" placeholder="or server address">
+  <input id="st-model" placeholder="model">
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button id="st-x">Close</button><button class="go" id="st-ok">Save</button></div>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let files = [], tab = 0, terms = [], accepted = false;
+const api = (p, b) => fetch(p, b ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(b)} : {}).then(r => r.json());
+(async () => { const st = await api('/api/state'); if (st.provider.set) show(st.files.length ? '#s-chat' : '#s-home'); if (st.files.length) { const r = await api('/api/review'); files = r.files; accepted = true; const t = await api('/api/terms'); terms = t.terms || []; } })();
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = id === '#s-provider' ? 'none' : ''; }
+
+// provider
+$('#p-go').onclick = async () => {
+  const key = $('#p-key').value.trim(), server = $('#p-server').value.trim();
+  if (!key && !server) { $('#p-key').focus(); return; }
+  await api('/api/provider', {api_key: key, server});
+  show('#s-home');
+};
+
+// settings
+$('#gear').onclick = () => $('#settings').classList.add('on');
+$('#st-x').onclick = () => $('#settings').classList.remove('on');
+$('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-key').value.trim(), server: $('#st-server').value.trim(), model: $('#st-model').value.trim()}); $('#settings').classList.remove('on'); };
+
+// folder
+async function pickFolder(){
+  let path = window.io && window.io.pickFolder ? await window.io.pickFolder() : prompt('Folder');
+  if (!path) return;
+  show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';
+  const poll = setInterval(async () => { const st = await api('/api/state'); if (st.progress && st.progress.length) $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">' + st.progress[st.progress.length-1] + '…</p>'; }, 800);
+  const r = await api('/api/folder', {path});
+  clearInterval(poll);
+  if (r.error) { alert(r.error); show(accepted ? '#s-chat' : '#s-home'); return; }
+  files = r.files; tab = 0; accepted = false; renderSheet();
+}
+$('#plus').onclick = pickFolder;
+$('#clip').onclick = pickFolder;
+
+function renderSheet(){
+  show('#s-sheet');
+  $('#tabs').innerHTML = files.map((f, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${f.name}</button>`).join('');
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = +b.dataset.i; renderSheet(); });
+  const f = files[tab];
+  const hid = f.hidden || {};
+  const spans = f.spans || {};
+  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : ''}" data-c="${encodeURIComponent(c)}">${c}${hid[c] ? `<span class=why>${hid[c]}</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
+  f.grid.forEach((row, ri) => {
+    html += '<tr>' + row.map((v, ci) => {
+      const c = f.columns[ci];
+      const colHid = !!hid[c];
+      const cellHit = spans[c] && spans[c].includes(ri);
+      return `<td class="${colHid ? 'hid' : ''}${cellHit ? ' cellhit' : ''}" data-c="${encodeURIComponent(c)}">${String(v ?? '').slice(0, 80)}</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  $('#gridwrap').innerHTML = html;
+  document.querySelectorAll('th[data-c], td.cellhit').forEach(el => el.onclick = () => toggle(decodeURIComponent(el.dataset.c)));
+}
+async function toggle(column){
+  const r = await api('/api/toggle', {name: files[tab].name, column});
+  if (!r.error) { files = r.files; renderSheet(); }
+}
+$('#sheet-ok').onclick = async () => {
+  accepted = true;
+  show('#s-chat'); $('#q').focus();
+  $('#note').textContent = 'coding the files…';
+  await api('/api/accept', {});
+  const t = await api('/api/terms'); terms = t.terms || [];
+  $('#note').textContent = '';
+  paintMirror();
+};
+
+// chat + live strikethrough
+const q = $('#q'), mirror = $('#mirror');
+function paintMirror(){
+  let v = q.value;
+  let out = v.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]));
+  if (accepted) for (const t of terms) { if (t.length < 3) continue; const rx = new RegExp('(?<![\\w])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w])', 'gi'); out = out.replace(rx, m => `<s>${m}</s>`); }
+  mirror.innerHTML = out || `<span style="color:var(--dim)">${q.placeholder}</span>`;
+  $('#note').textContent = accepted && /<s>/.test(out) ? 'struck-through words leave as codes' : '';
+}
+q.addEventListener('input', paintMirror);
+q.addEventListener('scroll', () => mirror.scrollTop = q.scrollTop);
+q.addEventListener('keydown', async e => {
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  e.preventDefault();
+  const text = q.value.trim(); if (!text) return;
+  if (!files.length) { pickFolder(); return; }
+  if (!accepted) { renderSheet(); return; }
+  q.value = ''; paintMirror(); q.disabled = true;
+  show('#s-chat');
+  const el = document.createElement('div'); el.className = 'msg';
+  el.innerHTML = `<div class="q"></div><div class="working">…</div>`;
+  el.querySelector('.q').textContent = text;
+  $('#thread').appendChild(el); $('#thread').scrollTop = 1e9;
+  const tick = setInterval(async () => { const st = await api('/api/state'); if (st.progress.length) el.querySelector('.working').textContent = st.progress[st.progress.length-1] + '…'; }, 700);
+  const r = await api('/api/chat', {text});
+  clearInterval(tick); q.disabled = false; q.focus();
+  const w = el.querySelector('.working'); w.className = 'a';
+  if (r.error) w.textContent = r.error;
+  else if (r.has_page) { w.innerHTML = `<iframe src="/api/page/${r.id}"></iframe>`; }
+  else w.textContent = r.answer || '';
+  if (!r.error) { const s = document.createElement('div'); s.className = 'sent'; s.textContent = `${r.sent_rows} rows sent as codes · ${r.model} · ${r.seconds}s`; el.appendChild(s); }
+  const t = await api('/api/terms'); terms = t.terms || terms;
+  $('#thread').scrollTop = 1e9;
+});
+paintMirror();
+</script>
+</body>
+</html>
