@@ -34,6 +34,7 @@ UI = Path(__file__).resolve().parent / "ui"
 CONF = Path(os.environ.get("IO_HOME") or (Path.home() / ".config" / "io"))
 CONF.mkdir(parents=True, exist_ok=True)
 DECISIONS_PATH = CONF / "decisions.json"
+FOLDERS_PATH = CONF / "folders.json"
 
 REASON = {
     "person_name": "names", "phone": "phone numbers", "aadhaar": "Aadhaar numbers", "email": "emails",
@@ -120,9 +121,9 @@ class State:
                     continue
                 frame = frame.fillna("")
                 frame.columns = [str(c) for c in frame.columns]
-                name = f.stem + (f" · {sheet}" if sheet and len(frames) > 1 else "")
+                name = f.stem + (f" - {sheet}" if sheet and len(frames) > 1 else "")
                 if any(t["name"] == name for t in self.tables):
-                    name = f"{f.stem} ({f.suffix.lstrip('.')})" + (f" · {sheet}" if sheet and len(frames) > 1 else "")
+                    name = f"{f.stem} ({f.suffix.lstrip('.')})" + (f" - {sheet}" if sheet and len(frames) > 1 else "")
                 self.step(f"scanning {name}")
                 classes = classify_columns(frame, det)
                 key = self.header_key(list(frame.columns))
@@ -131,6 +132,10 @@ class State:
                 self.tables.append({"file": f.name, "sheet": sheet, "name": name, "key": key,
                                     "frame": frame, "classes": classes, "decided": decided, "spans": spans})
         self.step("done")
+        folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
+        folders = [x for x in folders if x["path"] != str(folder)]
+        folders.insert(0, {"path": str(folder), "name": folder.name, "files": len(self.tables)})
+        FOLDERS_PATH.write_text(json.dumps(folders[:24], indent=1))
 
     @staticmethod
     def effective(t: dict) -> dict[str, str]:
@@ -159,7 +164,7 @@ class State:
                     for st, en, label, _c in found[:3]:
                         word = REASON.get(label, label).rstrip("s")
                         parts.append(f"{word}: {v[st:en][:24]}")
-                    hits[i] = " · ".join(parts)
+                    hits[i] = ", ".join(parts)
             spans[col] = hits
         return spans
 
@@ -248,8 +253,8 @@ def chat(question: str) -> dict:
     payload = S.sub_known(PROMPT.replace("{keys}", keys).format(files="\n\n".join(blocks), history=history, question=q))
     leaks = S.leak_check(payload)
     if leaks:
-        return {"error": f"stopped — {len(leaks)} private value(s) were about to leave: {', '.join(leaks[:3])}"}
-    S.step(f"asking · {sent_rows} rows go as codes")
+        return {"error": f"stopped: {len(leaks)} private value(s) were about to leave, {', '.join(leaks[:3])}"}
+    S.step(f"asking: {sent_rows} rows go as codes")
     raw, meta = call_model(payload)
     S.step("translating codes back")
     turn = {"q": question, "q_sent": q, "answer_sent": raw if "<html" not in raw.lower() else "(page)",
@@ -316,6 +321,27 @@ class H(BaseHTTPRequestHandler):
             except PermissionError:
                 pass
             return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200], "data_files": count})
+        if p == "/api/folders":
+            folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
+            return self._json({"folders": folders})
+        if p == "/api/preview":
+            with S.lock:
+                if not S.redacted:
+                    S.step("coding the files")
+                    S.build_vault()
+                out = []
+                for t in S.tables:
+                    red = S.redacted.get(t["name"])
+                    if red is None:
+                        continue
+                    grid = red.head(120)
+                    changed = {}
+                    for ci, c in enumerate(grid.columns):
+                        rows = [ri for ri, (a, b) in enumerate(zip(t["frame"][c].head(120), grid[c])) if str(a) != str(b)]
+                        if rows:
+                            changed[c] = rows
+                    out.append({"name": t["name"], "columns": list(grid.columns), "grid": grid.values.tolist(), "changed": changed})
+            return self._json({"files": out, "vault": len(S.pmap.display) if S.pmap else 0})
         if p == "/api/review":
             return self._json(self.review())
         if p == "/api/terms":
@@ -354,6 +380,11 @@ class H(BaseHTTPRequestHandler):
                     DECISIONS_PATH.write_text(json.dumps(S.decisions, indent=1))
                     S.redacted = {}  # rebuild vault on next question
                 return self._json(self.review())
+            if self.path == "/api/folders/remove":
+                folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
+                folders = [x for x in folders if x["path"] != body.get("path")]
+                FOLDERS_PATH.write_text(json.dumps(folders, indent=1))
+                return self._json({"folders": folders})
             if self.path == "/api/accept":
                 with S.lock:
                     if not S.redacted:

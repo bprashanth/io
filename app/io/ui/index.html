@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>io</title>
 <style>
-:root{--bg:#1a1d21;--panel:#22262b;--line:#33383f;--ink:#e8e6e1;--dim:#8b9096;--hi:#e8b26a;--hibg:rgba(232,178,106,.13)}
+:root{--bg:#1a1d21;--panel:#22262b;--line:#33383f;--ink:#e8e6e1;--dim:#8b9096;--hi:#e8b26a;--hibg:rgba(232,178,106,.13);--grn:#7fbf7f;--grnbg:rgba(110,190,120,.16)}
 *{box-sizing:border-box}html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column}
 button{font:inherit;color:var(--ink);background:none;border:1px solid var(--line);border-radius:10px;padding:8px 16px;cursor:pointer}
@@ -20,8 +20,25 @@ input:focus,textarea:focus{border-color:var(--hi)}
 #s-provider .card{width:400px;display:flex;flex-direction:column;gap:10px}
 #s-provider h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
 #s-provider p{margin:0 0 6px;text-align:center}
-#plus{width:88px;height:88px;border-radius:18px;border:1px solid var(--line);font-size:40px;font-weight:200;color:var(--dim);display:flex;align-items:center;justify-content:center;cursor:pointer}
-#plus:hover{border-color:var(--hi);color:var(--hi)}
+#shelf{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;max-width:760px}
+.fol{width:118px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;padding:12px 6px;border-radius:14px}
+.fol:hover{background:var(--panel)}
+.fol svg{color:var(--dim)}
+.fol:hover svg{color:var(--hi)}
+.fol .nm{font-size:13px;color:var(--ink);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fol .ct{font-size:11px;color:var(--dim)}
+#plus{width:64px;height:64px;border-radius:16px;border:1px solid var(--line);font-size:30px;font-weight:200;color:var(--dim);display:flex;align-items:center;justify-content:center}
+.fol:hover #plus{border-color:var(--hi);color:var(--hi)}
+#ctx{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;display:none;z-index:30}
+#ctx button{border:none;padding:7px 14px;width:100%;text-align:left}
+#ctx button:hover{color:var(--hi)}
+.cards{display:flex;gap:12px}
+.ftype{width:150px;border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:10px}
+.ftype .t{font-size:13px}
+.ftype svg{align-self:center;color:var(--dim);margin:8px 0}
+.ftype.pick{border-color:var(--grn)}
+.ftype.pick .t{color:var(--grn)}
+.ftype.off{opacity:.35;cursor:default}
 
 /* sheet */
 #s-sheet{justify-content:flex-start;align-items:stretch;padding:0;overflow:hidden}
@@ -33,10 +50,11 @@ input:focus,textarea:focus{border-color:var(--hi)}
 table{border-collapse:collapse;font-size:13px;min-width:100%}
 th,td{padding:6px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis}
 th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none}
-th .why{display:block;font-weight:400;font-size:11px;color:var(--hi)}
-.hid{background:var(--hibg)}
-th.hid{color:var(--hi)}
-td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:pointer}
+.hid{background:var(--grnbg)}
+th.hid{color:var(--grn)}
+th .why{display:block;font-weight:400;font-size:11px;color:var(--grn)}
+td.cellhit{background:var(--grnbg);box-shadow:inset 0 0 0 1px var(--grn);cursor:pointer}
+td.tok{background:var(--grnbg);color:var(--grn)}
 #sheet-bar{display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;border-top:1px solid var(--line)}
 
 /* chat */
@@ -82,13 +100,14 @@ td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:po
 </div>
 
 <div class="screen" id="s-home">
-  <div id="plus" title="Add a folder">+</div>
+  <div id="shelf"></div>
 </div>
+<div id="ctx"><button id="ctx-un">Unshelter</button></div>
 
 <div class="screen" id="s-sheet">
   <div id="sheet-top"><div class="tabs" id="tabs"></div></div>
   <div id="gridwrap"></div>
-  <div id="sheet-bar"><button id="sheet-ok" class="go">Looks right</button></div>
+  <div id="sheet-bar"><button id="sheet-preview">Preview</button><button id="sheet-back" style="display:none">Back</button><button id="sheet-ok" class="go">Looks right</button></div>
 </div>
 
 <div class="screen" id="s-chat">
@@ -104,9 +123,20 @@ td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:po
   <div id="note"></div>
 </div>
 
-<div id="confirmscan" class="modal"><div class="card" style="width:340px;text-align:center">
-  <div id="cs-text"></div>
-  <div style="display:flex;justify-content:center;gap:8px"><button id="cs-x">Cancel</button><button class="go" id="cs-ok">Scan</button></div>
+<div id="confirmscan" class="modal"><div class="card" style="width:540px">
+  <div class="cards">
+    <div class="ftype pick" id="ft-excel"><span class="t">excel / csv</span>
+      <svg width="64" height="64" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="8" width="36" height="32" rx="3"/><line x1="6" y1="18" x2="42" y2="18"/><line x1="6" y1="29" x2="42" y2="29"/><line x1="18" y1="8" x2="18" y2="40"/><line x1="30" y1="8" x2="30" y2="40"/></svg>
+    </div>
+    <div class="ftype off"><span class="t">whatsapp</span>
+      <svg width="64" height="64" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 10h32v22H18l-8 7v-7H8z"/><line x1="14" y1="18" x2="34" y2="18"/><line x1="14" y1="24" x2="28" y2="24"/></svg>
+    </div>
+    <div class="ftype off"><span class="t">pdf</span>
+      <svg width="64" height="64" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6h16l8 8v28H12z"/><path d="M28 6v8h8"/><line x1="18" y1="24" x2="30" y2="24"/><line x1="18" y1="31" x2="30" y2="31"/></svg>
+    </div>
+  </div>
+  <div id="cs-text" class="dim"></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button id="cs-x">Cancel</button><button class="go" id="cs-ok">OK</button></div>
 </div></div>
 
 <div id="browser" class="modal"><div class="card" style="width:460px">
@@ -126,7 +156,21 @@ td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:po
 const $ = s => document.querySelector(s);
 let files = [], skipped = [], tab = 0, terms = [], accepted = false;
 const api = (p, b) => fetch(p, b ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(b)} : {}).then(r => r.json());
-(async () => { const st = await api('/api/state'); if (st.provider.set) show('#s-home'); })();
+async function renderShelf(){
+  const r = await api('/api/folders');
+  const fol = f => `<div class="fol" data-p="${encodeURIComponent(f.path)}" title="${f.path}">
+    <svg width="56" height="56" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 12h12l4 5h20v21H6z"/></svg>
+    <span class="nm">${f.name}</span><span class="ct">${f.files} file${f.files === 1 ? '' : 's'}</span></div>`;
+  $('#shelf').innerHTML = r.folders.map(fol).join('') + `<div class="fol" id="add"><div id="plus">+</div><span class="nm dim">add</span></div>`;
+  document.querySelectorAll('.fol[data-p]').forEach(el => {
+    el.onclick = () => confirmScan(decodeURIComponent(el.dataset.p));
+    el.oncontextmenu = e => { e.preventDefault(); const c = $('#ctx'); c.style.display = 'block'; c.style.left = e.pageX + 'px'; c.style.top = e.pageY + 'px'; c.dataset.p = el.dataset.p; };
+  });
+  $('#add').onclick = pickFolder;
+}
+document.addEventListener('click', () => $('#ctx').style.display = 'none');
+$('#ctx-un').onclick = async () => { await api('/api/folders/remove', {path: decodeURIComponent($('#ctx').dataset.p)}); renderShelf(); };
+(async () => { const st = await api('/api/state'); if (st.provider.set) { show('#s-home'); renderShelf(); } })();
 function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = id === '#s-provider' ? 'none' : ''; }
 
 // provider
@@ -134,7 +178,7 @@ $('#p-go').onclick = async () => {
   const key = $('#p-key').value.trim(), server = $('#p-server').value.trim();
   if (!key && !server) { $('#p-key').focus(); return; }
   await api('/api/provider', {api_key: key, server});
-  show('#s-home');
+  show('#s-home'); renderShelf();
 };
 
 // settings
@@ -148,7 +192,7 @@ $('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-
 async function browseTo(path){
   const r = await api('/api/browse?path=' + encodeURIComponent(path || ''));
   $('#br-path').textContent = r.path; $('#br-path').dataset.path = r.path;
-  $('#br-open').textContent = r.data_files ? `Open · ${r.data_files} file${r.data_files > 1 ? 's' : ''}` : 'Open';
+  $('#br-open').textContent = r.data_files ? `Open - ${r.data_files} file${r.data_files > 1 ? 's' : ''}` : 'Open';
   $('#br-list').innerHTML = (r.parent ? `<div class="br-dir" data-p="${encodeURIComponent(r.parent)}">..</div>` : '') +
     r.dirs.map(d => `<div class="br-dir" data-p="${encodeURIComponent(r.path + '/' + d)}">${d}</div>`).join('');
   document.querySelectorAll('.br-dir').forEach(el => el.onclick = () => browseTo(decodeURIComponent(el.dataset.p)));
@@ -162,12 +206,10 @@ async function pickFolder(){
 }
 async function confirmScan(path){
   const r = await api('/api/browse?path=' + encodeURIComponent(path));
-  if (r.data_files > 1) {
-    $('#cs-text').textContent = `Scan ${r.data_files} files on this laptop?`;
-    $('#confirmscan').classList.add('on');
-    $('#cs-x').onclick = () => $('#confirmscan').classList.remove('on');
-    $('#cs-ok').onclick = () => { $('#confirmscan').classList.remove('on'); openFolder(path); };
-  } else openFolder(path);
+  $('#cs-text').textContent = r.data_files ? `Scanning ${r.data_files} file${r.data_files === 1 ? '' : 's'} with the on-device scanner.` : 'No excel or csv files here.';
+  $('#confirmscan').classList.add('on');
+  $('#cs-x').onclick = () => $('#confirmscan').classList.remove('on');
+  $('#cs-ok').onclick = () => { if (!r.data_files) return; $('#confirmscan').classList.remove('on'); openFolder(path); };
 }
 async function openFolder(path){
   show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';
@@ -177,18 +219,18 @@ async function openFolder(path){
   if (r.error) { alert(r.error); show(accepted ? '#s-chat' : '#s-home'); return; }
   files = r.files; skipped = r.skipped || []; tab = 0; accepted = false; renderSheet();
 }
-$('#plus').onclick = pickFolder;
 
 function renderSheet(){
   show('#s-sheet');
+  $('#sheet-preview').style.display = ''; $('#sheet-back').style.display = 'none';
   $('#tabs').innerHTML = files.map((f, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${f.name}</button>`).join('')
-    + (skipped.length ? `<span class="dim" style="font-size:12px;align-self:center;margin-left:8px">not read: ${skipped.join(' · ')}</span>` : '');
+    ;
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = +b.dataset.i; renderSheet(); });
   const f = files[tab];
   const hid = f.hidden || {};
   const spans = f.spans || {};
   const why = f.why || {};
-  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : ''}" data-c="${encodeURIComponent(c)}" title="${hid[c] ? (hid[c] + (why[c] ? ' — ' + why[c] : '')).replace(/"/g,'&quot;') : 'click to hide this column'}">${c}${hid[c] ? `<span class=why>${hid[c]}</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
+  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : ''}" data-c="${encodeURIComponent(c)}" title="${hid[c] ? (hid[c] + (why[c] ? ': ' + why[c] : '')).replace(/"/g,'&quot;') : 'click to hide this column'}">${c}${hid[c] ? `<span class=why>${hid[c]}</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
   f.grid.forEach((row, ri) => {
     html += '<tr>' + row.map((v, ci) => {
       const c = f.columns[ci];
@@ -204,6 +246,33 @@ function renderSheet(){
 async function toggle(column){
   const r = await api('/api/toggle', {name: files[tab].name, column});
   if (!r.error) { files = r.files; renderSheet(); }
+}
+let previewing = false;
+$('#sheet-preview').onclick = async () => {
+  $('#sheet-preview').disabled = true; $('#sheet-preview').textContent = 'coding';
+  const r = await api('/api/preview');
+  $('#sheet-preview').disabled = false; $('#sheet-preview').textContent = 'Preview';
+  if (r.error) { alert(r.error); return; }
+  previewFiles = r.files; previewing = true; renderPreview();
+};
+$('#sheet-back').onclick = () => { previewing = false; renderSheet(); };
+let previewFiles = [];
+function renderPreview(){
+  $('#sheet-preview').style.display = 'none'; $('#sheet-back').style.display = '';
+  const f = previewFiles[tab] || previewFiles[0];
+  $('#tabs').innerHTML = previewFiles.map((x, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${x.name}</button>`).join('')
+    + `<span class="dim" style="font-size:12px;align-self:center;margin-left:8px">this is what leaves</span>`;
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = +b.dataset.i; renderPreview(); });
+  const ch = f.changed || {};
+  let html = '<table><thead><tr>' + f.columns.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  f.grid.forEach((row, ri) => {
+    html += '<tr>' + row.map((v, ci) => {
+      const c = f.columns[ci];
+      const tok = ch[c] && ch[c].includes(ri);
+      return `<td class="${tok ? 'tok' : ''}">${String(v ?? '').slice(0, 80)}</td>`;
+    }).join('') + '</tr>';
+  });
+  $('#gridwrap').innerHTML = html + '</tbody></table>';
 }
 $('#sheet-ok').onclick = async () => {
   accepted = true;
@@ -245,7 +314,7 @@ q.addEventListener('keydown', async e => {
   if (r.error) w.textContent = r.error;
   else if (r.has_page) { w.innerHTML = `<iframe src="/api/page/${r.id}"></iframe>`; }
   else w.textContent = r.answer || '';
-  if (!r.error) { const s = document.createElement('div'); s.className = 'sent'; s.textContent = `${r.sent_rows} rows sent as codes · ${r.model} · ${r.seconds}s`; el.appendChild(s); }
+  if (!r.error) { const s = document.createElement('div'); s.className = 'sent'; s.textContent = `${r.sent_rows} rows sent as codes, ${r.model}, ${r.seconds}s`; el.appendChild(s); }
   const t = await api('/api/terms'); terms = t.terms || terms;
   $('#thread').scrollTop = 1e9;
 });
