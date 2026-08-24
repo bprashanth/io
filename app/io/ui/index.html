@@ -150,8 +150,8 @@ td.tok{background:var(--hibg);color:var(--hi)}
 <div id="confirmscan" class="modal"><div class="card" style="width:380px">
   <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
     <div class="br-dir" style="color:var(--hi)" id="ft-excel">excel / csv <span id="cs-count" class="dim"></span></div>
-    <div class="br-dir" style="opacity:.35;cursor:default">whatsapp</div>
-    <div class="br-dir" style="opacity:.35;cursor:default;border-bottom:none">pdf</div>
+    <div class="br-dir" style="color:var(--hi)" id="ft-chat">whatsapp / text <span id="cs-chat" class="dim"></span></div>
+    <div class="br-dir" style="color:var(--hi);border-bottom:none" id="ft-pdf">pdf <span id="cs-pdf" class="dim"></span></div>
   </div>
   <div style="display:flex;justify-content:flex-end;gap:8px"><button id="cs-x">Cancel</button><button class="go" id="cs-ok">OK</button></div>
 </div></div>
@@ -222,10 +222,12 @@ async function pickFolder(){
 }
 async function confirmScan(path){
   const r = await api('/api/browse?path=' + encodeURIComponent(path));
-  $('#cs-count').textContent = r.data_files ? `(${r.data_files} file${r.data_files === 1 ? '' : 's'}, scanned on this laptop)` : '(none here)';
+  const label = (n, el, row) => { el.textContent = n ? `(${n} file${n === 1 ? '' : 's'}, scanned on this laptop)` : '(none here)'; row.style.opacity = n ? '' : '.35'; };
+  label(r.data_files, $('#cs-count'), $('#ft-excel')); label(r.chat_files || 0, $('#cs-chat'), $('#ft-chat')); label(r.pdf_files || 0, $('#cs-pdf'), $('#ft-pdf'));
+  const total = (r.data_files || 0) + (r.chat_files || 0) + (r.pdf_files || 0);
   $('#confirmscan').classList.add('on');
   $('#cs-x').onclick = () => $('#confirmscan').classList.remove('on');
-  $('#cs-ok').onclick = () => { if (!r.data_files) return; $('#confirmscan').classList.remove('on'); openFolder(path); };
+  $('#cs-ok').onclick = () => { if (!total) return; $('#confirmscan').classList.remove('on'); openFolder(path); };
 }
 async function openFolder(path){
   show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';

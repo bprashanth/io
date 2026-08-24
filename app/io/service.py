@@ -462,7 +462,7 @@ class H(BaseHTTPRequestHandler):
             cur = Path(q.get("path", [str(Path.home())])[0]).expanduser().resolve()
             if not cur.is_dir():
                 cur = Path.home()
-            dirs, count = [], 0
+            dirs, count, chats, pdfs = [], 0, 0, 0
             try:
                 for e in sorted(cur.iterdir()):
                     if e.name.startswith("."):
@@ -471,9 +471,13 @@ class H(BaseHTTPRequestHandler):
                         dirs.append(e.name)
                     elif e.suffix.lower() in (".csv", ".xlsx", ".xls"):
                         count += 1
+                    elif e.suffix.lower() in (".txt", ".md", ".log"):
+                        chats += 1
+                    elif e.suffix.lower() == ".pdf":
+                        pdfs += 1
             except PermissionError:
                 pass
-            return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200], "data_files": count})
+            return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200], "data_files": count, "chat_files": chats, "pdf_files": pdfs})
         if p == "/api/folders":
             folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
             return self._json({"folders": folders})

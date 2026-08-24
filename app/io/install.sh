@@ -6,7 +6,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PIP="$HERE/.venv/bin/pip"
 "$PIP" install --upgrade pip >/dev/null
 "$PIP" install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2"
-"$PIP" install gliner==0.2.28 pandas openpyxl
+"$PIP" install gliner==0.2.28 pandas openpyxl pypdf
 HF_HOME="$HERE/hf-cache" "$HERE/.venv/bin/python" - <<'PY'
 from gliner import GLiNER
 GLiNER.from_pretrained("knowledgator/gliner-pii-edge-v1.0", map_location="cpu")
