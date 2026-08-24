@@ -68,7 +68,9 @@ class State:
         self.pmap: PseudonymMap | None = None
         self.redacted: dict[str, pd.DataFrame] = {}
         self.turns: list[dict] = []
-        self.decisions: dict = json.loads(DECISIONS_PATH.read_text()) if DECISIONS_PATH.exists() else {}
+        saved = json.loads(DECISIONS_PATH.read_text()) if DECISIONS_PATH.exists() else {}
+        self.kept: dict = saved.pop("_kept", {}) if isinstance(saved, dict) else {}
+        self.decisions: dict = saved
         self.detector = None
         self.det_lock = threading.Lock()
         self.lock = threading.Lock()
@@ -96,7 +98,9 @@ class State:
         return hashlib.sha256("|".join(sorted(str(c).strip().lower() for c in columns)).encode()).hexdigest()[:16]
 
     def load_folder(self, folder: Path) -> None:
-        self.decisions = json.loads(DECISIONS_PATH.read_text()) if DECISIONS_PATH.exists() else {}
+        saved = json.loads(DECISIONS_PATH.read_text()) if DECISIONS_PATH.exists() else {}
+        self.kept = saved.pop("_kept", {}) if isinstance(saved, dict) else {}
+        self.decisions = saved
         self.folder = folder
         self.tables, self.redacted, self.turns = [], {}, []
         self.pmap = PseudonymMap(CONF / f"vault-{hashlib.sha256(str(folder).encode()).hexdigest()[:12]}-local-only.json")
@@ -147,45 +151,67 @@ class State:
                 out[col] = cls if isinstance(cls, str) else cls[0]
         return out
 
-    def cell_spans(self, frame: pd.DataFrame, classes: dict, decided: dict, det) -> dict[str, dict[int, str]]:
+    def cell_spans(self, frame: pd.DataFrame, classes: dict, decided: dict, det) -> dict[str, dict[int, dict]]:
         """Free-text columns: per cell (first 200 rows), what exactly the scanner found."""
-        spans: dict[str, dict[int, str]] = {}
+        spans: dict[str, dict[int, dict]] = {}
         for col, info in classes.items():
             cls = decided.get(col, info["class"] if isinstance(info, dict) else info)
             if cls != "free_text_with_pii":
                 continue
-            hits: dict[int, str] = {}
+            hits: dict[int, dict] = {}
             for i, v in enumerate(frame[col].head(200)):
                 if not (isinstance(v, str) and v.strip()):
                     continue
                 found = det(v)
                 if found:
-                    parts = []
+                    parts, vals = [], []
                     for st, en, label, _c in found[:3]:
                         word = REASON.get(label, label).rstrip("s")
                         parts.append(f"{word}: {v[st:en][:24]}")
-                    hits[i] = ", ".join(parts)
+                        vals.append(v[st:en])
+                    hits[i] = {"why": ", ".join(parts), "values": vals}
             spans[col] = hits
         return spans
+
+    def kept_for(self, key: str) -> set:
+        return {v.casefold() for v in self.kept.get(key, [])}
+
+    def kept_all(self) -> set:
+        return {v.casefold() for vals in self.kept.values() for v in vals}
+
+    def save_decisions(self) -> None:
+        DECISIONS_PATH.write_text(json.dumps({**self.decisions, "_kept": self.kept}, indent=1))
 
     def build_vault(self) -> None:
         det = self.get_detector()
         for t in self.tables:
             self.step(f"coding {t['name']}")
+            kept = self.kept_for(t["key"])
+            def filt(text, _d=det, _k=kept):
+                return [sp for sp in _d(text) if text[sp[0]:sp[1]].casefold() not in _k]
+            kv = (lambda text, _k=kept: [sp for sp in regex_engine(text) if text[sp[0]:sp[1]].casefold() not in _k]) if kept else regex_engine
             classes = {c: v for c, v in self.effective(t).items()}
             full = {c: classes.get(c, "none") for c in t["frame"].columns}
-            self.redacted[t["name"]] = pseudonymise_frame(t["frame"], full, self.pmap, detector=det, kept_validator=regex_engine)
+            self.redacted[t["name"]] = pseudonymise_frame(t["frame"], full, self.pmap, detector=filt, kept_validator=kv)
         self.pmap.save()
 
     def sub_known(self, text: str) -> str:
         known = self.pmap.known_regex() if self.pmap else None
         if not known:
             return text
-        return known.sub(lambda m: self.pmap.forward.get(re.sub(r"\s+", " ", m.group(0).strip()).casefold(), m.group(0)), text)
+        kept = self.kept_all()
+        def sub(m):
+            if m.group(0).casefold() in kept:
+                return m.group(0)
+            return self.pmap.forward.get(re.sub(r"\s+", " ", m.group(0).strip()).casefold(), m.group(0))
+        return known.sub(sub, text)
 
     def leak_check(self, text: str) -> list[str]:
         known = self.pmap.known_regex() if self.pmap else None
-        return sorted({m.group(0) for m in known.finditer(text)})[:8] if known else []
+        if not known:
+            return []
+        kept = self.kept_all()
+        return sorted({m.group(0) for m in known.finditer(text) if m.group(0).casefold() not in kept})[:8]
 
 
 S = State()
@@ -377,8 +403,23 @@ class H(BaseHTTPRequestHandler):
                         auto = info.get("class") if isinstance(info, dict) else info
                         t["decided"][col] = auto if auto not in (None, "none", "record_id_non_pii", "age") else "person_name"
                     S.decisions[t["key"]] = t["decided"]
-                    DECISIONS_PATH.write_text(json.dumps(S.decisions, indent=1))
+                    S.save_decisions()
                     S.redacted = {}  # rebuild vault on next question
+                return self._json(self.review())
+            if self.path == "/api/cellkeep":
+                with S.lock:
+                    t = next(x for x in S.tables if x["name"] == body["name"])
+                    hit = t["spans"].get(body["column"], {}).get(int(body["row"]))
+                    if hit:
+                        kept = set(S.kept.get(t["key"], []))
+                        vals = set(hit["values"])
+                        if vals <= {v for v in kept if v in vals} or all(v.casefold() in {k.casefold() for k in kept} for v in vals):
+                            kept -= vals
+                        else:
+                            kept |= vals
+                        S.kept[t["key"]] = sorted(kept)
+                        S.save_decisions()
+                        S.redacted = {}
                 return self._json(self.review())
             if self.path == "/api/folders/remove":
                 folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
@@ -424,11 +465,19 @@ class H(BaseHTTPRequestHandler):
                     why[c] = f"found in {len(t['spans'].get(c, {}))} of the first 200 cells"
                 else:
                     why[c] = RULE.get(rule, rule or "") + (f", {int(conf * 100)}% of sampled cells" if conf and rule == "validator" else "")
+            kept = S.kept_for(t["key"])
+            cols = {c: REASON.get(cls, cls) for c, cls in eff.items() if cls != "free_text_with_pii"}
+            cells = {}
+            cellcols = {}
+            for c, cls in eff.items():
+                if cls != "free_text_with_pii":
+                    continue
+                cellcols[c] = REASON.get(cls, cls)
+                cells[c] = {str(r): {"why": h["why"], "kept": all(v.casefold() in kept for v in h["values"])}
+                            for r, h in t["spans"].get(c, {}).items()}
             out.append({"name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns),
                         "grid": grid.values.tolist(),
-                        "hidden": {c: REASON.get(cls, cls) for c, cls in eff.items()},
-                        "why": why,
-                        "spans": {c: r for c, r in t["spans"].items() if c in eff}})
+                        "hidden": cols, "cellcols": cellcols, "cells": cells, "why": why})
         return {"files": out, "skipped": getattr(S, "skipped", [])}
 
 

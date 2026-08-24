@@ -20,15 +20,14 @@ input:focus,textarea:focus{border-color:var(--hi)}
 #s-provider .card{width:400px;display:flex;flex-direction:column;gap:10px}
 #s-provider h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
 #s-provider p{margin:0 0 6px;text-align:center}
-#shelf{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;max-width:760px}
-.fol{width:118px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;padding:12px 6px;border-radius:14px}
+#shelf{width:460px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fol{display:flex;align-items:baseline;gap:10px;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--line)}
+.fol:last-child{border-bottom:none}
 .fol:hover{background:var(--panel)}
-.fol svg{color:var(--dim)}
-.fol:hover svg{color:var(--hi)}
-.fol .nm{font-size:13px;color:var(--ink);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fol .ct{font-size:11px;color:var(--dim)}
-#plus{width:64px;height:64px;border-radius:16px;border:1px solid var(--line);font-size:30px;font-weight:200;color:var(--dim);display:flex;align-items:center;justify-content:center}
-.fol:hover #plus{border-color:var(--hi);color:var(--hi)}
+.fol .nm{font-size:14px}
+.fol .ct{font-size:12px;color:var(--dim);margin-left:auto}
+.fol.add .nm{color:var(--dim)}
+.fol.add:hover .nm{color:var(--hi)}
 #ctx{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;display:none;z-index:30}
 #ctx button{border:none;padding:7px 14px;width:100%;text-align:left}
 #ctx button:hover{color:var(--hi)}
@@ -36,8 +35,8 @@ input:focus,textarea:focus{border-color:var(--hi)}
 .ftype{width:150px;border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:10px}
 .ftype .t{font-size:13px}
 .ftype svg{align-self:center;color:var(--dim);margin:8px 0}
-.ftype.pick{border-color:var(--grn)}
-.ftype.pick .t{color:var(--grn)}
+.ftype.pick{border-color:var(--hi)}
+.ftype.pick .t{color:var(--hi)}
 .ftype.off{opacity:.35;cursor:default}
 
 /* sheet */
@@ -50,11 +49,13 @@ input:focus,textarea:focus{border-color:var(--hi)}
 table{border-collapse:collapse;font-size:13px;min-width:100%}
 th,td{padding:6px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis}
 th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none}
-.hid{background:var(--grnbg)}
-th.hid{color:var(--grn)}
-th .why{display:block;font-weight:400;font-size:11px;color:var(--grn)}
-td.cellhit{background:var(--grnbg);box-shadow:inset 0 0 0 1px var(--grn);cursor:pointer}
-td.tok{background:var(--grnbg);color:var(--grn)}
+.hid{background:var(--hibg)}
+th.hid{color:var(--hi)}
+th.cellcol{color:var(--hi)}
+th .why{display:block;font-weight:400;font-size:11px;color:var(--hi)}
+td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:pointer}
+td.kept{box-shadow:inset 0 0 0 1px var(--line);cursor:pointer}
+td.tok{background:var(--hibg);color:var(--hi)}
 #sheet-bar{display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;border-top:1px solid var(--line)}
 
 /* chat */
@@ -107,7 +108,7 @@ td.tok{background:var(--grnbg);color:var(--grn)}
 <div class="screen" id="s-sheet">
   <div id="sheet-top"><div class="tabs" id="tabs"></div></div>
   <div id="gridwrap"></div>
-  <div id="sheet-bar"><button id="sheet-preview">Preview</button><button id="sheet-back" style="display:none">Back</button><button id="sheet-ok" class="go">Looks right</button></div>
+  <div id="sheet-bar"><button id="sheet-preview">Preview</button><button id="sheet-back" style="display:none">Back</button><button id="sheet-cancel">Cancel</button><button id="sheet-ok" class="go">Looks right</button></div>
 </div>
 
 <div class="screen" id="s-chat">
@@ -123,19 +124,12 @@ td.tok{background:var(--grnbg);color:var(--grn)}
   <div id="note"></div>
 </div>
 
-<div id="confirmscan" class="modal"><div class="card" style="width:540px">
-  <div class="cards">
-    <div class="ftype pick" id="ft-excel"><span class="t">excel / csv</span>
-      <svg width="64" height="64" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="8" width="36" height="32" rx="3"/><line x1="6" y1="18" x2="42" y2="18"/><line x1="6" y1="29" x2="42" y2="29"/><line x1="18" y1="8" x2="18" y2="40"/><line x1="30" y1="8" x2="30" y2="40"/></svg>
-    </div>
-    <div class="ftype off"><span class="t">whatsapp</span>
-      <svg width="64" height="64" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 10h32v22H18l-8 7v-7H8z"/><line x1="14" y1="18" x2="34" y2="18"/><line x1="14" y1="24" x2="28" y2="24"/></svg>
-    </div>
-    <div class="ftype off"><span class="t">pdf</span>
-      <svg width="64" height="64" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6h16l8 8v28H12z"/><path d="M28 6v8h8"/><line x1="18" y1="24" x2="30" y2="24"/><line x1="18" y1="31" x2="30" y2="31"/></svg>
-    </div>
+<div id="confirmscan" class="modal"><div class="card" style="width:380px">
+  <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
+    <div class="br-dir" style="color:var(--hi)" id="ft-excel">excel / csv <span id="cs-count" class="dim"></span></div>
+    <div class="br-dir" style="opacity:.35;cursor:default">whatsapp</div>
+    <div class="br-dir" style="opacity:.35;cursor:default;border-bottom:none">pdf</div>
   </div>
-  <div id="cs-text" class="dim"></div>
   <div style="display:flex;justify-content:flex-end;gap:8px"><button id="cs-x">Cancel</button><button class="go" id="cs-ok">OK</button></div>
 </div></div>
 
@@ -159,9 +153,8 @@ const api = (p, b) => fetch(p, b ? {method:'POST', headers:{'Content-Type':'appl
 async function renderShelf(){
   const r = await api('/api/folders');
   const fol = f => `<div class="fol" data-p="${encodeURIComponent(f.path)}" title="${f.path}">
-    <svg width="56" height="56" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 12h12l4 5h20v21H6z"/></svg>
     <span class="nm">${f.name}</span><span class="ct">${f.files} file${f.files === 1 ? '' : 's'}</span></div>`;
-  $('#shelf').innerHTML = r.folders.map(fol).join('') + `<div class="fol" id="add"><div id="plus">+</div><span class="nm dim">add</span></div>`;
+  $('#shelf').innerHTML = r.folders.map(fol).join('') + `<div class="fol add" id="add"><span class="nm">+ Add Sheltered Dir</span></div>`;
   document.querySelectorAll('.fol[data-p]').forEach(el => {
     el.onclick = () => confirmScan(decodeURIComponent(el.dataset.p));
     el.oncontextmenu = e => { e.preventDefault(); const c = $('#ctx'); c.style.display = 'block'; c.style.left = e.pageX + 'px'; c.style.top = e.pageY + 'px'; c.dataset.p = el.dataset.p; };
@@ -206,7 +199,7 @@ async function pickFolder(){
 }
 async function confirmScan(path){
   const r = await api('/api/browse?path=' + encodeURIComponent(path));
-  $('#cs-text').textContent = r.data_files ? `Scanning ${r.data_files} file${r.data_files === 1 ? '' : 's'} with the on-device scanner.` : 'No excel or csv files here.';
+  $('#cs-count').textContent = r.data_files ? `(${r.data_files} file${r.data_files === 1 ? '' : 's'}, scanned on this laptop)` : '(none here)';
   $('#confirmscan').classList.add('on');
   $('#cs-x').onclick = () => $('#confirmscan').classList.remove('on');
   $('#cs-ok').onclick = () => { if (!r.data_files) return; $('#confirmscan').classList.remove('on'); openFolder(path); };
@@ -228,20 +221,27 @@ function renderSheet(){
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = +b.dataset.i; renderSheet(); });
   const f = files[tab];
   const hid = f.hidden || {};
-  const spans = f.spans || {};
+  const cellcols = f.cellcols || {};
+  const cells = f.cells || {};
   const why = f.why || {};
-  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : ''}" data-c="${encodeURIComponent(c)}" title="${hid[c] ? (hid[c] + (why[c] ? ': ' + why[c] : '')).replace(/"/g,'&quot;') : 'click to hide this column'}">${c}${hid[c] ? `<span class=why>${hid[c]}</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
+  const hdrTitle = c => hid[c] ? (hid[c] + (why[c] ? ': ' + why[c] : '')) : cellcols[c] ? (cellcols[c] + (why[c] ? ': ' + why[c] : '') + '. Click a marked cell to keep just that cell.') : 'click to hide this column';
+  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : cellcols[c] ? 'cellcol' : ''}" data-c="${encodeURIComponent(c)}" title="${hdrTitle(c).replace(/"/g,'&quot;')}">${c}${hid[c] ? `<span class=why>${hid[c]}</span>` : cellcols[c] ? `<span class=why>in some cells</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
   f.grid.forEach((row, ri) => {
     html += '<tr>' + row.map((v, ci) => {
       const c = f.columns[ci];
-      const colHid = !!hid[c];
-      const hit = spans[c] && spans[c][ri];
-      return `<td class="${colHid ? 'hid' : ''}${hit ? ' cellhit' : ''}" data-c="${encodeURIComponent(c)}"${hit ? ` title="${String(hit).replace(/"/g,'&quot;')}"` : ''}>${String(v ?? '').slice(0, 80)}</td>`;
+      const hit = cells[c] && cells[c][String(ri)];
+      const cls = hid[c] ? 'hid' : hit ? (hit.kept ? 'kept' : 'cellhit') : '';
+      const title = hit ? (hit.kept ? 'kept: ' + hit.why + '. Click to hide again.' : hit.why + '. Click to keep this cell.') : '';
+      return `<td class="${cls}" data-c="${encodeURIComponent(c)}" data-r="${ri}"${title ? ` title="${title.replace(/"/g,'&quot;')}"` : ''}>${String(v ?? '').slice(0, 80)}</td>`;
     }).join('') + '</tr>';
   });
   html += '</tbody></table>';
   $('#gridwrap').innerHTML = html;
-  document.querySelectorAll('th[data-c], td.cellhit').forEach(el => el.onclick = () => toggle(decodeURIComponent(el.dataset.c)));
+  document.querySelectorAll('th[data-c]').forEach(el => el.onclick = () => toggle(decodeURIComponent(el.dataset.c)));
+  document.querySelectorAll('td.cellhit, td.kept').forEach(el => el.onclick = async () => {
+    const r = await api('/api/cellkeep', {name: f.name, column: decodeURIComponent(el.dataset.c), row: +el.dataset.r});
+    if (!r.error) { files = r.files; renderSheet(); }
+  });
 }
 async function toggle(column){
   const r = await api('/api/toggle', {name: files[tab].name, column});
@@ -256,6 +256,7 @@ $('#sheet-preview').onclick = async () => {
   previewFiles = r.files; previewing = true; renderPreview();
 };
 $('#sheet-back').onclick = () => { previewing = false; renderSheet(); };
+$('#sheet-cancel').onclick = () => { show('#s-home'); renderShelf(); };
 let previewFiles = [];
 function renderPreview(){
   $('#sheet-preview').style.display = 'none'; $('#sheet-back').style.display = '';
