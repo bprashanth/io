@@ -16,4 +16,10 @@ Point io at a folder. It shows what will leave as codes; you correct it by click
 - Pages/dashboards: the model writes the page against `window.data`; io pours the real rows in
   locally, so figures are computed in your browser over the true data.
 
-Engine: `benchmarks/pii/{columns,detect,pseudonymize}.py` — the privacy-shield modules, unchanged.
+- Text, chat exports and PDFs scan too: the document shows every find highlighted; click to keep.
+  The find box shows "27 hits, 0 redacted" with Redact all; terms are remembered per file.
+  "hide: names, addresses, account ids" sends those words to the on-device scanner as labels.
+- In chat, @ shows the file list; a mentioned question sends only that file.
+
+Engine: `benchmarks/pii/{columns,detect,pseudonymize}.py` and the app's vendored copies - the
+privacy-shield modules, unchanged.
