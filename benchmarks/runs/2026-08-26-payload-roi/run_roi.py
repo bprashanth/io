@@ -27,21 +27,27 @@ import pandas as pd  # noqa: E402
 
 pm = PseudonymMap(None)
 names = set()
-for f, col in (("staff_list.csv", None), ("donor_list.csv", None)):
+for f, nrows in (("staff_list.csv", None), ("donor_list.csv", 800)):
     p = BIG / f
     if p.exists():
-        df = pd.read_csv(p, dtype=str, nrows=200000)
+        df = pd.read_csv(p, dtype=str, nrows=nrows)
         for c in df.columns:
             if "name" in c.lower():
                 names |= set(df[c].dropna())
+names = {n for n in names if len(n) > 3}
 name_re = re.compile("|".join(re.escape(n) for n in sorted(names, key=len, reverse=True) if len(n) > 3)) if names else None
 
 def redact_text(t: str) -> str:
     if name_re:
         t = name_re.sub(lambda m: pm.token(m.group(0), "person_name"), t)
-    for s, e, cls, _ in sorted(regex_engine(t), key=lambda x: -x[0]):
-        t = t[:s] + pm.token(t[s:e], cls) + t[e:]
-    return t
+    spans = sorted(regex_engine(t), key=lambda x: x[0])
+    out, pos = [], 0
+    for s, e, cls, _ in spans:
+        if s < pos:
+            continue
+        out.append(t[pos:s]); out.append(pm.token(t[s:e], cls)); pos = e
+    out.append(t[pos:])
+    return "".join(out)
 
 def load_all():
     out = {}

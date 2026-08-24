@@ -53,13 +53,21 @@ function serverDir() {
   return path.join(ctx.extensionPath, "server");
 }
 
+function envDir() {
+  // The Python env lives in globalStorage, NOT in the versioned extension folder:
+  // the IDE deletes the old extension folder on every update, which used to take
+  // the 1.7 GB venv and model cache with it (measured 2026-08-25).
+  return path.join(stateDir(), "env");
+}
+
 function pythonPath() {
   const custom = cfg().get("pythonPath");
   if (custom) return custom;
-  const venv = os.platform() === "win32"
-    ? path.join(serverDir(), ".venv", "Scripts", "python.exe")
-    : path.join(serverDir(), ".venv", "bin", "python");
-  return fs.existsSync(venv) ? venv : null;
+  const cand = os.platform() === "win32"
+    ? [path.join(envDir(), ".venv", "Scripts", "python.exe"), path.join(serverDir(), ".venv", "Scripts", "python.exe")]
+    : [path.join(envDir(), ".venv", "bin", "python"), path.join(serverDir(), ".venv", "bin", "python")];
+  for (const c of cand) if (fs.existsSync(c)) return c;   // legacy in-extension venv still honoured
+  return null;
 }
 
 function stateDir() {
@@ -179,8 +187,9 @@ function daemonCommand() {
   const numbers = cfg().get("numbers");
   if (numbers) args.push("--numbers", String(numbers));
   if (cfg().get("annotate")) args.push("--annotate");
+  const hf = fs.existsSync(path.join(envDir(), "hf-cache")) ? path.join(envDir(), "hf-cache") : path.join(serverDir(), "hf-cache");
   const env = { ...process.env, PII_THREADS: String(cfg().get("threads") || 4),
-    HF_HOME: path.join(serverDir(), "hf-cache"), PYTHONUNBUFFERED: "1" };
+    HF_HOME: hf, PYTHONUNBUFFERED: "1" };
   delete env.CLOUD_CODE_URL; // the daemon itself must talk to Google directly
   delete env.ELECTRON_RUN_AS_NODE;
   return { py, args, env, log: path.join(stateDir(), "daemon.out") };

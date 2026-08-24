@@ -58,5 +58,12 @@ function settingsPaths() {
       }
     } catch (e) { /* leave settings untouched on any doubt */ }
   }
+  // remove the Python env (1.7 GB) from globalStorage; keep the vault (user data)
+  for (const sp of settingsPaths()) {
+    const d = path.join(path.dirname(sp), "globalStorage", "insight-out.privacy-shield", "env");
+    try {
+      if (fs.existsSync(d)) { fs.rmSync(d, { recursive: true, force: true }); console.log("privacy-shield uninstall: removed env", d); }
+    } catch (e) { /* leave it */ }
+  }
   console.log("privacy-shield uninstall: daemons stopped on ports", killed);
 })();
