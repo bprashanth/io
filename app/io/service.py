@@ -28,6 +28,7 @@ sys.path.insert(0, str(HERE / "engine"))                    # the shield's teste
 
 from columns import classify_columns  # noqa: E402
 from detect import build_engine, regex_engine  # noqa: E402
+from detect import make_text_v2  # noqa: E402
 from pseudonymize import PseudonymMap, pseudonymise_frame, redact_question  # noqa: E402
 
 UI = Path(__file__).resolve().parent / "ui"
@@ -69,6 +70,7 @@ class State:
         self.pmap: PseudonymMap | None = None
         self.redacted: dict[str, pd.DataFrame] = {}
         self.turns: list[dict] = []
+        self.docs: list[dict] = []
         saved = json.loads(DECISIONS_PATH.read_text()) if DECISIONS_PATH.exists() else {}
         self.kept: dict = saved.pop("_kept", {}) if isinstance(saved, dict) else {}
         self.decisions: dict = saved
@@ -82,6 +84,16 @@ class State:
         del self.progress[:-6]
 
     # ---------------------------------------------------------------- engine
+    def get_text_detector(self):
+        if getattr(self, "text_detector", None) is None:
+            self.get_detector()
+            try:
+                self.text_detector = make_text_v2(f"gliner:{GLINER_MODEL}")
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
+                self.text_detector = regex_engine
+        return self.text_detector
+
     def get_detector(self):
         with self.det_lock:
             if self.detector is None:
@@ -104,16 +116,24 @@ class State:
         self.decisions = saved
         self.folder = folder
         self.tables, self.redacted, self.turns = [], {}, []
+        self.docs = []
         self.pmap = PseudonymMap(CONF / f"vault-{hashlib.sha256(str(folder).encode()).hexdigest()[:12]}-local-only.json")
         det = self.get_detector()
         self.skipped = []
         for f in sorted(folder.iterdir()):
             if f.name.startswith("~$") or f.name.startswith("."):
                 continue
-            if f.is_file() and f.suffix.lower() not in (".csv", ".xlsx", ".xls"):
-                self.skipped.append(f.name)
-                continue
             if not f.is_file():
+                continue
+            if f.suffix.lower() in (".txt", ".md", ".log", ".pdf"):
+                try:
+                    self.load_doc(f)
+                except Exception:  # noqa: BLE001
+                    traceback.print_exc()
+                    self.skipped.append(f.name)
+                continue
+            if f.suffix.lower() not in (".csv", ".xlsx", ".xls"):
+                self.skipped.append(f.name)
                 continue
             try:
                 frames = {None: pd.read_csv(f, dtype=str)} if f.suffix.lower() == ".csv" else {
@@ -137,9 +157,10 @@ class State:
                 self.tables.append({"file": f.name, "sheet": sheet, "name": name, "key": key,
                                     "frame": frame, "classes": classes, "decided": decided, "spans": spans})
         self.step("done")
+        n_files = len(self.tables) + len(self.docs)
         folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
         folders = [x for x in folders if x["path"] != str(folder)]
-        folders.insert(0, {"path": str(folder), "name": folder.name, "files": len(self.tables)})
+        folders.insert(0, {"path": str(folder), "name": folder.name, "files": n_files})
         FOLDERS_PATH.write_text(json.dumps(folders[:24], indent=1))
 
     @staticmethod
@@ -174,6 +195,83 @@ class State:
             spans[col] = hits
         return spans
 
+    def load_doc(self, f: Path) -> None:
+        name = f.stem + (" (pdf)" if f.suffix.lower() == ".pdf" else "")
+        self.step(f"scanning {name}")
+        if f.suffix.lower() == ".pdf":
+            from pypdf import PdfReader
+            text = "\n\n".join((page.extract_text() or "") for page in PdfReader(str(f)).pages)
+        else:
+            text = f.read_text(errors="replace")
+        text = text[:400_000]
+        key = "doc:" + hashlib.sha256(("|".join([f.name, str(len(text))])).encode()).hexdigest()[:16]
+        det = self.get_text_detector()
+        spans = self.doc_spans(text, det(text))
+        d = {"name": name, "file": f.name, "key": key, "text": text, "spans": spans, "labels": []}
+        self.apply_doc_terms(d)
+        self.docs.append(d)
+
+    @staticmethod
+    def doc_spans(text: str, raw) -> list[dict]:
+        """Overlap-resolved, deduped spans: [{s, e, label, text}] sorted by position."""
+        raw = sorted(raw, key=lambda x: (x[0], -(x[1] - x[0])))
+        out, last = [], -1
+        for st, en, label, _c in raw:
+            if st >= last and en > st and en - st < 120:
+                out.append({"s": st, "e": en, "label": label, "text": text[st:en]})
+                last = en
+        return out
+
+    def doc_decisions(self, key: str) -> dict:
+        d = self.decisions.get(key) or {}
+        return {"terms": d.get("terms", []), "labels": d.get("labels", [])}
+
+    def apply_doc_terms(self, d: dict) -> None:
+        """User search-terms become spans (class 'hidden') at every occurrence."""
+        dd = self.doc_decisions(d["key"])
+        d["labels"] = dd["labels"]
+        existing = {(sp["s"], sp["e"]) for sp in d["spans"]}
+        for term in dd["terms"]:
+            for m in re.finditer(re.escape(term), d["text"], flags=re.I):
+                if not any(s < m.end() and m.start() < e for s, e in existing):
+                    d["spans"].append({"s": m.start(), "e": m.end(), "label": "hidden", "text": m.group(0)})
+                    existing.add((m.start(), m.end()))
+        d["spans"].sort(key=lambda x: x["s"])
+
+    def rescan_doc(self, d: dict, labels: list[str]) -> None:
+        """'names, addresses, bank account ids' -> extra GLiNER labels, zero-shot."""
+        if getattr(self, "gliner_model", None) is None:
+            from gliner import GLiNER  # noqa: PLC0415
+            self.gliner_model = GLiNER.from_pretrained(GLINER_MODEL, map_location="cpu")
+        model = self.gliner_model
+        found = []
+        text = d["text"]
+        for start in range(0, len(text), 1400):
+            chunk = text[start:start + 1500]
+            for ent in model.predict_entities(chunk, labels, threshold=0.35):
+                found.append((start + ent["start"], start + ent["end"], "hidden", ent["score"]))
+        existing = {(sp["s"], sp["e"]) for sp in d["spans"]}
+        for st, en, lab, _c in found:
+            if not any(s < en and st < e for s, e in existing):
+                d["spans"].append({"s": st, "e": en, "label": lab, "text": text[st:en]})
+                existing.add((st, en))
+        d["spans"].sort(key=lambda x: x["s"])
+        dec = self.decisions.setdefault(d["key"], {})
+        dec["labels"] = sorted(set(dec.get("labels", [])) | set(labels))
+        self.save_decisions()
+
+    def redact_doc(self, d: dict) -> str:
+        kept = self.kept_for(d["key"])
+        out, cur = [], 0
+        for sp in d["spans"]:
+            if sp["text"].casefold() in kept:
+                continue
+            out.append(d["text"][cur:sp["s"]])
+            out.append(self.pmap.token(sp["text"], sp["label"] if sp["label"] != "hidden" else "hidden"))
+            cur = sp["e"]
+        out.append(d["text"][cur:])
+        return "".join(out)
+
     def kept_for(self, key: str) -> set:
         return {v.casefold() for v in self.kept.get(key, [])}
 
@@ -194,6 +292,9 @@ class State:
             classes = {c: v for c, v in self.effective(t).items()}
             full = {c: classes.get(c, "none") for c in t["frame"].columns}
             self.redacted[t["name"]] = pseudonymise_frame(t["frame"], full, self.pmap, detector=filt, kept_validator=kv)
+        for d in self.docs:
+            self.step(f"coding {d['name']}")
+            self.redacted[d["name"]] = self.redact_doc(d)
         self.pmap.save()
 
     def sub_known(self, text: str) -> str:
@@ -257,8 +358,21 @@ def chat(question: str) -> dict:
         S.step("hiding what you marked")
         S.build_vault()
     det = S.get_detector()
+    # @ mentions restrict the question to named files
+    all_names = [t["name"] for t in S.tables] + [d["name"] for d in S.docs]
+    mentioned = []
+    q_clean = question
+    for m in re.finditer(r"@([\w][\w .()\-]{0,60}?)(?=\s*(?:@|$|[,;:?]|\s{2}))|@(\S+)", question):
+        frag = (m.group(1) or m.group(2) or "").strip()
+        hit = next((n for n in all_names if n.casefold() == frag.casefold()), None) or next((n for n in all_names if frag and frag.casefold() in n.casefold()), None)
+        if hit and hit not in mentioned:
+            mentioned.append(hit)
+            q_clean = q_clean.replace("@" + frag, hit)
+    use = mentioned if mentioned else all_names
     blocks, sent_rows, total = [], 0, 0
     for t in S.tables:
+        if t["name"] not in use:
+            continue
         red = S.redacted.get(t["name"])
         if red is None:
             continue
@@ -271,7 +385,19 @@ def chat(question: str) -> dict:
             blocks.append(f"--- {t['name']} ({len(red)} rows) ---\n{csv}")
             sent_rows += len(red)
         total += len(csv)
-    q = S.sub_known(redact_question(question, S.pmap, det)["redacted"])
+    for d in S.docs:
+        if d["name"] not in use:
+            continue
+        red = S.redacted.get(d["name"])
+        if red is None:
+            continue
+        if total + len(red) > 150_000:
+            red = red[:8000]
+            blocks.append(f"--- {d['name']} (first part only) ---\n{red}")
+        else:
+            blocks.append(f"--- {d['name']} ---\n{red}")
+        total += len(red)
+    q = S.sub_known(redact_question(q_clean, S.pmap, det)["redacted"])
     history = ""
     prior = [x for x in S.turns if x.get("answer")][-3:]
     if prior:
@@ -285,7 +411,7 @@ def chat(question: str) -> dict:
     raw, meta = call_model(payload)
     S.step("translating codes back")
     turn = {"q": question, "q_sent": q, "answer_sent": raw if "<html" not in raw.lower() else "(page)",
-            "sent_rows": sent_rows, "bytes": len(payload), **meta}
+            "sent_rows": sent_rows, "bytes": len(payload), "files_used": use if mentioned else [], **meta}
     if "<html" in raw.lower() or "<!doctype" in raw.lower():
         i = raw.lower().find("<!doctype")
         i = i if i >= 0 else raw.lower().find("<html")
@@ -407,6 +533,43 @@ class H(BaseHTTPRequestHandler):
                     S.save_decisions()
                     S.redacted = {}  # rebuild vault on next question
                 return self._json(self.review())
+            if self.path == "/api/dockeep":
+                with S.lock:
+                    d = next(x for x in S.docs if x["name"] == body["name"])
+                    val = body["value"]
+                    kept = set(S.kept.get(d["key"], []))
+                    if val.casefold() in {k.casefold() for k in kept}:
+                        kept = {k for k in kept if k.casefold() != val.casefold()}
+                    else:
+                        kept.add(val)
+                    S.kept[d["key"]] = sorted(kept)
+                    S.save_decisions()
+                    S.redacted = {}
+                return self._json(self.review())
+            if self.path == "/api/docterm":
+                with S.lock:
+                    d = next(x for x in S.docs if x["name"] == body["name"])
+                    dec = S.decisions.setdefault(d["key"], {})
+                    terms = set(dec.get("terms", []))
+                    if body.get("remove"):
+                        terms = {t for t in terms if t.casefold() != body["term"].casefold()}
+                    else:
+                        terms.add(body["term"])
+                    dec["terms"] = sorted(terms)
+                    S.save_decisions()
+                    d["spans"] = [sp for sp in d["spans"] if sp["label"] != "hidden" or sp["text"].casefold() in {t.casefold() for t in terms}]
+                    S.apply_doc_terms(d)
+                    S.redacted = {}
+                return self._json(self.review())
+            if self.path == "/api/rescan":
+                with S.lock:
+                    d = next(x for x in S.docs if x["name"] == body["name"])
+                    labels = [x.strip() for x in re.split(r"[,;]", body.get("labels", "")) if x.strip()][:8]
+                    if labels:
+                        S.step("scanning for: " + ", ".join(labels))
+                        S.rescan_doc(d, labels)
+                        S.redacted = {}
+                return self._json(self.review())
             if self.path == "/api/cellkeep":
                 with S.lock:
                     t = next(x for x in S.tables if x["name"] == body["name"])
@@ -476,9 +639,14 @@ class H(BaseHTTPRequestHandler):
                 cellcols[c] = REASON.get(cls, cls)
                 cells[c] = {str(r): {"why": h["why"], "kept": all(v.casefold() in kept for v in h["values"])}
                             for r, h in t["spans"].get(c, {}).items()}
-            out.append({"name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns),
+            out.append({"kind": "table", "name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns),
                         "grid": grid.values.tolist(),
                         "hidden": cols, "cellcols": cellcols, "cells": cells, "why": why})
+        for d in S.docs:
+            kept = S.kept_for(d["key"])
+            out.append({"kind": "doc", "name": d["name"], "chars": len(d["text"]), "text": d["text"][:200_000],
+                        "labels": d.get("labels", []),
+                        "spans": [{**sp, "kept": sp["text"].casefold() in kept} for sp in d["spans"]]})
         return {"files": out, "skipped": getattr(S, "skipped", [])}
 
 
