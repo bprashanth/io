@@ -58,8 +58,8 @@ form#ask input{flex:1;padding:12px 14px;border-radius:12px;font-size:15px}
   </div>
   <div class="box">
     <h2>Reach</h2>
-    <div class="dial"><button class="on" data-tier="t0">Laptop</button><button data-tier="t1" disabled title="Coming next: T4GC server">T4GC</button><button data-tier="t2" disabled title="Coming next: frontier">Frontier</button></div>
-    <p class="note">Only column names leave this laptop. Rows never do. Every number on screen came from a query that ran here.</p>
+    <div class="dial"><button data-reach="laptop">Laptop</button><button data-reach="t4gc">T4GC</button><button data-reach="frontier">Frontier</button></div>
+    <p class="note" id="reach-note"></p>
   </div>
   <div class="box">
     <h2>Model <button id="settings" style="float:right;font-size:12px;padding:2px 8px">Settings</button></h2>
@@ -83,6 +83,11 @@ form#ask input{flex:1;padding:12px 14px;border-radius:12px;font-size:15px}
 
 <div class="modal" id="cards"><div class="box" style="width:760px;max-height:90vh;overflow:auto"><h2 id="cards-title">Proposed skills</h2><p class="note" id="cards-note"></p><div id="cards-body"></div><div style="text-align:right;margin-top:12px"><button id="cards-close">Close</button></div></div></div>
 
+<div class="modal" id="openreview"><div class="box" style="width:640px;max-height:88vh;overflow:auto"><h2>What leaves the laptop in Open mode</h2>
+<p class="note">Your files go to the model you chose on the dial — with these values replaced by tokens (NAME_001, PHONE_002 …). The real values never leave; answers are translated back here.</p>
+<div id="openreview-body" style="font-size:13px"></div>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button id="or-cancel">Cancel</button><button id="or-ok" class="primary">Looks right — continue</button></div></div></div>
+
 <div class="modal" id="wizard"><div class="box" style="width:640px;max-height:90vh;overflow:auto"><h2>Add a skill</h2>
   <label>Name</label><input id="w-name" placeholder="e.g. households-column-names">
   <label>What kind of skill?</label>
@@ -99,7 +104,9 @@ form#ask input{flex:1;padding:12px 14px;border-radius:12px;font-size:15px}
 </div></div>
 <main>
   <div id="log"><p class="thinking" id="welcome">Open a folder of CSV / Excel files, then ask a question ("average marks by taluka") or ask for a page ("build me a dashboard", "write a summary for the board").</p></div>
-  <div class="hint">Ask questions; say <b>dashboard</b> / <b>report</b> for a data page; say <b>app</b> / <b>form</b> / <b>website</b> / <b>PWA</b> for a page the model writes. Follow-ups keep the context.</div>
+  <div class="hint" style="display:flex;gap:6px;align-items:center"><span>Lane:</span>
+    <span class="dial" id="lanes" style="display:flex;gap:4px"><button data-lane="auto" class="on">Auto</button><button data-lane="ask" title="one query, computed here, receipted">Ask</button><button data-lane="build" title="the model plans panels; the laptop computes every figure">Build</button><button data-lane="page" title="the model writes an app/form/page; your rows poured in locally">App</button><button data-lane="open" title="Antigravity-style: your files (tokenised) go to the big model, it does whatever you ask; answers rehydrated here">Open</button></span>
+    <span class="note" id="lane-note" style="margin:0"></span></div>
   <form id="ask"><input id="q" placeholder="Ask about your data…" autocomplete="off"><button class="primary" id="send">Send</button></form>
 </main>
 
@@ -125,6 +132,7 @@ form#ask input{flex:1;padding:12px 14px;border-radius:12px;font-size:15px}
 const $ = s => document.querySelector(s);
 const log = $('#log');
 let state = {config:{}}, egress = {calls:0, rows:0, bytes:0};
+let lane = 'auto'; let openReviewed = false; let pendingOpen = null;
 const fmtB = n => n > 1e6 ? (n/1e6).toFixed(1)+' MB' : n > 1e3 ? (n/1e3).toFixed(1)+' kB' : n+' B';
 
 async function api(path, body){ const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {}); return r.json(); }
@@ -134,6 +142,8 @@ function renderState(){
   $('#files').innerHTML = (state.tables||[]).map((t, i) => t.error ? `<div><span>${t.file}</span><span class=m style="color:var(--bad)">could not read</span></div>` : `<div class=fileline data-i="${i}" style="cursor:pointer" title="click: how io read this"><span>${t.file}${t.sheet?' › '+t.sheet:''}${(t.why&&t.why.skills&&t.why.skills.length)?' <b style="color:var(--accent)">●</b>':''}</span><span class=m>${t.rows}×${t.columns.length}</span></div>`).join('');
   document.querySelectorAll('.fileline').forEach(el => el.onclick = () => showWhy(state.tables[+el.dataset.i]));
   const c = state.config || {};
+  document.querySelectorAll('[data-reach]').forEach(b => { b.classList.toggle('on', (c.reach||'laptop') === b.dataset.reach); b.onclick = async () => { await api('/api/config', {reach: b.dataset.reach}); await load(); }; });
+  $('#reach-note').textContent = {laptop: 'Only column names leave this laptop. Rows never do.', t4gc: 'The trusted sector server may help. In Open mode it sees your files with private values tokenised.', frontier: 'A frontier model may help. In Open mode it sees your files with private values tokenised.'}[c.reach||'laptop'];
   $('#astro').style.display = c.astronaut ? '' : 'none';
   if (c.astronaut) loadSkills();
   $('#tg-state').textContent = c.telegram_token ? '(saved)' : '';
@@ -158,9 +168,25 @@ async function openFolder(path){
 }
 function addSystem(text){ const d = document.createElement('p'); d.className = 'thinking'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
+document.querySelectorAll('#lanes [data-lane]').forEach(b => b.onclick = () => { lane = b.dataset.lane; document.querySelectorAll('#lanes [data-lane]').forEach(x => x.classList.toggle('on', x === b)); $('#lane-note').textContent = b.title || ''; });
+
+async function showOpenReview(){
+  const r = await api('/api/open/review');
+  if (r.error) { alert(r.error); return false; }
+  $('#openreview-body').innerHTML = r.files.map(f => `<p style="margin:8px 0"><b>${f.file}</b> — ${f.rows} rows${f.hidden.length ? '<br>hidden: ' + f.hidden.map(h => `<code>${h.column}</code> (${h.why})`).join(', ') : '<br>nothing flagged'}</p>`).join('');
+  $('#openreview').classList.add('open');
+  return true;
+}
+$('#or-cancel').onclick = () => { $('#openreview').classList.remove('open'); pendingOpen = null; };
+$('#or-ok').onclick = () => { $('#openreview').classList.remove('open'); openReviewed = true; if (pendingOpen) { const t = pendingOpen; pendingOpen = null; send(t); } };
+
 $('#ask').onsubmit = async e => {
   e.preventDefault();
   const text = $('#q').value.trim(); if (!text) return;
+  if (lane === 'open' && !openReviewed) { pendingOpen = text; $('#q').value = ''; await showOpenReview(); return; }
+  send(text);
+};
+async function send(text){
   $('#q').value = ''; $('#send').disabled = true;
   const turn = document.createElement('div'); turn.className = 'turn';
   turn.innerHTML = `<div class=q></div><div class=a><div class=steps><span class=thinking>Starting…</span></div></div>`;
@@ -172,11 +198,15 @@ $('#ask').onsubmit = async e => {
       stepsEl.innerHTML = p.steps.map((s, i) => `<div class="${i === p.steps.length - 1 ? 'step now' : 'step'}">${i === p.steps.length - 1 ? '⏳' : '✓'} ${s.text}</div>`).join('') + `<div class=step style="color:var(--muted)">${secs}s · small local-tier model, thanks for waiting</div>`;
     } catch (e) {}
   }, 700);
-  const r = await api('/api/ask', {text});
+  const r = await api('/api/ask', {text, lane});
   clearInterval(ticker);
   const a = turn.querySelector('.a');
   if (r.id) { turn.dataset.id = r.id; turn.dataset.lane = r.lane; }
   if (r.error) { a.innerHTML = `<span class=err></span>`; a.querySelector('.err').textContent = r.error; }
+  else if (r.lane === 'open') {
+    if (r.answer) a.innerHTML = `<div style="white-space:pre-wrap">${r.answer.replace(/</g,'&lt;')}</div>` + metaLine(r);
+    else a.innerHTML = `<iframe class=page src="/api/page/${r.id}"></iframe><p class=note>Open mode: the model saw your files with private values tokenised and built this freely — figures are the model's own arithmetic, not receipted queries. <a href="/api/download-page/${r.id}">Download the page</a></p>` + metaLine(r);
+  }
   else if (r.lane === 'ask') {
     a.innerHTML = r.html + (r.scope_note ? `<p class=note style="color:var(--warn)">⚠ ${r.scope_note}</p>` : '') + metaLine(r);
     a.querySelectorAll('button.dl').forEach(b => b.onclick = () => window.open(`/api/csv/${r.id}/a1`));
@@ -212,7 +242,8 @@ function watchPage(frame, id, a){
 }
 function metaLine(r){
   const e = r.egress || {};
-  return `<div class=meta><span class=egress><i></i> sent: column names only · rows: 0 · ${fmtB(e.prompt_bytes||0)}</span><span>model: <b>${e.model||''}</b> · ${e.seconds||0}s${e.calls>1?' · '+e.calls+' calls':''}</span>${r.lane==='ask'?`<span>${r.rowcount} row(s) · from ${(r.tables_used||[]).join(', ')}</span>`:r.lane==='page'?`<span>${fmtB(r.bytes||0)} page</span>`:`<span>${r.panels} panel(s)</span>`}${r.attempts>1?`<span>${r.attempts} attempts</span>`:''}</div>`;
+  const sent = r.lane === 'open' ? `sent: ${e.rows_sent||0} tokenised rows (0 real names/numbers — checked) · ${fmtB(e.prompt_bytes||0)}` : `sent: column names only · rows: 0 · ${fmtB(e.prompt_bytes||0)}`;
+  return `<div class=meta><span class=egress><i></i> ${sent}</span><span>lane: <b>${r.lane}</b></span><span>model: <b>${e.model||''}</b> · ${e.seconds||0}s${e.calls>1?' · '+e.calls+' calls':''}</span>${r.lane==='ask'?`<span>${r.rowcount} row(s) · from ${(r.tables_used||[]).join(', ')}</span>`:(r.lane==='page'||r.lane==='open')?`<span>${r.bytes?fmtB(r.bytes)+' page':'answer'}</span>`:`<span>${r.panels} panel(s)</span>`}${r.attempts>1?`<span>${r.attempts} attempts</span>`:''}</div>`;
 }
 $('#reset').onclick = async () => { await api('/api/reset', {}); log.innerHTML=''; addSystem('New conversation. The tables are still loaded.'); };
 

@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import render_plan  # noqa: E402
 import skills as skillmod  # noqa: E402
 import telegram_shell  # noqa: E402
+import shelter as sheltermod  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 UI = HERE.parent / "ui"
@@ -412,6 +413,7 @@ class Workspace:
         self.tables: list[dict] = []
         self.bridges: list[dict] = []
         self.skills: list[dict] = []
+        self.shelter = None
         self.schema = ""
         self.categories: dict = {}
         self.history: list[dict] = []
@@ -494,6 +496,7 @@ class Workspace:
         self.categories = self._categories()
         self.signature = self.file_signature()
         self.changed_at = time.strftime("%H:%M:%S")
+        self.shelter = None  # rebuilt lazily on the first open-lane call
 
     def watch(self, interval: float = 2.0) -> None:
         """Reload when a file in the folder is saved; pages re-run their receipts on the next view."""
@@ -1056,6 +1059,129 @@ def render_page_now(turn: dict) -> str:
     return render_plan.render(plan, results, source, template=plan.get("_mode", "dashboard"), question=turn["text"])
 
 
+# ---------------------------------------------------------------- Open lane (sheltered, Antigravity-free)
+
+OPEN_PROMPT = """You are a capable data analyst and web developer helping an NGO. Their data files are described below:
+schema, summary statistics, and a small SAMPLE of rows. The sample has been pseudonymised on their laptop — values
+like NAME_001, PHONE_002, PLACE_003 are stable stand-ins for private values; treat them as ordinary labels, never
+remark on them. The user's own machine holds the full real data.
+
+Do whatever the request asks, with full creative freedom.
+
+If a page / dashboard / app is the right output: return ONE complete self-contained HTML document (all CSS and JS
+inline, no external URLs or CDNs, works offline) and NOTHING else. DO NOT embed the dataset — at runtime the full
+real data is available as `window.data`, an object with one array of row objects per table:
+{data_keys}
+Compute every figure in JavaScript from window.data (totals, averages, group-bys) — never hardcode numbers from the
+sample. Rich interactivity (filters, sliders, tabs, search) is welcome. Guard against missing/null values.
+
+If the request is a question rather than a build, answer it in text from the statistics and sample, and say when
+the sample is not enough to be sure.
+
+{files}
+
+REQUEST:
+{request}
+"""
+
+
+def open_table_brief(t: dict, sh, sample_rows: int = 20) -> str:
+    NL = chr(10)
+    red = sh.redacted.get(t["table"])
+    if red is None:
+        return ""
+    stats = []
+    for c in t["columns"]:
+        q = c.replace(chr(34), chr(34) * 2)
+        try:
+            typ = WS.db.execute(f'SELECT typeof("{q}") FROM "{t["table"]}" LIMIT 1').fetchone()[0]
+        except Exception:  # noqa: BLE001
+            continue
+        if typ in ("BIGINT", "DOUBLE", "INTEGER", "HUGEINT"):
+            try:
+                mn, mx, avg = WS.db.execute(f'SELECT MIN("{q}"), MAX("{q}"), ROUND(AVG("{q}"), 2) FROM "{t["table"]}"').fetchone()
+                stats.append(f"{c}: numeric min={mn} max={mx} mean={avg}")
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            cats = WS.categories.get(t["table"], {}).get(c)
+            if cats:
+                stats.append(f"{c}: categories {cats[:12]}")
+    sample = sh.sub_known(red.head(sample_rows).to_csv(index=False))
+    return ("--- " + t["file"] + (" / " + str(t["sheet"]) if t.get("sheet") else "") + " -> window.data[" + json.dumps(t["table"]) + "], "
+            + str(t["rows"]) + " rows ---" + NL + "COLUMN STATS (computed on the laptop over ALL rows):" + NL + NL.join(stats)
+            + NL + f"SAMPLE ({min(sample_rows, t['rows'])} of {t['rows']} rows, pseudonymised):" + NL + sample)
+
+
+def ensure_shelter():
+    if WS.shelter is None:
+        step("Scanning files for private values and building the token vault (stays on this laptop)")
+        WS.shelter = sheltermod.Shelter(WS.folder)
+        for t in WS.tables:
+            if "table" not in t:
+                continue
+            frame = WS.db.execute(f'SELECT * FROM "{t["table"]}"').df()
+            WS.shelter.redact_table(t["table"], frame)
+        WS.shelter.pmap.save()
+    return WS.shelter
+
+
+def open_review() -> list[dict]:
+    sh = ensure_shelter()
+    out = []
+    for t in WS.tables:
+        if "table" not in t:
+            continue
+        frame = WS.db.execute(f'SELECT * FROM "{t["table"]}"').df()
+        out.append({"file": t["file"], "table": t["table"], "rows": t["rows"], "hidden": sh.review(t["table"], frame)})
+    return out
+
+
+def run_open(text: str, cfg: dict) -> dict:
+    reach = cfg.get("reach", "laptop")
+    if reach == "laptop":
+        return {"lane": "open", "text": text, "error": "The open lane sends your files (with private values replaced by tokens) to a bigger model. Set the reach dial to T4GC or Frontier first - Laptop reach never sends file contents."}
+    sh = ensure_shelter()
+    NL = chr(10)
+    blocks = [open_table_brief(t, sh) for t in WS.tables if "table" in t]
+    blocks = [b for b in blocks if b]
+    sent_rows = sum(min(20, t["rows"]) for t in WS.tables if "table" in t)
+    keys = ", ".join(json.dumps(t["table"]) + " (columns: " + ", ".join(t["columns"][:24]) + ")" for t in WS.tables if "table" in t)
+    q = sh.redact_text(text)
+    payload = OPEN_PROMPT.format(files=(NL + NL).join(blocks), request=q, data_keys=keys)
+    payload = sh.sub_known(payload)  # final consistency pass over EVERYTHING outbound
+    leaks = sh.leak_check(payload)
+    if leaks:
+        return {"lane": "open", "text": text, "error": "Blocked before sending: " + str(len(leaks)) + " private value(s) survived redaction (" + ", ".join(leaks[:3]) + "). Nothing left the laptop."}
+    model = cfg.get("t2_model") if reach == "frontier" else cfg.get("t1_model")
+    step("Sending " + str(sent_rows) + " tokenised rows + your request to " + str(model) + " (" + str(len(payload) // 1000) + " kB; 0 real names/numbers - checked)")
+    raw, meta = call_model({**cfg, "reach": reach}, payload, max_tokens=16000, timeout=600)
+    meta["rows_sent"] = sent_rows
+    meta["tokenised"] = True
+    step("Rehydrating: replacing tokens with the real values on this laptop")
+    if "<html" in raw.lower() or "<!doctype" in raw.lower():
+        html_doc = extract_html(raw)
+        errs = script_errors(html_doc)
+        calls = 1
+        if errs:
+            step("The page has a code error (" + errs[0][:60] + "); asking for one fix")
+            fix = payload + NL + NL + "YOUR PREVIOUS PAGE HAD JAVASCRIPT SYNTAX ERRORS:" + NL + NL.join(errs) + NL + "Return the complete corrected HTML document."
+            raw2, meta2 = call_model({**cfg, "reach": reach}, fix, max_tokens=16000, timeout=600)
+            calls = 2
+            try:
+                cand = extract_html(raw2)
+                if not script_errors(cand):
+                    html_doc, errs = cand, []
+            except ValueError:
+                pass
+            meta = {**meta2, "seconds": round(meta["seconds"] + meta2["seconds"], 2), "rows_sent": sent_rows, "tokenised": True}
+        meta["calls"] = calls
+        html_doc = sh.rehydrate(html_doc)
+        return {"lane": "open", "text": text, "page_html": html_doc, "egress": meta, "bytes": len(html_doc), "script_errors": errs, "open_page": True}
+    answer = sh.rehydrate(raw)
+    return {"lane": "open", "text": text, "answer": answer[:8000], "egress": meta}
+
+
 # ---------------------------------------------------------------- Page lane (generic build)
 
 PAGE_PROMPT = """You build small, self-contained web pages for a social-sector NGO. Return ONE complete HTML document and nothing else (no prose, no code fences). Rules: everything inline (CSS and JS in the file; no external URLs, no CDNs, no frameworks); must work offline from a file; must not throw console errors; clean readable layout; plain English labels. If the request needs a service worker, register it from an inline Blob URL so the single file is enough.{data_clause}
@@ -1154,6 +1280,21 @@ def run_page(text: str, cfg: dict) -> dict:
 
 
 CAPTURE = "<script>window.__ioErrors=[];window.addEventListener('error',function(e){window.__ioErrors.push((e.message||'error')+(e.lineno?' (line '+e.lineno+')':''))});window.addEventListener('unhandledrejection',function(e){window.__ioErrors.push('promise: '+String(e.reason).slice(0,160))});</script>"
+
+
+def open_page_with_data(turn: dict) -> str:
+    """Open-lane pages read window.data = {table: [rows...]} — the REAL rows, injected on this laptop."""
+    html_doc = turn["page_html"]
+    data = {}
+    for t in WS.tables:
+        if "table" not in t:
+            continue
+        cur = WS.db.execute(f'SELECT * FROM "{t["table"]}" LIMIT 20000')
+        cols = [d[0] for d in cur.description]
+        data[t["table"]] = [{c: clean(v) for c, v in zip(cols, r)} for r in cur.fetchall()]
+    inject = "<script>window.data = " + json.dumps(data, default=str).replace("</", "<\\/") + ";</script>"
+    i = html_doc.lower().find("<head>")
+    return (html_doc[:i + 6] + inject + html_doc[i + 6:]) if i >= 0 else inject + html_doc
 
 
 def page_with_data(turn: dict) -> str:
@@ -1288,13 +1429,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"folder": str(WS.folder) if WS.folder else None, "tables": WS.tables, "version": getattr(WS, "version", 0), "changed_at": getattr(WS, "changed_at", None),
                                "config": {**cfg, "api_key": ("set" if cfg.get("api_key") else ""), "telegram_token": ("set" if cfg.get("telegram_token") else "")},
                                "history": [{k: v for k, v in t.items() if k not in ("_full", "page", "rows")} for t in WS.history]})
+        if path == "/api/open/review":
+            with WS.lock:
+                try:
+                    return self._json({"files": open_review()})
+                except Exception as exc:  # noqa: BLE001
+                    return self._json({"error": str(exc)[:300]}, 500)
         m = re.match(r"^/api/page/(\d+)$", path)
         if m:
             t = WS.turns.get(m.group(1))
             if not t or ("plan" not in t and "page_html" not in t):
                 return self._send(404, b"no page")
             with WS.lock:
-                page = page_with_data(t) if t.get("lane") == "page" else render_page_now(t)
+                page = open_page_with_data(t) if t.get("open_page") else page_with_data(t) if t.get("lane") == "page" else render_page_now(t)
             return self._send(200, page.encode(), "text/html; charset=utf-8")
         m = re.match(r"^/api/rerun/(\d+)$", path)
         if m:
@@ -1334,7 +1481,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Disposition", 'attachment; filename="io-page.html"')
             self.end_headers()
-            self.wfile.write(page_with_data(t).encode())
+            self.wfile.write((open_page_with_data(t) if t.get("open_page") else page_with_data(t)).encode())
             return None
         if path.startswith("/ui/"):
             f = (UI / path[4:]).resolve()
@@ -1359,7 +1506,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"folder": str(folder), "tables": WS.tables})
             if self.path == "/api/config":
                 cfg = load_config()
-                for k in ("source", "endpoint", "model", "local_endpoint", "local_model", "astronaut", "t1_model", "t2_model", "telegram_token"):
+                for k in ("source", "endpoint", "model", "local_endpoint", "local_model", "astronaut", "t1_model", "t2_model", "telegram_token", "reach"):
                     if k in body:
                         cfg[k] = body[k]
                 if body.get("api_key") and body["api_key"] != "set":
@@ -1378,6 +1525,8 @@ class Handler(BaseHTTPRequestHandler):
                 PROGRESS.clear()
                 FIRED.clear()
                 lane = body.get("lane")
+                if lane == "auto":
+                    lane = None
                 if not lane:
                     if PAGE_WORDS.search(text) and not re.search(r"\b(dashboard|report|summar\w*)\b", text, re.I):
                         lane = "page"
@@ -1385,9 +1534,9 @@ class Handler(BaseHTTPRequestHandler):
                         lane = "build"
                     else:
                         lane = "ask"
-                step({"page": "Page lane: the model writes a page; rows never leave", "build": "Build lane: the model plans panels; your laptop computes", "ask": "Ask lane: one query, computed here"}[lane])
+                step({"page": "Page lane: the model writes a page; rows never leave", "build": "Build lane: the model plans panels; your laptop computes", "ask": "Ask lane: one query, computed here", "open": "Open lane: your files go tokenised to the model on the dial; it works freely; answers come back and are rehydrated here"}.get(lane, lane))
                 with WS.lock:
-                    turn = run_page(text, cfg) if lane == "page" else run_build(text, cfg) if lane == "build" else run_ask(text, cfg)
+                    turn = run_open(text, cfg) if lane == "open" else run_page(text, cfg) if lane == "page" else run_build(text, cfg) if lane == "build" else run_ask(text, cfg)
                     step("Done")
                     turn["id"] = str(len(WS.history) + 1)
                     turn["at"] = time.strftime("%H:%M:%S")
