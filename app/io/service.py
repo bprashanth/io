@@ -45,6 +45,19 @@ REASON = {
 
 GLINER_MODEL = "knowledgator/gliner-pii-edge-v1.0"
 
+RULE = {
+    "validator": "the format checks out",
+    "long-unique-number": "long unique numbers",
+    "code-like-id": "record codes",
+    "precise-coordinate": "precise coordinates",
+    "sensitive-vocabulary": "sensitive words",
+    "categorical-names": "the values are people's names",
+    "span-coverage": "the scanner recognised the values",
+    "free-text": "found inside the text",
+    "categorical": "categories",
+    "numeric": "numbers",
+}
+
 
 class State:
     def __init__(self) -> None:
@@ -82,12 +95,19 @@ class State:
         return hashlib.sha256("|".join(sorted(str(c).strip().lower() for c in columns)).encode()).hexdigest()[:16]
 
     def load_folder(self, folder: Path) -> None:
+        self.decisions = json.loads(DECISIONS_PATH.read_text()) if DECISIONS_PATH.exists() else {}
         self.folder = folder
         self.tables, self.redacted, self.turns = [], {}, []
         self.pmap = PseudonymMap(CONF / f"vault-{hashlib.sha256(str(folder).encode()).hexdigest()[:12]}-local-only.json")
         det = self.get_detector()
+        self.skipped = []
         for f in sorted(folder.iterdir()):
-            if f.name.startswith("~$") or f.suffix.lower() not in (".csv", ".xlsx", ".xls"):
+            if f.name.startswith("~$") or f.name.startswith("."):
+                continue
+            if f.is_file() and f.suffix.lower() not in (".csv", ".xlsx", ".xls"):
+                self.skipped.append(f.name)
+                continue
+            if not f.is_file():
                 continue
             try:
                 frames = {None: pd.read_csv(f, dtype=str)} if f.suffix.lower() == ".csv" else {
@@ -122,18 +142,25 @@ class State:
                 out[col] = cls if isinstance(cls, str) else cls[0]
         return out
 
-    def cell_spans(self, frame: pd.DataFrame, classes: dict, decided: dict, det) -> dict[str, list[int]]:
-        """For free-text columns: which of the first 200 rows contain a detected value."""
-        spans: dict[str, list[int]] = {}
+    def cell_spans(self, frame: pd.DataFrame, classes: dict, decided: dict, det) -> dict[str, dict[int, str]]:
+        """Free-text columns: per cell (first 200 rows), what exactly the scanner found."""
+        spans: dict[str, dict[int, str]] = {}
         for col, info in classes.items():
             cls = decided.get(col, info["class"] if isinstance(info, dict) else info)
             if cls != "free_text_with_pii":
                 continue
-            rows = []
+            hits: dict[int, str] = {}
             for i, v in enumerate(frame[col].head(200)):
-                if isinstance(v, str) and v.strip() and det(v):
-                    rows.append(i)
-            spans[col] = rows
+                if not (isinstance(v, str) and v.strip()):
+                    continue
+                found = det(v)
+                if found:
+                    parts = []
+                    for st, en, label, _c in found[:3]:
+                        word = REASON.get(label, label).rstrip("s")
+                        parts.append(f"{word}: {v[st:en][:24]}")
+                    hits[i] = " · ".join(parts)
+            spans[col] = hits
         return spans
 
     def build_vault(self) -> None:
@@ -326,7 +353,6 @@ class H(BaseHTTPRequestHandler):
                     S.decisions[t["key"]] = t["decided"]
                     DECISIONS_PATH.write_text(json.dumps(S.decisions, indent=1))
                     S.redacted = {}  # rebuild vault on next question
-                    t["spans"] = S.cell_spans(t["frame"], t["classes"], t["decided"], S.get_detector())
                 return self._json(self.review())
             if self.path == "/api/accept":
                 with S.lock:
@@ -356,11 +382,23 @@ class H(BaseHTTPRequestHandler):
         for t in S.tables:
             eff = S.effective(t)
             grid = t["frame"].head(120)
+            why = {}
+            for c, cls in eff.items():
+                info = t["classes"].get(c, {})
+                rule = info.get("rule") if isinstance(info, dict) else None
+                conf = info.get("confidence") if isinstance(info, dict) else None
+                if c in t["decided"]:
+                    why[c] = "you marked this"
+                elif cls == "free_text_with_pii":
+                    why[c] = f"found in {len(t['spans'].get(c, {}))} of the first 200 cells"
+                else:
+                    why[c] = RULE.get(rule, rule or "") + (f", {int(conf * 100)}% of sampled cells" if conf and rule == "validator" else "")
             out.append({"name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns),
                         "grid": grid.values.tolist(),
                         "hidden": {c: REASON.get(cls, cls) for c, cls in eff.items()},
+                        "why": why,
                         "spans": {c: r for c, r in t["spans"].items() if c in eff}})
-        return {"files": out}
+        return {"files": out, "skipped": getattr(S, "skipped", [])}
 
 
 def main():

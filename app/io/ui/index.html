@@ -104,6 +104,11 @@ td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:po
   <div id="note"></div>
 </div>
 
+<div id="confirmscan" class="modal"><div class="card" style="width:340px;text-align:center">
+  <div id="cs-text"></div>
+  <div style="display:flex;justify-content:center;gap:8px"><button id="cs-x">Cancel</button><button class="go" id="cs-ok">Scan</button></div>
+</div></div>
+
 <div id="browser" class="modal"><div class="card" style="width:460px">
   <div id="br-path" class="dim" style="font-size:13px;word-break:break-all"></div>
   <div id="br-list" style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px"></div>
@@ -119,7 +124,7 @@ td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:po
 
 <script>
 const $ = s => document.querySelector(s);
-let files = [], tab = 0, terms = [], accepted = false;
+let files = [], skipped = [], tab = 0, terms = [], accepted = false;
 const api = (p, b) => fetch(p, b ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(b)} : {}).then(r => r.json());
 (async () => { const st = await api('/api/state'); if (st.provider.set) show('#s-home'); })();
 function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = id === '#s-provider' ? 'none' : ''; }
@@ -135,7 +140,7 @@ $('#p-go').onclick = async () => {
 // settings
 $('#gear').onclick = () => $('#settings').classList.add('on');
 $('#br-x').onclick = () => $('#browser').classList.remove('on');
-$('#br-open').onclick = () => { const p = $('#br-path').dataset.path; if (p) { $('#browser').classList.remove('on'); openFolder(p); } };
+$('#br-open').onclick = () => { const p = $('#br-path').dataset.path; if (p) { $('#browser').classList.remove('on'); openFolder(p); } };  // the button already shows the file count
 $('#st-x').onclick = () => $('#settings').classList.remove('on');
 $('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-key').value.trim(), server: $('#st-server').value.trim(), model: $('#st-model').value.trim()}); $('#settings').classList.remove('on'); };
 
@@ -153,7 +158,16 @@ async function pickFolder(){
   if (window.io && window.io.pickFolder) path = await window.io.pickFolder();
   else { $('#browser').classList.add('on'); await browseTo($('#br-path').dataset.path || ''); return; }
   if (!path) return;
-  openFolder(path);
+  confirmScan(path);
+}
+async function confirmScan(path){
+  const r = await api('/api/browse?path=' + encodeURIComponent(path));
+  if (r.data_files > 1) {
+    $('#cs-text').textContent = `Scan ${r.data_files} files on this laptop?`;
+    $('#confirmscan').classList.add('on');
+    $('#cs-x').onclick = () => $('#confirmscan').classList.remove('on');
+    $('#cs-ok').onclick = () => { $('#confirmscan').classList.remove('on'); openFolder(path); };
+  } else openFolder(path);
 }
 async function openFolder(path){
   show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';
@@ -161,24 +175,26 @@ async function openFolder(path){
   const r = await api('/api/folder', {path});
   clearInterval(poll);
   if (r.error) { alert(r.error); show(accepted ? '#s-chat' : '#s-home'); return; }
-  files = r.files; tab = 0; accepted = false; renderSheet();
+  files = r.files; skipped = r.skipped || []; tab = 0; accepted = false; renderSheet();
 }
 $('#plus').onclick = pickFolder;
 
 function renderSheet(){
   show('#s-sheet');
-  $('#tabs').innerHTML = files.map((f, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${f.name}</button>`).join('');
+  $('#tabs').innerHTML = files.map((f, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${f.name}</button>`).join('')
+    + (skipped.length ? `<span class="dim" style="font-size:12px;align-self:center;margin-left:8px">not read: ${skipped.join(' · ')}</span>` : '');
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = +b.dataset.i; renderSheet(); });
   const f = files[tab];
   const hid = f.hidden || {};
   const spans = f.spans || {};
-  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : ''}" data-c="${encodeURIComponent(c)}">${c}${hid[c] ? `<span class=why>${hid[c]}</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
+  const why = f.why || {};
+  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : ''}" data-c="${encodeURIComponent(c)}" title="${hid[c] ? (hid[c] + (why[c] ? ' — ' + why[c] : '')).replace(/"/g,'&quot;') : 'click to hide this column'}">${c}${hid[c] ? `<span class=why>${hid[c]}</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
   f.grid.forEach((row, ri) => {
     html += '<tr>' + row.map((v, ci) => {
       const c = f.columns[ci];
       const colHid = !!hid[c];
-      const cellHit = spans[c] && spans[c].includes(ri);
-      return `<td class="${colHid ? 'hid' : ''}${cellHit ? ' cellhit' : ''}" data-c="${encodeURIComponent(c)}">${String(v ?? '').slice(0, 80)}</td>`;
+      const hit = spans[c] && spans[c][ri];
+      return `<td class="${colHid ? 'hid' : ''}${hit ? ' cellhit' : ''}" data-c="${encodeURIComponent(c)}"${hit ? ` title="${String(hit).replace(/"/g,'&quot;')}"` : ''}>${String(v ?? '').slice(0, 80)}</td>`;
     }).join('') + '</tr>';
   });
   html += '</tbody></table>';
