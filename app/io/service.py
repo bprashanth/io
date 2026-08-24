@@ -55,6 +55,7 @@ class State:
         self.turns: list[dict] = []
         self.decisions: dict = json.loads(DECISIONS_PATH.read_text()) if DECISIONS_PATH.exists() else {}
         self.detector = None
+        self.det_lock = threading.Lock()
         self.lock = threading.Lock()
         self.progress: list[str] = []
 
@@ -64,14 +65,15 @@ class State:
 
     # ---------------------------------------------------------------- engine
     def get_detector(self):
-        if self.detector is None:
-            self.step("loading the on-device scanner")
-            try:
-                gl = build_engine(f"gliner:{GLINER_MODEL}")
-                self.detector = lambda t: regex_engine(t) + gl(t)
-            except Exception:  # noqa: BLE001
-                traceback.print_exc()
-                self.detector = regex_engine
+        with self.det_lock:
+            if self.detector is None:
+                self.step("loading the on-device scanner")
+                try:
+                    gl = build_engine(f"gliner:{GLINER_MODEL}")
+                    self.detector = lambda t: regex_engine(t) + gl(t)
+                except Exception:  # noqa: BLE001
+                    traceback.print_exc()
+                    self.detector = regex_engine
         return self.detector
 
     @staticmethod
@@ -98,6 +100,8 @@ class State:
                 frame = frame.fillna("")
                 frame.columns = [str(c) for c in frame.columns]
                 name = f.stem + (f" · {sheet}" if sheet and len(frames) > 1 else "")
+                if any(t["name"] == name for t in self.tables):
+                    name = f"{f.stem} ({f.suffix.lstrip('.')})" + (f" · {sheet}" if sheet and len(frames) > 1 else "")
                 self.step(f"scanning {name}")
                 classes = classify_columns(frame, det)
                 key = self.header_key(list(frame.columns))
@@ -341,6 +345,7 @@ class H(BaseHTTPRequestHandler):
 
 
 def main():
+    threading.Thread(target=S.get_detector, daemon=True).start()  # warm the scanner
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8801
     print(f"io on http://127.0.0.1:{port}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
