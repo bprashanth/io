@@ -37,6 +37,7 @@ DECISIONS_PATH = CONF / "decisions.json"
 FOLDERS_PATH = CONF / "folders.json"
 
 REASON = {
+    "hidden": "hidden",
     "person_name": "names", "phone": "phone numbers", "aadhaar": "Aadhaar numbers", "email": "emails",
     "bank_account": "account numbers", "ifsc": "IFSC codes", "village": "villages", "address": "addresses",
     "dob": "birth dates", "gps": "locations", "caste_category": "categories", "upi": "UPI ids",
@@ -401,7 +402,7 @@ class H(BaseHTTPRequestHandler):
                     else:
                         info = t["classes"].get(col, {})
                         auto = info.get("class") if isinstance(info, dict) else info
-                        t["decided"][col] = auto if auto not in (None, "none", "record_id_non_pii", "age") else "person_name"
+                        t["decided"][col] = auto if auto not in (None, "none", "record_id_non_pii", "age") else "hidden"
                     S.decisions[t["key"]] = t["decided"]
                     S.save_decisions()
                     S.redacted = {}  # rebuild vault on next question
@@ -460,7 +461,7 @@ class H(BaseHTTPRequestHandler):
                 rule = info.get("rule") if isinstance(info, dict) else None
                 conf = info.get("confidence") if isinstance(info, dict) else None
                 if c in t["decided"]:
-                    why[c] = "you marked this"
+                    why[c] = ""
                 elif cls == "free_text_with_pii":
                     why[c] = f"found in {len(t['spans'].get(c, {}))} of the first 200 cells"
                 else:

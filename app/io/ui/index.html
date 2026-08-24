@@ -41,7 +41,7 @@ input:focus,textarea:focus{border-color:var(--hi)}
 
 /* sheet */
 #s-sheet{justify-content:flex-start;align-items:stretch;padding:0;overflow:hidden}
-#sheet-top{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)}
+#sheet-top{display:flex;align-items:center;gap:14px;padding:12px 48px 12px 18px;border-bottom:1px solid var(--line)}
 #sheet-top .tabs{display:flex;gap:6px;overflow-x:auto}
 #sheet-top .tabs button{padding:5px 12px;font-size:13px;white-space:nowrap}
 #sheet-top .tabs button.on{border-color:var(--hi);color:var(--hi)}
@@ -206,8 +206,11 @@ async function confirmScan(path){
 }
 async function openFolder(path){
   show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';
-  const poll = setInterval(async () => { const st = await api('/api/state'); if (st.progress && st.progress.length) $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">' + st.progress[st.progress.length-1] + '…</p>'; }, 800);
+  $('#sheet-top').style.display = 'none'; $('#sheet-bar').style.display = 'none';
+  let scanning = true;
+  const poll = setInterval(async () => { const st = await api('/api/state'); if (!scanning) return; if (st.progress && st.progress.length) $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">' + st.progress[st.progress.length-1] + '…</p>'; }, 800);
   const r = await api('/api/folder', {path});
+  scanning = false;
   clearInterval(poll);
   if (r.error) { alert(r.error); show(accepted ? '#s-chat' : '#s-home'); return; }
   files = r.files; skipped = r.skipped || []; tab = 0; accepted = false; renderSheet();
@@ -215,6 +218,7 @@ async function openFolder(path){
 
 function renderSheet(){
   show('#s-sheet');
+  $('#sheet-top').style.display = ''; $('#sheet-bar').style.display = '';
   $('#sheet-preview').style.display = ''; $('#sheet-back').style.display = 'none';
   $('#tabs').innerHTML = files.map((f, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${f.name}</button>`).join('')
     ;
@@ -224,8 +228,8 @@ function renderSheet(){
   const cellcols = f.cellcols || {};
   const cells = f.cells || {};
   const why = f.why || {};
-  const hdrTitle = c => hid[c] ? (hid[c] + (why[c] ? ': ' + why[c] : '')) : cellcols[c] ? (cellcols[c] + (why[c] ? ': ' + why[c] : '') + '. Click a marked cell to keep just that cell.') : 'click to hide this column';
-  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : cellcols[c] ? 'cellcol' : ''}" data-c="${encodeURIComponent(c)}" title="${hdrTitle(c).replace(/"/g,'&quot;')}">${c}${hid[c] ? `<span class=why>${hid[c]}</span>` : cellcols[c] ? `<span class=why>in some cells</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
+  const hdrTitle = c => hid[c] ? (why[c] ? hid[c] + ': ' + why[c] : 'you marked this, click to keep') : cellcols[c] ? (cellcols[c] + (why[c] ? ': ' + why[c] : '') + '. Click a marked cell to keep just that cell.') : 'click to hide this column';
+  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : cellcols[c] ? 'cellcol' : ''}" data-c="${encodeURIComponent(c)}" title="${hdrTitle(c).replace(/"/g,'&quot;')}">${c}${hid[c] ? (why[c] ? `<span class=why>why: ${hid[c]}</span>` : '') : cellcols[c] ? `<span class=why>why: in some cells</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
   f.grid.forEach((row, ri) => {
     html += '<tr>' + row.map((v, ci) => {
       const c = f.columns[ci];
