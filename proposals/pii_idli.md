@@ -200,8 +200,12 @@ state, friendly message. Readable from a projector at the back of the room.
 
 1. ~~Pick the SLM (9b, sql model.. whatever) - must work well for ask lane and decently (even if its determistic) for the build lane; time the T0/T1 tiers.~~ **Done 2026-08-23:** Qwen 3.5 9B (T0), Qwen 3.5 27B (T1); T0 timings ~2 s hosted, ~30 s first / ~15 s follow-up on an 8 GB-class CPU; see stage 4.
    1b. Test `app/io-desktop` on the laptop (install.sh, key or local llama.cpp); decide whether T0 at the event is the hosted 9B or Qwen 3.6 35B-A3B under a different tier name.
-2. Extract the shield interceptor into the shared library; wire the
-   Antigravity plugin and io to it.
+2. ~~Extract the shield interceptor into the shared library; wire the
+   Antigravity plugin and io to it.~~ **Done differently 2026-08-24:** the vault
+   (classifier + pseudonym map + consistency pass + leak gate) is `app/io-desktop/server/shelter.py`,
+   feeding the io **open lane** — Antigravity-free building with the shield built in; verified
+   against the stage-3 reference numbers (`chronology/2026-08-24T1200-…`). The Antigravity plugin
+   keeps its own copy for now (backlog: one shared egress chokepoint).
 3. Build io as one local service with the six screens (Python + local web
    page is enough for the event): dial, lazy review, vault, guard, monitor.
 4. Receipts manifest + audit view + numeric-literal lint; T0 deterministic
