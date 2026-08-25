@@ -18,6 +18,25 @@ let poller = null;
 let ctx = null;
 let baselineCalls = null;   // daemon call-count when this window attached; routing is
 let verified = false;       // "verified" once a model call arrives after that.
+let scanNote = null;        // progress notification while the daemon reads files
+let blockedWarned = false;  // folder-too-big error shown once per session
+
+function scanProgress(s) {
+  if (s && s.scan_active) {
+    if (!scanNote) {
+      scanNote = {};
+      vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Shield: reading files" },
+        (progress) => new Promise((resolve) => { scanNote.progress = progress; scanNote.resolve = resolve; }));
+    }
+    if (scanNote.progress) {
+      scanNote.progress.report({ message: `${s.scan_done}/${s.scan_total}` + (s.scan_current ? ` · ${s.scan_current}` : "") });
+    }
+  } else if (scanNote) {
+    if (scanNote.resolve) scanNote.resolve();
+    scanNote = null;
+  }
+}
 
 const cfg = () => vscode.workspace.getConfiguration("privacyShield");
 const net = require("net");
@@ -354,9 +373,10 @@ async function menu() {
     { label: "$(shield) Enable Privacy Shield", action: "enable" },
     { label: "$(dashboard) Show shield status", action: "status" },
   ];
+  const ver = (ctx.extension && ctx.extension.packageJSON.version) || "";
   const pick = await vscode.window.showQuickPick(items, {
-    placeHolder: enabled ? "Privacy Shield is ON — personal data is replaced before it leaves this laptop"
-                         : "Privacy Shield is OFF — agent traffic goes directly to Google",
+    placeHolder: enabled ? `Privacy Shield ${ver} - ON. Personal data is replaced before it leaves this laptop`
+                         : `Privacy Shield ${ver} - OFF. Agent traffic goes directly to Google`,
   });
   if (!pick) return;
   if (pick.action === "enable") return enable();
@@ -374,18 +394,35 @@ async function refresh() {
     if (baselineCalls === null) baselineCalls = s.calls;
     if (s.calls > baselineCalls) verified = true;
   }
+  const ver = (ctx.extension && ctx.extension.packageJSON.version) || "";
+  scanProgress(enabled ? s : null);
   if (!enabled) {
     statusBar.text = "$(shield) Shield off";
-    statusBar.tooltip = "Privacy Shield is off. Click to enable.";
+    statusBar.tooltip = `Privacy Shield ${ver} is off. Click to enable.`;
     statusBar.backgroundColor = undefined;
-  } else if (!s) {
-    statusBar.text = "$(shield) Shield starting…";
+  } else if (!s && baselineCalls === null) {
+    statusBar.text = "$(shield) Shield starting";
+    statusBar.tooltip = `Privacy Shield ${ver} is starting its local daemon.`;
     statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+  } else if (!s) {
+    // The daemon was answering earlier and will again: it is busy redacting a
+    // large request, not crashed. No alarm colours.
+    statusBar.text = "$(shield) Shield busy";
+    statusBar.tooltip = `Privacy Shield ${ver} is redacting a large request. Not crashed - this clears by itself.`;
+    statusBar.backgroundColor = undefined;
+  } else if (s.scan_blocked) {
+    statusBar.text = "$(shield) Folder too big";
+    statusBar.tooltip = `Privacy Shield ${ver}: ${s.scan_blocked}. Use a smaller folder, or click and Disable.`;
+    statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+    if (!blockedWarned) {
+      blockedWarned = true;
+      vscode.window.showErrorMessage(`Shield: ${s.scan_blocked}. Use a smaller folder, or disable the shield.`,
+        "Disable shield").then((pick) => { if (pick === "Disable shield") disable(); });
+    }
   } else if (s.scan_active) {
-    statusBar.text = `$(shield) Scanning your files\u2026 ${s.scan_done}/${s.scan_total}` +
-      (s.scan_current ? ` \u00b7 ${s.scan_current}` : "");
-    statusBar.tooltip = "Privacy Shield is reading the files in this folder to learn what must be hidden. " +
-      "Questions asked now are held until the scan finishes; nothing leaves early.";
+    statusBar.text = `$(shield) Scanning files ${s.scan_done}/${s.scan_total}`;
+    statusBar.tooltip = `Privacy Shield ${ver} is reading this folder to learn what to hide. ` +
+      "Questions wait until it finishes; nothing leaves early.";
     statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
   } else if (!verified) {
     // The daemon is up but no model call has passed through it in this session yet,
@@ -425,7 +462,12 @@ function activate(context) {
     vscode.commands.registerCommand("privacyShield.reset", reset),
     vscode.commands.registerCommand("privacyShield.install", install),
     vscode.commands.registerCommand("privacyShield.openServerFolder", () => vscode.env.openExternal(vscode.Uri.file(serverDir()))),
-    vscode.commands.registerCommand("privacyShield.showLog", () => vscode.commands.executeCommand("workbench.action.output.show.extension-output-insight-out.privacy-shield-#1-Privacy Shield").then(undefined, () => vscode.commands.executeCommand("workbench.action.output.toggleOutput"))),
+    vscode.commands.registerCommand("privacyShield.showLog", () => {
+      const f = path.join(stateDir(), "daemon.out");
+      return vscode.workspace.openTextDocument(vscode.Uri.file(f))
+        .then((d) => vscode.window.showTextDocument(d, { preview: false }),
+              () => vscode.window.showInformationMessage("No daemon log yet: " + f));
+    }),
     { dispose: stopDaemon });
   if (!ctx.globalState.get("enabled")) {
     if (setCloudCodeUrlSetting(null) === "written") {

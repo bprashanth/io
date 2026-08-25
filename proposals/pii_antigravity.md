@@ -313,7 +313,53 @@ Two more gaps found and fixed in 0.2.5:
 - The partial pass only considers clean name-shaped vault values, so
   span-noise entries (`"Row 5: ['Priya Venkatesan'"`) can't poison it.
 
-## Open bugs for the next agent (2026-08-25 evening, laptop session)
+## 0.3.1 work in progress — committed for the server agent (2026-08-25, late)
+
+The perf/UX fixes below are **implemented in the repo (`extension/
+privacy-shield/`, version 0.3.1) but NOT packaged or IDE-verified** — the
+laptop still runs the installed 0.3.0. Server agent: rebuild the vsix
+(`npx @vscode/vsce package --no-dependencies --allow-missing-repository`),
+install, and run the in-IDE recipe below.
+
+Done in code, standalone-verified against a daemon on port 8899:
+
+- **Single-pass request path**: redaction cache entries are stamped with a
+  vault generation — a hit returns the string with **zero regex** while the
+  vault is unchanged (discovery-at-rest keeps it frozen between file
+  rescans); the leak check is now **one** precompiled alternation search
+  instead of ~4,500 per-value `re.search` calls; the consistency re-walk is
+  deleted (the single known-values pass over the final body covers ordering).
+- **Folder limits, blunt and visible**: > **40 files** or > **25 MB** of
+  scannable data → the scan refuses, status bar shows red "Folder too big",
+  a one-time error toast offers "Disable shield", and any model call is
+  answered in-chat: "Shield: 50 files in this folder, demo limit is 40.
+  Nothing was sent. Use a smaller folder, or click the shield icon and
+  Disable." Verified live, including **self-recovery**: remove files below
+  the limit and the watcher unblocks and scans within ~10 s.
+- **Scan progress is a real notification**, not just the tiny icon: a VS Code
+  progress toast "Shield: reading files — 3/10 · name.csv" driven off the
+  daemon's scan state, plus the status bar "Scanning files 3/10".
+- **Honest busy wording**: a status poll that times out while the daemon is
+  under load now shows "Shield busy" (no alarm colour, tooltip: "redacting a
+  large request. Not crashed - this clears by itself"); "Shield starting"
+  only before the daemon has ever answered.
+- **Version is visible everywhere**: daemon prints and serves `version` in
+  `/shield/status.json`; the status-bar tooltips and the shield menu title
+  show the extension version.
+- **"Show daemon log" opens the actual `daemon.out` file** (it used to open
+  an empty output channel); poller-disconnect `BrokenPipeError` tracebacks
+  are silenced in the daemon.
+
+Measured on the 4,517-entry corpus vault with a ~39 KB 31-part body:
+redact_ms 401 cold → ~250 warm (was seconds, with multi-second spikes). The
+<100 ms target is not yet met — the remaining cost is the known-regex
+alternation itself; if the status flicker persists in-IDE, chunk/trie-compile
+it (direction (d) below). Remaining for the server agent: package 0.3.1,
+install, re-run the in-IDE corpus smoke (§verification recipe), confirm no
+"Shield busy" flicker during a dashboard build, and check `daemon.out` stays
+clean of tracebacks.
+
+## Open bugs found earlier the same day (context for the fixes above)
 
 Diagnosed but NOT yet fixed — start here. The laptop stays in use; fix on a
 clean checkout and verify against `benchmarks/pii/corpus/` (a fresh workspace
