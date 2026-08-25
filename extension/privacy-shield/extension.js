@@ -373,15 +373,15 @@ async function refresh() {
     // The daemon is up but no model call has passed through it in this session yet,
     // so routing is unproven. This clears on the first shielded agent message; if it
     // never clears while the agent answers, traffic is bypassing the shield.
-    statusBar.text = "$(shield) Shield on · awaiting first call";
+    statusBar.text = "$(shield) Shield on - awaiting first call";
     statusBar.tooltip = `Privacy Shield is running on ${proxyUrl()} and Antigravity is pointed at it, ` +
       "but no model call has arrived yet. The first agent message verifies routing." +
       (languageServerUsesProxy() ? "" : "\nIf this persists after a chat message, run 'Privacy Shield: Enable' and choose Relaunch.");
     statusBar.backgroundColor = undefined;
   } else {
-    const peek = s.peek ? " · PEEK" : "";
-    const blocked = s.blocked ? ` · ${s.blocked} blocked` : "";
-    statusBar.text = `$(shield) ${s.calls} calls · ${Math.round(s.redact_ms_last)} ms · vault ${s.vault_entries}${blocked}${peek}`;
+    const peek = s.peek ? " - PEEK" : "";
+    const blocked = s.blocked ? ` - ${s.blocked} blocked` : "";
+    statusBar.text = `$(shield) ${s.calls} calls - ${Math.round(s.redact_ms_last)} ms - vault ${s.vault_entries}${blocked}${peek}`;
     statusBar.tooltip = `Privacy Shield active on ${proxyUrl()}\n` +
       `redaction total ${Math.round(s.redact_ms_total)} ms, upstream ${Math.round(s.upstream_ms_total)} ms, ` +
       `${s.bytes_out} bytes sent, ${s.spans_total} values hidden, cache ${s.cache_hits}/${s.cache_hits + s.cache_misses}` +
