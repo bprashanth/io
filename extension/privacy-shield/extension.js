@@ -21,7 +21,32 @@ let verified = false;       // "verified" once a model call arrives after that.
 let scanNote = null;        // progress notification while the daemon reads files
 let blockedWarned = false;  // folder-too-big error shown once per session
 
+let scanModal = false;      // a modal is on screen right now
+let scanState = null;       // latest scan numbers, read by the modal loop
+
+async function scanModalLoop() {
+  // Sheltering must be impossible to miss and impossible to talk past: while the
+  // daemon reads the folder, keep a centre-screen modal up. The IDE blocks input
+  // behind a modal, so the user waits; if they dismiss it early and the scan is
+  // still going, it comes straight back with fresh numbers. (The daemon gate
+  // still refuses any call that slips through - this is the visible half.)
+  if (scanModal) return;
+  scanModal = true;
+  try {
+    while (scanState && scanState.scan_active) {
+      const st = scanState;
+      const msg = `Privacy Shield is reading the files in this folder - ${st.scan_done || 0}/${st.scan_total || "?"}` +
+        (st.scan_current ? ` (${st.scan_current})` : "") +
+        ". Nothing can leave until this finishes. OK closes this box; it returns while the reading is still going.";
+      await vscode.window.showInformationMessage(msg, { modal: true }, "OK");
+    }
+  } finally {
+    scanModal = false;
+  }
+}
+
 function scanProgress(s) {
+  scanState = s;
   if (s && s.scan_active) {
     if (!scanNote) {
       scanNote = {};
@@ -32,6 +57,7 @@ function scanProgress(s) {
     if (scanNote.progress) {
       scanNote.progress.report({ message: `${s.scan_done}/${s.scan_total}` + (s.scan_current ? ` · ${s.scan_current}` : "") });
     }
+    scanModalLoop();
   } else if (scanNote) {
     if (scanNote.resolve) scanNote.resolve();
     scanNote = null;
