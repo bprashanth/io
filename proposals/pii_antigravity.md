@@ -1,6 +1,6 @@
 # PII masking & rehydration proxy for Antigravity
 
-Status: **built and working** — extension `privacy-shield-0.2.7.vsix`
+Status: **built and working** — extension `privacy-shield-0.2.8.vsix`
 (`extension/privacy-shield/`), verified end-to-end on Antigravity 1.107.0 on
 the Linux x64 laptop (apt `1.23.2-1776332190`, 0.2.2, Claude Sonnet 4.6 and
 Gemini 3.6 Flash) and on the DGX arm64 build (0.2.3, Gemini 3.6/3.7 Flash,

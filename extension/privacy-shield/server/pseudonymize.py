@@ -42,6 +42,11 @@ FOOTER_FRAGMENT = re.compile(r"\d+ ms redaction|new spans?, \d+ new parts|vault 
 # ("Child name", "Child ID", "Village code"): no real Indian name contains them.
 LABEL_WORDS = GENERIC_LABELS | {"id", "code", "number", "no", "score", "grade", "roll",
                                 "type", "status", "date", "dob", "sl", "sno", "child"}
+# Product and platform words that recur in paths, prompts and tool output; none of
+# them identifies a person or place, and tokenising one can corrupt control fields.
+PRODUCT_WORDS = {"gemini", "antigravity", "google", "claude", "openai", "gpt", "vscode",
+                 "github", "gitlab", "linux", "windows", "macos", "python", "pandas",
+                 "openpyxl", "jetski", "cloudcode"}
 
 
 def normalise(value: str) -> str:
@@ -68,7 +73,7 @@ class PseudonymMap:
                                        # lower-cased by a script's repr): never re-mint
         words = re.findall(r"[a-z]+", bare.casefold())
         labelish = pii_class in ("person_name", "village", "address", "place") \
-            and len(words) <= 3 and any(w in LABEL_WORDS for w in words)
+            and len(words) <= 3 and any(w in LABEL_WORDS or w in PRODUCT_WORDS for w in words)
         if bare.casefold() in GENERIC_LABELS or labelish or FOOTER_FRAGMENT.search(bare):
             return value.strip()       # a column-label word or phrase ("Village",
                                        # "Child name", "Child ID") or a fragment of our

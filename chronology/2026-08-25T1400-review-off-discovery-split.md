@@ -31,3 +31,27 @@ token-looking strings in the HTML are the model's own template placeholders
 Also fixed: the "Install now" flow never passed the globalStorage target to
 install.sh/ps1, so fresh envs landed back in the versioned extension folder
 and would die on update — exactly what the 0.2.4 change was for.
+
+## Addendum (same day, 0.2.8): the 404 was the shield rewriting the model id
+
+User hit `HTTP 404 Requested entity was not found` on every send. Chain, fully
+traced: Antigravity wraps its context-compaction summary in the same
+`<USER_REQUEST>` tags as typed questions → the full-engine question scan ran
+GLiNER over a machine summary full of file paths → minted "gemini",
+"antigravity", "desinotorious" as places → the 0.2.4-era last-line-of-defence
+pass (which substitutes known values over the WHOLE serialized body) rewrote
+the top-level model field to `PLACE_055-3.5-flash-low` and the userAgent to
+`PLACE_056` → Google 404s on the nonexistent model. Reproduced against the
+live daemon with a crafted probe; unit repro missed it because the full-body
+pass lives in the request handler, not in redact_request.
+
+Fixes in 0.2.8: the full-body pass restores model/userAgent/project/requestId
+after substitution (a junk vault entry can never again corrupt routing
+fields); USER_REQUEST spans over 1500 chars are treated as compaction
+summaries (replacement-only, no discovery); product/platform words (gemini,
+antigravity, google, claude, vscode, python, …) are never mintable as
+names/places; incoming model id now logged per request for diagnosis.
+Poisoned vault entries removed surgically. Verified: crafted probe and a
+fresh conversation both leave with the clean model id; shielded analysis of
+the fitness xlsx proceeds normally (the model computing with NAME_ tokens and
+correcting its own KeyError is the shield working, not a bug).

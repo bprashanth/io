@@ -409,7 +409,11 @@ class Shield:
             # The typed question rides inside machine scaffolding that classifies as
             # code (regex-only scan) — but a brand-new name typed by the human must
             # still be discovered. Run the full engine on just the question span.
-            text = USER_REQ.sub(lambda m: "<USER_REQUEST>\n" + redact_text(
+            # Long spans are not typed questions: Antigravity wraps its context-
+            # compaction summaries in the same tags, and scanning those minted file
+            # path fragments ("gemini", "desinotorious") as places. Replacement-only.
+            text = USER_REQ.sub(lambda m: m.group(0) if len(m.group(1)) > 1500
+                                else "<USER_REQUEST>\n" + redact_text(
                 m.group(1), self.vault, self.data_engine, classes=DIRECT | {"long_number"})[0] + "\n</USER_REQUEST>", text)
         kind = kind_of(text)
         engine = self.data_engine if kind == "data" else self.code_engine
@@ -875,7 +879,11 @@ def make_handler(shield: Shield, annotate: bool):
         def _fwd(self):
             body = self.read_body()
             with open("shield-requests.log", "a") as log:
-                log.write(json.dumps({"t": time.time(), "path": self.path, "bytes": len(body)}) + "\n")
+                try:
+                    _m = json.loads(body).get("model", "")
+                except Exception:
+                    _m = ""
+                log.write(json.dumps({"t": time.time(), "path": self.path, "bytes": len(body), "model_in": _m}) + "\n")
             counters = {"spans": 0, "hits": 0, "misses": 0}
             redact_ms = 0.0
             is_model_call = "streamGenerateContent" in self.path or "generateContent" in self.path
@@ -900,12 +908,27 @@ def make_handler(shield: Shield, annotate: bool):
                     return self.send_sse([sse_text_event(synthetic, finish=True)])
                 body = body2
                 # last line of defence repairs before it refuses: substitute every known
-                # value once more over the final body (order-independent), then check
+                # value once more over the final body (order-independent), then check.
+                # Routing/control fields are exempt: a junk vault entry must never be
+                # able to rewrite the model id or user agent (measured: "gemini" minted
+                # as a place turned the model into PLACE_055-3.5-flash-low -> HTTP 404).
                 known = shield.vault.known_regex()
                 if known:
                     def _sub(m):
                         return shield.vault.forward.get(re.sub(r"\s+", " ", m.group(0).strip()).casefold(), m.group(0))
+                    try:
+                        _p = json.loads(body)
+                        _saved = {k: _p[k] for k in ("model", "userAgent", "project", "requestId") if k in _p}
+                    except Exception:
+                        _p, _saved = None, {}
                     fixed = known.sub(_sub, body.decode("utf8", "replace"))
+                    if _saved:
+                        try:
+                            _q = json.loads(fixed)
+                            _q.update(_saved)
+                            fixed = json.dumps(_q, ensure_ascii=False)
+                        except Exception:
+                            pass
                     body = fixed.encode()
                     shield.last_walked = known.sub(_sub, getattr(shield, "last_walked", ""))
                 lowered = getattr(shield, "last_walked", "").casefold()
