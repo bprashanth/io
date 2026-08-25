@@ -414,6 +414,8 @@ def chat(question: str) -> dict:
             mentioned.append(hit)
             q_clean = q_clean.replace("@" + frag, hit)
     use = mentioned if mentioned else all_names
+    if not mentioned and len(all_names) > 12:
+        return {"error": f"this folder has {len(all_names)} files. Use @ to pick the ones your question needs, sending everything is a heavy call."}
     blocks, sent_rows, sent_lines, total = [], 0, 0, 0
     for t in S.tables:
         if t["name"] not in use:

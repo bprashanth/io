@@ -4,78 +4,45 @@
   <img src="assets/io.jpg" alt="Jupiter and Io" width="360">
 </p>
 
-This repository is working toward one practical event experience: an NGO user
-drops in an unfamiliar CSV, workbook or PDF, asks a short plain-language
-question, gets a correct desktop dashboard, and can refine it without debugging
-an agent or installing a new stack for every file.
+This repository is working toward one practical event experience: user
+(typically someone from the social sector, eg working at a NPO) drops in a
+CSV/workbook or PDF/chat dump, asks a few short plain-language question (no
+engineering hints, coding etc) and gets a correct desktop dashboard which they
+can refine without debugging an agent or installing a new stack for every file.
 
-## Current decision
+The current guide is [the demo plan](proposals/demo_and_flow.md). Everything
+built and measured on the way is in `chronology/` (append-only, timestamped);
+the stage ledger in [`docs/stages/`](docs/stages/README.md) is the short
+version. Two things ship from here: the privacy shield plugin for Antigravity
+(a shield for the common Antigravity user) and the io desktop app (for the
+serious privacy user: scan on the laptop, send tokenized values).
 
-The current event prototype is a checked model ladder, not Cline writing a
-website from scratch:
+## Quick start
 
-```text
-local CSV/XLSX/digital-PDF ingest
-  -> Arctic-Text2SQL-R1-7B Q4 proposes read-only DuckDB SQL
-  -> deterministic syntax, binding, scope, unit and result-shape checks
-       -> accept, or escalate to Qwen 3.8 27B on the trusted DGX
-  -> DuckDB calculates locally
-  -> deterministic typed report and self-contained HTML dashboard
-  -> browser, download, provenance and privacy checks
-  -> optional frontier layout advice from value-free metadata only
-```
+**A. The privacy shield in Antigravity**
 
-Arctic Q4 scored 25/30 alone. The generic router accepted 21 correct answers,
-accepted no wrong answers, and escalated nine. Qwen 3.8 27B passed 30/30 in its
-separate qualification run, giving a 30/30 routed replay on the frozen suite.
-The larger Arctic BF16 checkpoint scored 26/30 and passed a separate 15/15
-holdout, but is a server/high-end option rather than the intended laptop tier.
+1. Extensions view, "Install from VSIX", pick
+   `extension/privacy-shield-0.2.4.vsix`.
+2. Command palette, `Privacy Shield: Enable`. First time it offers a one-time
+   install (about 500 MB download, 1.7 GB disk install, needs python3 on the machine)
+   and asks for one relaunch.
+3. The status bar shows `N calls - X ms - vault M`. The status page has the
+   audit: bytes and rough tokens out, what was hidden, the exact last request
+   that left.
+4. Anything wrong, or uninstalling:
+   [`extension/privacy-shield/TROUBLESHOOTING.md`](extension/privacy-shield/TROUBLESHOOTING.md).
 
-**Stage ledger:** the work is now four additive stages — see
-[`docs/stages/`](docs/stages/README.md) (Cline vs Antigravity; local-first
-ladder and its re-verification; the Antigravity privacy shield, verified in
-the real IDE; the laptop-tier model choice for the custom io app). The shield
-is `extension/privacy-shield-0.2.3.vsix`; the io desktop shim is
-[`app/io-desktop/`](app/io-desktop/README.md) (T0 = Qwen 3.5 9B, Ask and
-Build lanes under a plan/receipt contract).
+**B. io, the desktop app**
 
-**Re-verification note (2026-08-21 evening):** the model ranking above
-reproduces, but the router's "accepted no wrong answers" and the "30/30 routed
-replay" do not hold out of sample, and a 2026 general 9B model matches Arctic
-Q4. Read [the foundation re-verification](docs/foundation-reverification-2026-08-21.md)
-before relying on the router, the escalation rate or the laptop-tier choice.
+1. `cd app/io && ./install.sh` (Windows: `install.ps1`). One time: makes its
+   own venv and caches the scanner model.
+2. Double-click `run.sh` (or `npm start`). Give it an API key or a server
+   address; it is kept in memory only.
+3. Add a sheltered dir, review the highlights (click to keep), Preview shows
+   exactly what leaves, then ask. `@` picks files, `~name~` looks up a person
+   without typing the full name, built pages get "share on your network".
 
-Read [the event decision](docs/v2-local-first-event-decision.md) before changing
-this architecture. Use [the reproduction guide](docs/local-first-reproduction.md)
-to run it. The aggregate result is
-[`benchmarks/results/v2-local-first-ladder-2026-08-21.json`](benchmarks/results/v2-local-first-ladder-2026-08-21.json).
-
-The frontier boundary is firm: it may receive an allowlisted intent, result
-column names/types/roles and a layout contract. It must not receive the raw
-question, real rows, category values, aggregates, filenames, screenshots or
-generated HTML. Real participant data stays on the laptop or trusted DGX. The
-OpenRouter path is for public and synthetic fixtures unless the user explicitly
-changes that policy.
-
-This is a qualified prototype, not a finished event build. Windows packaging,
-local Qwen replay on the DGX, a 20-user load rehearsal, scanned-PDF OCR,
-arbitrary workbook-region correction and official-data discovery remain open.
-
-## Earlier result
-
-The first phase asked a different question: could the product experience of
-Antigravity be matched by VS Code/Cline using Qwen 3.8 27B? The model was
-competitive, and the real-editor smoke favoured Cline/Qwen, but both the
-five-case product screen and the editor smoke had important limitations.
-DeepSeek Web plus a generic guardrail was the strongest multi-case capability
-result, but it was a different, expensive harness. That phase selected Qwen
-3.8 27B and taught us what the event shell must guarantee; it did not qualify
-Cline as the final event architecture.
-
-Start with [the first-phase narrative](narrative/2026-08-20-local-model-equivalence-field-note.md),
-[the product GUI findings](docs/product-gui-smoke-findings.md), and
-[`benchmarks/results/screening-v2-counted.json`](benchmarks/results/screening-v2-counted.json)
-when revisiting that comparison.
+Details and flow: [`app/io/README.md`](app/io/README.md).
 
 ## Repository map
 

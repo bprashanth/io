@@ -85,6 +85,11 @@ always included, (c) the existing @ mention as the explicit override, and (d) a 
 "searched N files, sent M" line so the user knows what the model saw. Caps only as an
 outer safety bound, not as the selection mechanism.
 
+Follow-up (same day): until the router is built (`backlog/2026-08-26-payload-router.md`),
+io refuses an open question on a folder with more than 12 files and asks for @ (verified:
+13-file folder refuses, "@stock_7" answers). README rewritten short, pointing at the demo
+plan; quick starts for the shield vsix and the app.
+
 ## Workshop probe (actions on the laptop)
 
 codex CLI + frontier over a tokenised workspace built and verified a working dashboard app in
