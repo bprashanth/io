@@ -31,6 +31,17 @@ PREFIX = {
     "vehicle_number": "VEHICLE", "address": "ADDRESS", "village": "PLACE", "long_number": "NUMBER",
 }
 TOKEN_RE = re.compile(r"\b[A-Z][A-Z_]{1,24}\\?_\d{3,}\b")   # any vault-style token; lookup decides
+# Generic label/header words the span model sometimes proposes as values. They
+# identify nobody, and a token for "village" rewrites the word everywhere.
+GENERIC_LABELS = {"village", "taluka", "district", "city", "town", "block", "state", "ward",
+                  "panchayat", "gram", "tehsil", "mandal", "pincode", "area", "region", "location",
+                  "name", "surname", "address", "place", "alias", "phone", "mobile", "email",
+                  "contact", "aadhaar", "pan", "account", "signature"}
+FOOTER_FRAGMENT = re.compile(r"\d+ ms redaction|new spans?, \d+ new parts|vault \d+$")
+# Words that mark a short phrase as a column label rather than a person or place
+# ("Child name", "Child ID", "Village code"): no real Indian name contains them.
+LABEL_WORDS = GENERIC_LABELS | {"id", "code", "number", "no", "score", "grade", "roll",
+                                "type", "status", "date", "dob", "sl", "sno", "child"}
 
 
 def normalise(value: str) -> str:
@@ -55,6 +66,14 @@ class PseudonymMap:
         if re.fullmatch(TOKEN_RE.pattern, bare, re.I):
             return value.strip()       # already one of our tokens (possibly quoted or
                                        # lower-cased by a script's repr): never re-mint
+        words = re.findall(r"[a-z]+", bare.casefold())
+        labelish = pii_class in ("person_name", "village", "address", "place") \
+            and len(words) <= 3 and any(w in LABEL_WORDS for w in words)
+        if bare.casefold() in GENERIC_LABELS or labelish or FOOTER_FRAGMENT.search(bare):
+            return value.strip()       # a column-label word or phrase ("Village",
+                                       # "Child name", "Child ID") or a fragment of our
+                                       # own annotation footer is not a secret;
+                                       # tokenising it garbles every later mention
         prefix = PREFIX.get(pii_class, pii_class.upper())
         self.counters[prefix] = self.counters.get(prefix, 0) + 1
         token = f"{prefix}_{self.counters[prefix]:03d}"

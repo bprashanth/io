@@ -183,7 +183,7 @@ function daemonCommand() {
   if (!py) return null;
   const args = [path.join(serverDir(), "shield_proxy.py"), "--port", String(port()),
     "--vault", path.join(stateDir(), "shield-vault-local-only.json"),
-    "--review", cfg().get("review") || "chat"];
+    "--review", cfg().get("review") || "off"];
   const numbers = cfg().get("numbers");
   if (numbers) args.push("--numbers", String(numbers));
   if (cfg().get("annotate")) args.push("--annotate");
@@ -296,9 +296,14 @@ async function disable() {
 
 async function install() {
   const script = os.platform() === "win32" ? "install.ps1" : "install.sh";
+  // The env must land in globalStorage: the IDE deletes the versioned extension
+  // folder on every update, and an env installed there dies with it.
+  const target = envDir();
   const term = vscode.window.createTerminal({ name: "Privacy Shield install", cwd: serverDir() });
   term.show();
-  term.sendText(os.platform() === "win32" ? `powershell -ExecutionPolicy Bypass -File .\\${script}` : `bash ./${script}`);
+  term.sendText(os.platform() === "win32"
+    ? `powershell -ExecutionPolicy Bypass -File .\\${script} "${target}"`
+    : `bash ./${script} "${target}"`);
   vscode.window.showInformationMessage("Privacy Shield: installing in the terminal. When it prints 'ready', run 'Privacy Shield: Enable'.");
 }
 

@@ -1,6 +1,6 @@
 # PII masking & rehydration proxy for Antigravity
 
-Status: **built and working** — extension `privacy-shield-0.2.5.vsix`
+Status: **built and working** — extension `privacy-shield-0.2.7.vsix`
 (`extension/privacy-shield/`), verified end-to-end on Antigravity 1.107.0 on
 the Linux x64 laptop (apt `1.23.2-1776332190`, 0.2.2, Claude Sonnet 4.6 and
 Gemini 3.6 Flash) and on the DGX arm64 build (0.2.3, Gemini 3.6/3.7 Flash,
@@ -133,9 +133,29 @@ These are model-agnostic hygiene, verified on both families.
   shaped like vault tokens are never re-minted — including quoted or
   lower-cased echoes from scripts (`'email_002'`) — or double-tokenisation
   chains poison rehydration.
+- **Discovery/replacement split (0.2.7, matching the io app)**: the span model
+  (GLiNER) *discovers* new values only in file/tool-derived content
+  (functionResponse parts — file reads, script output) and in the human's own
+  typed question (`<USER_REQUEST>`, scanned with the full engine). Everything
+  machine-assembled around them — conversation summaries, user_information,
+  metadata, model echoes — is **replacement-only**: known vault values are
+  still hidden wherever they reappear, but nothing new is ever minted from
+  our own echoes. This removed the vault-junk classes wholesale (footer
+  fragments as "addresses", label words as "places") on top of the explicit
+  mint guards (generic label words/phrases like "Village" or "Child name",
+  token echoes, footer shapes are never mintable).
+- **Review is off by default (0.2.7)**: tables are redacted silently with the
+  default column classification; the status-bar counts and the vault/wire
+  views are the after-the-fact review. Measured reasons: the chat review cost
+  a round-trip per new table shape, made models re-issue tool calls, produced
+  gibberish prompts on mangled headers, and was the most bug-dense code in
+  the daemon. The full machinery remains behind `privacyShield.review:
+  "chat"`; the *upfront, per-folder* review is io's differentiator. Known
+  trade-off now documented: without review a hidden column cannot be "kept",
+  so aggregations over hidden values (email-domain counts) stay token-based.
 - **Tables** (CSV/TSV blocks in tool output): column classifier + per-column
-  pseudonymisation, with an **in-chat review**: "a table is about to leave
-  your laptop, I will hide columns X, Y…". Replies understood:
+  pseudonymisation; with `review: "chat"`, an **in-chat review**: "a table is
+  about to leave your laptop, I will hide columns X, Y…". Replies understood:
   `ok` · `also hide <column>` · `also hide <any word/value>` (hidden
   everywhere from then on, e.g. a scheme name) · `don't hide <column>` — and
   clause mixes of all of these in one reply

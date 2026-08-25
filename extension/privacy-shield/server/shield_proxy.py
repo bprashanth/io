@@ -78,6 +78,10 @@ COMMON_WORDS = {"family", "school", "office", "village", "district", "block", "t
 NAME_SHAPE = re.compile(r"^(?:[A-Z][a-z]+|[A-Z]{2,}|[A-Z]\.?)(?:\s(?:[A-Z][a-z]+|[A-Z]{2,}|[A-Z]\.?)){1,3}$")
 LINE_NO = re.compile(r"^(\d+): ", re.M)
 FOOTER = re.compile(r"\n*_shield: [^\n]*_\s*$")
+# The same footer echoed back inside summaries/checkpoints loses its markdown
+# underscores and its end-of-text position; strip it wherever it appears so the
+# span model never sees (and mints from) our own annotation.
+FOOTER_ANYWHERE = re.compile(r"_?shield: \d+ new spans?, \d+ new parts?, \d+ ms redaction, vault \d+_?")
 CODE_HINT = re.compile(r"^\s*(def |class |import |from \S+ import|#include|function |const |let |var |\{|\}|</?\w+>|<\?xml)|;\s*$|=>|\(\)\s*\{", re.M)
 # directory listings, prompts, ps output, or unix paths with letters (never dates like 01/03/26)
 SHELL_HINT = re.compile(r"^(total \d+|[d-][rwx-]{9}\s|\$ |PID\s|USER\s+PID)|(?<![\w/])[A-Za-z~.][\w.-]*/[A-Za-z][\w.-]*/[\w.-]+", re.M)
@@ -383,7 +387,7 @@ class Shield:
     def redact_string(self, text: str) -> tuple[str, int, bool]:
         if len(text) < 3:
             return text, 0, True
-        text = FOOTER.sub("", text)
+        text = FOOTER_ANYWHERE.sub("", FOOTER.sub("", text))
         key = hashlib.sha256(text.encode()).hexdigest()
         if key in self.cache:
             # vault may have grown since this part was cached: re-apply known values only
@@ -401,6 +405,12 @@ class Shield:
                 return out, spans + len(e1) + len(e2), False
             except Exception:
                 pass
+        if "<USER_REQUEST>" in text:
+            # The typed question rides inside machine scaffolding that classifies as
+            # code (regex-only scan) — but a brand-new name typed by the human must
+            # still be discovered. Run the full engine on just the question span.
+            text = USER_REQ.sub(lambda m: "<USER_REQUEST>\n" + redact_text(
+                m.group(1), self.vault, self.data_engine, classes=DIRECT | {"long_number"})[0] + "\n</USER_REQUEST>", text)
         kind = kind_of(text)
         engine = self.data_engine if kind == "data" else self.code_engine
         redacted, events = redact_text(text, self.vault, engine, classes=DIRECT | {"long_number"})
@@ -425,6 +435,21 @@ class Shield:
                     out[k] = self.walk(v, counters, True, walked)
                 elif k in ("functionCall", "thought"):
                     out[k] = self.walk(v, counters, False, walked)
+                elif k == "parts" and isinstance(v, list) and node.get("role") == "user":
+                    # Discovery (minting) only where the content is the human's own:
+                    # the typed question (<USER_REQUEST>) and tool results
+                    # (functionResponse — re-enabled by its own branch). The
+                    # machine-assembled scaffolding around them (conversation
+                    # summaries, user_information, metadata) is replacement-only:
+                    # known values are still hidden wherever they reappear, but the
+                    # span model never scans our own echoes — matching the io app.
+                    out[k] = tidy_parts([
+                        self.walk(part, counters,
+                                  mint and (not isinstance(part, dict)
+                                            or not isinstance(part.get("text"), str)
+                                            or "<USER_REQUEST>" in part["text"]),
+                                  walked)
+                        for part in v])
                 elif k == "parts" and isinstance(v, list):
                     out[k] = tidy_parts(self.walk(v, counters, mint, walked))
                 else:
