@@ -51,6 +51,7 @@ from columns import classify_columns  # noqa: E402
 from detect import build_engine, regex_engine  # noqa: E402
 from pseudonymize import PseudonymMap, TOKEN_RE, pseudonymise_frame, redact_text  # noqa: E402
 
+VERSION = "0.3.1"
 UPHOST = "daily-cloudcode-pa.googleapis.com"
 SKIP_KEYS = {"thoughtSignature", "id", "name", "role", "model", "project", "requestId", "sessionId", "userAgent",
              "requestType", "AbsolutePath", "Cwd", "SearchDirectory", "TargetFile", "FilePath", "Pattern",
@@ -78,6 +79,10 @@ COMMON_WORDS = {"family", "school", "office", "village", "district", "block", "t
 NAME_SHAPE = re.compile(r"^(?:[A-Z][a-z]+|[A-Z]{2,}|[A-Z]\.?)(?:\s(?:[A-Z][a-z]+|[A-Z]{2,}|[A-Z]\.?)){1,3}$")
 LINE_NO = re.compile(r"^(\d+): ", re.M)
 FOOTER = re.compile(r"\n*_shield: [^\n]*_\s*$")
+# The same footer echoed back inside summaries/checkpoints loses its markdown
+# underscores and its end-of-text position; strip it wherever it appears so the
+# span model never sees (and mints from) our own annotation.
+FOOTER_ANYWHERE = re.compile(r"_?shield: \d+ new spans?, \d+ new parts?, \d+ ms redaction, vault \d+_?")
 CODE_HINT = re.compile(r"^\s*(def |class |import |from \S+ import|#include|function |const |let |var |\{|\}|</?\w+>|<\?xml)|;\s*$|=>|\(\)\s*\{", re.M)
 # directory listings, prompts, ps output, or unix paths with letters (never dates like 01/03/26)
 SHELL_HINT = re.compile(r"^(total \d+|[d-][rwx-]{9}\s|\$ |PID\s|USER\s+PID)|(?<![\w/])[A-Za-z~.][\w.-]*/[A-Za-z][\w.-]*/[\w.-]+", re.M)
@@ -108,7 +113,16 @@ def kind_of(text: str) -> str:
 
 class Shield:
     def __init__(self, engine_spec: str, vault_path: Path, numbers: int | None, always_hide: Path | None,
-                 review: str) -> None:
+                 review: str, scan_dir: Path | None = None, discovery: str = "files") -> None:
+        # discovery == "files" (default): the span model runs only over the files in
+        # scan_dir, once, at rest — the vault provably contains file-derived values
+        # and nothing minted from traffic. The request path is then deterministic
+        # (known values, validators, digit runs). "requests" restores the old
+        # scan-everything-in-flight behaviour.
+        self.discovery = discovery
+        self.scan_dir = scan_dir
+        self.scan = {"active": bool(scan_dir), "done": 0, "total": 0, "current": "", "errors": [], "blocked": ""}
+        self._mtimes: dict[str, float] = {}
         self.span_engine = build_engine(engine_spec)
         self.vault = PseudonymMap(vault_path)
         self.cache: dict[str, str] = {}
@@ -160,14 +174,16 @@ class Shield:
     # WhatsApp/Signal export line: "dd/mm/yy, hh:mm - Sender Name: message"
     CHAT_LINE = re.compile(r"^\[?\d{1,2}/\d{1,2}/\d{2,4},? \d{1,2}:\d{2}(?::\d{2})?(?: [AP]M)?\]? ?- ([^:\n]{2,60}):", re.M)
 
-    def data_engine(self, text: str, single_min: float = 0.65):
+    def data_engine(self, text: str, single_min: float = 0.65, with_model: bool | None = None):
         spans = [sp for sp in regex_engine(text) if sp[1] - sp[0] >= 4] + self.header_value_spans(text)
         spans += [(m.start(1), m.end(1), "person_name", 1.0) for m in self.CHAT_LINE.finditer(text)]
         spans += [(m.start(), m.end(), "person_name", 0.9) for m in self.INITIALS_NAME.finditer(text)]
         spans += [(m.start(1), m.end(1), "person_name", 0.9) for m in self.CUE_NAME.finditer(text)
                   if m.group(1).casefold() not in COMMON_WORDS]
+        if with_model is None:
+            with_model = self.discovery != "files"   # in files mode the model runs at rest only
         seen = set()
-        for variant in (text, text.title()):
+        for variant in (text, text.title()) if with_model else ():
             for start, end, label, score in self.span_engine(variant):
                 value = text[start:end]
                 if label not in MODEL_PROSE_CLASSES or score < 0.45 or (start, end) in seen or end - start < 4:
@@ -207,6 +223,116 @@ class Shield:
                 if (m.start(), m.end()) not in covered:
                     spans.append((m.start(), m.end(), "person_name", 0.9)); covered.add((m.start(), m.end()))
         return spans
+
+    # -------------------------------------------------------- at-rest scanning
+    def scan_engine(self, text: str):
+        return self.data_engine(text, with_model=True)
+
+    SCAN_SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "hf-cache", ".antigravity"}
+    SCAN_EXTS = (".csv", ".xlsx", ".xls", ".txt", ".md", ".log", ".json", ".pdf")
+    # Demo limits, on purpose and prominent: past these the shield refuses the
+    # folder instead of scanning for ten minutes. The refusal text tells the user.
+    MAX_SCAN_FILES = 40
+    MAX_SCAN_BYTES = 25_000_000
+
+    def scan_files(self) -> list[Path]:
+        """Scannable files, or a set `self.scan['blocked']` reason when the folder
+        exceeds the demo limits."""
+        files: list[Path] = []
+        total = 0
+        for root, dirs, names in os.walk(self.scan_dir):
+            dirs[:] = [d for d in dirs if d not in self.SCAN_SKIP_DIRS and not d.startswith(".")]
+            for n in names:
+                f = Path(root) / n
+                if n.startswith((".", "~$")) or f.suffix.lower() not in self.SCAN_EXTS:
+                    continue
+                try:
+                    total += f.stat().st_size
+                except OSError:
+                    continue
+                files.append(f)
+        if len(files) > self.MAX_SCAN_FILES:
+            self.scan["blocked"] = f"{len(files)} files in this folder, demo limit is {self.MAX_SCAN_FILES}"
+            return []
+        if total > self.MAX_SCAN_BYTES:
+            self.scan["blocked"] = (f"{total // 1_000_000} MB of data in this folder, "
+                                    f"demo limit is {self.MAX_SCAN_BYTES // 1_000_000} MB")
+            return []
+        self.scan["blocked"] = ""
+        return files
+
+    def scan_one(self, f: Path) -> None:
+        self.scan["current"] = f.name
+        try:
+            suffix = f.suffix.lower()
+            if suffix in (".csv", ".xlsx", ".xls"):
+                frames = {None: pd.read_csv(f, dtype=str)} if suffix == ".csv" else                     {k: v for k, v in pd.read_excel(f, sheet_name=None, dtype=str).items()}
+                for _sheet, frame in frames.items():
+                    if frame.empty:
+                        continue
+                    frame = frame.fillna("")
+                    frame.columns = [str(c) for c in frame.columns]
+                    self.headers.update(str(c).casefold().strip() for c in frame.columns)
+                    classes = {c: v["class"] if isinstance(v, dict) else v
+                               for c, v in classify_columns(frame, self.scan_engine).items()}
+                    pseudonymise_frame(frame, classes, self.vault, detector=self.scan_engine,
+                                       kept_validator=KEPT_SWEEP_ENGINE)
+            else:
+                if suffix == ".pdf":
+                    import subprocess
+                    r = subprocess.run(["pdftotext", str(f), "-"], capture_output=True, timeout=60)
+                    text = r.stdout.decode("utf8", "replace") if r.returncode == 0 else ""
+                else:
+                    text = f.read_text(encoding="utf8", errors="replace")
+                if text.strip():
+                    redact_text(text[:400_000], self.vault, self.scan_engine, classes=DIRECT | {"long_number"})
+            self._mtimes[str(f)] = f.stat().st_mtime
+        except Exception as exc:  # noqa: BLE001  — a bad file must not kill the scan
+            try:
+                self._mtimes[str(f)] = f.stat().st_mtime   # do not retry until it changes
+            except OSError:
+                pass
+            self.scan["errors"].append(f"{f.name}: {exc}")
+            with open("shield.log", "a") as log:
+                log.write(json.dumps({"t": time.time(), "scan_error": f.name, "error": str(exc)[:200]}) + "\n")
+
+    def scan_loop(self) -> None:
+        """Initial scan of scan_dir, then a change watcher. While `scan['active']`
+        is true, the request handler holds model calls, so a query can never leave
+        with a partially built vault."""
+        files = self.scan_files()
+        if self.scan["blocked"]:
+            self.scan.update(active=False, current="", total=0, done=0)
+            with open("shield.log", "a") as log:
+                log.write(json.dumps({"t": time.time(), "scan_blocked": self.scan["blocked"]}) + "\n")
+        else:
+            self.scan.update(total=len(files), done=0, active=True)
+            for f in files:
+                self.scan_one(f)
+                self.scan["done"] += 1
+            self.vault.save()
+            self.scan.update(active=False, current="")
+        with open("shield.log", "a") as log:
+            log.write(json.dumps({"t": time.time(), "scan_done": len(files),
+                                  "vault": len(self.vault.display), "errors": len(self.scan["errors"])}) + "\n")
+        while True:
+            time.sleep(5)
+            try:
+                candidates = self.scan_files()
+                if self.scan["blocked"]:
+                    continue     # folder still over the limits; re-checked every cycle
+                changed = [f for f in candidates if self._mtimes.get(str(f)) != f.stat().st_mtime]
+            except OSError:
+                continue
+            if not changed:
+                continue
+            self.scan.update(active=True, total=len(changed), done=0)
+            for f in changed:
+                self.scan_one(f)
+                self.scan["done"] += 1
+            self.vault.save()
+            self.cache.clear()   # cached redactions may predate the new values
+            self.scan.update(active=False, current="")
 
     def cell_engine(self, text: str):
         """Free-text cells inside tables: names and validator-backed identifiers only.
@@ -355,14 +481,58 @@ class Shield:
     def _hide_contact_names(self, text: str) -> str:
         return self.CONTACT_NAME.sub(lambda m: self.vault.token(m.group(1), "person_name"), text)
 
+    # Words that start sentences in questions and also appear inside vault values
+    # often enough to be noise for the partial-name pass.
+    PARTIAL_STOP = {"what", "which", "show", "give", "list", "tell", "the", "and", "for", "how",
+                    "who", "now", "only", "compare", "make", "dashboard", "table", "download",
+                    "source", "average", "total", "read", "build", "run", "open", "same", "email",
+                    "phone", "name", "village", "please", "answer"}
+
+    def leak_regex(self):
+        """One compiled alternation over every value that must never leave, rebuilt
+        only when the vault grows — replaces per-value re.search loops."""
+        n = len(self.vault.display)
+        if getattr(self, "_leak_n", -1) != n:
+            vals = sorted((v for t, v in self.vault.display.items()
+                           if len(v) >= 4 and not t.startswith(("NUMBER", "AGE"))
+                           and not re.fullmatch(TOKEN_RE.pattern, v.strip().strip("'\"`"), re.I)),
+                          key=len, reverse=True)
+            self._leak_re = re.compile(
+                r"(?<![\w@.])(?:" + "|".join(re.escape(v) for v in vals) + r")(?![\w@.])", re.I) if vals else None
+            self._leak_n = n
+        return self._leak_re
+
+    def _partial_names(self, text: str) -> str:
+        """A bare first name or village fragment in user text ("give me Priya's
+        email") must not leave even though only the full value is in the vault.
+        One matching NAME/PLACE value: substitute its token so the model keeps the
+        linkage. Several: mint a token for the fragment itself (privacy first)."""
+        for word in set(re.findall(r"\b[A-Z][a-z]{2,}\b", text)):
+            if word.casefold() in self.PARTIAL_STOP or TOKEN_RE.search(word):
+                continue
+            options = [(t, v) for t, v in self.vault.candidates(word)
+                       if t.split("_")[0] in {"NAME", "PLACE"}
+                       and re.fullmatch(r"[A-Za-z][A-Za-z .'-]*", v)   # clean values only, not span-noise
+                       and re.search(rf"\b{re.escape(word)}\b", v, re.I)]
+            if len(options) == 1:
+                text = re.sub(rf"\b{re.escape(word)}\b", options[0][0], text)
+            elif len(options) > 1:
+                text = re.sub(rf"\b{re.escape(word)}\b", self.vault.token(word, "person_name"), text)
+        return text
+
     def redact_string(self, text: str) -> tuple[str, int, bool]:
         if len(text) < 3:
             return text, 0, True
-        text = FOOTER.sub("", text)
+        text = FOOTER_ANYWHERE.sub("", FOOTER.sub("", text))
         key = hashlib.sha256(text.encode()).hexdigest()
-        if key in self.cache:
-            # vault may have grown since this part was cached: re-apply known values only
-            return redact_text(self.cache[key], self.vault, None)[0], 0, True
+        hit = self.cache.get(key)
+        if hit is not None:
+            gen, out = hit
+            if gen == len(self.vault.display):
+                return out, 0, True     # vault unchanged since caching: no regex at all
+            out = redact_text(out, self.vault, None)[0]   # one known-values pass, restamp
+            self.cache[key] = (len(self.vault.display), out)
+            return out, 0, True
         split = self.split_table(text)
         if split:
             pre, table, rest = split
@@ -371,17 +541,28 @@ class Shield:
                 redacted, spans = self.redact_table(table, classes)
                 pre_r, e1 = redact_text(pre, self.vault, self.data_engine, classes=DIRECT | {"long_number"})
                 rest_r, e2 = redact_text(rest, self.vault, self.data_engine, classes=DIRECT | {"long_number"})
-                out = self._hide_contact_names(pre_r + redacted + rest_r)
-                self.cache[key] = out
+                out = self._partial_names(self._hide_contact_names(pre_r + redacted + rest_r))
+                self.cache[key] = (len(self.vault.display), out)
                 return out, spans + len(e1) + len(e2), False
             except Exception:
                 pass
+        if "<USER_REQUEST>" in text:
+            # The typed question rides inside machine scaffolding that classifies as
+            # code (regex-only scan) — but a brand-new name typed by the human must
+            # still be discovered. Run the full engine on just the question span.
+            # Long spans are not typed questions: Antigravity wraps its context-
+            # compaction summaries in the same tags, and scanning those minted file
+            # path fragments ("gemini", "desinotorious") as places. Replacement-only.
+            text = USER_REQ.sub(lambda m: m.group(0) if len(m.group(1)) > 1500
+                                else "<USER_REQUEST>\n" + redact_text(
+                m.group(1), self.vault, self.data_engine, classes=DIRECT | {"long_number"})[0] + "\n</USER_REQUEST>", text)
         kind = kind_of(text)
         engine = self.data_engine if kind == "data" else self.code_engine
         redacted, events = redact_text(text, self.vault, engine, classes=DIRECT | {"long_number"})
         if kind == "data":
             redacted = self._hide_contact_names(redacted)
-        self.cache[key] = redacted
+        redacted = self._partial_names(redacted)
+        self.cache[key] = (len(self.vault.display), redacted)
         return redacted, len(events), False
 
     def walk(self, node: Any, counters: dict[str, int], mint: bool = True, walked: list[str] | None = None) -> Any:
@@ -399,6 +580,21 @@ class Shield:
                     out[k] = self.walk(v, counters, True, walked)
                 elif k in ("functionCall", "thought"):
                     out[k] = self.walk(v, counters, False, walked)
+                elif k == "parts" and isinstance(v, list) and node.get("role") == "user":
+                    # Discovery (minting) only where the content is the human's own:
+                    # the typed question (<USER_REQUEST>) and tool results
+                    # (functionResponse — re-enabled by its own branch). The
+                    # machine-assembled scaffolding around them (conversation
+                    # summaries, user_information, metadata) is replacement-only:
+                    # known values are still hidden wherever they reappear, but the
+                    # span model never scans our own echoes — matching the io app.
+                    out[k] = tidy_parts([
+                        self.walk(part, counters,
+                                  mint and (not isinstance(part, dict)
+                                            or not isinstance(part.get("text"), str)
+                                            or "<USER_REQUEST>" in part["text"]),
+                                  walked)
+                        for part in v])
                 elif k == "parts" and isinstance(v, list):
                     out[k] = tidy_parts(self.walk(v, counters, mint, walked))
                 else:
@@ -580,12 +776,10 @@ class Shield:
             with open("shield.log", "a") as log:
                 log.write(json.dumps({"t": time.time(), "rehydrated_files": fixed_files}) + "\n")
         walked: list[str] = []
-        before = len(self.vault.display)
         req["contents"] = self.walk(req["contents"], counters, True, walked)
-        # Consistency pass, always: every known value must be a token everywhere in
-        # the outgoing request, whatever order parts were walked or cached in.
-        walked = []
-        req["contents"] = self.walk(req["contents"], {"spans": 0, "hits": 0, "misses": 0}, False, walked)
+        # Order effects (a value minted from a later part also appearing in an
+        # earlier, already-processed one) are repaired by the single known-values
+        # pass over the final body in the request handler — one pass, not a re-walk.
         self.vault.save()
         self.last_walked = "\n".join(walked)
         return json.dumps(payload, ensure_ascii=False).encode(), counters, None
@@ -788,7 +982,11 @@ def make_handler(shield: Shield, annotate: bool):
                 snap.update(vault_entries=len(shield.vault.display), cache_entries=len(shield.cache),
                             peek=PEEK["on"], pending_review=bool(shield.pending),
                             tokens_est_out=int(snap.get("bytes_out", 0) / 4),
-                            server=os.path.dirname(os.path.abspath(__file__)))
+                            server=os.path.dirname(os.path.abspath(__file__)),
+                            discovery=shield.discovery, scan_active=shield.scan["active"],
+                            scan_done=shield.scan["done"], scan_total=shield.scan["total"],
+                            scan_current=shield.scan["current"], scan_blocked=shield.scan["blocked"],
+                            version=VERSION)
                 if url.path.endswith(".json"):
                     return self.send_local(200, json.dumps(snap, indent=1).encode())
                 rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in snap.items())
@@ -824,10 +1022,31 @@ def make_handler(shield: Shield, annotate: bool):
         def _fwd(self):
             body = self.read_body()
             with open("shield-requests.log", "a") as log:
-                log.write(json.dumps({"t": time.time(), "path": self.path, "bytes": len(body)}) + "\n")
+                try:
+                    _m = json.loads(body).get("model", "")
+                except Exception:
+                    _m = ""
+                log.write(json.dumps({"t": time.time(), "path": self.path, "bytes": len(body), "model_in": _m}) + "\n")
             counters = {"spans": 0, "hits": 0, "misses": 0}
             redact_ms = 0.0
             is_model_call = "streamGenerateContent" in self.path or "generateContent" in self.path
+            if is_model_call and shield.scan.get("blocked"):
+                return self.send_sse([sse_text_event(
+                    f"🛡️ Shield: {shield.scan['blocked']}. Nothing was sent. "
+                    "Use a smaller folder, or click the shield icon and Disable.", finish=True)])
+            if is_model_call and shield.scan["active"]:
+                # Never forward a model call while the vault is still being built.
+                # Short scans finish inside the wait; long ones get an in-chat note.
+                waited = 0.0
+                while shield.scan["active"] and waited < 45:
+                    time.sleep(0.5)
+                    waited += 0.5
+                if shield.scan["active"]:
+                    return self.send_sse([sse_text_event(
+                        f"🛡️ Privacy shield is still scanning your folder "
+                        f"({shield.scan['done']}/{shield.scan['total']} files, now on "
+                        f"{shield.scan['current'] or '…'}). Nothing was sent. "
+                        "Ask again once the status bar shows the shield ready.", finish=True)])
             if is_model_call and body:
                 t0 = time.monotonic()
                 try:
@@ -849,19 +1068,33 @@ def make_handler(shield: Shield, annotate: bool):
                     return self.send_sse([sse_text_event(synthetic, finish=True)])
                 body = body2
                 # last line of defence repairs before it refuses: substitute every known
-                # value once more over the final body (order-independent), then check
+                # value once more over the final body (order-independent), then check.
+                # Routing/control fields are exempt: a junk vault entry must never be
+                # able to rewrite the model id or user agent (measured: "gemini" minted
+                # as a place turned the model into PLACE_055-3.5-flash-low -> HTTP 404).
                 known = shield.vault.known_regex()
                 if known:
                     def _sub(m):
                         return shield.vault.forward.get(re.sub(r"\s+", " ", m.group(0).strip()).casefold(), m.group(0))
+                    try:
+                        _p = json.loads(body)
+                        _saved = {k: _p[k] for k in ("model", "userAgent", "project", "requestId") if k in _p}
+                    except Exception:
+                        _p, _saved = None, {}
                     fixed = known.sub(_sub, body.decode("utf8", "replace"))
+                    if _saved:
+                        try:
+                            _q = json.loads(fixed)
+                            _q.update(_saved)
+                            fixed = json.dumps(_q, ensure_ascii=False)
+                        except Exception:
+                            pass
                     body = fixed.encode()
                     shield.last_walked = known.sub(_sub, getattr(shield, "last_walked", ""))
                 lowered = getattr(shield, "last_walked", "").casefold()
-                leak = next((v for t, v in shield.vault.display.items()
-                             if len(v) >= 4 and not t.startswith(("NUMBER", "AGE"))
-                             and not re.fullmatch(TOKEN_RE.pattern, v.strip().strip("'\"`"), re.I)
-                             and re.search(rf"(?<![\w@.]){re.escape(v.casefold())}(?![\w@.])", lowered)), None)
+                _lk = shield.leak_regex()
+                _m = _lk.search(lowered) if _lk else None
+                leak = _m.group(0) if _m else None
                 if leak:
                     with LOCK:
                         STATS["blocked"] += 1
@@ -939,14 +1172,31 @@ def main() -> int:
     parser.add_argument("--numbers", type=int, help="also hide every run of N+ digits in data and tables")
     parser.add_argument("--always-hide", type=Path, help="file with one value per line to always hide")
     parser.add_argument("--review", choices=("chat", "off"), default="off")
+    parser.add_argument("--scan", type=Path, help="workspace folder: scan its files at start and on change")
+    parser.add_argument("--discovery", choices=("files", "requests"), default="files",
+                        help="files: the span model runs only over scanned files; requests: legacy in-flight scanning")
     args = parser.parse_args()
     os.environ.setdefault("PII_THREADS", "4")
+    scan_dir = args.scan if args.scan and args.scan.is_dir() else None
     t0 = time.monotonic()
-    shield = Shield(args.engine, args.vault, args.numbers, args.always_hide, args.review)
+    shield = Shield(args.engine, args.vault, args.numbers, args.always_hide, args.review,
+                    scan_dir=scan_dir, discovery=args.discovery)
     shield.pending_prompt = None
-    print(f"shield ready on http://127.0.0.1:{args.port}  (engine loaded in {time.monotonic() - t0:.1f}s)", flush=True)
+    if scan_dir:
+        threading.Thread(target=shield.scan_loop, daemon=True).start()
+        print(f"scanning {scan_dir}", flush=True)
+    else:
+        shield.scan["active"] = False
+    print(f"shield {VERSION} ready on http://127.0.0.1:{args.port}  (engine loaded in {time.monotonic() - t0:.1f}s)", flush=True)
     print(f"status: http://127.0.0.1:{args.port}/shield/status", flush=True)
-    http.server.ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(shield, args.annotate)).serve_forever()
+    class QuietServer(http.server.ThreadingHTTPServer):
+        def handle_error(self, request, client_address):   # noqa: N802
+            exc = sys.exc_info()[1]
+            if isinstance(exc, (BrokenPipeError, ConnectionResetError)):
+                return   # a poller hung up early; routine, not an error
+            super().handle_error(request, client_address)
+
+    QuietServer(("127.0.0.1", args.port), make_handler(shield, args.annotate)).serve_forever()
     return 0
 
 
