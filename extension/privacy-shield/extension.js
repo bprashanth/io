@@ -183,7 +183,14 @@ function daemonCommand() {
   if (!py) return null;
   const args = [path.join(serverDir(), "shield_proxy.py"), "--port", String(port()),
     "--vault", path.join(stateDir(), "shield-vault-local-only.json"),
-    "--review", cfg().get("review") || "off"];
+    "--review", cfg().get("review") || "off",
+    "--discovery", cfg().get("discovery") || "files"];
+  // Discovery-at-rest: the daemon scans the workspace folder's files once (and on
+  // change); the request path is then deterministic. Queries are held while the
+  // scan runs, so nothing can leave with a partially built vault.
+  const folder = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]
+    ? vscode.workspace.workspaceFolders[0].uri.fsPath : null;
+  if (folder) args.push("--scan", folder);
   const numbers = cfg().get("numbers");
   if (numbers) args.push("--numbers", String(numbers));
   if (cfg().get("annotate")) args.push("--annotate");
@@ -373,6 +380,12 @@ async function refresh() {
     statusBar.backgroundColor = undefined;
   } else if (!s) {
     statusBar.text = "$(shield) Shield starting…";
+    statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+  } else if (s.scan_active) {
+    statusBar.text = `$(shield) Scanning your files\u2026 ${s.scan_done}/${s.scan_total}` +
+      (s.scan_current ? ` \u00b7 ${s.scan_current}` : "");
+    statusBar.tooltip = "Privacy Shield is reading the files in this folder to learn what must be hidden. " +
+      "Questions asked now are held until the scan finishes; nothing leaves early.";
     statusBar.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
   } else if (!verified) {
     // The daemon is up but no model call has passed through it in this session yet,

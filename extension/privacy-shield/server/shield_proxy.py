@@ -112,7 +112,16 @@ def kind_of(text: str) -> str:
 
 class Shield:
     def __init__(self, engine_spec: str, vault_path: Path, numbers: int | None, always_hide: Path | None,
-                 review: str) -> None:
+                 review: str, scan_dir: Path | None = None, discovery: str = "files") -> None:
+        # discovery == "files" (default): the span model runs only over the files in
+        # scan_dir, once, at rest — the vault provably contains file-derived values
+        # and nothing minted from traffic. The request path is then deterministic
+        # (known values, validators, digit runs). "requests" restores the old
+        # scan-everything-in-flight behaviour.
+        self.discovery = discovery
+        self.scan_dir = scan_dir
+        self.scan = {"active": bool(scan_dir), "done": 0, "total": 0, "current": "", "errors": []}
+        self._mtimes: dict[str, float] = {}
         self.span_engine = build_engine(engine_spec)
         self.vault = PseudonymMap(vault_path)
         self.cache: dict[str, str] = {}
@@ -164,14 +173,16 @@ class Shield:
     # WhatsApp/Signal export line: "dd/mm/yy, hh:mm - Sender Name: message"
     CHAT_LINE = re.compile(r"^\[?\d{1,2}/\d{1,2}/\d{2,4},? \d{1,2}:\d{2}(?::\d{2})?(?: [AP]M)?\]? ?- ([^:\n]{2,60}):", re.M)
 
-    def data_engine(self, text: str, single_min: float = 0.65):
+    def data_engine(self, text: str, single_min: float = 0.65, with_model: bool | None = None):
         spans = [sp for sp in regex_engine(text) if sp[1] - sp[0] >= 4] + self.header_value_spans(text)
         spans += [(m.start(1), m.end(1), "person_name", 1.0) for m in self.CHAT_LINE.finditer(text)]
         spans += [(m.start(), m.end(), "person_name", 0.9) for m in self.INITIALS_NAME.finditer(text)]
         spans += [(m.start(1), m.end(1), "person_name", 0.9) for m in self.CUE_NAME.finditer(text)
                   if m.group(1).casefold() not in COMMON_WORDS]
+        if with_model is None:
+            with_model = self.discovery != "files"   # in files mode the model runs at rest only
         seen = set()
-        for variant in (text, text.title()):
+        for variant in (text, text.title()) if with_model else ():
             for start, end, label, score in self.span_engine(variant):
                 value = text[start:end]
                 if label not in MODEL_PROSE_CLASSES or score < 0.45 or (start, end) in seen or end - start < 4:
@@ -211,6 +222,96 @@ class Shield:
                 if (m.start(), m.end()) not in covered:
                     spans.append((m.start(), m.end(), "person_name", 0.9)); covered.add((m.start(), m.end()))
         return spans
+
+    # -------------------------------------------------------- at-rest scanning
+    def scan_engine(self, text: str):
+        return self.data_engine(text, with_model=True)
+
+    SCAN_SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "hf-cache", ".antigravity"}
+    SCAN_EXTS = (".csv", ".xlsx", ".xls", ".txt", ".md", ".log", ".json", ".pdf")
+
+    def scan_files(self) -> list[Path]:
+        files: list[Path] = []
+        for root, dirs, names in os.walk(self.scan_dir):
+            dirs[:] = [d for d in dirs if d not in self.SCAN_SKIP_DIRS and not d.startswith(".")]
+            for n in names:
+                f = Path(root) / n
+                if n.startswith((".", "~$")) or f.suffix.lower() not in self.SCAN_EXTS:
+                    continue
+                try:
+                    if f.stat().st_size > 8_000_000:
+                        continue
+                except OSError:
+                    continue
+                files.append(f)
+                if len(files) >= 300:
+                    return files
+        return files
+
+    def scan_one(self, f: Path) -> None:
+        self.scan["current"] = f.name
+        try:
+            suffix = f.suffix.lower()
+            if suffix in (".csv", ".xlsx", ".xls"):
+                frames = {None: pd.read_csv(f, dtype=str)} if suffix == ".csv" else                     {k: v for k, v in pd.read_excel(f, sheet_name=None, dtype=str).items()}
+                for _sheet, frame in frames.items():
+                    if frame.empty:
+                        continue
+                    frame = frame.fillna("")
+                    frame.columns = [str(c) for c in frame.columns]
+                    self.headers.update(str(c).casefold().strip() for c in frame.columns)
+                    classes = {c: v["class"] if isinstance(v, dict) else v
+                               for c, v in classify_columns(frame, self.scan_engine).items()}
+                    pseudonymise_frame(frame, classes, self.vault, detector=self.scan_engine,
+                                       kept_validator=KEPT_SWEEP_ENGINE)
+            else:
+                if suffix == ".pdf":
+                    import subprocess
+                    r = subprocess.run(["pdftotext", str(f), "-"], capture_output=True, timeout=60)
+                    text = r.stdout.decode("utf8", "replace") if r.returncode == 0 else ""
+                else:
+                    text = f.read_text(encoding="utf8", errors="replace")
+                if text.strip():
+                    redact_text(text[:400_000], self.vault, self.scan_engine, classes=DIRECT | {"long_number"})
+            self._mtimes[str(f)] = f.stat().st_mtime
+        except Exception as exc:  # noqa: BLE001  — a bad file must not kill the scan
+            try:
+                self._mtimes[str(f)] = f.stat().st_mtime   # do not retry until it changes
+            except OSError:
+                pass
+            self.scan["errors"].append(f"{f.name}: {exc}")
+            with open("shield.log", "a") as log:
+                log.write(json.dumps({"t": time.time(), "scan_error": f.name, "error": str(exc)[:200]}) + "\n")
+
+    def scan_loop(self) -> None:
+        """Initial scan of scan_dir, then a change watcher. While `scan['active']`
+        is true, the request handler holds model calls, so a query can never leave
+        with a partially built vault."""
+        files = self.scan_files()
+        self.scan.update(total=len(files), done=0, active=True)
+        for f in files:
+            self.scan_one(f)
+            self.scan["done"] += 1
+        self.vault.save()
+        self.scan.update(active=False, current="")
+        with open("shield.log", "a") as log:
+            log.write(json.dumps({"t": time.time(), "scan_done": len(files),
+                                  "vault": len(self.vault.display), "errors": len(self.scan["errors"])}) + "\n")
+        while True:
+            time.sleep(5)
+            try:
+                changed = [f for f in self.scan_files() if self._mtimes.get(str(f)) != f.stat().st_mtime]
+            except OSError:
+                continue
+            if not changed:
+                continue
+            self.scan.update(active=True, total=len(changed), done=0)
+            for f in changed:
+                self.scan_one(f)
+                self.scan["done"] += 1
+            self.vault.save()
+            self.cache.clear()   # cached redactions may predate the new values
+            self.scan.update(active=False, current="")
 
     def cell_engine(self, text: str):
         """Free-text cells inside tables: names and validator-backed identifiers only.
@@ -843,7 +944,10 @@ def make_handler(shield: Shield, annotate: bool):
                 snap.update(vault_entries=len(shield.vault.display), cache_entries=len(shield.cache),
                             peek=PEEK["on"], pending_review=bool(shield.pending),
                             tokens_est_out=int(snap.get("bytes_out", 0) / 4),
-                            server=os.path.dirname(os.path.abspath(__file__)))
+                            server=os.path.dirname(os.path.abspath(__file__)),
+                            discovery=shield.discovery, scan_active=shield.scan["active"],
+                            scan_done=shield.scan["done"], scan_total=shield.scan["total"],
+                            scan_current=shield.scan["current"])
                 if url.path.endswith(".json"):
                     return self.send_local(200, json.dumps(snap, indent=1).encode())
                 rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in snap.items())
@@ -887,6 +991,19 @@ def make_handler(shield: Shield, annotate: bool):
             counters = {"spans": 0, "hits": 0, "misses": 0}
             redact_ms = 0.0
             is_model_call = "streamGenerateContent" in self.path or "generateContent" in self.path
+            if is_model_call and shield.scan["active"]:
+                # Never forward a model call while the vault is still being built.
+                # Short scans finish inside the wait; long ones get an in-chat note.
+                waited = 0.0
+                while shield.scan["active"] and waited < 45:
+                    time.sleep(0.5)
+                    waited += 0.5
+                if shield.scan["active"]:
+                    return self.send_sse([sse_text_event(
+                        f"🛡️ Privacy shield is still scanning your folder "
+                        f"({shield.scan['done']}/{shield.scan['total']} files, now on "
+                        f"{shield.scan['current'] or '…'}). Nothing was sent. "
+                        "Ask again once the status bar shows the shield ready.", finish=True)])
             if is_model_call and body:
                 t0 = time.monotonic()
                 try:
@@ -1013,11 +1130,21 @@ def main() -> int:
     parser.add_argument("--numbers", type=int, help="also hide every run of N+ digits in data and tables")
     parser.add_argument("--always-hide", type=Path, help="file with one value per line to always hide")
     parser.add_argument("--review", choices=("chat", "off"), default="off")
+    parser.add_argument("--scan", type=Path, help="workspace folder: scan its files at start and on change")
+    parser.add_argument("--discovery", choices=("files", "requests"), default="files",
+                        help="files: the span model runs only over scanned files; requests: legacy in-flight scanning")
     args = parser.parse_args()
     os.environ.setdefault("PII_THREADS", "4")
+    scan_dir = args.scan if args.scan and args.scan.is_dir() else None
     t0 = time.monotonic()
-    shield = Shield(args.engine, args.vault, args.numbers, args.always_hide, args.review)
+    shield = Shield(args.engine, args.vault, args.numbers, args.always_hide, args.review,
+                    scan_dir=scan_dir, discovery=args.discovery)
     shield.pending_prompt = None
+    if scan_dir:
+        threading.Thread(target=shield.scan_loop, daemon=True).start()
+        print(f"scanning {scan_dir}", flush=True)
+    else:
+        shield.scan["active"] = False
     print(f"shield ready on http://127.0.0.1:{args.port}  (engine loaded in {time.monotonic() - t0:.1f}s)", flush=True)
     print(f"status: http://127.0.0.1:{args.port}/shield/status", flush=True)
     http.server.ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(shield, args.annotate)).serve_forever()

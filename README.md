@@ -55,7 +55,7 @@ antigravity --version               # must print 1.107.0
 **A. The privacy shield in Antigravity**
 
 1. Extensions view, "Install from VSIX", pick
-   `extension/privacy-shield-0.2.8.vsix`.
+   `extension/privacy-shield-0.3.0.vsix`.
 2. Command palette, `Privacy Shield: Enable`. First time it offers a one-time
    install (about 500 MB download, 1.7 GB disk install, needs python3 on the machine)
    and asks for one relaunch.
