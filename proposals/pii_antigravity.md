@@ -1,13 +1,68 @@
 # PII masking & rehydration proxy for Antigravity
 
-Status: **built and working** — extension `privacy-shield-0.2.8.vsix`
-(`extension/privacy-shield/`), verified end-to-end on Antigravity 1.107.0 on
-the Linux x64 laptop (apt `1.23.2-1776332190`, 0.2.2, Claude Sonnet 4.6 and
-Gemini 3.6 Flash) and on the DGX arm64 build (0.2.3, Gemini 3.6/3.7 Flash,
-driven through the real IDE under Xvfb) on 2026-08-22. This document is the living design record: the original
-proposal below was written before implementation; §"As built" onward records
-what is actually true, measured on the real product. Where the two disagree,
-"As built" wins.
+Status: **0.3.0 — "discovery at rest" architecture, working but with open
+polish bugs** (see §Current state and §Open bugs). Extension
+`extension/privacy-shield-0.3.0.vsix`, pinned platform Antigravity 1.107.0
+(apt `1.23.2-1776332190`). Earlier verification history: 0.2.2 laptop +
+0.2.3 DGX (2026-08-22), clean-install + smoke ladder 0.2.5→0.2.8
+(2026-08-25). This document is the living design record; where the original
+proposal (bottom) disagrees with "As built", "As built" wins.
+
+## Current state — 0.3.0, discovery at rest (read this first)
+
+The week of 0.2.x bug-fixing (footer fragments minted as "addresses", column
+labels as "people", file-path segments as "places", and finally a junk vault
+entry rewriting the outgoing **model id** into `PLACE_055-3.5-flash-low` →
+HTTP 404 on every send) had one shared root: **running the ML span model over
+request traffic**, where Antigravity's machine-made scaffolding (compaction
+summaries arrive wrapped in the same `<USER_REQUEST>` tags as typed
+questions) is indistinguishable from human data. 0.3.0 removes that root as a
+deliberate simplification for the demo:
+
+1. **The span model (GLiNER) only ever reads files on disk.** At daemon start
+   the extension passes `--scan <workspace folder>`; the daemon walks it
+   (recursive; csv/xlsx/xls/txt/md/log/pdf; skips dot-dirs, `.git`,
+   `node_modules` etc.; caps 300 files / 8 MB each; pdf via `pdftotext`;
+   xlsx needs `openpyxl`, now in `server/requirements.txt`) and mints the
+   vault with the same scanner the io app uses (`classify_columns` +
+   `pseudonymise_frame` + text engine). A watcher thread rescans new/changed
+   files every ~5 s (files that error are retried only when they change).
+   Nothing streaming through the proxy can ever mint a vault entry: `gemini`
+   can no longer become a "place", because it is in no file.
+2. **The request path is fully deterministic** — known-value replacement,
+   partial-name matching (bare "Priya" → the token for "Priya Venkatesan"),
+   regex validators (email/PAN/Aadhaar/IFSC/UPI/phone/voter/vehicle,
+   checksummed where applicable), 8+-digit runs, and the deterministic name
+   heuristics (chat-sender lines, initials, contact-cue lines). No ML in
+   flight, so per-call redaction is ms-fast and junk-minting is structurally
+   impossible. The legacy scan-traffic behaviour survives behind
+   `privacyShield.discovery: "requests"`.
+3. **Fail-closed scan gate.** A model call arriving while a scan is running is
+   held up to 45 s; if the scan is still going, the daemon answers the chat
+   itself: "still scanning your folder (n/m files) — nothing was sent". The
+   status bar shows `Scanning your files… n/m · <file>` live (daemon exposes
+   `scan_active/done/total/current` in `/shield/status.json`). A query can
+   never be forwarded against a partially built vault.
+4. **Routing fields are structurally protected.** The last-line-of-defence
+   substitution over the outgoing body restores `model`, `userAgent`,
+   `project`, `requestId` afterwards — no vault content can ever again corrupt
+   the envelope (the 404 bug class).
+5. **In-chat review is retired from the default path** (`privacyShield.review`
+   defaults to `off`): redact silently; the status-bar counts and the
+   vault/wire views are the after-the-fact review. The chat-review machinery
+   still exists behind the setting; the *upfront, per-folder click-to-keep
+   review* is the io app's differentiator, not the plugin's.
+
+The result is intentionally the same contract as the io desktop app:
+*discovery from files at rest, replacement everywhere in flight,
+rehydration on the way back, egress firewall as the last line.* The plugin is
+the "shield inside Antigravity"; io is the full workflow. Demo caveats that
+come with the simplification: values that exist in **no file** and are typed
+for the first time in a question are no longer ML-scanned (validators still
+catch identifier-shaped ones); files the agent reads from **outside the
+workspace folder** are covered by validators + known values only; aggregation
+questions over hidden columns ("count by email domain") return token-based
+answers by design.
 
 ## Objective
 
@@ -258,6 +313,67 @@ Two more gaps found and fixed in 0.2.5:
 - The partial pass only considers clean name-shaped vault values, so
   span-noise entries (`"Row 5: ['Priya Venkatesan'"`) can't poison it.
 
+## Open bugs for the next agent (2026-08-25 evening, laptop session)
+
+Diagnosed but NOT yet fixed — start here. The laptop stays in use; fix on a
+clean checkout and verify against `benchmarks/pii/corpus/` (a fresh workspace
+copy of it — do not commit generated dashboards into the corpus).
+
+1. **"Shield crashed mid-chat" is actually the first scan being slow + the
+   gate UX.** Measured: the initial scan of `benchmarks/pii/corpus/`
+   (18 files, incl. multi-hundred-row CSVs and the large `.cells.json`
+   annotation files) took ~5m20s on this laptop's CPU. During those minutes,
+   model calls are held 45 s then answered "still scanning" — mid-conversation
+   this reads exactly like a crash/restart. `daemon.out` proves the daemon
+   started once and never died. Fix directions, pick pragmatically:
+   scan tables with a row sample rather than every row (io scans first ~200
+   rows per free-text column already — mirror that); skip `.json` by default
+   or cap doc scan size harder (400 KB cap exists; the cost is GLiNER, so cap
+   by characters actually scanned); parallelise per-file (PII_THREADS exists);
+   and/or surface scan progress in the held-call message ("done in ~Ns").
+2. **Status-poll log spam.** Every 2 s poll that disconnects early writes a
+   BrokenPipeError traceback to `daemon.out` (dozens per hour, drowns real
+   errors). Wrap `send_local`/status writes in a BrokenPipe/ConnectionReset
+   catch, or silence `http.server`'s per-request exception logging for those.
+3. **"Privacy Shield: Show daemon log" shows an empty output channel.** The
+   daemon is spawned detached and writes to
+   `~/.config/Antigravity/User/globalStorage/insight-out.privacy-shield/daemon.out`
+   — the command should open that file (`vscode.window.showTextDocument`) not
+   the extension output channel.
+4. **Not re-verified end-to-end after the 0.3.0 switch on this machine**: the
+   full dashboard smoke (build → follow-ups → egress 0-hits, both model
+   families) passed standalone against a copy of the small shield-dash corpus,
+   and scan/watcher/gate behaviours were verified against a standalone daemon
+   on port 8899 — but the final in-IDE corpus run was interrupted by the slow
+   scan above. Re-run it after fixing (1).
+
+### How to verify quickly on a fresh machine
+
+- Install per README Quick start (pin `antigravity=1.23.2-1776332190`,
+  `--version` must print 1.107.0), install
+  `extension/privacy-shield-0.3.0.vsix`, palette → "Privacy Shield: Enable"
+  ("Install now" downloads ~500 MB env into globalStorage; one relaunch).
+- Open a *copy* of `benchmarks/pii/corpus/` as the workspace. Watch the
+  status bar: `Scanning your files… n/m` → then normal. Vault view
+  (`/shield/vault` via the shield menu) should contain only file-derived
+  values — no product words, no column labels, no "ms redaction" fragments.
+- Ask for a dashboard; then follow-ups naming people from the files (full
+  name and bare first name). Check `/shield/last-request` search box: 0 hits
+  for every real name/phone/email; the `model` field must read
+  `gemini-…`/`claude-…`, never a token.
+- **Permission prompts:** for hands-off verification, turn on Antigravity's
+  auto-execution ("yolo") mode so `run_command` doesn't wait for a human:
+  Antigravity Settings (gear, bottom-right) → Agent section → set the
+  terminal/command execution policy to auto-run/always allow (label varies by
+  build; it is presented as Turbo/auto-execution). Safe here — the workspace
+  is synthetic test data. Otherwise every python/pdftotext step needs a
+  manual "Run" click (Alt+Enter).
+- Daemon standalone (no IDE) for fast iteration:
+  `cd extension/privacy-shield/server && HF_HOME=<env>/hf-cache   <env>/.venv/bin/python shield_proxy.py --port 8899 --vault /tmp/v.json   --numbers 8 --scan <folder>` then POST a fake
+  `/v1internal:streamGenerateContent?alt=sse` body and read
+  `/shield/last-request` (expect 401 upstream without auth — the point is
+  inspecting what *would* leave).
+
 ## Known limits & brittleness (honest list)
 
 1. **Internal knob dependency.** Routing rests on `jetski.cloudCodeUrl` +
@@ -322,7 +438,7 @@ Two more gaps found and fixed in 0.2.5:
 ## Deliverables (current)
 
 - `extension/privacy-shield/` — extension + bundled server (source of truth).
-- `extension/privacy-shield-0.2.2.vsix` — installable package.
+- `extension/privacy-shield-0.3.0.vsix` — installable package.
 - One-time env install: command palette → "Privacy Shield: Install Python
   environment" (runs `server/install.sh`, CPU-only torch pinned).
 - Evidence: `debug/20260822T1040-antigravity-server-crash/` (local only,
