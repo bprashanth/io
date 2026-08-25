@@ -96,3 +96,24 @@ codex CLI + frontier over a tokenised workspace built and verified a working das
 2m38s / 37k tokens with zero real values anywhere; the server must be owned by io (it died
 with the harness). Full analysis and proposed lane shape:
 `backlog/2026-08-26-actions-lane-workshop.md`.
+
+## Appended 2026-08-25 evening: the sentence-period leak (found live, fixed in all engines)
+
+During the 0.3.1 in-IDE verification the wire carried `NAME_1604 Paswan` - a surname, raw.
+Root cause in the shared engine's known-values boundary: the lookahead `(?![\w@.])` (meant
+to keep matches out of emails/domains) also refused any name followed by a period, so
+"Sunil Paswan." fell back to the shorter bare-"Sunil" vault entry and the surname escaped;
+the egress firewall could not see it because the full value no longer appeared. The bare
+fragment token itself came from the (correct, privacy-first) ambiguous-name behaviour: 16
+Sunils in the vault, so bare "Sunil" gets an unlinked token and the model rightly cannot
+pick a person - the io ~name~ dropdown is the answer to that; the plugin documents it.
+
+Fix (one line, all three engine copies: benchmarks/pii, app/io/engine, plugin server): a
+trailing dot only blocks the match when it starts a domain-like tail (`(?!(?:[\w@]|\.[\w@]))`).
+Verified: "met Sunil Paswan." and the regex-string shape both tokenise; sunil.paswan@x.com
+still never matches piecewise; io q_sent for "Divya Thorat." is `NAME_007.` with the correct
+rehydrated answer. 0.3.1 vsix rebuilt with the fix. Also in this 0.3.1 pass: .json dropped
+from the at-rest scan (the corpus scan fell from 5m20s on the laptop to under a minute here,
+8 files instead of 18), scan progress verified live in the status bar, vault audit clean
+(4477 entries, all file-derived), dashboard built hands-off with zero Run clicks, no status
+flicker (bar stayed "Shield on" through a 40-call build), daemon.out free of tracebacks.

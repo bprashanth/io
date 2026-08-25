@@ -99,7 +99,7 @@ class PseudonymMap:
             return None
         if getattr(self, "_known_n", -1) != n:
             values = sorted((v for v in self.display.values() if len(v) >= 3), key=len, reverse=True)
-            self._known_re = re.compile(r"(?<![\w@.])(?:" + "|".join(re.escape(v) for v in values) + r")(?![\w@.])", re.I)
+            self._known_re = re.compile(r"(?<![\w@.])(?:" + "|".join(re.escape(v) for v in values) + r")(?!(?:[\w@]|\.[\w@]))", re.I)  # a trailing dot only blocks when it starts a domain-like tail; plain sentence periods must not hide a name
             self._known_n = n
         return self._known_re
 

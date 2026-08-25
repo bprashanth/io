@@ -229,7 +229,7 @@ class Shield:
         return self.data_engine(text, with_model=True)
 
     SCAN_SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "hf-cache", ".antigravity"}
-    SCAN_EXTS = (".csv", ".xlsx", ".xls", ".txt", ".md", ".log", ".json", ".pdf")
+    SCAN_EXTS = (".csv", ".xlsx", ".xls", ".txt", ".md", ".log", ".pdf")  # no .json: annotation dumps cost minutes of GLiNER; io never scanned them either
     # Demo limits, on purpose and prominent: past these the shield refuses the
     # folder instead of scanning for ten minutes. The refusal text tells the user.
     MAX_SCAN_FILES = 40
