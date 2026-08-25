@@ -1,0 +1,1 @@
+I have created `page.html` with all the fields from the Enrolment sheet (Student Details, Parent/Guardian, Identification & Contact sections). The page is self-contained with inline CSS/JS, works offline with no CDNs, and is formatted with responsive grid layout.

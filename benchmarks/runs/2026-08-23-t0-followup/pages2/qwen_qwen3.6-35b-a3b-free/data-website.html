@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scholarship Scheme Progress</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #27ae60;
+            --warning: #e67e22;
+            --danger: #c0392b;
+            --light: #ecf0f1;
+            --white: #ffffff;
+            --border: #bdc3c7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background-color: var(--white);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        .status-badge {
+            background-color: var(--light);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: var(--secondary);
+        }
+
+        /* Dashboard Cards */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border-left: 5px solid var(--primary);
+        }
+
+        .card h3 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+        }
+
+        .card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .card.pending { border-left-color: var(--warning); }
+        .card.pending .value { color: var(--warning); }
+        
+        .card.approved { border-left-color: var(--accent); }
+        .card.approved .value { color: var(--accent); }
+
+        /* Controls */
+        .controls {
+            background: var(--white);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        input, select {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        input[type="text"] {
+            flex-grow: 1;
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--white);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--light);
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: var(--secondary);
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th:hover {
+            background-color: #e9ecef;
+        }
+
+        tr:hover {
+            background-color: #f1f2f6;
+        }
+
+        /* Status Colors in Table */
+        .status-pill {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-pending { background-color: #fdebd0; color: #d35400; }
+        .status-approved { background-color: #d5f5e3; color: #27ae60; }
+        .status-rejected { background-color: #fadbd8; color: #c0392b; }
+        .status-default { background-color: #eaecee; color: #7f8c8d; }
+
+        .empty-state {
+            padding: 40px;
+            text-align: center;
+            color: #7f8c8d;
+        }
+
+        /* Loading State */
+        #loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2rem;
+            color: var(--secondary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Scholarship Scheme Progress</h1>
+        <div class="status-badge" id="data-status">Initializing...</div>
+    </header>
+
+    <div id="loading">Loading data...</div>
+
+    <div id="main-content" style="display: none;">
+        <!-- Dashboard Cards -->
+        <div class="dashboard">
+            <div class="card">
+                <h3>Total Applications</h3>
+                <div class="value" id="total-count">0</div>
+            </div>
+            <div class="card approved">
+                <h3>Approved</h3>
+                <div class="value" id="approved-count">0</div>
+            </div>
+            <div class="card pending">
+                <h3>Pending Cases</h3>
+                <div class="value" id="pending-count">0</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="controls">
+            <input type="text" id="search-input" placeholder="Search by Name, District, or Scheme...">
+            <select id="district-filter">
+                <option value="">All Districts</option>
+            </select>
+            <select id="status-filter">
+                <option value="">All Statuses</option>
+                <option value="Pending">Pending Only</option>
+                <option value="Approved">Approved Only</option>
+            </select>
+        </div>
+
+        <!-- Data Table -->
+        <div class="table-container">
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">Name</th>
+                        <th onclick="sortTable(1)">District</th>
+                        <th onclick="sortTable(2)">Taluka</th>
+                        <th onclick="sortTable(3)">Scheme</th>
+                        <th onclick="sortTable(4)">Marks %</th>
+                        <th onclick="sortTable(5)">Family Income</th>
+                        <th onclick="sortTable(6)">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Rows injected via JS -->
+                </tbody>
+            </table>
+            <div id="no-results" class="empty-state" style="display: none;">
+                No records found matching your criteria.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global state
+    let rawData = [];
+    let filteredData = [];
+    let sortColumn = -1;
+    let sortAsc = true;
+
+    // Helper to format currency
+    const formatCurrency = (val) => {
+        if (typeof val !== 'number') val = parseFloat(val);
+        if (isNaN(val)) return val;
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
+    };
+
+    // Helper to get status class
+    const getStatusClass = (status) => {
+        const s = (status || "").toLowerCase();
+        if (s.includes('pending')) return 'status-pending';
+        if (s.includes('approved') || s.includes('sanctioned')) return 'status-approved';
+        if (s.includes('reject') || s.includes('cancelled')) return 'status-rejected';
+        return 'status-default';
+    };
+
+    // Initialize
+    window.addEventListener('load', () => {
+        try {
+            if (window.data && Array.isArray(window.data)) {
+                rawData = window.data;
+                document.getElementById('data-status').textContent = `Loaded ${rawData.length} records`;
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('main-content').style.display = 'block';
+                initDashboard();
+                populateDistrictFilter();
+                renderTable();
+            } else {
+                document.getElementById('loading').innerHTML = "Error: No data found in window.data";
+            }
+        } catch (e) {
+            document.getElementById('loading').innerHTML = "Error processing data: " + e.message;
+            console.error(e);
+        }
+    });
+
+    function initDashboard() {
+        const total = rawData.length;
+        const approved = rawData.filter(r => (r.Status || "").toLowerCase().includes('approved')).length;
+        const pending = rawData.filter(r => (r.Status || "").toLowerCase().includes('pending')).length;
+
+        document.getElementById('total-count').textContent = total;
+        document.getElementById('approved-count').textContent = approved;
+        document.getElementById('pending-count').textContent = pending;
+    }
+
+    function populateDistrictFilter() {
+        const select = document.getElementById('district-filter');
+        const districts = [...new Set(rawData.map(r => r.District).filter(Boolean))].sort();
+        
+        districts.forEach(d => {
+            const option = document.createElement('option');
+            option.value = d;
+            option.textContent = d;
+            select.appendChild(option);
+        });
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('table-body');
+        const noResults = document.getElementById('no-results');
+        tbody.innerHTML = '';
+
+        if (filteredData.length === 0) {
+            noResults.style.display = 'block';
+            return;
+        }
+        noResults.style.display = 'none';
+
+        filteredData.forEach(row => {
+            const tr = document.createElement('tr');
+            
+            // Handle potential undefined values safely
+            const name = row['Name'] || row['Name of Student'] || 'N/A';
+            const district = row['District'] || 'N/A';
+            const taluka = row['Taluka'] || 'N/A';
+            const scheme = row['Name of scheme'] || row['Scheme'] || 'N/A';
+            const marks = row['Marks %'] || row['Marks'] || 'N/A';
+            const income = row['Family Income'] || row['Income'] || 'N/A';
+            const status = row['Status'] || 'N/A';
+
+            tr.innerHTML = `
+                <td><strong>${name}</strong></td>
+                <td>${district}</td>
+                <td>${taluka}</td>
+                <td>${scheme}</td>
+                <td>${marks}</td>
+                <td>${typeof income === 'number' ? formatCurrency(income) : income}</td>
+                <td><span class="status-pill ${getStatusClass(status)}">${status}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Filter Logic
+    document.getElementById('search-input').addEventListener('input', applyFilters);
+    document.getElementById('district-filter').addEventListener('change', applyFilters);
+    document.getElementById('status-filter').addEventListener('change', applyFilters);
+
+    function applyFilters() {
+        const search = document.getElementById('search-input').value.toLowerCase();
+        const district = document.getElementById('district-filter').value;
+        const status = document.getElementById('status-filter').value;
+
+        filteredData = rawData.filter(row => {
+            // Search Text
+            const textMatch = Object.values(row).some(val => 
+                String(val).toLowerCase().includes(search)
+            );
+
+            // District
+            const districtMatch = district === "" || (row.District || "") === district;
+
+            // Status
+            let statusMatch = true;
+            if (status !== "") {
+                const rowStatus = (row.Status || "").toLowerCase();
+                if (status === "Pending") statusMatch = rowStatus.includes("pending");
+                else if (status === "Approved") statusMatch = rowStatus.includes("approved");
+            }
+
+            return textMatch && districtMatch && statusMatch;
+        });
+
+        // Re-apply current sort if active
+        if (sortColumn !== -1) {
+            performSort();
+        }
+        
+        renderTable();
+    }
+
+    // Sort Logic
+    function sortTable(colIndex) {
+        // Toggle direction if clicking same column
+        if (sortColumn === colIndex) {
+            sortAsc = !sortAsc;
+        } else {
+            sortColumn = colIndex;
+            sortAsc = true;
+        }
+        performSort();
+        renderTable();
+    }
+
+    function performSort() {
+        const keys = ['Name', 'District', 'Taluka', 'Name of scheme', 'Marks %', 'Family Income', 'Status'];
+        const key = keys[sortColumn];
+
+        filteredData.sort((a, b) => {
+            let valA = a[key];
+            let valB = b[key];
+
+            // Handle numbers
+            if (!isNaN(valA) && !isNaN(valB)) {
+                return sortAsc ? valA - valB : valB - valA;
+            }
+
+            // Handle strings
+            valA = String(valA || "").toLowerCase();
+            valB = String(valB || "").toLowerCase();
+
+            if (valA < valB) return sortAsc ? -1 : 1;
+            if (valA > valB) return sortAsc ? 1 : -1;
+            return 0;
+        });
+    }
+</script>
+
+</body>
+</html>

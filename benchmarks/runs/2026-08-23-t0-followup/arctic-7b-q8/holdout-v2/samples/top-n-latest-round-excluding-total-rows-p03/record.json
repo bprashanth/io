@@ -1,0 +1,100 @@
+{
+  "id": "top-n-latest-round-excluding-total-rows-p03",
+  "task_id": "top-n-latest-round-excluding-total-rows",
+  "pattern": "filter one round, rank a plain column, limit to five, detail rows only",
+  "question": "NFHS-5 stunting among children under 5, show only the 5 highest districts across all states",
+  "gold_sql": "SELECT \"District\", \"Children under 5 years who are stunted (%)\" AS stunted_percent FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' AND \"District\" <> 'State Total' ORDER BY stunted_percent DESC, \"District\" LIMIT 5",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      49.6
+    ],
+    [
+      "Ranchi",
+      42.9
+    ],
+    [
+      "Kalahandi",
+      42.7
+    ],
+    [
+      "Rohtas",
+      42.2
+    ],
+    [
+      "Bhojpur",
+      40.9
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      49.6
+    ],
+    [
+      "Ranchi",
+      42.9
+    ],
+    [
+      "Kalahandi",
+      42.7
+    ],
+    [
+      "Rohtas",
+      42.2
+    ],
+    [
+      "Bhojpur",
+      40.9
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT District, \"Children under 5 years who are stunted (%)\" AS stunted_percentage FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' ORDER BY \"Children under 5 years who are stunted (%)\" DESC LIMIT 5",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nNFHS-5 stunting among children under 5, show only the 5 highest districts across all states",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to focus on the following key points:\n\n1. **Filter by Survey Round**: We need to filter the records to only include those from the \"NFHS-5\" survey round.\n2. **Select Relevant Columns**: We need to select the district and the percentage of children under 5 years who are stunted.\n3. **Order and Limit**: We need to order the results by the percentage of stunted children in descending order and limit the results to the top 5 districts.\n\nGiven the schema and the question, we can construct the SQL query as follows:\n\n1. **Filter the Data**: Use a `WHERE` clause to filter the records for the \"NFHS-5\" survey round.\n2. **Select the Necessary Columns**: We need the `District` and `Children under 5 years who are stunted (%)` columns.\n3. **Order and Limit the Results**: Use `ORDER BY` to sort the results by the stunted percentage in descending order and `LIMIT` to restrict the output to the top 5 districts.\n\nHere is the SQL query:\n\n```sql\nSELECT \n    District,\n    \"Children under 5 years who are stunted (%)\" AS stunted_percentage\nFROM \n    district_health_factsheet\nWHERE \n    \"Survey Round\" = 'NFHS-5'\nORDER BY \n    \"Children under 5 years who are stunted (%)\" DESC\nLIMIT 5;\n```\n\n### Explanation:\n- **SELECT Clause**: We select the `District` and the percentage of children under 5 years who are stunted, renaming it as `stunted_percentage` for clarity.\n- **FROM Clause**: We specify the table `district_health_factsheet` as the source of our data.\n- **WHERE Clause**: We filter the records to include only those from the \"NFHS-5\" survey round.\n- **ORDER BY Clause**: We order the results by the `Children under 5 years who are stunted (%)` column in descending order to get the highest percentages first.\n- **LIMIT Clause**: We limit the results to the top 5 districts.\n\nThis query directly addresses the requirements of the question without unnecessary complexity or joins, ensuring it is both efficient and easy to understand.",
+      "api": {
+        "id": "chatcmpl-QCACu48MTs5DKOA08iWDXOFzpBjnGFsa",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 469,
+          "prompt_tokens": 519,
+          "total_tokens": 988,
+          "prompt_tokens_details": {
+            "cached_tokens": 492
+          }
+        },
+        "duration_seconds": 17.312
+      },
+      "duration_seconds": 17.316,
+      "sql_duckdb": "SELECT District, \"Children under 5 years who are stunted (%)\" AS stunted_percentage FROM district_health_factsheet WHERE \"Survey Round\" = 'NFHS-5' ORDER BY \"Children under 5 years who are stunted (%)\" DESC LIMIT 5",
+      "rows": [
+        [
+          "Kishanganj",
+          49.6
+        ],
+        [
+          "Ranchi",
+          42.9
+        ],
+        [
+          "Kalahandi",
+          42.7
+        ],
+        [
+          "Rohtas",
+          42.2
+        ],
+        [
+          "Bhojpur",
+          40.9
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

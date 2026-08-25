@@ -1,0 +1,91 @@
+{
+  "id": "derived-rate-ranking-p03",
+  "task_id": "derived-rate-ranking",
+  "pattern": "filter, derive a comparable percentage, rank",
+  "question": "make district list for 2023 full immunisation coverage percentage and sort best first",
+  "gold_sql": "SELECT district, ROUND(100.0 * children_fully_immunised / children_due, 1) AS coverage_percent FROM immunisation WHERE year = 2023 ORDER BY coverage_percent DESC, district",
+  "expected_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Nalanda",
+      90.0
+    ],
+    [
+      "Gaya",
+      85.0
+    ],
+    [
+      "Purnia",
+      76.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT \"district\", (\"children_fully_immunised\" * 100.0 / NULLIF(NULLIF(\"children_due\", 0), 0)) AS \"coverage_percentage\" FROM \"immunisation\" WHERE \"year\" = 2023 ORDER BY \"coverage_percentage\" DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"immunisation\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"children_due\" BIGINT,\n  \"children_fully_immunised\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"immunisation\": {\"district\": [\"Gaya\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic smoke fixture\"]}}\n\nCURRENT QUESTION:\nmake district list for 2023 full immunisation coverage percentage and sort best first",
+      "response": "SELECT \"district\", (\"children_fully_immunised\" * 100.0 / NULLIF(\"children_due\", 0)) AS \"coverage_percentage\"\nFROM \"immunisation\"\nWHERE \"year\" = 2023\nORDER BY \"coverage_percentage\" DESC;",
+      "api": {
+        "id": "gen-1787421081-5QNYYoNtMf6uGIDdXhlm",
+        "model": "qwen/qwen3.5-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 311,
+          "completion_tokens": 61,
+          "total_tokens": 372,
+          "cost": 0.00010454,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00010454,
+            "upstream_inference_prompt_cost": 4.354e-05,
+            "upstream_inference_completions_cost": 6.1e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.623
+      },
+      "duration_seconds": 2.626,
+      "sql_duckdb": "SELECT \"district\", (\"children_fully_immunised\" * 100.0 / NULLIF(NULLIF(\"children_due\", 0), 0)) AS \"coverage_percentage\" FROM \"immunisation\" WHERE \"year\" = 2023 ORDER BY \"coverage_percentage\" DESC",
+      "rows": [
+        [
+          "Nalanda",
+          90.0
+        ],
+        [
+          "Gaya",
+          85.0
+        ],
+        [
+          "Purnia",
+          76.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

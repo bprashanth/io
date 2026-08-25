@@ -1,0 +1,838 @@
+{
+ "summary": {
+  "label": "io-app-9b",
+  "ask_passed": 5,
+  "ask_total": 22,
+  "builds": [],
+  "pages": [],
+  "mean_seconds": 5.2
+ },
+ "records": [
+  {
+   "id": "ask-01",
+   "lane": "ask",
+   "org": "sunrise-shiksha",
+   "prompt": "How many students are enrolled at Sunrise Shiksha for 2025-26?",
+   "expect": "A single count matching the Enrolment sheet row count (the 2-row merged group header above the real column headers must not be counted as a data row).",
+   "seconds": 2.6,
+   "model_seconds": 2.57,
+   "calls": 1,
+   "passed": true,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT COUNT(*) AS total_enrolled FROM \"students_2025_26_enrolment\"",
+   "got": [
+    {
+     "total_enrolled": 320
+    }
+   ],
+   "expected": [
+    [
+     320
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-02",
+   "lane": "ask",
+   "org": "sunrise-shiksha",
+   "prompt": "Which students dropped out between the baseline and endline assessment?",
+   "expect": "Students present in the Baseline table but absent from the Endline table below it. The two blocks share no ID scheme (Roll No vs none) so a correct answer must join on student name, not ID. Total dropouts: 28.",
+   "seconds": 2.1,
+   "model_seconds": 2.06,
+   "calls": 1,
+   "passed": false,
+   "why": "no rows",
+   "sql": "SELECT * FROM \"students_2025_26_assessment\" WHERE \"Reading Level\" IN ('Baseline', 'Endline') AND NOT \"Roll No\" IS NULL",
+   "got": [],
+   "expected": [
+    [
+     "Deepa Bagul"
+    ],
+    [
+     "Fatima Rathod"
+    ],
+    [
+     "Ganesh Singh"
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-03",
+   "lane": "ask",
+   "org": "sunrise-shiksha",
+   "prompt": "Which indicators are behind target in the Q1 funder report?",
+   "expect": "Rows where Achieved < Target, excluding the bottom TOTAL row. Top rows ranked by shortfall (Target - Achieved), descending.",
+   "seconds": 1.7,
+   "model_seconds": 1.65,
+   "calls": 1,
+   "passed": false,
+   "why": "8 rows got, 3 expected",
+   "sql": "SELECT \"Indicator\" FROM \"funder_report_q1\" WHERE \"% Achievement\" < 100",
+   "got": [
+    {
+     "Indicator": "Students retained (no dropout)"
+    },
+    {
+     "Indicator": "Avg attendance %"
+    },
+    {
+     "Indicator": "Students at 'Story' reading level"
+    },
+    {
+     "Indicator": "Learning camps conducted"
+    },
+    {
+     "Indicator": "Teachers trained"
+    }
+   ],
+   "expected": [
+    [
+     "Students retained (no dropout)",
+     300,
+     292
+    ],
+    [
+     "Students at 'Story' reading level",
+     60,
+     54
+    ],
+    [
+     "Avg attendance %",
+     85,
+     81
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-04",
+   "lane": "ask",
+   "org": "sunrise-shiksha",
+   "prompt": "What was total student attendance (days present) across all classes in June 2025?",
+   "expect": "Sum of the 'Jun-25' column in the wide-by-month Attendance sheet (Attendance ID differs from the Enrolment sheet's Student ID; join by name/class if the tool needs to combine the two sheets).",
+   "seconds": 3.2,
+   "model_seconds": 3.17,
+   "calls": 1,
+   "passed": false,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT SUM(\"Jun-25\") AS total_student_attendance FROM \"students_2025_26_attendance\"",
+   "got": [
+    {
+     "total_student_attendance": 5641
+    }
+   ],
+   "expected": [
+    [
+     "Jun-25",
+     5641
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-05",
+   "lane": "ask",
+   "org": "swayam-mahila",
+   "prompt": "How many SHGs are registered in Manchar village?",
+   "expect": "Count of shg_master.csv rows where village equals the named village.",
+   "seconds": 1.5,
+   "model_seconds": 1.48,
+   "calls": 1,
+   "passed": false,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT COUNT(*) AS shg_count FROM shg_master WHERE village = 'Manchar'",
+   "got": [
+    {
+     "shg_count": 15
+    }
+   ],
+   "expected": [
+    [
+     "Manchar",
+     15
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-06",
+   "lane": "ask",
+   "org": "swayam-mahila",
+   "prompt": "Which SHGs have the highest outstanding loan balance as of September?",
+   "expect": "Top rows of loan_ledger.xlsx ranked by 'Outstanding Balance' descending (the sheet is wide-by-month; balance is the last column).",
+   "seconds": 1.8,
+   "model_seconds": 1.79,
+   "calls": 1,
+   "passed": false,
+   "why": "1 rows got, 3 expected",
+   "sql": "SELECT \"SHG Name\", \"Outstanding Balance\" FROM \"loan_ledger\" WHERE NOT \"Outstanding Balance\" IS NULL ORDER BY \"Outstanding Balance\" DESC LIMIT 1",
+   "got": [
+    {
+     "SHG Name": "Kavita Mahila Bachat Gat 50",
+     "Outstanding Balance": 75000.0
+    }
+   ],
+   "expected": [
+    [
+     "SHG-0050",
+     "Kavita Mahila Bachat Gat 50",
+     75000.0
+    ],
+    [
+     "SHG-0025",
+     "Kavita Mahila Bachat Gat 25",
+     72222.2
+    ],
+    [
+     "SHG-0014",
+     "Vaishali Mahila Bachat Gat 14",
+     72222.2
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-07",
+   "lane": "ask",
+   "org": "swayam-mahila",
+   "prompt": "Which invoices are overdue and still have a balance pending?",
+   "expect": "Rows with Status == 'Overdue' from the Zoho Books export, ranked by parsed Balance (the column is a currency string like '\u20b912,500.00', not a number) descending.",
+   "seconds": 1.8,
+   "model_seconds": 1.83,
+   "calls": 1,
+   "passed": false,
+   "why": "35 rows got, 3 expected",
+   "sql": "SELECT * FROM \"zoho_books_invoices_export\" WHERE \"Status\" = 'Overdue' AND \"Balance\" > 0",
+   "got": [
+    {
+     "Invoice Number": "INV-2025-00001",
+     "Customer ID": "CUST-1001",
+     "Customer Name": "Zarina Mahila Bachat Gat 136",
+     "Invoice Date": "2025-07-26",
+     "Due Date": "2025-08-25",
+     "Status": "Overdue",
+     "Total": 10000.0,
+     "Balance": 7621.42,
+     "Currency Code": "INR",
+     "Sales Order Number": null,
+     "Notes": "Livelihoods material grant",
+     "Customer Name (as in shg_master)": "Zarina Mahila Bachat Gat 136"
+    },
+    {
+     "Invoice Number": "INV-2025-00002",
+     "Customer ID": "CUST-1002",
+     "Customer Name": "Anjali Mahila Bachat Gat 64",
+     "Invoice Date": "2025-03-25",
+     "Due Date": "2025-04-24",
+     "Status": "Overdue",
+     "Total": 15000.0,
+     "Balance": 8593.47,
+     "Currency Code": "INR",
+     "Sales Order Number": null,
+     "Notes": "Revolving fund",
+     "Customer Name (as in shg_master)": "Anjali Mahila Bachat Gat 64"
+    },
+    {
+     "Invoice Number": "INV-2025-00009",
+     "Customer ID": "CUST-1009",
+     "Customer Name": "Divya Mahila Bachat Gat 81",
+     "Invoice Date": "2025-01-03",
+     "Due Date": "2025-02-02",
+     "Status": "Overdue",
+     "Total": 12500.0,
+     "Balance": 9753.11,
+     "Currency Code": "INR",
+     "Sales Order Number": null,
+     "Notes": "Skill training kit invoice",
+     "Customer Name (as in shg_master)": "Divya Mahila Bachat Gat 81"
+    },
+    {
+     "Invoice Number": "INV-2025-00017",
+     "Customer ID": "CUST-1017",
+     "Customer Name": "Neha Mahila Bachat Gat 115",
+     "Invoice Date": "2025-08-21",
+     "Due Date": "2025-09-20",
+     "Status": "Overdue",
+     "Total": 15000.0,
+     "Balance": 3753.72,
+     "Currency Code": "INR",
+     "Sales Order Number": null,
+     "Notes": "Revolving fund",
+     "Customer Name (as in shg_master)": "Neha Mahila Bachat Gat 115"
+    },
+    {
+     "Invoice Number": "INV-2025-00023",
+     "Customer ID": "CUST-1023",
+     "Customer Name": "Jyoti Mahila Bachat Gat 79",
+     "Invoice Date": "2025-05-06",
+     "Due Date": "2025-06-05",
+     "Status": "Overdue",
+     "Total": 7500.0,
+     "Balance": 3049.63,
+     "Currency Code": "INR",
+     "Sales Order Number": null,
+     "Notes": null,
+     "Customer Name (as in shg_master)": "Jyoti Mahila Bachat Gat 79"
+    }
+   ],
+   "expected": [
+    [
+     "INV-2025-00072",
+     "Divya Mahila Bachat Gat 143",
+     "\u20b923,372.06"
+    ],
+    [
+     "INV-2025-00230",
+     "Asha Mahila Bachat Gat 93",
+     "\u20b916,374.29"
+    ],
+    [
+     "INV-2025-00162",
+     "Deepa Mahila Bachat Gat 6",
+     "\u20b915,359.54"
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-08",
+   "lane": "ask",
+   "org": "arogya-jyoti",
+   "prompt": "How many women completed at least their first ANC visit (ANC1)?",
+   "expect": "Count of rows where visit/anc1 == 'yes' in the KoboToolbox export.",
+   "seconds": 4.9,
+   "model_seconds": 4.85,
+   "calls": 1,
+   "passed": true,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT COUNT(*) AS total_women_with_anc1 FROM \"anc_tracking_kobo_export\" WHERE \"visit/anc1\" = 'yes'",
+   "got": [
+    {
+     "total_women_with_anc1": 327
+    }
+   ],
+   "expected": [
+    [
+     327
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-09",
+   "lane": "ask",
+   "org": "arogya-jyoti",
+   "prompt": "Which health camps had the most women attendees?",
+   "expect": "camp_register.xlsx has one title-row + attendee-table block per camp (not one tidy table); a correct answer aggregates women count per camp from those blocks and ranks descending.",
+   "seconds": 1.8,
+   "model_seconds": 1.78,
+   "calls": 1,
+   "passed": false,
+   "why": "20 rows got, 3 expected",
+   "sql": "SELECT \"hh/village\" AS \"Village\", COUNT(*) AS \"Women_Attendees\" FROM \"anc_tracking_kobo_export\" GROUP BY \"hh/village\" ORDER BY \"Women_Attendees\" DESC",
+   "got": [
+    {
+     "Village": "Daund",
+     "Women_Attendees": 27
+    },
+    {
+     "Village": "Shirur",
+     "Women_Attendees": 23
+    },
+    {
+     "Village": "Bhor",
+     "Women_Attendees": 20
+    },
+    {
+     "Village": "Baramati",
+     "Women_Attendees": 20
+    },
+    {
+     "Village": "Velhe",
+     "Women_Attendees": 19
+    }
+   ],
+   "expected": [
+    [
+     14,
+     "Indapur",
+     "21/04/2025",
+     44
+    ],
+    [
+     24,
+     "Baramati",
+     "14/06/2025",
+     40
+    ],
+    [
+     12,
+     "Haveli",
+     "03/03/2025",
+     35
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-10",
+   "lane": "ask",
+   "org": "saksham-kalyan",
+   "prompt": "How many beneficiaries have received an assistive device?",
+   "expect": "Count of rows where Assistive Device Issued is non-empty. Dates in this sheet are mixed dd/mm/yyyy and yyyy-mm-dd; a correct tool should not mis-parse or drop rows because of that.",
+   "seconds": 1.7,
+   "model_seconds": 1.7,
+   "calls": 1,
+   "passed": true,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT COUNT(*) AS beneficiary_count FROM beneficiary_master WHERE NOT \"Assistive Device Issued\" IS NULL",
+   "got": [
+    {
+     "beneficiary_count": 143
+    }
+   ],
+   "expected": [
+    [
+     143
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-11",
+   "lane": "ask",
+   "org": "saksham-kalyan",
+   "prompt": "Which device type has the lowest stock remaining?",
+   "expect": "The running 'balance_after' column is a stock ledger, not a stock table; a correct answer takes the most recent (by date) balance per device_type and ranks ascending.",
+   "seconds": 3.0,
+   "model_seconds": 3.01,
+   "calls": 1,
+   "passed": false,
+   "why": "1 rows got, 3 expected",
+   "sql": "SELECT device_type, balance_after FROM device_inventory WHERE txn_type = 'OUT' ORDER BY balance_after ASC LIMIT 1",
+   "got": [
+    {
+     "device_type": "Wheelchair",
+     "balance_after": 31
+    }
+   ],
+   "expected": [
+    [
+     "Calipers",
+     37
+    ],
+    [
+     "Tricycle",
+     65
+    ],
+    [
+     "Crutches",
+     111
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-12",
+   "lane": "ask",
+   "org": "asha-kiran",
+   "prompt": "How many leads in the donor CRM export are marked 'Converted'?",
+   "expect": "Count of rows where Lead Status == 'Converted' in the Zoho CRM export.",
+   "seconds": 1.5,
+   "model_seconds": 1.54,
+   "calls": 1,
+   "passed": true,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT COUNT(*) AS lead_count FROM \"donor_crm_zoho_export\" WHERE \"Lead Status\" = 'Converted'",
+   "got": [
+    {
+     "lead_count": 83
+    }
+   ],
+   "expected": [
+    [
+     83
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-13",
+   "lane": "ask",
+   "org": "asha-kiran",
+   "prompt": "What was the total captured amount raised for the WinterDrive2025 campaign?",
+   "expect": "Sum of 'amount' (paise, divide by 100 for INR) where status == 'captured' and notes.campaign matches, in razorpay_payments.csv.",
+   "seconds": 5.4,
+   "model_seconds": 1.79,
+   "calls": 1,
+   "passed": false,
+   "why": "I couldn't turn that into a query I can run. Last problem: BinderException: Binder Error: Referenced table \"notes\" not found!\nCandidate tables: \"razorpay_payments\"\n\nLINE 1: ...mount FROM razorpay_paym"
+  },
+  {
+   "id": "ask-14",
+   "lane": "ask",
+   "org": "asha-kiran",
+   "prompt": "Which donors made more than one captured payment (i.e. gave twice or more)?",
+   "expect": "Group captured rows in razorpay_payments.csv by email/contact; donors with count > 1, ranked by count descending.",
+   "seconds": 1.6,
+   "model_seconds": 1.61,
+   "calls": 1,
+   "passed": false,
+   "why": "46 rows got, 3 expected",
+   "sql": "SELECT r.email AS donor_email, COUNT(*) AS payment_count FROM razorpay_payments AS r WHERE r.status = 'captured' GROUP BY r.email HAVING COUNT(*) > 1",
+   "got": [
+    {
+     "donor_email": "tushar.pathan54@outlook.com",
+     "payment_count": 3
+    },
+    {
+     "donor_email": "om.shaikh9@gmail.com",
+     "payment_count": 2
+    },
+    {
+     "donor_email": "vishal.nikam26@gmail.com",
+     "payment_count": 2
+    },
+    {
+     "donor_email": "kalpana.bagul32@outlook.com",
+     "payment_count": 4
+    },
+    {
+     "donor_email": "komal.shinde13@outlook.com",
+     "payment_count": 5
+    }
+   ],
+   "expected": [
+    [
+     "swati.jadhav90@gmail.com",
+     8
+    ],
+    [
+     "balwinder.shaikh82@outlook.com",
+     7
+    ],
+    [
+     "kavita.gaikwad8@outlook.com",
+     7
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-15",
+   "lane": "ask",
+   "org": "asha-kiran",
+   "prompt": "How many 80G receipts were issued in total for 2025?",
+   "expect": "Row count of 80g_receipts_2025.xlsx (one receipt per captured donation sampled for receipting).",
+   "seconds": 1.6,
+   "model_seconds": 1.56,
+   "calls": 1,
+   "passed": true,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT COUNT(*) AS total_80g_receipts FROM \"t_80g_receipts_2025\"",
+   "got": [
+    {
+     "total_80g_receipts": 200
+    }
+   ],
+   "expected": [
+    [
+     200
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-16",
+   "lane": "ask",
+   "org": "prayas-seva-sangh",
+   "prompt": "Which expense heads are over their FY25-26 budget based on Apr-Sep actuals?",
+   "expect": "Rows of the pre-pivoted 'Budget vs Actual' sheet where Actual > Budget (variance > 0), ranked by variance descending.",
+   "seconds": 1.2,
+   "model_seconds": 1.2,
+   "calls": 1,
+   "passed": false,
+   "why": "4 rows got, 4 expected",
+   "sql": "SELECT \"Head\", \"Budget (FY25-26)\", \"Actual (Apr-Sep)\", \"Variance\" FROM \"expense_vouchers_2025_budget_vs_actual\" WHERE \"Variance\" > 0",
+   "got": [
+    {
+     "Head": "Programme",
+     "Budget (FY25-26)": 350000,
+     "Actual (Apr-Sep)": 1238808.85,
+     "Variance": 888808.85
+    },
+    {
+     "Head": "Admin",
+     "Budget (FY25-26)": 120000,
+     "Actual (Apr-Sep)": 880580.52,
+     "Variance": 760580.52
+    },
+    {
+     "Head": "Salaries",
+     "Budget (FY25-26)": 900000,
+     "Actual (Apr-Sep)": 1220316.1,
+     "Variance": 320316.1
+    },
+    {
+     "Head": "Logistics",
+     "Budget (FY25-26)": 150000,
+     "Actual (Apr-Sep)": 1058442.86,
+     "Variance": 908442.86
+    }
+   ],
+   "expected": [
+    [
+     "Logistics",
+     150000.0,
+     1058442.86,
+     908442.86
+    ],
+    [
+     "Programme",
+     350000.0,
+     1238808.85,
+     888808.85
+    ],
+    [
+     "Admin",
+     120000.0,
+     880580.52,
+     760580.52
+    ],
+    [
+     "Salaries",
+     900000.0,
+     1220316.1,
+     320316.1
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-17",
+   "lane": "ask",
+   "org": "prayas-seva-sangh",
+   "prompt": "Which staff members had the most absent (A) days in August?",
+   "expect": "From the wide days-1..31 attendance grid, count 'A' codes per row and rank descending (the sheet already includes a pre-summed 'A' column that should agree with a fresh count of the day columns).",
+   "seconds": 55.9,
+   "model_seconds": 55.88,
+   "calls": 1,
+   "passed": false,
+   "why": "41 rows got, 3 expected",
+   "sql": "SELECT \"Sunil Shaikh\" AS StaffName, SUM(CASE WHEN \"P\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (2)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (3)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (4)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (5)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (6)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (7)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (8)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (9)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (10)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (11)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (12)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (13)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (14)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (15)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (16)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (17)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (18)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (19)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (20)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (21)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (22)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (23)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (24)\" = 'A' THEN 1 ELSE 0 END) + SUM(CASE WHEN \"P (25)\" = 'A' THEN 1 ELSE 0 END) AS TotalAbsentDays FROM \"staff_attendance_aug\" WHERE NOT \"Sunil Shaikh\" IS NULL GROUP BY \"Sunil Shaikh\" ORDER BY TotalAbsentDays DESC",
+   "got": [
+    {
+     "StaffName": "Yogesh Kadam",
+     "TotalAbsentDays": 4
+    },
+    {
+     "StaffName": "Prakash Kale",
+     "TotalAbsentDays": 4
+    },
+    {
+     "StaffName": "Manisha Dhumal",
+     "TotalAbsentDays": 4
+    },
+    {
+     "StaffName": "Lata Bhoir",
+     "TotalAbsentDays": 4
+    },
+    {
+     "StaffName": "Rajesh Nikam",
+     "TotalAbsentDays": 4
+    }
+   ],
+   "expected": [
+    [
+     "Manisha Dhumal",
+     "Accountant",
+     4
+    ],
+    [
+     "Prakash Kale",
+     "Data Entry Operator",
+     4
+    ],
+    [
+     "Yogesh Kadam",
+     "Programme Coordinator",
+     4
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-18",
+   "lane": "ask",
+   "org": "prayas-seva-sangh",
+   "prompt": "What was the total distance travelled by the fleet in June 2025?",
+   "expect": "Sum of km_travelled in vehicle_log.csv for trips dated in June 2025 (dates are dd/mm/yyyy strings).",
+   "seconds": 2.0,
+   "model_seconds": 2.0,
+   "calls": 1,
+   "passed": false,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT SUM(km_travelled) AS total_distance FROM vehicle_log WHERE date >= '2025-06-01' AND date < '2025-07-01'",
+   "got": [
+    {
+     "total_distance": 4884
+    }
+   ],
+   "expected": [
+    [
+     "June 2025",
+     4884
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-19",
+   "lane": "ask",
+   "org": "gram-sudhar",
+   "prompt": "From the WhatsApp field group chat, which days had the highest reported number of children attending, and how many?",
+   "expect": "The chat is a raw 'dd/mm/yy, HH:MM - Name: message' export with ordinary chatter, <Media omitted> lines and shared phone numbers mixed in; a correct answer extracts only the daily count messages (e.g. 'Aaj <village> mein N bacche aaye') and ranks by N descending.",
+   "seconds": 11.4,
+   "model_seconds": 11.37,
+   "calls": 1,
+   "passed": false,
+   "why": "1 rows got, 3 expected",
+   "sql": "SELECT date, first_number FROM \"whatsapp_field_group_export_messages\" WHERE message LIKE '%bacche%' OR message LIKE '%aaye%' ORDER BY first_number DESC, date ASC LIMIT 1",
+   "got": [
+    {
+     "date": "2025-05-16",
+     "first_number": 45
+    }
+   ],
+   "expected": [
+    [
+     "26/05/25",
+     "Mulshi",
+     45
+    ],
+    [
+     "16/05/25",
+     "Wadgaon",
+     45
+    ],
+    [
+     "25/07/25",
+     "Junnar",
+     45
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-20",
+   "lane": "ask",
+   "org": "gram-sudhar",
+   "prompt": "Which villages received the most field visits?",
+   "expect": "Count of rows per village in village_visit_log.csv, ranked descending.",
+   "seconds": 3.0,
+   "model_seconds": 3.01,
+   "calls": 1,
+   "passed": false,
+   "why": "20 rows got, 3 expected",
+   "sql": "SELECT village, COUNT(*) AS visit_count FROM \"village_visit_log\" GROUP BY village ORDER BY visit_count DESC",
+   "got": [
+    {
+     "village": "Saswad",
+     "visit_count": 26
+    },
+    {
+     "village": "Rajgurunagar",
+     "visit_count": 24
+    },
+    {
+     "village": "Daund",
+     "visit_count": 20
+    },
+    {
+     "village": "Narayangaon",
+     "visit_count": 20
+    },
+    {
+     "village": "Baramati",
+     "visit_count": 19
+    }
+   ],
+   "expected": [
+    [
+     "Saswad",
+     26
+    ],
+    [
+     "Rajgurunagar",
+     24
+    ],
+    [
+     "Narayangaon",
+     20
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-21",
+   "lane": "ask",
+   "org": "krishi-jal-vikas",
+   "prompt": "How many households were reached in June 2025 across all villages?",
+   "expect": "Sum of the households column in the June sheet. The column header text drifts across the workbook's month sheets ('No. of HH' in April/May, 'Households reached' in June/July/September, 'HH Covered' in August) even though it is the same indicator; a correct tool must reconcile that before summing, not treat them as different metrics.",
+   "seconds": 1.7,
+   "model_seconds": 1.67,
+   "calls": 1,
+   "passed": false,
+   "why": "1 rows got, 1 expected",
+   "sql": "SELECT SUM(\"Households reached\") AS total_households_reached FROM \"mis_apr_sep_2025_jun\"",
+   "got": [
+    {
+     "total_households_reached": 2724
+    }
+   ],
+   "expected": [
+    [
+     "June",
+     2724
+    ]
+   ],
+   "scope_note": null
+  },
+  {
+   "id": "ask-22",
+   "lane": "ask",
+   "org": "krishi-jal-vikas",
+   "prompt": "Which villages had the highest total households reached across Apr-Sep 2025?",
+   "expect": "Top rows of the Consolidated sheet (values pasted from formulas, not live formulas) ranked by Total HH Reached descending.",
+   "seconds": 2.1,
+   "model_seconds": 2.08,
+   "calls": 1,
+   "passed": false,
+   "why": "1 rows got, 3 expected",
+   "sql": "SELECT Village, \"Total HH Reached (Apr-Sep)\" AS Total_Households FROM \"mis_apr_sep_2025_consolidated\" ORDER BY \"Total HH Reached (Apr-Sep)\" DESC LIMIT 1",
+   "got": [
+    {
+     "Village": "Otur",
+     "Total_Households": 1431
+    }
+   ],
+   "expected": [
+    [
+     "Otur",
+     1431
+    ],
+    [
+     "Velhe",
+     1408
+    ],
+    [
+     "Purandar",
+     1296
+    ]
+   ],
+   "scope_note": null
+  }
+ ]
+}

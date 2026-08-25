@@ -1,0 +1,71 @@
+{
+  "id": "attendance-biggest-drop-p01",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "which centre saw the biggest fall in attendance rate from 2023 to 2024",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Dharavi Balwadi",
+      67.44186401367188,
+      80.43478393554688,
+      12.992918014526367
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT a2023.\"Centre\" AS centre, (CAST(a2023.\"Avg Daily Present\" AS REAL) / NULLIF(NULLIF(a2023.\"Enrolled Kids\", 0), 0)) * 100 AS rate_2023, (CAST(a2024.\"average_attendance\" AS REAL) / NULLIF(NULLIF(a2024.\"enrolment\", 0), 0)) * 100 AS rate_2024, ((CAST(a2024.\"average_attendance\" AS REAL) / NULLIF(NULLIF(a2024.\"enrolment\", 0), 0)) - (CAST(a2023.\"Avg Daily Present\" AS REAL) / NULLIF(NULLIF(a2023.\"Enrolled Kids\", 0), 0))) * 100 AS fall_percentage FROM attendance_2023 AS a2023 JOIN attendance_2024 AS a2024 ON a2023.\"Centre\" = a2024.\"centre_name\" ORDER BY fall_percentage DESC LIMIT 1",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nwhich centre saw the biggest fall in attendance rate from 2023 to 2024",
+      "response": "SELECT \n    a2023.\"Centre\" AS centre,\n    (CAST(a2023.\"Avg Daily Present\" AS FLOAT) / NULLIF(a2023.\"Enrolled Kids\", 0)) * 100 AS rate_2023,\n    (CAST(a2024.\"average_attendance\" AS FLOAT) / NULLIF(a2024.\"enrolment\", 0)) * 100 AS rate_2024,\n    ((CAST(a2024.\"average_attendance\" AS FLOAT) / NULLIF(a2024.\"enrolment\", 0)) - (CAST(a2023.\"Avg Daily Present\" AS FLOAT) / NULLIF(a2023.\"Enrolled Kids\", 0))) * 100 AS fall_percentage\nFROM \n    attendance_2023 a2023\nJOIN \n    attendance_2024 a2024\n    ON a2023.\"Centre\" = a2024.\"centre_name\"\nORDER BY \n    fall_percentage DESC\nLIMIT 1;",
+      "api": {
+        "id": "gen-1787421414-juD7P11rhDmBYuQId4FH",
+        "model": "ibm-granite/granite-4.1-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 573,
+          "completion_tokens": 200,
+          "total_tokens": 773,
+          "cost": 4.865e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 224,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.865e-05,
+            "upstream_inference_prompt_cost": 2.865e-05,
+            "upstream_inference_completions_cost": 2e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.799
+      },
+      "duration_seconds": 1.806,
+      "sql_duckdb": "SELECT a2023.\"Centre\" AS centre, (CAST(a2023.\"Avg Daily Present\" AS REAL) / NULLIF(NULLIF(a2023.\"Enrolled Kids\", 0), 0)) * 100 AS rate_2023, (CAST(a2024.\"average_attendance\" AS REAL) / NULLIF(NULLIF(a2024.\"enrolment\", 0), 0)) * 100 AS rate_2024, ((CAST(a2024.\"average_attendance\" AS REAL) / NULLIF(NULLIF(a2024.\"enrolment\", 0), 0)) - (CAST(a2023.\"Avg Daily Present\" AS REAL) / NULLIF(NULLIF(a2023.\"Enrolled Kids\", 0), 0))) * 100 AS fall_percentage FROM attendance_2023 AS a2023 JOIN attendance_2024 AS a2024 ON a2023.\"Centre\" = a2024.\"centre_name\" ORDER BY fall_percentage DESC LIMIT 1",
+      "rows": [
+        [
+          "Dharavi Balwadi",
+          67.44186401367188,
+          80.43478393554688,
+          12.992918014526367
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

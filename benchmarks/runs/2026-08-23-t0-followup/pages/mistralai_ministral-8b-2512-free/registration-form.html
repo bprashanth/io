@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beneficiary Registration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .error {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .success {
+            color: #27ae60;
+            font-size: 16px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .entries {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .download-btn {
+            background-color: #2ecc71;
+            margin-top: 10px;
+        }
+        .download-btn:hover {
+            background-color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <h1>Beneficiary Registration</h1>
+
+    <div id="form-container">
+        <form id="beneficiary-form">
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" required>
+                <div id="name-error" class="error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="age">Age</label>
+                <input type="number" id="age" min="1" max="120" required>
+                <div id="age-error" class="error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="village">Village</label>
+                <input type="text" id="village" required>
+                <div id="village-error" class="error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" required>
+                <div id="phone-error" class="error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="category">Beneficiary Category</label>
+                <select id="category" required>
+                    <option value="">Select a category</option>
+                    <option value="child">Child</option>
+                    <option value="elderly">Elderly</option>
+                    <option value="disabled">Disabled</option>
+                    <option value="widow">Widow</option>
+                    <option value="other">Other</option>
+                </select>
+                <div id="category-error" class="error"></div>
+            </div>
+
+            <button type="submit">Register Beneficiary</button>
+        </form>
+    </div>
+
+    <div id="entries-container" class="entries" style="display: none;">
+        <h2>Registered Beneficiaries</h2>
+        <table id="entries-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Village</th>
+                    <th>Phone</th>
+                    <th>Category</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button id="download-btn" class="download-btn">Download as CSV</button>
+    </div>
+
+    <script>
+        // Initialize data storage
+        if (!window.data) {
+            window.data = {
+                beneficiaries: [],
+                nextId: 1
+            };
+        }
+
+        // DOM elements
+        const form = document.getElementById('beneficiary-form');
+        const entriesTable = document.querySelector('#entries-table tbody');
+        const entriesContainer = document.getElementById('entries-container');
+        const downloadBtn = document.getElementById('download-btn');
+
+        // Validate form
+        function validateForm() {
+            let isValid = true;
+            const name = document.getElementById('name').value.trim();
+            const age = document.getElementById('age').value;
+            const village = document.getElementById('village').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const category = document.getElementById('category').value;
+
+            // Clear previous errors
+            document.querySelectorAll('.error').forEach(el => el.textContent = '');
+
+            // Validate name
+            if (!name) {
+                document.getElementById('name-error').textContent = 'Name is required';
+                isValid = false;
+            }
+
+            // Validate age
+            if (!age || age < 1 || age > 120) {
+                document.getElementById('age-error').textContent = 'Please enter a valid age (1-120)';
+                isValid = false;
+            }
+
+            // Validate village
+            if (!village) {
+                document.getElementById('village-error').textContent = 'Village is required';
+                isValid = false;
+            }
+
+            // Validate phone
+            if (!phone) {
+                document.getElementById('phone-error').textContent = 'Phone number is required';
+                isValid = false;
+            } else if (!/^[\d\s\-+()]{10,}$/.test(phone)) {
+                document.getElementById('phone-error').textContent = 'Please enter a valid phone number';
+                isValid = false;
+            }
+
+            // Validate category
+            if (!category) {
+                document.getElementById('category-error').textContent = 'Please select a category';
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        // Add beneficiary
+        function addBeneficiary() {
+            if (!validateForm()) return;
+
+            const beneficiary = {
+                id: window.data.nextId++,
+                name: document.getElementById('name').value.trim(),
+                age: document.getElementById('age').value,
+                village: document.getElementById('village').value.trim(),
+                phone: document.getElementById('phone').value.trim(),
+                category: document.getElementById('category').value,
+                timestamp: new Date().toISOString()
+            };
+
+            window.data.beneficiaries.push(beneficiary);
+            renderEntries();
+            form.reset();
+            document.getElementById('form-container').style.display = 'none';
+            entriesContainer.style.display = 'block';
+        }
+
+        // Render entries table
+        function renderEntries() {
+            entriesTable.innerHTML = '';
+
+            window.data.beneficiaries.forEach(beneficiary => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${beneficiary.name}</td>
+                    <td>${beneficiary.age}</td>
+                    <td>${beneficiary.village}</td>
+                    <td>${beneficiary.phone}</td>
+                    <td>${beneficiary.category}</td>
+                `;
+                entriesTable.appendChild(row);
+            });
+        }
+
+        // Download as CSV
+        function downloadCSV() {
+            if (window.data.beneficiaries.length === 0) return;
+
+            const headers = ['ID,Name,Age,Village,Phone,Category,Timestamp\n'];
+            const rows = window.data.beneficiaries.map(beneficiary =>
+                `${beneficiary.id},"${beneficiary.name.replace(/"/g, '""')}",${beneficiary.age},"${beneficiary.village.replace(/"/g, '""')}",${beneficiary.phone},"${beneficiary.category}",${beneficiary.timestamp}\n`
+            );
+
+            const csv = headers.concat(rows).join('');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'beneficiaries.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Event listeners
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            addBeneficiary();
+        });
+
+        downloadBtn.addEventListener('click', downloadCSV);
+
+        // Initialize
+        if (window.data.beneficiaries.length > 0) {
+            document.getElementById('form-container').style.display = 'none';
+            entriesContainer.style.display = 'block';
+            renderEntries();
+        }
+
+        // Service Worker registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(new URL('sw.js', import.meta.url))
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful');
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
+    <script>
+        // Service Worker script (inline)
+        self.addEventListener('install', (event) => {
+            event.waitUntil(
+                caches.open('beneficiary-cache').then((cache) => {
+                    return cache.addAll([
+                        self.location.href
+                    ]);
+                })
+            );
+        });
+
+        self.addEventListener('fetch', (event) => {
+            event.respondWith(
+                caches.match(event.request).then((response) => {
+                    return response || fetch(event.request);
+                })
+            );
+        });
+    </script>
+</body>
+</html>

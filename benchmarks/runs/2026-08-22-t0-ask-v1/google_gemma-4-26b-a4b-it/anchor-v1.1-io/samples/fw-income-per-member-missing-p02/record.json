@@ -1,0 +1,335 @@
+{
+  "id": "fw-income-per-member-missing-p02",
+  "task_id": "fw-income-per-member-missing",
+  "pattern": "ratio of two columns excluding null rows, ascending rank",
+  "question": "per person monthly earning by household excluding blank income entries, ascending order",
+  "gold_sql": "SELECT \"HH ID\", \"Monthly Income Rs\" / \"Members\" AS income_per_member FROM fw_households WHERE \"Monthly Income Rs\" IS NOT NULL ORDER BY income_per_member ASC, \"HH ID\"",
+  "expected_rows": [
+    [
+      "FW-015",
+      429.8181818181818
+    ],
+    [
+      "FW-010",
+      595.9090909090909
+    ],
+    [
+      "FW-022",
+      679.3
+    ],
+    [
+      "FW-012",
+      713.3333333333334
+    ],
+    [
+      "FW-028",
+      900.25
+    ],
+    [
+      "FW-017",
+      1138.2
+    ],
+    [
+      "FW-020",
+      1171.2
+    ],
+    [
+      "FW-002",
+      1200.3636363636363
+    ],
+    [
+      "FW-014",
+      1506.6666666666667
+    ],
+    [
+      "FW-003",
+      1871.5714285714287
+    ],
+    [
+      "FW-024",
+      2009.25
+    ],
+    [
+      "FW-025",
+      2015.9
+    ],
+    [
+      "FW-009",
+      2065.6666666666665
+    ],
+    [
+      "FW-001",
+      2310.6
+    ],
+    [
+      "FW-021",
+      2433.5555555555557
+    ],
+    [
+      "FW-018",
+      2593.125
+    ],
+    [
+      "FW-007",
+      2719.6666666666665
+    ],
+    [
+      "FW-008",
+      3294.0
+    ],
+    [
+      "FW-029",
+      3343.25
+    ],
+    [
+      "FW-013",
+      3363.8
+    ],
+    [
+      "FW-011",
+      3578.8333333333335
+    ],
+    [
+      "FW-004",
+      3621.5
+    ],
+    [
+      "FW-026",
+      3732.0
+    ],
+    [
+      "FW-030",
+      4116.166666666667
+    ],
+    [
+      "FW-019",
+      4376.333333333333
+    ],
+    [
+      "FW-027",
+      6058.5
+    ],
+    [
+      "FW-005",
+      8069.666666666667
+    ],
+    [
+      "FW-023",
+      8133.333333333333
+    ]
+  ],
+  "actual_rows": [
+    [
+      429.8181818181818
+    ],
+    [
+      595.9090909090909
+    ],
+    [
+      679.3
+    ],
+    [
+      713.3333333333334
+    ],
+    [
+      900.25
+    ],
+    [
+      1138.2
+    ],
+    [
+      1171.2
+    ],
+    [
+      1200.3636363636363
+    ],
+    [
+      1506.6666666666667
+    ],
+    [
+      1871.5714285714287
+    ],
+    [
+      2009.25
+    ],
+    [
+      2015.9
+    ],
+    [
+      2065.6666666666665
+    ],
+    [
+      2310.6
+    ],
+    [
+      2433.5555555555557
+    ],
+    [
+      2593.125
+    ],
+    [
+      2719.6666666666665
+    ],
+    [
+      3294.0
+    ],
+    [
+      3343.25
+    ],
+    [
+      3363.8
+    ],
+    [
+      3578.8333333333335
+    ],
+    [
+      3621.5
+    ],
+    [
+      3732.0
+    ],
+    [
+      4116.166666666667
+    ],
+    [
+      4376.333333333333
+    ],
+    [
+      6058.5
+    ],
+    [
+      8069.666666666667
+    ],
+    [
+      8133.333333333333
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT \"Monthly Income Rs\" / NULLIF(NULLIF(\"Members\", 0), 0) AS \"per person monthly earning\" FROM \"fw_households\" WHERE NOT \"Monthly Income Rs\" IS NULL ORDER BY \"per person monthly earning\" ASC NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"fw_households\" (\n  \"HH ID\" VARCHAR,\n  \"Head of Household\" VARCHAR,\n  \"Village\" VARCHAR,\n  \"Members\" BIGINT,\n  \"Earners\" BIGINT,\n  \"Monthly Income Rs\" DOUBLE,\n  \"Land Acres\" DOUBLE,\n  \"Has Ration Card\" VARCHAR,\n  \"Children in School\" BIGINT,\n  \"Children Total\" BIGINT,\n  \"Chronic Illness\" VARCHAR,\n  \"Roof Type\" VARCHAR,\n  \"Loan Outstanding Rs\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"fw_households\": {\"HH ID\": [\"FW-001\", \"FW-002\", \"FW-003\", \"FW-004\", \"FW-005\", \"FW-006\", \"FW-007\", \"FW-008\", \"FW-009\", \"FW-010\", \"FW-011\", \"FW-012\", \"FW-013\", \"FW-014\", \"FW-015\", \"FW-016\", \"FW-017\", \"FW-018\", \"FW-019\", \"FW-020\", \"FW-021\", \"FW-022\", \"FW-023\", \"FW-024\", \"FW-025\", \"FW-026\", \"FW-027\", \"FW-028\", \"FW-029\", \"FW-030\"], \"Head of Household\": [\"Aadhya Bhat\", \"Aadhya Pandey\", \"Anaya Nair\", \"Ayesha Kaur\", \"Ayesha Pandey\", \"Ayesha Shah\", \"Diya Iyer\", \"Fatima Das\", \"Ishaan Jadhav\", \"Ishaan More\", \"Krishna Rane\", \"Myra Pawar\", \"Prakash Bhat\", \"Prakash Khan\", \"Priya Bansal\", \"Rajesh Das\", \"Ramesh Jadhav\", \"Ramesh Sawant\", \"Sai Bansal\", \"Salma Ansari\", \"Sanjay Chavan\", \"Sanjay Roy\", \"Sunita Agarwal\", \"Vihaan Chowdhury\", \"Vihaan Sawant\", \"Vikas Kaur\", \"Vivaan Mishra\", \"Yash Verma\", \"Zara Chowdhury\", \"Zara Menon\"], \"Village\": [\"Barhi\", \"Islampur\", \"Nawada\", \"Rampur\", \"Sherpur\"], \"Has Ration Card\": [\"No\", \"Yes\"], \"Chronic Illness\": [\"No\", \"Yes\"], \"Roof Type\": [\"Kutcha\", \"Pucca\"]}}\n\nCURRENT QUESTION:\nper person monthly earning by household excluding blank income entries, ascending order",
+      "response": "```sql\nSELECT\n  \"Monthly Income Rs\" / NULLIF(\"Members\", 0) AS \"per person monthly earning\"\nFROM \"fw_households\"\nWHERE \"Monthly Income Rs\" IS NOT NULL\nORDER BY \"per person monthly earning\" ASC;\n```",
+      "api": {
+        "id": "gen-1787421700-Aw25CMTb104igWapcJcz",
+        "model": "google/gemma-4-26b-a4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 897,
+          "completion_tokens": 59,
+          "total_tokens": 956,
+          "cost": 7.01e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 864,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 7.01e-05,
+            "upstream_inference_prompt_cost": 4.65e-05,
+            "upstream_inference_completions_cost": 2.36e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.35
+      },
+      "duration_seconds": 1.353,
+      "sql_duckdb": "SELECT \"Monthly Income Rs\" / NULLIF(NULLIF(\"Members\", 0), 0) AS \"per person monthly earning\" FROM \"fw_households\" WHERE NOT \"Monthly Income Rs\" IS NULL ORDER BY \"per person monthly earning\" ASC NULLS FIRST",
+      "rows": [
+        [
+          429.8181818181818
+        ],
+        [
+          595.9090909090909
+        ],
+        [
+          679.3
+        ],
+        [
+          713.3333333333334
+        ],
+        [
+          900.25
+        ],
+        [
+          1138.2
+        ],
+        [
+          1171.2
+        ],
+        [
+          1200.3636363636363
+        ],
+        [
+          1506.6666666666667
+        ],
+        [
+          1871.5714285714287
+        ],
+        [
+          2009.25
+        ],
+        [
+          2015.9
+        ],
+        [
+          2065.6666666666665
+        ],
+        [
+          2310.6
+        ],
+        [
+          2433.5555555555557
+        ],
+        [
+          2593.125
+        ],
+        [
+          2719.6666666666665
+        ],
+        [
+          3294.0
+        ],
+        [
+          3343.25
+        ],
+        [
+          3363.8
+        ],
+        [
+          3578.8333333333335
+        ],
+        [
+          3621.5
+        ],
+        [
+          3732.0
+        ],
+        [
+          4116.166666666667
+        ],
+        [
+          4376.333333333333
+        ],
+        [
+          6058.5
+        ],
+        [
+          8069.666666666667
+        ],
+        [
+          8133.333333333333
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

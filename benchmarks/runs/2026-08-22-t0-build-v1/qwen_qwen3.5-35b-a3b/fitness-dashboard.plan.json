@@ -1,0 +1,295 @@
+{
+ "plan": {
+  "title": "Child Fitness Progress Dashboard",
+  "subtitle": "Comparing baseline and endline performance metrics across locations and coaches",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Children Assessed",
+    "sql": "SELECT COUNT(*) AS n FROM (SELECT \"Child ID\" FROM \"baseline\" UNION ALL SELECT \"Child ID\" FROM \"endline\") t",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Avg Sit-ups Improvement",
+    "sql": "SELECT AVG(b.\"Sit ups\" - e.\"Sit ups\") AS improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Avg Shuttle Run Change",
+    "sql": "SELECT AVG(e.\"Shuttle run sec\" - b.\"Shuttle run sec\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Sit-ups Gain by Location",
+    "sql": "SELECT b.\"Location\", AVG(e.\"Sit ups\" - b.\"Sit ups\") AS sit_ups_gain FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC NULLS LAST LIMIT 15",
+    "x": "Location",
+    "y": [
+     "sit_ups_gain"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Shuttle Run Improvement by Coach",
+    "sql": "SELECT b.\"Coach\", AVG(b.\"Shuttle run sec\" - e.\"Shuttle run sec\") AS shuttle_improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC NULLS LAST LIMIT 15",
+    "x": "Coach",
+    "y": [
+     "shuttle_improvement"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top Locations by Overall Fitness Gain",
+    "sql": "SELECT b.\"Location\", AVG(e.\"Sit ups\" - b.\"Sit ups\") AS sit_ups_gain, AVG(b.\"Shuttle run sec\" - e.\"Shuttle run sec\") AS shuttle_gain FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY sit_ups_gain DESC NULLS LAST LIMIT 10"
+   }
+  ],
+  "narrative": "This dashboard tracks the physical progress of children from baseline to endline. The total number of unique children assessed is {{p1}}. On average, participants improved their sit-up count by {{p2}}, indicating better core strength. Conversely, a positive value in {{p3}} would indicate slower times, but since this metric represents seconds, a negative value here signifies faster running times and thus improvement. When analyzing by location, the top performers in sit-ups are shown in {{p4}}, highlighting regional strengths. Similarly, {{p5}} breaks down running speed improvements by coach, helping identify which training methods yielded the best results for shuttle runs."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 400
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "improvement"
+   ],
+   "rows": [
+    {
+     "improvement": -2.915
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "change"
+   ],
+   "rows": [
+    {
+     "change": -0.013500000000000147
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Location",
+    "sit_ups_gain"
+   ],
+   "rows": [
+    {
+     "Location": "Kadus",
+     "sit_ups_gain": 24.0
+    },
+    {
+     "Location": "Saswad",
+     "sit_ups_gain": 13.0
+    },
+    {
+     "Location": "Atri",
+     "sit_ups_gain": 11.333333333333334
+    },
+    {
+     "Location": "Manjari",
+     "sit_ups_gain": 10.666666666666666
+    },
+    {
+     "Location": "Uruli Kanchan",
+     "sit_ups_gain": 8.666666666666666
+    },
+    {
+     "Location": "Bishunpur",
+     "sit_ups_gain": 8.428571428571429
+    },
+    {
+     "Location": "Motipur",
+     "sit_ups_gain": 8.375
+    },
+    {
+     "Location": "Barachatti",
+     "sit_ups_gain": 8.2
+    },
+    {
+     "Location": "Imamganj",
+     "sit_ups_gain": 7.875
+    },
+    {
+     "Location": "Paroo",
+     "sit_ups_gain": 7.8
+    },
+    {
+     "Location": "Harnaut Tola",
+     "sit_ups_gain": 7.6
+    },
+    {
+     "Location": "Rampur",
+     "sit_ups_gain": 7.166666666666667
+    },
+    {
+     "Location": "Wadgaon",
+     "sit_ups_gain": 6.5
+    },
+    {
+     "Location": "Bakhtiyarpur Tola",
+     "sit_ups_gain": 6.375
+    },
+    {
+     "Location": "Chakan",
+     "sit_ups_gain": 6.0
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Coach",
+    "shuttle_improvement"
+   ],
+   "rows": [
+    {
+     "Coach": "Salman Rao",
+     "shuttle_improvement": 0.9933333333333335
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "shuttle_improvement": 0.9142857142857138
+    },
+    {
+     "Coach": "Bapu Yadav",
+     "shuttle_improvement": 0.8499999999999992
+    },
+    {
+     "Coach": "P. T. Pereira",
+     "shuttle_improvement": 0.6789473684210527
+    },
+    {
+     "Coach": "Rupali Kumar",
+     "shuttle_improvement": 0.5733333333333337
+    },
+    {
+     "Coach": "Bhagyashree",
+     "shuttle_improvement": 0.4307692307692309
+    },
+    {
+     "Coach": "Jaspreet George",
+     "shuttle_improvement": 0.29230769230769277
+    },
+    {
+     "Coach": "sunil thakur",
+     "shuttle_improvement": 0.023529411764705695
+    },
+    {
+     "Coach": "AAKASH ZENDE",
+     "shuttle_improvement": -0.09999999999999998
+    },
+    {
+     "Coach": "Vimla",
+     "shuttle_improvement": -0.12307692307692278
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "shuttle_improvement": -0.39999999999999974
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "shuttle_improvement": -0.7
+    },
+    {
+     "Coach": "indira chandra",
+     "shuttle_improvement": -0.8388888888888889
+    },
+    {
+     "Coach": "Rosy",
+     "shuttle_improvement": -1.0666666666666667
+    },
+    {
+     "Coach": "T. S. Fernandez",
+     "shuttle_improvement": -1.209090909090909
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Location",
+    "sit_ups_gain",
+    "shuttle_gain"
+   ],
+   "rows": [
+    {
+     "Location": "Kadus",
+     "sit_ups_gain": 24.0,
+     "shuttle_gain": 3.6999999999999993
+    },
+    {
+     "Location": "Saswad",
+     "sit_ups_gain": 13.0,
+     "shuttle_gain": -6.299999999999999
+    },
+    {
+     "Location": "Atri",
+     "sit_ups_gain": 11.333333333333334,
+     "shuttle_gain": 0.16666666666666666
+    },
+    {
+     "Location": "Manjari",
+     "sit_ups_gain": 10.666666666666666,
+     "shuttle_gain": 1.0666666666666675
+    },
+    {
+     "Location": "Uruli Kanchan",
+     "sit_ups_gain": 8.666666666666666,
+     "shuttle_gain": -2.0666666666666678
+    },
+    {
+     "Location": "Bishunpur",
+     "sit_ups_gain": 8.428571428571429,
+     "shuttle_gain": 0.11428571428571413
+    },
+    {
+     "Location": "Motipur",
+     "sit_ups_gain": 8.375,
+     "shuttle_gain": 2.4875
+    },
+    {
+     "Location": "Barachatti",
+     "sit_ups_gain": 8.2,
+     "shuttle_gain": 2.2399999999999998
+    },
+    {
+     "Location": "Imamganj",
+     "sit_ups_gain": 7.875,
+     "shuttle_gain": 0.5124999999999997
+    },
+    {
+     "Location": "Paroo",
+     "sit_ups_gain": 7.8,
+     "shuttle_gain": 0.7199999999999995
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

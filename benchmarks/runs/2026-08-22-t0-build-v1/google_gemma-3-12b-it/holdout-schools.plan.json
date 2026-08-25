@@ -1,0 +1,123 @@
+{
+ "plan": {
+  "title": "School Performance Dashboard",
+  "subtitle": "Key indicators for school enrolment, infrastructure, and gender balance.",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Schools",
+    "sql": "SELECT COUNT(*) AS n FROM school_enrolment_by_year",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "line",
+    "title": "Enrolment Trend",
+    "sql": "SELECT year, SUM(girls) AS total_girls, SUM(boys) AS total_boys FROM (SELECT '2022' AS year, Girls 2022 AS girls, Boys 2022 AS boys FROM school_enrolment_by_year UNION ALL SELECT '2023' AS year, Girls 2023 AS girls, Boys 2023 AS boys FROM school_enrolment_by_year UNION ALL SELECT '2024' AS year, Girls 2024 AS girls, Boys 2024 AS boys FROM school_enrolment_by_year) GROUP BY 1 ORDER BY 1",
+    "x": "year",
+    "y": [
+     "total_girls",
+     "total_boys"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Enrolment by Block (2024)",
+    "sql": "SELECT Block, Girls 2024 AS girls, Boys 2024 AS boys FROM school_enrolment_by_year GROUP BY 1 ORDER BY girls + boys DESC LIMIT 20",
+    "x": "Block",
+    "y": [
+     "girls",
+     "boys"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Schools with No Drinking Water",
+    "sql": "SELECT School Code, School Name FROM school_infrastructure WHERE Drinking water = 'No' LIMIT 10"
+   },
+   {
+    "id": "p5",
+    "kind": "kpi",
+    "title": "Schools with Functional Toilets (Girls)",
+    "sql": "SELECT COUNT(*) AS n FROM school_infrastructure WHERE \"Toilets functional (girls)\" = 'Yes'",
+    "unit": ""
+   },
+   {
+    "id": "p6",
+    "kind": "pie",
+    "title": "Infrastructure Gaps",
+    "sql": "SELECT \"Drinking water\", COUNT(*) AS count FROM school_infrastructure GROUP BY 1",
+    "x": "\"Drinking water\"",
+    "y": [
+     "count"
+    ]
+   }
+  ],
+  "narrative": "This dashboard provides a snapshot of school performance across key areas. The enrolment trend shows overall student population changes over the past three years.  The bar chart highlights enrolment differences by block in 2024.  A table lists schools lacking access to clean drinking water, indicating a critical infrastructure need. Finally, a pie chart visualizes the distribution of schools with and without access to drinking water, offering a quick view of the overall infrastructure gap."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 40
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expecting ). Line 1, Col: 103.\n  SELECT year, SUM(girls) AS total_girls, SUM(boys) AS total_boys FROM (SELECT '2022' AS year, Girls \u001b[4m2022\u001b[0m AS girls, Boys 2022 AS boys FROM school_enrolment_by_year UNION ALL SELECT '2023' AS year, Girls 20"
+  },
+  "p3": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Invalid expression / Unexpected token. Line 1, Col: 24.\n  SELECT Block, Girls \u001b[4m2024\u001b[0m AS girls, Boys 2024 AS boys FROM school_enrolment_by_year GROUP BY 1 ORDER BY girls + boys DESC LIM"
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Invalid expression / Unexpected token. Line 1, Col: 79.\n  SELECT School Code, School Name FROM school_infrastructure WHERE Drinking \u001b[4mwater\u001b[0m = 'No' LIMIT 10"
+  },
+  "p5": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 25
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Drinking water",
+    "count"
+   ],
+   "rows": [
+    {
+     "Drinking water": "Yes",
+     "count": 31
+    },
+    {
+     "Drinking water": "No",
+     "count": 9
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  }
+ }
+}

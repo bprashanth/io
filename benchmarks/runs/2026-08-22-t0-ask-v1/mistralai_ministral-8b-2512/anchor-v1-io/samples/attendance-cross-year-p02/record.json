@@ -1,0 +1,128 @@
+{
+  "id": "attendance-cross-year-p02",
+  "task_id": "attendance-cross-year",
+  "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+  "question": "for each centre show the average turnout rate in both years next to each other",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+  "expected_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH combined_attendance AS (SELECT \"Centre\" AS \"Centre_Name\", \"Month\", \"Enrolled Kids\" AS \"Enrollment\", \"Avg Daily Present\" AS \"Average_Attendance\" FROM \"attendance_2023\" WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December') UNION ALL SELECT \"centre_name\" AS \"Centre_Name\", \"month\", \"enrolment\" AS \"Enrollment\", \"average_attendance\" AS \"Average_Attendance\" FROM \"attendance_2024\" WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), yearly_turnout AS (SELECT \"Centre_Name\", EXTRACT(YEAR FROM CAST(CAST(\"Month\" AS TIMESTAMP) AT TIME ZONE 'UTC' AT TIME ZONE 'MMMM' AS DATE)) AS \"Year\", NULLIF(AVG(\"Average_Attendance\"), 0) / NULLIF(NULLIF(AVG(\"Enrollment\"), 0), 0) * 100 AS \"Turnout_Percentage\" FROM combined_attendance GROUP BY \"Centre_Name\", EXTRACT(YEAR FROM CAST(CAST(\"Month\" AS TIMESTAMP) AT TIME ZONE 'UTC' AT TIME ZONE 'MMMM' AS DATE))) SELECT \"Centre_Name\", MAX(CASE WHEN \"Year\" = 2023 THEN \"Turnout_Percentage\" END) AS \"2023_Turnout_Percentage\", MAX(CASE WHEN \"Year\" = 2024 THEN \"Turnout_Percentage\" END) AS \"2024_Turnout_Percentage\" FROM yearly_turnout GROUP BY \"Centre_Name\" ORDER BY \"Centre_Name\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nfor each centre show the average turnout rate in both years next to each other",
+      "response": "```sql\nWITH combined_attendance AS (\n    -- 2023 data\n    SELECT\n        \"Centre\" AS \"Centre Name\",\n        \"Month\",\n        NULLIF(\"Enrolled Kids\", 0) AS \"Enrolled Kids\",\n        NULLIF(\"Avg Daily Present\", 0) AS \"Avg Daily Present\",\n        1 AS \"Year\"\n    FROM \"attendance_2023\"\n    WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n\n    UNION ALL\n\n    -- 2024 data with name matching\n    SELECT\n        \"centre_name\" AS \"Centre Name\",\n        \"month\",\n        NULLIF(\"enrolment\", 0) AS \"Enrolled Kids\",\n        NULLIF(\"average_attendance\", 0) AS \"Avg Daily Present\",\n        2 AS \"Year\"\n    FROM \"attendance_2024\"\n    WHERE jaro_winkler_similarity(lower(trim(\"centre_name\")), lower(trim(\"Centre\"))) >= 0.9\n    AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n),\n\nyearly_turnout AS (\n    SELECT\n        \"Centre Name\",\n        \"Year\",\n        AVG((\"Avg Daily Present\"::FLOAT / NULLIF(\"Enrolled Kids\", 0)) * 100) AS \"Average Turnout Rate (%)\"\n    FROM combined_attendance\n    GROUP BY \"Centre Name\", \"Year\"\n)\n\nSELECT\n    \"Centre Name\",\n    MAX(CASE WHEN \"Year\" = 1 THEN \"Average Turnout Rate (%)\" END) AS \"2023 Average Turnout Rate (%)\",\n    MAX(CASE WHEN \"Year\" = 2 THEN \"Average Turnout Rate (%)\" END) AS \"2024 Average Turnout Rate (%)\"\nFROM yearly_turnout\nGROUP BY \"Centre Name\"\nORDER BY \"Centre Name\";\n```",
+      "api": {
+        "id": "gen-1787421446-P9SZuQrMxFvp3vPZgkdG",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 591,
+          "completion_tokens": 520,
+          "total_tokens": 1111,
+          "cost": 9.753e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 512,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 9.753e-05,
+            "upstream_inference_prompt_cost": 1.953e-05,
+            "upstream_inference_completions_cost": 7.8e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.769
+      },
+      "duration_seconds": 3.774,
+      "error": "BinderException: Binder Error: Referenced column \"Centre\" not found in FROM clause!\nCandidate bindings: \"centre_name\", \"enrolment\", \"month\", \"average_attendance\"\n\nLINE 1: ..._WINKLER_SIMILARITY(LOWER(TRIM(\"centre_name\")), LOWER(TRIM(\"Centre\"))) >= 0.9 AND \"month\" IN ('January', 'February...\n                                                                      ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nfor each centre show the average turnout rate in both years next to each other\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"Centre\" not found in FROM clause!\nCandidate bindings: \"centre_name\", \"enrolment\", \"month\", \"average_attendance\"\n\nLINE 1: ..._WINKLER_SIMILARITY(LOWER(TRIM(\"centre_name\")), LOWER(TRIM(\"Centre\"))) >= 0.9 AND \"month\" IN ('January', 'February...\n                                                                      ^\nReturn a complete corrected query.",
+      "response": "```sql\nWITH combined_attendance AS (\n    SELECT\n        \"Centre\" AS \"Centre_Name\",\n        \"Month\",\n        \"Enrolled Kids\" AS \"Enrollment\",\n        \"Avg Daily Present\" AS \"Average_Attendance\"\n    FROM \"attendance_2023\"\n    WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n\n    UNION ALL\n\n    SELECT\n        \"centre_name\" AS \"Centre_Name\",\n        \"month\",\n        \"enrolment\" AS \"Enrollment\",\n        \"average_attendance\" AS \"Average_Attendance\"\n    FROM \"attendance_2024\"\n    WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n),\n\nyearly_turnout AS (\n    SELECT\n        \"Centre_Name\",\n        EXTRACT(YEAR FROM DATE(\"Month\", 'MMMM')) AS \"Year\",\n        NULLIF(AVG(\"Average_Attendance\"), 0) / NULLIF(AVG(\"Enrollment\"), 0) * 100 AS \"Turnout_Percentage\"\n    FROM combined_attendance\n    GROUP BY \"Centre_Name\", EXTRACT(YEAR FROM DATE(\"Month\", 'MMMM'))\n)\n\nSELECT\n    \"Centre_Name\",\n    MAX(CASE WHEN \"Year\" = 2023 THEN \"Turnout_Percentage\" END) AS \"2023_Turnout_Percentage\",\n    MAX(CASE WHEN \"Year\" = 2024 THEN \"Turnout_Percentage\" END) AS \"2024_Turnout_Percentage\"\nFROM yearly_turnout\nGROUP BY \"Centre_Name\"\nORDER BY \"Centre_Name\";\n```",
+      "api": {
+        "id": "gen-1787421450-gRBmWTksaptosDLN201q",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 699,
+          "completion_tokens": 545,
+          "total_tokens": 1244,
+          "cost": 0.00011748,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 512,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00011748,
+            "upstream_inference_prompt_cost": 3.573e-05,
+            "upstream_inference_completions_cost": 8.175e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.039
+      },
+      "duration_seconds": 4.045,
+      "error": "ConversionException: Conversion Error: invalid timestamp field format: \"January\", expected format is (YYYY-MM-DD HH:MM:SS[.US][±HH[:MM[:SS]]| ZONE]) when casting from source column Month\n\nLINE 1: ..._attendance GROUP BY \"Centre_Name\", EXTRACT(YEAR FROM CAST(CAST(\"Month\" AS TIMESTAMP) AT TIME ZONE 'UTC' AT TIME ZONE...\n                                                                      ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

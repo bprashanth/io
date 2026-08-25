@@ -1,0 +1,264 @@
+{
+  "id": "wide-header-pp-change-excluding-total-rows-p02",
+  "task_id": "wide-header-pp-change-excluding-total-rows",
+  "pattern": "percentage-point change between two labelled rounds on messy headers, state filter, detail rows only",
+  "question": "for each district of Bihar how many points did full immunisation of 12-23 month children move between the two rounds",
+  "gold_sql": "SELECT \"District\", MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_pp FROM district_health_factsheet WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' GROUP BY \"District\" ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Bhojpur",
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      4.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Bhojpur",
+      60.7,
+      60.7,
+      null
+    ],
+    [
+      "Bhojpur",
+      54.9,
+      54.9,
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      47.5,
+      47.5,
+      null
+    ],
+    [
+      "Gaya",
+      55.3,
+      55.3,
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      58.6,
+      58.6,
+      null
+    ],
+    [
+      "Kishanganj",
+      61.4,
+      61.4,
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      50.1,
+      50.1,
+      null
+    ],
+    [
+      "Madhubani",
+      53.3,
+      53.3,
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      56.6,
+      56.6,
+      null
+    ],
+    [
+      "Nalanda",
+      62.3,
+      62.3,
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      46.8,
+      46.8,
+      null
+    ],
+    [
+      "Purnia",
+      43.4,
+      43.4,
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      68.5,
+      68.5,
+      null
+    ],
+    [
+      "Rohtas",
+      66.6,
+      66.6,
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      66.3,
+      66.3,
+      null
+    ],
+    [
+      "Saran",
+      70.3,
+      70.3,
+      4.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"District\", \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-4\", \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-5\", \"Children age 12-23 months fully vaccinated (%)\" - LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\" NULLS FIRST) AS \"Change in percentage points\" FROM \"district_health_factsheet\" WHERE \"State\" = 'Bihar' AND \"District\" IN ('Bhojpur', 'Cuttack', 'Dumka', 'Ganjam', 'Gaya', 'Giridih', 'Gumla', 'Hazaribagh', 'Kalahandi', 'Kishanganj', 'Koraput', 'Madhubani', 'Mayurbhanj', 'Nalanda', 'Palamu', 'Purnia', 'Ranchi', 'Rayagada', 'Rohtas', 'Saran') AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') ORDER BY \"District\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nfor each district of Bihar how many points did full immunisation of 12-23 month children move between the two rounds",
+      "response": "SELECT \n    \"District\",\n    \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-4\",\n    \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-5\",\n    \"Children age 12-23 months fully vaccinated (%)\" - LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\") AS \"Change in percentage points\"\nFROM \"district_health_factsheet\"\nWHERE \"State\" = 'Bihar'\n  AND \"District\" IN ('Bhojpur', 'Cuttack', 'Dumka', 'Ganjam', 'Gaya', 'Giridih', 'Gumla', 'Hazaribagh', 'Kalahandi', 'Kishanganj', 'Koraput', 'Madhubani', 'Mayurbhanj', 'Nalanda', 'Palamu', 'Purnia', 'Ranchi', 'Rayagada', 'Rohtas', 'Saran')\n  AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')\nORDER BY \"District\";",
+      "api": {
+        "id": "chatcmpl-C5wbiLh60moUVXiNft1C8akoE6EGEq0T",
+        "model": "/models/Qwen3.5-9B-Q5_K_M.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 263,
+          "prompt_tokens": 529,
+          "total_tokens": 792,
+          "prompt_tokens_details": {
+            "cached_tokens": 267
+          }
+        },
+        "duration_seconds": 20.87
+      },
+      "duration_seconds": 20.874,
+      "sql_duckdb": "SELECT \"District\", \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-4\", \"Children age 12-23 months fully vaccinated (%)\" AS \"NFHS-5\", \"Children age 12-23 months fully vaccinated (%)\" - LAG(\"Children age 12-23 months fully vaccinated (%)\") OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\" NULLS FIRST) AS \"Change in percentage points\" FROM \"district_health_factsheet\" WHERE \"State\" = 'Bihar' AND \"District\" IN ('Bhojpur', 'Cuttack', 'Dumka', 'Ganjam', 'Gaya', 'Giridih', 'Gumla', 'Hazaribagh', 'Kalahandi', 'Kishanganj', 'Koraput', 'Madhubani', 'Mayurbhanj', 'Nalanda', 'Palamu', 'Purnia', 'Ranchi', 'Rayagada', 'Rohtas', 'Saran') AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5') ORDER BY \"District\" NULLS FIRST",
+      "rows": [
+        [
+          "Bhojpur",
+          60.7,
+          60.7,
+          null
+        ],
+        [
+          "Bhojpur",
+          54.9,
+          54.9,
+          -5.800000000000004
+        ],
+        [
+          "Gaya",
+          47.5,
+          47.5,
+          null
+        ],
+        [
+          "Gaya",
+          55.3,
+          55.3,
+          7.799999999999997
+        ],
+        [
+          "Kishanganj",
+          58.6,
+          58.6,
+          null
+        ],
+        [
+          "Kishanganj",
+          61.4,
+          61.4,
+          2.799999999999997
+        ],
+        [
+          "Madhubani",
+          50.1,
+          50.1,
+          null
+        ],
+        [
+          "Madhubani",
+          53.3,
+          53.3,
+          3.1999999999999957
+        ],
+        [
+          "Nalanda",
+          56.6,
+          56.6,
+          null
+        ],
+        [
+          "Nalanda",
+          62.3,
+          62.3,
+          5.699999999999996
+        ],
+        [
+          "Purnia",
+          46.8,
+          46.8,
+          null
+        ],
+        [
+          "Purnia",
+          43.4,
+          43.4,
+          -3.3999999999999986
+        ],
+        [
+          "Rohtas",
+          68.5,
+          68.5,
+          null
+        ],
+        [
+          "Rohtas",
+          66.6,
+          66.6,
+          -1.9000000000000057
+        ],
+        [
+          "Saran",
+          66.3,
+          66.3,
+          null
+        ],
+        [
+          "Saran",
+          70.3,
+          70.3,
+          4.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

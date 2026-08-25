@@ -197,3 +197,14 @@ been audited.
 Do not test local-model concurrency in the hosted OpenRouter phase. The later
 DGX replay records quantization, engine, memory and throughput; only a separate
 load test can support a 10--20 concurrent-user claim.
+
+
+## 2026-08-23 update — harness vs io on the NGO corpus
+
+Measured with the chosen laptop model (Qwen 3.5 9B) and Qwen 3.8 27B on 22
+sector ask cases: a generic agent loop (Codex CLI in a container) is no more
+correct than io's plan/receipt lanes, 10–15× slower, 20–35× the tokens, and
+reads raw rows into the model unless given io's own tools. Decision recorded
+in `chronology/2026-08-23T1400-harness-question-and-ngo-corpus.md`: no
+harness inside io for T0; `benchmarks/t0/harness-skill/` is the interface for
+higher-tier agents.

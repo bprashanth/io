@@ -1,0 +1,382 @@
+{
+ "plan": {
+  "title": "School Enrolment & Infrastructure Overview",
+  "subtitle": "Analysis of multi-year enrolment trends, gender distribution, and facility availability across schools",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Enrolment (2024)",
+    "sql": "SELECT SUM(\"Girls 2024\" + \"Boys 2024\") AS total_enrolment FROM school_enrolment_by_year",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Girls Share (2024)",
+    "sql": "SELECT 100.0 * SUM(\"Girls 2024\") / NULLIF(SUM(\"Girls 2024\" + \"Boys 2024\"), 0) AS girls_share FROM school_enrolment_by_year",
+    "unit": "%"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Functional Girls Toilets Coverage",
+    "sql": "SELECT 100.0 * COUNT(CASE WHEN \"Toilets functional (girls)\" = 'Yes' THEN 1 END) / NULLIF(COUNT(*), 0) AS toilet_pct FROM school_infrastructure",
+    "unit": "%"
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Enrolment Trend by Gender",
+    "sql": "SELECT year, gender, SUM(students) AS enrolment FROM (SELECT '2022' AS year, 'Girls' AS gender, SUM(\"Girls 2022\") AS students FROM school_enrolment_by_year UNION ALL SELECT '2022' AS year, 'Boys' AS gender, SUM(\"Boys 2022\") AS students FROM school_enrolment_by_year UNION ALL SELECT '2023' AS year, 'Girls' AS gender, SUM(\"Girls 2023\") AS students FROM school_enrolment_by_year UNION ALL SELECT '2023' AS year, 'Boys' AS gender, SUM(\"Boys 2023\") AS students FROM school_enrolment_by_year UNION ALL SELECT '2024' AS year, 'Girls' AS gender, SUM(\"Girls 2024\") AS students FROM school_enrolment_by_year UNION ALL SELECT '2024' AS year, 'Boys' AS gender, SUM(\"Boys 2024\") AS students FROM school_enrolment_by_year) GROUP BY 1, 2 ORDER BY 1, 2",
+    "x": "year",
+    "y": [
+     "enrolment"
+    ],
+    "series": "gender"
+   },
+   {
+    "id": "p5",
+    "kind": "stacked_bar",
+    "title": "2024 Enrolment by Block",
+    "sql": "SELECT \"Block\" AS block, SUM(\"Girls 2024\") AS girls, SUM(\"Boys 2024\") AS boys FROM school_enrolment_by_year GROUP BY 1 ORDER BY (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) DESC",
+    "x": "block",
+    "y": [
+     "girls",
+     "boys"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "bar",
+    "title": "Infrastructure Provisioning Rates",
+    "sql": "SELECT facility, coverage_pct FROM (SELECT 'Functional Girls Toilet' AS facility, 100.0 * COUNT(CASE WHEN \"Toilets functional (girls)\" = 'Yes' THEN 1 END) / NULLIF(COUNT(*), 0) AS coverage_pct FROM school_infrastructure UNION ALL SELECT 'Drinking Water' AS facility, 100.0 * COUNT(CASE WHEN \"Drinking water\" = 'Yes' THEN 1 END) / NULLIF(COUNT(*), 0) AS coverage_pct FROM school_infrastructure UNION ALL SELECT 'Electricity' AS facility, 100.0 * COUNT(CASE WHEN \"Electricity\" = 'Yes' THEN 1 END) / NULLIF(COUNT(*), 0) AS coverage_pct FROM school_infrastructure) ORDER BY coverage_pct DESC",
+    "x": "facility",
+    "y": [
+     "coverage_pct"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "School-Level Facilities and 2024 Enrolment",
+    "sql": "SELECT e.\"School Name\" AS school_name, e.\"Block\" AS block, (e.\"Girls 2024\" + e.\"Boys 2024\") AS total_2024, e.\"Girls 2024\" AS girls_2024, e.\"Boys 2024\" AS boys_2024, i.\"Toilets functional (girls)\" AS girls_toilet, i.\"Drinking water\" AS drinking_water, i.\"Electricity\" AS electricity, i.\"Classrooms\" AS classrooms FROM school_enrolment_by_year e LEFT JOIN school_infrastructure i ON e.\"School Code\" = i.\"School Code\" ORDER BY total_2024 DESC LIMIT 15"
+   }
+  ],
+  "narrative": "Across the reporting schools, total enrolment reached {{p1.total_enrolment}} students in 2024, with girls representing {{p2.girls_share}}% of the student body. Tracking across 2022 to 2024 shows the progress in parity across administrative blocks.\n\nInfrastructure assessments reveal critical basic provisioning, with functional girls' toilets accessible in {{p3.toilet_pct}}% of surveyed facilities. Ensuring all schools achieve comprehensive water, sanitation, and power access remains vital alongside student retention."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_enrolment"
+   ],
+   "rows": [
+    {
+     "total_enrolment": 9343
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "girls_share"
+   ],
+   "rows": [
+    {
+     "girls_share": 52.37075885689821
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "toilet_pct"
+   ],
+   "rows": [
+    {
+     "toilet_pct": 62.5
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "year",
+    "gender",
+    "enrolment"
+   ],
+   "rows": [
+    {
+     "year": "2022",
+     "gender": "Boys",
+     "enrolment": 4202
+    },
+    {
+     "year": "2022",
+     "gender": "Girls",
+     "enrolment": 4611
+    },
+    {
+     "year": "2023",
+     "gender": "Boys",
+     "enrolment": 4355
+    },
+    {
+     "year": "2023",
+     "gender": "Girls",
+     "enrolment": 4733
+    },
+    {
+     "year": "2024",
+     "gender": "Boys",
+     "enrolment": 4450
+    },
+    {
+     "year": "2024",
+     "gender": "Girls",
+     "enrolment": 4893
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "block",
+    "girls",
+    "boys"
+   ],
+   "rows": [
+    {
+     "block": "Belaganj",
+     "girls": 1333,
+     "boys": 1203
+    },
+    {
+     "block": "Dobhi",
+     "girls": 1177,
+     "boys": 1270
+    },
+    {
+     "block": "Barachatti",
+     "girls": 1236,
+     "boys": 996
+    },
+    {
+     "block": "Atri",
+     "girls": 1147,
+     "boys": 981
+    }
+   ],
+   "rowcount": 4,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "facility",
+    "coverage_pct"
+   ],
+   "rows": [
+    {
+     "facility": "Drinking Water",
+     "coverage_pct": 77.5
+    },
+    {
+     "facility": "Electricity",
+     "coverage_pct": 75.0
+    },
+    {
+     "facility": "Functional Girls Toilet",
+     "coverage_pct": 62.5
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "school_name",
+    "block",
+    "total_2024",
+    "girls_2024",
+    "boys_2024",
+    "girls_toilet",
+    "drinking_water",
+    "electricity",
+    "classrooms"
+   ],
+   "rows": [
+    {
+     "school_name": "Rajkiya Vidyalaya Khizarsarai",
+     "block": "Belaganj",
+     "total_2024": 367,
+     "girls_2024": 188,
+     "boys_2024": 179,
+     "girls_toilet": "Yes",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 8
+    },
+    {
+     "school_name": "Kanya Vidyalaya Amas",
+     "block": "Dobhi",
+     "total_2024": 360,
+     "girls_2024": 167,
+     "boys_2024": 193,
+     "girls_toilet": "Yes",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 9
+    },
+    {
+     "school_name": "Madhya Vidyalaya Bhadeya",
+     "block": "Belaganj",
+     "total_2024": 346,
+     "girls_2024": 190,
+     "boys_2024": 156,
+     "girls_toilet": "No",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 8
+    },
+    {
+     "school_name": "Rajkiya Vidyalaya Bankat",
+     "block": "Belaganj",
+     "total_2024": 319,
+     "girls_2024": 162,
+     "boys_2024": 157,
+     "girls_toilet": "Yes",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 7
+    },
+    {
+     "school_name": "Prathmik Vidyalaya Bhadeya",
+     "block": "Dobhi",
+     "total_2024": 303,
+     "girls_2024": 165,
+     "boys_2024": 138,
+     "girls_toilet": "No",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 9
+    },
+    {
+     "school_name": "Kanya Vidyalaya Khizarsarai",
+     "block": "Atri",
+     "total_2024": 293,
+     "girls_2024": 140,
+     "boys_2024": 153,
+     "girls_toilet": "No",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 8
+    },
+    {
+     "school_name": "Madhya Vidyalaya Chakand",
+     "block": "Barachatti",
+     "total_2024": 286,
+     "girls_2024": 189,
+     "boys_2024": 97,
+     "girls_toilet": "No",
+     "drinking_water": "No",
+     "electricity": "Yes",
+     "classrooms": 4
+    },
+    {
+     "school_name": "Adarsh Vidyalaya Bankat",
+     "block": "Atri",
+     "total_2024": 281,
+     "girls_2024": 158,
+     "boys_2024": 123,
+     "girls_toilet": "No",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 4
+    },
+    {
+     "school_name": "Rajkiya Vidyalaya Sonbarsa",
+     "block": "Belaganj",
+     "total_2024": 270,
+     "girls_2024": 110,
+     "boys_2024": 160,
+     "girls_toilet": "Yes",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 7
+    },
+    {
+     "school_name": "Kanya Vidyalaya Bhadeya",
+     "block": "Dobhi",
+     "total_2024": 267,
+     "girls_2024": 97,
+     "boys_2024": 170,
+     "girls_toilet": "Yes",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 6
+    },
+    {
+     "school_name": "Adarsh Vidyalaya Rampur",
+     "block": "Atri",
+     "total_2024": 261,
+     "girls_2024": 193,
+     "boys_2024": 68,
+     "girls_toilet": "Yes",
+     "drinking_water": "Yes",
+     "electricity": "No",
+     "classrooms": 7
+    },
+    {
+     "school_name": "Rajkiya Vidyalaya Lodipur",
+     "block": "Barachatti",
+     "total_2024": 260,
+     "girls_2024": 170,
+     "boys_2024": 90,
+     "girls_toilet": "Yes",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 6
+    },
+    {
+     "school_name": "Madhya Vidyalaya Karmauni",
+     "block": "Dobhi",
+     "total_2024": 258,
+     "girls_2024": 105,
+     "boys_2024": 153,
+     "girls_toilet": "No",
+     "drinking_water": "Yes",
+     "electricity": "No",
+     "classrooms": 4
+    },
+    {
+     "school_name": "Madhya Vidyalaya Khizarsarai",
+     "block": "Barachatti",
+     "total_2024": 257,
+     "girls_2024": 116,
+     "boys_2024": 141,
+     "girls_toilet": "No",
+     "drinking_water": "Yes",
+     "electricity": "No",
+     "classrooms": 6
+    },
+    {
+     "school_name": "Adarsh Vidyalaya Amas",
+     "block": "Belaganj",
+     "total_2024": 253,
+     "girls_2024": 85,
+     "boys_2024": 168,
+     "girls_toilet": "No",
+     "drinking_water": "Yes",
+     "electricity": "Yes",
+     "classrooms": 7
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  }
+ }
+}

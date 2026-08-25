@@ -1,0 +1,175 @@
+{
+  "id": "attendance-cross-year-p02",
+  "task_id": "attendance-cross-year",
+  "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+  "question": "for each centre show the average turnout rate in both years next to each other",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+  "expected_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH y23 AS (SELECT \"Centre\" AS centre, AVG(CAST(\"Avg Daily Present\" AS DOUBLE) / NULLIF(NULLIF(\"Enrolled Kids\", 0), 0) * 100) AS avg_turnout_2023 FROM \"attendance_2023\" GROUP BY \"Centre\"), y24 AS (SELECT \"centre_name\" AS centre, AVG(CAST(\"average_attendance\" AS DOUBLE) / NULLIF(NULLIF(\"enrolment\", 0), 0) * 100) AS avg_turnout_2024 FROM \"attendance_2024\" GROUP BY \"centre_name\") SELECT y23.centre, y23.avg_turnout_2023, y24.avg_turnout_2024 FROM y23 JOIN y24 ON y23.centre = y24.centre ORDER BY y23.centre NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nfor each centre show the average turnout rate in both years next to each other",
+      "response": "WITH\n  y23 AS (\n    SELECT\n      \"Centre\" AS centre,\n      AVG(CAST(\"Avg Daily Present\" AS DOUBLE) / NULLIF(\"Enrolled Kids\", 0) * 100) AS avg_turnout_2023\n    FROM \"attendance_2023\"\n    GROUP BY \"Centre\"\n  ),\n  y24 AS (\n    SELECT\n      \"centre_name\" AS centre,\n      AVG(CAST(\"average_attendance\" AS DOUBLE) / NULLIF(\"enrolment\", 0) * 100) AS avg_turnout_2024\n    FROM \"attendance_2024\"\n    GROUP BY \"centre_name\"\n  )\nSELECT\n  y23.centre,\n  y23.avg_turnout_2023,\n  y24.avg_turnout_2024\nFROM y23\nJOIN y24 ON y23.centre = y24.centre\nORDER BY y23.centre;",
+      "api": {
+        "id": "gen-1787420995-FFxNfDEAZhbF7bK3nsNi",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 548,
+          "completion_tokens": 228,
+          "total_tokens": 776,
+          "cost": 8.9e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 8.9e-05,
+            "upstream_inference_prompt_cost": 5.48e-05,
+            "upstream_inference_completions_cost": 3.42e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.35
+      },
+      "duration_seconds": 7.359,
+      "sql_duckdb": "WITH y23 AS (SELECT \"Centre\" AS centre, AVG(CAST(\"Avg Daily Present\" AS DOUBLE) / NULLIF(NULLIF(\"Enrolled Kids\", 0), 0) * 100) AS avg_turnout_2023 FROM \"attendance_2023\" GROUP BY \"Centre\"), y24 AS (SELECT \"centre_name\" AS centre, AVG(CAST(\"average_attendance\" AS DOUBLE) / NULLIF(NULLIF(\"enrolment\", 0), 0) * 100) AS avg_turnout_2024 FROM \"attendance_2024\" GROUP BY \"centre_name\") SELECT y23.centre, y23.avg_turnout_2023, y24.avg_turnout_2024 FROM y23 JOIN y24 ON y23.centre = y24.centre ORDER BY y23.centre NULLS FIRST",
+      "rows": [
+        [
+          "Chembur Balwadi",
+          70.360615190941,
+          70.44660635437101
+        ],
+        [
+          "Dharavi Balwadi",
+          70.82452584394089,
+          74.97294321155522
+        ],
+        [
+          "Govandi Balwadi",
+          75.9944282010392,
+          80.66053460475666
+        ],
+        [
+          "Kurla Balwadi",
+          83.94073053389387,
+          63.430859353534544
+        ],
+        [
+          "Mankhurd Balwadi",
+          64.20706883526674,
+          62.326350096023994
+        ],
+        [
+          "Sion Balwadi",
+          60.5153044840458,
+          55.56386806777662
+        ],
+        [
+          "Wadala Balwadi",
+          87.81901547526547,
+          88.94728964433877
+        ],
+        [
+          "Worli Balwadi",
+          80.31790744980887,
+          77.5822639156466
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

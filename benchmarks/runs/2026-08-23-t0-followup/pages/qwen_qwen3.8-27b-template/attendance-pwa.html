@@ -1,0 +1,187 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tuition Attendance</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Tuition Attendance</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+(function () {
+  'use strict';
+  var K = { kids: 'tuition_kids', att: 'tuition_att', date: 'tuition_date' };
+  var kids = store.get(K.kids, []);
+  var att = store.get(K.att, {});
+  var today = new Date();
+  var selDate = store.get(K.date, today.toISOString().slice(0, 10));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(selDate)) selDate = today.toISOString().slice(0, 10);
+  var month = selDate.slice(0, 7);
+  var view = 'day';
+  var last = null;
+
+  function saveKids() { store.set(K.kids, kids); }
+  function saveAtt() { store.set(K.att, att); }
+  function saveDate() { store.set(K.date, selDate); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function monthLabel(m) { var p = m.split('-'); var d = new Date(+p[0], +p[1] - 1, 1); return d.toLocaleString('en', { month: 'long', year: 'numeric' }); }
+  function dayLabel(iso) { var p = iso.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short' }); }
+  function daysInMonth(m) { var p = m.split('-'); return new Date(+p[0], +p[1], 0).getDate(); }
+  function monthDays(m) { var n = daysInMonth(m), a = []; for (var d = 1; d <= n; d++) a.push(m + '-' + String(d).padStart(2, '0')); return a; }
+  function dayRec(iso) { return att[iso] || {}; }
+  function presentCount(iso) { var r = dayRec(iso), c = 0; kids.forEach(function (k) { if (r[k.id] === 'P') c++; }); return c; }
+  function absentCount(iso) { var r = dayRec(iso), c = 0; kids.forEach(function (k) { if (r[k.id] === 'A') c++; }); return c; }
+  function monthStats() {
+    var days = monthDays(month), present = {}, absent = {};
+    kids.forEach(function (k) { present[k.id] = 0; absent[k.id] = 0; });
+    days.forEach(function (iso) {
+      var r = dayRec(iso);
+      kids.forEach(function (k) { if (r[k.id] === 'P') present[k.id]++; else if (r[k.id] === 'A') absent[k.id]++; });
+    });
+    return { days: days, present: present, absent: absent };
+  }
+  function monthTotals() {
+    var s = monthStats(), p = 0, a = 0;
+    kids.forEach(function (k) { p += s.present[k.id]; a += s.absent[k.id]; });
+    return { days: s.days, present: p, absent: a };
+  }
+  function exportDay() {
+    var r = dayRec(selDate);
+    var rows = kids.map(function (k) { return { name: k.name, status: r[k.id] || '—' }; });
+    download('attendance-' + selDate + '.csv', toCSV(rows), 'text/csv');
+  }
+  function exportMonth() {
+    var s = monthStats();
+    var rows = kids.map(function (k) {
+      var p = s.present[k.id], a = s.absent[k.id], t = p + a;
+      return { name: k.name, present: p, absent: a, days: t, pct: t ? Math.round(p / t * 100) + '%' : '—' };
+    });
+    download('summary-' + month + '.csv', toCSV(rows), 'text/csv');
+  }
+  function exportAll() {
+    var rows = [];
+    Object.keys(att).sort().forEach(function (iso) {
+      var r = att[iso];
+      kids.forEach(function (k) { if (r[k.id]) rows.push({ date: iso, name: k.name, status: r[k.id] }); });
+    });
+    download('attendance-all.csv', toCSV(rows), 'text/csv');
+  }
+  function addKid() {
+    var el = document.getElementById('kidName');
+    var v = el.value.trim();
+    if (!v) { el.focus(); return; }
+    kids.push({ id: 'k' + Date.now() + Math.random().toString(36).slice(2, 6), name: v });
+    saveKids(); el.value = ''; el.focus(); render();
+  }
+  function removeKid(id) {
+    var k = kids.filter(function (x) { return x.id === id; })[0];
+    if (!k) return;
+    if (!confirm('Remove ' + k.name + ' and all their attendance?')) return;
+    kids = kids.filter(function (x) { return x.id !== id; });
+    Object.keys(att).forEach(function (d) { delete att[d][id]; });
+    saveKids(); saveAtt(); render();
+  }
+  function setStatus(id, val) {
+    var r = att[selDate] || (att[selDate] = {});
+    if (r[id] === val) delete r[id]; else r[id] = val;
+    saveAtt(); render();
+  }
+  function markAll(val) {
+    var r = att[selDate] || (att[selDate] = {});
+    kids.forEach(function (k) { r[k.id] = val; });
+    saveAtt(); render();
+  }
+  function clearDay() {
+    if (!confirm('Clear all marks for ' + dayLabel(selDate) + '?')) return;
+    delete att[selDate]; saveAtt(); render();
+  }
+  function shiftMonth(delta) {
+    var p = month.split('-'), d = new Date(+p[0], +p[1] - 1 + delta, 1);
+    month = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    render();
+  }
+  function render() {
+    var m = document.getElementById('main');
+    var h = '';
+    h += '<div class="card"><div class="row" style="align-items:center"><div style="flex:1;min-width:180px"><label>Attendance date</label><input type="date" id="date" value="' + esc(selDate) + '"></div><div style="flex:1;min-width:180px"><label>Month summary</label><input type="month" id="month" value="' + esc(month) + '"></div></div><div class="row" style="margin-top:10px"><button class="secondary" id="prevM">‹ Month</button><button class="secondary" id="nextM">Month ›</button><button class="secondary" id="today">Today</button></div></div>';
+    h += '<div class="card"><div class="row" style="align-items:center;justify-content:space-between"><h2 style="margin:0;font-size:18px">Kids (' + kids.length + ')</h2><button class="secondary" id="addKid">+ Add kid</button></div><div class="row" style="margin-top:10px"><input id="kidName" placeholder="Type a name, then Add" style="flex:1;min-width:160px"><button id="addKidBtn">Add</button></div>';
+    if (kids.length) {
+      h += '<table style="margin-top:10px"><tbody>';
+      kids.forEach(function (k) { h += '<tr><td>' + esc(k.name) + '</td><td style="text-align:right;white-space:nowrap"><button class="secondary" data-del="' + k.id + '">Remove</button></td></tr>'; });
+      h += '</tbody></table>';
+    } else {
+      h += '<p class="muted" style="margin-top:10px">No kids yet. Add your first student above.</p>';
+    }
+    h += '</div>';
+    h += '<div class="card"><div class="row" style="align-items:center;justify-content:space-between"><h2 style="margin:0;font-size:18px">Daily attendance</h2><span class="muted">' + dayLabel(selDate) + '</span></div><div class="row" style="margin-top:10px"><button class="secondary" id="allP">All present</button><button class="secondary" id="allA">All absent</button><button class="secondary" id="clearDay">Clear day</button><button class="secondary" id="expDay">Export day</button></div>';
+    if (kids.length) {
+      h += '<table style="margin-top:10px"><thead><tr><th>Name</th><th style="text-align:center">Present</th><th style="text-align:center">Absent</th></tr></thead><tbody>';
+      var r = dayRec(selDate);
+      kids.forEach(function (k) {
+        var st = r[k.id];
+        h += '<tr><td>' + esc(k.name) + '</td><td style="text-align:center"><button class="secondary" data-p="' + k.id + '"' + (st === 'P' ? ' style="background:var(--accent);color:#fff"' : '') + '>✓</button></td><td style="text-align:center"><button class="secondary" data-a="' + k.id + '"' + (st === 'A' ? ' style="background:#dc2626;border-color:#dc2626;color:#fff"' : '') + '>✕</button></td></tr>';
+      });
+      h += '</tbody></table>';
+    } else {
+      h += '<p class="muted" style="margin-top:10px">Add kids to start marking attendance.</p>';
+    }
+    h += '</div>';
+    h += '<div class="card"><div class="row" style="align-items:center;justify-content:space-between"><h2 style="margin:0;font-size:18px">Monthly summary</h2><span class="muted">' + monthLabel(month) + '</span></div><div class="row" style="margin-top:10px"><button class="secondary" id="expMonth">Export month</button><button class="secondary" id="expAll">Export all</button></div>';
+    if (kids.length) {
+      var s = monthStats(), t = monthTotals();
+      h += '<div class="grid" style="margin-top:10px"><div class="card" style="margin:0"><div class="muted">Days in month</div><div style="font-size:26px;font-weight:700">' + t.days + '</div></div><div class="card" style="margin:0"><div class="muted">Total present</div><div style="font-size:26px;font-weight:700">' + t.present + '</div></div><div class="card" style="margin:0"><div class="muted">Total absent</div><div style="font-size:26px;font-weight:700">' + t.absent + '</div></div></div>';
+      h += '<table style="margin-top:12px"><thead><tr><th>Name</th><th style="text-align:center">Present</th><th style="text-align:center">Absent</th><th style="text-align:center">Days</th><th style="text-align:center">%</th></tr></thead><tbody>';
+      kids.forEach(function (k) {
+        var p = s.present[k.id], a = s.absent[k.id], tt = p + a;
+        h += '<tr><td>' + esc(k.name) + '</td><td style="text-align:center">' + p + '</td><td style="text-align:center">' + a + '</td><td style="text-align:center">' + tt + '</td><td style="text-align:center">' + (tt ? Math.round(p / tt * 100) + '%' : '—') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    } else {
+      h += '<p class="muted" style="margin-top:10px">Add kids to build a summary.</p>';
+    }
+    h += '</div>';
+    m.innerHTML = h;
+    wire();
+  }
+  function wire() {
+    var g = function (id) { return document.getElementById(id); };
+    var date = g('date'); if (date) date.addEventListener('change', function () { selDate = date.value || today.toISOString().slice(0, 10); saveDate(); render(); });
+    var mo = g('month'); if (mo) mo.addEventListener('change', function () { if (mo.value) { month = mo.value; render(); } });
+    var prev = g('prevM'); if (prev) prev.addEventListener('click', function () { shiftMonth(-1); });
+    var next = g('nextM'); if (next) next.addEventListener('click', function () { shiftMonth(1); });
+    var td = g('today'); if (td) td.addEventListener('click', function () { selDate = today.toISOString().slice(0, 10); month = selDate.slice(0, 7); saveDate(); render(); });
+    var kn = g('kidName');
+    if (kn) {
+      kn.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addKid(); } });
+      kn.addEventListener('input', function () { if (kn.value.trim()) { var b = g('addKidBtn'); if (b) b.disabled = false; } });
+    }
+    var ab = g('addKidBtn'); if (ab) ab.addEventListener('click', addKid);
+    var ak = g('addKid'); if (ak) ak.addEventListener('click', function () { var e = g('kidName'); if (e) { e.focus(); e.select(); } });
+    var ap = g('allP'); if (ap) ap.addEventListener('click', function () { markAll('P'); });
+    var aa = g('allA'); if (aa) aa.addEventListener('click', function () { markAll('A'); });
+    var cd = g('clearDay'); if (cd) cd.addEventListener('click', clearDay);
+    var ed = g('expDay'); if (ed) ed.addEventListener('click', exportDay);
+    var em = g('expMonth'); if (em) em.addEventListener('click', exportMonth);
+    var ea = g('expAll'); if (ea) ea.addEventListener('click', exportAll);
+    var main = g('main');
+    if (main) main.addEventListener('click', function (e) {
+      var t = e.target;
+      if (t.dataset && t.dataset.p) setStatus(t.dataset.p, 'P');
+      else if (t.dataset && t.dataset.a) setStatus(t.dataset.a, 'A');
+      else if (t.dataset && t.dataset.del) removeKid(t.dataset.del);
+    });
+  }
+  offlineReady();
+  render();
+})();
+</script>
+</body></html>

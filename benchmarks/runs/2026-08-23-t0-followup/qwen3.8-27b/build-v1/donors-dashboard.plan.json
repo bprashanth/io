@@ -1,0 +1,273 @@
+{
+ "plan": {
+  "title": "Donation Analytics Dashboard",
+  "subtitle": "Monthly trends, top cities, payment modes, and repeat donor insights",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Donations",
+    "sql": "SELECT COUNT(*) AS n FROM \"donor_transactions\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Amount",
+    "sql": "SELECT SUM(\"Amount\") AS total FROM \"donor_transactions\"",
+    "unit": "INR"
+   },
+   {
+    "id": "p3",
+    "kind": "line",
+    "title": "Monthly Donation Trend",
+    "sql": "SELECT STRFTIME(STRPTIME(\"Date\", '%d-%m-%Y'), '%Y-%m') AS month, SUM(\"Amount\") AS total FROM \"donor_transactions\" GROUP BY 1 ORDER BY 1",
+    "x": "month",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Top 10 Cities by Donation Amount",
+    "sql": "SELECT \"City\" AS city, SUM(\"Amount\") AS total FROM \"donor_transactions\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "city",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "pie",
+    "title": "Donation Share by Payment Mode",
+    "sql": "SELECT \"Mode\" AS mode, SUM(\"Amount\") AS total FROM \"donor_transactions\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "mode",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top 10 Repeat Donors",
+    "sql": "SELECT \"Donor\" AS donor, COUNT(*) AS donation_count, SUM(\"Amount\") AS total_amount FROM \"donor_transactions\" GROUP BY 1 HAVING COUNT(*) > 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The dashboard highlights key donation metrics, starting with a total of {{p1}} transactions and a cumulative amount of {{p2}}. The monthly trend reveals fluctuations in donation activity, with the highest recorded month being {{p3[0].month}}.\n\nGeographically, donations are concentrated in specific regions. The top city by donation volume is {{p4[0].city}}, followed by {{p4[1].city}} and {{p4[2].city}}. This distribution suggests targeted outreach in these areas may yield higher returns.\n\nPayment behavior shows a preference for specific modes. The most common payment method is {{p5[0].mode}}, accounting for a significant portion of the total. Understanding these preferences can help optimize payment gateway integrations.\n\nRepeat donors are a critical segment for sustainability. The most frequent donor is {{p6[0].donor}} with {{p6[0].donation_count}} transactions. Engaging these individuals through personalized communication can strengthen long-term support."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 250
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "total"
+   ],
+   "rows": [
+    {
+     "total": 6641021
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "month",
+    "total"
+   ],
+   "rows": [
+    {
+     "month": "2025-04",
+     "total": 77898
+    },
+    {
+     "month": "2025-05",
+     "total": 234907
+    },
+    {
+     "month": "2025-06",
+     "total": 346521
+    },
+    {
+     "month": "2025-07",
+     "total": 395938
+    },
+    {
+     "month": "2025-08",
+     "total": 428649
+    },
+    {
+     "month": "2025-09",
+     "total": 379063
+    },
+    {
+     "month": "2025-10",
+     "total": 575872
+    },
+    {
+     "month": "2025-11",
+     "total": 427203
+    },
+    {
+     "month": "2025-12",
+     "total": 370697
+    },
+    {
+     "month": "2026-01",
+     "total": 274762
+    },
+    {
+     "month": "2026-02",
+     "total": 383068
+    },
+    {
+     "month": "2026-03",
+     "total": 478007
+    },
+    {
+     "month": "2026-04",
+     "total": 834357
+    },
+    {
+     "month": "2026-05",
+     "total": 370131
+    },
+    {
+     "month": "2026-06",
+     "total": 372342
+    },
+    {
+     "month": "2026-07",
+     "total": 470206
+    },
+    {
+     "month": "2026-08",
+     "total": 221400
+    }
+   ],
+   "rowcount": 17,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "city",
+    "total"
+   ],
+   "rows": [
+    {
+     "city": "Gaya",
+     "total": 787715
+    },
+    {
+     "city": "Bengaluru",
+     "total": 771729
+    },
+    {
+     "city": "Solapur",
+     "total": 729972
+    },
+    {
+     "city": "Thane",
+     "total": 678448
+    },
+    {
+     "city": "Mumbai",
+     "total": 617867
+    },
+    {
+     "city": "Pune",
+     "total": 544876
+    },
+    {
+     "city": "Nashik",
+     "total": 498828
+    },
+    {
+     "city": "Nagpur",
+     "total": 428953
+    },
+    {
+     "city": "Aurangabad",
+     "total": 403921
+    },
+    {
+     "city": "Delhi",
+     "total": 395268
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "mode",
+    "total"
+   ],
+   "rows": [
+    {
+     "mode": "NEFT",
+     "total": 1511602
+    },
+    {
+     "mode": "Card",
+     "total": 1322416
+    },
+    {
+     "mode": "Cash",
+     "total": 1277633
+    },
+    {
+     "mode": "DD",
+     "total": 1250836
+    },
+    {
+     "mode": "UPI",
+     "total": 728176
+    },
+    {
+     "mode": "Cheque",
+     "total": 550358
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "donor",
+    "donation_count",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "donor": "Rohit",
+     "donation_count": 2,
+     "total_amount": 3091
+    },
+    {
+     "donor": "Rajesh",
+     "donation_count": 2,
+     "total_amount": 60187
+    },
+    {
+     "donor": "Pankaj Pereira",
+     "donation_count": 2,
+     "total_amount": 100648
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  }
+ }
+}

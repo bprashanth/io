@@ -1,0 +1,157 @@
+{
+  "id": "wide-header-pp-change-excluding-total-rows-p03",
+  "task_id": "wide-header-pp-change-excluding-total-rows",
+  "pattern": "percentage-point change between two labelled rounds on messy headers, state filter, detail rows only",
+  "question": "NFHS-5 minus NFHS-4 fully vaccinated percent for every Bihar district, don't include the state total row",
+  "gold_sql": "SELECT \"District\", MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_pp FROM district_health_factsheet WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' GROUP BY \"District\" ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Bhojpur",
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      4.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      7.799999999999997
+    ],
+    [
+      "Nalanda",
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      -3.3999999999999986
+    ],
+    [
+      "Kishanganj",
+      2.799999999999997
+    ],
+    [
+      "Rohtas",
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      4.0
+    ],
+    [
+      "Madhubani",
+      3.1999999999999957
+    ],
+    [
+      "Bhojpur",
+      -5.800000000000004
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH NFHS4 AS (SELECT District, \"Children age 12-23 months fully vaccinated (%)\" AS NFHS4_Vaccination FROM district_health_factsheet WHERE State = 'Bihar' AND \"Survey Round\" = 'NFHS-4' AND District <> 'State Total'), NFHS5 AS (SELECT District, \"Children age 12-23 months fully vaccinated (%)\" AS NFHS5_Vaccination FROM district_health_factsheet WHERE State = 'Bihar' AND \"Survey Round\" = 'NFHS-5' AND District <> 'State Total') SELECT n4.District, (n5.NFHS5_Vaccination - n4.NFHS4_Vaccination) AS \"Percentage Point Change\" FROM NFHS4 AS n4 JOIN NFHS5 AS n5 ON n4.District = n5.District",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nNFHS-5 minus NFHS-4 fully vaccinated percent for every Bihar district, don't include the state total row",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Tables and Columns**: The question is about comparing the percentage of fully vaccinated children aged 12-23 months between two survey rounds (NFHS-4 and NFHS-5) for each district in the state of Bihar. Therefore, we need to focus on the `district_health_factsheet` table and the columns `District`, `Survey Round`, and `Children age 12-23 months fully vaccinated (%)`.\n\n2. **Filter Data for Bihar**: We need to filter the data to include only records from the state of Bihar.\n\n3. **Filter Data for Survey Rounds**: We need to filter the data to include only records from the survey rounds NFHS-4 and NFHS-5.\n\n4. **Calculate the Percentage Difference**: We need to calculate the difference in the percentage of fully vaccinated children aged 12-23 months between NFHS-5 and NFHS-4 for each district.\n\n5. **Exclude State Total Row**: The question specifies not to include the state total row, so we need to ensure that our query does not return a row for the state total.\n\n6. **Construct the Query**: We will use a self-join on the `district_health_factsheet` table to compare the two survey rounds for each district.\n\nHere is the step-by-step SQL query:\n\n```sql\nSELECT \n    dhf1.District,\n    (dhf2.\"Children age 12-23 months fully vaccinated (%\") - dhf1.\"Children age 12-23 months fully vaccinated (%\") AS \"Percentage Point Change\"\nFROM \n    district_health_factsheet dhf1\nJOIN \n    district_health_factsheet dhf2\nON \n    dhf1.District = dhf2.District\nWHERE \n    dhf1.\"Survey Round\" = 'NFHS-4'\n    AND dhf2.\"Survey Round\" = 'NFHS-5'\n    AND dhf1.\"State\" = 'Bihar'\n    AND dhf2.\"State\" = 'Bihar'\nORDER BY \n    dhf1.District;\n```\n\n### Explanation:\n\n- **Self-Join**: We perform a self-join on the `district_health_factsheet` table to compare the data from NFHS-4 and NFHS-5 for each district.\n- **Filter Conditions**: We filter the records to include only those from the state of Bihar and the specified survey rounds.\n- **Percentage Point Change Calculation**: We calculate the difference in the percentage of fully vaccinated children aged 12-23 months between NFHS-5 and NFHS-4.\n- **Ordering**: We order the results by district for better readability.\n\nThis query directly addresses the requirements of the question without unnecessary complexity or joins, ensuring that the output is accurate and relevant.",
+      "api": {
+        "id": "chatcmpl-vH9uZxOeyNPiC73XTPklYrphHWGGj7xp",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 604,
+          "prompt_tokens": 521,
+          "total_tokens": 1125,
+          "prompt_tokens_details": {
+            "cached_tokens": 492
+          }
+        },
+        "duration_seconds": 22.341
+      },
+      "duration_seconds": 22.341,
+      "error": "ParseError: Invalid expression / Unexpected token. Line 3, Col: 114.\n  ildren age 12-23 months fully vaccinated (%\") - dhf1.\"Children age 12-23 months fully vaccinated (%\"\u001b[4m)\u001b[0m AS \"Percentage Point Change\"\nFROM \n    district_health_factsheet dhf1\nJOIN \n    district_health_fac"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nNFHS-5 minus NFHS-4 fully vaccinated percent for every Bihar district, don't include the state total row\n\nREJECTED QUERY ERROR:\nParseError: Invalid expression / Unexpected token. Line 3, Col: 114.\n  ildren age 12-23 months fully vaccinated (%\") - dhf1.\"Children age 12-23 months fully vaccinated (%\"\u001b[4m)\u001b[0m AS \"Percentage Point Change\"\nFROM \n    district_health_factsheet dhf1\nJOIN \n    district_health_fac\nReturn a complete corrected query.",
+      "response": "To translate the given natural language question into an executable SQLite query, we need to carefully consider the requirements and the schema provided. The task is to calculate the percentage-point change in the fully vaccinated percentage between NFHS-5 and NFHS-4 for each district in the state of Bihar, excluding the state total row.\n\n### Step-by-Step Solution:\n\n1. **Identify Relevant Tables and Columns**:\n   - The relevant table is `district_health_factsheet`.\n   - The relevant columns are `State`, `District`, `Survey Round`, and `Children age 12-23 months fully vaccinated (%)`.\n\n2. **Filter Data for Bihar**:\n   - We need to filter the data to include only records where `State` is 'Bihar'.\n\n3. **Filter Data for Survey Rounds**:\n   - We need to filter the data to include only records where `Survey Round` is either 'NFHS-4' or 'NFHS-5'.\n\n4. **Exclude State Total Row**:\n   - We need to exclude any records where `District` is 'State Total'.\n\n5. **Join Data for Calculation**:\n   - We need to join the data for 'NFHS-4' and 'NFHS-5' on the `District` column to calculate the percentage-point change.\n\n6. **Calculate Percentage-Point Change**:\n   - The percentage-point change is calculated as the difference between the fully vaccinated percentage in 'NFHS-5' and 'NFHS-4'.\n\n### SQL Query Construction:\n\n```sql\nWITH NFHS4 AS (\n    SELECT \n        District, \n        \"Children age 12-23 months fully vaccinated (%)\" AS NFHS4_Vaccination\n    FROM \n        district_health_factsheet\n    WHERE \n        State = 'Bihar' \n        AND \"Survey Round\" = 'NFHS-4'\n        AND District != 'State Total'\n),\nNFHS5 AS (\n    SELECT \n        District, \n        \"Children age 12-23 months fully vaccinated (%)\" AS NFHS5_Vaccination\n    FROM \n        district_health_factsheet\n    WHERE \n        State = 'Bihar' \n        AND \"Survey Round\" = 'NFHS-5'\n        AND District != 'State Total'\n)\nSELECT \n    n4.District, \n    (n5.NFHS5_Vaccination - n4.NFHS4_Vaccination) AS \"Percentage Point Change\"\nFROM \n    NFHS4 n4\nJOIN \n    NFHS5 n5 ON n4.District = n5.District;\n```\n\n### Explanation:\n\n- **CTE (Common Table Expressions)**: We use two CTEs, `NFHS4` and `NFHS5`, to separately filter and select the fully vaccinated percentages for NFHS-4 and NFHS-5.\n- **Filtering**: Each CTE filters the data for the respective survey round and excludes the state total row.\n- **Join**: We join the two CTEs on the `District` column to align the data for the same districts.\n- **Calculation**: We calculate the percentage-point change by subtracting the NFHS-4 percentage from the NFHS-5 percentage.\n\nThis query efficiently calculates the required percentage-point change for each district in Bihar, adhering to the specified conditions.",
+      "api": {
+        "id": "chatcmpl-glhMjydOJtjiBy4fqpqW0UEYrtbXgTxs",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 692,
+          "prompt_tokens": 619,
+          "total_tokens": 1311,
+          "prompt_tokens_details": {
+            "cached_tokens": 516
+          }
+        },
+        "duration_seconds": 25.583
+      },
+      "duration_seconds": 25.587,
+      "sql_duckdb": "WITH NFHS4 AS (SELECT District, \"Children age 12-23 months fully vaccinated (%)\" AS NFHS4_Vaccination FROM district_health_factsheet WHERE State = 'Bihar' AND \"Survey Round\" = 'NFHS-4' AND District <> 'State Total'), NFHS5 AS (SELECT District, \"Children age 12-23 months fully vaccinated (%)\" AS NFHS5_Vaccination FROM district_health_factsheet WHERE State = 'Bihar' AND \"Survey Round\" = 'NFHS-5' AND District <> 'State Total') SELECT n4.District, (n5.NFHS5_Vaccination - n4.NFHS4_Vaccination) AS \"Percentage Point Change\" FROM NFHS4 AS n4 JOIN NFHS5 AS n5 ON n4.District = n5.District",
+      "rows": [
+        [
+          "Gaya",
+          7.799999999999997
+        ],
+        [
+          "Nalanda",
+          5.699999999999996
+        ],
+        [
+          "Purnia",
+          -3.3999999999999986
+        ],
+        [
+          "Kishanganj",
+          2.799999999999997
+        ],
+        [
+          "Rohtas",
+          -1.9000000000000057
+        ],
+        [
+          "Saran",
+          4.0
+        ],
+        [
+          "Madhubani",
+          3.1999999999999957
+        ],
+        [
+          "Bhojpur",
+          -5.800000000000004
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

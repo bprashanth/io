@@ -1,0 +1,201 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tuition Attendance Tracker</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.absent-row { background: #fff5f5; }
+.present-row { background: #f0fff4; }
+.status-btn { width: 100%; padding: 10px; font-weight: bold; }
+</style></head><body>
+<header><h1 id="view-title">Attendance</h1></header>
+<main id="app">
+    <div class="row" style="margin-bottom: 20px;">
+        <button onclick="showView('daily')">Daily Mark</button>
+        <button onclick="showView('summary')">Monthly Summary</button>
+        <button onclick="showView('settings')" class="secondary">Settings</button>
+    </div>
+
+    <div id="view-daily" class="view">
+        <div class="card">
+            <label>Select Date</label>
+            <input type="date" id="attendance-date" onchange="renderDaily()">
+        </div>
+        <div id="daily-list"></div>
+    </div>
+
+    <div id="view-summary" class="view" style="display:none">
+        <div class="card">
+            <label>Month</label>
+            <input type="month" id="summary-month" onchange="renderSummary()">
+        </div>
+        <div class="card">
+            <button onclick="exportSummary()" class="secondary">Export CSV</button>
+        </div>
+        <div id="summary-list"></div>
+    </div>
+
+    <div id="view-settings" class="view" style="display:none">
+        <div class="card">
+            <h3>Manage Students</h3>
+            <p class="muted">Add or remove students from the tuition list.</p>
+            <div class="row">
+                <input type="text" id="new-student-name" placeholder="Student Name">
+                <button onclick="addStudent()">Add</button>
+            </div>
+            <div id="student-mgmt-list" style="margin-top:20px"></div>
+        </div>
+    </div>
+</main>
+<script>
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// APP LOGIC
+let students = store.get('tuition_students', []);
+let attendance = store.get('tuition_attendance', {}); // Format: { "2023-10-25": { "studentId": true/false } }
+
+function showView(viewId) {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    document.getElementById('view-' + viewId).style.display = 'block';
+    const titles = { daily: 'Daily Attendance', summary: 'Monthly Summary', settings: 'Settings' };
+    document.getElementById('view-title').innerText = titles[viewId];
+    if(viewId === 'daily') renderDaily();
+    if(viewId === 'summary') renderSummary();
+    if(viewId === 'settings') renderSettings();
+}
+
+function addStudent() {
+    const input = document.getElementById('new-student-name');
+    const name = input.value.trim();
+    if (name) {
+        students.push({ id: Date.now().toString(), name: name });
+        store.set('tuition_students', students);
+        input.value = '';
+        renderSettings();
+    }
+}
+
+function removeStudent(id) {
+    if(confirm('Remove this student? Attendance data for them will remain in history but they won't appear in lists.')) {
+        students = students.filter(s => s.id !== id);
+        store.set('tuition_students', students);
+        renderSettings();
+    }
+}
+
+function renderSettings() {
+    const list = document.getElementById('student-mgmt-list');
+    list.innerHTML = students.map(s => `
+        <div class="row" style="justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line)">
+            <span>${s.name}</span>
+            <button class="secondary" style="color:red; border-color:red" onclick="removeStudent('${s.id}')">Delete</button>
+        </div>
+    `).join('');
+}
+
+function renderDaily() {
+    const dateInput = document.getElementById('attendance-date');
+    if (!dateInput.value) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+    }
+    const date = dateInput.value;
+    const list = document.getElementById('daily-list');
+    const dayData = attendance[date] || {};
+
+    if (students.length === 0) {
+        list.innerHTML = '<p class="muted">No students added. Go to Settings.</p>';
+        return;
+    }
+
+    list.innerHTML = students.map(s => {
+        const status = dayData[s.id]; // true = present, false = absent, undefined = not marked
+        let btnClass = 'secondary';
+        let btnText = 'Mark...';
+        if (status === true) { btnClass = ''; btnText = '✅ Present'; }
+        if (status === false) { btnClass = 'secondary'; btnText = '❌ Absent'; }
+
+        return `
+            <div class="card ${status === false ? 'absent-row' : (status === true ? 'present-row' : '')}">
+                <div class="row" style="justify-content:space-between; align-items:center">
+                    <strong>${s.name}</strong>
+                    <div class="row">
+                        <button class="${status === true ? '' : 'secondary'}" onclick="mark('${date}', '${s.id}', true)">Present</button>
+                        <button class="${status === false ? '' : 'secondary'}" onclick="mark('${date}', '${s.id}', false)">Absent</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function mark(date, studentId, isPresent) {
+    if (!attendance[date]) attendance[date] = {};
+    attendance[date][studentId] = isPresent;
+    store.set('tuition_attendance', attendance);
+    renderDaily();
+}
+
+function renderSummary() {
+    const monthInput = document.getElementById('summary-month');
+    if (!monthInput.value) {
+        const now = new Date();
+        monthInput.value = now.toISOString().slice(0, 7);
+    }
+    const month = monthInput.value; // YYYY-MM
+    const list = document.getElementById('summary-list');
+    
+    let html = `<table><thead><tr><th>Student</th><th>Days Present</th><th>Total Days</th><th>%</th></tr></thead><tbody>`;
+    
+    let totalDaysInMonth = 0;
+    const dateSet = new Set();
+    
+    // Find all unique dates in this month that have any attendance recorded
+    Object.keys(attendance).forEach(d => {
+        if (d.startsWith(month)) dateSet.add(d);
+    });
+    totalDaysInMonth = dateSet.size;
+
+    if (totalDaysInMonth === 0) {
+        list.innerHTML = '<p class="muted">No attendance recorded for this month.</p>';
+        return;
+    }
+
+    const summaryData = students.map(s => {
+        let presentCount = 0;
+        dateSet.forEach(d => {
+            if (attendance[d] && attendance[d][s.id] === true) presentCount++;
+        });
+        const percent = ((presentCount / totalDaysInMonth) * 100).toFixed(0);
+        return { name: s.name, present: presentCount, total: totalDaysInMonth, pct: percent };
+    });
+
+    summaryData.forEach(row => {
+        html += `<tr>
+            <td>${row.name}</td>
+            <td>${row.present}</td>
+            <td>${row.total}</td>
+            <td>${row.pct}%</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    list.innerHTML = html;
+    window.currentSummary = summaryData; // for export
+}
+
+function exportSummary() {
+    if (!window.currentSummary) return;
+    const csv = toCSV(window.currentSummary);
+    download('attendance_summary.csv', csv, 'text/csv');
+}
+
+// Init
+offlineReady();
+showView('daily');
+</script>
+</body></html>

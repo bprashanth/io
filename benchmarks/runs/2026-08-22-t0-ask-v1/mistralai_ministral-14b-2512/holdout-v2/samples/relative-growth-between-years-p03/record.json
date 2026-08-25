@@ -1,0 +1,91 @@
+{
+  "id": "relative-growth-between-years-p03",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "how much more money was given out in 2024 than in 2023, in percent terms",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH yearly_totals AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_amount FROM \"shg_loan_register\" WHERE \"Disbursement Date\" LIKE '2023%'), yearly_totals_2024 AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_amount FROM \"shg_loan_register\" WHERE \"Disbursement Date\" LIKE '2024%') SELECT (total_amount_2024 - total_amount_2023) / NULLIF(NULLIF(total_amount_2023, 0), 0) * 100 AS percent_increase FROM yearly_totals_2024 CROSS JOIN yearly_totals",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nhow much more money was given out in 2024 than in 2023, in percent terms",
+      "response": "```sql\nWITH\nyearly_totals AS (\n  SELECT\n    CASE\n      WHEN strpos(\"Disbursement Date\", '2024') > 0 THEN '2024'\n      WHEN strpos(\"Disbursement Date\", '2023') > 0 THEN '2023'\n      ELSE NULL\n    END AS year,\n    SUM(\"Loan Amount (Rs)\") AS total_amount\n  FROM \"shg_loan_register\"\n  WHERE strpos(\"Disbursement Date\", '2024') > 0 OR strpos(\"Disbursement Date\", '2023') > 0\n  GROUP BY year\n)\nSELECT\n  (total_amount_2024 - total_amount_2023) / NULLIF(total_amount_2023, 0) * 100 AS percent_increase\nFROM yearly_totals\nWHERE year = '2024' OR year = '2023'\n```",
+      "api": {
+        "id": "gen-1787421124-FzKe21yJUBE42hcbH4Mt",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 404,
+          "completion_tokens": 220,
+          "total_tokens": 624,
+          "cost": 7.872e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 7.872e-05,
+            "upstream_inference_prompt_cost": 3.472e-05,
+            "upstream_inference_completions_cost": 4.4e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.163
+      },
+      "duration_seconds": 2.165,
+      "error": "BinderException: Binder Error: Referenced column \"total_amount_2024\" not found in FROM clause!\nCandidate bindings: \"total_amount\"\n\nLINE 1: ...(\"Disbursement Date\", '2023') > 0 GROUP BY year) SELECT (total_amount_2024 - total_amount_2023) / NULLIF(NULLIF(tota...\n                                                                    ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nhow much more money was given out in 2024 than in 2023, in percent terms\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"total_amount_2024\" not found in FROM clause!\nCandidate bindings: \"total_amount\"\n\nLINE 1: ...(\"Disbursement Date\", '2023') > 0 GROUP BY year) SELECT (total_amount_2024 - total_amount_2023) / NULLIF(NULLIF(tota...\n                                                                    ^\nReturn a complete corrected query.",
+      "response": "```sql\nWITH\nyearly_totals AS (\n  SELECT\n    SUM(\"Loan Amount (Rs)\") AS total_amount\n  FROM\n    \"shg_loan_register\"\n  WHERE\n    \"Disbursement Date\" LIKE '2023%'\n),\nyearly_totals_2024 AS (\n  SELECT\n    SUM(\"Loan Amount (Rs)\") AS total_amount\n  FROM\n    \"shg_loan_register\"\n  WHERE\n    \"Disbursement Date\" LIKE '2024%'\n)\nSELECT\n  (total_amount_2024 - total_amount_2023) / NULLIF(total_amount_2023, 0) * 100 AS percent_increase\nFROM\n  yearly_totals_2024,\n  yearly_totals\n```",
+      "api": {
+        "id": "gen-1787421126-lLyDHGfe979tcVa0Z2mL",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 503,
+          "completion_tokens": 184,
+          "total_tokens": 687,
+          "cost": 6.828e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.828e-05,
+            "upstream_inference_prompt_cost": 3.148e-05,
+            "upstream_inference_completions_cost": 3.68e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.984
+      },
+      "duration_seconds": 1.986,
+      "error": "BinderException: Binder Error: Referenced column \"total_amount_2024\" not found in FROM clause!\nCandidate bindings: \"yearly_totals.total_amount\", \"yearly_totals_2024.total_amount\"\n\nLINE 1: ..._register\" WHERE \"Disbursement Date\" LIKE '2024%') SELECT (total_amount_2024 - total_amount_2023) / NULLIF(NULLIF(tota...\n                                                                      ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

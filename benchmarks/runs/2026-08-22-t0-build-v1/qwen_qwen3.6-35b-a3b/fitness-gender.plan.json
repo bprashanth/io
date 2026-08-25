@@ -1,0 +1,160 @@
+{
+ "plan": {
+  "title": "Gender Performance Gap Analysis",
+  "subtitle": "Comparing baseline to endline improvements in physical fitness metrics by gender",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Children Tracked",
+    "sql": "SELECT COUNT(*) AS n FROM (SELECT \"Child ID\" FROM baseline UNION SELECT \"Child ID\" FROM endline) t",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Avg Sit-ups Improvement (Boys)",
+    "sql": "SELECT AVG(b.\"Sit ups\" - e.\"Sit ups\") AS n FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" WHERE b.\"Gender\" = 'Male'",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Avg Sit-ups Improvement (Girls)",
+    "sql": "SELECT AVG(b.\"Sit ups\" - e.\"Sit ups\") AS n FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" WHERE b.\"Gender\" = 'Female'",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Sit-ups Improvement by Gender",
+    "sql": "SELECT b.\"Gender\", AVG(b.\"Sit ups\" - e.\"Sit ups\") AS improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Gender",
+    "y": [
+     "improvement"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Shuttle Run Improvement by Gender (Sec)",
+    "sql": "SELECT b.\"Gender\", AVG(e.\"Shuttle run sec\" - b.\"Shuttle run sec\") AS improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 ASC",
+    "x": "Gender",
+    "y": [
+     "improvement"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Detailed Metrics by Gender",
+    "sql": "SELECT b.\"Gender\", COUNT(*) AS n, AVG(b.\"Sit ups\") AS baseline_situps, AVG(e.\"Sit ups\") AS endline_situps, AVG(b.\"Shuttle run sec\") AS baseline_shuttle, AVG(e.\"Shuttle run sec\") AS endline_shuttle FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 1"
+   }
+  ],
+  "narrative": "To determine if girls and boys are improving equally, we compare the delta between baseline and endline measurements for key physical indicators. The total cohort size is {{p1}} children.\n\nIn terms of muscular endurance (Sit-ups), boys showed an average improvement of {{p2}} repetitions, while girls improved by {{p3}} repetitions. This suggests a disparity in strength gains if the values differ significantly.\n\nFor cardiovascular agility (Shuttle Run), lower times are better. The bar chart {{p5}} shows the change in seconds. A negative value indicates improvement (faster time). Comparing the bars in {{p4}} and {{p5}} reveals which gender is gaining more in each domain.\n\nThe table {{p6}} provides the raw averages. If the gap between baseline and endline is wider for one gender in both metrics, that group is improving more rapidly. If one improves in speed but the other in strength, the improvement is complementary rather than equal."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": -3.4464285714285716
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": -2.2386363636363638
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Gender",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Gender": "Female",
+     "improvement": -2.2386363636363638
+    },
+    {
+     "Gender": "Male",
+     "improvement": -3.4464285714285716
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Gender",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Gender": "Male",
+     "improvement": -0.014285714285714615
+    },
+    {
+     "Gender": "Female",
+     "improvement": -0.012500000000000016
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Gender",
+    "n",
+    "baseline_situps",
+    "endline_situps",
+    "baseline_shuttle",
+    "endline_shuttle"
+   ],
+   "rows": [
+    {
+     "Gender": "Female",
+     "n": 88,
+     "baseline_situps": 17.28409090909091,
+     "endline_situps": 19.522727272727273,
+     "baseline_shuttle": 13.261363636363637,
+     "endline_shuttle": 13.248863636363632
+    },
+    {
+     "Gender": "Male",
+     "n": 112,
+     "baseline_situps": 17.035714285714285,
+     "endline_situps": 20.482142857142858,
+     "baseline_shuttle": 13.33392857142857,
+     "endline_shuttle": 13.319642857142862
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  }
+ }
+}

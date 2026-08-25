@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Camp Signup</title>
+    <style>
+        :root {
+            --primary: #2d6a4f;
+            --secondary: #40916c;
+            --accent: #d8f3dc;
+            --text: #1b4332;
+            --bg: #f8f9fa;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 { color: var(--primary); margin-bottom: 10px; }
+
+        .card {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        /* Countdown Styles */
+        #countdown {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            font-weight: bold;
+        }
+        .timer-unit {
+            display: flex;
+            flex-direction: column;
+        }
+        .timer-val {
+            font-size: 1.5rem;
+            color: var(--secondary);
+        }
+        .timer-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+
+        /* Form Styles */
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: var(--secondary);
+        }
+
+        /* List Styles */
+        .attendee-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .attendee-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+        .attendee-item:last-child { border-bottom: none; }
+        .empty-msg { text-align: center; color: #888; font-style: italic; }
+
+        .success-msg {
+            color: var(--secondary);
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1 id="event-title">Health Camp Signup</h1>
+        <p id="event-desc">Join us for our community health outreach program.</p>
+    </header>
+
+    <!-- Countdown Section -->
+    <div class="card">
+        <div id="countdown">
+            <div class="timer-unit"><span class="timer-val" id="days">00</span><span class="timer-label">Days</span></div>
+            <div class="timer-unit"><span class="timer-val" id="hours">00</span><span class="timer-label">Hrs</span></div>
+            <div class="timer-unit"><span class="timer-val" id="mins">00</span><span class="timer-label">Min</span></div>
+            <div class="timer-unit"><span class="timer-val" id="secs">00</span><span class="timer-label">Sec</span></div>
+        </div>
+    </div>
+
+    <!-- Signup Form -->
+    <div class="card">
+        <h2 style="margin-top:0">Register Interest</h2>
+        <p id="success-msg" class="success-msg">Thank you! You have been registered.</p>
+        <form id="signup-form">
+            <div class="form-group">
+                <label for="full-name">Full Name</label>
+                <input type="text" id="full-name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" required>
+            </div>
+            <button type="submit">Sign Up Now</button>
+        </form>
+    </div>
+
+    <!-- Attendee List -->
+    <div class="card">
+        <h2 style="margin-top:0">Who is attending</h2>
+        <ul id="attendee-list" class="attendee-list">
+            <!-- Items injected by JS -->
+        </ul>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // Data handling
+        // If window.data is provided, use it. Otherwise, use defaults.
+        const config = window.data || {
+            eventDate: "2024-09-14T09:00:00",
+            attendees: [
+                { name: "Jane Doe", email: "jane@example.com" },
+                { name: "John Smith", email: "john@example.com" }
+            ]
+        };
+
+        const eventDate = new Date(config.eventDate).getTime();
+        let attendees = config.attendees || [];
+
+        // DOM Elements
+        const countdownEl = {
+            days: document.getElementById('days'),
+            hours: document.getElementById('hours'),
+            mins: document.getElementById('mins'),
+            secs: document.getElementById('secs')
+        };
+        const form = document.getElementById('signup-form');
+        const listEl = document.getElementById('attendee-list');
+        const successMsg = document.getElementById('success-msg');
+
+        // Countdown Logic
+        function updateCountdown() {
+            const now = new Date().getTime();
+            const distance = eventDate - now;
+
+            if (distance < 0) {
+                document.getElementById('countdown').innerHTML = "<strong>Event has started!</strong>";
+                return;
+            }
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            countdownEl.days.innerText = String(days).padStart(2, '0');
+            countdownEl.hours.innerText = String(hours).padStart(2, '0');
+            countdownEl.mins.innerText = String(minutes).padStart(2, '0');
+            countdownEl.secs.innerText = String(seconds).padStart(2, '0');
+        }
+
+        // List Rendering
+        function renderList() {
+            listEl.innerHTML = '';
+            if (attendees.length === 0) {
+                listEl.innerHTML = '<li class="empty-msg">No one has signed up yet.</li>';
+                return;
+            }
+
+            attendees.forEach(person => {
+                const li = document.createElement('li');
+                li.className = 'attendee-item';
+                li.innerHTML = `<span>${person.name}</span><span style="font-size:0.8rem; opacity:0.6">${person.email}</span>`;
+                listEl.appendChild(li);
+            });
+        }
+
+        // Form Submission
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const nameInput = document.getElementById('full-name');
+            const emailInput = document.getElementById('email');
+
+            const newAttendee = {
+                name: nameInput.value,
+                email: emailInput.value
+            };
+
+            // Add to local state
+            attendees.unshift(newAttendee);
+            
+            // UI Updates
+            renderList();
+            form.reset();
+            successMsg.style.display = 'block';
+            
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+            }, 4000);
+        });
+
+        // Initialization
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+        renderList();
+
+    })();
+</script>
+
+</body>
+</html>

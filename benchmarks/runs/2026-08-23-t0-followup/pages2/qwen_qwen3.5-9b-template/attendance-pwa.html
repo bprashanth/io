@@ -1,0 +1,232 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Daily Attendance Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Daily Attendance Tracker","short_name":"Attendance","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Daily Attendance Tracker</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+<div class="card">
+  <div class="row">
+    <div style="flex:1">
+      <label for="studentName">Student Name</label>
+      <input type="text" id="studentName" placeholder="Enter name..." autocomplete="off">
+    </div>
+    <div>
+      <button id="addStudentBtn">Add Student</button>
+    </div>
+  </div>
+  <div id="studentList" style="margin-top:12px; display:flex; flex-direction:column; gap:4px;"></div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <div style="flex:1">
+      <label for="attendanceDate">Date</label>
+      <input type="date" id="attendanceDate">
+    </div>
+    <div>
+      <button id="saveAttendanceBtn">Save Attendance</button>
+    </div>
+  </div>
+  <div id="attendanceForm" style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"></div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <div style="flex:1">
+      <label for="summaryMonth">Month</label>
+      <input type="month" id="summaryMonth">
+    </div>
+    <div>
+      <button id="exportBtn" class="secondary">Export CSV</button>
+    </div>
+  </div>
+  <div id="summaryTable" style="margin-top:12px; overflow-x:auto;"></div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+const students = store.get('students', []);
+const attendance = store.get('attendance', {}); // Key: "YYYY-MM-DD", Value: { "Name": "Present/Absent" }
+const today = new Date().toISOString().split('T')[0];
+
+// --- DOM Elements ---
+const studentNameInput = document.getElementById('studentName');
+const addStudentBtn = document.getElementById('addStudentBtn');
+const studentListEl = document.getElementById('studentList');
+const attendanceDateInput = document.getElementById('attendanceDate');
+const saveAttendanceBtn = document.getElementById('saveAttendanceBtn');
+const attendanceFormEl = document.getElementById('attendanceForm');
+const summaryMonthInput = document.getElementById('summaryMonth');
+const exportBtn = document.getElementById('exportBtn');
+const summaryTableEl = document.getElementById('summaryTable');
+
+// --- Initialization ---
+attendanceDateInput.value = today;
+summaryMonthInput.value = today.slice(0, 7);
+
+function renderStudentList() {
+  studentListEl.innerHTML = '';
+  students.forEach((student, index) => {
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = `
+      <input type="text" value="${student}" readonly style="background:#f9fafb;">
+      <button class="secondary" onclick="removeStudent(${index})" style="padding:4px 8px; font-size:12px;">Remove</button>
+    `;
+    studentListEl.appendChild(div);
+  });
+}
+
+function removeStudent(index) {
+  students.splice(index, 1);
+  store.set('students', students);
+  renderStudentList();
+}
+
+function renderAttendanceForm() {
+  attendanceFormEl.innerHTML = '';
+  if (students.length === 0) {
+    attendanceFormEl.innerHTML = '<div class="muted">No students added yet.</div>';
+    return;
+  }
+  students.forEach(student => {
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = `
+      <span style="font-weight:500; width:100px;">${student}</span>
+      <select id="att-${student.replace(/\s+/g, '-').toLowerCase()}">
+        <option value="Present">Present</option>
+        <option value="Absent">Absent</option>
+      </select>
+    `;
+    attendanceFormEl.appendChild(div);
+  });
+}
+
+function saveAttendance() {
+  const date = attendanceDateInput.value;
+  if (!date) return;
+  
+  const currentData = attendance[date] || {};
+  students.forEach(student => {
+    const select = document.getElementById(`att-${student.replace(/\s+/g, '-').toLowerCase()}`);
+    if (select) {
+      currentData[student] = select.value;
+    }
+  });
+  
+  attendance[date] = currentData;
+  store.set('attendance', attendance);
+  alert('Attendance saved!');
+}
+
+function renderSummary() {
+  const month = summaryMonthInput.value;
+  if (!month) return;
+  
+  const [year, monthNum] = month.split('-');
+  const monthStart = new Date(year, monthNum - 1, 1);
+  const monthEnd = new Date(year, monthNum, 0);
+  
+  const rows = [];
+  const headers = ['Student', 'Present', 'Absent', 'Total Days'];
+  
+  students.forEach(student => {
+    let present = 0;
+    let absent = 0;
+    
+    for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      if (attendance[dateStr] && attendance[dateStr][student]) {
+        if (attendance[dateStr][student] === 'Present') present++;
+        else absent++;
+      }
+    }
+    
+    rows.push({
+      Student: student,
+      Present: present,
+      Absent: absent,
+      Total Days: present + absent
+    });
+  });
+  
+  summaryTableEl.innerHTML = `
+    <table>
+      <thead>
+        <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `<tr>${headers.map(h => `<td>${r[h]}</td>`).join('')}</tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// --- Event Listeners ---
+addStudentBtn.addEventListener('click', () => {
+  const name = studentNameInput.value.trim();
+  if (name) {
+    students.push(name);
+    store.set('students', students);
+    studentNameInput.value = '';
+    renderStudentList();
+    renderAttendanceForm();
+  }
+});
+
+saveAttendanceBtn.addEventListener('click', saveAttendance);
+
+exportBtn.addEventListener('click', () => {
+  const month = summaryMonthInput.value;
+  if (!month) return;
+  
+  const [year, monthNum] = month.split('-');
+  const monthStart = new Date(year, monthNum - 1, 1);
+  const monthEnd = new Date(year, monthNum, 0);
+  
+  const rows = [];
+  const headers = ['Student', 'Present', 'Absent', 'Total Days'];
+  
+  students.forEach(student => {
+    let present = 0;
+    let absent = 0;
+    
+    for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      if (attendance[dateStr] && attendance[dateStr][student]) {
+        if (attendance[dateStr][student] === 'Present') present++;
+        else absent++;
+      }
+    }
+    
+    rows.push({
+      Student: student,
+      Present: present,
+      Absent: absent,
+      Total Days: present + absent
+    });
+  });
+  
+  const csvContent = toCSV(rows);
+  download(`attendance-${month}.csv`, csvContent, 'text/csv');
+});
+
+// --- Initial Render ---
+renderStudentList();
+renderAttendanceForm();
+renderSummary();
+</script>
+</body></html>

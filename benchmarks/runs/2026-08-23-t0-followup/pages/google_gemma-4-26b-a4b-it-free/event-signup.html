@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Camp Signup</title>
+    <style>
+        :root {
+            --primary: #2d6a4f;
+            --secondary: #40916c;
+            --accent: #d8f3dc;
+            --text: #1b4332;
+            --bg: #f8fdf9;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        container {
+            max-width: 500px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 { margin-bottom: 0.5rem; color: var(--primary); }
+        p.subtitle { color: var(--secondary); font-weight: 500; }
+
+        card {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Countdown Styles */
+        countdown-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            text-align: center;
+            margin-top: 1rem;
+        }
+        countdown-item {
+            background: var(--accent);
+            padding: 10px 5px;
+            border-radius: 8px;
+        }
+        countdown-val {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        countdown-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+
+        /* Form Styles */
+        form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.4rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: var(--secondary); }
+
+        /* List Styles */
+        attendee-list {
+            list-style: none;
+            padding: 0;
+        }
+        attendee-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+        attendee-item:last-child { border-bottom: none; }
+        empty-msg { color: #888; font-style: italic; text-align: center; }
+
+        success-msg {
+            color: #2d6a4f;
+            background: #d8f3dc;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            margin-bottom: 1rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Community Health Camp</h1>
+            <p class="subtitle">September 14th</p>
+        </header>
+
+        <div class="card">
+            <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">Time until event:</div>
+            <div class="countdown-grid">
+                <div class="countdown-item">
+                    <span class="countdown-val" id="days">00</span>
+                    <span class="countdown-label">Days</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-val" id="hours">00</span>
+                    <span class="countdown-label">Hrs</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-val" id="mins">00</span>
+                    <span class="countdown-label">Min</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-val" id="secs">00</span>
+                    <span class="countdown-label">Sec</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-top:0; font-size: 1.2rem;">Register for the Camp</h2>
+            <div id="successBanner" class="success-msg">Registration successful!</div>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" required placeholder="John Doe">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" required placeholder="john@example.com">
+                </div>
+                <button type="submit">Confirm Signup</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-top:0; font-size: 1.2rem;">Who is coming</h2>
+            <ul id="attendeeList" class="attendee-list">
+                <!-- List items injected here -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Data handling
+        // If window.data exists, use it, otherwise use local storage for persistence
+        let attendees = [];
+        if (window.data && window.data.attendees) {
+            attendees = window.data.attendees;
+        } else {
+            const saved = localStorage.getItem('camp_signups');
+            if (saved) attendees = JSON.parse(saved);
+        }
+
+        const form = document.getElementById('signupForm');
+        const listElement = document.getElementById('attendeeList');
+        const successBanner = document.getElementById('successBanner');
+
+        function renderList() {
+            listElement.innerHTML = '';
+            if (attendees.length === 0) {
+                listElement.innerHTML = '<li class="empty-msg">No signups yet. Be the first!</li>';
+                return;
+            }
+            attendees.forEach(person => {
+                const li = document.createElement('li');
+                li.className = 'attendee-item';
+                li.innerHTML = `<span>${person.name}</span><span style="color:#888; font-size:0.8rem;">Registered</span>`;
+                listElement.appendChild(li);
+            });
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('fullName').value;
+            const email = document.getElementById('email').value;
+
+            if (name && email) {
+                attendees.push({ name, email });
+                localStorage.setItem('camp_signups', JSON.stringify(attendees));
+                renderList();
+                form.reset();
+                
+                successBanner.style.display = 'block';
+                setTimeout(() => {
+                    successBanner.style.display = 'none';
+                }, 3000);
+            }
+        });
+
+        // Countdown Logic
+        function updateCountdown() {
+            const targetDate = new Date('September 14, 2024 09:00:00').getTime();
+            const now = new Date().getTime();
+            const distance = targetDate - now;
+
+            if (distance < 0) {
+                document.querySelector('.countdown-grid').innerHTML = '<div style="grid-column: span 4; padding: 10px;">Event has started!</div>';
+                return;
+            }
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            document.getElementById('days').innerText = days.toString().padStart(2, '0');
+            document.getElementById('hours').innerText = hours.toString().padStart(2, '0');
+            document.getElementById('mins').innerText = minutes.toString().padStart(2, '0');
+            document.getElementById('secs').innerText = seconds.toString().padStart(2, '0');
+        }
+
+        // Initialization
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+        renderList();
+
+        // Service Worker Registration (Offline Support)
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                const CACHE_NAME = 'health-camp-v1';
+                self.addEventListener('install', (e) => {
+                    e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(['./'])));
+                });
+                self.addEventListener('fetch', (e) => {
+                    e.respondWith(caches.match(e.request).then((res) => res || fetch(e.request)));
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW failed', err));
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+{
+ "plan": {
+  "title": "Donation Performance and Donor Analytics",
+  "subtitle": "Monthly donation trends, geographic distribution, payment modes, and repeat donor activity",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Donations",
+    "sql": "SELECT SUM(\"Amount\") AS total_amount FROM donor_transactions",
+    "unit": "\u20b9"
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Transactions",
+    "sql": "SELECT COUNT(*) AS total_tx FROM donor_transactions",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Repeat Donors",
+    "sql": "SELECT COUNT(*) AS repeat_donors FROM (SELECT COALESCE(\"PAN\", \"Email\", \"Donor\") AS donor_id FROM donor_transactions GROUP BY 1 HAVING COUNT(*) > 1)",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Monthly Donation Trend",
+    "sql": "SELECT strftime('%Y-%m', try_strptime(\"Date\", '%Y-%m-%d')) AS month, SUM(\"Amount\") AS total_amount FROM donor_transactions WHERE \"Date\" IS NOT NULL GROUP BY 1 ORDER BY 1",
+    "x": "month",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Top Cities by Donation Amount",
+    "sql": "SELECT \"City\" AS city, SUM(\"Amount\") AS total_amount FROM donor_transactions WHERE \"City\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "city",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "pie",
+    "title": "Payment Mode Distribution",
+    "sql": "SELECT \"Mode\" AS mode, SUM(\"Amount\") AS total_amount FROM donor_transactions WHERE \"Mode\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC",
+    "x": "mode",
+    "y": "total_amount"
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Top Repeat Donors",
+    "sql": "SELECT COALESCE(\"Donor\", 'Anonymous') AS donor_name, COUNT(*) AS donation_count, SUM(\"Amount\") AS total_contributed, MAX(\"Date\") AS last_donation_date FROM donor_transactions GROUP BY 1 HAVING COUNT(*) > 1 ORDER BY 3 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "Across all records, total collections reached {{p1.total_amount}} across {{p2.total_tx}} transactions. A core segment of {{p3.repeat_donors}} repeat donors continues to contribute regularly. Monthly trends track overall inflows over time, while city and payment mode breakdowns highlight top regional and channel sources."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "total_amount": 6641021
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "total_tx"
+   ],
+   "rows": [
+    {
+     "total_tx": 250
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "repeat_donors"
+   ],
+   "rows": [
+    {
+     "repeat_donors": 0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "month",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "month": null,
+     "total_amount": 6641021
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "city",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "city": "Gaya",
+     "total_amount": 787715
+    },
+    {
+     "city": "Bengaluru",
+     "total_amount": 771729
+    },
+    {
+     "city": "Solapur",
+     "total_amount": 729972
+    },
+    {
+     "city": "Thane",
+     "total_amount": 678448
+    },
+    {
+     "city": "Mumbai",
+     "total_amount": 617867
+    },
+    {
+     "city": "Pune",
+     "total_amount": 544876
+    },
+    {
+     "city": "Nashik",
+     "total_amount": 498828
+    },
+    {
+     "city": "Nagpur",
+     "total_amount": 428953
+    },
+    {
+     "city": "Aurangabad",
+     "total_amount": 403921
+    },
+    {
+     "city": "Delhi",
+     "total_amount": 395268
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "mode",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "mode": "NEFT",
+     "total_amount": 1511602
+    },
+    {
+     "mode": "Card",
+     "total_amount": 1322416
+    },
+    {
+     "mode": "Cash",
+     "total_amount": 1277633
+    },
+    {
+     "mode": "DD",
+     "total_amount": 1250836
+    },
+    {
+     "mode": "UPI",
+     "total_amount": 728176
+    },
+    {
+     "mode": "Cheque",
+     "total_amount": 550358
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "donor_name",
+    "donation_count",
+    "total_contributed",
+    "last_donation_date"
+   ],
+   "rows": [
+    {
+     "donor_name": "Pankaj Pereira",
+     "donation_count": 2,
+     "total_contributed": 100648,
+     "last_donation_date": "25-07-2025"
+    },
+    {
+     "donor_name": "Rajesh",
+     "donation_count": 2,
+     "total_contributed": 60187,
+     "last_donation_date": "12-10-2025"
+    },
+    {
+     "donor_name": "Rohit",
+     "donation_count": 2,
+     "total_contributed": 3091,
+     "last_donation_date": "28-04-2025"
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  }
+ }
+}

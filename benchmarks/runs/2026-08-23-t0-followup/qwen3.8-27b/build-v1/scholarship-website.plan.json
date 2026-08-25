@@ -1,0 +1,264 @@
+{
+ "plan": {
+  "title": "Scholarship Scheme Progress by District",
+  "subtitle": "Overview of application status, scheme distribution, and pending cases across districts",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Applications",
+    "sql": "SELECT COUNT(*) AS total FROM \"scholarship_applicants\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Pending Cases",
+    "sql": "SELECT COUNT(*) AS pending FROM \"scholarship_applicants\" WHERE \"Status\" = 'Pending'",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Approved & Disbursed",
+    "sql": "SELECT COUNT(*) AS completed FROM \"scholarship_applicants\" WHERE \"Status\" IN ('Approved', 'Disbursed')",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "stacked_bar",
+    "title": "Application Status by District",
+    "sql": "SELECT \"District\" AS district, SUM(CASE WHEN \"Status\" = 'Approved' THEN 1 ELSE 0 END) AS approved, SUM(CASE WHEN \"Status\" = 'Disbursed' THEN 1 ELSE 0 END) AS disbursed, SUM(CASE WHEN \"Status\" = 'Pending' THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN \"Status\" = 'Rejected' THEN 1 ELSE 0 END) AS rejected, SUM(CASE WHEN \"Status\" = 'Under Review' THEN 1 ELSE 0 END) AS under_review FROM \"scholarship_applicants\" GROUP BY 1 ORDER BY 1",
+    "x": "district",
+    "y": [
+     "approved",
+     "disbursed",
+     "pending",
+     "rejected",
+     "under_review"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Pending Cases by District",
+    "sql": "SELECT \"District\" AS district, COUNT(*) AS pending_count FROM \"scholarship_applicants\" WHERE \"Status\" = 'Pending' GROUP BY 1 ORDER BY 2 DESC",
+    "x": "district",
+    "y": [
+     "pending_count"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Pending Applications by Scheme and District",
+    "sql": "SELECT \"Name of scheme\" AS scheme, \"District\" AS district, COUNT(*) AS pending_count FROM \"scholarship_applicants\" WHERE \"Status\" = 'Pending' GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 20"
+   }
+  ],
+  "narrative": "The dashboard tracks scholarship application progress across districts, highlighting total volume, completed cases, and pending items. The total number of applications is {{p1}}, with {{p2}} currently pending and {{p3}} already approved or disbursed.\n\nThe stacked bar chart shows the status breakdown by district, allowing quick identification of areas with high pending or rejected counts. The bar chart isolates pending cases by district, with the highest pending count in {{p5}}.\n\nThe table lists the top pending applications by scheme and district, with the most common pending scheme-district combination being {{p6}}."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total"
+   ],
+   "rows": [
+    {
+     "total": 300
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "pending"
+   ],
+   "rows": [
+    {
+     "pending": 60
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "completed"
+   ],
+   "rows": [
+    {
+     "completed": 103
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "district",
+    "approved",
+    "disbursed",
+    "pending",
+    "rejected",
+    "under_review"
+   ],
+   "rows": [
+    {
+     "district": "Gaya",
+     "approved": 14,
+     "disbursed": 20,
+     "pending": 20,
+     "rejected": 20,
+     "under_review": 22
+    },
+    {
+     "district": "Muzaffarpur",
+     "approved": 14,
+     "disbursed": 16,
+     "pending": 25,
+     "rejected": 20,
+     "under_review": 30
+    },
+    {
+     "district": "Pune",
+     "approved": 20,
+     "disbursed": 19,
+     "pending": 15,
+     "rejected": 21,
+     "under_review": 24
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "district",
+    "pending_count"
+   ],
+   "rows": [
+    {
+     "district": "Muzaffarpur",
+     "pending_count": 25
+    },
+    {
+     "district": "Gaya",
+     "pending_count": 20
+    },
+    {
+     "district": "Pune",
+     "pending_count": 15
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "scheme",
+    "district",
+    "pending_count"
+   ],
+   "rows": [
+    {
+     "scheme": "Post-Matric Scholarship Scheme",
+     "district": "Muzaffarpur",
+     "pending_count": 9
+    },
+    {
+     "scheme": "EBC Scholarship Scheme",
+     "district": "Gaya",
+     "pending_count": 5
+    },
+    {
+     "scheme": "Merit-cum-Means Scholarship",
+     "district": "Gaya",
+     "pending_count": 5
+    },
+    {
+     "scheme": "Minority Welfare Scholarship",
+     "district": "Pune",
+     "pending_count": 4
+    },
+    {
+     "scheme": "EBC Scholarship Scheme",
+     "district": "Muzaffarpur",
+     "pending_count": 4
+    },
+    {
+     "scheme": "Savitribai Phule Scholarship",
+     "district": "Gaya",
+     "pending_count": 4
+    },
+    {
+     "scheme": "Minority Welfare Scholarship",
+     "district": "Muzaffarpur",
+     "pending_count": 3
+    },
+    {
+     "scheme": "Savitribai Phule Scholarship",
+     "district": "Pune",
+     "pending_count": 3
+    },
+    {
+     "scheme": "Post-Matric Scholarship Scheme",
+     "district": "Gaya",
+     "pending_count": 3
+    },
+    {
+     "scheme": "Rajarshi Shahu Maharaj Scholarship",
+     "district": "Muzaffarpur",
+     "pending_count": 3
+    },
+    {
+     "scheme": "Pre-Matric Scholarship Scheme",
+     "district": "Muzaffarpur",
+     "pending_count": 2
+    },
+    {
+     "scheme": "Merit-cum-Means Scholarship",
+     "district": "Muzaffarpur",
+     "pending_count": 2
+    },
+    {
+     "scheme": "EBC Scholarship Scheme",
+     "district": "Pune",
+     "pending_count": 2
+    },
+    {
+     "scheme": "Post-Matric Scholarship Scheme",
+     "district": "Pune",
+     "pending_count": 2
+    },
+    {
+     "scheme": "Savitribai Phule Scholarship",
+     "district": "Muzaffarpur",
+     "pending_count": 2
+    },
+    {
+     "scheme": "Minority Welfare Scholarship",
+     "district": "Gaya",
+     "pending_count": 2
+    },
+    {
+     "scheme": "Pre-Matric Scholarship Scheme",
+     "district": "Pune",
+     "pending_count": 2
+    },
+    {
+     "scheme": "Merit-cum-Means Scholarship",
+     "district": "Pune",
+     "pending_count": 2
+    },
+    {
+     "scheme": "Rajarshi Shahu Maharaj Scholarship",
+     "district": "Gaya",
+     "pending_count": 1
+    }
+   ],
+   "rowcount": 19,
+   "error": null
+  }
+ }
+}

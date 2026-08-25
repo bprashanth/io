@@ -1,0 +1,211 @@
+{
+  "id": "attendance-cross-year-p03",
+  "task_id": "attendance-cross-year",
+  "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+  "question": "compare average monthly attendance percentage per centre across the two years, one row per centre with both years",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+  "expected_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Chembur Balwadi",
+      70.36061535278955,
+      70.44660647710165
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452575365701,
+      74.9729429682096
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944275021553,
+      80.66053539514542
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073098897934,
+      63.430858651796974
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706957578659,
+      62.32635031143824
+    ],
+    [
+      "Sion Balwadi",
+      60.51530490318934,
+      55.563867588837944
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901597976685,
+      88.94728968540826
+    ],
+    [
+      "Worli Balwadi",
+      80.31790802876154,
+      77.58226295312247
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH combined_2023 AS (SELECT \"Centre\", AVG(CAST(\"Avg Daily Present\" AS REAL) / NULLIF(NULLIF(CAST(\"Enrolled Kids\" AS REAL), 0), 0)) * 100 AS \"Avg Monthly Attendance %\" FROM \"attendance_2023\" GROUP BY \"Centre\"), combined_2024 AS (SELECT \"centre_name\" AS \"Centre\", AVG(CAST(\"average_attendance\" AS REAL) / NULLIF(NULLIF(CAST(\"enrolment\" AS REAL), 0), 0)) * 100 AS \"Avg Monthly Attendance %\" FROM \"attendance_2024\" GROUP BY \"centre_name\") SELECT COALESCE(c23.\"Centre\", c24.\"Centre\") AS \"Centre\", c23.\"Avg Monthly Attendance %\" AS \"2023 Attendance %\", c24.\"Avg Monthly Attendance %\" AS \"2024 Attendance %\" FROM combined_2023 AS c23 FULL OUTER JOIN combined_2024 AS c24 ON c23.\"Centre\" = c24.\"Centre\" ORDER BY \"Centre\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncompare average monthly attendance percentage per centre across the two years, one row per centre with both years",
+      "response": "```sql\nWITH\n-- Align 2023 and 2024 centre names\ncentre_mapping AS (\n    SELECT\n        a.\"Centre\" AS centre_2023,\n        b.\"centre_name\" AS centre_2024,\n        jaro_winkler_similarity(lower(trim(a.\"Centre\")), lower(trim(b.\"centre_name\"))) AS similarity\n    FROM \"attendance_2023\" a\n    CROSS JOIN \"attendance_2024\" b\n    QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Centre\" ORDER BY similarity DESC) = 1\n),\n\n-- Get best matches (left join to keep all 2023 centres)\nmatched_centres AS (\n    SELECT\n        a.\"Centre\" AS centre_2023,\n        COALESCE(b.\"centre_name\", a.\"Centre\") AS centre_2024\n    FROM \"attendance_2023\" a\n    LEFT JOIN centre_mapping m ON a.\"Centre\" = m.centre_2023\n    LEFT JOIN \"attendance_2024\" b ON m.centre_2024 = b.\"centre_name\"\n),\n\n-- Calculate monthly averages for each year\nyearly_averages AS (\n    SELECT\n        centre_2023 AS \"Centre\",\n        AVG(\"Avg Daily Present\"::FLOAT / NULLIF(\"Enrolled Kids\"::FLOAT, 0)) * 100 AS \"2023 Avg Monthly Attendance %\"\n    FROM \"attendance_2023\"\n    GROUP BY centre_2023\n\n    UNION ALL\n\n    SELECT\n        centre_2024 AS \"Centre\",\n        AVG(average_attendance::FLOAT / NULLIF(enrolment::FLOAT, 0)) * 100 AS \"2024 Avg Monthly Attendance %\"\n    FROM \"attendance_2024\"\n    GROUP BY centre_2024\n)\n\n-- Final comparison with both years\nSELECT\n    \"Centre\",\n    \"2023 Avg Monthly Attendance %\",\n    \"2024 Avg Monthly Attendance %\"\nFROM yearly_averages\nQUALIFY ROW_NUMBER() OVER (PARTITION BY \"Centre\" ORDER BY\n    CASE WHEN \"Centre\" LIKE '%2023%' THEN 1 ELSE 2 END\n) = 1\nORDER BY \"Centre\";\n```",
+      "api": {
+        "id": "gen-1787421763-rpIGfQfCDS7qOnWs35P8",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 639,
+          "completion_tokens": 533,
+          "total_tokens": 1172,
+          "cost": 0.00014224,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 512,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00014224,
+            "upstream_inference_prompt_cost": 3.564e-05,
+            "upstream_inference_completions_cost": 0.0001066
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 5.605
+      },
+      "duration_seconds": 5.611,
+      "error": "BinderException: Binder Error: Referenced column \"centre_2023\" not found in FROM clause!\nCandidate bindings: \"Centre\", \"Month\"\n\nLINE 1: ... Avg Monthly Attendance %\" FROM \"attendance_2023\" GROUP BY centre_2023 UNION ALL SELECT centre_2024 AS \"Centre\", AVG...\n                                                                      ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncompare average monthly attendance percentage per centre across the two years, one row per centre with both years\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"centre_2023\" not found in FROM clause!\nCandidate bindings: \"Centre\", \"Month\"\n\nLINE 1: ... Avg Monthly Attendance %\" FROM \"attendance_2023\" GROUP BY centre_2023 UNION ALL SELECT centre_2024 AS \"Centre\", AVG...\n                                                                      ^\nReturn a complete corrected query.",
+      "response": "```sql\nWITH combined_2023 AS (\n    SELECT\n        \"Centre\",\n        AVG(\"Avg Daily Present\"::FLOAT / NULLIF(\"Enrolled Kids\"::FLOAT, 0)) * 100 AS \"Avg Monthly Attendance %\"\n    FROM \"attendance_2023\"\n    GROUP BY \"Centre\"\n),\ncombined_2024 AS (\n    SELECT\n        \"centre_name\" AS \"Centre\",\n        AVG(\"average_attendance\"::FLOAT / NULLIF(\"enrolment\"::FLOAT, 0)) * 100 AS \"Avg Monthly Attendance %\"\n    FROM \"attendance_2024\"\n    GROUP BY \"centre_name\"\n)\n\nSELECT\n    COALESCE(c23.\"Centre\", c24.\"Centre\") AS \"Centre\",\n    c23.\"Avg Monthly Attendance %\" AS \"2023 Attendance %\",\n    c24.\"Avg Monthly Attendance %\" AS \"2024 Attendance %\"\nFROM combined_2023 c23\nFULL OUTER JOIN combined_2024 c24 ON c23.\"Centre\" = c24.\"Centre\"\nORDER BY \"Centre\"\n```",
+      "api": {
+        "id": "gen-1787421769-fcakkwX6MZ7YY4LVuMaL",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 734,
+          "completion_tokens": 263,
+          "total_tokens": 997,
+          "cost": 0.00010724,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 512,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00010724,
+            "upstream_inference_prompt_cost": 5.464e-05,
+            "upstream_inference_completions_cost": 5.26e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.945
+      },
+      "duration_seconds": 2.954,
+      "sql_duckdb": "WITH combined_2023 AS (SELECT \"Centre\", AVG(CAST(\"Avg Daily Present\" AS REAL) / NULLIF(NULLIF(CAST(\"Enrolled Kids\" AS REAL), 0), 0)) * 100 AS \"Avg Monthly Attendance %\" FROM \"attendance_2023\" GROUP BY \"Centre\"), combined_2024 AS (SELECT \"centre_name\" AS \"Centre\", AVG(CAST(\"average_attendance\" AS REAL) / NULLIF(NULLIF(CAST(\"enrolment\" AS REAL), 0), 0)) * 100 AS \"Avg Monthly Attendance %\" FROM \"attendance_2024\" GROUP BY \"centre_name\") SELECT COALESCE(c23.\"Centre\", c24.\"Centre\") AS \"Centre\", c23.\"Avg Monthly Attendance %\" AS \"2023 Attendance %\", c24.\"Avg Monthly Attendance %\" AS \"2024 Attendance %\" FROM combined_2023 AS c23 FULL OUTER JOIN combined_2024 AS c24 ON c23.\"Centre\" = c24.\"Centre\" ORDER BY \"Centre\" NULLS FIRST",
+      "rows": [
+        [
+          "Chembur Balwadi",
+          70.36061535278955,
+          70.44660647710165
+        ],
+        [
+          "Dharavi Balwadi",
+          70.82452575365701,
+          74.9729429682096
+        ],
+        [
+          "Govandi Balwadi",
+          75.9944275021553,
+          80.66053539514542
+        ],
+        [
+          "Kurla Balwadi",
+          83.94073098897934,
+          63.430858651796974
+        ],
+        [
+          "Mankhurd Balwadi",
+          64.20706957578659,
+          62.32635031143824
+        ],
+        [
+          "Sion Balwadi",
+          60.51530490318934,
+          55.563867588837944
+        ],
+        [
+          "Wadala Balwadi",
+          87.81901597976685,
+          88.94728968540826
+        ],
+        [
+          "Worli Balwadi",
+          80.31790802876154,
+          77.58226295312247
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

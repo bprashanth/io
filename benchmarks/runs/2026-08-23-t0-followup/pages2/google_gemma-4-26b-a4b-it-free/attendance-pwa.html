@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Attendance Tracker</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+        container { max-width: 500px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; text-align: center; margin-bottom: 1.5rem; }
+        card {
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+        }
+        nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        nav-btn {
+            border: none;
+            background: none;
+            color: #64748b;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+        nav-btn.active { color: var(--primary); font-weight: bold; }
+        nav-btn svg { width: 24px; height: 24px; margin-bottom: 4px; }
+        
+        input-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        input[type="text"], input[type="date"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        button.main-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        student-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        student-row:last-child { border-bottom: none; }
+        btn-toggle {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        btn-present { background: #dcfce7; color: #166534; }
+        btn-absent { background: #fee2e2; color: #991b1b; }
+        hidden { display: none; }
+        summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Setup View -->
+    <div id="view-setup" class="view">
+        <h1>Student Setup</h1>
+        <div class="card">
+            <div class="input-group">
+                <label>Add Student Name</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="new-student-name" placeholder="Enter name...">
+                    <button class="main-btn" style="width:auto;" onclick="addStudent()">Add</button>
+                </div>
+            </div>
+            <p style="font-size: 0.8rem; color: #64748b;">Add all 25 students to begin.</p>
+        </div>
+        <div class="card">
+            <div id="student-list-setup"></div>
+            <button class="main-btn" style="background:#64748b; margin-top:1rem;" onclick="clearAllData()">Reset All Data</button>
+        </div>
+    </div>
+
+    <!-- Attendance View -->
+    <div id="view-attendance" class="view hidden">
+        <h1>Daily Attendance</h1>
+        <div class="card">
+            <div class="input-group">
+                <label>Date</label>
+                <input type="date" id="attendance-date">
+            </div>
+        </div>
+        <div class="card">
+            <div id="attendance-list"></div>
+        </div>
+    </div>
+
+    <!-- Summary View -->
+    <div id="view-summary" class="view hidden">
+        <h1>Monthly Summary</h1>
+        <div class="card">
+            <div class="input-group">
+                <label>Select Month</label>
+                <input type="month" id="summary-month">
+            </div>
+        </div>
+        <div class="card" id="summary-results">
+            <p style="text-align:center; color:#64748b;">Select a month to see stats</p>
+        </div>
+    </div>
+</div>
+
+<div class="nav">
+    <button class="nav-btn active" onclick="showView('setup', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        Setup
+    </button>
+    <button class="nav-btn" onclick="showView('attendance', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        Mark
+    </button>
+    <button class="nav-btn" onclick="showView('summary', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="2" y1="5" x2="14" y2="5"></line><line x1="2" y1="12" x2="14" y2="12"></line><line x1="2" y1="19" x2="14" y2="19"></line><line x1="15" y1="5" x2="15" y2="19"></line></svg>
+        Stats
+    </button>
+</div>
+
+<script>
+    // Data Management
+    let state = {
+        students: [],
+        attendance: {} // Format: { "YYYY-MM-DD": { "studentId": true/false } }
+    };
+
+    function loadData() {
+        const saved = localStorage.getItem('ngo_attendance_data');
+        if (saved) {
+            state = JSON.parse(saved);
+        }
+        renderSetup();
+        renderAttendance();
+        renderSummary();
+    }
+
+    function saveData() {
+        localStorage.setItem('ngo_attendance_data', JSON.stringify(state));
+    }
+
+    // Navigation
+    function showView(viewId, btn) {
+        document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+        document.getElementById('view-' + viewId).classList.remove('hidden');
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        if(viewId === 'attendance') renderAttendance();
+        if(viewId === 'ummary') renderSummary();
+    }
+
+    // Setup Logic
+    function addStudent() {
+        const input = document.getElementById('new-student-name');
+        const name = input.value.trim();
+        if (name) {
+            state.students.push({ id: Date.now().toString(), name: name });
+            input.value = '';
+            saveData();
+            renderSetup();
+        }
+    }
+
+    function removeStudent(id) {
+        state.students = state.students.filter(s => s.id!== id);
+        saveData();
+        renderSetup();
+    }
+
+    function renderSetup() {
+        const list = document.getElementById('student-list-setup');
+        list.innerHTML = state.students.length === 0? '<p style="color:#64748b; font-size:0.9rem;">No students added yet.</p>' : '';
+        state.students.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'tudent-row';
+            div.innerHTML = `
+                <span>${s.name}</span>
+                <button onclick="removeStudent('${s.id}')" style="color:var(--danger); border:none; background:none; cursor:pointer;">Remove</button>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function clearAllData() {
+        if(confirm("Delete all students and attendance history?")) {
+            state = { students: [], attendance: {} };
+            saveData();
+            renderSetup();
+        }
+    }
+
+    // Attendance Logic
+    function renderAttendance() {
+        const list = document.getElementById('attendance-list');
+        const dateInput = document.getElementById('attendance-date');
+        
+        if (!dateInput.value) {
+            dateInput.valueAsDate = new Date();
+        }
+
+        list.innerHTML = '';
+        if (state.students.length === 0) {
+            list.innerHTML = '<p style="text-align:center; color:#64748b;">Add students in Setup first.</p>';
+            return;
+        }
+
+        const selectedDate = dateInput.value;
+        const dayData = state.attendance[selectedDate] || {};
+
+        state.students.forEach(s => {
+            const isPresent = dayData[s.id] === true;
+            const div = document.createElement('div');
+            div.className = 'tudent-row';
+            div.innerHTML = `
+                <span>${s.name}</span>
+                <button class="btn-toggle ${isPresent? 'btn-present' : 'btn-absent'}" 
+                        onclick="toggleAttendance('${s.id}', '${selectedDate}')">
+                    ${isPresent? 'Present' : 'Absent'}
+                </button>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function toggleAttendance(studentId, date) {
+        if (!state.attendance[date]) state.attendance[date] = {};
+        state.attendance[date][studentId] =!state.attendance[date][studentId];
+        saveData();
+        renderAttendance();
+    }
+
+    // Summary Logic
+    function renderSummary() {
+        const container = document.getElementById('summary-results');
+        const monthInput = document.getElementById('summary-month');
+        
+        if (!monthInput.value) return;
+
+        const [year, month] = monthInput.value.split('-');
+        container.innerHTML = '';
+
+        // Calculate stats
+        const stats = state.students.map(s => {
+            let presentCount = 0;
+            let totalDays = 0;
+            
+            // Iterate through all dates in the selected month
+            // For simplicity, we check all dates in state that match the month/year
+            Object.keys(state.attendance).forEach(dateStr => {
+                if (dateStr.startsWith(year + '-' + month)) {
+                    totalDays++;
+                    if (state.attendance[dateStr][s.id] === true) {
+                        presentCount++;
+                    }
+                }
+            });
+
+            return { name: s.name, present: presentCount, total: totalDays };
+        });
+
+        if (stats.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#64748b;">No data for this month.</p>';
+            return;
+        }
+
+        stats.forEach(stat => {
+            const div = document.createElement('div');
+            div.className = 'ummary-item';
+            const rate = stat.total > 0? Math.round((stat.present / stat.total) * 100) : 0;
+            div.innerHTML = `
+                <span>${stat.name}</span>
+                <span>${stat.present} / ${stat.total} days (${rate}%)</span>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    document.getElementById('summary-month').addEventListener('change', renderSummary);
+    document.getElementById('attendance-date').addEventListener('change', renderAttendance);
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        const swCode = `
+            self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
+            self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() =>)));
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch(err => console.log('SW failed', err));
+    }
+
+    // Init
+    loadData();
+</script>
+</body>
+</html>

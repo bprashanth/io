@@ -1,0 +1,188 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Beneficiary Registration</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Beneficiary Registration","short_name":"Beneficiaries","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Beneficiary Registration</h1></header>
+<main>
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:18px">Register Beneficiary</h2>
+    <form id="beneficiaryForm">
+      <div class="grid">
+        <div>
+          <label for="name">Full Name *</label>
+          <input type="text" id="name" required placeholder="e.g. Jane Doe" autocomplete="name">
+        </div>
+        <div>
+          <label for="age">Age *</label>
+          <input type="number" id="age" min="1" max="120" required placeholder="e.g. 34">
+        </div>
+      </div>
+      <div class="grid">
+        <div>
+          <label for="village">Village / Community *</label>
+          <input type="text" id="village" required placeholder="e.g. Riverside Village">
+        </div>
+        <div>
+          <label for="phone">Phone Number *</label>
+          <input type="tel" id="phone" pattern="^[0-9+() -]{6,20}$" title="Enter a valid phone number" required placeholder="e.g. +1234567890">
+        </div>
+      </div>
+      <div>
+        <label for="category">Program Category *</label>
+        <select id="category" required>
+          <option value="">-- Select Category --</option>
+          <option value="Healthcare Support">Healthcare Support</option>
+          <option value="Livelihood & Skills">Livelihood & Skills</option>
+          <option value="Education Assistance">Education Assistance</option>
+          <option value="Nutrition & Food Aid">Nutrition & Food Aid</option>
+          <option value="Elderly Care">Elderly Care</option>
+          <option value="Disability Support">Disability Support</option>
+          <option value="Emergency Relief">Emergency Relief</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:16px;justify-content:flex-end">
+        <button type="reset" class="secondary">Clear Form</button>
+        <button type="submit">Save Beneficiary</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:18px">Registered Beneficiaries (<span id="recordCount">0</span>)</h2>
+      <div class="row">
+        <button id="downloadBtn" class="secondary" type="button">Download CSV</button>
+        <button id="clearAllBtn" class="secondary" type="button" style="color:#dc2626;border-color:#dc2626">Clear All</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Age</th>
+            <th>Village</th>
+            <th>Phone</th>
+            <th>Category</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="beneficiaryTableBody">
+          <tr><td colspan="8" class="muted" style="text-align:center;padding:16px">No beneficiaries registered yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+
+const STORAGE_KEY = 'ngo_beneficiaries_data';
+const initialData = (typeof window.data !== 'undefined' && Array.isArray(window.data)) ? window.data : [];
+let beneficiaries = store.get(STORAGE_KEY, initialData);
+
+const form = document.getElementById('beneficiaryForm');
+const tableBody = document.getElementById('beneficiaryTableBody');
+const recordCount = document.getElementById('recordCount');
+const downloadBtn = document.getElementById('downloadBtn');
+const clearAllBtn = document.getElementById('clearAllBtn');
+
+function renderTable() {
+  recordCount.textContent = beneficiaries.length;
+  if (beneficiaries.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;padding:16px">No beneficiaries registered yet.</td></tr>';
+    return;
+  }
+  
+  tableBody.innerHTML = beneficiaries.map((item, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td><strong>${escapeHtml(item.name || '')}</strong></td>
+      <td>${escapeHtml(String(item.age || ''))}</td>
+      <td>${escapeHtml(item.village || '')}</td>
+      <td>${escapeHtml(item.phone || '')}</td>
+      <td>${escapeHtml(item.category || '')}</td>
+      <td class="muted">${escapeHtml(item.date || '')}</td>
+      <td>
+        <button type="button" class="secondary" style="padding:2px 8px;font-size:12px;color:#dc2626;border-color:#dc2626" onclick="deleteEntry(${idx})">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+window.deleteEntry = function(index) {
+  if (confirm('Delete this beneficiary entry?')) {
+    beneficiaries.splice(index, 1);
+    store.set(STORAGE_KEY, beneficiaries);
+    renderTable();
+  }
+};
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  
+  const name = document.getElementById('name').value.trim();
+  const age = document.getElementById('age').value.trim();
+  const village = document.getElementById('village').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const category = document.getElementById('category').value;
+
+  if (!name || !age || !village || !phone || !category) {
+    alert('Please fill out all required fields.');
+    return;
+  }
+
+  const newEntry = {
+    name,
+    age: Number(age),
+    village,
+    phone,
+    category,
+    date: new Date().toISOString().split('T')[0]
+  };
+
+  beneficiaries.unshift(newEntry);
+  store.set(STORAGE_KEY, beneficiaries);
+  renderTable();
+  form.reset();
+  document.getElementById('name').focus();
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (beneficiaries.length === 0) {
+    alert('No beneficiary records available to download.');
+    return;
+  }
+  const csvData = toCSV(beneficiaries);
+  const dateStr = new Date().toISOString().split('T')[0];
+  download(`beneficiaries_${dateStr}.csv`, csvData, 'text/csv');
+});
+
+clearAllBtn.addEventListener('click', () => {
+  if (beneficiaries.length === 0) return;
+  if (confirm('Are you sure you want to delete all saved beneficiary entries?')) {
+    beneficiaries = [];
+    store.set(STORAGE_KEY, beneficiaries);
+    renderTable();
+  }
+});
+
+renderTable();
+</script>
+</body></html>

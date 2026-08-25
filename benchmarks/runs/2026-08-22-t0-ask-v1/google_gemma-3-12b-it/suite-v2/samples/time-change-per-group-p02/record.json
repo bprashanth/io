@@ -1,0 +1,69 @@
+{
+  "id": "time-change-per-group-p02",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "compare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      7.608020305633545
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH anc_visits_2021 AS (SELECT \"anc4_completed\", \"pregnancies_registered\" FROM \"anc_visits\" WHERE \"year\" = 2021 AND \"district\" IN ('Gaya', 'Nalanda')), anc_visits_2023 AS (SELECT \"anc4_completed\", \"pregnancies_registered\" FROM \"anc_visits\" WHERE \"year\" = 2023 AND \"district\" IN ('Gaya', 'Nalanda')) SELECT ((CAST(SUM(\"anc_visits_2023\".\"anc4_completed\") AS REAL) / NULLIF(NULLIF(SUM(\"anc_visits_2023\".\"pregnancies_registered\"), 0), 0)) - (CAST(SUM(\"anc_visits_2021\".\"anc4_completed\") AS REAL) / NULLIF(NULLIF(SUM(\"anc_visits_2021\".\"pregnancies_registered\"), 0), 0))) * 100 FROM anc_visits_2021 CROSS JOIN anc_visits_2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+      "response": "```sql\nWITH anc_visits_2021 AS (\n  SELECT\n    \"anc4_completed\",\n    \"pregnancies_registered\"\n  FROM \"anc_visits\"\n  WHERE\n    \"year\" = 2021\n    AND \"district\" IN ('Gaya', 'Nalanda')\n), anc_visits_2023 AS (\n  SELECT\n    \"anc4_completed\",\n    \"pregnancies_registered\"\n  FROM \"anc_visits\"\n  WHERE\n    \"year\" = 2023\n    AND \"district\" IN ('Gaya', 'Nalanda')\n)\nSELECT\n  (\n    (\n      CAST(SUM(\"anc_visits_2023\".\"anc4_completed\") AS REAL) / NULLIF(SUM(\"anc_visits_2023\".\"pregnancies_registered\"), 0)\n    ) - (\n      CAST(SUM(\"anc_visits_2021\".\"anc4_completed\") AS REAL) / NULLIF(SUM(\"anc_visits_2021\".\"pregnancies_registered\"), 0)\n    )\n  ) * 100\nFROM anc_visits_2021, anc_visits_2023;\n```",
+      "api": {
+        "id": "gen-1787420904-4OzPb1A7dOi9TMaf1Cz9",
+        "model": "google/gemma-3-12b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 330,
+          "completion_tokens": 281,
+          "total_tokens": 611,
+          "cost": 5.865e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.865e-05,
+            "upstream_inference_prompt_cost": 1.65e-05,
+            "upstream_inference_completions_cost": 4.215e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.834
+      },
+      "duration_seconds": 4.842,
+      "sql_duckdb": "WITH anc_visits_2021 AS (SELECT \"anc4_completed\", \"pregnancies_registered\" FROM \"anc_visits\" WHERE \"year\" = 2021 AND \"district\" IN ('Gaya', 'Nalanda')), anc_visits_2023 AS (SELECT \"anc4_completed\", \"pregnancies_registered\" FROM \"anc_visits\" WHERE \"year\" = 2023 AND \"district\" IN ('Gaya', 'Nalanda')) SELECT ((CAST(SUM(\"anc_visits_2023\".\"anc4_completed\") AS REAL) / NULLIF(NULLIF(SUM(\"anc_visits_2023\".\"pregnancies_registered\"), 0), 0)) - (CAST(SUM(\"anc_visits_2021\".\"anc4_completed\") AS REAL) / NULLIF(NULLIF(SUM(\"anc_visits_2021\".\"pregnancies_registered\"), 0), 0))) * 100 FROM anc_visits_2021 CROSS JOIN anc_visits_2023",
+      "rows": [
+        [
+          7.608020305633545
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

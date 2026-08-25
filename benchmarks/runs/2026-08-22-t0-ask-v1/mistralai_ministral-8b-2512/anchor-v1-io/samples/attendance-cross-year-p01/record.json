@@ -1,0 +1,128 @@
+{
+  "id": "attendance-cross-year-p01",
+  "task_id": "attendance-cross-year",
+  "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+  "question": "centre wise attendance percentage for 2023 and 2024 side by side",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+  "expected_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncentre wise attendance percentage for 2023 and 2024 side by side",
+      "response": "```sql\nWITH combined_attendance AS (\n    -- 2023 data\n    SELECT\n        \"Centre\" AS centre,\n        \"Month\",\n        NULLIF(\"Enrolled Kids\", 0) AS enrolled_kids,\n        NULLIF(\"Avg Daily Present\", 0) AS avg_daily_present,\n        1 AS year,\n        (NULLIF(\"Avg Daily Present\", 0) * 100.0 / NULLIF(\"Enrolled Kids\", 0)) AS attendance_percentage\n    FROM attendance_2023\n    WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n\n    UNION ALL\n\n    -- 2024 data\n    SELECT\n        \"centre_name\" AS centre,\n        \"month\",\n        NULLIF(\"enrolment\", 0) AS enrolled_kids,\n        NULLIF(\"average_attendance\", 0) AS avg_daily_present,\n        2 AS year,\n        (NULLIF(\"average_attendance\", 0) * 100.0 / NULLIF(\"enrolment\", 0)) AS attendance_percentage\n    FROM attendance_2024\n    WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n),\n\n-- Pivot to get side-by-side comparison\npivoted_attendance AS (\n    SELECT\n        centre,\n        year,\n        MAX(CASE WHEN \"Month\" = 'January' THEN attendance_percentage END) AS \"January Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'February' THEN attendance_percentage END) AS \"February Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'March' THEN attendance_percentage END) AS \"March Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'April' THEN attendance_percentage END) AS \"April Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'May' THEN attendance_percentage END) AS \"May Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'June' THEN attendance_percentage END) AS \"June Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'July' THEN attendance_percentage END) AS \"July Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'August' THEN attendance_percentage END) AS \"August Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'September' THEN attendance_percentage END) AS \"September Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'October' THEN attendance_percentage END) AS \"October Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'November' THEN attendance_percentage END) AS \"November Attendance %\",\n        MAX(CASE WHEN \"Month\" = 'December' THEN attendance_percentage END) AS \"December Attendance %\"\n    FROM combined_attendance\n    GROUP BY centre, year\n)\n\nSELECT\n    centre,\n    \"2023 Attendance %\" AS \"2023\",\n    \"2024 Attendance %\" AS \"2024\"\nFROM (\n    SELECT\n        centre,\n        MAX(CASE WHEN year = 1 THEN \"January Attendance %\" END) AS \"2023 January Attendance %\",\n        MAX(CASE WHEN year = 1 THEN \"February Attendance %\" END) AS \"2023 February Attendance %\",\n        MAX(CASE WHEN year = 1 THEN \"March Attendance %\" END) AS \"2023 March Attendance %\",\n        MAX(CASE WHEN year = 1 THEN \"April Attendance %\" END) AS \"2023 April Attendance %\",\n        MAX(CASE WHEN year = 1 THEN \"May Attendance %\" END) AS \"2023 May Attendance %\",\n        MAX(CASE WHEN year = 1 THEN \"June Attendance %\" END) AS \"2023 June Attendance %\",\n        MAX(CASE WHEN year = 1 THEN \"July Attendance %\" END) AS \"2023 July Attendance %\",\n        MAX(CASE WHEN year =",
+      "api": {
+        "id": "gen-1787421431-EFs9vrF1gGCwQh8v3KLO",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 596,
+          "completion_tokens": 1024,
+          "total_tokens": 1620,
+          "cost": 0.00022572,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 128,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00022572,
+            "upstream_inference_prompt_cost": 7.212e-05,
+            "upstream_inference_completions_cost": 0.0001536
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.533
+      },
+      "duration_seconds": 7.537,
+      "error": "ParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.EQ'>. Line 64, Col: 28.\n  WHEN year = 1 THEN \"July Attendance %\" END) AS \"2023 July Attendance %\",\n        MAX(CASE WHEN year \u001b[4m=\u001b[0m"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncentre wise attendance percentage for 2023 and 2024 side by side\n\nREJECTED QUERY ERROR:\nParseError: Required keyword: 'expression' missing for <class 'sqlglot.expressions.core.EQ'>. Line 64, Col: 28.\n  WHEN year = 1 THEN \"July Attendance %\" END) AS \"2023 July Attendance %\",\n        MAX(CASE WHEN year \u001b[4m=\u001b[0m\nReturn a complete corrected query.",
+      "response": "```sql\nWITH combined_attendance AS (\n    SELECT\n        \"Centre\" AS \"Centre Name\",\n        \"Month\" AS \"Month\",\n        \"Enrolled Kids\" AS \"Enrollment\",\n        \"Avg Daily Present\" AS \"Attendance\",\n        1 AS \"Year\"\n    FROM \"attendance_2023\"\n    WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"Month\" IN ('April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September')\n\n    UNION ALL\n\n    SELECT\n        \"centre_name\" AS \"Centre Name\",\n        \"month\" AS \"Month\",\n        \"enrolment\" AS \"Enrollment\",\n        \"average_attendance\" AS \"Attendance\",\n        2 AS \"Year\"\n    FROM \"attendance_2024\"\n    WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"month\" IN ('April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September')\n),\n\nattendance_percentages AS (\n    SELECT\n        \"Centre Name\",\n        \"Month\",\n        \"Year\",\n        ROUND(100.0 * NULLIF(\"Attendance\", 0) / NULLIF(\"Enrollment\", 0), 2) AS \"Attendance Percentage\"\n    FROM combined_attendance\n)\n\nSELECT\n    \"Centre Name\",\n    MAX(CASE WHEN \"Month\" = 'January' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 January Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'February' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 February Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'March' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 March Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'April' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 April Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'May' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 May Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'June' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 June Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'July' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 July Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'August' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 August Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'September' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 September Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'October' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 October Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'November' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 November Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'December' AND \"Year\" = 1 THEN \"Attendance Percentage\" END) AS \"2023 December Attendance %\",\n\n    MAX(CASE WHEN \"Month\" = 'January' AND \"Year\" = 2 THEN \"Attendance Percentage\" END) AS \"2024 January Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'February' AND \"Year\" = 2 THEN \"Attendance Percentage\" END) AS \"2024 February Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'March' AND \"Year\" = 2 THEN \"Attendance Percentage\" END) AS \"2024 March Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'April' AND \"Year\" = 2 THEN \"Attendance Percentage\" END) AS \"2024 April Attendance %\",\n    MAX(CASE WHEN \"Month\" = 'May' AND \"",
+      "api": {
+        "id": "gen-1787421439-gwh5fkc3w9IyKNvivA1s",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 686,
+          "completion_tokens": 1024,
+          "total_tokens": 1710,
+          "cost": 0.00018738,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 512,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00018738,
+            "upstream_inference_prompt_cost": 3.378e-05,
+            "upstream_inference_completions_cost": 0.0001536
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.021
+      },
+      "duration_seconds": 7.022,
+      "error": "TokenError: Error tokenizing 'dance %\",\n    MAX(CASE WHEN \"Month\" = 'May' AND '"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

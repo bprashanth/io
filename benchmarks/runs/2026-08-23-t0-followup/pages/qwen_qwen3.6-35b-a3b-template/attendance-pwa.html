@@ -1,0 +1,288 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Attendance Tracker</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Attendance Tracker</h1></header>
+<main>
+  <div class="row" style="margin-bottom:16px">
+    <input type="date" id="datePicker" style="flex:1">
+    <button id="btnView">Load</button>
+    <button id="btnSave" class="secondary">Save Day</button>
+  </div>
+
+  <div class="card">
+    <h3>Mark Attendance</h3>
+    <div id="attendanceList"></div>
+  </div>
+
+  <div class="card">
+    <h3>Monthly Summary</h3>
+    <div class="row">
+      <select id="summaryMonth"></select>
+      <button id="btnExport">Download CSV</button>
+    </div>
+    <div id="summaryTable" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h3>Manage Students</h3>
+    <div class="row">
+      <input type="text" id="newName" placeholder="Student Name">
+      <button id="btnAdd">Add</button>
+    </div>
+    <div id="studentList" style="margin-top:10px"></div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+const STORAGE_KEY = 'attendance_data';
+const STUDENTS_KEY = 'students_list';
+
+// Initialize
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('datePicker').value = today;
+
+// State
+let students = store.get(STUDENTS_KEY, []);
+let attendanceData = store.get(STORAGE_KEY, {});
+
+// DOM Elements
+const dateInput = document.getElementById('datePicker');
+const attendanceList = document.getElementById('attendanceList');
+const studentList = document.getElementById('studentList');
+const summaryTable = document.getElementById('summaryTable');
+const summaryMonth = document.getElementById('summaryMonth');
+const newNameInput = document.getElementById('newName');
+
+// Render Students List (Manage)
+function renderStudentList() {
+  studentList.innerHTML = '';
+  if (students.length === 0) {
+    studentList.innerHTML = '<p class="muted">No students added yet.</p>';
+    return;
+  }
+  students.forEach((name, index) => {
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.style.marginBottom = '4px';
+    div.innerHTML = `
+      <span style="flex:1">${name}</span>
+      <button class="secondary" style="padding:4px 8px;font-size:12px" onclick="removeStudent(${index})">Remove</button>
+    `;
+    studentList.appendChild(div);
+  });
+}
+
+// Render Attendance List
+function renderAttendanceList() {
+  attendanceList.innerHTML = '';
+  if (students.length === 0) {
+    attendanceList.innerHTML = '<p class="muted">Please add students first.</p>';
+    return;
+  }
+  
+  const date = dateInput.value;
+  const dayData = attendanceData[date] || {};
+
+  students.forEach((name, index) => {
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.style.marginBottom = '8px';
+    div.style.alignItems = 'center';
+    
+    const isChecked = dayData[index] === 'present';
+    
+    div.innerHTML = `
+      <label style="flex:1;margin:0;cursor:pointer;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" data-index="${index}" ${isChecked ? 'checked' : ''} style="width:auto;padding:0">
+        ${name}
+      </label>
+      <span class="muted" style="font-size:12px">${isChecked ? 'Present' : 'Absent'}</span>
+    `;
+    attendanceList.appendChild(div);
+  });
+}
+
+// Save Attendance
+function saveAttendance() {
+  if (students.length === 0) {
+    alert('Please add students first.');
+    return;
+  }
+  const date = dateInput.value;
+  if (!date) {
+    alert('Please select a date.');
+    return;
+  }
+
+  const checkboxes = attendanceList.querySelectorAll('input[type="checkbox"]');
+  const dayData = {};
+  
+  checkboxes.forEach(cb => {
+    dayData[cb.dataset.index] = cb.checked ? 'present' : 'absent';
+  });
+
+  attendanceData[date] = dayData;
+  store.set(STORAGE_KEY, attendanceData);
+  alert('Attendance saved for ' + date);
+  renderSummary();
+}
+
+// Add Student
+function addStudent() {
+  const name = newNameInput.value.trim();
+  if (!name) return;
+  if (students.includes(name)) {
+    alert('Student already exists');
+    return;
+  }
+  students.push(name);
+  store.set(STUDENTS_KEY, students);
+  newNameInput.value = '';
+  renderStudentList();
+  renderAttendanceList();
+}
+
+// Remove Student
+window.removeStudent = function(index) {
+  if (confirm('Remove ' + students[index] + '?')) {
+    students.splice(index, 1);
+    store.set(STUDENTS_KEY, students);
+    renderStudentList();
+    renderAttendanceList();
+    renderSummary();
+  }
+};
+
+// Render Monthly Summary
+function renderSummary() {
+  const month = summaryMonth.value;
+  if (!month) return;
+
+  const [year, monthStr] = month.split('-');
+  const monthNum = parseInt(monthStr);
+  
+  // Filter dates for the selected month
+  const relevantDates = Object.keys(attendanceData).filter(date => {
+    const d = new Date(date);
+    return d.getFullYear() === parseInt(year) && (d.getMonth() + 1) === monthNum;
+  }).sort();
+
+  if (relevantDates.length === 0) {
+    summaryTable.innerHTML = '<p class="muted">No data for this month.</p>';
+    return;
+  }
+
+  // Calculate stats
+  const stats = students.map((name, index) => {
+    let present = 0;
+    relevantDates.forEach(date => {
+      if (attendanceData[date] && attendanceData[date][index] === 'present') {
+        present++;
+      }
+    });
+    return { name, present, total: relevantDates.length, percentage: relevantDates.length > 0 ? Math.round((present / relevantDates.length) * 100) : 0 };
+  });
+
+  // Render Table
+  let html = '<table><thead><tr><th>Name</th><th>Present</th><th>Total Days</th><th>Attendance %</th></tr></thead><tbody>';
+  stats.forEach(s => {
+    html += `<tr>
+      <td>${s.name}</td>
+      <td>${s.present}</td>
+      <td>${s.total}</td>
+      <td>${s.percentage}%</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  summaryTable.innerHTML = html;
+}
+
+// Populate Month Selector
+function populateMonths() {
+  const months = new Set();
+  Object.keys(attendanceData).forEach(date => {
+    const d = new Date(date);
+    months.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  });
+  
+  // Also add current month if no data
+  const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  months.add(currentMonth);
+
+  const sortedMonths = Array.from(months).sort().reverse();
+  summaryMonth.innerHTML = '';
+  sortedMonths.forEach(m => {
+    const option = document.createElement('option');
+    option.value = m;
+    option.textContent = m;
+    summaryMonth.appendChild(option);
+  });
+  
+  // Select current month
+  if (sortedMonths.includes(currentMonth)) {
+    summaryMonth.value = currentMonth;
+  }
+}
+
+// Export CSV
+function exportCSV() {
+  const month = summaryMonth.value;
+  if (!month) {
+    alert('Please select a month to export.');
+    return;
+  }
+
+  const [year, monthStr] = month.split('-');
+  const monthNum = parseInt(monthStr);
+  
+  const relevantDates = Object.keys(attendanceData).filter(date => {
+    const d = new Date(date);
+    return d.getFullYear() === parseInt(year) && (d.getMonth() + 1) === monthNum;
+  }).sort();
+
+  if (relevantDates.length === 0 || students.length === 0) {
+    alert('No data to export.');
+    return;
+  }
+
+  // Header: Name, Date1, Date2, ...
+  const header = ['Name', ...relevantDates];
+  const rows = students.map((name, index) => {
+    const row = [name];
+    relevantDates.forEach(date => {
+      const status = attendanceData[date] && attendanceData[date][index] === 'present' ? 'P' : 'A';
+      row.push(status);
+    });
+    return row;
+  });
+
+  // Convert to CSV format
+  const csvContent = [header.join(',')].concat(rows.map(r => r.join(','))).join('\n');
+  download(`attendance_${month}.csv`, csvContent, 'text/csv');
+}
+
+// Event Listeners
+document.getElementById('btnAdd').addEventListener('click', addStudent);
+document.getElementById('btnSave').addEventListener('click', saveAttendance);
+document.getElementById('btnView').addEventListener('click', renderAttendanceList);
+document.getElementById('btnExport').addEventListener('click', exportCSV);
+summaryMonth.addEventListener('change', renderSummary);
+
+// Initial Render
+renderStudentList();
+renderAttendanceList();
+populateMonths();
+renderSummary();
+offlineReady();
+</script>
+</body></html>

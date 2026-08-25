@@ -1,0 +1,143 @@
+{
+  "id": "sportathon-dropouts-p02",
+  "task_id": "sportathon-dropouts",
+  "pattern": "anti-join two same-shape tables on an id, project one column",
+  "question": "list kids who dropped out before the second round of testing",
+  "gold_sql": "SELECT b.\"Child Name\" FROM sportathon_baseline AS b WHERE NOT EXISTS (SELECT 1 FROM sportathon_endline AS e WHERE e.\"Child ID\" = b.\"Child ID\") ORDER BY b.\"Child Name\"",
+  "expected_rows": [
+    [
+      "Ayesha Iyer"
+    ],
+    [
+      "Irfan Reddy"
+    ],
+    [
+      "Kabir Rao"
+    ],
+    [
+      "Lata Mondal"
+    ],
+    [
+      "Manoj Bhat"
+    ],
+    [
+      "Vikas Pawar"
+    ],
+    [
+      "Vivaan Bansal"
+    ],
+    [
+      "Vivaan Chowdhury"
+    ]
+  ],
+  "actual_rows": [
+    [
+      "SPA-0030",
+      "Vivaan Chowdhury"
+    ],
+    [
+      "SPA-0045",
+      "Lata Mondal"
+    ],
+    [
+      "SPA-0050",
+      "Vikas Pawar"
+    ],
+    [
+      "SPA-0071",
+      "Manoj Bhat"
+    ],
+    [
+      "SPA-0088",
+      "Kabir Rao"
+    ],
+    [
+      "SPA-0163",
+      "Ayesha Iyer"
+    ],
+    [
+      "SPA-0165",
+      "Irfan Reddy"
+    ],
+    [
+      "SPA-0192",
+      "Vivaan Bansal"
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT b.\"Child ID\", b.\"Child Name\" FROM sportathon_baseline AS b LEFT JOIN sportathon_endline AS e ON b.\"Child ID\" = e.\"Child ID\" WHERE e.\"Child ID\" IS NULL",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"sportathon_baseline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nCREATE TABLE \"sportathon_endline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"sportathon_baseline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}, \"sportathon_endline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}}\n\nCURRENT QUESTION:\nlist kids who dropped out before the second round of testing",
+      "response": "```sql\nSELECT\n  b.\"Child ID\",\n  b.\"Child Name\"\nFROM sportathon_baseline AS b\nLEFT JOIN sportathon_endline AS e\n  ON b.\"Child ID\" = e.\"Child ID\"\nWHERE\n  e.\"Child ID\" IS NULL;\n```",
+      "api": {
+        "id": "gen-1787420923-xr6ig5PgVGNiA8n3HkbM",
+        "model": "google/gemma-4-26b-a4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 677,
+          "completion_tokens": 65,
+          "total_tokens": 742,
+          "cost": 9.37e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 9.37e-05,
+            "upstream_inference_prompt_cost": 6.77e-05,
+            "upstream_inference_completions_cost": 2.6e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.411
+      },
+      "duration_seconds": 1.415,
+      "sql_duckdb": "SELECT b.\"Child ID\", b.\"Child Name\" FROM sportathon_baseline AS b LEFT JOIN sportathon_endline AS e ON b.\"Child ID\" = e.\"Child ID\" WHERE e.\"Child ID\" IS NULL",
+      "rows": [
+        [
+          "SPA-0030",
+          "Vivaan Chowdhury"
+        ],
+        [
+          "SPA-0045",
+          "Lata Mondal"
+        ],
+        [
+          "SPA-0050",
+          "Vikas Pawar"
+        ],
+        [
+          "SPA-0071",
+          "Manoj Bhat"
+        ],
+        [
+          "SPA-0088",
+          "Kabir Rao"
+        ],
+        [
+          "SPA-0163",
+          "Ayesha Iyer"
+        ],
+        [
+          "SPA-0165",
+          "Irfan Reddy"
+        ],
+        [
+          "SPA-0192",
+          "Vivaan Bansal"
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

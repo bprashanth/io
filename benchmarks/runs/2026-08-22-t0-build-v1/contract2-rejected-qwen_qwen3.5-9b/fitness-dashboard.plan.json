@@ -1,0 +1,246 @@
+{
+ "plan": {
+  "title": "Child Fitness Improvement",
+  "subtitle": "Comparing baseline and endline metrics by location and coach",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Children",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM \"baseline\" UNION ALL SELECT COUNT(DISTINCT \"Child ID\") AS n FROM \"endline\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Avg Height Change by Location",
+    "sql": "WITH diffs AS (SELECT \"Location\", AVG(\"Height cm\") - ANY_VALUE(\"Height cm\") OVER (PARTITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), SELECT \"Location\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "Location",
+    "y": [
+     "diff"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Avg Sit-ups Change by Coach",
+    "sql": "WITH diffs AS (SELECT \"Coach\", AVG(\"Sit ups\") - ANY_VALUE(\"Sit ups\") OVER (PARTITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), SELECT \"Coach\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "Coach",
+    "y": [
+     "diff"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Avg Shuttle Run Change by Location",
+    "sql": "WITH diffs AS (SELECT \"Location\", AVG(\"Shuttle run sec\") - ANY_VALUE(\"Shuttle run sec\") OVER (PARTITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), SELECT \"Location\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 ASC LIMIT 10",
+    "x": "Location",
+    "y": [
+     "diff"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top 10 Height Gainers",
+    "sql": "SELECT b.\"Child name\", b.\"Location\", b.\"Coach\", (e.\"Height cm\" - b.\"Height cm\") AS gain FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY gain DESC LIMIT 10",
+    "x": "Child name",
+    "y": [
+     "gain"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top 10 Sit-ups Gainers",
+    "sql": "SELECT b.\"Child name\", b.\"Location\", b.\"Coach\", (e.\"Sit ups\" - b.\"Sit ups\") AS gain FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY gain DESC LIMIT 10",
+    "x": "Child name",
+    "y": [
+     "gain"
+    ]
+   }
+  ],
+  "narrative": "This dashboard tracks the physical progress of children from baseline to endline measurements. The first panel shows the total number of unique children recorded in the dataset. Subsequent bar charts break down the average improvement in height, sit-ups, and shuttle run times by location and coach, highlighting which groups saw the most significant gains. The tables list the individual children with the highest improvements in height and sit-ups, providing specific examples of success.",
+  "missing": []
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    },
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p2": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected CTE to have alias. Line 1, Col: 191.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Location\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+  },
+  "p3": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected CTE to have alias. Line 1, Col: 184.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Coach\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected CTE to have alias. Line 1, Col: 203.\n  TITION BY \"Child ID\") AS change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\"), \u001b[4mSELECT\u001b[0m \"Location\", SUM(change) AS diff FROM diffs GROUP BY 1 ORDER BY 2 ASC LIMIT 10"
+  },
+  "p5": {
+   "columns": [
+    "Child name",
+    "Location",
+    "Coach",
+    "gain"
+   ],
+   "rows": [
+    {
+     "Child name": "Jadhav Francis",
+     "Location": "Kalyanpur",
+     "Coach": "sunil thakur",
+     "gain": 49.400000000000006
+    },
+    {
+     "Child name": "Vinod Mishra",
+     "Location": "Bakhtiyarpur Tola",
+     "Coach": "Jaspreet George",
+     "gain": 46.30000000000001
+    },
+    {
+     "Child name": "Sudha Tiwari",
+     "Location": "Nanded Phata",
+     "Coach": "P. T. Pereira",
+     "gain": 46.3
+    },
+    {
+     "Child name": "Nitin Shinde",
+     "Location": "Sahebganj",
+     "Coach": "T. S. Fernandez",
+     "gain": 45.70000000000002
+    },
+    {
+     "Child name": "Farooq Sharma",
+     "Location": "Dehu",
+     "Coach": "Ranjan Nasir",
+     "gain": 45.0
+    },
+    {
+     "Child name": "Vishal Chaudhary",
+     "Location": "Dehu",
+     "Coach": "Rosy",
+     "gain": 44.099999999999994
+    },
+    {
+     "Child name": "Gadhave Shakuntala",
+     "Location": "Harnaut Tola",
+     "Coach": "T. S. Fernandez",
+     "gain": 40.60000000000001
+    },
+    {
+     "Child name": "Iyengar Sudha",
+     "Location": "Supa",
+     "Coach": "Rupali Kumar",
+     "gain": 38.5
+    },
+    {
+     "Child name": "Navjot Rai",
+     "Location": "Talegaon Dhamdhere",
+     "Coach": "indira chandra",
+     "gain": 38.29999999999998
+    },
+    {
+     "Child name": "Francis Prasad",
+     "Location": "Barachatti",
+     "Coach": "AAKASH ZENDE",
+     "gain": 37.60000000000001
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Child name",
+    "Location",
+    "Coach",
+    "gain"
+   ],
+   "rows": [
+    {
+     "Child name": "Anthony Thomas",
+     "Location": "Paroo",
+     "Coach": "T. S. Fernandez",
+     "gain": 25
+    },
+    {
+     "Child name": "Gaikwad Neha",
+     "Location": "Kadus",
+     "Coach": "sunil thakur",
+     "gain": 24
+    },
+    {
+     "Child name": "Mathew Vijay",
+     "Location": "Rampur",
+     "Coach": "Vimla",
+     "gain": 23
+    },
+    {
+     "Child name": "Stephen Fernandez",
+     "Location": "Kharadi",
+     "Coach": "Vimla",
+     "gain": 22
+    },
+    {
+     "Child name": "Shivaji More",
+     "Location": "Imamganj",
+     "Coach": "sunil thakur",
+     "gain": 22
+    },
+    {
+     "Child name": "Vandana",
+     "Location": "Manjari",
+     "Coach": "Rosy",
+     "gain": 22
+    },
+    {
+     "Child name": "Bapu Mishra",
+     "Location": "Motipur",
+     "Coach": "Manjhi Lata",
+     "gain": 22
+    },
+    {
+     "Child name": "Bapu Rai",
+     "Location": "Bishunpur",
+     "Coach": "Bhagyashree",
+     "gain": 21
+    },
+    {
+     "Child name": "Rekha Deshmukh",
+     "Location": "Rampur Sokho",
+     "Coach": "Ranjan Nasir",
+     "gain": 21
+    },
+    {
+     "Child name": "Bansal Nitin",
+     "Location": "Uruli Kanchan",
+     "Coach": "sunil thakur",
+     "gain": 21
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

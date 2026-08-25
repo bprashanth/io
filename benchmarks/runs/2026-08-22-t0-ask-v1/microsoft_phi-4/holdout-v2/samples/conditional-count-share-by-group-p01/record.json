@@ -1,0 +1,145 @@
+{
+  "id": "conditional-count-share-by-group-p01",
+  "task_id": "conditional-count-share-by-group",
+  "pattern": "count rows matching a text status per group and its percent of all rows in the group, rank",
+  "question": "block wise how many loans are overdue and what percent of that block's loans is that, worst block first",
+  "gold_sql": "SELECT \"Block\", SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) AS overdue_loans, 100.0 * SUM(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 ELSE 0 END) / COUNT(*) AS overdue_percent FROM shg_loan_register GROUP BY \"Block\" ORDER BY overdue_percent DESC, \"Block\"",
+  "expected_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Fatehpur",
+      15,
+      23.4375
+    ],
+    [
+      "Belaganj",
+      13,
+      20.0
+    ],
+    [
+      "Wazirganj",
+      13,
+      19.696969696969695
+    ],
+    [
+      "Atri",
+      8,
+      15.384615384615385
+    ],
+    [
+      "Barachatti",
+      8,
+      14.285714285714286
+    ],
+    [
+      "Dobhi",
+      3,
+      5.2631578947368425
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH BlockLoanCounts AS (SELECT \"Block\", COUNT(*) AS TotalLoans FROM \"shg_loan_register\" GROUP BY \"Block\"), OverdueLoans AS (SELECT \"Block\", COUNT(*) AS OverdueCount FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue' GROUP BY \"Block\") SELECT blc.\"Block\", COALESCE(ol.OverdueCount, 0) AS OverdueLoans, COALESCE(ol.OverdueCount, 0) * 100.0 / NULLIF(NULLIF(blc.TotalLoans, 0), 0) AS OverduePercentage FROM BlockLoanCounts AS blc LEFT JOIN OverdueLoans AS ol ON blc.\"Block\" = ol.\"Block\" ORDER BY OverduePercentage DESC, blc.\"Block\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nblock wise how many loans are overdue and what percent of that block's loans is that, worst block first",
+      "response": "```sql\nWITH BlockLoanCounts AS (\n    SELECT \n        \"Block\",\n        COUNT(*) AS TotalLoans\n    FROM \n        \"shg_loan_register\"\n    GROUP BY \n        \"Block\"\n),\nOverdueLoans AS (\n    SELECT \n        \"Block\",\n        COUNT(*) AS OverdueCount\n    FROM \n        \"shg_loan_register\"\n    WHERE \n        \"Repayment Status\" = 'Overdue'\n    GROUP BY \n        \"Block\"\n)\nSELECT \n    blc.\"Block\",\n    COALESCE(ol.OverdueCount, 0) AS OverdueLoans,\n    COALESCE(ol.OverdueCount, 0) * 100.0 / NULLIF(blc.TotalLoans, 0) AS OverduePercentage\nFROM \n    BlockLoanCounts blc\nLEFT JOIN \n    OverdueLoans ol ON blc.\"Block\" = ol.\"Block\"\nORDER BY \n    OverduePercentage DESC, blc.\"Block\";\n```",
+      "api": {
+        "id": "gen-1787421240-pbiTjGPyVPu5JtAPydhh",
+        "model": "microsoft/phi-4",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 390,
+          "completion_tokens": 206,
+          "total_tokens": 596,
+          "cost": 5.614e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.614e-05,
+            "upstream_inference_prompt_cost": 2.73e-05,
+            "upstream_inference_completions_cost": 2.884e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.979
+      },
+      "duration_seconds": 2.984,
+      "sql_duckdb": "WITH BlockLoanCounts AS (SELECT \"Block\", COUNT(*) AS TotalLoans FROM \"shg_loan_register\" GROUP BY \"Block\"), OverdueLoans AS (SELECT \"Block\", COUNT(*) AS OverdueCount FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue' GROUP BY \"Block\") SELECT blc.\"Block\", COALESCE(ol.OverdueCount, 0) AS OverdueLoans, COALESCE(ol.OverdueCount, 0) * 100.0 / NULLIF(NULLIF(blc.TotalLoans, 0), 0) AS OverduePercentage FROM BlockLoanCounts AS blc LEFT JOIN OverdueLoans AS ol ON blc.\"Block\" = ol.\"Block\" ORDER BY OverduePercentage DESC, blc.\"Block\" NULLS FIRST",
+      "rows": [
+        [
+          "Fatehpur",
+          15,
+          23.4375
+        ],
+        [
+          "Belaganj",
+          13,
+          20.0
+        ],
+        [
+          "Wazirganj",
+          13,
+          19.696969696969695
+        ],
+        [
+          "Atri",
+          8,
+          15.384615384615385
+        ],
+        [
+          "Barachatti",
+          8,
+          14.285714285714286
+        ],
+        [
+          "Dobhi",
+          3,
+          5.2631578947368425
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

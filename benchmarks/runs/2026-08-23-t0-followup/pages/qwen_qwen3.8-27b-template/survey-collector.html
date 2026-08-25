@@ -1,0 +1,177 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Water Point Survey</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Water Point Survey</h1></header>
+<main>
+  <div class="card">
+    <div class="row">
+      <div style="flex:1 1 160px"><strong>Responses saved:</strong> <span id="count" class="muted">0</span></div>
+      <div class="row" style="margin-left:auto">
+        <button id="export" class="secondary">Export JSON</button>
+        <button id="clear" class="secondary">Clear all</button>
+      </div>
+    </div>
+  </div>
+
+  <form id="form" class="card" novalidate>
+    <div class="grid">
+      <div>
+        <label for="habitation">Habitation / village</label>
+        <input id="habitation" name="habitation" type="text" required placeholder="e.g. Kalinga">
+      </div>
+      <div>
+        <label for="pumpType">Pump type</label>
+        <select id="pumpType" name="pumpType" required>
+          <option value="">Select…</option>
+          <option>Hand pump</option>
+          <option>Motor pump</option>
+          <option>Spring</option>
+          <option>Borehole</option>
+          <option>Tap stand</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div>
+        <label for="working">Working?</label>
+        <select id="working" name="working" required>
+          <option value="">Select…</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div>
+        <label for="users">Estimated users</label>
+        <input id="users" name="users" type="number" min="0" step="1" required placeholder="e.g. 120">
+      </div>
+    </div>
+
+    <label for="notes">Notes</label>
+    <textarea id="notes" name="notes" rows="2" placeholder="Condition, repairs needed, access…"></textarea>
+
+    <div class="row" style="margin-top:12px">
+      <button type="button" id="gps" class="secondary">Get GPS location</button>
+      <span id="gpsStatus" class="muted">No location captured</span>
+    </div>
+    <div class="grid" style="margin-top:8px">
+      <div>
+        <label for="lat">Latitude</label>
+        <input id="lat" name="lat" type="text" readonly placeholder="—">
+      </div>
+      <div>
+        <label for="lng">Longitude</label>
+        <input id="lng" name="lng" type="text" readonly placeholder="—">
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button type="submit">Save response</button>
+      <button type="reset" class="secondary">Reset</button>
+    </div>
+    <p id="msg" class="muted" style="margin:10px 0 0"></p>
+  </form>
+
+  <div class="card">
+    <h2 style="font-size:16px;margin:0 0 8px">Saved responses</h2>
+    <div id="list" class="muted">No responses yet.</div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+offlineReady();
+const KEY = 'waterPointSurvey';
+const form = document.getElementById('form');
+const msg = document.getElementById('msg');
+const gpsBtn = document.getElementById('gps');
+const gpsStatus = document.getElementById('gpsStatus');
+const latEl = document.getElementById('lat');
+const lngEl = document.getElementById('lng');
+const listEl = document.getElementById('list');
+const countEl = document.getElementById('count');
+
+function getResponses() { return store.get(KEY, []); }
+function setResponses(r) { store.set(KEY, r); }
+
+function render() {
+  const rows = getResponses();
+  countEl.textContent = rows.length;
+  if (!rows.length) { listEl.textContent = 'No responses yet.'; return; }
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['Habitation','Pump','Working','Users','GPS','Saved'].forEach(h => { const th = document.createElement('th'); th.textContent = h; hr.appendChild(th); });
+  thead.appendChild(hr); table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.slice().reverse().forEach(r => {
+    const tr = document.createElement('tr');
+    const gps = (r.lat != null && r.lng != null) ? r.lat.toFixed(4) + ', ' + r.lng.toFixed(4) : '—';
+    const cells = [r.habitation, r.pumpType, r.working, r.users, gps, r.savedAt ? new Date(r.savedAt).toLocaleString() : ''];
+    cells.forEach(c => { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  listEl.innerHTML = '';
+  listEl.appendChild(table);
+}
+
+gpsBtn.addEventListener('click', () => {
+  if (!('geolocation' in navigator)) { gpsStatus.textContent = 'Geolocation not supported'; return; }
+  gpsStatus.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      latEl.value = pos.coords.latitude.toFixed(6);
+      lngEl.value = pos.coords.longitude.toFixed(6);
+      gpsStatus.textContent = 'Accuracy ±' + Math.round(pos.coords.accuracy) + ' m';
+    },
+    err => { gpsStatus.textContent = 'Location error: ' + err.message; },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+});
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+  const fd = new FormData(form);
+  const rec = {
+    habitation: (fd.get('habitation') || '').toString().trim(),
+    pumpType: (fd.get('pumpType') || '').toString(),
+    working: (fd.get('working') || '').toString(),
+    users: fd.get('users') != null && fd.get('users') !== '' ? Number(fd.get('users')) : null,
+    notes: (fd.get('notes') || '').toString().trim(),
+    lat: latEl.value !== '' ? Number(latEl.value) : null,
+    lng: lngEl.value !== '' ? Number(lngEl.value) : null,
+    savedAt: new Date().toISOString()
+  };
+  const rows = getResponses();
+  rows.push(rec);
+  setResponses(rows);
+  form.reset();
+  latEl.value = ''; lngEl.value = '';
+  gpsStatus.textContent = 'No location captured';
+  msg.textContent = 'Response saved offline.';
+  render();
+});
+
+document.getElementById('export').addEventListener('click', () => {
+  const rows = getResponses();
+  if (!rows.length) { msg.textContent = 'Nothing to export yet.'; return; }
+  download('water-point-survey.json', JSON.stringify(rows, null, 2), 'application/json');
+});
+
+document.getElementById('clear').addEventListener('click', () => {
+  if (!getResponses().length) return;
+  if (confirm('Delete all saved responses?')) { setResponses([]); render(); }
+});
+
+render();
+</script>
+</body></html>

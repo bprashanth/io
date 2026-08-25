@@ -1,0 +1,74 @@
+{
+ "cards": [
+  {
+   "name": "vehicle-log-monthly-filter",
+   "kind": "rule",
+   "description": "Use date range filters for monthly vehicle log queries instead of listing individual days.",
+   "trigger": {
+    "table_regex": "vehicle_log",
+    "question_regex": "(total|sum|distance|km).*month|month.*(total|sum|distance|km)"
+   },
+   "claim": "When asked for totals over a month, use `date >= 'YYYY-MM-01' AND date < 'YYYY-(MM+1)-01'` to avoid truncation or missing days.",
+   "evidence": [
+    2,
+    5,
+    8
+   ],
+   "confidence": 0.95,
+   "origin": "compacted",
+   "leaks": [],
+   "fires_on": []
+  },
+  {
+   "name": "attendance-absence-interpretation",
+   "kind": "hint",
+   "description": "The column 'A' in staff attendance represents the count of absent days.",
+   "trigger": {
+    "columns_all": [
+     "Name",
+     "A"
+    ],
+    "table_regex": "staff_attendance"
+   },
+   "claim": "Column 'A' contains the total number of absent days for each staff member; sort by this column descending to find those with most absences.",
+   "evidence": [
+    1,
+    4,
+    7
+   ],
+   "confidence": 0.9,
+   "origin": "compacted",
+   "leaks": [],
+   "fires_on": [
+    "staff_attendance_aug"
+   ]
+  }
+ ],
+ "log_lines": 9,
+ "model": "qwen/qwen3.8-27b",
+ "seconds": 4.99,
+ "usage": {
+  "prompt_tokens": 2467,
+  "completion_tokens": 313,
+  "total_tokens": 2780,
+  "cost": 0.0021725,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0021725,
+   "upstream_inference_prompt_cost": 0.0012335,
+   "upstream_inference_completions_cost": 0.000939
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "raw": "```json\n[\n  {\n    \"name\": \"vehicle-log-monthly-filter\",\n    \"kind\": \"rule\",\n    \"description\": \"Use date range filters for monthly vehicle log queries instead of listing individual days.\",\n    \"trigger\": {\n      \"table_regex\": \"vehicle_log\",\n      \"question_regex\": \"(total|sum|distance|km).*month|month.*(total|sum|distance|km)\"\n    },\n    \"claim\": \"When asked for totals over a month, use `date >= 'YYYY-MM-01' AND date < 'YYYY-(MM+1)-01'` to avoid truncation or missing days.\",\n    \"evidence\": [2, 5, 8],\n    \"confidence\": 0.95\n  },\n  {\n    \"name\": \"attendance-absence-interpretation\",\n    \"kind\": \"hint\",\n    \"description\": \"The column 'A' in staff attendance represents the count of absent days.\",\n    \"trigger\": {\n      \"columns_all\": [\"Name\", \"A\"],\n      \"table_regex\": \"staff_attendance\"\n    },\n    \"claim\": \"Column 'A' contains the total number of absent days for each staff member; sort by this column descending to find those with most absences.\",\n    \"evidence\": [1, 4, 7],\n    \"confidence\": 0.9\n  }\n]\n```"
+}

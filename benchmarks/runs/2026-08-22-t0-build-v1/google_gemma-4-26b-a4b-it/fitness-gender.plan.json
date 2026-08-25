@@ -1,0 +1,113 @@
+{
+ "plan": {
+  "title": "Gender-Based Physical Progress",
+  "subtitle": "Comparing fitness improvements between boys and girls",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Participants",
+    "sql": "SELECT COUNT(*) AS n FROM (SELECT \"Child ID\" FROM baseline UNION ALL SELECT \"Child ID\" FROM endline)",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Avg Sit Ups Improvement by Gender",
+    "sql": "SELECT gender, AVG(end_situps - base_situps) AS avg_improvement FROM (SELECT b.\"Child ID\", b.\"Gender\" AS gender, b.\"Sit ups\" AS base_situps, e.\"Sit ups\" AS end_situps FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\") GROUP BY 1 ORDER BY 2 DESC",
+    "x": "gender",
+    "y": [
+     "avg_improvement"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Avg Shuttle Run Improvement by Gender",
+    "sql": "SELECT gender, AVG(base_run - end_run) AS avg_improvement FROM (SELECT b.\"Child ID\", b.\"Gender\" AS gender, b.\"Shuttle run sec\" AS base_run, e.\"Shuttle run sec\" AS end_run FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\") GROUP BY 1 ORDER BY 2 DESC",
+    "x": "gender",
+    "y": [
+     "avg_improvement"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Gender Performance Summary",
+    "sql": "SELECT gender, AVG(end_situps - base_situps) AS avg_situp_gain, AVG(base_run - end_run) AS avg_run_gain FROM (SELECT b.\"Child ID\", b.\"Gender\" AS gender, b.\"Sit ups\" AS base_situps, e.\"Sit ups\" AS end_situps, b.\"Shuttle run sec\" AS base_run, e.\"Shuttle run sec\" AS end_run FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\") GROUP BY 1"
+   }
+  ],
+  "narrative": "The total cohort consists of {{p1.n}} participants. We analyzed the delta between baseline and endline measurements to determine if progress is equitable across genders.\n\nIn terms of core strength, the average sit-up improvement for {{p2.gender}} is {{p2.avg_improvement}}. For speed and stamina, the average shuttle run improvement is {{p3.avg_improvement}} seconds.\n\nThe summary table provides a direct comparison of these gains, showing whether one group is outpacing the other in specific physical metrics."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 400
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "gender",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "gender": "Male",
+     "avg_improvement": 3.4464285714285716
+    },
+    {
+     "gender": "Female",
+     "avg_improvement": 2.2386363636363638
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "gender",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "gender": "Male",
+     "avg_improvement": 0.014285714285714615
+    },
+    {
+     "gender": "Female",
+     "avg_improvement": 0.012500000000000016
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "gender",
+    "avg_situp_gain",
+    "avg_run_gain"
+   ],
+   "rows": [
+    {
+     "gender": "Female",
+     "avg_situp_gain": 2.2386363636363638,
+     "avg_run_gain": 0.012500000000000016
+    },
+    {
+     "gender": "Male",
+     "avg_situp_gain": 3.4464285714285716,
+     "avg_run_gain": 0.014285714285714615
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  }
+ }
+}

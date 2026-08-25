@@ -1,0 +1,96 @@
+{
+  "id": "time-change-per-group-p02",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "compare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH rate_2021 AS (SELECT district, numerator, denominator FROM (SELECT district, pregnancies_registered AS numerator, anc4_completed AS denominator FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda')) AS subquery), rate_2023 AS (SELECT district, numerator, denominator FROM (SELECT district, pregnancies_registered AS numerator, anc4_completed AS denominator FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda')) AS subquery), percent_change AS (SELECT district, NULLIF((rate_2023.numerator - rate_2021.numerator) * 100 / NULLIF(rate_2021.denominator, 0), 0) AS percent_change FROM rate_2021 JOIN rate_2023 ON rate_2021.district = rate_2023.district) SELECT rate_2021.district, rate_2021.numerator, rate_2021.denominator, rate_2023.numerator, rate_2023.denominator, percent_change FROM rate_2021 JOIN rate_2023 ON rate_2021.district = rate_2023.district JOIN percent_change ON rate_2021.district = percent_change.district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+      "response": "```sql\nWITH \n  known_districts AS (\n    SELECT 'Gaya' AS district UNION SELECT 'Nalanda' AS district\n  ),\n  known_source AS (\n    SELECT 'synthetic Bihar ANC fixture' AS source\n  ),\n  data AS (\n    SELECT \n      year,\n      district,\n      pregnancies_registered,\n      anc4_completed,\n      source\n    FROM anc_visits\n    WHERE district IN (SELECT district FROM known_districts)\n    AND source IN (SELECT source FROM known_source)\n  ),\n  rates AS (\n    SELECT \n      year,\n      district,\n      pregnancies_registered,\n      anc4_completed,\n      pregnancies_registered AS denominator,\n      pregnancies_registered - anc4_completed AS numerator\n    FROM data\n  ),\n  rate_2021 AS (\n    SELECT \n      district,\n      numerator,\n      denominator\n    FROM rates\n    WHERE year = 2021\n  ),\n  rate_2023 AS (\n    SELECT \n      district,\n      numerator,\n      denominator\n    FROM rates\n    WHERE year = 2023\n  ),\n  percent_change AS (\n    SELECT \n      district,\n      NULLIF((rate_2023.numerator - rate_2021.numerator) * 100 / NULLIF(rate_2023.denominator - rate_2021.denominator, 1), NULL) AS percent_change\n    FROM rate_2021\n    JOIN rate_2023 ON rate_2021.district = rate_2023.district\n  )\nSELECT \n  district,\n  percent_change\nFROM percent_change\nORDER BY district;\n```",
+      "api": {
+        "id": "gen-1787421234-1zvJiYaz0zG7ROZUrgvH",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 308,
+          "completion_tokens": 323,
+          "total_tokens": 631,
+          "cost": 1.908e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.908e-05,
+            "upstream_inference_prompt_cost": 6.16e-06,
+            "upstream_inference_completions_cost": 1.292e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 13.02
+      },
+      "duration_seconds": 13.024,
+      "error": "BinderException: Binder Error: Ambiguous reference to column name \"district\" (use: \"rate_2021.district\" or \"rate_2023.district\")\n\nLINE 1: ... FROM rates WHERE year = 2023), percent_change AS (SELECT district, NULLIF((rate_2023.numerator - rate_2021.numerator...\n                                                                     ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Ambiguous reference to column name \"district\" (use: \"rate_2021.district\" or \"rate_2023.district\")\n\nLINE 1: ... FROM rates WHERE year = 2023), percent_change AS (SELECT district, NULLIF((rate_2023.numerator - rate_2021.numerator...\n                                                                     ^\nReturn a complete corrected query.",
+      "response": "```sql\nWITH rate_2021 AS (\n  SELECT district, numerator, denominator\n  FROM (\n    SELECT district, pregnancies_registered AS numerator, anc4_completed AS denominator\n    FROM anc_visits\n    WHERE year = 2021 AND district IN ('Gaya', 'Nalanda')\n  ) AS subquery\n),\nrate_2023 AS (\n  SELECT district, numerator, denominator\n  FROM (\n    SELECT district, pregnancies_registered AS numerator, anc4_completed AS denominator\n    FROM anc_visits\n    WHERE year = 2023 AND district IN ('Gaya', 'Nalanda')\n  ) AS subquery\n),\npercent_change AS (\n  SELECT district, NULLIF((rate_2023.numerator - rate_2021.numerator) * 100 / rate_2021.denominator, 0) AS percent_change\n  FROM rate_2021\n  JOIN rate_2023 ON rate_2021.district = rate_2023.district\n)\nSELECT rate_2021.district, rate_2021.numerator, rate_2021.denominator, rate_2023.numerator, rate_2023.denominator, percent_change\nFROM rate_2021\nJOIN rate_2023 ON rate_2021.district = rate_2023.district\nJOIN percent_change ON rate_2021.district = percent_change.district;\n```",
+      "api": {
+        "id": "gen-1787421247-9VWSUBQQfKIVFJXcxoba",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 395,
+          "completion_tokens": 287,
+          "total_tokens": 682,
+          "cost": 1.938e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.938e-05,
+            "upstream_inference_prompt_cost": 7.9e-06,
+            "upstream_inference_completions_cost": 1.148e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 9.557
+      },
+      "duration_seconds": 9.56,
+      "error": "BinderException: Binder Error: Ambiguous reference to column name \"district\" (use: \"rate_2021.district\" or \"rate_2023.district\")\n\nLINE 1: ... ('Gaya', 'Nalanda')) AS subquery), percent_change AS (SELECT district, NULLIF((rate_2023.numerator - rate_2021.numerator...\n                                                                         ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

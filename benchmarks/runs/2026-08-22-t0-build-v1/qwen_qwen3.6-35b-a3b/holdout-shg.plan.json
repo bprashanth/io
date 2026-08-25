@@ -1,0 +1,172 @@
+{
+ "plan": {
+  "title": "SHG Loan Repayment & Purpose Analysis",
+  "subtitle": "Overview of loan disbursements, repayment status distribution, and purpose breakdown across blocks.",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Loans Disbursed",
+    "sql": "SELECT COUNT(*) AS n FROM \"shg_loan_register\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Loan Amount (Rs)",
+    "sql": "SELECT SUM(\"Loan Amount (Rs)\") AS total_amount FROM \"shg_loan_register\"",
+    "unit": "Rs"
+   },
+   {
+    "id": "p3",
+    "kind": "pie",
+    "title": "Repayment Status Distribution",
+    "sql": "SELECT \"Repayment Status\", COUNT(*) AS cnt FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Repayment Status",
+    "y": [
+     "cnt"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Average Loan Amount by Purpose",
+    "sql": "SELECT \"Purpose\", AVG(\"Loan Amount (Rs)\") AS avg_amount FROM \"shg_loan_register\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Purpose",
+    "y": [
+     "avg_amount"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top Blocks by Overdue Loans",
+    "sql": "SELECT \"Block\", COUNT(*) AS overdue_count, SUM(\"Loan Amount (Rs)\") AS overdue_amount FROM \"shg_loan_register\" WHERE \"Repayment Status\" = 'Overdue' GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The SHG program has disbursed {{p1}} loans totaling {{p2}}. The majority of these loans are in good standing, with only a fraction marked as overdue as shown in the repayment status pie chart. When analyzing loan purposes, {{p4}} indicates which category receives the highest average funding. For risk management, it is critical to monitor the top blocks listed in the table below, where overdue concentrations are highest."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "total_amount": 17815000
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Repayment Status",
+    "cnt"
+   ],
+   "rows": [
+    {
+     "Repayment Status": "Regular",
+     "cnt": 156
+    },
+    {
+     "Repayment Status": "Closed",
+     "cnt": 144
+    },
+    {
+     "Repayment Status": "Overdue",
+     "cnt": 60
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Purpose",
+    "avg_amount"
+   ],
+   "rows": [
+    {
+     "Purpose": "Housing",
+     "avg_amount": 85625.0
+    },
+    {
+     "Purpose": "Agriculture",
+     "avg_amount": 50330.188679245286
+    },
+    {
+     "Purpose": "Education",
+     "avg_amount": 48064.51612903226
+    },
+    {
+     "Purpose": "Livestock",
+     "avg_amount": 45126.582278481015
+    },
+    {
+     "Purpose": "Petty trade",
+     "avg_amount": 42348.48484848485
+    },
+    {
+     "Purpose": "Health",
+     "avg_amount": 41086.95652173913
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Block",
+    "overdue_count",
+    "overdue_amount"
+   ],
+   "rows": [
+    {
+     "Block": "Fatehpur",
+     "overdue_count": 15,
+     "overdue_amount": 795000
+    },
+    {
+     "Block": "Belaganj",
+     "overdue_count": 13,
+     "overdue_amount": 735000
+    },
+    {
+     "Block": "Wazirganj",
+     "overdue_count": 13,
+     "overdue_amount": 620000
+    },
+    {
+     "Block": "Atri",
+     "overdue_count": 8,
+     "overdue_amount": 460000
+    },
+    {
+     "Block": "Barachatti",
+     "overdue_count": 8,
+     "overdue_amount": 310000
+    },
+    {
+     "Block": "Dobhi",
+     "overdue_count": 3,
+     "overdue_amount": 190000
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  }
+ }
+}

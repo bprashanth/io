@@ -1,0 +1,110 @@
+{
+ "plan": {
+  "title": "School Dashboard: Enrolment & Infrastructure",
+  "subtitle": "Tracks enrolment trends, gender gaps, and facility status across schools",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Enrolment (2024)",
+    "sql": "SELECT SUM(\"Girls 2024\") + SUM(\"Boys 2024\") AS total FROM \"school_enrolment_by_year\" WHERE \"School Code\" IS NOT NULL",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "line",
+    "title": "Enrolment Trend (Girls vs Boys)",
+    "sql": "WITH yearly_totals AS (SELECT 'Girls' AS series, SUM(\"Girls 2022\") AS g22, SUM(\"Girls 2023\") AS g23, SUM(\"Girls 2024\") AS g24 FROM \"school_enrolment_by_year\" WHERE \"School Code\" IS NOT NULL UNION ALL SELECT 'Boys' AS series, SUM(\"Boys 2022\") AS g22, SUM(\"Boys 2023\") AS g23, SUM(\"Boys 2024\") AS g24 FROM \"school_enrolment_by_year\" WHERE \"School Code\" IS NOT NULL) SELECT series, g22, g23, g24 FROM yearly_totals ORDER BY series, g24 DESC",
+    "x": "series",
+    "y": [
+     "g22",
+     "g23",
+     "g24"
+    ],
+    "series": "series"
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Girls vs Boys Enrolment (2024)",
+    "sql": "SELECT SUM(\"Girls 2024\") AS girls_2024, SUM(\"Boys 2024\") AS boys_2024 FROM \"school_enrolment_by_year\" WHERE \"School Code\" IS NOT NULL",
+    "x": "girls_2024",
+    "y": [
+     "boys_2024"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Schools with Infrastructure Gaps",
+    "sql": "SELECT \"School Name\", SUM(CASE WHEN \"Toilets functional (girls)\" = 'No' THEN 1 ELSE 0 END) AS no_girls_toilets, SUM(CASE WHEN \"Drinking water\" = 'No' THEN 1 ELSE 0 END) AS no_water, SUM(CASE WHEN \"Electricity\" = 'No' THEN 1 ELSE 0 END) AS no_electricity FROM \"school_infrastructure\" GROUP BY \"School Name\" ORDER BY no_girls_toilets DESC, no_water DESC, no_electricity DESC LIMIT 10",
+    "x": "School Name",
+    "y": [
+     "no_girls_toilets",
+     "no_water",
+     "no_electricity"
+    ]
+   }
+  ],
+  "narrative": "The dashboard highlights the total student population in 2024, which is the sum of girls and boys enrolled across all schools. By comparing the enrolment trends from 2022 to 2024, we can observe the growth trajectory for both genders. The bar chart specifically isolates the 2024 figures to visualize the current gender gap in attendance.",
+  "missing": []
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total"
+   ],
+   "rows": [
+    {
+     "total": 9343
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "series",
+    "g22",
+    "g23",
+    "g24"
+   ],
+   "rows": [
+    {
+     "series": "Boys",
+     "g22": 4202,
+     "g23": 4355,
+     "g24": 4450
+    },
+    {
+     "series": "Girls",
+     "g22": 4611,
+     "g23": 4733,
+     "g24": 4893
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "girls_2024",
+    "boys_2024"
+   ],
+   "rows": [
+    {
+     "girls_2024": 4893,
+     "boys_2024": 4450
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Referenced column \"School Name\" not found in FROM clause!\nCandidate bindings: \"School Code\", \"Classrooms\"\n\nLINE 1: ... END) AS no_electricity FROM \"school_infrastructure\" GROUP BY \"School Name\" ORDER BY no_girls_toilets DESC, no_water DESC...\n                          "
+  }
+ }
+}

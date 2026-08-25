@@ -1,0 +1,220 @@
+{
+ "plan": {
+  "title": "Donation Dashboard",
+  "subtitle": "Monthly trends, top cities, payment modes, and donor retention",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Donations",
+    "sql": "SELECT SUM(\"Amount\") AS total_amount FROM \"donor_transactions\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Unique Donors",
+    "sql": "SELECT COUNT(DISTINCT \"Donor\") AS unique_donors FROM \"donor_transactions\"",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Average Donation",
+    "sql": "SELECT AVG(\"Amount\") AS avg_amount FROM \"donor_transactions\"",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Monthly Trend",
+    "sql": "SELECT DATE_TRUNC('MONTH', CAST(\"Date\" AS TIMESTAMP)) AS month, SUM(\"Amount\") AS total_amount FROM \"donor_transactions\" GROUP BY 1 ORDER BY 1",
+    "x": "month",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Top Cities by Donation Amount",
+    "sql": "SELECT \"City\", SUM(\"Amount\") AS total_amount FROM \"donor_transactions\" WHERE \"City\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "city",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "pie",
+    "title": "Payment Modes Distribution",
+    "sql": "SELECT \"Mode\", SUM(\"Amount\") AS total_amount FROM \"donor_transactions\" WHERE \"Mode\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 8",
+    "x": "mode",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Repeat Donors (Top 10)",
+    "sql": "SELECT \"Donor\", COUNT(*) AS donation_count, SUM(\"Amount\") AS total_amount FROM \"donor_transactions\" GROUP BY 1 HAVING COUNT(*) > 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The dashboard highlights key metrics such as {{p1}} in total donations and {{p2}} unique donors. The average donation amount stands at {{p3}}.\n\nThe monthly trend shows how donations have evolved over time, with the most recent month contributing significantly to the total. Top cities like those listed in the bar chart drive a large portion of the revenue.\n\nPayment modes vary, with UPI and Card being the most popular methods. Repeat donors, shown in the table, are crucial for sustained growth, with some individuals contributing multiple times."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "total_amount": 6641021
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "unique_donors"
+   ],
+   "rows": [
+    {
+     "unique_donors": 247
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "avg_amount"
+   ],
+   "rows": [
+    {
+     "avg_amount": 26564.084
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ConversionException: Conversion Error: invalid timestamp field format: \"29-05-2025\", expected format is (YYYY-MM-DD HH:MM:SS[.US][\u00b1HH[:MM[:SS]]| ZONE]) when casting from source column Date\n\nLINE 1: SELECT DATE_TRUNC('MONTH', CAST(\"Date\" AS TIMESTAMP)) AS month, SUM(\"Amount\") AS total...\n            "
+  },
+  "p5": {
+   "columns": [
+    "City",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "City": "Gaya",
+     "total_amount": 787715
+    },
+    {
+     "City": "Bengaluru",
+     "total_amount": 771729
+    },
+    {
+     "City": "Solapur",
+     "total_amount": 729972
+    },
+    {
+     "City": "Thane",
+     "total_amount": 678448
+    },
+    {
+     "City": "Mumbai",
+     "total_amount": 617867
+    },
+    {
+     "City": "Pune",
+     "total_amount": 544876
+    },
+    {
+     "City": "Nashik",
+     "total_amount": 498828
+    },
+    {
+     "City": "Nagpur",
+     "total_amount": 428953
+    },
+    {
+     "City": "Aurangabad",
+     "total_amount": 403921
+    },
+    {
+     "City": "Delhi",
+     "total_amount": 395268
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Mode",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "Mode": "NEFT",
+     "total_amount": 1511602
+    },
+    {
+     "Mode": "Card",
+     "total_amount": 1322416
+    },
+    {
+     "Mode": "Cash",
+     "total_amount": 1277633
+    },
+    {
+     "Mode": "DD",
+     "total_amount": 1250836
+    },
+    {
+     "Mode": "UPI",
+     "total_amount": 728176
+    },
+    {
+     "Mode": "Cheque",
+     "total_amount": 550358
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "Donor",
+    "donation_count",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "Donor": "Rajesh",
+     "donation_count": 2,
+     "total_amount": 60187
+    },
+    {
+     "Donor": "Rohit",
+     "donation_count": 2,
+     "total_amount": 3091
+    },
+    {
+     "Donor": "Pankaj Pereira",
+     "donation_count": 2,
+     "total_amount": 100648
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  }
+ }
+}

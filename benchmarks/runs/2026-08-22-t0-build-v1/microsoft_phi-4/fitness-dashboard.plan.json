@@ -1,0 +1,385 @@
+{
+ "plan": {
+  "title": "Improvement Dashboard: Baseline to Endline",
+  "subtitle": "Analyzing children's performance improvements by location and coach",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total children assessed",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM baseline UNION ALL SELECT COUNT(DISTINCT \"Child ID\") AS n FROM endline",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Average improvement in shuttle run time by location",
+    "sql": "SELECT b.\"Location\", AVG(NULLIF(e.\"Shuttle run sec\", 0) - b.\"Shuttle run sec\") AS avg_improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Location",
+    "y": [
+     "avg_improvement"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Average improvement in sit-ups by coach",
+    "sql": "SELECT b.\"Coach\", AVG(NULLIF(e.\"Sit ups\", 0) - b.\"Sit ups\") AS avg_improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Coach",
+    "y": [
+     "avg_improvement"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Monthly trend in average height improvement",
+    "sql": "WITH monthly_height AS (SELECT EXTRACT(MONTH FROM e.\"DOB\") AS month, AVG(NULLIF(e.\"Height cm\", 0) - b.\"Height cm\") AS avg_height_improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1) SELECT month, avg_height_improvement FROM monthly_height ORDER BY 1",
+    "x": "month",
+    "y": [
+     "avg_height_improvement"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top 10 locations by average weight improvement",
+    "sql": "SELECT b.\"Location\", AVG(NULLIF(e.\"Weight kg\", 0) - b.\"Weight kg\") AS avg_weight_improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "This dashboard provides insights into the improvements observed in children from baseline to endline assessments. The total number of children assessed is {{p1}}. The average improvement in shuttle run time by location is shown in panel {{p2}}, highlighting which locations saw the most significant enhancements. Panel {{p3}} displays the average improvement in sit-ups by coach, indicating which coaches had the most impact. The monthly trend in average height improvement is visualized in panel {{p4}}, showing how height improvements varied over the months. Finally, panel {{p5}} lists the top 10 locations by average weight improvement, identifying where the most significant weight gains occurred."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    },
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "Location",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "Location": "Saswad",
+     "avg_improvement": 6.299999999999999
+    },
+    {
+     "Location": "Loni Kalbhor",
+     "avg_improvement": 4.500000000000001
+    },
+    {
+     "Location": "Paraiya",
+     "avg_improvement": 4.116666666666666
+    },
+    {
+     "Location": "Bariarpur",
+     "avg_improvement": 3.2399999999999998
+    },
+    {
+     "Location": "Devipur",
+     "avg_improvement": 2.5999999999999996
+    },
+    {
+     "Location": "Karpi",
+     "avg_improvement": 2.1999999999999997
+    },
+    {
+     "Location": "Uruli Kanchan",
+     "avg_improvement": 2.0666666666666678
+    },
+    {
+     "Location": "Chikhali",
+     "avg_improvement": 2.0000000000000004
+    },
+    {
+     "Location": "Talegaon Dhamdhere",
+     "avg_improvement": 1.6833333333333336
+    },
+    {
+     "Location": "Kalyanpur",
+     "avg_improvement": 1.4666666666666661
+    },
+    {
+     "Location": "Alandi",
+     "avg_improvement": 1.3000000000000003
+    },
+    {
+     "Location": "Rajgurunagar",
+     "avg_improvement": 0.8000000000000002
+    },
+    {
+     "Location": "Bakhtiyarpur Tola",
+     "avg_improvement": 0.7374999999999994
+    },
+    {
+     "Location": "Chakan",
+     "avg_improvement": 0.6499999999999999
+    },
+    {
+     "Location": "Bhor",
+     "avg_improvement": 0.3285714285714287
+    },
+    {
+     "Location": "Harnaut Tola",
+     "avg_improvement": 0.31999999999999956
+    },
+    {
+     "Location": "Deopur",
+     "avg_improvement": 0.31428571428571467
+    },
+    {
+     "Location": "Nanded Phata",
+     "avg_improvement": 0.16666666666666666
+    },
+    {
+     "Location": "Sahebganj",
+     "avg_improvement": -0.039999999999999855
+    },
+    {
+     "Location": "Bishunpur",
+     "avg_improvement": -0.11428571428571413
+    },
+    {
+     "Location": "Supa",
+     "avg_improvement": -0.1600000000000005
+    },
+    {
+     "Location": "Atri",
+     "avg_improvement": -0.16666666666666666
+    },
+    {
+     "Location": "Chandpur",
+     "avg_improvement": -0.27500000000000036
+    },
+    {
+     "Location": "Rampur Sokho",
+     "avg_improvement": -0.3000000000000001
+    },
+    {
+     "Location": "Basaith",
+     "avg_improvement": -0.4222222222222219
+    },
+    {
+     "Location": "Wadgaon",
+     "avg_improvement": -0.42500000000000027
+    },
+    {
+     "Location": "Imamganj",
+     "avg_improvement": -0.5124999999999997
+    },
+    {
+     "Location": "Fatehpur",
+     "avg_improvement": -0.6200000000000003
+    },
+    {
+     "Location": "Shirur",
+     "avg_improvement": -0.7000000000000005
+    },
+    {
+     "Location": "Paroo",
+     "avg_improvement": -0.7199999999999995
+    },
+    {
+     "Location": "Kesnand",
+     "avg_improvement": -0.8000000000000007
+    },
+    {
+     "Location": "Kharadi",
+     "avg_improvement": -0.9200000000000003
+    },
+    {
+     "Location": "Amawan",
+     "avg_improvement": -1.0
+    },
+    {
+     "Location": "Manjari",
+     "avg_improvement": -1.0666666666666675
+    },
+    {
+     "Location": "Ambegaon Budruk",
+     "avg_improvement": -1.3999999999999995
+    },
+    {
+     "Location": "Mahuar",
+     "avg_improvement": -1.48
+    },
+    {
+     "Location": "Chandwara",
+     "avg_improvement": -1.5749999999999993
+    },
+    {
+     "Location": "Dehu",
+     "avg_improvement": -1.6333333333333335
+    },
+    {
+     "Location": "Rampur",
+     "avg_improvement": -1.8
+    },
+    {
+     "Location": "Dobhi",
+     "avg_improvement": -2.166666666666668
+    },
+    {
+     "Location": "Barachatti",
+     "avg_improvement": -2.2399999999999998
+    },
+    {
+     "Location": "Motipur",
+     "avg_improvement": -2.4875
+    },
+    {
+     "Location": "Guraru",
+     "avg_improvement": -2.95
+    },
+    {
+     "Location": "Kadus",
+     "avg_improvement": -3.6999999999999993
+    },
+    {
+     "Location": "Nira",
+     "avg_improvement": -5.100000000000001
+    }
+   ],
+   "rowcount": 45,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Coach",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "Coach": "T. S. Fernandez",
+     "avg_improvement": 11.090909090909092
+    },
+    {
+     "Coach": "Vimla",
+     "avg_improvement": 8.615384615384615
+    },
+    {
+     "Coach": "Jaspreet George",
+     "avg_improvement": 7.461538461538462
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "avg_improvement": 6.285714285714286
+    },
+    {
+     "Coach": "sunil thakur",
+     "avg_improvement": 5.117647058823529
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "avg_improvement": 3.888888888888889
+    },
+    {
+     "Coach": "Bhagyashree",
+     "avg_improvement": 1.6923076923076923
+    },
+    {
+     "Coach": "indira chandra",
+     "avg_improvement": 1.2777777777777777
+    },
+    {
+     "Coach": "Rosy",
+     "avg_improvement": 1.1111111111111112
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "avg_improvement": 0.7058823529411765
+    },
+    {
+     "Coach": "AAKASH ZENDE",
+     "avg_improvement": 0.5625
+    },
+    {
+     "Coach": "Rupali Kumar",
+     "avg_improvement": 0.4666666666666667
+    },
+    {
+     "Coach": "Salman Rao",
+     "avg_improvement": 0.2
+    },
+    {
+     "Coach": "P. T. Pereira",
+     "avg_improvement": 0.10526315789473684
+    },
+    {
+     "Coach": "Bapu Yadav",
+     "avg_improvement": -0.25
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: No function matches the given name and argument types 'date_part(STRING_LITERAL, VARCHAR)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tdate_part(VARCHAR[], DATE) -> STRUCT()\n\tdate_part(VARCHAR[], INTERVAL) -> STRUCT()\n\tdate_part(VARCHAR[], TIME) "
+  },
+  "p5": {
+   "columns": [
+    "Location",
+    "avg_weight_improvement"
+   ],
+   "rows": [
+    {
+     "Location": "Amawan",
+     "avg_weight_improvement": 14.125
+    },
+    {
+     "Location": "Manjari",
+     "avg_weight_improvement": 13.799999999999997
+    },
+    {
+     "Location": "Ambegaon Budruk",
+     "avg_weight_improvement": 12.55
+    },
+    {
+     "Location": "Bakhtiyarpur Tola",
+     "avg_weight_improvement": 8.325
+    },
+    {
+     "Location": "Dobhi",
+     "avg_weight_improvement": 8.133333333333331
+    },
+    {
+     "Location": "Devipur",
+     "avg_weight_improvement": 5.333333333333335
+    },
+    {
+     "Location": "Nira",
+     "avg_weight_improvement": 5.199999999999999
+    },
+    {
+     "Location": "Karpi",
+     "avg_weight_improvement": 5.166666666666668
+    },
+    {
+     "Location": "Barachatti",
+     "avg_weight_improvement": 4.520000000000001
+    },
+    {
+     "Location": "Bishunpur",
+     "avg_weight_improvement": 4.128571428571428
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

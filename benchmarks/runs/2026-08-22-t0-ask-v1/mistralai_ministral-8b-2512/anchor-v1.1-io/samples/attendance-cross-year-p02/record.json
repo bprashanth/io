@@ -1,0 +1,175 @@
+{
+  "id": "attendance-cross-year-p02",
+  "task_id": "attendance-cross-year",
+  "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+  "question": "for each centre, the average monthly attendance rate in percent for 2023 and for 2024 in two columns",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+  "expected_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.99442820103918,
+      80.66053460475668
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.51530448404581,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980886,
+      77.5822639156466
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH aligned_2023 /* Align tables by centre name and month */ AS (SELECT \"Centre\" AS centre, \"Month\" AS month, \"Enrolled Kids\" AS enrolment, \"Avg Daily Present\" AS attendance FROM attendance_2023 WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), aligned_2024 AS (SELECT \"centre_name\" AS centre, \"month\" AS month, \"enrolment\" AS enrolment, \"average_attendance\" AS attendance FROM attendance_2024 WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), monthly_rates_2023 /* Calculate monthly attendance rates */ AS (SELECT centre, month, (attendance * 100.0) / NULLIF(NULLIF(enrolment, 0), 0) AS attendance_rate_2023 FROM aligned_2023), monthly_rates_2024 AS (SELECT centre, month, (attendance * 100.0) / NULLIF(NULLIF(enrolment, 0), 0) AS attendance_rate_2024 FROM aligned_2024) /* Calculate average monthly attendance rates per centre */ SELECT centre, AVG(attendance_rate_2023) AS avg_monthly_attendance_rate_2023, AVG(attendance_rate_2024) AS avg_monthly_attendance_rate_2024 FROM (SELECT mr2023.centre, mr2023.month, mr2023.attendance_rate_2023, mr2024.attendance_rate_2024 FROM monthly_rates_2023 AS mr2023 LEFT JOIN monthly_rates_2024 AS mr2024 ON mr2023.centre = mr2024.centre AND mr2023.month = mr2024.month) GROUP BY centre ORDER BY centre NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nfor each centre, the average monthly attendance rate in percent for 2023 and for 2024 in two columns",
+      "response": "```sql\nWITH\n-- Align tables by centre name and month\naligned_2023 AS (\n    SELECT\n        \"Centre\" AS centre,\n        \"Month\" AS month,\n        \"Enrolled Kids\" AS enrolment,\n        \"Avg Daily Present\" AS attendance\n    FROM attendance_2023\n    WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n),\n\naligned_2024 AS (\n    SELECT\n        \"centre_name\" AS centre,\n        \"month\" AS month,\n        \"enrolment\" AS enrolment,\n        \"average_attendance\" AS attendance\n    FROM attendance_2024\n    WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n),\n\n-- Calculate monthly attendance rates\nmonthly_rates_2023 AS (\n    SELECT\n        centre,\n        month,\n        (attendance * 100.0) / NULLIF(enrolment, 0) AS attendance_rate_2023\n    FROM aligned_2023\n),\n\nmonthly_rates_2024 AS (\n    SELECT\n        centre,\n        month,\n        (attendance * 100.0) / NULLIF(enrolment, 0) AS attendance_rate_2024\n    FROM aligned_2024\n)\n\n-- Calculate average monthly attendance rates per centre\nSELECT\n    centre,\n    AVG(attendance_rate_2023) AS avg_monthly_attendance_rate_2023,\n    AVG(attendance_rate_2024) AS avg_monthly_attendance_rate_2024\nFROM (\n    SELECT\n        mr2023.centre,\n        mr2023.month,\n        mr2023.attendance_rate_2023,\n        mr2024.attendance_rate_2024\n    FROM monthly_rates_2023 mr2023\n    LEFT JOIN monthly_rates_2024 mr2024 ON mr2023.centre = mr2024.centre AND mr2023.month = mr2024.month\n)\nGROUP BY centre\nORDER BY centre;\n```",
+      "api": {
+        "id": "gen-1787421749-qglsuajbTNi3yaxHqGiD",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 647,
+          "completion_tokens": 673,
+          "total_tokens": 1320,
+          "cost": 0.00012888,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 512,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00012888,
+            "upstream_inference_prompt_cost": 2.793e-05,
+            "upstream_inference_completions_cost": 0.00010095
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 8.662
+      },
+      "duration_seconds": 8.676,
+      "sql_duckdb": "WITH aligned_2023 /* Align tables by centre name and month */ AS (SELECT \"Centre\" AS centre, \"Month\" AS month, \"Enrolled Kids\" AS enrolment, \"Avg Daily Present\" AS attendance FROM attendance_2023 WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), aligned_2024 AS (SELECT \"centre_name\" AS centre, \"month\" AS month, \"enrolment\" AS enrolment, \"average_attendance\" AS attendance FROM attendance_2024 WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), monthly_rates_2023 /* Calculate monthly attendance rates */ AS (SELECT centre, month, (attendance * 100.0) / NULLIF(NULLIF(enrolment, 0), 0) AS attendance_rate_2023 FROM aligned_2023), monthly_rates_2024 AS (SELECT centre, month, (attendance * 100.0) / NULLIF(NULLIF(enrolment, 0), 0) AS attendance_rate_2024 FROM aligned_2024) /* Calculate average monthly attendance rates per centre */ SELECT centre, AVG(attendance_rate_2023) AS avg_monthly_attendance_rate_2023, AVG(attendance_rate_2024) AS avg_monthly_attendance_rate_2024 FROM (SELECT mr2023.centre, mr2023.month, mr2023.attendance_rate_2023, mr2024.attendance_rate_2024 FROM monthly_rates_2023 AS mr2023 LEFT JOIN monthly_rates_2024 AS mr2024 ON mr2023.centre = mr2024.centre AND mr2023.month = mr2024.month) GROUP BY centre ORDER BY centre NULLS FIRST",
+      "rows": [
+        [
+          "Chembur Balwadi",
+          70.360615190941,
+          70.44660635437101
+        ],
+        [
+          "Dharavi Balwadi",
+          70.82452584394089,
+          74.97294321155522
+        ],
+        [
+          "Govandi Balwadi",
+          75.99442820103918,
+          80.66053460475668
+        ],
+        [
+          "Kurla Balwadi",
+          83.94073053389387,
+          63.430859353534544
+        ],
+        [
+          "Mankhurd Balwadi",
+          64.20706883526674,
+          62.326350096023994
+        ],
+        [
+          "Sion Balwadi",
+          60.51530448404581,
+          55.56386806777662
+        ],
+        [
+          "Wadala Balwadi",
+          87.81901547526547,
+          88.94728964433877
+        ],
+        [
+          "Worli Balwadi",
+          80.31790744980886,
+          77.5822639156466
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

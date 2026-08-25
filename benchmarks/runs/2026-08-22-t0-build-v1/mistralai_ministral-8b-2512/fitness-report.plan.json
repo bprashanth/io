@@ -1,0 +1,186 @@
+{
+ "plan": {
+  "title": "Fitness Programme Impact Summary",
+  "subtitle": "Measures of child engagement, physical development, and coach-led progress over the programme",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total children enrolled",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM baseline",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Completion rate",
+    "sql": "SELECT ROUND(COUNT(DISTINCT e.\"Child ID\") * 100.0 / COUNT(DISTINCT b.\"Child ID\"), 2) AS percent FROM baseline b LEFT JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" WHERE e.\"Child ID\" IS NOT NULL",
+    "unit": "%"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Average shuttle run improvement (seconds)",
+    "sql": "SELECT AVG(NULLIF(e.\"Shuttle run sec\" - b.\"Shuttle run sec\", 0)) AS avg_improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": "sec"
+   },
+   {
+    "id": "p4",
+    "kind": "kpi",
+    "title": "Average sit-ups increase",
+    "sql": "SELECT AVG(NULLIF(e.\"Sit ups\" - b.\"Sit ups\", 0)) AS avg_increase FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": ""
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Top 5 coaches by participation growth",
+    "sql": "SELECT b.\"Coach\", COUNT(DISTINCT e.\"Child ID\") - COUNT(DISTINCT b.\"Child ID\") AS growth FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 2 DESC LIMIT 5",
+    "x": "Coach",
+    "y": [
+     "growth"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "line",
+    "title": "Weight gain distribution by age group",
+    "sql": "SELECT \"Age\", AVG(NULLIF(e.\"Weight kg\" - b.\"Weight kg\", 0)) AS avg_gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY 1",
+    "x": "Age",
+    "y": [
+     "avg_gain"
+    ],
+    "series": "Weight gain (kg)"
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Top 5 locations by physical improvement",
+    "sql": "SELECT b.\"Location\", AVG(NULLIF(e.\"Shuttle run sec\" - b.\"Shuttle run sec\", 0)) AS shuttle_improvement, AVG(NULLIF(e.\"Sit ups\" - b.\"Sit ups\", 0)) AS situps_improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY 1 ORDER BY shuttle_improvement DESC LIMIT 5"
+   }
+  ],
+  "narrative": "The fitness programme engaged {{p1}} children across {{p2}}% of the enrolled cohort, demonstrating strong retention. On average, participants improved their shuttle run times by {{p3}} seconds and increased their sit-ups by {{p4}} repetitions. The most impactful coaches were those who worked with the most growth in participation, with {{p5}} showing the highest gains. Weight gain was consistent across age groups, with younger children showing slightly higher average gains. The top locations for physical improvement were {{p7}}, where children showed the most significant gains in both endurance and strength. These results reflect the programme's effectiveness in building both physical capacity and coach-child relationships."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "percent"
+   ],
+   "rows": [
+    {
+     "percent": 100.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "avg_improvement": -0.013636363636363785
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "avg_increase"
+   ],
+   "rows": [
+    {
+     "avg_increase": 3.101063829787234
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Coach",
+    "growth"
+   ],
+   "rows": [
+    {
+     "Coach": "Ranjan Nasir",
+     "growth": 0
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "growth": 0
+    },
+    {
+     "Coach": "Bapu Yadav",
+     "growth": 0
+    },
+    {
+     "Coach": "T. S. Fernandez",
+     "growth": 0
+    },
+    {
+     "Coach": "Salman Rao",
+     "growth": 0
+    }
+   ],
+   "rowcount": 5,
+   "error": null
+  },
+  "p6": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Ambiguous reference to column name \"Age\" (use: \"b.Age\" or \"e.Age\")\n\nLINE 1: SELECT \"Age\", AVG(NULLIF(e.\"Weight kg\" - b.\"Weight kg\", 0)) AS...\n               ^"
+  },
+  "p7": {
+   "columns": [
+    "Location",
+    "shuttle_improvement",
+    "situps_improvement"
+   ],
+   "rows": [
+    {
+     "Location": "Saswad",
+     "shuttle_improvement": 6.299999999999999,
+     "situps_improvement": 13.0
+    },
+    {
+     "Location": "Paraiya",
+     "shuttle_improvement": 4.9399999999999995,
+     "situps_improvement": -2.8333333333333335
+    },
+    {
+     "Location": "Loni Kalbhor",
+     "shuttle_improvement": 4.500000000000001,
+     "situps_improvement": 3.0
+    },
+    {
+     "Location": "Bariarpur",
+     "shuttle_improvement": 3.2399999999999998,
+     "situps_improvement": -4.0
+    },
+    {
+     "Location": "Devipur",
+     "shuttle_improvement": 2.5999999999999996,
+     "situps_improvement": -8.666666666666666
+    }
+   ],
+   "rowcount": 5,
+   "error": null
+  }
+ }
+}

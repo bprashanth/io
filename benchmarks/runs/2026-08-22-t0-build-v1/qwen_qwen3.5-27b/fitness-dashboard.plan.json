@@ -1,0 +1,315 @@
+{
+ "plan": {
+  "title": "Child Fitness Improvement Dashboard",
+  "subtitle": "Tracking physical progress from baseline to endline by location and coach",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Children Tracked",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM (SELECT \"Child ID\" FROM \"baseline\" UNION SELECT \"Child ID\" FROM \"endline\") AS all_children",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Avg Shuttle Run Improvement (sec)",
+    "sql": "SELECT AVG(e.\"Shuttle run sec\" - b.\"Shuttle run sec\") AS n FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" WHERE b.\"Shuttle run sec\" IS NOT NULL AND e.\"Shuttle run sec\" IS NOT NULL",
+    "unit": "sec"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Avg Sit Ups Improvement",
+    "sql": "SELECT AVG(e.\"Sit ups\" - b.\"Sit ups\") AS n FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" WHERE b.\"Sit ups\" IS NOT NULL AND e.\"Sit ups\" IS NOT NULL",
+    "unit": "reps"
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Avg Shuttle Run Change by Location",
+    "sql": "SELECT b.\"Location\", AVG(e.\"Shuttle run sec\" - b.\"Shuttle run sec\") AS avg_change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" WHERE b.\"Shuttle run sec\" IS NOT NULL AND e.\"Shuttle run sec\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+    "x": "location",
+    "y": [
+     "avg_change"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Avg Sit Ups Change by Coach",
+    "sql": "SELECT b.\"Coach\", AVG(e.\"Sit ups\" - b.\"Sit ups\") AS avg_change FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" WHERE b.\"Sit ups\" IS NOT NULL AND e.\"Sit ups\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+    "x": "coach",
+    "y": [
+     "avg_change"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top 10 Locations by Shuttle Run Improvement",
+    "sql": "SELECT b.\"Location\", COUNT(*) AS child_count, AVG(e.\"Shuttle run sec\" - b.\"Shuttle run sec\") AS avg_improvement FROM \"baseline\" b JOIN \"endline\" e ON b.\"Child ID\" = e.\"Child ID\" WHERE b.\"Shuttle run sec\" IS NOT NULL AND e.\"Shuttle run sec\" IS NOT NULL GROUP BY 1 ORDER BY 3 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "This dashboard tracks the physical fitness progress of children from baseline to endline assessments. The total number of unique children tracked is {{p1}}. On average, children improved their shuttle run time by {{p2}} seconds, indicating better speed and agility. Additionally, the average increase in sit-ups was {{p3}} repetitions, showing enhanced core strength.\n\nThe bar chart by location highlights which areas saw the most significant improvements in shuttle run times, with the top performing locations leading the pack. Similarly, the coach-specific analysis reveals which instructors are driving the most substantial gains in core strength exercises.\n\nFor a detailed breakdown, the table lists the top 10 locations where children showed the greatest improvement in shuttle run performance, providing actionable insights for resource allocation and coaching strategies."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": -0.013500000000000147
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 2.915
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Location",
+    "avg_change"
+   ],
+   "rows": [
+    {
+     "Location": "Saswad",
+     "avg_change": 6.299999999999999
+    },
+    {
+     "Location": "Loni Kalbhor",
+     "avg_change": 4.500000000000001
+    },
+    {
+     "Location": "Paraiya",
+     "avg_change": 4.116666666666666
+    },
+    {
+     "Location": "Bariarpur",
+     "avg_change": 3.2399999999999998
+    },
+    {
+     "Location": "Devipur",
+     "avg_change": 2.5999999999999996
+    },
+    {
+     "Location": "Karpi",
+     "avg_change": 2.1999999999999997
+    },
+    {
+     "Location": "Uruli Kanchan",
+     "avg_change": 2.0666666666666678
+    },
+    {
+     "Location": "Chikhali",
+     "avg_change": 2.0000000000000004
+    },
+    {
+     "Location": "Talegaon Dhamdhere",
+     "avg_change": 1.6833333333333336
+    },
+    {
+     "Location": "Kalyanpur",
+     "avg_change": 1.4666666666666661
+    },
+    {
+     "Location": "Alandi",
+     "avg_change": 1.3000000000000003
+    },
+    {
+     "Location": "Rajgurunagar",
+     "avg_change": 0.8000000000000002
+    },
+    {
+     "Location": "Bakhtiyarpur Tola",
+     "avg_change": 0.7374999999999994
+    },
+    {
+     "Location": "Chakan",
+     "avg_change": 0.6499999999999999
+    },
+    {
+     "Location": "Bhor",
+     "avg_change": 0.3285714285714287
+    },
+    {
+     "Location": "Harnaut Tola",
+     "avg_change": 0.31999999999999956
+    },
+    {
+     "Location": "Deopur",
+     "avg_change": 0.31428571428571467
+    },
+    {
+     "Location": "Nanded Phata",
+     "avg_change": 0.16666666666666666
+    },
+    {
+     "Location": "Sahebganj",
+     "avg_change": -0.039999999999999855
+    },
+    {
+     "Location": "Bishunpur",
+     "avg_change": -0.11428571428571413
+    }
+   ],
+   "rowcount": 20,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Coach",
+    "avg_change"
+   ],
+   "rows": [
+    {
+     "Coach": "T. S. Fernandez",
+     "avg_change": 11.090909090909092
+    },
+    {
+     "Coach": "Vimla",
+     "avg_change": 8.615384615384615
+    },
+    {
+     "Coach": "Jaspreet George",
+     "avg_change": 7.461538461538462
+    },
+    {
+     "Coach": "Manjhi Lata",
+     "avg_change": 6.285714285714286
+    },
+    {
+     "Coach": "sunil thakur",
+     "avg_change": 5.117647058823529
+    },
+    {
+     "Coach": "Ranjan Nasir",
+     "avg_change": 3.888888888888889
+    },
+    {
+     "Coach": "Bhagyashree",
+     "avg_change": 1.6923076923076923
+    },
+    {
+     "Coach": "indira chandra",
+     "avg_change": 1.2777777777777777
+    },
+    {
+     "Coach": "Rosy",
+     "avg_change": 1.1111111111111112
+    },
+    {
+     "Coach": "Geeta Bhagat",
+     "avg_change": 0.7058823529411765
+    },
+    {
+     "Coach": "AAKASH ZENDE",
+     "avg_change": 0.5625
+    },
+    {
+     "Coach": "Rupali Kumar",
+     "avg_change": 0.4666666666666667
+    },
+    {
+     "Coach": "Salman Rao",
+     "avg_change": 0.2
+    },
+    {
+     "Coach": "P. T. Pereira",
+     "avg_change": 0.10526315789473684
+    },
+    {
+     "Coach": "Bapu Yadav",
+     "avg_change": -0.25
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Location",
+    "child_count",
+    "avg_improvement"
+   ],
+   "rows": [
+    {
+     "Location": "Saswad",
+     "child_count": 1,
+     "avg_improvement": 6.299999999999999
+    },
+    {
+     "Location": "Loni Kalbhor",
+     "child_count": 2,
+     "avg_improvement": 4.500000000000001
+    },
+    {
+     "Location": "Paraiya",
+     "child_count": 6,
+     "avg_improvement": 4.116666666666666
+    },
+    {
+     "Location": "Bariarpur",
+     "child_count": 5,
+     "avg_improvement": 3.2399999999999998
+    },
+    {
+     "Location": "Devipur",
+     "child_count": 3,
+     "avg_improvement": 2.5999999999999996
+    },
+    {
+     "Location": "Karpi",
+     "child_count": 3,
+     "avg_improvement": 2.1999999999999997
+    },
+    {
+     "Location": "Uruli Kanchan",
+     "child_count": 3,
+     "avg_improvement": 2.0666666666666678
+    },
+    {
+     "Location": "Chikhali",
+     "child_count": 3,
+     "avg_improvement": 2.0000000000000004
+    },
+    {
+     "Location": "Talegaon Dhamdhere",
+     "child_count": 6,
+     "avg_improvement": 1.6833333333333336
+    },
+    {
+     "Location": "Kalyanpur",
+     "child_count": 3,
+     "avg_improvement": 1.4666666666666661
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

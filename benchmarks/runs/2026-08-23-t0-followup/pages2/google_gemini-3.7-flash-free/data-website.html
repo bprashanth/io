@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scholarship Scheme Progress Dashboard</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --danger: #ef4444;
+    --danger-light: #fee2e2;
+    --success: #10b981;
+    --success-light: #d1fae5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background-color: var(--bg); color: var(--text); padding: 24px; line-height: 1.5; }
+  .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  header { background: var(--card); padding: 24px; border-radius: 8px; border: 1px solid var(--border); }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; color: #111827; }
+  p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .kpi-card { background: var(--card); padding: 20px; border-radius: 8px; border: 1px solid var(--border); border-left: 5px solid var(--primary); }
+  .kpi-card.pending { border-left-color: var(--warning); }
+  .kpi-card.approved { border-left-color: var(--success); }
+  .kpi-card.rejected { border-left-color: var(--danger); }
+  .kpi-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-value { font-size: 1.8rem; font-weight: 700; margin-top: 6px; color: #111827; }
+
+  .card { background: var(--card); border-radius: 8px; border: 1px solid var(--border); padding: 20px; }
+  .card-title { font-size: 1.15rem; margin-bottom: 16px; font-weight: 600; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+  .control-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+  label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+  select, input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none; }
+  select:focus, input:focus { border-color: var(--primary); }
+
+  .table-responsive { width: 100%; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+  th { background-color: #f9fafb; padding: 12px; font-weight: 600; border-bottom: 1px solid var(--border); color: #374151; white-space: nowrap; }
+  td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:hover { background-color: #f9fafb; }
+
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .badge-pending { background: var(--warning-light); color: #92400e; }
+  .badge-approved { background: var(--success-light); color: #065f46; }
+  .badge-rejected { background: var(--danger-light); color: #991b1b; }
+  .badge-default { background: #e5e7eb; color: #374151; }
+
+  .empty-state { text-align: center; padding: 32px; color: var(--text-muted); font-size: 0.95rem; }
+  
+  .progress-bar-container { background: #e5e7eb; border-radius: 4px; height: 8px; width: 100px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 8px; }
+  .progress-bar-fill { background: var(--warning); height: 100%; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Scholarship Scheme Progress Dashboard</h1>
+    <p class="subtitle">District-wise monitoring, verification progress, and pending application tracking</p>
+  </header>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Applications</div>
+      <div class="kpi-value" id="kpi-total">0</div>
+    </div>
+    <div class="kpi-card pending">
+      <div class="kpi-label">Pending Cases</div>
+      <div class="kpi-value" id="kpi-pending">0</div>
+    </div>
+    <div class="kpi-card approved">
+      <div class="kpi-label">Approved Cases</div>
+      <div class="kpi-value" id="kpi-approved">0</div>
+    </div>
+    <div class="kpi-card rejected">
+      <div class="kpi-label">Rejected Cases</div>
+      <div class="kpi-value" id="kpi-rejected">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">District-wise Summary &amp; Pending Cases</div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>District</th>
+            <th>Total Applications</th>
+            <th>Approved</th>
+            <th>Rejected</th>
+            <th>Pending Verification</th>
+            <th>Pending Rate</th>
+          </tr>
+        </thead>
+        <tbody id="district-summary-body">
+          <tr><td colspan="6" class="empty-state">No data available</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Applications Directory</div>
+    <div class="controls">
+      <div class="control-group">
+        <label for="filter-district">Filter by District</label>
+        <select id="filter-district">
+          <option value="">All Districts</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="filter-status">Filter by Status</label>
+        <select id="filter-status">
+          <option value="">All Statuses</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="filter-scheme">Filter by Scheme</label>
+        <select id="filter-scheme">
+          <option value="">All Schemes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>District</th>
+            <th>Taluka</th>
+            <th>Scheme Name</th>
+            <th>Marks %</th>
+            <th>Family Income</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="cases-tbody">
+          <tr><td colspan="6" class="empty-state">No records found</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function formatCurrency(val) {
+    if (val === null || val === undefined || val === '') return '-';
+    var num = Number(val);
+    return isNaN(num) ? val : '₹' + num.toLocaleString();
+  }
+
+  function formatPercent(val) {
+    if (val === null || val === undefined || val === '') return '-';
+    var num = Number(val);
+    return isNaN(num) ? val : num + '%';
+  }
+
+  function getBadgeClass(status) {
+    if (!status) return 'badge-default';
+    var s = String(status).toLowerCase();
+    if (s.indexOf('pending') !== -1) return 'badge-pending';
+    if (s.indexOf('approved') !== -1) return 'badge-approved';
+    if (s.indexOf('rejected') !== -1) return 'badge-rejected';
+    return 'badge-default';
+  }
+
+  function initApp() {
+    var rawData = Array.isArray(window.data) ? window.data : [];
+    
+    var filterDistrict = document.getElementById('filter-district');
+    var filterStatus = document.getElementById('filter-status');
+    var filterScheme = document.getElementById('filter-scheme');
+
+    var districts = {};
+    var statuses = {};
+    var schemes = {};
+
+    var total = rawData.length;
+    var pendingCount = 0;
+    var approvedCount = 0;
+    var rejectedCount = 0;
+
+    var districtStats = {};
+
+    for (var i = 0; i < rawData.length; i++) {
+      var row = rawData[i];
+      var d = row['District'] || 'Unknown';
+      var st = row['Status'] || 'Unknown';
+      var sc = row['Name of scheme'] || 'Unknown';
+
+      districts[d] = true;
+      statuses[st] = true;
+      schemes[sc] = true;
+
+      var stLower = String(st).toLowerCase();
+      var isPend = stLower.indexOf('pending') !== -1;
+      var isApp = stLower.indexOf('approved') !== -1;
+      var isRej = stLower.indexOf('rejected') !== -1;
+
+      if (isPend) pendingCount++;
+      if (isApp) approvedCount++;
+      if (isRej) rejectedCount++;
+
+      if (!districtStats[d]) {
+        districtStats[d] = { total: 0, pending: 0, approved: 0, rejected: 0 };
+      }
+      districtStats[d].total++;
+      if (isPend) districtStats[d].pending++;
+      if (isApp) districtStats[d].approved++;
+      if (isRej) districtStats[d].rejected++;
+    }
+
+    document.getElementById('kpi-total').textContent = total.toLocaleString();
+    document.getElementById('kpi-pending').textContent = pendingCount.toLocaleString();
+    document.getElementById('kpi-approved').textContent = approvedCount.toLocaleString();
+    document.getElementById('kpi-rejected').textContent = rejectedCount.toLocaleString();
+
+    function populateOptions(selectEl, obj) {
+      var keys = Object.keys(obj).sort();
+      for (var j = 0; j < keys.length; j++) {
+        var opt = document.createElement('option');
+        opt.value = keys[j];
+        opt.textContent = keys[j];
+        selectEl.appendChild(opt);
+      }
+    }
+
+    populateOptions(filterDistrict, districts);
+    populateOptions(filterStatus, statuses);
+    populateOptions(filterScheme, schemes);
+
+    var distTbody = document.getElementById('district-summary-body');
+    var distKeys = Object.keys(districtStats).sort();
+
+    if (distKeys.length === 0) {
+      distTbody.innerHTML = '<tr><td colspan="6" class="empty-state">No district data available</td></tr>';
+    } else {
+      var distHtml = '';
+      for (var k = 0; k < distKeys.length; k++) {
+        var dName = distKeys[k];
+        var s = districtStats[dName];
+        var pRate = s.total > 0 ? ((s.pending / s.total) * 100).toFixed(1) : 0;
+        distHtml += '<tr>' +
+          '<td><strong>' + dName + '</strong></td>' +
+          '<td>' + s.total.toLocaleString() + '</td>' +
+          '<td>' + s.approved.toLocaleString() + '</td>' +
+          '<td>' + s.rejected.toLocaleString() + '</td>' +
+          '<td><span class="badge badge-pending">' + s.pending.toLocaleString() + '</span></td>' +
+          '<td>' + pRate + '% <div class="progress-bar-container"><div class="progress-bar-fill" style="width: ' + pRate + '%"></div></div></td>' +
+          '</tr>';
+      }
+      distTbody.innerHTML = distHtml;
+    }
+
+    function renderFilteredTable() {
+      var selDist = filterDistrict.value;
+      var selStat = filterStatus.value;
+      var selSch = filterScheme.value;
+
+      var tbody = document.getElementById('cases-tbody');
+      var matched = [];
+
+      for (var m = 0; m < rawData.length; m++) {
+        var item = rawData[m];
+        var itemDist = item['District'] || 'Unknown';
+        var itemStat = item['Status'] || 'Unknown';
+        var itemSch = item['Name of scheme'] || 'Unknown';
+
+        if (selDist && itemDist !== selDist) continue;
+        if (selStat && itemStat !== selStat) continue;
+        if (selSch && itemSch !== selSch) continue;
+
+        matched.push(item);
+      }
+
+      if (matched.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No matching cases found</td></tr>';
+        return;
+      }
+
+      var outHtml = '';
+      for (var n = 0; n < matched.length; n++) {
+        var rowData = matched[n];
+        var st = rowData['Status'] || '-';
+        outHtml += '<tr>' +
+          '<td>' + (rowData['District'] || '-') + '</td>' +
+          '<td>' + (rowData['Taluka'] || '-') + '</td>' +
+          '<td>' + (rowData['Name of scheme'] || '-') + '</td>' +
+          '<td>' + formatPercent(rowData['Marks %']) + '</td>' +
+          '<td>' + formatCurrency(rowData['Family Income']) + '</td>' +
+          '<td><span class="badge ' + getBadgeClass(st) + '">' + st + '</span></td>' +
+          '</tr>';
+      }
+      tbody.innerHTML = outHtml;
+    }
+
+    filterDistrict.addEventListener('change', renderFilteredTable);
+    filterStatus.addEventListener('change', renderFilteredTable);
+    filterScheme.addEventListener('change', renderFilteredTable);
+
+    renderFilteredTable();
+  }
+
+  window.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>

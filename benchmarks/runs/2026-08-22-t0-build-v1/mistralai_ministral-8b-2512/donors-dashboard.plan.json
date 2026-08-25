@@ -1,0 +1,225 @@
+{
+ "plan": {
+  "title": "Donation Dashboard",
+  "subtitle": "Monthly trends, top cities, payment modes, and repeat donor insights",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Donations (\u20b9)",
+    "sql": "SELECT SUM(Amount) AS total FROM donor_transactions",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Repeat Donors (%)",
+    "sql": "SELECT ROUND(100.0 * SUM(CASE WHEN donor_count > 1 THEN 1 ELSE 0 END) / COUNT(DISTINCT \"Donor\"), 1) AS repeat_percentage FROM (SELECT \"Donor\", COUNT(*) AS donor_count FROM donor_transactions GROUP BY 1)",
+    "unit": "%"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Avg. Donation (\u20b9)",
+    "sql": "SELECT ROUND(AVG(Amount), 2) AS avg_donation FROM donor_transactions",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Monthly Donation Trend (\u20b9)",
+    "sql": "SELECT DATE(\"Date\", 'YYYY-MM') AS month, SUM(Amount) AS total FROM donor_transactions GROUP BY 1 ORDER BY 1",
+    "x": "month",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Top 5 Donation Cities (\u20b9)",
+    "sql": "SELECT \"City\", SUM(Amount) AS city_total FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC LIMIT 5",
+    "x": "City",
+    "y": [
+     "city_total"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "stacked_bar",
+    "title": "Payment Mode Distribution (%)",
+    "sql": "SELECT \"Mode\", SUM(Amount) AS mode_total FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Mode",
+    "y": [
+     "mode_total"
+    ],
+    "unit": "%"
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Top 10 Repeat Donors (Transactions)",
+    "sql": "SELECT \"Donor\", COUNT(*) AS transaction_count FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "This dashboard reveals key patterns in donor behavior. {{p1}} were collected across {{p3}} average donations, with {{p2}}% of donors contributing more than once. The monthly trend ({{p4}}) shows seasonal giving patterns, peaking in {{p4.y[0]}} with {{p4.y[1]}} (\u20b9). Cities like {{p5.x[0]}} and {{p5.x[1]}} dominate contributions, accounting for {{p5.y[0]}} and {{p5.y[1]}} (\u20b9) respectively. Payment preferences vary significantly: {{p6.x[0]}} accounts for {{p6.y[0]}}% of transactions, while {{p6.x[1]}} makes up {{p6.y[1]}}%. The top repeat donors ({{p7}}) include {{p7.x[0]}} with {{p7.y[0]}} transactions, demonstrating strong donor loyalty."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total"
+   ],
+   "rows": [
+    {
+     "total": 6641021
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "repeat_percentage"
+   ],
+   "rows": [
+    {
+     "repeat_percentage": 1.2
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "avg_donation"
+   ],
+   "rows": [
+    {
+     "avg_donation": 26564.08
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ConversionException: Conversion Error: invalid timestamp field format: \"29-05-2025\", expected format is (YYYY-MM-DD HH:MM:SS[.US][\u00b1HH[:MM[:SS]]| ZONE]) when casting from source column Date\n\nLINE 1: SELECT CAST(CAST(\"Date\" AS TIMESTAMP) AT TIME ZONE 'UTC' AT TIME ZONE...\n                    ^"
+  },
+  "p5": {
+   "columns": [
+    "City",
+    "city_total"
+   ],
+   "rows": [
+    {
+     "City": "Gaya",
+     "city_total": 787715
+    },
+    {
+     "City": "Bengaluru",
+     "city_total": 771729
+    },
+    {
+     "City": "Solapur",
+     "city_total": 729972
+    },
+    {
+     "City": "Thane",
+     "city_total": 678448
+    },
+    {
+     "City": "Mumbai",
+     "city_total": 617867
+    }
+   ],
+   "rowcount": 5,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Mode",
+    "mode_total"
+   ],
+   "rows": [
+    {
+     "Mode": "NEFT",
+     "mode_total": 1511602
+    },
+    {
+     "Mode": "Card",
+     "mode_total": 1322416
+    },
+    {
+     "Mode": "Cash",
+     "mode_total": 1277633
+    },
+    {
+     "Mode": "DD",
+     "mode_total": 1250836
+    },
+    {
+     "Mode": "UPI",
+     "mode_total": 728176
+    },
+    {
+     "Mode": "Cheque",
+     "mode_total": 550358
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "Donor",
+    "transaction_count"
+   ],
+   "rows": [
+    {
+     "Donor": "Pankaj Pereira",
+     "transaction_count": 2
+    },
+    {
+     "Donor": "Rohit",
+     "transaction_count": 2
+    },
+    {
+     "Donor": "Rajesh",
+     "transaction_count": 2
+    },
+    {
+     "Donor": "Rajwinder Sheikh",
+     "transaction_count": 1
+    },
+    {
+     "Donor": "E. Y. Gill",
+     "transaction_count": 1
+    },
+    {
+     "Donor": "Sanjay Paswan",
+     "transaction_count": 1
+    },
+    {
+     "Donor": "Nair Ayesha",
+     "transaction_count": 1
+    },
+    {
+     "Donor": "S. O. Sayyed",
+     "transaction_count": 1
+    },
+    {
+     "Donor": "C. P. Chettiar",
+     "transaction_count": 1
+    },
+    {
+     "Donor": "RAJU MORE",
+     "transaction_count": 1
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

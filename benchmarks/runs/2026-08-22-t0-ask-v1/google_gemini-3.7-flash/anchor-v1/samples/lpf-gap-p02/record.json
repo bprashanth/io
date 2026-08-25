@@ -1,0 +1,953 @@
+{
+  "id": "lpf-gap-p02",
+  "task_id": "lpf-gap",
+  "pattern": "fuzzy string join with best-match dedup, group count compared against a stated column, threshold filter",
+  "question": "list schools where actual applications received, fuzzy matched, fall short of half the expected number",
+  "gold_sql": "WITH best AS (SELECT a.\"Applicant\" AS applicant, o.\"School Name\" AS matched_school, jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) AS sim FROM lpf_applications AS a JOIN lpf_outreach AS o ON jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) >= 0.9 QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Applicant\" ORDER BY sim DESC, o.\"School Name\") = 1) SELECT o.\"School Name\", COUNT(b.applicant) AS applications_received, o.\"Applications Expected\" FROM lpf_outreach AS o LEFT JOIN best AS b ON b.matched_school = o.\"School Name\" GROUP BY o.\"School Name\", o.\"Applications Expected\" HAVING COUNT(b.applicant) < o.\"Applications Expected\" / 2.0 ORDER BY o.\"School Name\"",
+  "expected_rows": [
+    [
+      "Amas Madhya Vidyalaya, Zilla Parishad",
+      1,
+      21
+    ],
+    [
+      "Amas Prathmik Vidyalaya",
+      0,
+      26
+    ],
+    [
+      "Amawan Adarsh Vidyalaya, Zilla Parishad",
+      1,
+      8
+    ],
+    [
+      "Amba Buniyadi Vidyalaya, Zilla Parishad",
+      0,
+      11
+    ],
+    [
+      "Amba Kanya Shala",
+      1,
+      20
+    ],
+    [
+      "Amba Kanya Vidyalaya, Zilla Parishad",
+      0,
+      28
+    ],
+    [
+      "Amba Madhyamik Vidyalaya, Zilla Parishad",
+      1,
+      15
+    ],
+    [
+      "Arwal Kanya Shala",
+      1,
+      13
+    ],
+    [
+      "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+      2,
+      16
+    ],
+    [
+      "Atri Kanya Shala",
+      2,
+      29
+    ],
+    [
+      "Atri Prathmik Vidyalaya",
+      0,
+      18
+    ],
+    [
+      "Aurangabad Kanya Shala",
+      0,
+      10
+    ],
+    [
+      "Aurangabad Prathmik Vidyalaya, Zilla Parishad",
+      1,
+      5
+    ],
+    [
+      "Bankat Adarsh Vidyalaya",
+      0,
+      5
+    ],
+    [
+      "Bankat Kanya Vidyalaya, Zilla Parishad",
+      0,
+      7
+    ],
+    [
+      "Bankat Navin Vidyalaya",
+      0,
+      10
+    ],
+    [
+      "Barachatti Kanya Shala",
+      2,
+      13
+    ],
+    [
+      "Barhi Kanya Shala",
+      1,
+      28
+    ],
+    [
+      "Bathani Adarsh Vidyalaya",
+      0,
+      9
+    ],
+    [
+      "Belaganj Kanya Shala",
+      1,
+      9
+    ],
+    [
+      "Belaganj Prathmik Shala (Zilla Parishad)",
+      0,
+      5
+    ],
+    [
+      "Bhadeya Kanya Shala",
+      0,
+      17
+    ],
+    [
+      "Bhadeya Prathmik Vidyalaya",
+      2,
+      27
+    ],
+    [
+      "Bhadeya Uchcha Madhyamik Vidyalaya",
+      0,
+      28
+    ],
+    [
+      "Bishunpur Buniyadi Vidyalaya, Zilla Parishad",
+      1,
+      28
+    ],
+    [
+      "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+      0,
+      5
+    ],
+    [
+      "Bishunpur Navin Vidyalaya",
+      2,
+      12
+    ],
+    [
+      "Bishunpur Prathmik Shala (Zilla Parishad)",
+      0,
+      2
+    ],
+    [
+      "Bodh Gaya Kanya Shala",
+      1,
+      5
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya",
+      2,
+      21
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+      0,
+      3
+    ],
+    [
+      "Bodh Gaya Prathmik Shala (Zilla Parishad)",
+      1,
+      17
+    ],
+    [
+      "Buxar Kanya Vidyalaya, Zilla Parishad",
+      0,
+      14
+    ],
+    [
+      "Buxar Prathmik Shala (Zilla Parishad)",
+      0,
+      17
+    ],
+    [
+      "Buxar Prathmik Vidyalaya, Zilla Parishad",
+      0,
+      24
+    ],
+    [
+      "Chandauti Prathmik Vidyalaya",
+      0,
+      24
+    ],
+    [
+      "Deorhi Kanya Vidyalaya",
+      1,
+      28
+    ],
+    [
+      "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+      3,
+      10
+    ],
+    [
+      "Dobhi Prathmik Shala (Zilla Parishad)",
+      0,
+      23
+    ],
+    [
+      "Dobhi Uchcha Madhyamik Vidyalaya",
+      2,
+      20
+    ],
+    [
+      "Domuhan Kanya Shala",
+      1,
+      4
+    ],
+    [
+      "Dumraon Kanya Shala",
+      0,
+      29
+    ],
+    [
+      "Dumraon Kanya Vidyalaya, Zilla Parishad",
+      1,
+      13
+    ],
+    [
+      "Dumraon Prathmik Shala (Zilla Parishad)",
+      2,
+      17
+    ],
+    [
+      "Fatehpur Kanya Shala",
+      1,
+      5
+    ],
+    [
+      "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+      3,
+      27
+    ],
+    [
+      "Fatehpur Prathmik Shala (Zilla Parishad)",
+      1,
+      7
+    ],
+    [
+      "Guraru Kanya Vidyalaya",
+      3,
+      26
+    ],
+    [
+      "Guraru Uchcha Madhyamik Vidyalaya",
+      0,
+      8
+    ],
+    [
+      "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+      1,
+      28
+    ],
+    [
+      "Imamganj Buniyadi Vidyalaya",
+      0,
+      14
+    ],
+    [
+      "Imamganj Madhya Vidyalaya",
+      0,
+      18
+    ],
+    [
+      "Imamganj Madhya Vidyalaya, Zilla Parishad",
+      1,
+      23
+    ],
+    [
+      "Islampur Kanya Shala",
+      0,
+      4
+    ],
+    [
+      "Islampur Kanya Vidyalaya",
+      2,
+      6
+    ],
+    [
+      "Islampur Madhya Vidyalaya",
+      0,
+      13
+    ],
+    [
+      "Islampur Prathmik Shala (Zilla Parishad)",
+      4,
+      17
+    ],
+    [
+      "Karmauni Kanya Vidyalaya",
+      2,
+      13
+    ],
+    [
+      "Karmauni Madhya Vidyalaya, Zilla Parishad",
+      1,
+      5
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya",
+      1,
+      18
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      0,
+      27
+    ],
+    [
+      "Khizarsarai Adarsh Vidyalaya, Zilla Parishad",
+      0,
+      8
+    ],
+    [
+      "Khizarsarai Buniyadi Vidyalaya",
+      0,
+      13
+    ],
+    [
+      "Konch Adarsh Vidyalaya, Zilla Parishad",
+      2,
+      17
+    ],
+    [
+      "Konch Prathmik Shala (Zilla Parishad)",
+      1,
+      20
+    ],
+    [
+      "Kothi Buniyadi Vidyalaya",
+      0,
+      23
+    ],
+    [
+      "Kothi Navin Vidyalaya",
+      0,
+      16
+    ],
+    [
+      "Kothi Prathmik Shala (Zilla Parishad)",
+      0,
+      9
+    ],
+    [
+      "Lodipur Navin Vidyalaya, Zilla Parishad",
+      1,
+      11
+    ],
+    [
+      "Mahuar Madhya Vidyalaya",
+      1,
+      30
+    ],
+    [
+      "Mahuar Prathmik Shala (Zilla Parishad)",
+      1,
+      12
+    ],
+    [
+      "Manpur Prathmik Shala (Zilla Parishad)",
+      1,
+      27
+    ],
+    [
+      "Manpur Prathmik Vidyalaya",
+      0,
+      9
+    ],
+    [
+      "Modanganj Kanya Shala",
+      0,
+      16
+    ],
+    [
+      "Modanganj Prathmik Vidyalaya",
+      1,
+      10
+    ],
+    [
+      "Modanganj Uchcha Madhyamik Vidyalaya",
+      2,
+      5
+    ],
+    [
+      "Muhra Buniyadi Vidyalaya",
+      1,
+      4
+    ],
+    [
+      "Muhra Prathmik Shala (Zilla Parishad)",
+      3,
+      16
+    ],
+    [
+      "Nawada Buniyadi Vidyalaya, Zilla Parishad",
+      0,
+      22
+    ],
+    [
+      "Nawada Kanya Vidyalaya",
+      2,
+      18
+    ],
+    [
+      "Nawada Madhya Vidyalaya",
+      1,
+      19
+    ],
+    [
+      "Nawada Madhya Vidyalaya, Zilla Parishad",
+      1,
+      4
+    ],
+    [
+      "Nawada Prathmik Vidyalaya, Zilla Parishad",
+      0,
+      6
+    ],
+    [
+      "Nawada Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1,
+      16
+    ],
+    [
+      "Neemchak Prathmik Shala (Zilla Parishad)",
+      0,
+      21
+    ],
+    [
+      "Nimi Kanya Shala",
+      0,
+      28
+    ],
+    [
+      "Nimi Madhya Vidyalaya, Zilla Parishad",
+      2,
+      7
+    ],
+    [
+      "Panchgama Buniyadi Vidyalaya",
+      1,
+      15
+    ],
+    [
+      "Paraiya Adarsh Vidyalaya",
+      0,
+      10
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya",
+      0,
+      26
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+      2,
+      27
+    ],
+    [
+      "Paraiya Kanya Vidyalaya, Zilla Parishad",
+      1,
+      26
+    ],
+    [
+      "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+      1,
+      23
+    ],
+    [
+      "Paraiya Prathmik Shala (Zilla Parishad)",
+      1,
+      23
+    ],
+    [
+      "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+      2,
+      28
+    ],
+    [
+      "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+      1,
+      27
+    ],
+    [
+      "Rampur Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1,
+      24
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Bathani",
+      0,
+      15
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Konch",
+      0,
+      25
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Modanganj",
+      0,
+      19
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Tetariya",
+      1,
+      24
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Nimi",
+      2,
+      13
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      0,
+      16
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Wazirganj",
+      1,
+      21
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Bodh Gaya",
+      2,
+      9
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      0,
+      16
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      1,
+      9
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Bathani",
+      0,
+      26
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Tetariya",
+      1,
+      30
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      1,
+      18
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      1,
+      17
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Manpur",
+      1,
+      17
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Arwal",
+      1,
+      10
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Buxar",
+      2,
+      9
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Karmauni",
+      1,
+      25
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Barhi",
+      0,
+      6
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Belaganj",
+      0,
+      14
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Guraru",
+      0,
+      11
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Nimi",
+      0,
+      7
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+      0,
+      28
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+      0,
+      7
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+      1,
+      8
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+      2,
+      5
+    ],
+    [
+      "Sarwan Madhyamik Vidyalaya",
+      3,
+      9
+    ],
+    [
+      "Sherghati Kanya Vidyalaya, Zilla Parishad",
+      0,
+      4
+    ],
+    [
+      "Sherghati Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      0,
+      26
+    ],
+    [
+      "Sherpur Navin Vidyalaya, Zilla Parishad",
+      2,
+      16
+    ],
+    [
+      "Shri Durga Vidyalaya, Amas",
+      0,
+      15
+    ],
+    [
+      "Shri Durga Vidyalaya, Domuhan",
+      0,
+      10
+    ],
+    [
+      "Shri Durga Vidyalaya, Fatehpur",
+      1,
+      6
+    ],
+    [
+      "Shri Durga Vidyalaya, Karmauni",
+      0,
+      9
+    ],
+    [
+      "Shri Durga Vidyalaya, Sonbarsa",
+      1,
+      11
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      0,
+      10
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      0,
+      8
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      2,
+      15
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      0,
+      3
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      0,
+      23
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      1,
+      10
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      0,
+      9
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      0,
+      4
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      2,
+      17
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Bhadeya",
+      0,
+      28
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Islampur",
+      1,
+      9
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Sherpur",
+      2,
+      21
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      2,
+      5
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      4,
+      17
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      1,
+      13
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      0,
+      16
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      1,
+      26
+    ],
+    [
+      "Shri Ram Vidyalaya, Amba",
+      0,
+      24
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Belaganj",
+      0,
+      16
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Dumraon",
+      0,
+      11
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Rafiganj",
+      0,
+      9
+    ],
+    [
+      "Shri Shiv Vidyalaya, Aurangabad",
+      0,
+      12
+    ],
+    [
+      "Shri Shiv Vidyalaya, Domuhan",
+      1,
+      22
+    ],
+    [
+      "Shri Shiv Vidyalaya, Nimi",
+      0,
+      2
+    ],
+    [
+      "Shri Shiv Vidyalaya, Wazirganj",
+      1,
+      5
+    ],
+    [
+      "Sikaria Buniyadi Vidyalaya",
+      2,
+      27
+    ],
+    [
+      "Sikaria Kanya Vidyalaya, Zilla Parishad",
+      1,
+      5
+    ],
+    [
+      "Sikaria Uchcha Madhyamik Vidyalaya",
+      0,
+      27
+    ],
+    [
+      "Sonbarsa Buniyadi Vidyalaya",
+      1,
+      29
+    ],
+    [
+      "Sonbarsa Kanya Shala",
+      0,
+      30
+    ],
+    [
+      "Sonbarsa Kanya Vidyalaya, Zilla Parishad",
+      0,
+      19
+    ],
+    [
+      "Tekari Buniyadi Vidyalaya, Zilla Parishad",
+      0,
+      26
+    ],
+    [
+      "Tekari Kanya Shala",
+      1,
+      26
+    ],
+    [
+      "Tekari Prathmik Shala (Zilla Parishad)",
+      1,
+      19
+    ],
+    [
+      "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      3,
+      16
+    ],
+    [
+      "Tetariya Kanya Vidyalaya",
+      0,
+      6
+    ],
+    [
+      "Tetariya Madhya Vidyalaya, Zilla Parishad",
+      0,
+      14
+    ],
+    [
+      "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+      2,
+      12
+    ],
+    [
+      "Tetariya Prathmik Shala (Zilla Parishad)",
+      0,
+      6
+    ],
+    [
+      "Wazirganj Prathmik Vidyalaya, Zilla Parishad",
+      0,
+      18
+    ],
+    [
+      "Wazirganj Uchcha Madhyamik Vidyalaya",
+      1,
+      6
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "SELECT o.\"School Name\" FROM \"lpf_outreach\" AS o LEFT JOIN \"lpf_applications\" AS a ON jaro_w",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"lpf_outreach\" (\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Students Reached\" BIGINT,\n  \"Applications Expected\" BIGINT,\n  \"Contact Teacher\" VARCHAR,\n  \"Date\" VARCHAR\n);\n\nCREATE TABLE \"lpf_applications\" (\n  \"Applicant\" VARCHAR,\n  \"School\" VARCHAR,\n  \"Course\" VARCHAR,\n  \"Status\" VARCHAR,\n  \"Marks\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"lpf_outreach\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"]}, \"lpf_applications\": {\"Course\": [\"Beautician\", \"Computer Operator\", \"Diploma Civil Engineering\", \"ITI Electrician\", \"Nursing Assistant\", \"Retail Sales Associate\", \"Tailoring & Fashion Design\"], \"Status\": [\"Incomplete\", \"Rejected\", \"Submitted\", \"Verified\"]}}\n\nCURRENT QUESTION:\nlist schools where actual applications received, fuzzy matched, fall short of half the expected number",
+      "response": "```sql\nSELECT\n  o.\"School Name\"\nFROM \"lpf_outreach\" AS o\nLEFT JOIN \"lpf_applications\" AS a\n  ON jaro_",
+      "api": {
+        "id": "gen-1787422024-6D3N6bcuO1AhnFkXtn5z",
+        "model": "google/gemini-3.7-flash",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 421,
+          "completion_tokens": 1020,
+          "total_tokens": 1441,
+          "cost": 0.002070375,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.002070375,
+            "upstream_inference_prompt_cost": 0.000157875,
+            "upstream_inference_completions_cost": 0.0019125
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 981,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 9.172
+      },
+      "duration_seconds": 9.173,
+      "error": "BinderException: Binder Error: Referenced column \"jaro_\" not found in FROM clause!\nCandidate bindings: \"Marks\"\n\nLINE 1: ... FROM \"lpf_outreach\" AS o LEFT JOIN \"lpf_applications\" AS a ON jaro_\n                                                                          ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"lpf_outreach\" (\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Students Reached\" BIGINT,\n  \"Applications Expected\" BIGINT,\n  \"Contact Teacher\" VARCHAR,\n  \"Date\" VARCHAR\n);\n\nCREATE TABLE \"lpf_applications\" (\n  \"Applicant\" VARCHAR,\n  \"School\" VARCHAR,\n  \"Course\" VARCHAR,\n  \"Status\" VARCHAR,\n  \"Marks\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"lpf_outreach\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"]}, \"lpf_applications\": {\"Course\": [\"Beautician\", \"Computer Operator\", \"Diploma Civil Engineering\", \"ITI Electrician\", \"Nursing Assistant\", \"Retail Sales Associate\", \"Tailoring & Fashion Design\"], \"Status\": [\"Incomplete\", \"Rejected\", \"Submitted\", \"Verified\"]}}\n\nCURRENT QUESTION:\nlist schools where actual applications received, fuzzy matched, fall short of half the expected number\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"jaro_\" not found in FROM clause!\nCandidate bindings: \"Marks\"\n\nLINE 1: ... FROM \"lpf_outreach\" AS o LEFT JOIN \"lpf_applications\" AS a ON jaro_\n                                                                          ^\nReturn a complete corrected query.",
+      "response": "```sql\nSELECT\n  o.\"School Name\"\nFROM \"lpf_outreach\" AS o\nLEFT JOIN \"lpf_applications\" AS a\n  ON jaro_w",
+      "api": {
+        "id": "gen-1787422034-kMzFmHRPcrG2Ws7vRcCS",
+        "model": "google/gemini-3.7-flash",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 495,
+          "completion_tokens": 1020,
+          "total_tokens": 1515,
+          "cost": 0.002098125,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.002098125,
+            "upstream_inference_prompt_cost": 0.000185625,
+            "upstream_inference_completions_cost": 0.0019125
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 980,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 7.435
+      },
+      "duration_seconds": 7.436,
+      "error": "BinderException: Binder Error: Referenced column \"jaro_w\" not found in FROM clause!\nCandidate bindings: \"Marks\"\n\nLINE 1: ... FROM \"lpf_outreach\" AS o LEFT JOIN \"lpf_applications\" AS a ON jaro_w\n                                                                          ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

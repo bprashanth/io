@@ -1,0 +1,175 @@
+{
+  "id": "attendance-cross-year-p03",
+  "task_id": "attendance-cross-year",
+  "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+  "question": "compare average monthly attendance percentage per centre across the two years, one row per centre with both years",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+  "expected_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Chembur Balwadi",
+      70.36061519094109,
+      70.446606354371
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394086,
+      74.97294321155536
+    ],
+    [
+      "Govandi Balwadi",
+      75.99442820103916,
+      80.6605346047566
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389383,
+      63.43085935353449
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526672,
+      62.32635009602409
+    ],
+    [
+      "Sion Balwadi",
+      60.51530448404584,
+      55.56386806777676
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526553,
+      88.94728964433887
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.58226391564665
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH aligned_centres /* Align tables by centre name using approximate matching */ AS (SELECT a.\"Centre\" AS \"Centre_2023\", b.\"centre_name\" AS \"Centre_2024\", JARO_WINKLER_SIMILARITY(LOWER(TRIM(a.\"Centre\")), LOWER(TRIM(b.\"centre_name\"))) AS similarity FROM attendance_2023 AS a CROSS JOIN attendance_2024 AS b QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Centre\" ORDER BY similarity DESC) = 1), monthly_percentages_2023 /* Calculate monthly attendance percentages for each year */ AS (SELECT a.\"Centre\", a.\"Month\", NULLIF(a.\"Avg Daily Present\", 0) * 100.0 / NULLIF(NULLIF(a.\"Enrolled Kids\", 0), 0) AS \"Monthly Attendance %\" FROM attendance_2023 AS a WHERE a.\"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND a.\"Month\" IN ('April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September')), monthly_percentages_2024 AS (SELECT b.\"centre_name\" AS \"Centre\", b.\"month\" AS \"Month\", NULLIF(b.\"average_attendance\", 0) * 100.0 / NULLIF(NULLIF(b.\"enrolment\", 0), 0) AS \"Monthly Attendance %\" FROM attendance_2024 AS b WHERE b.\"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND b.\"month\" IN ('April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September')) /* Join aligned centres with aggregated monthly percentages */ SELECT ac.\"Centre_2023\" AS \"Centre\", COALESCE(AVG(mp2023.\"Monthly Attendance %\"), 0) AS \"2023 Avg Monthly Attendance %\", COALESCE(AVG(mp2024.\"Monthly Attendance %\"), 0) AS \"2024 Avg Monthly Attendance %\" FROM aligned_centres AS ac LEFT JOIN monthly_percentages_2023 AS mp2023 ON ac.\"Centre_2023\" = mp2023.\"Centre\" LEFT JOIN monthly_percentages_2024 AS mp2024 ON ac.\"Centre_2024\" = mp2024.\"Centre\" GROUP BY ac.\"Centre_2023\" ORDER BY ac.\"Centre_2023\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncompare average monthly attendance percentage per centre across the two years, one row per centre with both years",
+      "response": "```sql\nWITH\n-- Align tables by centre name using approximate matching\naligned_centres AS (\n    SELECT\n        a.\"Centre\" AS \"Centre_2023\",\n        b.\"centre_name\" AS \"Centre_2024\",\n        jaro_winkler_similarity(lower(trim(a.\"Centre\")), lower(trim(b.\"centre_name\"))) AS similarity\n    FROM attendance_2023 a\n    CROSS JOIN attendance_2024 b\n    QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Centre\" ORDER BY similarity DESC) = 1\n),\n\n-- Calculate monthly attendance percentages for each year\nmonthly_percentages_2023 AS (\n    SELECT\n        a.\"Centre\",\n        a.\"Month\",\n        NULLIF(a.\"Avg Daily Present\", 0) * 100.0 / NULLIF(a.\"Enrolled Kids\", 0) AS \"Monthly Attendance %\"\n    FROM attendance_2023 a\n    WHERE a.\"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND a.\"Month\" IN ('April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September')\n),\n\nmonthly_percentages_2024 AS (\n    SELECT\n        b.\"centre_name\" AS \"Centre\",\n        b.\"month\" AS \"Month\",\n        NULLIF(b.\"average_attendance\", 0) * 100.0 / NULLIF(b.\"enrolment\", 0) AS \"Monthly Attendance %\"\n    FROM attendance_2024 b\n    WHERE b.\"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND b.\"month\" IN ('April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September')\n)\n\n-- Join aligned centres with aggregated monthly percentages\nSELECT\n    ac.\"Centre_2023\" AS \"Centre\",\n    COALESCE(AVG(mp2023.\"Monthly Attendance %\"), 0) AS \"2023 Avg Monthly Attendance %\",\n    COALESCE(AVG(mp2024.\"Monthly Attendance %\"), 0) AS \"2024 Avg Monthly Attendance %\"\nFROM aligned_centres ac\nLEFT JOIN monthly_percentages_2023 mp2023 ON ac.\"Centre_2023\" = mp2023.\"Centre\"\nLEFT JOIN monthly_percentages_2024 mp2024 ON ac.\"Centre_2024\" = mp2024.\"Centre\"\nGROUP BY ac.\"Centre_2023\"\nORDER BY ac.\"Centre_2023\";\n```",
+      "api": {
+        "id": "gen-1787421757-WYdctzkrvN7Ajtbpx6Gp",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 639,
+          "completion_tokens": 714,
+          "total_tokens": 1353,
+          "cost": 0.00013383,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 512,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00013383,
+            "upstream_inference_prompt_cost": 2.673e-05,
+            "upstream_inference_completions_cost": 0.0001071
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 8.418
+      },
+      "duration_seconds": 8.434,
+      "sql_duckdb": "WITH aligned_centres /* Align tables by centre name using approximate matching */ AS (SELECT a.\"Centre\" AS \"Centre_2023\", b.\"centre_name\" AS \"Centre_2024\", JARO_WINKLER_SIMILARITY(LOWER(TRIM(a.\"Centre\")), LOWER(TRIM(b.\"centre_name\"))) AS similarity FROM attendance_2023 AS a CROSS JOIN attendance_2024 AS b QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Centre\" ORDER BY similarity DESC) = 1), monthly_percentages_2023 /* Calculate monthly attendance percentages for each year */ AS (SELECT a.\"Centre\", a.\"Month\", NULLIF(a.\"Avg Daily Present\", 0) * 100.0 / NULLIF(NULLIF(a.\"Enrolled Kids\", 0), 0) AS \"Monthly Attendance %\" FROM attendance_2023 AS a WHERE a.\"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND a.\"Month\" IN ('April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September')), monthly_percentages_2024 AS (SELECT b.\"centre_name\" AS \"Centre\", b.\"month\" AS \"Month\", NULLIF(b.\"average_attendance\", 0) * 100.0 / NULLIF(NULLIF(b.\"enrolment\", 0), 0) AS \"Monthly Attendance %\" FROM attendance_2024 AS b WHERE b.\"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND b.\"month\" IN ('April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September')) /* Join aligned centres with aggregated monthly percentages */ SELECT ac.\"Centre_2023\" AS \"Centre\", COALESCE(AVG(mp2023.\"Monthly Attendance %\"), 0) AS \"2023 Avg Monthly Attendance %\", COALESCE(AVG(mp2024.\"Monthly Attendance %\"), 0) AS \"2024 Avg Monthly Attendance %\" FROM aligned_centres AS ac LEFT JOIN monthly_percentages_2023 AS mp2023 ON ac.\"Centre_2023\" = mp2023.\"Centre\" LEFT JOIN monthly_percentages_2024 AS mp2024 ON ac.\"Centre_2024\" = mp2024.\"Centre\" GROUP BY ac.\"Centre_2023\" ORDER BY ac.\"Centre_2023\" NULLS FIRST",
+      "rows": [
+        [
+          "Chembur Balwadi",
+          70.36061519094109,
+          70.446606354371
+        ],
+        [
+          "Dharavi Balwadi",
+          70.82452584394086,
+          74.97294321155536
+        ],
+        [
+          "Govandi Balwadi",
+          75.99442820103916,
+          80.6605346047566
+        ],
+        [
+          "Kurla Balwadi",
+          83.94073053389383,
+          63.43085935353449
+        ],
+        [
+          "Mankhurd Balwadi",
+          64.20706883526672,
+          62.32635009602409
+        ],
+        [
+          "Sion Balwadi",
+          60.51530448404584,
+          55.56386806777676
+        ],
+        [
+          "Wadala Balwadi",
+          87.81901547526553,
+          88.94728964433887
+        ],
+        [
+          "Worli Balwadi",
+          80.31790744980887,
+          77.58226391564665
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

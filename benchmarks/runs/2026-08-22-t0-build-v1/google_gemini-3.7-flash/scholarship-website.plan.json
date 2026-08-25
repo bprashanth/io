@@ -1,0 +1,283 @@
+{
+ "plan": {
+  "title": "Scholarship Progress & Pending Cases by District",
+  "subtitle": "District-level distribution of scholarship applications, approvals, and pending reviews",
+  "panels": [
+   {
+    "id": "kpi_total_apps",
+    "kind": "kpi",
+    "title": "Total Applications",
+    "sql": "SELECT COUNT(*) AS total_apps FROM scholarship_applicants",
+    "unit": ""
+   },
+   {
+    "id": "kpi_pending_cases",
+    "kind": "kpi",
+    "title": "Pending Applications",
+    "sql": "SELECT COUNT(*) AS pending_count FROM scholarship_applicants WHERE \"Status\" IN ('Pending', 'Under Review')",
+    "unit": ""
+   },
+   {
+    "id": "kpi_pending_pct",
+    "kind": "kpi",
+    "title": "Pending Rate",
+    "sql": "SELECT COUNT(CASE WHEN \"Status\" IN ('Pending', 'Under Review') THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) AS pending_pct FROM scholarship_applicants",
+    "unit": "%"
+   },
+   {
+    "id": "district_status_breakdown",
+    "kind": "stacked_bar",
+    "title": "Application Status by District",
+    "sql": "SELECT \"District\" AS district, COUNT(CASE WHEN \"Status\" IN ('Approved', 'Disbursed') THEN 1 END) AS approved_or_disbursed, COUNT(CASE WHEN \"Status\" IN ('Pending', 'Under Review') THEN 1 END) AS pending_or_review, COUNT(CASE WHEN \"Status\" = 'Rejected' THEN 1 END) AS rejected FROM scholarship_applicants WHERE \"District\" IS NOT NULL GROUP BY 1 ORDER BY 1",
+    "x": "district",
+    "y": [
+     "approved_or_disbursed",
+     "pending_or_review",
+     "rejected"
+    ]
+   },
+   {
+    "id": "pending_by_scheme",
+    "kind": "bar",
+    "title": "Pending Cases by Scheme",
+    "sql": "SELECT \"Name of scheme\" AS scheme_name, COUNT(*) AS pending_count FROM scholarship_applicants WHERE \"Status\" IN ('Pending', 'Under Review') AND \"Name of scheme\" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC",
+    "x": "scheme_name",
+    "y": [
+     "pending_count"
+    ]
+   },
+   {
+    "id": "taluka_pending_table",
+    "kind": "table",
+    "title": "District & Taluka Pending Caseload",
+    "sql": "SELECT \"District\" AS district, \"Taluka\" AS taluka, COUNT(*) AS total_applicants, COUNT(CASE WHEN \"Status\" IN ('Pending', 'Under Review') THEN 1 END) AS pending_cases, ROUND(COUNT(CASE WHEN \"Status\" IN ('Pending', 'Under Review') THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0), 1) AS pending_rate_pct FROM scholarship_applicants WHERE \"District\" IS NOT NULL AND \"Taluka\" IS NOT NULL GROUP BY 1, 2 ORDER BY pending_cases DESC",
+    "unit": ""
+   }
+  ],
+  "narrative": "Across all regions, a total of {{kpi_total_apps.total_apps}} scholarship applications have been recorded. Out of these, {{kpi_pending_cases.pending_count}} cases remain unresolved, representing a backlog rate of {{kpi_pending_pct.pending_pct}}% across pending and under-review statuses.\n\nThe distribution across districts highlights regional operational differences, while the scheme breakdown identifies which scholarship programs require expedited verification."
+ },
+ "results": {
+  "kpi_total_apps": {
+   "columns": [
+    "total_apps"
+   ],
+   "rows": [
+    {
+     "total_apps": 300
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "kpi_pending_cases": {
+   "columns": [
+    "pending_count"
+   ],
+   "rows": [
+    {
+     "pending_count": 136
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "kpi_pending_pct": {
+   "columns": [
+    "pending_pct"
+   ],
+   "rows": [
+    {
+     "pending_pct": 45.333333333333336
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "district_status_breakdown": {
+   "columns": [
+    "district",
+    "approved_or_disbursed",
+    "pending_or_review",
+    "rejected"
+   ],
+   "rows": [
+    {
+     "district": "Gaya",
+     "approved_or_disbursed": 34,
+     "pending_or_review": 42,
+     "rejected": 20
+    },
+    {
+     "district": "Muzaffarpur",
+     "approved_or_disbursed": 30,
+     "pending_or_review": 55,
+     "rejected": 20
+    },
+    {
+     "district": "Pune",
+     "approved_or_disbursed": 39,
+     "pending_or_review": 39,
+     "rejected": 21
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "pending_by_scheme": {
+   "columns": [
+    "scheme_name",
+    "pending_count"
+   ],
+   "rows": [
+    {
+     "scheme_name": "Post-Matric Scholarship Scheme",
+     "pending_count": 26
+    },
+    {
+     "scheme_name": "EBC Scholarship Scheme",
+     "pending_count": 21
+    },
+    {
+     "scheme_name": "Merit-cum-Means Scholarship",
+     "pending_count": 21
+    },
+    {
+     "scheme_name": "Minority Welfare Scholarship",
+     "pending_count": 20
+    },
+    {
+     "scheme_name": "Savitribai Phule Scholarship",
+     "pending_count": 17
+    },
+    {
+     "scheme_name": "Pre-Matric Scholarship Scheme",
+     "pending_count": 16
+    },
+    {
+     "scheme_name": "Rajarshi Shahu Maharaj Scholarship",
+     "pending_count": 15
+    }
+   ],
+   "rowcount": 7,
+   "error": null
+  },
+  "taluka_pending_table": {
+   "columns": [
+    "district",
+    "taluka",
+    "total_applicants",
+    "pending_cases",
+    "pending_rate_pct"
+   ],
+   "rows": [
+    {
+     "district": "Muzaffarpur",
+     "taluka": "Sakra",
+     "total_applicants": 24,
+     "pending_cases": 15,
+     "pending_rate_pct": 62.5
+    },
+    {
+     "district": "Gaya",
+     "taluka": "Wazirganj",
+     "total_applicants": 24,
+     "pending_cases": 13,
+     "pending_rate_pct": 54.2
+    },
+    {
+     "district": "Muzaffarpur",
+     "taluka": "Kurhani",
+     "total_applicants": 26,
+     "pending_cases": 13,
+     "pending_rate_pct": 50.0
+    },
+    {
+     "district": "Muzaffarpur",
+     "taluka": "Kanti",
+     "total_applicants": 25,
+     "pending_cases": 12,
+     "pending_rate_pct": 48.0
+    },
+    {
+     "district": "Pune",
+     "taluka": "Khed",
+     "total_applicants": 24,
+     "pending_cases": 9,
+     "pending_rate_pct": 37.5
+    },
+    {
+     "district": "Pune",
+     "taluka": "Mulshi",
+     "total_applicants": 19,
+     "pending_cases": 9,
+     "pending_rate_pct": 47.4
+    },
+    {
+     "district": "Gaya",
+     "taluka": "Sherghati",
+     "total_applicants": 19,
+     "pending_cases": 9,
+     "pending_rate_pct": 47.4
+    },
+    {
+     "district": "Gaya",
+     "taluka": "Belaganj",
+     "total_applicants": 22,
+     "pending_cases": 8,
+     "pending_rate_pct": 36.4
+    },
+    {
+     "district": "Muzaffarpur",
+     "taluka": "Musahri",
+     "total_applicants": 14,
+     "pending_cases": 8,
+     "pending_rate_pct": 57.1
+    },
+    {
+     "district": "Pune",
+     "taluka": "Junnar",
+     "total_applicants": 23,
+     "pending_cases": 8,
+     "pending_rate_pct": 34.8
+    },
+    {
+     "district": "Gaya",
+     "taluka": "Tekari",
+     "total_applicants": 13,
+     "pending_cases": 7,
+     "pending_rate_pct": 53.8
+    },
+    {
+     "district": "Pune",
+     "taluka": "Baramati",
+     "total_applicants": 20,
+     "pending_cases": 7,
+     "pending_rate_pct": 35.0
+    },
+    {
+     "district": "Muzaffarpur",
+     "taluka": "Bochaha",
+     "total_applicants": 16,
+     "pending_cases": 7,
+     "pending_rate_pct": 43.8
+    },
+    {
+     "district": "Pune",
+     "taluka": "Haveli",
+     "total_applicants": 13,
+     "pending_cases": 6,
+     "pending_rate_pct": 46.2
+    },
+    {
+     "district": "Gaya",
+     "taluka": "Konch",
+     "total_applicants": 18,
+     "pending_cases": 5,
+     "pending_rate_pct": 27.8
+    }
+   ],
+   "rowcount": 15,
+   "error": null
+  }
+ }
+}

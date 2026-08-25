@@ -1,0 +1,65 @@
+{
+  "id": "attendance-biggest-drop-p02",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "centre with the largest drop in attendance percentage between 2023 and 2024 (average of monthly rates, drop in percentage points, positive)",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kurla Balwadi"
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH att_2023 /* Calculate monthly attendance percentage for 2023 */ AS (SELECT \"Centre\", \"Month\", (\"Avg Daily Present\" * 100.0) / NULLIF(NULLIF(\"Enrolled Kids\", 0), 0) AS monthly_rate FROM \"attendance_2023\"), att_2024 /* Calculate monthly attendance percentage for 2024 */ AS (SELECT \"centre_name\" AS \"Centre\", \"month\" AS \"Month\", (\"average_attendance\" * 100.0) / NULLIF(NULLIF(\"enrolment\", 0), 0) AS monthly_rate FROM \"attendance_2024\"), avg_2023 /* Calculate average monthly rate per centre for 2023 */ AS (SELECT \"Centre\", AVG(monthly_rate) AS avg_rate_2023 FROM att_2023 GROUP BY \"Centre\"), avg_2024 /* Calculate average monthly rate per centre for 2024 */ AS (SELECT \"Centre\", AVG(monthly_rate) AS avg_rate_2024 FROM att_2024 GROUP BY \"Centre\"), drops /* Join and calculate the drop in percentage points */ AS (SELECT a23.\"Centre\", a23.avg_rate_2023, a24.avg_rate_2024, (a23.avg_rate_2023 - a24.avg_rate_2024) AS drop_pp FROM avg_2023 AS a23 JOIN avg_2024 AS a24 ON a23.\"Centre\" = a24.\"Centre\") SELECT \"Centre\" FROM drops WHERE drop_pp > 0 ORDER BY drop_pp DESC LIMIT 1",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncentre with the largest drop in attendance percentage between 2023 and 2024 (average of monthly rates, drop in percentage points, positive)",
+      "response": "```sql\nWITH \n-- Calculate monthly attendance percentage for 2023\natt_2023 AS (\n    SELECT \n        \"Centre\",\n        \"Month\",\n        (\"Avg Daily Present\" * 100.0) / NULLIF(\"Enrolled Kids\", 0) AS monthly_rate\n    FROM \"attendance_2023\"\n),\n-- Calculate monthly attendance percentage for 2024\natt_2024 AS (\n    SELECT \n        \"centre_name\" AS \"Centre\",\n        \"month\" AS \"Month\",\n        (\"average_attendance\" * 100.0) / NULLIF(\"enrolment\", 0) AS monthly_rate\n    FROM \"attendance_2024\"\n),\n-- Calculate average monthly rate per centre for 2023\navg_2023 AS (\n    SELECT \n        \"Centre\",\n        AVG(monthly_rate) AS avg_rate_2023\n    FROM att_2023\n    GROUP BY \"Centre\"\n),\n-- Calculate average monthly rate per centre for 2024\navg_2024 AS (\n    SELECT \n        \"Centre\",\n        AVG(monthly_rate) AS avg_rate_2024\n    FROM att_2024\n    GROUP BY \"Centre\"\n),\n-- Join and calculate the drop in percentage points\ndrops AS (\n    SELECT \n        a23.\"Centre\",\n        a23.avg_rate_2023,\n        a24.avg_rate_2024,\n        (a23.avg_rate_2023 - a24.avg_rate_2024) AS drop_pp\n    FROM avg_2023 a23\n    JOIN avg_2024 a24 ON a23.\"Centre\" = a24.\"Centre\"\n)\nSELECT \n    \"Centre\"\nFROM drops\nWHERE drop_pp > 0\nORDER BY drop_pp DESC\nLIMIT 1;\n```",
+      "api": {
+        "id": "gen-1787449279-vpHatfgfhIR8n5czL4Vm",
+        "model": "qwen/qwen3.8-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 566,
+          "completion_tokens": 443,
+          "total_tokens": 1009,
+          "cost": 0.0016723,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0016723,
+            "upstream_inference_prompt_cost": 0.0002547,
+            "upstream_inference_completions_cost": 0.0014176
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.247
+      },
+      "duration_seconds": 4.259,
+      "sql_duckdb": "WITH att_2023 /* Calculate monthly attendance percentage for 2023 */ AS (SELECT \"Centre\", \"Month\", (\"Avg Daily Present\" * 100.0) / NULLIF(NULLIF(\"Enrolled Kids\", 0), 0) AS monthly_rate FROM \"attendance_2023\"), att_2024 /* Calculate monthly attendance percentage for 2024 */ AS (SELECT \"centre_name\" AS \"Centre\", \"month\" AS \"Month\", (\"average_attendance\" * 100.0) / NULLIF(NULLIF(\"enrolment\", 0), 0) AS monthly_rate FROM \"attendance_2024\"), avg_2023 /* Calculate average monthly rate per centre for 2023 */ AS (SELECT \"Centre\", AVG(monthly_rate) AS avg_rate_2023 FROM att_2023 GROUP BY \"Centre\"), avg_2024 /* Calculate average monthly rate per centre for 2024 */ AS (SELECT \"Centre\", AVG(monthly_rate) AS avg_rate_2024 FROM att_2024 GROUP BY \"Centre\"), drops /* Join and calculate the drop in percentage points */ AS (SELECT a23.\"Centre\", a23.avg_rate_2023, a24.avg_rate_2024, (a23.avg_rate_2023 - a24.avg_rate_2024) AS drop_pp FROM avg_2023 AS a23 JOIN avg_2024 AS a24 ON a23.\"Centre\" = a24.\"Centre\") SELECT \"Centre\" FROM drops WHERE drop_pp > 0 ORDER BY drop_pp DESC LIMIT 1",
+      "rows": [
+        [
+          "Kurla Balwadi"
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

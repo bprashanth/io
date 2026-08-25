@@ -1,0 +1,79 @@
+{
+  "id": "time-change-per-group-p05",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "calculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      null
+    ],
+    [
+      "Nalanda",
+      null
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH yearly_rates AS (SELECT district, year, (anc4_completed * 100.0 / NULLIF(NULLIF(pregnancies_registered, 0), 0)) AS coverage_rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023) AND source = 'synthetic Bihar ANC fixture') SELECT district, (coverage_rate - LAG(coverage_rate, 2) OVER (PARTITION BY district ORDER BY year NULLS FIRST)) AS pp_change_2023_vs_2021 FROM yearly_rates WHERE year = 2023 ORDER BY district NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+      "response": "```sql\nWITH\nyearly_rates AS (\n  SELECT\n    district,\n    year,\n    (anc4_completed * 100.0 / NULLIF(pregnancies_registered, 0)) AS coverage_rate\n  FROM anc_visits\n  WHERE district IN ('Gaya', 'Nalanda')\n    AND year IN (2021, 2023)\n    AND source = 'synthetic Bihar ANC fixture'\n)\nSELECT\n  district,\n  (coverage_rate - LAG(coverage_rate, 2) OVER (PARTITION BY district ORDER BY year)) AS pp_change_2023_vs_2021\nFROM yearly_rates\nWHERE year = 2023\nORDER BY district;\n```",
+      "api": {
+        "id": "gen-1787421095-1xeyzy0AguVML62EB2Dn",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 313,
+          "completion_tokens": 165,
+          "total_tokens": 478,
+          "cost": 4.952e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.952e-05,
+            "upstream_inference_prompt_cost": 1.652e-05,
+            "upstream_inference_completions_cost": 3.3e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.833
+      },
+      "duration_seconds": 1.839,
+      "sql_duckdb": "WITH yearly_rates AS (SELECT district, year, (anc4_completed * 100.0 / NULLIF(NULLIF(pregnancies_registered, 0), 0)) AS coverage_rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023) AND source = 'synthetic Bihar ANC fixture') SELECT district, (coverage_rate - LAG(coverage_rate, 2) OVER (PARTITION BY district ORDER BY year NULLS FIRST)) AS pp_change_2023_vs_2021 FROM yearly_rates WHERE year = 2023 ORDER BY district NULLS FIRST",
+      "rows": [
+        [
+          "Gaya",
+          null
+        ],
+        [
+          "Nalanda",
+          null
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

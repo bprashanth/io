@@ -1,0 +1,239 @@
+{
+ "plan": {
+  "title": "Donation Insights",
+  "subtitle": "Track monthly trends, top cities, payment modes, and donor frequency",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Donations",
+    "sql": "SELECT COUNT(*) AS n FROM \"donor_transactions\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Amount Raised",
+    "sql": "SELECT SUM(\"Amount\") AS n FROM \"donor_transactions\"",
+    "unit": "\u20b9"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Unique Donors",
+    "sql": "SELECT COUNT(DISTINCT \"Donor\") AS n FROM \"donor_transactions\"",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "kpi",
+    "title": "Average Donation Size",
+    "sql": "SELECT AVG(\"Amount\") AS n FROM \"donor_transactions\"",
+    "unit": "\u20b9"
+   },
+   {
+    "id": "p5",
+    "kind": "line",
+    "title": "Monthly Trend",
+    "sql": "WITH monthly AS (SELECT DATE_TRUNC('month', CAST(\"Date\" AS DATE)) AS month, SUM(\"Amount\") AS total FROM \"donor_transactions\" GROUP BY 1 ORDER BY 1) SELECT month, total FROM monthly",
+    "x": "month",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "bar",
+    "title": "Top 10 Cities",
+    "sql": "SELECT \"City\", SUM(\"Amount\") AS total FROM \"donor_transactions\" GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "City",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "bar",
+    "title": "Payment Modes",
+    "sql": "SELECT \"Mode\", SUM(\"Amount\") AS total FROM \"donor_transactions\" GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Mode",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p8",
+    "kind": "table",
+    "title": "Repeat Donors",
+    "sql": "WITH donor_counts AS (SELECT \"Donor\", COUNT(*) AS freq FROM \"donor_transactions\" GROUP BY 1 HAVING COUNT(*) > 1) SELECT \"Donor\", freq FROM donor_counts ORDER BY freq DESC LIMIT 10",
+    "x": "Donor",
+    "y": [
+     "freq"
+    ]
+   }
+  ],
+  "narrative": "This dashboard provides a comprehensive view of donation activities. The top row highlights key metrics including the total number of donations, the aggregate amount raised, the count of unique donors, and the average donation size. These figures offer an immediate snapshot of the campaign's scale and donor engagement.\n\nThe line chart visualizes the monthly trend, allowing you to observe how donation volume fluctuates over time. This helps in identifying peak giving periods and seasonal patterns. Below that, the bar charts break down performance by geography and payment method, revealing which cities contribute the most funds and which payment modes are preferred by the donor base.\n\nFinally, the table lists repeat donors, highlighting individuals who have contributed multiple times. Identifying these loyal supporters is crucial for retention strategies and future engagement campaigns."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 250
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 6641021
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 247
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 26564.084
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p5": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ConversionException: Conversion Error: invalid date field format: \"29-05-2025\", expected format is (YYYY-MM-DD) when casting from source column Date\n\nLINE 1: WITH monthly AS (SELECT DATE_TRUNC('MONTH', CAST(\"Date\" AS DATE)) AS month, SUM(\"Amount\") AS total FROM...\n                                   "
+  },
+  "p6": {
+   "columns": [
+    "City",
+    "total"
+   ],
+   "rows": [
+    {
+     "City": "Gaya",
+     "total": 787715
+    },
+    {
+     "City": "Bengaluru",
+     "total": 771729
+    },
+    {
+     "City": "Solapur",
+     "total": 729972
+    },
+    {
+     "City": "Thane",
+     "total": 678448
+    },
+    {
+     "City": "Mumbai",
+     "total": 617867
+    },
+    {
+     "City": "Pune",
+     "total": 544876
+    },
+    {
+     "City": "Nashik",
+     "total": 498828
+    },
+    {
+     "City": "Nagpur",
+     "total": 428953
+    },
+    {
+     "City": "Aurangabad",
+     "total": 403921
+    },
+    {
+     "City": "Delhi",
+     "total": 395268
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "Mode",
+    "total"
+   ],
+   "rows": [
+    {
+     "Mode": "NEFT",
+     "total": 1511602
+    },
+    {
+     "Mode": "Card",
+     "total": 1322416
+    },
+    {
+     "Mode": "Cash",
+     "total": 1277633
+    },
+    {
+     "Mode": "DD",
+     "total": 1250836
+    },
+    {
+     "Mode": "UPI",
+     "total": 728176
+    },
+    {
+     "Mode": "Cheque",
+     "total": 550358
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p8": {
+   "columns": [
+    "Donor",
+    "freq"
+   ],
+   "rows": [
+    {
+     "Donor": "Rohit",
+     "freq": 2
+    },
+    {
+     "Donor": "Pankaj Pereira",
+     "freq": 2
+    },
+    {
+     "Donor": "Rajesh",
+     "freq": 2
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  }
+ }
+}

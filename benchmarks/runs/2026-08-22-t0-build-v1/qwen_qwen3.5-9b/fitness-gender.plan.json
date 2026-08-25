@@ -1,0 +1,168 @@
+{
+ "plan": {
+  "title": "Gender Gap Analysis",
+  "subtitle": "Comparing improvement in physical fitness metrics between girls and boys",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total participants",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM (SELECT * FROM \"baseline\" UNION ALL SELECT * FROM \"endline\")",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Average Sit-ups improvement",
+    "sql": "WITH baseline_stats AS (SELECT \"Gender\", AVG(\"Sit ups\") AS avg_situps FROM \"baseline\" GROUP BY 1), endline_stats AS (SELECT \"Gender\", AVG(\"Sit ups\") AS avg_situps FROM \"endline\" GROUP BY 1), combined AS (SELECT \"Gender\", avg_situps FROM baseline_stats UNION ALL SELECT \"Gender\", avg_situps FROM endline_stats) SELECT \"Gender\", (avg_situps - (SELECT avg_situps FROM baseline_stats WHERE \"Gender\" = combined.\"Gender\")) AS improvement FROM combined ORDER BY 1",
+    "x": "Gender",
+    "y": [
+     "improvement"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Average Shuttle run improvement",
+    "sql": "WITH baseline_stats AS (SELECT \"Gender\", AVG(\"Shuttle run sec\") AS avg_time FROM \"baseline\" GROUP BY 1), endline_stats AS (SELECT \"Gender\", AVG(\"Shuttle run sec\") AS avg_time FROM \"endline\" GROUP BY 1), combined AS (SELECT \"Gender\", avg_time FROM baseline_stats UNION ALL SELECT \"Gender\", avg_time FROM endline_stats) SELECT \"Gender\", (avg_time - (SELECT avg_time FROM baseline_stats WHERE \"Gender\" = combined.\"Gender\")) AS improvement FROM combined ORDER BY 1",
+    "x": "Gender",
+    "y": [
+     "improvement"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Top 10 Girls by Sit-ups Gain",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", \"Sit ups\" AS start_situps FROM \"baseline\" WHERE \"Gender\" = 'Female'), endline AS (SELECT \"Child ID\", \"Sit ups\" AS end_situps FROM \"endline\" WHERE \"Gender\" = 'Female') SELECT b.\"Child ID\", b.\"Child name\", b.\"School\", b.start_situps, e.end_situps, (e.end_situps - b.start_situps) AS gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY gain DESC LIMIT 10",
+    "x": null,
+    "y": null
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Top 10 Boys by Sit-ups Gain",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", \"Sit ups\" AS start_situps FROM \"baseline\" WHERE \"Gender\" = 'Male'), endline AS (SELECT \"Child ID\", \"Sit ups\" AS end_situps FROM \"endline\" WHERE \"Gender\" = 'Male') SELECT b.\"Child ID\", b.\"Child name\", b.\"School\", b.start_situps, e.end_situps, (e.end_situps - b.start_situps) AS gain FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY gain DESC LIMIT 10",
+    "x": null,
+    "y": null
+   },
+   {
+    "id": "p6",
+    "kind": "kpi",
+    "title": "Girls Sit-ups Gain",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", \"Sit ups\" AS start_situps FROM \"baseline\" WHERE \"Gender\" = 'Female'), endline AS (SELECT \"Child ID\", \"Sit ups\" AS end_situps FROM \"endline\" WHERE \"Gender\" = 'Female') SELECT AVG(end_situps - start_situps) AS n FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": "reps"
+   },
+   {
+    "id": "p7",
+    "kind": "kpi",
+    "title": "Boys Sit-ups Gain",
+    "sql": "WITH baseline AS (SELECT \"Child ID\", \"Sit ups\" AS start_situps FROM \"baseline\" WHERE \"Gender\" = 'Male'), endline AS (SELECT \"Child ID\", \"Sit ups\" AS end_situps FROM \"endline\" WHERE \"Gender\" = 'Male') SELECT AVG(end_situps - start_situps) AS n FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\"",
+    "unit": "reps"
+   }
+  ],
+  "narrative": "This dashboard compares the physical fitness improvements between girls and boys using data from baseline and endline assessments. The first panel shows the total number of unique participants tracked across both time points. The second and third panels display the average improvement in sit-ups and shuttle run times, respectively, broken down by gender to highlight where the gap lies. The fourth and fifth panels list the top 10 performers for each gender based on their gain in sit-ups, providing a granular view of individual success stories. The final two key performance indicators summarize the average sit-ups gained by girls and boys, offering a direct numerical comparison of their respective progress."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "Gender",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Gender": "Female",
+     "improvement": 0.0
+    },
+    {
+     "Gender": "Female",
+     "improvement": 2.2386363636363633
+    },
+    {
+     "Gender": "Male",
+     "improvement": 0.0
+    },
+    {
+     "Gender": "Male",
+     "improvement": 3.446428571428573
+    }
+   ],
+   "rowcount": 4,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "Gender",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Gender": "Female",
+     "improvement": 0.0
+    },
+    {
+     "Gender": "Female",
+     "improvement": -0.012500000000004619
+    },
+    {
+     "Gender": "Male",
+     "improvement": 0.0
+    },
+    {
+     "Gender": "Male",
+     "improvement": -0.014285714285708906
+    }
+   ],
+   "rowcount": 4,
+   "error": null
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Values list \"b\" does not have a column named \"Child name\"\n\nLINE 1: ... \"endline\" WHERE \"Gender\" = 'Female') SELECT b.\"Child ID\", b.\"Child name\", b.\"School\", b.start_situps, e.end_situps...\n                                                                      ^"
+  },
+  "p5": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "BinderException: Binder Error: Values list \"b\" does not have a column named \"Child name\"\n\nLINE 1: ... FROM \"endline\" WHERE \"Gender\" = 'Male') SELECT b.\"Child ID\", b.\"Child name\", b.\"School\", b.start_situps, e.end_situps...\n                                                                         ^"
+  },
+  "p6": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 2.2386363636363638
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 3.4464285714285716
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  }
+ }
+}

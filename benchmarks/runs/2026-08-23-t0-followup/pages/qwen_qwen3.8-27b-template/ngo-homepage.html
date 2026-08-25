@@ -1,0 +1,127 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jagruti Foundation</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Jagruti Foundation</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+<section class="card">
+  <h2>What we do</h2>
+  <p class="muted">Jagruti Foundation works with communities to build lasting change through education, health, and livelihoods. We partner with local leaders, schools, and families to make sure no one is left behind.</p>
+</section>
+
+<section>
+  <h2>Our programmes</h2>
+  <div class="grid" id="programmes"></div>
+</section>
+
+<section>
+  <h2>From the field</h2>
+  <div class="grid" id="photos"></div>
+</section>
+
+<section class="card">
+  <h2>Contact us</h2>
+  <p class="muted">Have a question, want to volunteer, or would like to partner with us? Reach out below.</p>
+  <form id="contactForm">
+    <label for="name">Name</label>
+    <input id="name" name="name" type="text" required>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required>
+    <label for="message">Message</label>
+    <textarea id="message" name="message" rows="4" required></textarea>
+    <div class="row" style="margin-top:10px">
+      <button type="submit">Send message</button>
+      <button type="button" class="secondary" id="clearBtn">Clear</button>
+    </div>
+    <p id="formStatus" class="muted" style="margin-top:10px"></p>
+  </form>
+</section>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+window.data = {
+  programmes: [
+    { title: 'Education for All', desc: 'We run after-school tutoring, supply learning kits, and support first-generation students to complete their schooling.' },
+    { title: 'Community Health', desc: 'Our mobile clinics and health camps bring basic care, vaccinations, and awareness to remote villages.' },
+    { title: 'Livelihoods & Skills', desc: 'We train families in vocational skills and micro-enterprise so they can build sustainable incomes.' }
+  ],
+  photos: [
+    { label: 'Classroom session' },
+    { label: 'Health camp' },
+    { label: 'Skills workshop' },
+    { label: 'Community meeting' }
+  ]
+};
+
+(function () {
+  const data = window.data || { programmes: [], photos: [] };
+
+  const progWrap = document.getElementById('programmes');
+  (data.programmes || []).forEach(function (p) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const h = document.createElement('h3');
+    h.textContent = p.title;
+    const d = document.createElement('p');
+    d.className = 'muted';
+    d.textContent = p.desc;
+    card.appendChild(h);
+    card.appendChild(d);
+    progWrap.appendChild(card);
+  });
+
+  const photoWrap = document.getElementById('photos');
+  (data.photos || []).forEach(function (ph) {
+    const fig = document.createElement('figure');
+    fig.style.margin = '0';
+    const box = document.createElement('div');
+    box.style.cssText = 'height:140px;border-radius:8px;background:linear-gradient(135deg,#dbeafe,#e5e7eb);display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:13px;';
+    box.textContent = 'Photo';
+    const cap = document.createElement('figcaption');
+    cap.className = 'muted';
+    cap.style.fontSize = '13px';
+    cap.style.marginTop = '6px';
+    cap.textContent = ph.label;
+    fig.appendChild(box);
+    fig.appendChild(cap);
+    photoWrap.appendChild(fig);
+  });
+
+  const form = document.getElementById('contactForm');
+  const status = document.getElementById('formStatus');
+  const clearBtn = document.getElementById('clearBtn');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const entry = {
+      name: form.name.value.trim(),
+      email: form.email.value.trim(),
+      message: form.message.value.trim(),
+      date: new Date().toISOString()
+    };
+    const list = store.get('jagruti_messages', []);
+    list.push(entry);
+    store.set('jagruti_messages', list);
+    status.textContent = 'Thank you, ' + (entry.name || 'friend') + '! Your message has been saved.';
+    form.reset();
+  });
+
+  clearBtn.addEventListener('click', function () {
+    form.reset();
+    status.textContent = '';
+  });
+
+  offlineReady();
+})();
+</script>
+</body></html>

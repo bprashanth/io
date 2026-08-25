@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#2c3e50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Class Attendance Tracker</title>
+<style>
+    :root {
+        --primary: #2c3e50;
+        --accent: #27ae60;
+        --absent: #c0392b;
+        --bg: #f4f6f7;
+        --card-bg: #ffffff;
+        --text: #333333;
+        --border: #e0e0e0;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 0;
+        padding-bottom: 80px; /* Space for footer */
+    }
+
+    /* Header */
+    header {
+        background-color: var(--primary);
+        color: white;
+        padding: 15px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    h1 { margin: 0; font-size: 1.2rem; font-weight: 600; }
+    
+    .controls { display: flex; gap: 10px; align-items: center; }
+    
+    button {
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        font-weight: 500;
+        transition: opacity 0.2s;
+    }
+    
+    button:active { opacity: 0.7; }
+    
+    .btn-primary { background-color: var(--accent); color: white; }
+    .btn-outline { background-color: transparent; border: 1px solid white; color: white; }
+    .btn-danger { background-color: var(--absent); color: white; }
+
+    /* Date Navigation */
+    .date-nav {
+        background: white;
+        padding: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .date-display {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: var(--primary);
+    }
+
+    /* Student List */
+    #student-list {
+        padding: 10px;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .student-card {
+        background: var(--card-bg);
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: transform 0.1s;
+    }
+
+    .student-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .student-name { font-weight: 600; font-size: 1rem; }
+    .student-status-text { font-size: 0.8rem; color: #7f8c8d; margin-top: 2px; }
+
+    /* Toggle Switch */
+    .toggle-container {
+        display: flex;
+        gap: 10px;
+    }
+
+    .status-btn {
+        width: 50px;
+        height: 30px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: bold;
+        color: white;
+        opacity: 0.3;
+        border: 1px solid transparent;
+    }
+
+    .status-btn.active { opacity: 1; transform: scale(1.05); }
+    .status-btn.present.active { background-color: var(--accent); box-shadow: 0 0 8px rgba(39, 174, 96, 0.4); }
+    .status-btn.absent.active { background-color: var(--absent); box-shadow: 0 0 8px rgba(192, 57, 43, 0.4); }
+
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 200;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal.open { display: flex; }
+
+    .modal-content {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        width: 90%;
+        max-width: 400px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .modal-header { display: flex; justify-content: space-between; margin-bottom: 15px; }
+    .close-modal { font-size: 1.5rem; cursor: pointer; line-height: 1; }
+
+    .input-group { margin-bottom: 15px; }
+    .input-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #666; }
+    .input-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem; }
+
+    /* Summary Table */
+    .summary-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .summary-table th, .summary-table td { padding: 8px; text-align: left; border-bottom: 1px solid #eee; }
+    .summary-table th { background-color: #f8f9fa; color: #555; }
+    .summary-table tr:last-child td { border-bottom: none; }
+    .summary-total { font-weight: bold; color: var(--primary); }
+
+    /* Floating Action Button */
+    .fab {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: var(--primary);
+        color: white;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        font-size: 24px;
+        z-index: 90;
+    }
+
+    /* Toast */
+    #toast {
+        visibility: hidden;
+        min-width: 250px;
+        background-color: #333;
+        color: #fff;
+        text-align: center;
+        border-radius: 4px;
+        padding: 16px;
+        position: fixed;
+        z-index: 300;
+        left: 50%;
+        bottom: 30px;
+        transform: translateX(-50%);
+        font-size: 14px;
+    }
+    #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+
+    @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+    @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: #7f8c8d; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Attendance</h1>
+    <div class="controls">
+        <button class="btn-outline" id="btn-summary">Summary</button>
+        <button class="btn-outline" id="btn-manage">Manage</button>
+    </div>
+</header>
+
+<div class="date-nav">
+    <button class="btn-primary" id="prev-day" style="background:#7f8c8d; padding: 5px 10px;">&lt;</button>
+    <div class="date-display" id="current-date">Loading...</div>
+    <button class="btn-primary" id="next-day" style="background:#7f8c8d; padding: 5px 10px;">&gt;</button>
+</div>
+
+<div id="student-list">
+    <!-- Student cards injected here -->
+</div>
+
+<div class="fab" id="fab-today" title="Go to Today">
+    <span>&#8635;</span>
+</div>
+
+<!-- Manage Students Modal -->
+<div class="modal" id="modal-manage">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Manage Students</h2>
+            <span class="close-modal" id="close-manage">&times;</span>
+        </div>
+        <div class="input-group">
+            <label>Add New Student</label>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="new-student-name" placeholder="Enter name...">
+                <button class="btn-primary" id="add-student-btn">Add</button>
+            </div>
+        </div>
+        <div id="student-list-admin">
+            <!-- List for deletion -->
+        </div>
+    </div>
+</div>
+
+<!-- Summary Modal -->
+<div class="modal" id="modal-summary">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Monthly Summary</h2>
+            <span class="close-modal" id="close-summary">&times;</span>
+        </div>
+        <div id="summary-content">
+            <!-- Table injected here -->
+        </div>
+    </div>
+</div>
+
+<div id="toast">Saved</div>
+
+<script>
+    // --- Data Management ---
+    const DB_KEY = 'attendance_app_data_v1';
+    
+    // Default structure if no data exists
+    const defaultData = {
+        students: [], // Array of strings
+        attendance: {} // Key: "YYYY-MM-DD", Value: { studentId: 'P' | 'A' }
+    };
+
+    let appData = JSON.parse(localStorage.getItem(DB_KEY)) || defaultData;
+    let currentDate = new Date();
+    let currentViewDate = new Date(); // For navigation
+
+    // --- DOM Elements ---
+    const els = {
+        dateDisplay: document.getElementById('current-date'),
+        list: document.getElementById('student-list'),
+        prevDay: document.getElementById('prev-day'),
+        nextDay: document.getElementById('next-day'),
+        fabToday: document.getElementById('fab-today'),
+        modalManage: document.getElementById('modal-manage'),
+        modalSummary: document.getElementById('modal-summary'),
+        btnSummary: document.getElementById('btn-summary'),
+        btnManage: document.getElementById('btn-manage'),
+        closeManage: document.getElementById('close-manage'),
+        closeSummary: document.getElementById('close-summary'),
+        adminList: document.getElementById('student-list-admin'),
+        newStudentInput: document.getElementById('new-student-name'),
+        addStudentBtn: document.getElementById('add-student-btn'),
+        summaryContent: document.getElementById('summary-content'),
+        toast: document.getElementById('toast')
+    };
+
+    // --- Core Logic ---
+
+    function saveData() {
+        localStorage.setItem(DB_KEY, JSON.stringify(appData));
+    }
+
+    function formatDate(date) {
+        return date.toISOString().split('T')[0];
+    }
+
+    function getAttendanceForDate(dateStr) {
+        return appData.attendance[dateStr] || {};
+    }
+
+    function showToast(msg) {
+        els.toast.textContent = msg;
+        els.toast.className = "show";
+        setTimeout(() => { els.toast.className = els.toast.className.replace("show", ""); }, 3000);
+    }
+
+    // --- Rendering ---
+
+    function renderHeader() {
+        const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+        els.dateDisplay.textContent = currentViewDate.toLocaleDateString('en-US', options);
+        
+        // Disable buttons if navigating too far back (optional, but good UX)
+        const todayStr = formatDate(new Date());
+        const viewStr = formatDate(currentViewDate);
+        
+        els.prevDay.style.opacity = viewStr === todayStr ? 0.5 : 1;
+        els.nextDay.style.opacity = 0.5; // Don't allow future dates for attendance
+    }
+
+    function renderStudentList() {
+        els.list.innerHTML = '';
+        const dateStr = formatDate(currentViewDate);
+        const dayData = getAttendanceForDate(dateStr);
+        const isToday = dateStr === formatDate(new Date());
+
+        if (appData.students.length === 0) {
+            els.list.innerHTML = `<div class="empty-state">No students added yet.<br>Tap "Manage" to add students.</div>`;
+            return;
+        }
+
+        appData.students.forEach((name, index) => {
+            const id = index; // Using index as ID for simplicity
+            const status = dayData[id] || 'P'; // Default to Present if not set
+            
+            const card = document.createElement('div');
+            card.className = 'student-card';
+            
+            card.innerHTML = `
+                <div class="student-info">
+                    <span class="student-name">${name}</span>
+                    <span class="student-status-text" id="status-text-${id}">${status === 'P' ? 'Present' : 'Absent'}</span>
+                </div>
+                <div class="toggle-container">
+                    <div class="status-btn present ${status === 'P' ? 'active' : ''}" data-id="${id}" data-type="P">P</div>
+                    <div class="status-btn absent ${status === 'A' ? 'active' : ''}" data-id="${id}" data-type="A">A</div>
+                </div>
+            `;
+            els.list.appendChild(card);
+        });
+
+        // Attach listeners
+        document.querySelectorAll('.status-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.target.dataset.id;
+                const type = e.target.dataset.type;
+                
+                // Update UI
+                const card = e.target.closest('.student-card');
+                card.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                const statusText = card.querySelector('.student-status-text');
+                statusText.textContent = type === 'P' ? 'Present' : 'Absent';
+                statusText.style.color = type === 'P' ? 'var(--accent)' : 'var(--absent)';
+
+                // Save Data
+                if (!appData.attendance[dateStr]) appData.attendance[dateStr] = {};
+                appData.attendance[dateStr][id] = type;
+                saveData();
+            });
+        });
+    }
+
+    function renderAdminList() {
+        els.adminList.innerHTML = '';
+        appData.students.forEach((name, index) => {
+            const row = document.createElement('div');
+            row.style.cssText = "display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;";
+            row.innerHTML = `
+                <span>${name}</span>
+                <button class="btn-danger" style="padding:2px 8px; font-size:0.8rem;" onclick="removeStudent(${index})">Remove</button>
+            `;
+            els.adminList.appendChild(row);
+        });
+    }
+
+    function renderSummary() {
+        const currentMonth = currentViewDate.getMonth();
+        const currentYear = currentViewDate.getFullYear();
+        
+        // Get all dates in this month that have data
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        let html = `<table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Present</th>
+                    <th>Absent</th>
+                    <th>%</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        
+        let totalPresent = 0;
+        let totalDays = 0;
+
+        appData.students.forEach((name, index) => {
+            let pCount = 0;
+            let aCount = 0;
+            
+            for(let d=1; d<=daysInMonth; d++) {
+                const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const dayData = appData.attendance[dateStr];
+                if(dayData && dayData[index] === 'P') pCount++;
+                if(dayData && dayData[index] === 'A') aCount++;
+            }
+
+            const total = pCount + aCount;
+            const pct = total > 0 ? Math.round((pCount / total) * 100) : 0;
+            
+            totalPresent += pCount;
+            totalDays += total;
+
+            html += `
+                <tr>
+                    <td>${name}</td>
+                    <td style="color:var(--accent)">${pCount}</td>
+                    <td style="color:var(--absent)">${aCount}</td>
+                    <td>${pct}%</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table>`;
+        
+        // Add total row
+        const totalPct = totalDays > 0 ? Math.round((totalPresent / totalDays) * 100) : 0;
+        html += `<div style="margin-top:10px; font-weight:bold; text-align:right;">Class Average: ${totalPct}%</div>`;
+
+        els.summaryContent.innerHTML = html;
+    }
+
+    // --- Actions ---
+
+    function changeDate(days) {
+        currentViewDate.setDate(currentViewDate.getDate() + days);
+        renderHeader();
+        renderStudentList();
+    }
+
+    function goToToday() {
+        currentViewDate = new Date();
+        renderHeader();
+        renderStudentList();
+    }
+
+    function addStudent() {
+        const name = els.newStudentInput.value.trim();
+        if (name) {
+            appData.students.push(name);
+            saveData();
+            els.newStudentInput.value = '';
+            renderAdminList();
+            renderStudentList(); // Refresh main list if open
+            showToast('Student added');
+        }
+    }
+
+    window.removeStudent = function(index) {
+        if(confirm('Remove this student? History will remain but they won\'t appear in daily list.')) {
+            appData.students.splice(index, 1);
+            saveData();
+            renderAdminList();
+            renderStudentList();
+        }
+    };
+
+    // --- Event Listeners ---
+
+    els.prevDay.addEventListener('click', () => changeDate(-1));
+    els.nextDay.addEventListener('click', () => changeDate(1));
+    els.fabToday.addEventListener('click', goToToday);
+    
+    els.btnManage.addEventListener('click', () => {
+        renderAdminList();
+        els.modalManage.classList.add('open');
+    });
+    
+    els.btnSummary.addEventListener('click', () => {
+        renderSummary();
+        els.modalSummary.classList.add('open');
+    });
+
+    els.closeManage.addEventListener('click', () => els.modalManage.classList.remove('open'));
+    els.closeSummary.addEventListener('click', () => els.modalSummary.classList.remove('open'));
+    
+    els.addStudentBtn.addEventListener('click', addStudent);
+    els.newStudentInput.addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') addStudent();
+    });
+
+    // Close modals on outside click
+    window.addEventListener('click', (e) => {
+        if (e.target === els.modalManage) els.modalManage.classList.remove('open');
+        if (e.target === els.modalSummary) els.modalSummary.classList.remove('open');
+    });
+
+    // --- Initialization ---
+
+    // Check for window.data as requested
+    if (window.data) {
+        if (window.data.students) appData.students = window.data.students;
+        if (window.data.attendance) appData.attendance = window.data.attendance;
+        saveData();
+    }
+
+    // Initial Render
+    renderHeader();
+    renderStudentList();
+
+    // --- Service Worker Registration (Inline Blob) ---
+    if ('serviceWorker' in navigator) {
+        const swCode = `
+            const CACHE_NAME = 'attendance-v1';
+            self.addEventListener('install', e => {
+                e.waitUntil(
+                    caches.open(CACHE_NAME).then(cache => {
+                        return cache.addAll(['/']); // Cache the main page
+                    })
+                );
+                self.skipWaiting();
+            });
+            self.addEventListener('fetch', e => {
+                e.respondWith(
+                    caches.match(e.request).then(response => {
+                        return response || fetch(e.request);
+                    })
+                );
+            });
+        `;
+        const blob = new Blob([swCode], {type: 'application/javascript'});
+        const swUrl = URL.createObjectURL(blob);
+        
+        navigator.serviceWorker.register(swUrl)
+            .then(() => console.log('Service Worker Registered'))
+            .catch(err => console.log('SW Registration Failed', err));
+    }
+
+</script>
+</body>
+</html>

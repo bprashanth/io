@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>io</title>
+<style>
+:root{--bg:#1a1d21;--panel:#22262b;--line:#33383f;--ink:#e8e6e1;--dim:#8b9096;--hi:#e8b26a;--hibg:rgba(232,178,106,.13);--grn:#7fbf7f;--grnbg:rgba(110,190,120,.16)}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column}
+button{font:inherit;color:var(--ink);background:none;border:1px solid var(--line);border-radius:10px;padding:8px 16px;cursor:pointer}
+button.go{border-color:var(--hi);color:var(--hi)}
+input,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;outline:none;width:100%}
+input:focus,textarea:focus{border-color:var(--hi)}
+.dim{color:var(--dim)}
+#gear{position:fixed;top:14px;right:16px;color:var(--dim);cursor:pointer;font-size:17px;z-index:5;background:none;border:none;padding:4px}
+
+/* screens */
+.screen{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px}
+.screen.on{display:flex}
+#s-provider .card{width:400px;display:flex;flex-direction:column;gap:10px}
+#s-provider h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
+#s-provider p{margin:0 0 6px;text-align:center}
+#shelf{width:460px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fol{display:flex;align-items:baseline;gap:10px;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--line)}
+.fol:last-child{border-bottom:none}
+.fol:hover{background:var(--panel)}
+.fol .nm{font-size:14px}
+.fol .ct{font-size:12px;color:var(--dim);margin-left:auto}
+.fol.add .nm{color:var(--dim)}
+.fol.add:hover .nm{color:var(--hi)}
+#ctx{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;display:none;z-index:30}
+#ctx button{border:none;padding:7px 14px;width:100%;text-align:left}
+#ctx button:hover{color:var(--hi)}
+.cards{display:flex;gap:12px}
+.ftype{width:150px;border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:10px}
+.ftype .t{font-size:13px}
+.ftype svg{align-self:center;color:var(--dim);margin:8px 0}
+.ftype.pick{border-color:var(--hi)}
+.ftype.pick .t{color:var(--hi)}
+.ftype.off{opacity:.35;cursor:default}
+
+/* sheet */
+#s-sheet{justify-content:flex-start;align-items:stretch;padding:0;overflow:hidden}
+#sheet-top{display:flex;align-items:center;gap:14px;padding:12px 48px 12px 18px;border-bottom:1px solid var(--line)}
+#sheet-top .tabs{display:flex;gap:6px;overflow-x:auto}
+#sheet-top .tabs button{padding:5px 12px;font-size:13px;white-space:nowrap}
+#sheet-top .tabs button.on{border-color:var(--hi);color:var(--hi)}
+#gridwrap{flex:1;overflow:auto}
+table{border-collapse:collapse;font-size:13px;min-width:100%}
+th,td{padding:6px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none}
+.hid{background:var(--hibg)}
+th.hid{color:var(--hi)}
+th.cellcol{color:var(--hi)}
+th .why{display:block;font-weight:400;font-size:11px;color:var(--hi)}
+td.cellhit{background:var(--hibg);box-shadow:inset 0 0 0 1px var(--hi);cursor:pointer}
+td.kept{box-shadow:inset 0 0 0 1px var(--line);cursor:pointer}
+td.tok{background:var(--hibg);color:var(--hi)}
+#sheet-bar{display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;border-top:1px solid var(--line)}
+
+/* chat */
+#s-chat{justify-content:flex-start;align-items:stretch;padding:0;overflow:hidden}
+#thread{flex:1;overflow:auto;padding:28px 0}
+.msg{max-width:820px;margin:0 auto 18px;padding:0 24px;width:100%}
+.msg .q{color:var(--hi)}
+.msg .a{white-space:pre-wrap}
+.msg .sent{font-size:12px;color:var(--dim);margin-top:6px}
+.msg iframe{width:100%;height:600px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.share{font-size:12px;margin-top:6px}
+.share a{color:var(--hi);cursor:pointer}
+.share .shareurl{color:var(--dim);margin-left:10px;user-select:all}
+.msg .working{color:var(--dim)}
+
+/* doc view */
+#docbar{display:flex;gap:10px;align-items:center;padding:10px 48px 10px 18px;border-bottom:1px solid var(--line)}
+#docbar input{width:220px;padding:7px 10px}
+#docbar .cnt{font-size:13px;color:var(--dim)}
+#docwrap{flex:1;overflow:auto;padding:20px 26px;white-space:pre-wrap;font-size:14px;line-height:1.7;max-width:100%}
+#docwrap mark{background:var(--hibg);color:var(--hi);border-radius:4px;padding:0 2px;cursor:pointer;box-shadow:inset 0 0 0 1px var(--hi)}
+#docwrap mark.kept{background:none;color:inherit;box-shadow:inset 0 0 0 1px var(--line)}
+#docwrap mark.term{box-shadow:inset 0 0 0 1px var(--hi);font-style:normal}
+#docwrap .find{outline:2px solid var(--dim);border-radius:3px}
+#timenu{position:absolute;bottom:64px;left:34px;background:var(--panel);border:1px solid var(--line);border-radius:10px;display:none;max-height:260px;overflow-y:auto;z-index:21;min-width:260px}
+#timenu div{padding:8px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--line)}
+#timenu div:last-child{border-bottom:none}
+#timenu div:hover,#timenu div.sel{color:var(--hi);background:var(--bg)}
+#timenu .cls{color:var(--dim);font-size:12px;margin-left:10px}
+#atmenu{position:absolute;bottom:64px;left:34px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:none;max-height:260px;overflow-y:auto;z-index:20;min-width:260px}
+#atmenu div{padding:8px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--line)}
+#atmenu div:last-child{border-bottom:none}
+#atmenu div:hover,#atmenu div.sel{color:var(--hi);background:var(--bg)}
+
+/* input bar */
+#bar{padding:16px 24px 22px}
+#barin{max-width:860px;margin:0 auto;position:relative}
+#mirror{position:absolute;inset:0;padding:14px 18px 14px 34px;pointer-events:none;white-space:pre-wrap;overflow:hidden;font:inherit;line-height:1.5;color:var(--ink)}
+#mirror s{color:var(--dim);text-decoration-color:var(--hi)}
+#q{padding:13px 18px 13px 34px;border-radius:16px;resize:none;height:52px;background:var(--panel);color:transparent;caret-color:var(--ink)}
+#q::placeholder{color:var(--dim)}
+#q:disabled{opacity:.45}
+#chev{position:absolute;left:14px;top:14px;color:var(--dim)}
+#note{max-width:860px;margin:6px auto 0;font-size:12px;color:var(--dim);padding:0 6px;min-height:16px}
+
+/* modals */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+.modal.on{display:flex}
+.modal .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px;width:400px;display:flex;flex-direction:column;gap:10px}
+.br-dir{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px}
+.br-dir:hover{color:var(--hi)}
+</style>
+</head>
+<body>
+<button id="gear" style="display:none">⚙</button>
+
+<div class="screen on" id="s-provider">
+  <div class="card">
+    <h1>io</h1>
+    <p class="dim">io needs an AI provider.</p>
+    <input id="p-key" type="password" placeholder="API key" autocomplete="off">
+    <input id="p-server" placeholder="or server address" autocomplete="off">
+    <button class="go" id="p-go">Start</button>
+  </div>
+</div>
+
+<div class="screen" id="s-home">
+  <div id="shelf"></div>
+</div>
+<div id="ctx"><button id="ctx-un">Unshelter</button></div>
+
+<div class="screen" id="s-sheet">
+  <div id="sheet-top"><div class="tabs" id="tabs"></div></div>
+  <div id="docbar" style="display:none">
+    <input id="doc-find" placeholder="find">
+    <span class="cnt" id="doc-count"></span>
+    <button id="doc-redact" style="display:none">Redact all</button>
+    <span style="flex:1"></span>
+    <input id="doc-labels" placeholder="hide: names, addresses, account ids" style="width:280px">
+    <button id="doc-scanlabels">Scan</button>
+  </div>
+  <div id="gridwrap"></div>
+  <div id="sheet-bar"><button id="sheet-preview">Preview</button><button id="sheet-back" style="display:none">Back</button><button id="sheet-cancel">Cancel</button><button id="sheet-ok" class="go">Looks right</button></div>
+</div>
+
+<div class="screen" id="s-chat">
+  <div id="thread"></div>
+</div>
+
+<div id="bar" style="display:none">
+  <div id="barin">
+    <div id="atmenu"></div>
+    <div id="timenu"></div>
+    <div id="mirror"></div>
+    <textarea id="q" placeholder="ready when you are..." rows="1"></textarea>
+    <span id="chev">&gt;</span>
+  </div>
+  <div id="note"></div>
+</div>
+
+<div id="confirmscan" class="modal"><div class="card" style="width:380px">
+  <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
+    <div class="br-dir" style="color:var(--hi)" id="ft-excel">excel / csv <span id="cs-count" class="dim"></span></div>
+    <div class="br-dir" style="color:var(--hi)" id="ft-chat">whatsapp / text <span id="cs-chat" class="dim"></span></div>
+    <div class="br-dir" style="color:var(--hi);border-bottom:none" id="ft-pdf">pdf <span id="cs-pdf" class="dim"></span></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button id="cs-x">Cancel</button><button class="go" id="cs-ok">OK</button></div>
+</div></div>
+
+<div id="browser" class="modal"><div class="card" style="width:460px">
+  <div id="br-path" class="dim" style="font-size:13px;word-break:break-all"></div>
+  <div id="br-list" style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px"></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button id="br-x">Cancel</button><button class="go" id="br-open">Open</button></div>
+</div></div>
+
+<div id="settings" class="modal"><div class="card">
+  <input id="st-key" type="password" placeholder="API key">
+  <input id="st-server" placeholder="or server address">
+  <input id="st-model" placeholder="model">
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button id="st-x">Close</button><button class="go" id="st-ok">Save</button></div>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let files = [], skipped = [], tab = 0, terms = [], accepted = false;
+const api = (p, b) => fetch(p, b ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(b)} : {}).then(r => r.json());
+async function renderShelf(){
+  const r = await api('/api/folders');
+  const fol = f => `<div class="fol" data-p="${encodeURIComponent(f.path)}" title="${f.path}">
+    <span class="nm">${f.name}</span><span class="ct">${f.files} file${f.files === 1 ? '' : 's'}</span></div>`;
+  $('#shelf').innerHTML = r.folders.map(fol).join('') + `<div class="fol add" id="add"><span class="nm">+ Add Sheltered Dir</span></div>`;
+  document.querySelectorAll('.fol[data-p]').forEach(el => {
+    el.onclick = () => confirmScan(decodeURIComponent(el.dataset.p));
+    el.oncontextmenu = e => { e.preventDefault(); const c = $('#ctx'); c.style.display = 'block'; c.style.left = e.pageX + 'px'; c.style.top = e.pageY + 'px'; c.dataset.p = el.dataset.p; };
+  });
+  $('#add').onclick = pickFolder;
+}
+document.addEventListener('click', () => $('#ctx').style.display = 'none');
+$('#ctx-un').onclick = async () => { await api('/api/folders/remove', {path: decodeURIComponent($('#ctx').dataset.p)}); renderShelf(); };
+(async () => { const st = await api('/api/state'); if (st.provider.set) { show('#s-home'); renderShelf(); } })();
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = id === '#s-provider' ? 'none' : ''; }
+
+// provider
+$('#p-go').onclick = async () => {
+  const key = $('#p-key').value.trim(), server = $('#p-server').value.trim();
+  if (!key && !server) { $('#p-key').focus(); return; }
+  await api('/api/provider', {api_key: key, server});
+  show('#s-home'); renderShelf();
+};
+
+// settings
+$('#gear').onclick = () => $('#settings').classList.add('on');
+$('#br-x').onclick = () => $('#browser').classList.remove('on');
+$('#br-open').onclick = () => { const p = $('#br-path').dataset.path; if (p) { $('#browser').classList.remove('on'); openFolder(p); } };  // the button already shows the file count
+$('#st-x').onclick = () => $('#settings').classList.remove('on');
+$('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-key').value.trim(), server: $('#st-server').value.trim(), model: $('#st-model').value.trim()}); $('#settings').classList.remove('on'); };
+
+// folder
+async function browseTo(path){
+  const r = await api('/api/browse?path=' + encodeURIComponent(path || ''));
+  $('#br-path').textContent = r.path; $('#br-path').dataset.path = r.path;
+  $('#br-open').textContent = r.data_files ? `Open - ${r.data_files} file${r.data_files > 1 ? 's' : ''}` : 'Open';
+  $('#br-list').innerHTML = (r.parent ? `<div class="br-dir" data-p="${encodeURIComponent(r.parent)}">..</div>` : '') +
+    r.dirs.map(d => `<div class="br-dir" data-p="${encodeURIComponent(r.path + '/' + d)}">${d}</div>`).join('');
+  document.querySelectorAll('.br-dir').forEach(el => el.onclick = () => browseTo(decodeURIComponent(el.dataset.p)));
+}
+async function pickFolder(){
+  let path = null;
+  if (window.io && window.io.pickFolder) path = await window.io.pickFolder();
+  else { $('#browser').classList.add('on'); await browseTo($('#br-path').dataset.path || ''); return; }
+  if (!path) return;
+  confirmScan(path);
+}
+async function confirmScan(path){
+  const r = await api('/api/browse?path=' + encodeURIComponent(path));
+  const label = (n, el, row) => { el.textContent = n ? `(${n} file${n === 1 ? '' : 's'}, scanned on this laptop)` : '(none here)'; row.style.opacity = n ? '' : '.35'; };
+  label(r.data_files, $('#cs-count'), $('#ft-excel')); label(r.chat_files || 0, $('#cs-chat'), $('#ft-chat')); label(r.pdf_files || 0, $('#cs-pdf'), $('#ft-pdf'));
+  const total = (r.data_files || 0) + (r.chat_files || 0) + (r.pdf_files || 0);
+  $('#confirmscan').classList.add('on');
+  $('#cs-x').onclick = () => $('#confirmscan').classList.remove('on');
+  $('#cs-ok').onclick = () => { if (!total) return; $('#confirmscan').classList.remove('on'); openFolder(path); };
+}
+async function openFolder(path){
+  show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';
+  $('#sheet-top').style.display = 'none'; $('#sheet-bar').style.display = 'none';
+  let scanning = true;
+  const poll = setInterval(async () => { const st = await api('/api/state'); if (!scanning) return; if (st.progress && st.progress.length) $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">' + st.progress[st.progress.length-1] + '…</p>'; }, 800);
+  const r = await api('/api/folder', {path});
+  scanning = false;
+  clearInterval(poll);
+  if (r.error) { alert(r.error); show(accepted ? '#s-chat' : '#s-home'); return; }
+  files = r.files; skipped = r.skipped || []; tab = 0; accepted = false; renderSheet();
+}
+
+function renderSheet(){
+  show('#s-sheet');
+  $('#sheet-top').style.display = ''; $('#sheet-bar').style.display = '';
+  $('#sheet-preview').style.display = ''; $('#sheet-back').style.display = 'none';
+  if ((files[tab] || {}).kind === 'doc') { renderDoc(); return; }
+  $('#docbar').style.display = 'none';
+  $('#tabs').innerHTML = files.map((f, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${f.name}</button>`).join('')
+    ;
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = +b.dataset.i; renderSheet(); });
+  const f = files[tab];
+  const hid = f.hidden || {};
+  const cellcols = f.cellcols || {};
+  const cells = f.cells || {};
+  const why = f.why || {};
+  const hdrTitle = c => hid[c] ? (why[c] ? hid[c] + ': ' + why[c] : 'you marked this, click to keep') : cellcols[c] ? (cellcols[c] + (why[c] ? ': ' + why[c] : '') + '. Click a marked cell to keep just that cell.') : 'click to hide this column';
+  let html = '<table><thead><tr>' + f.columns.map(c => `<th class="${hid[c] ? 'hid' : cellcols[c] ? 'cellcol' : ''}" data-c="${encodeURIComponent(c)}" title="${hdrTitle(c).replace(/"/g,'&quot;')}">${c}${hid[c] ? (why[c] ? `<span class=why>why: ${hid[c]}</span>` : '') : cellcols[c] ? `<span class=why>why: in some cells</span>` : ''}</th>`).join('') + '</tr></thead><tbody>';
+  f.grid.forEach((row, ri) => {
+    html += '<tr>' + row.map((v, ci) => {
+      const c = f.columns[ci];
+      const hit = cells[c] && cells[c][String(ri)];
+      const cls = hid[c] ? 'hid' : hit ? (hit.kept ? 'kept' : 'cellhit') : '';
+      const title = hit ? (hit.kept ? 'kept: ' + hit.why + '. Click to hide again.' : hit.why + '. Click to keep this cell.') : '';
+      return `<td class="${cls}" data-c="${encodeURIComponent(c)}" data-r="${ri}"${title ? ` title="${title.replace(/"/g,'&quot;')}"` : ''}>${String(v ?? '').slice(0, 80)}</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  $('#gridwrap').innerHTML = html;
+  $('#gridwrap').style.whiteSpace = '';
+  document.querySelectorAll('th[data-c]').forEach(el => el.onclick = () => toggle(decodeURIComponent(el.dataset.c)));
+  document.querySelectorAll('td.cellhit, td.kept').forEach(el => el.onclick = async () => {
+    const r = await api('/api/cellkeep', {name: f.name, column: decodeURIComponent(el.dataset.c), row: +el.dataset.r});
+    if (!r.error) { files = r.files; renderSheet(); }
+  });
+}
+async function toggle(column){
+  const r = await api('/api/toggle', {name: files[tab].name, column});
+  if (!r.error) { files = r.files; renderSheet(); }
+}
+
+function escT(t){ return t.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])); }
+let docFind = '';
+function renderDoc(){
+  const f = files[tab];
+  $('#tabs').innerHTML = files.map((x, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${x.name}</button>`).join('');
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = +b.dataset.i; docFind = ''; $('#doc-find').value = ''; renderSheet(); });
+  $('#docbar').style.display = '';
+  $('#doc-labels').value = (f.labels || []).join(', ');
+  const text = f.text; const spans = f.spans || [];
+  let html = '', cur = 0;
+  spans.forEach((sp, i) => {
+    if (sp.s < cur) return;
+    html += escT(text.slice(cur, sp.s));
+    const cls = (sp.kept ? 'kept' : '') + (sp.label === 'hidden' ? ' term' : '');
+    const tip = sp.kept ? 'kept. Click to hide again.' : (sp.label === 'hidden' ? 'you marked this. Click to keep.' : sp.label.replace(/_/g, ' ') + '. Click to keep.');
+    html += `<mark class="${cls}" data-i="${i}" title="${tip}">${escT(text.slice(sp.s, sp.e))}</mark>`;
+    cur = sp.e;
+  });
+  html += escT(text.slice(cur));
+  $('#gridwrap').innerHTML = `<div id=docwrap>${html}</div>`;
+  document.querySelectorAll('#docwrap mark').forEach(el => el.onclick = async () => {
+    const sp = f.spans[+el.dataset.i];
+    let r;
+    if (sp.label === 'hidden' && !sp.kept) r = await api('/api/docterm', {name: f.name, term: sp.text, remove: true});
+    else r = await api('/api/dockeep', {name: f.name, value: sp.text});
+    if (!r.error) { files = r.files; renderSheet(); updateFind(); }
+  });
+  updateFind();
+}
+function updateFind(){
+  const f = files[tab]; if (!f || f.kind !== 'doc') return;
+  const q2 = docFind.trim();
+  if (!q2) { $('#doc-count').textContent = ''; $('#doc-redact').style.display = 'none'; document.querySelectorAll('#docwrap .find').forEach(el => el.classList.remove('find')); return; }
+  const rx = new RegExp(q2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  const hits = (f.text.match(rx) || []).length;
+  let redacted = 0, m;
+  rx.lastIndex = 0;
+  while ((m = rx.exec(f.text)) !== null) { if ((f.spans || []).some(sp => !sp.kept && sp.s < m.index + m[0].length && m.index < sp.e)) redacted += 1; }
+  $('#doc-count').textContent = hits ? `${hits} hit${hits > 1 ? 's' : ''}, ${redacted} redacted` : 'no hits';
+  $('#doc-redact').style.display = (hits && redacted < hits) ? '' : 'none';
+  document.querySelectorAll('#docwrap .find').forEach(el => el.classList.remove('find'));
+  if (hits) document.querySelectorAll('#docwrap mark').forEach(el => { if (rx.test(el.textContent)) el.classList.add('find'); rx.lastIndex = 0; });
+}
+$('#doc-find').oninput = e => { docFind = e.target.value; updateFind(); };
+$('#doc-redact').onclick = async () => {
+  const f = files[tab]; const q2 = docFind.trim(); if (!q2) return;
+  const r = await api('/api/docterm', {name: f.name, term: q2});
+  if (!r.error) { files = r.files; renderSheet(); updateFind(); }
+};
+$('#doc-scanlabels').onclick = async () => {
+  const f = files[tab]; const labels = $('#doc-labels').value.trim(); if (!labels) return;
+  $('#doc-scanlabels').disabled = true; $('#doc-scanlabels').textContent = 'scanning';
+  const r = await api('/api/rescan', {name: f.name, labels});
+  $('#doc-scanlabels').disabled = false; $('#doc-scanlabels').textContent = 'Scan';
+  if (!r.error) { files = r.files; renderSheet(); }
+};
+
+let previewing = false;
+$('#sheet-preview').onclick = async () => {
+  $('#sheet-preview').disabled = true; $('#sheet-preview').textContent = 'coding';
+  const r = await api('/api/preview');
+  $('#sheet-preview').disabled = false; $('#sheet-preview').textContent = 'Preview';
+  if (r.error) { alert(r.error); return; }
+  previewFiles = r.files; previewing = true; renderPreview();
+};
+$('#sheet-back').onclick = () => { previewing = false; renderSheet(); };
+$('#sheet-cancel').onclick = () => { show('#s-home'); renderShelf(); };
+let previewFiles = [];
+function renderPreview(){
+  $('#sheet-preview').style.display = 'none'; $('#sheet-back').style.display = '';
+  const f = previewFiles[tab] || previewFiles[0];
+  $('#tabs').innerHTML = previewFiles.map((x, i) => `<button class="${i === tab ? 'on' : ''}" data-i="${i}">${x.name}</button>`).join('')
+    + `<span class="dim" style="font-size:12px;align-self:center;margin-left:8px">this is what leaves</span>`;
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = +b.dataset.i; renderPreview(); });
+  if (f.kind === 'doc') {
+    const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    $('#gridwrap').innerHTML = `<div id=docwrap>` + esc(f.text).replace(/\b[A-Z][A-Z_]{1,24}_\d{3,}\b/g, m => `<mark>${m}</mark>`) + `</div>`;
+    return;
+  }
+  const ch = f.changed || {};
+  let html = '<table><thead><tr>' + f.columns.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  f.grid.forEach((row, ri) => {
+    html += '<tr>' + row.map((v, ci) => {
+      const c = f.columns[ci];
+      const tok = ch[c] && ch[c].includes(ri);
+      return `<td class="${tok ? 'tok' : ''}">${String(v ?? '').slice(0, 80)}</td>`;
+    }).join('') + '</tr>';
+  });
+  $('#gridwrap').innerHTML = html + '</tbody></table>';
+}
+$('#sheet-ok').onclick = async () => {
+  accepted = true;
+  show('#s-chat'); $('#q').focus();
+  $('#note').textContent = 'coding the files…';
+  await api('/api/accept', {});
+  const t = await api('/api/terms'); terms = t.terms || [];
+  $('#note').textContent = '';
+  paintMirror();
+};
+
+// chat + live strikethrough
+const q = $('#q'), mirror = $('#mirror');
+function paintMirror(){
+  let v = q.value;
+  let out = v.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]));
+  out = out.replace(/@([\w .()\-]+?)(?=\s|$)/g, (m0, g1) => files.some(f => f.name.toLowerCase() === g1.trim().toLowerCase()) ? `<b style="color:var(--hi)">${m0}</b>` : m0);
+  if (accepted) for (const t of terms) { if (t.length < 3) continue; const rx = new RegExp('(?<![\\w])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w])', 'gi'); out = out.replace(rx, m => `<s>${m}</s>`); }
+  mirror.innerHTML = out || `<span style="color:var(--dim)">${q.placeholder}</span>`;
+  $('#note').textContent = accepted && /<s>/.test(out) ? 'struck-through words leave as codes' : '';
+}
+let atOpen = false, atSel = 0;
+function atItems(){ return files.map(f => f.name); }
+function renderAt(filter){
+  const items = atItems().filter(n => n.toLowerCase().includes(filter.toLowerCase()));
+  if (!items.length) { $('#atmenu').style.display = 'none'; atOpen = false; return; }
+  atSel = Math.min(atSel, items.length - 1);
+  $('#atmenu').innerHTML = items.map((n, i) => `<div class="${i === atSel ? 'sel' : ''}" data-n="${n.replace(/"/g,'&quot;')}">${n}</div>`).join('');
+  document.querySelectorAll('#atmenu div').forEach(el => el.onclick = () => pickAt(el.dataset.n));
+  $('#atmenu').style.display = 'block'; atOpen = true;
+}
+function atFilter(){ const m = q.value.slice(0, q.selectionStart).match(/@([\w .()\-]*)$/); return m ? m[1] : null; }
+function pickAt(name){
+  const pos = q.selectionStart; const before = q.value.slice(0, pos).replace(/@([\w .()\-]*)$/, '@' + name + ' ');
+  q.value = before + q.value.slice(pos); q.focus(); q.selectionStart = q.selectionEnd = before.length;
+  $('#atmenu').style.display = 'none'; atOpen = false; paintMirror();
+}
+let tiOpen = false, tiSel = 0, tiMatches = [];
+function tiFilter(){ const m = q.value.slice(0, q.selectionStart).match(/~([^~]{0,40})$/); return m ? m[1] : null; }
+async function renderTi(filter){
+  if (filter && filter.length >= 2) { const r = await api('/api/vault/find?q=' + encodeURIComponent(filter)); tiMatches = r.matches || []; }
+  else if (filter !== undefined && !tiOpen) tiMatches = [];
+  if (!tiMatches.length) { $('#timenu').style.display = 'none'; tiOpen = false; return; }
+  tiSel = Math.min(tiSel, tiMatches.length - 1);
+  $('#timenu').innerHTML = tiMatches.map((m, i) => `<div class="${i === tiSel ? 'sel' : ''}" data-i="${i}">${m.value}<span class="cls">${m.cls}</span></div>`).join('');
+  document.querySelectorAll('#timenu div').forEach(el => el.onclick = () => pickTi(tiMatches[+el.dataset.i].value));
+  $('#timenu').style.display = 'block'; tiOpen = true;
+}
+function pickTi(value){
+  const pos = q.selectionStart;
+  const before = q.value.slice(0, pos).replace(/~([^~]{0,40})~?$/, value + ' ');
+  q.value = before + q.value.slice(pos).replace(/^~/, ''); q.focus(); q.selectionStart = q.selectionEnd = before.length;
+  $('#timenu').style.display = 'none'; tiOpen = false; paintMirror();
+}
+q.addEventListener('input', async () => {
+  const f = atFilter(); if (f !== null && files.length) renderAt(f); else { $('#atmenu').style.display = 'none'; atOpen = false; }
+  const closed = q.value.slice(0, q.selectionStart).match(/~([^~]{2,40})~$/);
+  if (closed) { const r = await api('/api/vault/find?q=' + encodeURIComponent(closed[1])); const ms = r.matches || [];
+    if (ms.length === 1) { pickTi(ms[0].value); return; }
+    tiMatches = ms; if (ms.length) { renderTi(closed[1]); } else { $('#timenu').style.display = 'none'; tiOpen = false; }
+  } else { const tf = tiFilter(); if (tf !== null) renderTi(tf); else { $('#timenu').style.display = 'none'; tiOpen = false; } }
+  paintMirror();
+});
+q.addEventListener('scroll', () => mirror.scrollTop = q.scrollTop);
+q.addEventListener('keydown', async e => {
+  if (tiOpen) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); tiSel = (tiSel + 1) % tiMatches.length; renderTi(undefined); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); tiSel = (tiSel - 1 + tiMatches.length) % tiMatches.length; renderTi(undefined); return; }
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (tiMatches[tiSel]) pickTi(tiMatches[tiSel].value); return; }
+    if (e.key === 'Escape') { $('#timenu').style.display = 'none'; tiOpen = false; return; }
+  }
+  if (atOpen) {
+    const items = [...document.querySelectorAll('#atmenu div')];
+    if (e.key === 'ArrowDown') { e.preventDefault(); atSel = (atSel + 1) % items.length; renderAt(atFilter() || ''); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); atSel = (atSel - 1 + items.length) % items.length; renderAt(atFilter() || ''); return; }
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (items[atSel]) pickAt(items[atSel].dataset.n); return; }
+    if (e.key === 'Escape') { $('#atmenu').style.display = 'none'; atOpen = false; return; }
+  }
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  e.preventDefault();
+  const text = q.value.trim(); if (!text) return;
+  if (!files.length) { pickFolder(); return; }
+  if (!accepted) { renderSheet(); return; }
+  q.value = ''; paintMirror(); q.disabled = true;
+  show('#s-chat');
+  const el = document.createElement('div'); el.className = 'msg';
+  el.innerHTML = `<div class="q"></div><div class="working">…</div>`;
+  el.querySelector('.q').textContent = text;
+  $('#thread').appendChild(el); $('#thread').scrollTop = 1e9;
+  const tick = setInterval(async () => { const st = await api('/api/state'); if (st.progress.length) el.querySelector('.working').textContent = st.progress[st.progress.length-1] + '…'; }, 700);
+  const r = await api('/api/chat', {text});
+  clearInterval(tick); q.disabled = false; q.focus();
+  const w = el.querySelector('.working'); w.className = 'a';
+  if (r.error) w.textContent = r.error;
+  else if (r.has_page) {
+    w.innerHTML = `<iframe src="/api/page/${r.id}"></iframe><div class="share"><a data-id="${r.id}">share on your network</a><span class="shareurl"></span></div>`;
+    w.querySelector('.share a').onclick = async e => {
+      const sr = await api('/api/share', {id: +e.target.dataset.id});
+      if (sr.url) { const sp = w.querySelector('.shareurl'); sp.textContent = sr.url; try { await navigator.clipboard.writeText(sr.url); sp.textContent = sr.url + '  (copied)'; } catch(_){} }
+    };
+  }
+  else w.textContent = r.answer || '';
+  if (!r.error) { const s = document.createElement('div'); s.className = 'sent'; const parts = []; if (r.sent_rows) parts.push(`${r.sent_rows} rows`); if (r.sent_lines) parts.push(`${r.sent_lines} lines`); s.textContent = `${r.files_used && r.files_used.length ? r.files_used.join(', ') + ': ' : ''}${parts.length ? parts.join(' + ') : 'nothing'} sent as codes, ${r.model}, ${r.seconds}s`; el.appendChild(s); }
+  const t = await api('/api/terms'); terms = t.terms || terms;
+  $('#thread').scrollTop = 1e9;
+});
+paintMirror();
+</script>
+</body>
+</html>

@@ -1,0 +1,2215 @@
+{
+  "id": "lpf-reconciliation-fuzzy-p01",
+  "task_id": "lpf-reconciliation-fuzzy",
+  "pattern": "fuzzy string join with best-match dedup, left join to include zero-count rows, group count",
+  "question": "for each school we contacted, how many applications came in - match school names loosely since spellings differ, include schools with none",
+  "gold_sql": "WITH best AS (SELECT a.\"Applicant\" AS applicant, o.\"School Name\" AS matched_school, jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) AS sim FROM lpf_applications AS a JOIN lpf_outreach AS o ON jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) >= 0.9 QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Applicant\" ORDER BY sim DESC, o.\"School Name\") = 1) SELECT o.\"School Name\", COUNT(b.applicant) AS applications_received FROM lpf_outreach AS o LEFT JOIN best AS b ON b.matched_school = o.\"School Name\" GROUP BY o.\"School Name\" ORDER BY o.\"School Name\"",
+  "expected_rows": [
+    [
+      "Amas Madhya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Amas Prathmik Vidyalaya",
+      0
+    ],
+    [
+      "Amawan Adarsh Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Amba Buniyadi Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Amba Kanya Shala",
+      1
+    ],
+    [
+      "Amba Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Amba Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Arwal Kanya Shala",
+      1
+    ],
+    [
+      "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+      2
+    ],
+    [
+      "Atri Kanya Shala",
+      2
+    ],
+    [
+      "Atri Prathmik Vidyalaya",
+      0
+    ],
+    [
+      "Aurangabad Kanya Shala",
+      0
+    ],
+    [
+      "Aurangabad Prathmik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Bankat Adarsh Vidyalaya",
+      0
+    ],
+    [
+      "Bankat Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Bankat Navin Vidyalaya",
+      0
+    ],
+    [
+      "Bankat Prathmik Shala (Zilla Parishad)",
+      2
+    ],
+    [
+      "Barachatti Kanya Shala",
+      2
+    ],
+    [
+      "Barhi Kanya Shala",
+      1
+    ],
+    [
+      "Bathani Adarsh Vidyalaya",
+      0
+    ],
+    [
+      "Belaganj Kanya Shala",
+      1
+    ],
+    [
+      "Belaganj Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Bhadeya Kanya Shala",
+      0
+    ],
+    [
+      "Bhadeya Prathmik Vidyalaya",
+      2
+    ],
+    [
+      "Bhadeya Uchcha Madhyamik Vidyalaya",
+      0
+    ],
+    [
+      "Bishunpur Buniyadi Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Bishunpur Navin Vidyalaya",
+      2
+    ],
+    [
+      "Bishunpur Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Bodh Gaya Adarsh Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Shala",
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya",
+      2
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Bodh Gaya Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Buxar Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Buxar Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Buxar Prathmik Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Chandauti Prathmik Vidyalaya",
+      0
+    ],
+    [
+      "Deorhi Kanya Vidyalaya",
+      1
+    ],
+    [
+      "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+      3
+    ],
+    [
+      "Dobhi Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Dobhi Uchcha Madhyamik Vidyalaya",
+      2
+    ],
+    [
+      "Domuhan Kanya Shala",
+      1
+    ],
+    [
+      "Dumraon Kanya Shala",
+      0
+    ],
+    [
+      "Dumraon Kanya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Dumraon Prathmik Shala (Zilla Parishad)",
+      2
+    ],
+    [
+      "Fatehpur Kanya Shala",
+      1
+    ],
+    [
+      "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+      3
+    ],
+    [
+      "Fatehpur Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Guraru Kanya Vidyalaya",
+      3
+    ],
+    [
+      "Guraru Uchcha Madhyamik Vidyalaya",
+      0
+    ],
+    [
+      "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Imamganj Buniyadi Vidyalaya",
+      0
+    ],
+    [
+      "Imamganj Madhya Vidyalaya",
+      0
+    ],
+    [
+      "Imamganj Madhya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Islampur Kanya Shala",
+      0
+    ],
+    [
+      "Islampur Kanya Vidyalaya",
+      2
+    ],
+    [
+      "Islampur Madhya Vidyalaya",
+      0
+    ],
+    [
+      "Islampur Prathmik Shala (Zilla Parishad)",
+      4
+    ],
+    [
+      "Karmauni Kanya Vidyalaya",
+      2
+    ],
+    [
+      "Karmauni Madhya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya",
+      1
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Khizarsarai Adarsh Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Khizarsarai Buniyadi Vidyalaya",
+      0
+    ],
+    [
+      "Konch Adarsh Vidyalaya, Zilla Parishad",
+      2
+    ],
+    [
+      "Konch Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Kothi Buniyadi Vidyalaya",
+      0
+    ],
+    [
+      "Kothi Navin Vidyalaya",
+      0
+    ],
+    [
+      "Kothi Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Kothi Prathmik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Lodipur Navin Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Mahuar Madhya Vidyalaya",
+      1
+    ],
+    [
+      "Mahuar Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Mahuar Uchcha Madhyamik Vidyalaya",
+      2
+    ],
+    [
+      "Manpur Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Manpur Prathmik Vidyalaya",
+      0
+    ],
+    [
+      "Modanganj Kanya Shala",
+      0
+    ],
+    [
+      "Modanganj Prathmik Vidyalaya",
+      1
+    ],
+    [
+      "Modanganj Uchcha Madhyamik Vidyalaya",
+      2
+    ],
+    [
+      "Muhra Buniyadi Vidyalaya",
+      1
+    ],
+    [
+      "Muhra Prathmik Shala (Zilla Parishad)",
+      3
+    ],
+    [
+      "Nawada Buniyadi Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Nawada Kanya Vidyalaya",
+      2
+    ],
+    [
+      "Nawada Madhya Vidyalaya",
+      1
+    ],
+    [
+      "Nawada Madhya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Nawada Prathmik Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Nawada Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Neemchak Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Nimi Kanya Shala",
+      0
+    ],
+    [
+      "Nimi Madhya Vidyalaya, Zilla Parishad",
+      2
+    ],
+    [
+      "Panchgama Buniyadi Vidyalaya",
+      1
+    ],
+    [
+      "Panchgama Prathmik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Paraiya Adarsh Vidyalaya",
+      0
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya",
+      0
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+      2
+    ],
+    [
+      "Paraiya Kanya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Paraiya Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+      2
+    ],
+    [
+      "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Rampur Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Bathani",
+      0
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Konch",
+      0
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Modanganj",
+      0
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Tetariya",
+      1
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Nimi",
+      2
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      0
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Wazirganj",
+      1
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Bodh Gaya",
+      2
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      0
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      1
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Bathani",
+      0
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Tetariya",
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      1
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Manpur",
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Arwal",
+      1
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Buxar",
+      2
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Karmauni",
+      1
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Barhi",
+      0
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Belaganj",
+      0
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Guraru",
+      0
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Nimi",
+      0
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+      0
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+      0
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+      1
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+      2
+    ],
+    [
+      "Sarwan Madhyamik Vidyalaya",
+      3
+    ],
+    [
+      "Sherghati Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Sherghati Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Sherpur Navin Vidyalaya, Zilla Parishad",
+      2
+    ],
+    [
+      "Shri Durga Vidyalaya, Amas",
+      0
+    ],
+    [
+      "Shri Durga Vidyalaya, Domuhan",
+      0
+    ],
+    [
+      "Shri Durga Vidyalaya, Fatehpur",
+      1
+    ],
+    [
+      "Shri Durga Vidyalaya, Karmauni",
+      0
+    ],
+    [
+      "Shri Durga Vidyalaya, Sonbarsa",
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      0
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      0
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      2
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      0
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      0
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      1
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      0
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      0
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      2
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Bhadeya",
+      0
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Islampur",
+      1
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Sherpur",
+      2
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      2
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      4
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      1
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      0
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      1
+    ],
+    [
+      "Shri Ram Vidyalaya, Amba",
+      0
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Belaganj",
+      0
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Dumraon",
+      0
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Rafiganj",
+      0
+    ],
+    [
+      "Shri Shiv Vidyalaya, Aurangabad",
+      0
+    ],
+    [
+      "Shri Shiv Vidyalaya, Domuhan",
+      1
+    ],
+    [
+      "Shri Shiv Vidyalaya, Nimi",
+      0
+    ],
+    [
+      "Shri Shiv Vidyalaya, Wazirganj",
+      1
+    ],
+    [
+      "Sikaria Buniyadi Vidyalaya",
+      2
+    ],
+    [
+      "Sikaria Kanya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Sikaria Uchcha Madhyamik Vidyalaya",
+      0
+    ],
+    [
+      "Sonbarsa Buniyadi Vidyalaya",
+      1
+    ],
+    [
+      "Sonbarsa Kanya Shala",
+      0
+    ],
+    [
+      "Sonbarsa Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Sonbarsa Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Tekari Buniyadi Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Tekari Kanya Shala",
+      1
+    ],
+    [
+      "Tekari Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Tekari Prathmik Vidyalaya",
+      3
+    ],
+    [
+      "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      3
+    ],
+    [
+      "Tetariya Kanya Vidyalaya",
+      0
+    ],
+    [
+      "Tetariya Madhya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+      2
+    ],
+    [
+      "Tetariya Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Wazirganj Prathmik Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Wazirganj Uchcha Madhyamik Vidyalaya",
+      1
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Amas Madhya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Amas Prathmik Vidyalaya",
+      0
+    ],
+    [
+      "Amawan Adarsh Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Amba Buniyadi Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Amba Kanya Shala",
+      1
+    ],
+    [
+      "Amba Kanya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Amba Madhyamik Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Arwal Kanya Shala",
+      4
+    ],
+    [
+      "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Atri Kanya Shala",
+      16
+    ],
+    [
+      "Atri Prathmik Vidyalaya",
+      0
+    ],
+    [
+      "Aurangabad Kanya Shala",
+      0
+    ],
+    [
+      "Aurangabad Prathmik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Bankat Adarsh Vidyalaya",
+      0
+    ],
+    [
+      "Bankat Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Bankat Navin Vidyalaya",
+      0
+    ],
+    [
+      "Bankat Prathmik Shala (Zilla Parishad)",
+      9
+    ],
+    [
+      "Barachatti Kanya Shala",
+      4
+    ],
+    [
+      "Barhi Kanya Shala",
+      9
+    ],
+    [
+      "Bathani Adarsh Vidyalaya",
+      0
+    ],
+    [
+      "Belaganj Kanya Shala",
+      1
+    ],
+    [
+      "Belaganj Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Bhadeya Kanya Shala",
+      0
+    ],
+    [
+      "Bhadeya Prathmik Vidyalaya",
+      4
+    ],
+    [
+      "Bhadeya Uchcha Madhyamik Vidyalaya",
+      0
+    ],
+    [
+      "Bishunpur Buniyadi Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+      9
+    ],
+    [
+      "Bishunpur Navin Vidyalaya",
+      4
+    ],
+    [
+      "Bishunpur Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Bodh Gaya Adarsh Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Bodh Gaya Kanya Shala",
+      9
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya",
+      9
+    ],
+    [
+      "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+      9
+    ],
+    [
+      "Bodh Gaya Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Buxar Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Buxar Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Buxar Prathmik Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Chandauti Prathmik Vidyalaya",
+      0
+    ],
+    [
+      "Deorhi Kanya Vidyalaya",
+      1
+    ],
+    [
+      "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+      16
+    ],
+    [
+      "Dobhi Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Dobhi Uchcha Madhyamik Vidyalaya",
+      4
+    ],
+    [
+      "Domuhan Kanya Shala",
+      1
+    ],
+    [
+      "Dumraon Kanya Shala",
+      1
+    ],
+    [
+      "Dumraon Kanya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Dumraon Prathmik Shala (Zilla Parishad)",
+      4
+    ],
+    [
+      "Fatehpur Kanya Shala",
+      1
+    ],
+    [
+      "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+      9
+    ],
+    [
+      "Fatehpur Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Guraru Kanya Vidyalaya",
+      9
+    ],
+    [
+      "Guraru Uchcha Madhyamik Vidyalaya",
+      0
+    ],
+    [
+      "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+      16
+    ],
+    [
+      "Imamganj Buniyadi Vidyalaya",
+      0
+    ],
+    [
+      "Imamganj Madhya Vidyalaya",
+      1
+    ],
+    [
+      "Imamganj Madhya Vidyalaya, Zilla Parishad",
+      9
+    ],
+    [
+      "Islampur Kanya Shala",
+      4
+    ],
+    [
+      "Islampur Kanya Vidyalaya",
+      4
+    ],
+    [
+      "Islampur Madhya Vidyalaya",
+      4
+    ],
+    [
+      "Islampur Prathmik Shala (Zilla Parishad)",
+      4
+    ],
+    [
+      "Karmauni Kanya Vidyalaya",
+      4
+    ],
+    [
+      "Karmauni Madhya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya",
+      1
+    ],
+    [
+      "Karmauni Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Khizarsarai Adarsh Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Khizarsarai Buniyadi Vidyalaya",
+      0
+    ],
+    [
+      "Konch Adarsh Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Konch Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Kothi Buniyadi Vidyalaya",
+      0
+    ],
+    [
+      "Kothi Navin Vidyalaya",
+      0
+    ],
+    [
+      "Kothi Prathmik Shala (Zilla Parishad)",
+      9
+    ],
+    [
+      "Kothi Prathmik Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Lodipur Navin Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Mahuar Madhya Vidyalaya",
+      1
+    ],
+    [
+      "Mahuar Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Mahuar Uchcha Madhyamik Vidyalaya",
+      4
+    ],
+    [
+      "Manpur Prathmik Shala (Zilla Parishad)",
+      4
+    ],
+    [
+      "Manpur Prathmik Vidyalaya",
+      0
+    ],
+    [
+      "Modanganj Kanya Shala",
+      0
+    ],
+    [
+      "Modanganj Prathmik Vidyalaya",
+      1
+    ],
+    [
+      "Modanganj Uchcha Madhyamik Vidyalaya",
+      4
+    ],
+    [
+      "Muhra Buniyadi Vidyalaya",
+      1
+    ],
+    [
+      "Muhra Prathmik Shala (Zilla Parishad)",
+      6
+    ],
+    [
+      "Nawada Buniyadi Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Nawada Kanya Vidyalaya",
+      6
+    ],
+    [
+      "Nawada Madhya Vidyalaya",
+      12
+    ],
+    [
+      "Nawada Madhya Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Nawada Prathmik Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Nawada Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Neemchak Prathmik Shala (Zilla Parishad)",
+      9
+    ],
+    [
+      "Nimi Kanya Shala",
+      0
+    ],
+    [
+      "Nimi Madhya Vidyalaya, Zilla Parishad",
+      2
+    ],
+    [
+      "Panchgama Buniyadi Vidyalaya",
+      1
+    ],
+    [
+      "Panchgama Prathmik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Paraiya Adarsh Vidyalaya",
+      0
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya",
+      4
+    ],
+    [
+      "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+      9
+    ],
+    [
+      "Paraiya Kanya Vidyalaya, Zilla Parishad",
+      16
+    ],
+    [
+      "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+      9
+    ],
+    [
+      "Paraiya Prathmik Shala (Zilla Parishad)",
+      1
+    ],
+    [
+      "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+      9
+    ],
+    [
+      "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+      9
+    ],
+    [
+      "Rampur Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Bathani",
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Konch",
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Modanganj",
+      1
+    ],
+    [
+      "Rashtriya Adarsh Vidyalaya Tetariya",
+      4
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Nimi",
+      9
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Sarwan",
+      36
+    ],
+    [
+      "Rashtriya Buniyadi Vidyalaya Wazirganj",
+      16
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Bodh Gaya",
+      9
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Manpur",
+      25
+    ],
+    [
+      "Rashtriya Kanya Vidyalaya Sarwan",
+      36
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Bathani",
+      16
+    ],
+    [
+      "Rashtriya Madhya Vidyalaya Tetariya",
+      16
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Atri",
+      56
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Barhi",
+      25
+    ],
+    [
+      "Rashtriya Madhyamik Vidyalaya Manpur",
+      16
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Arwal",
+      16
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Buxar",
+      16
+    ],
+    [
+      "Rashtriya Navin Vidyalaya Karmauni",
+      16
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Barhi",
+      9
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Belaganj",
+      0
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Guraru",
+      4
+    ],
+    [
+      "Rashtriya Prathmik Vidyalaya Nimi",
+      0
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+      12
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+      6
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+      6
+    ],
+    [
+      "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+      12
+    ],
+    [
+      "Sarwan Madhyamik Vidyalaya",
+      6
+    ],
+    [
+      "Sherghati Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Sherghati Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Sherpur Navin Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Shri Durga Vidyalaya, Amas",
+      12
+    ],
+    [
+      "Shri Durga Vidyalaya, Domuhan",
+      4
+    ],
+    [
+      "Shri Durga Vidyalaya, Fatehpur",
+      4
+    ],
+    [
+      "Shri Durga Vidyalaya, Karmauni",
+      4
+    ],
+    [
+      "Shri Durga Vidyalaya, Sonbarsa",
+      16
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Amas",
+      80
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bishunpur",
+      25
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Bodh Gaya",
+      36
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Chandauti",
+      25
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Fatehpur",
+      36
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Jehanabad",
+      25
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Khizarsarai",
+      36
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Paraiya",
+      36
+    ],
+    [
+      "Shri Ganesh Vidyalaya, Tekari",
+      25
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Bhadeya",
+      6
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Islampur",
+      24
+    ],
+    [
+      "Shri Hanuman Vidyalaya, Sherpur",
+      6
+    ],
+    [
+      "Shri Krishna Vidyalaya, Amawan",
+      48
+    ],
+    [
+      "Shri Krishna Vidyalaya, Arwal",
+      63
+    ],
+    [
+      "Shri Krishna Vidyalaya, Khizarsarai",
+      48
+    ],
+    [
+      "Shri Krishna Vidyalaya, Paraiya",
+      63
+    ],
+    [
+      "Shri Krishna Vidyalaya, Tekari",
+      48
+    ],
+    [
+      "Shri Ram Vidyalaya, Amba",
+      24
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Belaganj",
+      0
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Dumraon",
+      0
+    ],
+    [
+      "Shri Saraswati Vidyalaya, Rafiganj",
+      0
+    ],
+    [
+      "Shri Shiv Vidyalaya, Aurangabad",
+      4
+    ],
+    [
+      "Shri Shiv Vidyalaya, Domuhan",
+      4
+    ],
+    [
+      "Shri Shiv Vidyalaya, Nimi",
+      4
+    ],
+    [
+      "Shri Shiv Vidyalaya, Wazirganj",
+      4
+    ],
+    [
+      "Sikaria Buniyadi Vidyalaya",
+      4
+    ],
+    [
+      "Sikaria Kanya Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Sikaria Uchcha Madhyamik Vidyalaya",
+      1
+    ],
+    [
+      "Sonbarsa Buniyadi Vidyalaya",
+      1
+    ],
+    [
+      "Sonbarsa Kanya Shala",
+      0
+    ],
+    [
+      "Sonbarsa Kanya Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Sonbarsa Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Tekari Buniyadi Vidyalaya, Zilla Parishad",
+      0
+    ],
+    [
+      "Tekari Kanya Shala",
+      9
+    ],
+    [
+      "Tekari Prathmik Shala (Zilla Parishad)",
+      9
+    ],
+    [
+      "Tekari Prathmik Vidyalaya",
+      6
+    ],
+    [
+      "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+      6
+    ],
+    [
+      "Tetariya Kanya Vidyalaya",
+      0
+    ],
+    [
+      "Tetariya Madhya Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+      4
+    ],
+    [
+      "Tetariya Prathmik Shala (Zilla Parishad)",
+      0
+    ],
+    [
+      "Wazirganj Prathmik Vidyalaya, Zilla Parishad",
+      1
+    ],
+    [
+      "Wazirganj Uchcha Madhyamik Vidyalaya",
+      1
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH matched_schools AS (SELECT DISTINCT o.\"School Name\" AS outreach_school, a.\"School\" AS app_school FROM \"lpf_outreach\" AS o LEFT JOIN \"lpf_applications\" AS a ON JARO_WINKLER_SIMILARITY(LOWER(TRIM(o.\"School Name\")), LOWER(TRIM(a.\"School\"))) >= 0.9), school_counts AS (SELECT ms.outreach_school, COUNT(a.\"Applicant\") AS application_count FROM matched_schools AS ms LEFT JOIN \"lpf_applications\" AS a ON JARO_WINKLER_SIMILARITY(LOWER(TRIM(ms.outreach_school)), LOWER(TRIM(a.\"School\"))) >= 0.9 GROUP BY ms.outreach_school) SELECT outreach_school, application_count FROM school_counts ORDER BY outreach_school NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"lpf_outreach\" (\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Students Reached\" BIGINT,\n  \"Applications Expected\" BIGINT,\n  \"Contact Teacher\" VARCHAR,\n  \"Date\" VARCHAR\n);\n\nCREATE TABLE \"lpf_applications\" (\n  \"Applicant\" VARCHAR,\n  \"School\" VARCHAR,\n  \"Course\" VARCHAR,\n  \"Status\" VARCHAR,\n  \"Marks\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"lpf_outreach\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"]}, \"lpf_applications\": {\"Course\": [\"Beautician\", \"Computer Operator\", \"Diploma Civil Engineering\", \"ITI Electrician\", \"Nursing Assistant\", \"Retail Sales Associate\", \"Tailoring & Fashion Design\"], \"Status\": [\"Incomplete\", \"Rejected\", \"Submitted\", \"Verified\"]}}\n\nCURRENT QUESTION:\nfor each school we contacted, how many applications came in - match school names loosely since spellings differ, include schools with none",
+      "response": "WITH matched_schools AS (\n    SELECT DISTINCT\n        o.\"School Name\" AS outreach_school,\n        a.\"School\" AS app_school\n    FROM \"lpf_outreach\" o\n    LEFT JOIN \"lpf_applications\" a\n        ON jaro_winkler_similarity(lower(trim(o.\"School Name\")), lower(trim(a.\"School\"))) >= 0.9\n),\nschool_counts AS (\n    SELECT\n        ms.outreach_school,\n        COUNT(a.\"Applicant\") AS application_count\n    FROM matched_schools ms\n    LEFT JOIN \"lpf_applications\" a\n        ON jaro_winkler_similarity(lower(trim(ms.outreach_school)), lower(trim(a.\"School\"))) >= 0.9\n    GROUP BY ms.outreach_school\n)\nSELECT\n    outreach_school,\n    application_count\nFROM school_counts\nORDER BY outreach_school;",
+      "api": {
+        "id": "gen-1787421395-rTlWpjd0LpcGznGL4og1",
+        "model": "qwen/qwen3.6-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 509,
+          "completion_tokens": 183,
+          "total_tokens": 692,
+          "cost": 0.00024274,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 128,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00024274,
+            "upstream_inference_prompt_cost": 5.974e-05,
+            "upstream_inference_completions_cost": 0.000183
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.135
+      },
+      "duration_seconds": 1.158,
+      "sql_duckdb": "WITH matched_schools AS (SELECT DISTINCT o.\"School Name\" AS outreach_school, a.\"School\" AS app_school FROM \"lpf_outreach\" AS o LEFT JOIN \"lpf_applications\" AS a ON JARO_WINKLER_SIMILARITY(LOWER(TRIM(o.\"School Name\")), LOWER(TRIM(a.\"School\"))) >= 0.9), school_counts AS (SELECT ms.outreach_school, COUNT(a.\"Applicant\") AS application_count FROM matched_schools AS ms LEFT JOIN \"lpf_applications\" AS a ON JARO_WINKLER_SIMILARITY(LOWER(TRIM(ms.outreach_school)), LOWER(TRIM(a.\"School\"))) >= 0.9 GROUP BY ms.outreach_school) SELECT outreach_school, application_count FROM school_counts ORDER BY outreach_school NULLS FIRST",
+      "rows": [
+        [
+          "Amas Madhya Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Amas Prathmik Vidyalaya",
+          0
+        ],
+        [
+          "Amawan Adarsh Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Amba Buniyadi Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Amba Kanya Shala",
+          1
+        ],
+        [
+          "Amba Kanya Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Amba Madhyamik Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Arwal Kanya Shala",
+          4
+        ],
+        [
+          "Arwal Madhyamik Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Atri Kanya Shala",
+          16
+        ],
+        [
+          "Atri Prathmik Vidyalaya",
+          0
+        ],
+        [
+          "Aurangabad Kanya Shala",
+          0
+        ],
+        [
+          "Aurangabad Prathmik Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Bankat Adarsh Vidyalaya",
+          0
+        ],
+        [
+          "Bankat Kanya Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Bankat Navin Vidyalaya",
+          0
+        ],
+        [
+          "Bankat Prathmik Shala (Zilla Parishad)",
+          9
+        ],
+        [
+          "Barachatti Kanya Shala",
+          4
+        ],
+        [
+          "Barhi Kanya Shala",
+          9
+        ],
+        [
+          "Bathani Adarsh Vidyalaya",
+          0
+        ],
+        [
+          "Belaganj Kanya Shala",
+          1
+        ],
+        [
+          "Belaganj Prathmik Shala (Zilla Parishad)",
+          0
+        ],
+        [
+          "Bhadeya Kanya Shala",
+          0
+        ],
+        [
+          "Bhadeya Prathmik Vidyalaya",
+          4
+        ],
+        [
+          "Bhadeya Uchcha Madhyamik Vidyalaya",
+          0
+        ],
+        [
+          "Bishunpur Buniyadi Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Bishunpur Madhya Vidyalaya, Zilla Parishad",
+          9
+        ],
+        [
+          "Bishunpur Navin Vidyalaya",
+          4
+        ],
+        [
+          "Bishunpur Prathmik Shala (Zilla Parishad)",
+          0
+        ],
+        [
+          "Bodh Gaya Adarsh Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Bodh Gaya Kanya Shala",
+          9
+        ],
+        [
+          "Bodh Gaya Kanya Vidyalaya",
+          9
+        ],
+        [
+          "Bodh Gaya Kanya Vidyalaya, Zilla Parishad",
+          9
+        ],
+        [
+          "Bodh Gaya Prathmik Shala (Zilla Parishad)",
+          1
+        ],
+        [
+          "Buxar Kanya Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Buxar Prathmik Shala (Zilla Parishad)",
+          1
+        ],
+        [
+          "Buxar Prathmik Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Chandauti Prathmik Vidyalaya",
+          0
+        ],
+        [
+          "Deorhi Kanya Vidyalaya",
+          1
+        ],
+        [
+          "Deorhi Prathmik Vidyalaya, Zilla Parishad",
+          16
+        ],
+        [
+          "Dobhi Prathmik Shala (Zilla Parishad)",
+          0
+        ],
+        [
+          "Dobhi Uchcha Madhyamik Vidyalaya",
+          4
+        ],
+        [
+          "Domuhan Kanya Shala",
+          1
+        ],
+        [
+          "Dumraon Kanya Shala",
+          1
+        ],
+        [
+          "Dumraon Kanya Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Dumraon Prathmik Shala (Zilla Parishad)",
+          4
+        ],
+        [
+          "Fatehpur Kanya Shala",
+          1
+        ],
+        [
+          "Fatehpur Madhya Vidyalaya, Zilla Parishad",
+          9
+        ],
+        [
+          "Fatehpur Prathmik Shala (Zilla Parishad)",
+          1
+        ],
+        [
+          "Guraru Kanya Vidyalaya",
+          9
+        ],
+        [
+          "Guraru Uchcha Madhyamik Vidyalaya",
+          0
+        ],
+        [
+          "Imamganj Adarsh Vidyalaya, Zilla Parishad",
+          16
+        ],
+        [
+          "Imamganj Buniyadi Vidyalaya",
+          0
+        ],
+        [
+          "Imamganj Madhya Vidyalaya",
+          1
+        ],
+        [
+          "Imamganj Madhya Vidyalaya, Zilla Parishad",
+          9
+        ],
+        [
+          "Islampur Kanya Shala",
+          4
+        ],
+        [
+          "Islampur Kanya Vidyalaya",
+          4
+        ],
+        [
+          "Islampur Madhya Vidyalaya",
+          4
+        ],
+        [
+          "Islampur Prathmik Shala (Zilla Parishad)",
+          4
+        ],
+        [
+          "Karmauni Kanya Vidyalaya",
+          4
+        ],
+        [
+          "Karmauni Madhya Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Karmauni Uchcha Madhyamik Vidyalaya",
+          1
+        ],
+        [
+          "Karmauni Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Khizarsarai Adarsh Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Khizarsarai Buniyadi Vidyalaya",
+          0
+        ],
+        [
+          "Konch Adarsh Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Konch Prathmik Shala (Zilla Parishad)",
+          1
+        ],
+        [
+          "Kothi Buniyadi Vidyalaya",
+          0
+        ],
+        [
+          "Kothi Navin Vidyalaya",
+          0
+        ],
+        [
+          "Kothi Prathmik Shala (Zilla Parishad)",
+          9
+        ],
+        [
+          "Kothi Prathmik Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Lodipur Navin Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Mahuar Madhya Vidyalaya",
+          1
+        ],
+        [
+          "Mahuar Prathmik Shala (Zilla Parishad)",
+          1
+        ],
+        [
+          "Mahuar Uchcha Madhyamik Vidyalaya",
+          4
+        ],
+        [
+          "Manpur Prathmik Shala (Zilla Parishad)",
+          4
+        ],
+        [
+          "Manpur Prathmik Vidyalaya",
+          0
+        ],
+        [
+          "Modanganj Kanya Shala",
+          0
+        ],
+        [
+          "Modanganj Prathmik Vidyalaya",
+          1
+        ],
+        [
+          "Modanganj Uchcha Madhyamik Vidyalaya",
+          4
+        ],
+        [
+          "Muhra Buniyadi Vidyalaya",
+          1
+        ],
+        [
+          "Muhra Prathmik Shala (Zilla Parishad)",
+          6
+        ],
+        [
+          "Nawada Buniyadi Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Nawada Kanya Vidyalaya",
+          6
+        ],
+        [
+          "Nawada Madhya Vidyalaya",
+          12
+        ],
+        [
+          "Nawada Madhya Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Nawada Prathmik Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Nawada Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Neemchak Prathmik Shala (Zilla Parishad)",
+          9
+        ],
+        [
+          "Nimi Kanya Shala",
+          0
+        ],
+        [
+          "Nimi Madhya Vidyalaya, Zilla Parishad",
+          2
+        ],
+        [
+          "Panchgama Buniyadi Vidyalaya",
+          1
+        ],
+        [
+          "Panchgama Prathmik Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Paraiya Adarsh Vidyalaya",
+          0
+        ],
+        [
+          "Paraiya Buniyadi Vidyalaya",
+          4
+        ],
+        [
+          "Paraiya Buniyadi Vidyalaya, Zilla Parishad",
+          9
+        ],
+        [
+          "Paraiya Kanya Vidyalaya, Zilla Parishad",
+          16
+        ],
+        [
+          "Paraiya Madhyamik Vidyalaya, Zilla Parishad",
+          9
+        ],
+        [
+          "Paraiya Prathmik Shala (Zilla Parishad)",
+          1
+        ],
+        [
+          "Rafiganj Adarsh Vidyalaya, Zilla Parishad",
+          9
+        ],
+        [
+          "Rafiganj Prathmik Vidyalaya, Zilla Parishad",
+          9
+        ],
+        [
+          "Rampur Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Bathani",
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Konch",
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Modanganj",
+          1
+        ],
+        [
+          "Rashtriya Adarsh Vidyalaya Tetariya",
+          4
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Nimi",
+          9
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Sarwan",
+          36
+        ],
+        [
+          "Rashtriya Buniyadi Vidyalaya Wazirganj",
+          16
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Bodh Gaya",
+          9
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Manpur",
+          25
+        ],
+        [
+          "Rashtriya Kanya Vidyalaya Sarwan",
+          36
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Bathani",
+          16
+        ],
+        [
+          "Rashtriya Madhya Vidyalaya Tetariya",
+          16
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Atri",
+          56
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Barhi",
+          25
+        ],
+        [
+          "Rashtriya Madhyamik Vidyalaya Manpur",
+          16
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Arwal",
+          16
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Buxar",
+          16
+        ],
+        [
+          "Rashtriya Navin Vidyalaya Karmauni",
+          16
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Barhi",
+          9
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Belaganj",
+          0
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Guraru",
+          4
+        ],
+        [
+          "Rashtriya Prathmik Vidyalaya Nimi",
+          0
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Barhi",
+          12
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Belaganj",
+          6
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Bodh Gaya",
+          6
+        ],
+        [
+          "Rashtriya Uchcha Madhyamik Vidyalaya Tetariya",
+          12
+        ],
+        [
+          "Sarwan Madhyamik Vidyalaya",
+          6
+        ],
+        [
+          "Sherghati Kanya Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Sherghati Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Sherpur Navin Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Shri Durga Vidyalaya, Amas",
+          12
+        ],
+        [
+          "Shri Durga Vidyalaya, Domuhan",
+          4
+        ],
+        [
+          "Shri Durga Vidyalaya, Fatehpur",
+          4
+        ],
+        [
+          "Shri Durga Vidyalaya, Karmauni",
+          4
+        ],
+        [
+          "Shri Durga Vidyalaya, Sonbarsa",
+          16
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Amas",
+          80
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bishunpur",
+          25
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Bodh Gaya",
+          36
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Chandauti",
+          25
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Fatehpur",
+          36
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Jehanabad",
+          25
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Khizarsarai",
+          36
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Paraiya",
+          36
+        ],
+        [
+          "Shri Ganesh Vidyalaya, Tekari",
+          25
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Bhadeya",
+          6
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Islampur",
+          24
+        ],
+        [
+          "Shri Hanuman Vidyalaya, Sherpur",
+          6
+        ],
+        [
+          "Shri Krishna Vidyalaya, Amawan",
+          48
+        ],
+        [
+          "Shri Krishna Vidyalaya, Arwal",
+          63
+        ],
+        [
+          "Shri Krishna Vidyalaya, Khizarsarai",
+          48
+        ],
+        [
+          "Shri Krishna Vidyalaya, Paraiya",
+          63
+        ],
+        [
+          "Shri Krishna Vidyalaya, Tekari",
+          48
+        ],
+        [
+          "Shri Ram Vidyalaya, Amba",
+          24
+        ],
+        [
+          "Shri Saraswati Vidyalaya, Belaganj",
+          0
+        ],
+        [
+          "Shri Saraswati Vidyalaya, Dumraon",
+          0
+        ],
+        [
+          "Shri Saraswati Vidyalaya, Rafiganj",
+          0
+        ],
+        [
+          "Shri Shiv Vidyalaya, Aurangabad",
+          4
+        ],
+        [
+          "Shri Shiv Vidyalaya, Domuhan",
+          4
+        ],
+        [
+          "Shri Shiv Vidyalaya, Nimi",
+          4
+        ],
+        [
+          "Shri Shiv Vidyalaya, Wazirganj",
+          4
+        ],
+        [
+          "Sikaria Buniyadi Vidyalaya",
+          4
+        ],
+        [
+          "Sikaria Kanya Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Sikaria Uchcha Madhyamik Vidyalaya",
+          1
+        ],
+        [
+          "Sonbarsa Buniyadi Vidyalaya",
+          1
+        ],
+        [
+          "Sonbarsa Kanya Shala",
+          0
+        ],
+        [
+          "Sonbarsa Kanya Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Sonbarsa Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Tekari Buniyadi Vidyalaya, Zilla Parishad",
+          0
+        ],
+        [
+          "Tekari Kanya Shala",
+          9
+        ],
+        [
+          "Tekari Prathmik Shala (Zilla Parishad)",
+          9
+        ],
+        [
+          "Tekari Prathmik Vidyalaya",
+          6
+        ],
+        [
+          "Tekari Uchcha Madhyamik Vidyalaya, Zilla Parishad",
+          6
+        ],
+        [
+          "Tetariya Kanya Vidyalaya",
+          0
+        ],
+        [
+          "Tetariya Madhya Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Tetariya Madhyamik Vidyalaya, Zilla Parishad",
+          4
+        ],
+        [
+          "Tetariya Prathmik Shala (Zilla Parishad)",
+          0
+        ],
+        [
+          "Wazirganj Prathmik Vidyalaya, Zilla Parishad",
+          1
+        ],
+        [
+          "Wazirganj Uchcha Madhyamik Vidyalaya",
+          1
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

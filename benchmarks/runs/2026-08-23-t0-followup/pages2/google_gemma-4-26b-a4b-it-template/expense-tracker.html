@@ -1,0 +1,137 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field Expense Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Field Expense Tracker","short_name":"Expenses","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1 id="title">Field Expense Tracker</h1></header>
+<main>
+<div class="grid">
+<div class="card">
+<h2 style="margin-top:0;font-size:18px">Add New Expense</h2>
+<form id="expenseForm">
+<label for="date">Date</label>
+<input type="date" id="date" required>
+<label for="head">Expense Head</label>
+<select id="head" required>
+<option value="Travel">Travel</option>
+<option value="Food">Food</option>
+<option value="Supplies">Supplies</option>
+<option value="Communication">Communication</option>
+<option value="Other">Other</option>
+</select>
+<label for="amount">Amount</label>
+<input type="number" id="amount" step="0.01" required>
+<div style="margin-top:16px">
+<button type="submit">Save Expense</button>
+<button type="button" class="secondary" id="exportBtn">Export CSV</button>
+</div>
+</form>
+</div>
+
+<div class="card">
+<h2 style="margin-top:0;font-size:18px">Summary</h2>
+<div id="summaryStats"></div>
+</div>
+</div>
+
+<div class="card">
+<h2 style="margin-top:0;font-size:18px">Expense History</h2>
+<div style="overflow-x:auto">
+<table id="expenseTable">
+<thead>
+<tr>
+<th>Date</th>
+<th>Head</th>
+<th>Amount</th>
+<th></th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<div style="margin-top:12px;text-align:right">
+<button class="secondary" id="clearBtn" style="border-color:#ef4444;color:#ef4444">Clear All Data</button>
+</div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+
+const STORAGE_KEY = 'ngo_expenses';
+const form = document.getElementById('expenseForm');
+const tableBody = document.querySelector('#expenseTable tbody');
+const summaryDiv = document.getElementById('summaryStats');
+
+function render() {
+const expenses = store.get(STORAGE_KEY, []);
+tableBody.innerHTML = '';
+let total = 0;
+const heads = {};
+
+expenses.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach((exp, idx) => {
+total += parseFloat(exp.amount);
+heads[exp.head] = (heads[exp.head] || 0) + parseFloat(exp.amount);
+
+const tr = document.createElement('tr');
+tr.innerHTML = `
+<td>${exp.date}</td>
+<td>${exp.head}</td>
+<td>${parseFloat(exp.amount).toFixed(2)}</td>
+<td style="text-align:right"><button class="secondary" style="padding:2px 8px;font-size:11px" onclick="deleteExp(${expenses.indexOf(exp)})">Del</button></td>
+`;
+tableBody.appendChild(tr);
+});
+
+let summaryHtml = `<div style="font-size:20px;font-weight:bold;margin-bottom:12px">Total: ${total.toFixed(2)}</div><table style="font-size:13px">`;
+for (const [head, val] of Object.entries(heads)) {
+summaryHtml += `<tr><td class="muted">${head}</td><td style="text-align:right">${val.toFixed(2)}</td></tr>`;
+}
+summaryHtml += '</table>';
+summaryDiv.innerHTML = total === 0 ? '<p class="muted">No expenses recorded.</p>' : summaryHtml;
+}
+
+form.onsubmit = (e) => {
+e.preventDefault();
+const expenses = store.get(STORAGE_KEY, []);
+expenses.push({
+date: document.getElementById('date').value,
+head: document.getElementById('head').value,
+amount: document.getElementById('amount').value
+});
+store.set(STORAGE_KEY, expenses);
+form.reset();
+render();
+};
+
+window.deleteExp = (index) => {
+const expenses = store.get(STORAGE_KEY, []);
+expenses.splice(index, 1);
+store.set(STORAGE_KEY, expenses);
+render();
+};
+
+document.getElementById('exportBtn').onclick = () => {
+const data = store.get(STORAGE_KEY, []);
+if (data.length === 0) return alert('No data to export');
+download('expenses.csv', toCSV(data), 'text/csv');
+};
+
+document.getElementById('clearBtn').onclick = () => {
+if (confirm('Are you sure you want to delete all records?')) {
+store.set(STORAGE_KEY, []);
+render();
+}
+};
+
+render();
+</script>
+</body></html>

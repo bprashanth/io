@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scholarship Scheme Progress — District Wise</title>
+<style>
+  :root{
+    --paper:#f4f1e8;
+    --paper-2:#ece7d8;
+    --ink:#1b2a24;
+    --ink-soft:#4a5a52;
+    --line:#d8d2c0;
+    --line-soft:#e6e1d2;
+    --forest:#123a2c;
+    --forest-2:#0c2a20;
+    --forest-3:#1c5240;
+    --gold:#c99a34;
+    --gold-soft:#e6c877;
+    --sage:#5f8a6f;
+    --sage-soft:#8fb39a;
+    --clay:#b5532f;
+    --clay-soft:#d98a63;
+    --slate:#5b6b78;
+    --slate-soft:#93a2ad;
+    --shadow:0 18px 40px -22px rgba(18,58,44,.55);
+    --shadow-sm:0 8px 20px -14px rgba(18,58,44,.5);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:"Avenir Next","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Code","Consolas","Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(201,154,52,.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 20%, rgba(95,138,111,.12), transparent 55%),
+      var(--paper);
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:44px 44px;
+    opacity:.35;
+    mask-image:radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
+  }
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 22px}
+
+  /* ---------- Masthead ---------- */
+  .masthead{
+    position:relative;
+    background:
+      radial-gradient(700px 300px at 90% 0%, rgba(201,154,52,.18), transparent 60%),
+      linear-gradient(160deg, var(--forest) 0%, var(--forest-2) 100%);
+    color:#f3efe2;
+    border-bottom:3px solid var(--gold);
+    overflow:hidden;
+  }
+  .masthead::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:repeating-linear-gradient(115deg, rgba(255,255,255,.03) 0 2px, transparent 2px 26px);
+  }
+  .mast-inner{position:relative;z-index:1;padding:34px 0 30px}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+  .seal{
+    width:52px;height:52px;flex:0 0 auto;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--gold-soft), var(--gold) 70%);
+    display:grid;place-items:center;color:var(--forest-2);
+    font-family:var(--serif);font-weight:700;font-size:22px;
+    box-shadow:0 0 0 3px rgba(201,154,52,.25), var(--shadow-sm);
+  }
+  .brand-name{font-family:var(--serif);font-size:1.15rem;letter-spacing:.02em;line-height:1.1}
+  .brand-sub{font-size:.72rem;letter-spacing:.28em;text-transform:uppercase;color:var(--gold-soft);margin-top:3px}
+
+  .kicker{
+    display:inline-block;font-size:.72rem;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--gold-soft);border:1px solid rgba(201,154,52,.4);
+    padding:6px 12px;border-radius:2px;margin-bottom:16px;
+  }
+  h1.title{
+    font-family:var(--serif);font-weight:600;
+    font-size:clamp(2.1rem,5.2vw,3.5rem);line-height:1.02;margin:0 0 14px;
+    letter-spacing:-.01em;max-width:16ch;
+  }
+  h1.title em{font-style:italic;color:var(--gold-soft)}
+  .lede{max-width:56ch;color:#d9d3c2;font-size:1.02rem;margin:0 0 22px}
+  .meta{display:flex;flex-wrap:wrap;gap:10px 22px;font-size:.82rem;color:#c9c3b2}
+  .meta b{color:#f3efe2;font-weight:600}
+  .meta .dot{width:6px;height:6px;border-radius:50%;background:var(--sage-soft);display:inline-block;margin-right:7px;vertical-align:middle}
+
+  /* ---------- Stat band ---------- */
+  .stats{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    margin-top:-26px;position:relative;z-index:2;box-shadow:var(--shadow);
+  }
+  .stat{background:var(--paper);padding:20px 20px 18px;position:relative}
+  .stat .num{font-family:var(--mono);font-size:clamp(1.7rem,3.4vw,2.5rem);font-weight:600;line-height:1;letter-spacing:-.02em}
+  .stat .lbl{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin-top:9px}
+  .stat .bar{height:5px;border-radius:3px;background:var(--line-soft);margin-top:12px;overflow:hidden}
+  .stat .bar i{display:block;height:100%;width:0;border-radius:3px;transition:width 1.1s cubic-bezier(.2,.8,.2,1)}
+  .stat.s1 .num{color:var(--forest-3)} .stat.s1 .bar i{background:var(--sage)}
+  .stat.s2 .num{color:var(--clay)} .stat.s2 .bar i{background:var(--clay)}
+  .stat.s3 .num{color:var(--slate)} .stat.s3 .bar i{background:var(--slate)}
+  .stat.s4 .num{color:var(--gold)} .stat.s4 .bar i{background:var(--gold)}
+
+  /* ---------- Section shell ---------- */
+  section.block{padding:52px 0 8px}
+  .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+  .sec-head .eyebrow{font-size:.72rem;letter-spacing:.3em;text-transform:uppercase;color:var(--clay);margin-bottom:8px}
+  .sec-head h2{font-family:var(--serif);font-weight:600;font-size:clamp(1.5rem,3.4vw,2.15rem);margin:0;letter-spacing:-.01em}
+  .sec-head p{margin:6px 0 0;color:var(--ink-soft);max-width:46ch;font-size:.92rem}
+
+  /* ---------- District cards ---------- */
+  .districts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+  .dcard{
+    background:var(--paper);border:1px solid var(--line);border-radius:12px;
+    padding:18px 18px 16px;position:relative;overflow:hidden;
+    transition:transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .35s;
+    opacity:0;transform:translateY(18px);
+  }
+  .dcard.in{opacity:1;transform:none}
+  .dcard:hover{transform:translateY(-5px);box-shadow:var(--shadow);border-color:var(--sage)}
+  .dcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sage)}
+  .dcard.low::before{background:var(--clay)}
+  .dcard .dtop{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .dcard h3{font-family:var(--serif);font-size:1.28rem;margin:0;font-weight:600}
+  .dcard .dcount{font-family:var(--mono);font-size:.78rem;color:var(--ink-soft);white-space:nowrap}
+  .dcard .dcount b{color:var(--ink);font-weight:600}
+  .dcard .dcount .pend{color:var(--clay)}
+  .dcard .dcount .pend b{color:var(--clay)}
+  .dcard .dcount .sep{margin:0 6px;color:var(--line)}
+  .dcard .dcount .ok{color:var(--sage)}
+  .dcard .dcount .ok b{color:var(--sage)}
+  .dcard .dcount .rev{color:var(--slate)}
+  .dcard .dcount .rev b{color:var(--slate)}
+  .dcard .dcount .rej{color:var(--clay)}
+  .dcard .dcount .rej b{color:var(--clay)}
+  .dcard .dcount .app{color:var(--gold)}
+  .dcard .dcount .app b{color:var(--gold)}
+
+  .stack{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:14px 0 12px;background:var(--line-soft)}
+  .stack span{display:block;height:100%;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+  .stack .s-approved{background:var(--sage)}
+  .stack .s-pending{background:var(--clay)}
+  .stack .s-rejected{background:var(--slate)}
+  .stack .s-under-review{background:var(--slate-soft)}
+  .stack .s-application-submitted{background:var(--gold)}
+
+  .dcard .dfoot{display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:var(--ink-soft)}
+  .dcard .dfoot .rate{font-family:var(--mono);font-weight:600;color:var(--forest-3)}
+  .dcard.low .dfoot .rate{color:var(--clay)}
+  .dcard .dfoot .tal{max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* ---------- Legend ---------- */
+  .legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:20px;font-size:.8rem;color:var(--ink-soft)}
+  .legend .li{display:flex;align-items:center;gap:8px}
+  .legend .sw{width:14px;height:14px;border-radius:4px}
+
+  /* ---------- Controls ---------- */
+  .controls{
+    display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+    background:var(--paper-2);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-bottom:18px;
+  }
+  .controls .field{display:flex;flex-direction:column;gap:5px}
+  .controls label{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
+  .controls input,.controls select{
+    font-family:var(--sans);font-size:.9rem;color:var(--ink);
+    background:var(--paper);border:1px solid var(--line);border-radius:7px;
+    padding:9px 11px;min-width:180px;
+  }
+  .controls input:focus,.controls select:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 3px rgba(95,138,111,.18)}
+  .controls .grow{flex:1 1 220px}
+  .controls .count{margin-left:auto;font-family:var(--mono);font-size:.82rem;color:var(--ink-soft);white-space:nowrap}
+  .controls .count b{color:var(--forest-3)}
+
+  /* ---------- Table ---------- */
+  .table-wrap{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow-sm)}
+  .table-scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:760px}
+  thead th{
+    text-align:left;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);background:var(--paper-2);padding:13px 14px;
+    border-bottom:2px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;
+    position:sticky;top:0;
+  }
+  thead th:hover{color:var(--forest-3)}
+  thead th .arw{opacity:.35;margin-left:5px;font-size:.7em}
+  thead th.sorted .arw{opacity:1;color:var(--clay)}
+  thead th.num,td.num{text-align:right;font-family:var(--mono)}
+  tbody td{padding:12px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  tbody tr{transition:background .2s}
+  tbody tr:hover{background:rgba(95,138,111,.08)}
+  tbody tr:last-child td{border-bottom:none}
+  td .name{font-weight:600}
+  td .sub{font-size:.74rem;color:var(--ink-soft)}
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;
+    padding:4px 10px;border-radius:20px;white-space:nowrap;letter-spacing:.01em;
+  }
+  .badge .bd{width:7px;height:7px;border-radius:50%}
+  .b-approved{background:rgba(95,138,111,.16);color:#2f5a41}
+  .b-approved .bd{background:var(--sage)}
+  .b-pending{background:rgba(181,83,47,.14);color:#8a3c1e}
+  .b-pending .bd{background:var(--clay)}
+  .b-rejected{background:rgba(91,107,120,.16);color:#3d4a55}
+  .b-rejected .bd{background:var(--slate)}
+  .b-under-review{background:rgba(147,162,173,.2);color:#4a5a66}
+  .b-under-review .bd{background:var(--slate-soft)}
+  .b-application-submitted{background:rgba(201,154,52,.18);color:#7a5c14}
+  .b-application-submitted .bd{background:var(--gold)}
+  .empty{padding:40px;text-align:center;color:var(--ink-soft);font-size:.95rem}
+
+  /* ---------- Footer ---------- */
+  footer{margin-top:56px;background:var(--forest-2);color:#cfc9b8;border-top:3px solid var(--gold)}
+  .foot-inner{padding:34px 0;display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;align-items:center}
+  footer .fnote{font-size:.82rem;max-width:52ch}
+  footer .fnote b{color:#f3efe2}
+  footer .fbrand{font-family:var(--serif);font-size:1.05rem;color:#f3efe2}
+  footer .fbrand span{color:var(--gold-soft)}
+
+  /* ---------- Reveal ---------- */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  @media (max-width:720px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .controls .count{margin-left:0;width:100%}
+    .controls input,.controls select{min-width:0;width:100%}
+    .controls .field{flex:1 1 100%}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+    .reveal,.dcard{opacity:1!important;transform:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap mast-inner">
+    <div class="brand">
+      <div class="seal">S</div>
+      <div>
+        <div class="brand-name">Sahay Scholarship Trust</div>
+        <div class="brand-sub">District Progress Report</div>
+      </div>
+    </div>
+    <span class="kicker">Scholarship Scheme · District Wise</span>
+    <h1 class="title">Where every application <em>finds its way</em> to a student.</h1>
+    <p class="lede">A live view of our scholarship scheme across districts — how many applications are approved, still pending, under review, or rejected, so we can see exactly where support is needed next.</p>
+    <div class="meta">
+      <span><span class="dot"></span>Live from <b>window.data</b></span>
+      <span>Updated <b id="updated">—</b></span>
+      <span><b id="m-districts">—</b> districts · <b id="m-talukas">—</b> talukas</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stats" id="stats">
+    <div class="stat s1">
+      <div class="num" data-count="0" id="n-total">0</div>
+      <div class="lbl">Total applications</div>
+      <div class="bar"><i id="bar-total"></i></div>
+    </div>
+    <div class="stat s2">
+      <div class="num" data-count="0" id="n-pending">0</div>
+      <div class="lbl">Pending cases</div>
+      <div class="bar"><i id="bar-pending"></i></div>
+    </div>
+    <div class="stat s3">
+      <div class="num" data-count="0" id="n-approved">0</div>
+      <div class="lbl">Approved</div>
+      <div class="bar"><i id="bar-approved"></i></div>
+    </div>
+    <div class="stat s4">
+      <div class="num" data-count="0" id="n-rate">0%</div>
+      <div class="lbl">Approval rate</div>
+      <div class="bar"><i id="bar-rate"></i></div>
+    </div>
+  </div>
+
+  <section class="block reveal">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">District overview</div>
+        <h2>Progress by district</h2>
+        <p>Each card shows the full case mix for a district. A red edge marks districts with a high share of pending cases.</p>
+      </div>
+    </div>
+    <div class="districts" id="districts"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="block reveal">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">Case register</div>
+        <h2>Every application, one by one</h2>
+        <p>Search, filter, and sort the full register. Click any column header to sort.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="field grow">
+        <label for="q">Search</label>
+        <input id="q" type="search" placeholder="Name, district, taluka, or scheme…" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="f-district">District</label>
+        <select id="f-district"><option value="">All districts</option></select>
+      </div>
+      <div class="field">
+        <label for="f-status">Status</label>
+        <select id="f-status"><option value="">All statuses</option></select>
+      </div>
+      <div class="count" id="count"></div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table id="reg">
+          <thead>
+            <tr>
+              <th data-key="name">Name <span class="arw">↕</span></th>
+              <th data-key="district">District <span class="arw">↕</span></th>
+              <th data-key="taluka">Taluka <span class="arw">↕</span></th>
+              <th data-key="scheme">Scheme <span class="arw">↕</span></th>
+              <th data-key="status">Status <span class="arw">↕</span></th>
+              <th data-key="marks" class="num">Marks % <span class="arw">↕</span></th>
+              <th data-key="income" class="num">Family income <span class="arw">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div class="fnote">
+      <b>How to read this page.</b> Figures are computed at runtime from the data provided in <b>window.data</b> — nothing is hardcoded. "Pending" counts cases not yet approved or rejected.
+    </div>
+    <div class="fbrand">Sahay <span>Scholarship Trust</span></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Read runtime data (never hardcoded) ---------- */
+  var raw = (typeof window.data !== "undefined" && Array.isArray(window.data)) ? window.data : [];
+
+  function pick(row, keys){
+    for (var i=0;i<keys.length;i++){
+      if (row && row[keys[i]] !== undefined && row[keys[i]] !== null) return row[keys[i]];
+    }
+    return "";
+  }
+  function toNum(v){
+    if (typeof v === "number") return v;
+    var s = String(v).replace(/[^0-9.\-]/g,"");
+    var n = parseFloat(s);
+   

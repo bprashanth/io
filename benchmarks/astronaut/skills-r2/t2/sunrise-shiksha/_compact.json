@@ -1,0 +1,87 @@
+{
+ "cards": [
+  {
+   "name": "unify-student-name-columns",
+   "kind": "mapping",
+   "description": "Standardize student name column across enrolment, attendance, and assessment sheets",
+   "trigger": {
+    "columns_any": [
+     "Name",
+     "Student Name"
+    ]
+   },
+   "mapping": {
+    "unify": {
+     "student_name": [
+      "Name",
+      "Student Name"
+     ]
+    }
+   },
+   "evidence": [
+    1,
+    5,
+    8,
+    9,
+    11
+   ],
+   "confidence": 0.95,
+   "origin": "compacted",
+   "leaks": [],
+   "fires_on": [
+    "students_2025_26_enrolment",
+    "students_2025_26_attendance",
+    "students_2025_26_assessment_baseline_assessment_june_2025",
+    "students_2025_26_assessment_endline_assessment_march_2026"
+   ]
+  },
+  {
+   "name": "attendance-month-column-aggregation",
+   "kind": "rule",
+   "description": "Calculate monthly attendance by summing the specific month's column rather than Total Present",
+   "trigger": {
+    "columns_all": [
+     "Total Present"
+    ],
+    "question_regex": "(?i)attendance.*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)"
+   },
+   "claim": "When querying attendance for a specific month, sum that specific month's column (e.g. \"Jun-25\") directly, rather than \"Total Present\".",
+   "evidence": [
+    3,
+    7,
+    11
+   ],
+   "confidence": 0.9,
+   "origin": "compacted",
+   "leaks": [],
+   "fires_on": []
+  }
+ ],
+ "log_lines": 12,
+ "model": "google/gemini-3.7-flash",
+ "seconds": 4.21,
+ "usage": {
+  "prompt_tokens": 3001,
+  "completion_tokens": 317,
+  "total_tokens": 3318,
+  "cost": 0.00171975,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00171975,
+   "upstream_inference_prompt_cost": 0.001125375,
+   "upstream_inference_completions_cost": 0.000594375
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "raw": "```json\n[\n  {\n    \"name\": \"unify-student-name-columns\",\n    \"kind\": \"mapping\",\n    \"description\": \"Standardize student name column across enrolment, attendance, and assessment sheets\",\n    \"trigger\": {\n      \"columns_any\": [\"Name\", \"Student Name\"]\n    },\n    \"mapping\": {\n      \"unify\": {\n        \"student_name\": [\"Name\", \"Student Name\"]\n      }\n    },\n    \"evidence\": [1, 5, 8, 9, 11],\n    \"confidence\": 0.95\n  },\n  {\n    \"name\": \"attendance-month-column-aggregation\",\n    \"kind\": \"rule\",\n    \"description\": \"Calculate monthly attendance by summing the specific month's column rather than Total Present\",\n    \"trigger\": {\n      \"columns_all\": [\"Total Present\"],\n      \"question_regex\": \"(?i)attendance.*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\"\n    },\n    \"claim\": \"When querying attendance for a specific month, sum that specific month's column (e.g. \\\"Jun-25\\\") directly, rather than \\\"Total Present\\\".\",\n    \"evidence\": [3, 7, 11],\n    \"confidence\": 0.9\n  }\n]\n```"
+}

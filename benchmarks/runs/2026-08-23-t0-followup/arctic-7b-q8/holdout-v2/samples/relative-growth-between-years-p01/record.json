@@ -1,0 +1,49 @@
+{
+  "id": "relative-growth-between-years-p01",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "by what percent did total loan disbursement grow from 2023 to 2024",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH loans_2023 AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_loan_amount_2023 FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2023'), loans_2024 AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_loan_amount_2024 FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2024') SELECT ((loans_2024.total_loan_amount_2024 - loans_2023.total_loan_amount_2023) * 100.0 / NULLIF(NULLIF(loans_2023.total_loan_amount_2023, 0), 0)) AS percentage_growth FROM loans_2023 CROSS JOIN loans_2024",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nby what percent did total loan disbursement grow from 2023 to 2024",
+      "response": "To translate the natural language question into an executable SQLite query, we need to follow these steps:\n\n1. **Identify the Relevant Data**: The question asks for the percentage growth in total loan disbursement from 2023 to 2024. This requires summing up the loan amounts for each year and then calculating the percentage change.\n\n2. **Filter Data by Year**: We need to filter the records in the `shg_loan_register` table to separate those from 2023 and 2024. The `Disbursement Date` column will be used for this purpose.\n\n3. **Aggregate Loan Amounts**: We will sum up the `Loan Amount (Rs)` for each year.\n\n4. **Calculate Percentage Change**: Using the sums from the two years, we will calculate the percentage growth from 2023 to 2024.\n\n5. **Construct the SQL Query**: We will use a `WITH` clause to create two Common Table Expressions (CTEs) for the sums of loan amounts for 2023 and 2024, and then calculate the percentage change.\n\nHere is the step-by-step SQL query:\n\n```sql\nWITH \n    loans_2023 AS (\n        SELECT SUM(`Loan Amount (Rs)`) AS total_loan_amount_2023\n        FROM `shg_loan_register`\n        WHERE strftime('%Y', `Disbursement Date`) = '2023'\n    ),\n    loans_2024 AS (\n        SELECT SUM(`Loan Amount (Rs)`) AS total_loan_amount_2024\n        FROM `shg_loan_register`\n        WHERE strftime('%Y', `Disbursement Date`) = '2024'\n    )\nSELECT \n    ((loans_2024.total_loan_amount_2024 - loans_2023.total_loan_amount_2023) * 100.0 / NULLIF(loans_2023.total_loan_amount_2023, 0)) AS percentage_growth\nFROM \n    loans_2023, loans_2024;\n```\n\n### Explanation:\n\n- **CTE `loans_2023`**: This CTE calculates the total loan amount for the year 2023 by filtering the records where the `Disbursement Date` falls within 2023.\n  \n- **CTE `loans_2024`**: Similarly, this CTE calculates the total loan amount for the year 2024.\n\n- **Final SELECT Statement**: This part of the query calculates the percentage growth from 2023 to 2024. The formula used is:\n  \\[\n  \\text{Percentage Growth} = \\left( \\frac{\\text{Total Loan Amount in 2024} - \\text{Total Loan Amount in 2023}}{\\text{Total Loan Amount in 2023}} \\right) \\times 100\n  \\]\n  The `NULLIF` function is used to avoid division by zero, ensuring that if the total loan amount in 2023 is zero, the result will be `NULL` instead of causing an error.\n\nThis query efficiently calculates the required percentage growth using CTEs and basic arithmetic operations.",
+      "api": {
+        "id": "chatcmpl-iACdBGFMI2qHwZYqExUADsGsnge1xAxj",
+        "model": "/models/Arctic-Text2SQL-R1-7B.Q8_0.gguf",
+        "finish_reason": "stop",
+        "usage": {
+          "completion_tokens": 699,
+          "prompt_tokens": 415,
+          "total_tokens": 1114,
+          "prompt_tokens_details": {
+            "cached_tokens": 389
+          }
+        },
+        "duration_seconds": 26.033
+      },
+      "duration_seconds": 26.038,
+      "sql_duckdb": "WITH loans_2023 AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_loan_amount_2023 FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2023'), loans_2024 AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_loan_amount_2024 FROM \"shg_loan_register\" WHERE STRFTIME(CAST(\"Disbursement Date\" AS TIMESTAMP), '%Y') = '2024') SELECT ((loans_2024.total_loan_amount_2024 - loans_2023.total_loan_amount_2023) * 100.0 / NULLIF(NULLIF(loans_2023.total_loan_amount_2023, 0), 0)) AS percentage_growth FROM loans_2023 CROSS JOIN loans_2024",
+      "rows": [
+        [
+          26.040816326530614
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

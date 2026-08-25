@@ -1,0 +1,140 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scholarship Scheme Progress Tracker</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1 id="page-title">Scholarship Progress Dashboard</h1></header>
+<main>
+<div class="grid" id="stats-grid">
+    <div class="card">
+        <label>Total Applications</label>
+        <div id="stat-total" style="font-size:24px;font-weight:bold">0</div>
+    </div>
+    <div class="card">
+        <label>Pending Cases</label>
+        <div id="stat-pending" style="font-size:24px;font-weight:bold;color:var(--accent)">0</div>
+    </div>
+    <div class="card">
+        <label>Completed</label>
+        <div id="stat-completed" style="font-size:24px;font-weight:bold;color:#059669">0</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2 style="margin:0; font-size:18px;">District-wise Summary</h2>
+        <button class="secondary" onclick="exportData()">Export CSV</button>
+    </div>
+    <div style="overflow-x: auto;">
+        <table id="summary-table">
+            <thead>
+                <tr>
+                    <th>District</th>
+                    <th>Total</th>
+                    <th>Pending</th>
+                    <th>Completed</th>
+                </tr>
+            </thead>
+            <tbody id="summary-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2 style="margin:0 0 15px 0; font-size:18px;">Detailed Pending Cases</h2>
+    <div style="overflow-x: auto;">
+        <table id="details-table">
+            <thead>
+                <tr>
+                    <th>District</th>
+                    <th>Taluka</th>
+                    <th>Scheme</th>
+                    <th>Income</th>
+                    <th>Marks %</th>
+                </tr>
+            </thead>
+            <tbody id="details-body"></tbody>
+        </table>
+    </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// YOUR CODE HERE
+document.addEventListener('DOMContentLoaded', () => {
+    const data = window.data || [];
+    const summaryBody = document.getElementById('summary-body');
+    const detailsBody = document.getElementById('details-body');
+    
+    let totalCount = data.length;
+    let pendingCount = 0;
+    let completedCount = 0;
+    
+    const districtMap = {};
+
+    data.forEach(row => {
+        const isPending = row.Status && row.Status.toLowerCase().includes('pending');
+        const isCompleted = row.Status && row.Status.toLowerCase().includes('complete');
+        
+        if (isPending) pendingCount++;
+        if (isCompleted) completedCount++;
+
+        // Grouping for summary
+        const d = row.District || 'Unknown';
+        if (!districtMap[d]) {
+            districtMap[d] = { total: 0, pending: 0, completed: 0 };
+        }
+        districtMap[d].total++;
+        if (isPending) districtMap[d].pending++;
+        if (isCompleted) districtMap[d].completed++;
+
+        // Add to details if pending
+        if (isPending) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${row.District || '-'}</td>
+                <td>${row.Taluka || '-'}</td>
+                <td>${row['Name of scheme'] || '-'}</td>
+                <td>${row['Family Income'] || '-'}</td>
+                <td>${row['Marks %'] || '-'}%</td>
+            `;
+            detailsBody.appendChild(tr);
+        }
+    });
+
+    // Update Stats
+    document.getElementById('stat-total').textContent = totalCount;
+    document.getElementById('stat-pending').textContent = pendingCount;
+    document.getElementById('stat-completed').textContent = completedCount;
+
+    // Populate Summary Table
+    Object.keys(districtMap).sort().forEach(dist => {
+        const stats = districtMap[dist];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${dist}</strong></td>
+            <td>${stats.total}</td>
+            <td style="color:var(--accent)">${stats.pending}</td>
+            <td style="color:#059669">${stats.completed}</td>
+        `;
+        summaryBody.appendChild(tr);
+    });
+
+    // Global export function
+    window.exportData = () => {
+        if (data.length === 0) return;
+        download('scholarship_report.csv', toCSV(data), 'text/csv');
+    };
+});
+
+offlineReady();
+</script>
+</body></html>

@@ -1,0 +1,69 @@
+{
+  "id": "attendance-biggest-drop-p03",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "where did attendance percentage decline the most year on year",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kurla Balwadi",
+      "January",
+      -24.734042553191486
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH combined AS (SELECT \"Centre\" AS centre, \"Month\" AS month, \"Enrolled Kids\" AS enrolment, \"Avg Daily Present\" AS attendance, 2023 AS year FROM \"attendance_2023\" UNION ALL SELECT \"centre_name\" AS centre, \"month\" AS month, \"enrolment\" AS enrolment, \"average_attendance\" AS attendance, 2024 AS year FROM \"attendance_2024\"), yearly_rates AS (SELECT centre, month, year, CAST(100.0 * attendance / NULLIF(NULLIF(enrolment, 0), 0) AS DOUBLE) AS attendance_pct FROM combined), pivoted AS (SELECT centre, month, MAX(CASE WHEN year = 2023 THEN attendance_pct END) AS pct_2023, MAX(CASE WHEN year = 2024 THEN attendance_pct END) AS pct_2024 FROM yearly_rates GROUP BY centre, month), changes AS (SELECT centre, month, pct_2024 - pct_2023 AS change_pct FROM pivoted) SELECT centre, month, change_pct FROM changes ORDER BY change_pct ASC NULLS FIRST LIMIT 1",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nwhere did attendance percentage decline the most year on year",
+      "response": "WITH combined AS (\n    SELECT \"Centre\" AS centre, \"Month\" AS month, \"Enrolled Kids\" AS enrolment, \"Avg Daily Present\" AS attendance, 2023 AS year\n    FROM \"attendance_2023\"\n    UNION ALL\n    SELECT \"centre_name\" AS centre, \"month\" AS month, \"enrolment\" AS enrolment, \"average_attendance\" AS attendance, 2024 AS year\n    FROM \"attendance_2024\"\n),\nyearly_rates AS (\n    SELECT\n        centre,\n        month,\n        year,\n        CAST(100.0 * attendance / NULLIF(enrolment, 0) AS DOUBLE) AS attendance_pct\n    FROM combined\n),\npivoted AS (\n    SELECT\n        centre,\n        month,\n        MAX(CASE WHEN year = 2023 THEN attendance_pct END) AS pct_2023,\n        MAX(CASE WHEN year = 2024 THEN attendance_pct END) AS pct_2024\n    FROM yearly_rates\n    GROUP BY centre, month\n),\nchanges AS (\n    SELECT\n        centre,\n        month,\n        pct_2024 - pct_2023 AS change_pct\n    FROM pivoted\n)\nSELECT\n    centre,\n    month,\n    change_pct\nFROM changes\nORDER BY change_pct ASC\nLIMIT 1;",
+      "api": {
+        "id": "gen-1787421416-oeergk0kfRJsuws2ZGPd",
+        "model": "qwen/qwen3.6-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 605,
+          "completion_tokens": 316,
+          "total_tokens": 921,
+          "cost": 0.0004007,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0004007,
+            "upstream_inference_prompt_cost": 8.47e-05,
+            "upstream_inference_completions_cost": 0.000316
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.428
+      },
+      "duration_seconds": 1.436,
+      "sql_duckdb": "WITH combined AS (SELECT \"Centre\" AS centre, \"Month\" AS month, \"Enrolled Kids\" AS enrolment, \"Avg Daily Present\" AS attendance, 2023 AS year FROM \"attendance_2023\" UNION ALL SELECT \"centre_name\" AS centre, \"month\" AS month, \"enrolment\" AS enrolment, \"average_attendance\" AS attendance, 2024 AS year FROM \"attendance_2024\"), yearly_rates AS (SELECT centre, month, year, CAST(100.0 * attendance / NULLIF(NULLIF(enrolment, 0), 0) AS DOUBLE) AS attendance_pct FROM combined), pivoted AS (SELECT centre, month, MAX(CASE WHEN year = 2023 THEN attendance_pct END) AS pct_2023, MAX(CASE WHEN year = 2024 THEN attendance_pct END) AS pct_2024 FROM yearly_rates GROUP BY centre, month), changes AS (SELECT centre, month, pct_2024 - pct_2023 AS change_pct FROM pivoted) SELECT centre, month, change_pct FROM changes ORDER BY change_pct ASC NULLS FIRST LIMIT 1",
+      "rows": [
+        [
+          "Kurla Balwadi",
+          "January",
+          -24.734042553191486
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

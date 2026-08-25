@@ -1,0 +1,233 @@
+{
+ "plan": {
+  "title": "SHG Loan Repayment and Purpose Analysis",
+  "subtitle": "Key metrics on loan repayment status and purpose distribution across blocks",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total SHG Loans Disbursed",
+    "sql": "SELECT COUNT(*) AS n FROM shg_loan_register",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Loans Overdue (%)",
+    "sql": "SELECT ROUND(COUNT(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 END) * 100.0 / COUNT(*), 1) AS n FROM shg_loan_register",
+    "unit": "%"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Average Loan Amount (Rs)",
+    "sql": "SELECT ROUND(AVG(\"Loan Amount (Rs)\"), 0) AS n FROM shg_loan_register",
+    "unit": "Rs"
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Repayment Status by Block",
+    "sql": "SELECT \"Block\", COUNT(*) AS n FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC",
+    "x": "block",
+    "y": [
+     "n"
+    ],
+    "series": "repayment_status"
+   },
+   {
+    "id": "p5",
+    "kind": "pie",
+    "title": "Loan Purpose Distribution",
+    "sql": "SELECT \"Purpose\", COUNT(*) AS n FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC",
+    "x": "purpose",
+    "y": [
+     "n"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top 5 Blocks by Overdue Loans",
+    "sql": "SELECT \"Block\", COUNT(*) AS overdue_count FROM shg_loan_register WHERE \"Repayment Status\" = 'Overdue' GROUP BY 1 ORDER BY 2 DESC LIMIT 5"
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Average Loan Amount by Purpose",
+    "sql": "SELECT \"Purpose\", ROUND(AVG(\"Loan Amount (Rs)\"), 0) AS avg_amount FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC"
+   }
+  ],
+  "narrative": "The SHG loan register reveals {{p1}} total loans disbursed across {{p4.n}} blocks, with {{p2}}% currently overdue. The average loan amount stands at {{p3}} Rs, though this varies significantly by purpose. {{p5}} shows that {{p5.x[0]}} and {{p5.x[1]}} purposes dominate the portfolio, while {{p6}} highlights {{p6.x[0]}} as the block with the highest overdue burden. Notably, {{p7}} indicates that {{p7.x[0]}} loans tend to be the largest in value, potentially explaining their higher repayment risk. Blocks like {{p4.x[0]}} and {{p4.x[1]}} show the highest overall activity, though their overdue rates differ sharply\u2014suggesting {{p4.x[0]}} may need targeted repayment support."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 16.7
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 49486.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Block",
+    "n"
+   ],
+   "rows": [
+    {
+     "Block": "Wazirganj",
+     "n": 66
+    },
+    {
+     "Block": "Belaganj",
+     "n": 65
+    },
+    {
+     "Block": "Fatehpur",
+     "n": 64
+    },
+    {
+     "Block": "Dobhi",
+     "n": 57
+    },
+    {
+     "Block": "Barachatti",
+     "n": 56
+    },
+    {
+     "Block": "Atri",
+     "n": 52
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Purpose",
+    "n"
+   ],
+   "rows": [
+    {
+     "Purpose": "Agriculture",
+     "n": 106
+    },
+    {
+     "Purpose": "Livestock",
+     "n": 79
+    },
+    {
+     "Purpose": "Petty trade",
+     "n": 66
+    },
+    {
+     "Purpose": "Health",
+     "n": 46
+    },
+    {
+     "Purpose": "Housing",
+     "n": 32
+    },
+    {
+     "Purpose": "Education",
+     "n": 31
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Block",
+    "overdue_count"
+   ],
+   "rows": [
+    {
+     "Block": "Fatehpur",
+     "overdue_count": 15
+    },
+    {
+     "Block": "Wazirganj",
+     "overdue_count": 13
+    },
+    {
+     "Block": "Belaganj",
+     "overdue_count": 13
+    },
+    {
+     "Block": "Barachatti",
+     "overdue_count": 8
+    },
+    {
+     "Block": "Atri",
+     "overdue_count": 8
+    }
+   ],
+   "rowcount": 5,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "Purpose",
+    "avg_amount"
+   ],
+   "rows": [
+    {
+     "Purpose": "Housing",
+     "avg_amount": 85625.0
+    },
+    {
+     "Purpose": "Agriculture",
+     "avg_amount": 50330.0
+    },
+    {
+     "Purpose": "Education",
+     "avg_amount": 48065.0
+    },
+    {
+     "Purpose": "Livestock",
+     "avg_amount": 45127.0
+    },
+    {
+     "Purpose": "Petty trade",
+     "avg_amount": 42348.0
+    },
+    {
+     "Purpose": "Health",
+     "avg_amount": 41087.0
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  }
+ }
+}

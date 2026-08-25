@@ -1,0 +1,145 @@
+{
+  "id": "share-of-total-by-category-text-date-year-p02",
+  "task_id": "share-of-total-by-category-text-date-year",
+  "pattern": "year filter on a text date, group sum, share of grand total, rank",
+  "question": "for loans disbursed in 2024 show purpose wise total rupees and percent share of all 2024 lending, highest first",
+  "gold_sql": "WITH y AS (SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Purpose\") SELECT \"Purpose\", total_amount, 100.0 * total_amount / SUM(total_amount) OVER () AS share_percent FROM y ORDER BY total_amount DESC, \"Purpose\"",
+  "expected_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH yearly_totals AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_lending FROM \"shg_loan_register\" WHERE EXTRACT(YEAR FROM CAST(\"Disbursement Date\" AS DATE)) = 2024) SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_rupees, (SUM(\"Loan Amount (Rs)\") * 100.0 / NULLIF(NULLIF(yt.total_lending, 0), 0)) AS percent_share FROM \"shg_loan_register\" CROSS JOIN yearly_totals AS yt WHERE EXTRACT(YEAR FROM CAST(\"Disbursement Date\" AS DATE)) = 2024 GROUP BY \"Purpose\", yt.total_lending ORDER BY total_rupees DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nfor loans disbursed in 2024 show purpose wise total rupees and percent share of all 2024 lending, highest first",
+      "response": "WITH yearly_totals AS (\n    SELECT SUM(\"Loan Amount (Rs)\") AS total_lending\n    FROM \"shg_loan_register\"\n    WHERE EXTRACT(YEAR FROM CAST(\"Disbursement Date\" AS DATE)) = 2024\n)\nSELECT\n    \"Purpose\",\n    SUM(\"Loan Amount (Rs)\") AS total_rupees,\n    (SUM(\"Loan Amount (Rs)\") * 100.0 / NULLIF(yt.total_lending, 0)) AS percent_share\nFROM \"shg_loan_register\", yearly_totals yt\nWHERE EXTRACT(YEAR FROM CAST(\"Disbursement Date\" AS DATE)) = 2024\nGROUP BY \"Purpose\", yt.total_lending\nORDER BY total_rupees DESC;",
+      "api": {
+        "id": "gen-1787420915-PN5LZX2iTsOPQQ4EuiAT",
+        "model": "qwen/qwen3.6-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 430,
+          "completion_tokens": 158,
+          "total_tokens": 588,
+          "cost": 0.0002225,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002225,
+            "upstream_inference_prompt_cost": 6.45e-05,
+            "upstream_inference_completions_cost": 0.000158
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.556
+      },
+      "duration_seconds": 1.562,
+      "sql_duckdb": "WITH yearly_totals AS (SELECT SUM(\"Loan Amount (Rs)\") AS total_lending FROM \"shg_loan_register\" WHERE EXTRACT(YEAR FROM CAST(\"Disbursement Date\" AS DATE)) = 2024) SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_rupees, (SUM(\"Loan Amount (Rs)\") * 100.0 / NULLIF(NULLIF(yt.total_lending, 0), 0)) AS percent_share FROM \"shg_loan_register\" CROSS JOIN yearly_totals AS yt WHERE EXTRACT(YEAR FROM CAST(\"Disbursement Date\" AS DATE)) = 2024 GROUP BY \"Purpose\", yt.total_lending ORDER BY total_rupees DESC",
+      "rows": [
+        [
+          "Agriculture",
+          2000000,
+          25.906735751295336
+        ],
+        [
+          "Livestock",
+          1595000,
+          20.66062176165803
+        ],
+        [
+          "Petty trade",
+          1435000,
+          18.588082901554404
+        ],
+        [
+          "Housing",
+          1245000,
+          16.126943005181346
+        ],
+        [
+          "Education",
+          830000,
+          10.751295336787564
+        ],
+        [
+          "Health",
+          615000,
+          7.966321243523316
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

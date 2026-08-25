@@ -1,0 +1,150 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Health Camp Signup</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.countdown{font-size:18px;font-weight:bold;text-align:center;padding:10px 0}.countdown-item{display:inline-block;margin:0 10px}
+</style></head><body>
+<header><h1>Health Camp Signup</h1></header>
+<main>
+  <div class="card">
+    <h2>Countdown to 14 September</h2>
+    <div class="countdown" id="countdown"></div>
+  </div>
+
+  <div class="card">
+    <h2>Sign Up for the Health Camp</h2>
+    <form id="signupForm">
+      <div class="row">
+        <div>
+          <label for="name">Full Name</label>
+          <input type="text" id="name" name="name" required>
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required>
+        </div>
+      </div>
+      <div>
+        <label for="phone">Phone Number</label>
+        <input type="tel" id="phone" name="phone">
+      </div>
+      <div>
+        <label for="preferences">Health Concerns (select all that apply)</label>
+        <select id="preferences" name="preferences" multiple>
+          <option value="blood-pressure">Blood Pressure</option>
+          <option value="diabetes">Diabetes</option>
+          <option value="vision">Vision</option>
+          <option value="general-checkup">General Checkup</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label for="notes">Additional Notes</label>
+        <textarea id="notes" name="notes" rows="3"></textarea>
+      </div>
+      <button type="submit">Sign Up</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Attendees List</h2>
+    <div id="attendeesList">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Concerns</th>
+          </tr>
+        </thead>
+        <tbody id="attendeesBody">
+          <!-- Will be populated by JavaScript -->
+        </tbody>
+      </table>
+      <div class="row">
+        <button id="exportBtn" class="secondary">Export to CSV</button>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// Event-specific data
+const eventDate = new Date('2023-09-14');
+const attendees = store.get('healthCampAttendees', []);
+
+// Initialize countdown
+function updateCountdown() {
+  const now = new Date();
+  const diff = eventDate - now;
+
+  if (diff <= 0) {
+    document.getElementById('countdown').textContent = 'The event has started!';
+    return;
+  }
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  document.getElementById('countdown').innerHTML = `
+    ${days}d ${hours}h ${minutes}m ${seconds}s
+  `;
+}
+
+// Update attendees list
+function updateAttendeesList() {
+  const body = document.getElementById('attendeesBody');
+  body.innerHTML = attendees.length > 0 ?
+    attendees.map(attendee => `
+      <tr>
+        <td>${attendee.name}</td>
+        <td>${attendee.email}</td>
+        <td>${attendee.phone || 'N/A'}</td>
+        <td>${attendee.preferences.join(', ')}</td>
+      </tr>
+    `).join('') :
+    '<tr><td colspan="4" class="muted">No attendees yet</td></tr>';
+}
+
+// Handle form submission
+document.getElementById('signupForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  const formData = {
+    name: this.name.value,
+    email: this.email.value,
+    phone: this.phone.value,
+    preferences: Array.from(this.preferences.selectedOptions).map(option => option.value),
+    notes: this.notes.value
+  };
+
+  attendees.push(formData);
+  store.set('healthCampAttendees', attendees);
+
+  this.reset();
+  updateAttendeesList();
+});
+
+// Handle export button
+document.getElementById('exportBtn').addEventListener('click', function() {
+  const csv = toCSV(attendees);
+  download('health-camp-attendees.csv', csv, 'text/csv');
+});
+
+// Initialize
+updateCountdown();
+setInterval(updateCountdown, 1000);
+updateAttendeesList();
+</script>
+</body></html>

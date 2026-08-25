@@ -1,0 +1,128 @@
+{
+  "id": "attendance-cross-year-p03",
+  "task_id": "attendance-cross-year",
+  "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+  "question": "compare average daily attendance rate per centre across the two years, one row each",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+  "expected_rows": [
+    [
+      "Chembur Balwadi",
+      70.360615190941,
+      70.44660635437101
+    ],
+    [
+      "Dharavi Balwadi",
+      70.82452584394089,
+      74.97294321155522
+    ],
+    [
+      "Govandi Balwadi",
+      75.9944282010392,
+      80.66053460475666
+    ],
+    [
+      "Kurla Balwadi",
+      83.94073053389387,
+      63.430859353534544
+    ],
+    [
+      "Mankhurd Balwadi",
+      64.20706883526674,
+      62.326350096023994
+    ],
+    [
+      "Sion Balwadi",
+      60.5153044840458,
+      55.56386806777662
+    ],
+    [
+      "Wadala Balwadi",
+      87.81901547526547,
+      88.94728964433877
+    ],
+    [
+      "Worli Balwadi",
+      80.31790744980887,
+      77.5822639156466
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH rates_2023 AS (SELECT \"Centre\" AS centre, \"Month\" AS month, \"Avg Daily Present\" AS present, \"Enrolled Kids\" AS enrolled FROM \"attendance_2023\"), rates_2024 AS (SELECT \"centre_name\" AS centre, \"month\" AS month, \"average_attendance\" AS present, \"enrolment\" AS enrolled FROM \"attendance_2024\"), combined AS (SELECT * FROM rates_2023 UNION ALL SELECT * FROM rates_2024), rates AS (SELECT centre, month, present, enrolled, CASE WHEN year = 2023 THEN (present * 100.0 / NULLIF(NULLIF(enrolled, 0), 0)) ELSE (present * 100.0 / NULLIF(NULLIF(enrolled, 0), 0)) END AS rate FROM combined CROSS JOIN (SELECT 2023 AS year UNION ALL SELECT 2024) AS years) SELECT r1.centre, r1.month, r1.rate AS rate_2023, r2.rate AS rate_2024 FROM rates AS r1 JOIN rates AS r2 ON r1.centre = r2.centre AND r1.month = r2.month WHERE r1.year = 2023 AND r2.year = 2024 ORDER BY r1.centre NULLS FIRST, r1.month NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncompare average daily attendance rate per centre across the two years, one row each",
+      "response": "WITH centres AS (\n  SELECT \"Centre\" AS name, \"Month\" AS m FROM \"attendance_2023\"\n  UNION ALL\n  SELECT \"centre_name\" AS name, \"month\" AS m FROM \"attendance_2024\"\n),\nrates AS (\n  SELECT \n    c.name AS centre,\n    c.m AS month,\n    a.\"Avg Daily Present\" AS present,\n    a.\"Enrolled Kids\" AS enrolled,\n    a.\"Avg Daily Present\" * 100.0 / NULLIF(a.\"Enrolled Kids\", 0) AS rate_2023\n  FROM centres c\n  JOIN \"attendance_2023\" a ON c.name = a.\"Centre\" AND c.m = a.\"Month\"\n  UNION ALL\n  SELECT \n    c.name AS centre,\n    c.m AS month,\n    a.\"average_attendance\" AS present,\n    a.\"enrolment\" AS enrolled,\n    a.\"average_attendance\" * 100.0 / NULLIF(a.\"enrolment\", 0) AS rate_2024\n  FROM centres c\n  JOIN \"attendance_2024\" a ON c.name = a.\"centre_name\" AND c.m = a.\"month\"\n)\nSELECT \n  centre,\n  month,\n  rate_2023,\n  rate_2024\nFROM rates\nORDER BY centre, month;",
+      "api": {
+        "id": "gen-1787421462-BOGhE4y15E6LSSBUQQbq",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 610,
+          "completion_tokens": 318,
+          "total_tokens": 928,
+          "cost": 0.0001087,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0001087,
+            "upstream_inference_prompt_cost": 6.1e-05,
+            "upstream_inference_completions_cost": 4.77e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.342
+      },
+      "duration_seconds": 3.344,
+      "error": "BinderException: Binder Error: Referenced column \"rate_2024\" not found in FROM clause!\nCandidate bindings: \"rate_2023\", \"present\"\n\nLINE 1: ...\" AND c.m = a.\"month\") SELECT centre, month, rate_2023, rate_2024 FROM rates ORDER BY centre NULLS FIRST, month...\n                                                                   ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\ncompare average daily attendance rate per centre across the two years, one row each\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"rate_2024\" not found in FROM clause!\nCandidate bindings: \"rate_2023\", \"present\"\n\nLINE 1: ...\" AND c.m = a.\"month\") SELECT centre, month, rate_2023, rate_2024 FROM rates ORDER BY centre NULLS FIRST, month...\n                                                                   ^\nReturn a complete corrected query.",
+      "response": "WITH rates_2023 AS (\n  SELECT \n    \"Centre\" AS centre,\n    \"Month\" AS month,\n    \"Avg Daily Present\" AS present,\n    \"Enrolled Kids\" AS enrolled\n  FROM \"attendance_2023\"\n),\nrates_2024 AS (\n  SELECT \n    \"centre_name\" AS centre,\n    \"month\" AS month,\n    \"average_attendance\" AS present,\n    \"enrolment\" AS enrolled\n  FROM \"attendance_2024\"\n),\ncombined AS (\n  SELECT * FROM rates_2023\n  UNION ALL\n  SELECT * FROM rates_2024\n),\nrates AS (\n  SELECT \n    centre,\n    month,\n    present,\n    enrolled,\n    CASE \n      WHEN year = 2023 THEN (present * 100.0 / NULLIF(enrolled, 0))\n      ELSE (present * 100.0 / NULLIF(enrolled, 0))\n    END AS rate\n  FROM combined\n  CROSS JOIN (SELECT 2023 AS year UNION ALL SELECT 2024) AS years\n)\nSELECT \n  r1.centre,\n  r1.month,\n  r1.rate AS rate_2023,\n  r2.rate AS rate_2024\nFROM rates r1\nJOIN rates r2 ON r1.centre = r2.centre AND r1.month = r2.month\nWHERE r1.year = 2023 AND r2.year = 2024\nORDER BY r1.centre, r1.month;",
+      "api": {
+        "id": "gen-1787421465-JAAkWVt4lhTSVCZbaRwT",
+        "model": "qwen/qwen3.5-9b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 708,
+          "completion_tokens": 366,
+          "total_tokens": 1074,
+          "cost": 0.0001257,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0001257,
+            "upstream_inference_prompt_cost": 7.08e-05,
+            "upstream_inference_completions_cost": 5.49e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.861
+      },
+      "duration_seconds": 3.865,
+      "error": "BinderException: Binder Error: Values list \"r1\" does not have a column named \"year\"\n\nLINE 1: ... AS r2 ON r1.centre = r2.centre AND r1.month = r2.month WHERE r1.year = 2023 AND r2.year = 2024 ORDER BY r1.centre NULLS...\n                                                                         ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

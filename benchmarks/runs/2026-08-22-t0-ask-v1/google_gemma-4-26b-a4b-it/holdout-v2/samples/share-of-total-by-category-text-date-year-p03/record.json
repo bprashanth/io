@@ -1,0 +1,145 @@
+{
+  "id": "share-of-total-by-category-text-date-year-p03",
+  "task_id": "share-of-total-by-category-text-date-year",
+  "pattern": "year filter on a text date, group sum, share of grand total, rank",
+  "question": "what share of 2024 loan money went to each purpose? give total and percentage, largest purpose on top",
+  "gold_sql": "WITH y AS (SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Purpose\") SELECT \"Purpose\", total_amount, 100.0 * total_amount / SUM(total_amount) OVER () AS share_percent FROM y ORDER BY total_amount DESC, \"Purpose\"",
+  "expected_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295333
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523317
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_loan_amount, SUM(\"Loan Amount (Rs)\") / NULLIF(NULLIF(SUM(SUM(\"Loan Amount (Rs)\")) OVER (), 0), 0) * 100 AS percentage FROM shg_loan_register WHERE STRFTIME(CAST(CAST(\"Disbursement Date\" AS DATE) AS TIMESTAMP), '%Y') = '2024' GROUP BY \"Purpose\" ORDER BY total_loan_amount DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nwhat share of 2024 loan money went to each purpose? give total and percentage, largest purpose on top",
+      "response": "```sql\nSELECT\n  \"Purpose\",\n  SUM(\"Loan Amount (Rs)\") AS total_loan_amount,\n  SUM(\"Loan Amount (Rs)\") / NULLIF(SUM(SUM(\"Loan Amount (Rs)\")) OVER (), 0) * 100 AS percentage\nFROM shg_loan_register\nWHERE strftime('%Y', CAST(\"Disbursement Date\" AS DATE)) = '2024'\nGROUP BY \"Purpose\"\nORDER BY total_loan_amount DESC;\n```",
+      "api": {
+        "id": "gen-1787420946-UHZqGWvg5NFlslyVGYpQ",
+        "model": "google/gemma-4-26b-a4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 421,
+          "completion_tokens": 109,
+          "total_tokens": 530,
+          "cost": 4.83e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.83e-05,
+            "upstream_inference_prompt_cost": 2.105e-05,
+            "upstream_inference_completions_cost": 2.725e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 6.146
+      },
+      "duration_seconds": 6.153,
+      "sql_duckdb": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_loan_amount, SUM(\"Loan Amount (Rs)\") / NULLIF(NULLIF(SUM(SUM(\"Loan Amount (Rs)\")) OVER (), 0), 0) * 100 AS percentage FROM shg_loan_register WHERE STRFTIME(CAST(CAST(\"Disbursement Date\" AS DATE) AS TIMESTAMP), '%Y') = '2024' GROUP BY \"Purpose\" ORDER BY total_loan_amount DESC",
+      "rows": [
+        [
+          "Agriculture",
+          2000000,
+          25.906735751295333
+        ],
+        [
+          "Livestock",
+          1595000,
+          20.66062176165803
+        ],
+        [
+          "Petty trade",
+          1435000,
+          18.588082901554404
+        ],
+        [
+          "Housing",
+          1245000,
+          16.126943005181346
+        ],
+        [
+          "Education",
+          830000,
+          10.751295336787564
+        ],
+        [
+          "Health",
+          615000,
+          7.966321243523317
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

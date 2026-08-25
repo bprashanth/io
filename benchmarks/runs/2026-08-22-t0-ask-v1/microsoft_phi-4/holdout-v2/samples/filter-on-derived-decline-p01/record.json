@@ -1,0 +1,115 @@
+{
+  "id": "filter-on-derived-decline-p01",
+  "task_id": "filter-on-derived-decline",
+  "pattern": "keep groups whose derived change is negative, null rounds drop out",
+  "question": "in which districts did women literacy go down from NFHS-4 to NFHS-5",
+  "gold_sql": "SELECT \"District\" FROM district_health_factsheet WHERE \"District\" <> 'State Total' GROUP BY \"District\" HAVING MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Women age 15-49 years who are literate (%)\" END) < MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Women age 15-49 years who are literate (%)\" END) ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Cuttack"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Purnia",
+      -2.0
+    ],
+    [
+      "Rohtas",
+      -1.6000000000000014
+    ],
+    [
+      "State Total",
+      -4.100000000000001
+    ],
+    [
+      "Hazaribagh",
+      -2.5
+    ],
+    [
+      "State Total",
+      -1.1000000000000014
+    ],
+    [
+      "Cuttack",
+      -2.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH literacy_nfhs4 AS (SELECT \"District\", \"Women age 15-49 years who are literate (%)\" AS literacy_nfhs4 FROM \"district_health_factsheet\" WHERE \"Survey Round\" = 'NFHS-4'), literacy_nfhs5 AS (SELECT \"District\", \"Women age 15-49 years who are literate (%)\" AS literacy_nfhs5 FROM \"district_health_factsheet\" WHERE \"Survey Round\" = 'NFHS-5') SELECT nfhs5.\"District\", nfhs5.literacy_nfhs5 - nfhs4.literacy_nfhs4 AS literacy_change FROM literacy_nfhs5 AS nfhs5 JOIN literacy_nfhs4 AS nfhs4 ON nfhs5.\"District\" = nfhs4.\"District\" WHERE nfhs5.literacy_nfhs5 < nfhs4.literacy_nfhs4",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nin which districts did women literacy go down from NFHS-4 to NFHS-5",
+      "response": "```sql\nWITH literacy_nfhs4 AS (\n    SELECT \"District\", \"Women age 15-49 years who are literate (%)\" AS literacy_nfhs4\n    FROM \"district_health_factsheet\"\n    WHERE \"Survey Round\" = 'NFHS-4'\n),\nliteracy_nfhs5 AS (\n    SELECT \"District\", \"Women age 15-49 years who are literate (%)\" AS literacy_nfhs5\n    FROM \"district_health_factsheet\"\n    WHERE \"Survey Round\" = 'NFHS-5'\n)\nSELECT \n    nfhs5.\"District\",\n    nfhs5.literacy_nfhs5 - nfhs4.literacy_nfhs4 AS literacy_change\nFROM \n    literacy_nfhs5 nfhs5\nJOIN \n    literacy_nfhs4 nfhs4 ON nfhs5.\"District\" = nfhs4.\"District\"\nWHERE \n    nfhs5.literacy_nfhs5 < nfhs4.literacy_nfhs4;\n```",
+      "api": {
+        "id": "gen-1787421220-ZLH0DC0NGCTY3g9vdUYn",
+        "model": "microsoft/phi-4",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 486,
+          "completion_tokens": 206,
+          "total_tokens": 692,
+          "cost": 6.286e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.286e-05,
+            "upstream_inference_prompt_cost": 3.402e-05,
+            "upstream_inference_completions_cost": 2.884e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.058
+      },
+      "duration_seconds": 4.063,
+      "sql_duckdb": "WITH literacy_nfhs4 AS (SELECT \"District\", \"Women age 15-49 years who are literate (%)\" AS literacy_nfhs4 FROM \"district_health_factsheet\" WHERE \"Survey Round\" = 'NFHS-4'), literacy_nfhs5 AS (SELECT \"District\", \"Women age 15-49 years who are literate (%)\" AS literacy_nfhs5 FROM \"district_health_factsheet\" WHERE \"Survey Round\" = 'NFHS-5') SELECT nfhs5.\"District\", nfhs5.literacy_nfhs5 - nfhs4.literacy_nfhs4 AS literacy_change FROM literacy_nfhs5 AS nfhs5 JOIN literacy_nfhs4 AS nfhs4 ON nfhs5.\"District\" = nfhs4.\"District\" WHERE nfhs5.literacy_nfhs5 < nfhs4.literacy_nfhs4",
+      "rows": [
+        [
+          "Purnia",
+          -2.0
+        ],
+        [
+          "Rohtas",
+          -1.6000000000000014
+        ],
+        [
+          "State Total",
+          -4.100000000000001
+        ],
+        [
+          "Hazaribagh",
+          -2.5
+        ],
+        [
+          "State Total",
+          -1.1000000000000014
+        ],
+        [
+          "Cuttack",
+          -2.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

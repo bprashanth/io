@@ -1,0 +1,127 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hand Washing Quiz</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Hand Washing Quiz","short_name":"Quiz","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Hand Washing Quiz</h1></header>
+<main>
+<div class="card">
+  <form id="quiz-form">
+    <div class="row">
+      <div style="flex:1">
+        <label for="q1">1. How long should you wash your hands with soap?</label>
+        <select id="q1" name="q1">
+          <option value="">Select an answer</option>
+          <option value="wrong">Until they smell nice</option>
+          <option value="correct">20 seconds (about the time of singing "Happy Birthday" twice)</option>
+          <option value="wrong">Just a quick rub</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:1">
+        <label for="q2">2. When should you wash your hands?</label>
+        <select id="q2" name="q2">
+          <option value="">Select an answer</option>
+          <option value="wrong">Only before eating lunch</option>
+          <option value="correct">Before eating, after using the toilet, and after playing outside</option>
+          <option value="wrong">Only when my hands look dirty</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:1">
+        <label for="q3">3. What is the best way to dry your hands?</label>
+        <select id="q3" name="q3">
+          <option value="">Select an answer</option>
+          <option value="wrong">A shared towel</option>
+          <option value="wrong">My sleeve</option>
+          <option value="correct">A paper towel or a hand dryer</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:1">
+        <label for="q4">4. Why do we wash our hands?</label>
+        <select id="q4" name="q4">
+          <option value="">Select an answer</option>
+          <option value="wrong">To make them smell like flowers</option>
+          <option value="wrong">To make them soft</option>
+          <option value="correct">To get rid of germs and keep us healthy</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div style="flex:1">
+        <label for="q5">5. What should you do if you don't have soap?</label>
+        <select id="q5" name="q5">
+          <option value="">Select an answer</option>
+          <option value="wrong">Use hand sanitizer only</option>
+          <option value="wrong">Do nothing</option>
+          <option value="correct">Wash with water and dry them well</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:20px">
+      <button type="submit">Check My Score</button>
+    </div>
+  </form>
+</div>
+<div id="result-card" class="card" style="display:none">
+  <h2>Great Job!</h2>
+  <p id="score-text"></p>
+  <button class="secondary" id="retry-btn">Try Again</button>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+const form = document.getElementById('quiz-form');
+const resultCard = document.getElementById('result-card');
+const scoreText = document.getElementById('score-text');
+const retryBtn = document.getElementById('retry-btn');
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const answers = {
+    q1: document.getElementById('q1').value,
+    q2: document.getElementById('q2').value,
+    q3: document.getElementById('q3').value,
+    q4: document.getElementById('q4').value,
+    q5: document.getElementById('q5').value
+  };
+
+  let score = 0;
+  if (answers.q1 === 'correct') score++;
+  if (answers.q2 === 'correct') score++;
+  if (answers.q3 === 'correct') score++;
+  if (answers.q4 === 'correct') score++;
+  if (answers.q5 === 'correct') score++;
+
+  const percentage = (score / 5) * 100;
+  let message = '';
+  if (score === 5) message = 'Perfect! You are a germ-fighting champion!';
+  else if (score >= 3) message = 'Good job! You know most of the rules.';
+  else message = 'Keep practicing! Remember to wash for 20 seconds.';
+
+  scoreText.textContent = `You scored ${score} out of 5 (${percentage}%). ${message}`;
+  resultCard.style.display = 'block';
+  resultCard.scrollIntoView({ behavior: 'smooth' });
+});
+
+retryBtn.addEventListener('click', () => {
+  form.reset();
+  resultCard.style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+</script>
+</body></html>

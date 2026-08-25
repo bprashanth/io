@@ -1,0 +1,112 @@
+{
+  "id": "sportathon-site-average-change-p01",
+  "task_id": "sportathon-site-average-change",
+  "pattern": "join on id, compute per-row delta, average by group",
+  "question": "site wise average change in shuttle run time from baseline to endline, negative means faster",
+  "gold_sql": "SELECT b.\"Location\", AVG(e.\"Shuttle Run sec\" - b.\"Shuttle Run sec\") AS avg_shuttle_change FROM sportathon_baseline AS b JOIN sportathon_endline AS e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY b.\"Location\" ORDER BY b.\"Location\"",
+  "expected_rows": [
+    [
+      "Chembur",
+      -0.8297297297297296
+    ],
+    [
+      "Dharavi",
+      -0.6914285714285713
+    ],
+    [
+      "Govandi",
+      -0.8575757575757578
+    ],
+    [
+      "Kurla",
+      -0.6923076923076923
+    ],
+    [
+      "Mankhurd",
+      -0.6392857142857143
+    ],
+    [
+      "Wadala",
+      -0.9363636363636365
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"sportathon_baseline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nCREATE TABLE \"sportathon_endline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"sportathon_baseline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}, \"sportathon_endline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}}\n\nCURRENT QUESTION:\nsite wise average change in shuttle run time from baseline to endline, negative means faster",
+      "response": "```duckdb\nSELECT\n  s.Location,\n  AVG(s.Shuttle Run sec) - AVG(e.Shuttle Run sec) AS shuttle_run_time_change\nFROM sportathon_baseline AS s\nJOIN sportathon_endline AS e\n  ON s.Child ID = e.Child ID\nWHERE\n  s.Shuttle Run sec IS NOT NULL AND e.Shuttle Run sec IS NOT NULL\nGROUP BY\n  s.Location\nHAVING\n  COUNT(s.Child ID) > 0\n```",
+      "api": {
+        "id": "gen-1787420917-JNWGXtJ5AOns4jnQjVtr",
+        "model": "google/gemma-3n-e4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 686,
+          "completion_tokens": 118,
+          "total_tokens": 804,
+          "cost": 5.532e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.532e-05,
+            "upstream_inference_prompt_cost": 4.116e-05,
+            "upstream_inference_completions_cost": 1.416e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.441
+      },
+      "duration_seconds": 2.441,
+      "error": "ParseError: Expecting ). Line 3, Col: 19.\n  SELECT\n  s.Location,\n  AVG(s.Shuttle \u001b[4mRun\u001b[0m sec) - AVG(e.Shuttle Run sec) AS shuttle_run_time_change\nFROM sportathon_baseline AS s\nJOIN sportat"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"sportathon_baseline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nCREATE TABLE \"sportathon_endline\" (\n  \"Child ID\" VARCHAR,\n  \"Child Name\" VARCHAR,\n  \"Gender\" VARCHAR,\n  \"Age\" BIGINT,\n  \"Location\" VARCHAR,\n  \"Coach\" VARCHAR,\n  \"Height cm\" DOUBLE,\n  \"Weight kg\" DOUBLE,\n  \"Shuttle Run sec\" DOUBLE,\n  \"Sit Ups\" BIGINT,\n  \"Standing Jump cm\" DOUBLE,\n  \"Life Skills Score\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"sportathon_baseline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}, \"sportathon_endline\": {\"Gender\": [\"F\", \"M\"], \"Location\": [\"Chembur\", \"Dharavi\", \"Govandi\", \"Kurla\", \"Mankhurd\", \"Wadala\"], \"Coach\": [\"Anjali Kamble\", \"Deepak Rane\", \"Fatima Shaikh\", \"Irfan Sheikh\", \"Kavita Pawar\", \"Meena Chavan\", \"Nasreen Ansari\", \"Prakash Sawant\", \"Ramesh Yadav\", \"Sunita More\", \"Suresh Gaikwad\", \"Vikram Jadhav\"]}}\n\nCURRENT QUESTION:\nsite wise average change in shuttle run time from baseline to endline, negative means faster\n\nREJECTED QUERY ERROR:\nParseError: Expecting ). Line 3, Col: 19.\n  SELECT\n  s.Location,\n  AVG(s.Shuttle \u001b[4mRun\u001b[0m sec) - AVG(e.Shuttle Run sec) AS shuttle_run_time_change\nFROM sportathon_baseline AS s\nJOIN sportat\nReturn a complete corrected query.",
+      "response": "```duckdb\nSELECT\n  s.Location,\n  AVG(s.Shuttle Run sec) - AVG(e.Shuttle Run sec) AS shuttle_run_time_change\nFROM sportathon_baseline AS s\nJOIN sportathon_endline AS e\n  ON s.\"Child ID\" = e.\"Child ID\"\nGROUP BY\n  s.Location\n```",
+      "api": {
+        "id": "gen-1787420919-ah6uWLhEW2jJ2Kv1mRKj",
+        "model": "google/gemma-3n-e4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 774,
+          "completion_tokens": 82,
+          "total_tokens": 856,
+          "cost": 5.628e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.628e-05,
+            "upstream_inference_prompt_cost": 4.644e-05,
+            "upstream_inference_completions_cost": 9.84e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.685
+      },
+      "duration_seconds": 1.685,
+      "error": "ParseError: Expecting ). Line 3, Col: 19.\n  SELECT\n  s.Location,\n  AVG(s.Shuttle \u001b[4mRun\u001b[0m sec) - AVG(e.Shuttle Run sec) AS shuttle_run_time_change\nFROM sportathon_baseline AS s\nJOIN sportat"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

@@ -1,0 +1,129 @@
+{
+ "plan": {
+  "title": "Child Improvement Dashboard",
+  "subtitle": "Comparing baseline to endline performance by location and coach",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total children tracked",
+    "sql": "SELECT COUNT(DISTINCT \"Child ID\") AS n FROM baseline",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Average shuttle run improvement by location",
+    "sql": "SELECT \"Location\", AVG(\"Shuttle run sec\"_end - \"Shuttle run sec\"_base) AS improvement FROM (SELECT b.\"Child ID\", b.\"Location\", b.\"Shuttle run sec\" AS \"Shuttle run sec\"_base, e.\"Shuttle run sec\" AS \"Shuttle run sec\"_end FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\") GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "Location",
+    "y": [
+     "improvement"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Average sit-ups improvement by coach",
+    "sql": "SELECT \"Coach\", AVG(\"Sit ups\"_end - \"Sit ups\"_base) AS improvement FROM (SELECT b.\"Coach\", b.\"Child ID\", b.\"Sit ups\" AS \"Sit ups\"_base, e.\"Sit ups\" AS \"Sit ups\"_end FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\") GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "Coach",
+    "y": [
+     "improvement"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Top 10 children with greatest shuttle run improvement",
+    "sql": "SELECT b.\"Child ID\", b.\"Child name\", (e.\"Shuttle run sec\" - b.\"Shuttle run sec\") AS improvement FROM baseline b JOIN endline e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY improvement DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The dashboard shows {{p1}} children were tracked across locations and coaches. Average shuttle run improvements varied by location, with {{p2}} showing the most significant gains. Coaches like {{p3}} demonstrated strong performance in sit-ups improvement. The table highlights individual cases where children improved by over {{p4.improvement}} seconds in shuttle runs."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 200
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expecting ). Line 1, Col: 44.\n  SELECT \"Location\", AVG(\"Shuttle run sec\"\u001b[4m_end\u001b[0m - \"Shuttle run sec\"_base) AS improvement FROM (SELECT b.\"Child ID\", b.\"Location\", b.\"Shuttle run se"
+  },
+  "p3": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expecting ). Line 1, Col: 33.\n  SELECT \"Coach\", AVG(\"Sit ups\"\u001b[4m_end\u001b[0m - \"Sit ups\"_base) AS improvement FROM (SELECT b.\"Coach\", b.\"Child ID\", b.\"Sit ups\" AS \"Sit ups\"_bas"
+  },
+  "p4": {
+   "columns": [
+    "Child ID",
+    "Child name",
+    "improvement"
+   ],
+   "rows": [
+    {
+     "Child ID": "CFS0177",
+     "Child name": "Bhoir Jaspreet",
+     "improvement": 8.4
+    },
+    {
+     "Child ID": "CFS0034",
+     "Child name": "Lakshmi Sawant",
+     "improvement": 7.800000000000001
+    },
+    {
+     "Child ID": "CFS0055",
+     "Child name": "I. T. Siddiqui",
+     "improvement": 7.800000000000001
+    },
+    {
+     "Child ID": "CFS0192",
+     "Child name": "Jadhav Francis",
+     "improvement": 7.599999999999998
+    },
+    {
+     "Child ID": "CFS0179",
+     "Child name": "Milind Bhosale",
+     "improvement": 7.399999999999999
+    },
+    {
+     "Child ID": "CFS0167",
+     "Child name": "rahul sayyed",
+     "improvement": 7.299999999999999
+    },
+    {
+     "Child ID": "CFS0133",
+     "Child name": "Mangala Kumari",
+     "improvement": 7.000000000000002
+    },
+    {
+     "Child ID": "CFS0039",
+     "Child name": "Mary Nair",
+     "improvement": 6.799999999999999
+    },
+    {
+     "Child ID": "CFS0152",
+     "Child name": "Rekha Deshmukh",
+     "improvement": 6.799999999999999
+    },
+    {
+     "Child ID": "CFS0160",
+     "Child name": "Ganesh Gill",
+     "improvement": 6.299999999999999
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

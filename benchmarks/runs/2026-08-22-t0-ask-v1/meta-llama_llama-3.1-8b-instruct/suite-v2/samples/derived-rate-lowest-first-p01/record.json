@@ -1,0 +1,107 @@
+{
+  "id": "derived-rate-lowest-first-p01",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "2023 employment after 6 months as percent of enrolled, lowest district first",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      2022,
+      800,
+      280,
+      520,
+      "synthetic women livelihood outcomes fixture",
+      35.0
+    ],
+    [
+      "Kishanganj",
+      2023,
+      900,
+      342,
+      612,
+      "synthetic women livelihood outcomes fixture",
+      38.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH employment_after_6_months AS (SELECT district, year, women_enrolled, employed_at_6_months, completed_training, source, (employed_at_6_months * 100.0) / NULLIF(NULLIF(women_enrolled, 0), 0) AS employment_percent FROM livelihoods), ranked_districts AS (SELECT district, year, women_enrolled, employed_at_6_months, completed_training, source, employment_percent, ROW_NUMBER() OVER (PARTITION BY year ORDER BY employment_percent NULLS FIRST) AS rank FROM employment_after_6_months) SELECT district, year, women_enrolled, employed_at_6_months, completed_training, source, employment_percent FROM ranked_districts WHERE rank = 1",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\n2023 employment after 6 months as percent of enrolled, lowest district first",
+      "response": "```sql\nWITH employment_after_6_months AS (\n  SELECT \n    district,\n    year,\n    women_enrolled,\n    employed_at_6_months,\n    completed_training,\n    source,\n    (employed_at_6_months * 100.0) / NULLIF(women_enrolled, 0) AS employment_percent\n  FROM livelihoods\n),\nranked_districts AS (\n  SELECT \n    district,\n    year,\n    women_enrolled,\n    employed_at_6_months,\n    completed_training,\n    source,\n    employment_percent,\n    ROW_NUMBER() OVER (PARTITION BY year ORDER BY employment_percent) AS rank\n  FROM employment_after_6_months\n)\nSELECT \n  district,\n  year,\n  women_enrolled,\n  employed_at_6_months,\n  completed_training,\n  source,\n  employment_percent\nFROM ranked_districts\nWHERE rank = 1\n```",
+      "api": {
+        "id": "gen-1787421281-VNaac4707cvqbZMeqhno",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 303,
+          "completion_tokens": 182,
+          "total_tokens": 485,
+          "cost": 1.334e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.334e-05,
+            "upstream_inference_prompt_cost": 6.06e-06,
+            "upstream_inference_completions_cost": 7.28e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 6.778
+      },
+      "duration_seconds": 6.782,
+      "sql_duckdb": "WITH employment_after_6_months AS (SELECT district, year, women_enrolled, employed_at_6_months, completed_training, source, (employed_at_6_months * 100.0) / NULLIF(NULLIF(women_enrolled, 0), 0) AS employment_percent FROM livelihoods), ranked_districts AS (SELECT district, year, women_enrolled, employed_at_6_months, completed_training, source, employment_percent, ROW_NUMBER() OVER (PARTITION BY year ORDER BY employment_percent NULLS FIRST) AS rank FROM employment_after_6_months) SELECT district, year, women_enrolled, employed_at_6_months, completed_training, source, employment_percent FROM ranked_districts WHERE rank = 1",
+      "rows": [
+        [
+          "Kishanganj",
+          2022,
+          800,
+          280,
+          520,
+          "synthetic women livelihood outcomes fixture",
+          35.0
+        ],
+        [
+          "Kishanganj",
+          2023,
+          900,
+          342,
+          612,
+          "synthetic women livelihood outcomes fixture",
+          38.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

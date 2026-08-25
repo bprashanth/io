@@ -1,0 +1,91 @@
+{
+  "id": "relative-growth-between-years-p01",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "by what percent did total loan disbursement grow from 2023 to 2024",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": null,
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nby what percent did total loan disbursement grow from 2023 to 2024",
+      "response": "```sql\nWITH LoanData AS (\n  SELECT\n    SUM(Loan Amount (Rs)) AS total_loan_disbursement\n  FROM shg_loan_register\n  WHERE\n    STRFTIME('%Y', Disbursement Date) = '2023'\n), LoanData2 AS (\n  SELECT\n    SUM(Loan Amount (Rs)) AS total_loan_disbursement\n  FROM shg_loan_register\n  WHERE\n    STRFTIME('%Y', Disbursement Date) = '2024'\n)\nSELECT\n  (total_loan_disbursement - total_loan_disbursement) * 100 / total_loan_disbursement\nFROM LoanData,\n  LoanData2;\n```",
+      "api": {
+        "id": "gen-1787420972-rD4pBkQ4Y4unrJ0p1EWs",
+        "model": "google/gemma-3n-e4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 420,
+          "completion_tokens": 160,
+          "total_tokens": 580,
+          "cost": 4.44e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.44e-05,
+            "upstream_inference_prompt_cost": 2.52e-05,
+            "upstream_inference_completions_cost": 1.92e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 3.562
+      },
+      "duration_seconds": 3.562,
+      "error": "ParseError: Expecting ). Line 3, Col: 19.\n  WITH LoanData AS (\n  SELECT\n    SUM(Loan \u001b[4mAmount\u001b[0m (Rs)) AS total_loan_disbursement\n  FROM shg_loan_register\n  WHERE\n    STRFTIME('%Y', Disbursement D"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nby what percent did total loan disbursement grow from 2023 to 2024\n\nREJECTED QUERY ERROR:\nParseError: Expecting ). Line 3, Col: 19.\n  WITH LoanData AS (\n  SELECT\n    SUM(Loan \u001b[4mAmount\u001b[0m (Rs)) AS total_loan_disbursement\n  FROM shg_loan_register\n  WHERE\n    STRFTIME('%Y', Disbursement D\nReturn a complete corrected query.",
+      "response": "```sql\nWITH LoanData AS (\n  SELECT\n    SUM(Loan_Amount (Rs)) AS total_loan_disbursement\n  FROM shg_loan_register\n  WHERE STRFTIME('%Y', Disbursement Date) = '2023'\n), LoanData2 AS (\n  SELECT\n    SUM(Loan_Amount (Rs)) AS total_loan_disbursement\n  FROM shg_loan_register\n  WHERE STRFTIME('%Y', Disbursement Date) = '2024'\n)\nSELECT\n  (total_loan_disbursement - total_loan_disbursement) * 100 / total_loan_disbursement\nFROM LoanData, LoanData2;\n```",
+      "api": {
+        "id": "gen-1787420975-h1nF8YsHzBebqh1xTAd6",
+        "model": "google/gemma-3n-e4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 506,
+          "completion_tokens": 156,
+          "total_tokens": 662,
+          "cost": 4.908e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.908e-05,
+            "upstream_inference_prompt_cost": 3.036e-05,
+            "upstream_inference_completions_cost": 1.872e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.703
+      },
+      "duration_seconds": 4.703,
+      "error": "ParseError: Expecting ). Line 5, Col: 40.\n  mount (Rs)) AS total_loan_disbursement\n  FROM shg_loan_register\n  WHERE STRFTIME('%Y', Disbursement \u001b[4mDate\u001b[0m) = '2023'\n), LoanData2 AS (\n  SELECT\n    SUM(Loan_Amount (Rs)) AS total_loan_disbursement\n  FROM sh"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

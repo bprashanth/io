@@ -1,0 +1,92 @@
+{
+  "id": "donations-repeat-share-p03",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "out of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH total_donations AS (SELECT SUM(\"Amount\") AS total_amt FROM \"donations\"), multi_donors AS (SELECT \"Donor\", COUNT(*) AS cnt, SUM(\"Amount\") AS multi_amt FROM \"donations\" GROUP BY \"Donor\" HAVING COUNT(*) > 1) SELECT (SUM(m.multi_amt) * 100.0 / NULLIF(NULLIF(t.total_amt, 0), 0)) AS percent_from_multi_donors, COUNT(*) AS number_of_multi_donors FROM total_donations AS t CROSS JOIN multi_donors AS m",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nout of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors",
+      "response": "WITH donor_occasions AS (\n    SELECT \"Donor\", COUNT(*) AS occasion_count\n    FROM \"donations\"\n    GROUP BY \"Donor\"\n),\nmulti_donors AS (\n    SELECT \"Donor\"\n    FROM donor_occasions\n    WHERE occasion_count > 1\n),\ntotal_amount AS (\n    SELECT SUM(\"Amount\") AS total_amt\n    FROM \"donations\"\n),\nmulti_donor_amount AS (\n    SELECT SUM(d.\"Amount\") AS multi_amt\n    FROM \"donations\" d\n    JOIN multi_donors m ON d.\"Donor\" = m.\"Donor\"\n)\nSELECT \n    (m.multi_amt * 100.0 / NULLIF(t.total_amt, 0)) AS percent_from_multi_donors,\n    COUNT(DISTINCT m2.\"Donor\") AS number_of_multi_donors\nFROM multi_donor_amount m\nCROSS JOIN total_amount t\nCROSS JOIN multi_donors m2;",
+      "api": {
+        "id": "gen-1787421605-2oD9llTspPJolM8Ufxsv",
+        "model": "qwen/qwen3.5-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 437,
+          "completion_tokens": 209,
+          "total_tokens": 646,
+          "cost": 0.000411255,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000411255,
+            "upstream_inference_prompt_cost": 8.5215e-05,
+            "upstream_inference_completions_cost": 0.00032604
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.514
+      },
+      "duration_seconds": 2.518,
+      "error": "BinderException: Binder Error: column \"multi_amt\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(multi_amt)\" if the exact value of \"multi_amt\" is not important.\n\nLINE 1: ... AS d JOIN multi_donors AS m ON d.\"Donor\" = m.\"Donor\") SELECT (m.multi_amt * 100.0 / NULLIF(NULLIF(t.total_amt, 0), 0)...\n                                                                          ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nout of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: column \"multi_amt\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(multi_amt)\" if the exact value of \"multi_amt\" is not important.\n\nLINE 1: ... AS d JOIN multi_donors AS m ON d.\"Donor\" = m.\"Donor\") SELECT (m.multi_amt * 100.0 / NULLIF(NULLIF(t.total_amt, 0), 0)...\n                                                                          ^\nReturn a complete corrected query.",
+      "response": "WITH total_donations AS (\n  SELECT SUM(\"Amount\") AS total_amt FROM \"donations\"\n),\nmulti_donors AS (\n  SELECT \"Donor\", COUNT(*) AS cnt, SUM(\"Amount\") AS multi_amt\n  FROM \"donations\"\n  GROUP BY \"Donor\"\n  HAVING COUNT(*) > 1\n)\nSELECT \n  (SUM(m.multi_amt) * 100.0 / NULLIF(t.total_amt, 0)) AS percent_from_multi_donors,\n  COUNT(*) AS number_of_multi_donors\nFROM total_donations t\nCROSS JOIN multi_donors m;",
+      "api": {
+        "id": "gen-1787421607-wcrp6MMZkcYwUDRqKTLL",
+        "model": "qwen/qwen3.5-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 566,
+          "completion_tokens": 133,
+          "total_tokens": 699,
+          "cost": 0.00031785,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00031785,
+            "upstream_inference_prompt_cost": 0.00011037,
+            "upstream_inference_completions_cost": 0.00020748
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.267
+      },
+      "duration_seconds": 2.27,
+      "error": "BinderException: Binder Error: column \"total_amt\" must appear in the GROUP BY clause or must be part of an aggregate function.\nEither add it to the GROUP BY list, or use \"ANY_VALUE(total_amt)\" if the exact value of \"total_amt\" is not important.\n\nLINE 1: ...(*) > 1) SELECT (SUM(m.multi_amt) * 100.0 / NULLIF(NULLIF(t.total_amt, 0), 0)) AS percent_from_multi_donors, COUNT...\n                                                                     ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

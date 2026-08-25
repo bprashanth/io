@@ -1,0 +1,118 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jagruti Foundation</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Jagruti Foundation","short_name":"Jagruti","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+/* Additional styles for homepage specific elements */
+.hero { text-align: center; padding: 40px 20px; background: #fff; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--line); }
+.hero h2 { margin-top: 0; color: var(--accent); }
+.photo-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; }
+.photo-placeholder { min-width: 200px; height: 120px; background: #e5e7eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.contact-info { margin-top: 10px; }
+</style></head><body>
+<header><h1>Jagruti Foundation</h1></header>
+<main>
+    <div class="hero">
+        <h2 id="mission-text">Loading...</h2>
+        <p id="about-text" class="muted">Loading...</p>
+    </div>
+
+    <h3>Our Programmes</h3>
+    <div id="programmes-grid" class="grid">
+        <!-- Programmes injected here -->
+    </div>
+
+    <h3>Impact Gallery</h3>
+    <div id="photo-strip" class="photo-strip">
+        <!-- Photos injected here -->
+    </div>
+
+    <h3>Contact Us</h3>
+    <div class="card">
+        <div id="contact-details" class="contact-info">
+            <!-- Contact details injected here -->
+        </div>
+        <div style="margin-top: 15px;">
+            <label for="visitor-name">Name</label>
+            <input type="text" id="visitor-name" placeholder="Your Name">
+            <label for="visitor-msg">Message</label>
+            <textarea id="visitor-msg" rows="3" placeholder="How can we help?"></textarea>
+            <button id="send-btn" style="margin-top: 10px;">Send Message</button>
+        </div>
+    </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+(function() {
+    // 1. Data Source
+    const data = window.data || {
+        mission: "Empowering communities through education, health, and sustainable development.",
+        about: "Jagruti Foundation works tirelessly to uplift underprivileged sections of society. We believe in creating a ripple effect of positive change.",
+        programmes: [
+            { title: "Education for All", desc: "Providing quality schooling and resources to children in rural areas." },
+            { title: "Health & Hygiene", desc: "Organizing camps and awareness drives for better community health." },
+            { title: "Women Empowerment", desc: "Skill development and micro-finance support for women entrepreneurs." }
+        ],
+        photos: ["Rural School Visit", "Health Camp", "Skill Workshop", "Community Meet"],
+        contact: { email: "contact@jagruti.org", phone: "+91 98765 43210", address: "123, Hope Street, Mumbai, India" }
+    };
+
+    // 2. Render Mission/About
+    document.getElementById('mission-text').textContent = data.mission;
+    document.getElementById('about-text').textContent = data.about;
+
+    // 3. Render Programmes
+    const progGrid = document.getElementById('programmes-grid');
+    data.programmes.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `<h4 style="margin:0 0 5px 0">${p.title}</h4><p class="muted" style="margin:0">${p.desc}</p>`;
+        progGrid.appendChild(div);
+    });
+
+    // 4. Render Photo Strip
+    const strip = document.getElementById('photo-strip');
+    data.photos.forEach(label => {
+        const div = document.createElement('div');
+        div.className = 'photo-placeholder';
+        div.textContent = label;
+        strip.appendChild(div);
+    });
+
+    // 5. Render Contact Info
+    const contactDiv = document.getElementById('contact-details');
+    contactDiv.innerHTML = `
+        <p><strong>Email:</strong> ${data.contact.email}</p>
+        <p><strong>Phone:</strong> ${data.contact.phone}</p>
+        <p><strong>Address:</strong> ${data.contact.address}</p>
+    `;
+
+    // 6. Handle Form Submission
+    document.getElementById('send-btn').addEventListener('click', function() {
+        const name = document.getElementById('visitor-name').value;
+        const msg = document.getElementById('visitor-msg').value;
+        if(!name || !msg) {
+            alert("Please fill in both fields.");
+            return;
+        }
+        // Save to local store
+        const messages = store.get('jagruti_messages', []);
+        messages.push({ name, message: msg, date: new Date().toISOString() });
+        store.set('jagruti_messages', messages);
+        
+        alert("Thank you, " + name + "! Your message has been saved locally.");
+        document.getElementById('visitor-name').value = '';
+        document.getElementById('visitor-msg').value = '';
+    });
+})();
+</script>
+</body></html>

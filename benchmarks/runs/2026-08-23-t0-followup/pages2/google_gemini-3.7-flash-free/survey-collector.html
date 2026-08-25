@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Water Point Field Survey</title>
+<style>
+  :root {
+    --primary: #0284c7;
+    --primary-dark: #0369a1;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #0f172a;
+    --muted: #64748b;
+    --border: #cbd5e1;
+    --success: #16a34a;
+    --danger: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { background: var(--bg); color: var(--text); padding: 12px; line-height: 1.4; }
+  .container { max-width: 500px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 16px; padding: 12px; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
+  h1 { font-size: 1.25rem; color: var(--primary-dark); }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.75rem; background: #e0f2fe; color: var(--primary-dark); border-radius: 12px; margin-top: 4px; font-weight: 600; }
+  .card { background: var(--card); padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px; }
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; background: #fff;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); ring: 2px solid #bae6fd; }
+  .radio-group { display: flex; gap: 12px; }
+  .radio-label { display: flex; align-items: center; gap: 6px; font-weight: normal; font-size: 0.95rem; cursor: pointer; }
+  .gps-box { background: #f1f5f9; padding: 10px; border-radius: 6px; border: 1px dashed var(--border); margin-bottom: 6px; }
+  .gps-status { font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 10px 14px; font-size: 0.95rem; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; background: var(--primary); color: white; }
+  .btn:active { background: var(--primary-dark); }
+  .btn-secondary { background: #e2e8f0; color: var(--text); }
+  .btn-secondary:active { background: #cbd5e1; }
+  .btn-danger { background: #fee2e2; color: var(--danger); }
+  .btn-group { display: flex; gap: 8px; margin-top: 8px; }
+  .stats { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
+  .status-tag { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; display: none; text-align: center; margin-bottom: 12px; }
+  .status-tag.show { display: block; }
+  .status-tag.ok { background: #dcfce7; color: var(--success); }
+  .status-tag.err { background: #fee2e2; color: var(--danger); }
+  ul.record-list { list-style: none; max-height: 150px; overflow-y: auto; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 6px; }
+  ul.record-list li { padding: 8px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
+  ul.record-list li:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Water Point Survey</h1>
+    <div class="badge">Offline Field Data Collection</div>
+  </header>
+
+  <div id="statusAlert" class="status-tag"></div>
+
+  <form id="surveyForm" class="card">
+    <div class="form-group">
+      <label for="habitation">Habitation / Village Name *</label>
+      <input type="text" id="habitation" required placeholder="e.g. Rampur Tola">
+    </div>
+
+    <div class="form-group">
+      <label for="pumpType">Water Point Type *</label>
+      <select id="pumpType" required>
+        <option value="">Select an option</option>
+        <option value="Handpump (India Mark II)">Handpump (India Mark II)</option>
+        <option value="Handpump (Extra Deep)">Handpump (Extra Deep)</option>
+        <option value="Solar Borewell">Solar Borewell</option>
+        <option value="Open Well">Open Well</option>
+        <option value="Piped Water Tap">Piped Water Tap</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Is it working? *</label>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="working" value="Yes" required> Yes</label>
+        <label class="radio-label"><input type="radio" name="working" value="No"> No</label>
+        <label class="radio-label"><input type="radio" name="working" value="Partially"> Partially</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="users">Estimated Households Using *</label>
+      <input type="number" id="users" min="0" required placeholder="e.g. 25">
+    </div>
+
+    <div class="form-group">
+      <label>GPS Location</label>
+      <div class="gps-box">
+        <div class="gps-status" id="gpsStatus">Coordinates not captured</div>
+        <button type="button" class="btn btn-secondary" id="btnGps">Capture Current GPS</button>
+      </div>
+      <input type="hidden" id="latitude">
+      <input type="hidden" id="longitude">
+      <input type="hidden" id="accuracy">
+    </div>
+
+    <div class="form-group">
+      <label for="notes">Observations / Remarks</label>
+      <textarea id="notes" rows="2" placeholder="e.g. Broken handle, brown water"></textarea>
+    </div>
+
+    <button type="submit" class="btn" id="btnSave">Save Record Locally</button>
+  </form>
+
+  <div class="card">
+    <div class="stats">
+      <span>Stored Locally: <span id="recordCount">0</span> records</span>
+    </div>
+    <ul class="record-list" id="recordList"></ul>
+    <div class="btn-group">
+      <button type="button" class="btn" id="btnExport">Export All (JSON)</button>
+      <button type="button" class="btn btn-danger" id="btnClear">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const DB_KEY = 'water_point_surveys';
+  let coords = { lat: null, lon: null, acc: null };
+
+  const form = document.getElementById('surveyForm');
+  const btnGps = document.getElementById('btnGps');
+  const gpsStatus = document.getElementById('gpsStatus');
+  const recordCount = document.getElementById('recordCount');
+  const recordList = document.getElementById('recordList');
+  const btnExport = document.getElementById('btnExport');
+  const btnClear = document.getElementById('btnClear');
+  const statusAlert = document.getElementById('statusAlert');
+
+  function getRecords() {
+    try {
+      return JSON.parse(localStorage.getItem(DB_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRecords(data) {
+    try {
+      localStorage.setItem(DB_KEY, JSON.stringify(data));
+      renderList();
+    } catch (e) {
+      showMessage('Storage full or unavailable', 'err');
+    }
+  }
+
+  function showMessage(text, type) {
+    statusAlert.textContent = text;
+    statusAlert.className = 'status-tag show ' + type;
+    setTimeout(() => { statusAlert.className = 'status-tag'; }, 3000);
+  }
+
+  function renderList() {
+    const list = getRecords();
+    recordCount.textContent = list.length;
+    recordList.innerHTML = '';
+    if (list.length === 0) {
+      recordList.innerHTML = '<li style="color: #64748b; justify-content: center;">No stored responses</li>';
+      return;
+    }
+    list.slice().reverse().forEach(item => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span><strong>${item.habitation}</strong> (${item.pumpType})</span> <span>${item.working === 'Yes' ? '🟢' : '🔴'}</span>`;
+      recordList.appendChild(li);
+    });
+  }
+
+  btnGps.addEventListener('click', function() {
+    if (!navigator.geolocation) {
+      gpsStatus.textContent = 'Geolocation not supported on this device';
+      return;
+    }
+    gpsStatus.textContent = 'Acquiring GPS fix...';
+    btnGps.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        coords.lat = pos.coords.latitude.toFixed(6);
+        coords.lon = pos.coords.longitude.toFixed(6);
+        coords.acc = Math.round(pos.coords.accuracy);
+        gpsStatus.textContent = `Lat: ${coords.lat}, Lon: ${coords.lon} (±${coords.acc}m)`;
+        btnGps.disabled = false;
+      },
+      function(err) {
+        gpsStatus.textContent = 'Unable to get location: ' + err.message;
+        btnGps.disabled = false;
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const record = {
+      id: 'WP-' + Date.now(),
+      timestamp: new Date().toISOString(),
+      habitation: document.getElementById('habitation').value.trim(),
+      pumpType: document.getElementById('pumpType').value,
+      working: form.querySelector('input[name="working"]:checked').value,
+      households: parseInt(document.getElementById('users').value, 10),
+      notes: document.getElementById('notes').value.trim(),
+      location: {
+        latitude: coords.lat,
+        longitude: coords.lon,
+        accuracyMeters: coords.acc
+      }
+    };
+
+    const records = getRecords();
+    records.push(record);
+    saveRecords(records);
+
+    form.reset();
+    coords = { lat: null, lon: null, acc: null };
+    gpsStatus.textContent = 'Coordinates not captured';
+    showMessage('Response saved locally!', 'ok');
+  });
+
+  btnExport.addEventListener('click', function() {
+    const list = getRecords();
+    if (list.length === 0) {
+      showMessage('No data to export', 'err');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `water_survey_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  btnClear.addEventListener('click', function() {
+    const list = getRecords();
+    if (list.length === 0) return;
+    if (confirm('Delete all ' + list.length + ' saved records? Make sure you exported first.')) {
+      saveRecords([]);
+      showMessage('All local records cleared', 'ok');
+    }
+  });
+
+  // Init
+  renderList();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,338 @@
+{
+ "plan": {
+  "title": "School Enrolment and Infrastructure Dashboard",
+  "subtitle": "Tracking enrolment trends, gender parity, and infrastructure gaps across schools",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Students (2024)",
+    "sql": "SELECT SUM(COALESCE(\"Girls 2024\", 0) + COALESCE(\"Boys 2024\", 0)) AS total_students FROM \"school_enrolment_by_year\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Girls Share in 2024",
+    "sql": "SELECT ROUND(100.0 * SUM(COALESCE(\"Girls 2024\", 0)) / NULLIF(SUM(COALESCE(\"Girls 2024\", 0) + COALESCE(\"Boys 2024\", 0)), 0), 1) AS girls_share FROM \"school_enrolment_by_year\"",
+    "unit": "%"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Schools with Functional Girls' Toilets",
+    "sql": "SELECT COUNT(*) AS toilet_count FROM \"school_infrastructure\" WHERE \"Toilets functional (girls)\" = 'Yes'",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Enrolment Trend by Gender (2022-2024)",
+    "sql": "WITH yearly_totals AS (\n  SELECT \n    '2022' AS year,\n    SUM(COALESCE(\"Girls 2022\", 0)) AS girls,\n    SUM(COALESCE(\"Boys 2022\", 0)) AS boys\n  FROM \"school_enrolment_by_year\"\n  UNION ALL\n  SELECT \n    '2023' AS year,\n    SUM(COALESCE(\"Girls 2023\", 0)) AS girls,\n    SUM(COALESCE(\"Boys 2023\", 0)) AS boys\n  FROM \"school_enrolment_by_year\"\n  UNION ALL\n  SELECT \n    '2024' AS year,\n    SUM(COALESCE(\"Girls 2024\", 0)) AS girls,\n    SUM(COALESCE(\"Boys 2024\", 0)) AS boys\n  FROM \"school_enrolment_by_year\"\n)\nSELECT year, girls, boys FROM yearly_totals ORDER BY year",
+    "x": "year",
+    "y": [
+     "girls",
+     "boys"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Infrastructure Gaps by School",
+    "sql": "SELECT \n  \"School Code\",\n  CASE WHEN \"Toilets functional (girls)\" = 'No' THEN 1 ELSE 0 END AS missing_toilets,\n  CASE WHEN \"Drinking water\" = 'No' THEN 1 ELSE 0 END AS missing_water,\n  CASE WHEN \"Electricity\" = 'No' THEN 1 ELSE 0 END AS missing_electricity\nFROM \"school_infrastructure\"\nORDER BY missing_toilets DESC, missing_water DESC, missing_electricity DESC\nLIMIT 20",
+    "x": "School Code",
+    "y": [
+     "missing_toilets",
+     "missing_water",
+     "missing_electricity"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top 10 Schools by Total Enrolment (2024)",
+    "sql": "SELECT \n  \"School Name\",\n  \"Block\",\n  COALESCE(\"Girls 2024\", 0) AS girls_2024,\n  COALESCE(\"Boys 2024\", 0) AS boys_2024,\n  COALESCE(\"Girls 2024\", 0) + COALESCE(\"Boys 2024\", 0) AS total_2024\nFROM \"school_enrolment_by_year\"\nWHERE COALESCE(\"Girls 2024\", 0) + COALESCE(\"Boys 2024\", 0) > 0\nORDER BY total_2024 DESC\nLIMIT 10"
+   }
+  ],
+  "narrative": "The dashboard shows a total of {{p1}} students enrolled in 2024, with girls making up {{p2}}% of the student population. This indicates progress toward gender parity in education.\n\nOver the years, enrolment trends reveal steady growth for both genders, though the gap between boys and girls remains a focus area for intervention.\n\nInfrastructure gaps persist, with only {{p3}} schools having functional toilets for girls. Access to drinking water and electricity also varies significantly across schools.\n\nAddressing these gaps is critical to improving retention and learning outcomes, especially for girls who may face additional barriers due to inadequate facilities."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_students"
+   ],
+   "rows": [
+    {
+     "total_students": 9343
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "girls_share"
+   ],
+   "rows": [
+    {
+     "girls_share": 52.4
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "toilet_count"
+   ],
+   "rows": [
+    {
+     "toilet_count": 25
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "year",
+    "girls",
+    "boys"
+   ],
+   "rows": [
+    {
+     "year": "2022",
+     "girls": 4611,
+     "boys": 4202
+    },
+    {
+     "year": "2023",
+     "girls": 4733,
+     "boys": 4355
+    },
+    {
+     "year": "2024",
+     "girls": 4893,
+     "boys": 4450
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "School Code",
+    "missing_toilets",
+    "missing_water",
+    "missing_electricity"
+   ],
+   "rows": [
+    {
+     "School Code": 10940013,
+     "missing_toilets": 1,
+     "missing_water": 1,
+     "missing_electricity": 1
+    },
+    {
+     "School Code": 10390020,
+     "missing_toilets": 1,
+     "missing_water": 1,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10660024,
+     "missing_toilets": 1,
+     "missing_water": 1,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10640033,
+     "missing_toilets": 1,
+     "missing_water": 1,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10880008,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 1
+    },
+    {
+     "School Code": 10710017,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 1
+    },
+    {
+     "School Code": 10990022,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 1
+    },
+    {
+     "School Code": 10760027,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 1
+    },
+    {
+     "School Code": 10450002,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10850009,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10550012,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10680018,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10190021,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10110023,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10460036,
+     "missing_toilets": 1,
+     "missing_water": 0,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10680019,
+     "missing_toilets": 0,
+     "missing_water": 1,
+     "missing_electricity": 1
+    },
+    {
+     "School Code": 10240005,
+     "missing_toilets": 0,
+     "missing_water": 1,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10610006,
+     "missing_toilets": 0,
+     "missing_water": 1,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10370007,
+     "missing_toilets": 0,
+     "missing_water": 1,
+     "missing_electricity": 0
+    },
+    {
+     "School Code": 10320032,
+     "missing_toilets": 0,
+     "missing_water": 1,
+     "missing_electricity": 0
+    }
+   ],
+   "rowcount": 20,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "School Name",
+    "Block",
+    "girls_2024",
+    "boys_2024",
+    "total_2024"
+   ],
+   "rows": [
+    {
+     "School Name": "Rajkiya Vidyalaya Khizarsarai",
+     "Block": "Belaganj",
+     "girls_2024": 188,
+     "boys_2024": 179,
+     "total_2024": 367
+    },
+    {
+     "School Name": "Kanya Vidyalaya Amas",
+     "Block": "Dobhi",
+     "girls_2024": 167,
+     "boys_2024": 193,
+     "total_2024": 360
+    },
+    {
+     "School Name": "Madhya Vidyalaya Bhadeya",
+     "Block": "Belaganj",
+     "girls_2024": 190,
+     "boys_2024": 156,
+     "total_2024": 346
+    },
+    {
+     "School Name": "Rajkiya Vidyalaya Bankat",
+     "Block": "Belaganj",
+     "girls_2024": 162,
+     "boys_2024": 157,
+     "total_2024": 319
+    },
+    {
+     "School Name": "Prathmik Vidyalaya Bhadeya",
+     "Block": "Dobhi",
+     "girls_2024": 165,
+     "boys_2024": 138,
+     "total_2024": 303
+    },
+    {
+     "School Name": "Kanya Vidyalaya Khizarsarai",
+     "Block": "Atri",
+     "girls_2024": 140,
+     "boys_2024": 153,
+     "total_2024": 293
+    },
+    {
+     "School Name": "Madhya Vidyalaya Chakand",
+     "Block": "Barachatti",
+     "girls_2024": 189,
+     "boys_2024": 97,
+     "total_2024": 286
+    },
+    {
+     "School Name": "Adarsh Vidyalaya Bankat",
+     "Block": "Atri",
+     "girls_2024": 158,
+     "boys_2024": 123,
+     "total_2024": 281
+    },
+    {
+     "School Name": "Rajkiya Vidyalaya Sonbarsa",
+     "Block": "Belaganj",
+     "girls_2024": 110,
+     "boys_2024": 160,
+     "total_2024": 270
+    },
+    {
+     "School Name": "Kanya Vidyalaya Bhadeya",
+     "Block": "Dobhi",
+     "girls_2024": 97,
+     "boys_2024": 170,
+     "total_2024": 267
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

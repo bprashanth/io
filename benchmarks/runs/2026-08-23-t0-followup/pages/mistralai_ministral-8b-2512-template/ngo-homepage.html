@@ -1,0 +1,136 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jagruti Foundation</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Jagruti Foundation</h1></header>
+<main>
+  <section class="card">
+    <h2>Our Mission</h2>
+    <p>Jagruti Foundation empowers marginalized communities through education, skill development, and sustainable livelihood programs. We believe in creating lasting change through grassroots initiatives.</p>
+  </section>
+
+  <section class="card">
+    <h2>What We Do</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Education Access</h3>
+        <p>Providing quality education to underprivileged children through community schools and scholarship programs.</p>
+      </div>
+      <div class="card">
+        <h3>Skill Development</h3>
+        <p>Training youth in vocational skills to create sustainable livelihood opportunities.</p>
+      </div>
+      <div class="card">
+        <h3>Community Health</h3>
+        <p>Promoting health awareness and providing basic healthcare services in rural areas.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Our Impact</h2>
+    <div class="row">
+      <div>
+        <p><strong>Children Educated:</strong> <span id="children-educated">0</span></p>
+        <p><strong>Skills Trained:</strong> <span id="skills-trained">0</span></p>
+        <p><strong>Communities Reached:</strong> <span id="communities-reached">0</span></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Our Work in Action</h2>
+    <div class="row">
+      <div style="width: 100%; height: 200px; background: #ddd; display: flex; align-items: center; justify-content: center; color: #666;">
+        <span>Community School</span>
+      </div>
+      <div style="width: 100%; height: 200px; background: #ddd; display: flex; align-items: center; justify-content: center; color: #666;">
+        <span>Skill Training Workshop</span>
+      </div>
+      <div style="width: 100%; height: 200px; background: #ddd; display: flex; align-items: center; justify-content: center; color: #666;">
+        <span>Health Camp</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Get Involved</h2>
+    <form id="contact-form">
+      <div>
+        <label for="name">Name</label>
+        <input type="text" id="name" required>
+      </div>
+      <div>
+        <label for="email">Email</label>
+        <input type="email" id="email" required>
+      </div>
+      <div>
+        <label for="message">Message</label>
+        <textarea id="message" rows="4" required></textarea>
+      </div>
+      <button type="submit">Send Message</button>
+    </form>
+  </section>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// Initialize data from window.data if available
+if (window.data) {
+  const impactData = window.data.impact || {
+    childrenEducated: 0,
+    skillsTrained: 0,
+    communitiesReached: 0
+  };
+
+  document.getElementById('children-educated').textContent = impactData.childrenEducated;
+  document.getElementById('skills-trained').textContent = impactData.skillsTrained;
+  document.getElementById('communities-reached').textContent = impactData.communitiesReached;
+}
+
+// Handle contact form submission
+document.getElementById('contact-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const formData = {
+    name: this.elements.name.value,
+    email: this.elements.email.value,
+    message: this.elements.message.value,
+    timestamp: new Date().toISOString()
+  };
+
+  // Store in localStorage
+  const contacts = store.get('contacts', []);
+  contacts.push(formData);
+  store.set('contacts', contacts);
+
+  // Show success message
+  alert('Thank you for your message! We will get back to you soon.');
+
+  // Reset form
+  this.reset();
+});
+
+// Export contacts data
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'e') {
+    const contacts = store.get('contacts', []);
+    if (contacts.length > 0) {
+      download('jagruti_contacts.csv', toCSV(contacts), 'text/csv');
+    } else {
+      alert('No contact data to export.');
+    }
+  }
+});
+
+// Initialize offline support
+offlineReady();
+</script>
+</body></html>

@@ -1,0 +1,61 @@
+{
+  "id": "relative-growth-between-years-p03",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "how much more money was given out in 2024 than in 2023, in percent terms",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH yearly_totals AS (SELECT STRFTIME(CAST('%Y' AS TIMESTAMP), \"Disbursement Date\") AS year, SUM(\"Loan Amount (Rs)\") AS total_loans FROM shg_loan_register WHERE STRFTIME(CAST('%Y' AS TIMESTAMP), \"Disbursement Date\") IN ('2023', '2024') GROUP BY STRFTIME(CAST('%Y' AS TIMESTAMP), \"Disbursement Date\")) SELECT ROUND(((SELECT total_loans FROM yearly_totals WHERE year = '2024') - (SELECT total_loans FROM yearly_totals WHERE year = '2023')) / NULLIF(NULLIF((SELECT total_loans FROM yearly_totals WHERE year = '2023'), 0), 0) * 100, 2) AS percentage_increase",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nhow much more money was given out in 2024 than in 2023, in percent terms",
+      "duration_seconds": 16.645,
+      "error": "ValueError: model returned no answer content"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\nhow much more money was given out in 2024 than in 2023, in percent terms\n\nREJECTED QUERY ERROR:\nValueError: model returned no answer content\nReturn a complete corrected query.",
+      "response": "WITH yearly_totals AS (\r\n    SELECT \r\n        STRFTIME(\"Disbursement Date\", '%Y') AS year,\r\n        SUM(\"Loan Amount (Rs)\") AS total_loans\r\n    FROM \r\n        shg_loan_register\r\n    WHERE \r\n        STRFTIME(\"Disbursement Date\", '%Y') IN ('2023', '2024')\r\n    GROUP BY \r\n        STRFTIME(\"Disbursement Date\", '%Y')\r\n)\r\nSELECT \r\n    ROUND(\r\n        ((SELECT total_loans FROM yearly_totals WHERE year = '2024') - (SELECT total_loans FROM yearly_totals WHERE year = '2023')) \r\n        / NULLIF((SELECT total_loans FROM yearly_totals WHERE year = '2023'), 0) \r\n        * 100, \r\n    2) AS percentage_increase;",
+      "api": {
+        "id": "gen-1787421078-V3iazDxeiRWD2XbazJa3",
+        "model": "qwen/qwen3-14b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 419,
+          "completion_tokens": 630,
+          "total_tokens": 1049,
+          "cost": 0.0001805,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0001805,
+            "upstream_inference_prompt_cost": 4.19e-05,
+            "upstream_inference_completions_cost": 0.0001386
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 479,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 10.163
+      },
+      "duration_seconds": 10.165,
+      "error": "InvalidInputException: Invalid Input Error: strftime format must be a constant\n\nLINE 1: ... shg_loan_register WHERE STRFTIME(CAST('%Y' AS TIMESTAMP), \"Disbursement Date\") IN ('2023', '2024') GROUP BY STRFTIME...\n                                                                      ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

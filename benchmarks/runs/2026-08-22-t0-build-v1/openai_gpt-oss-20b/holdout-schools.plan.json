@@ -1,0 +1,127 @@
+{
+ "plan": {
+  "title": "School Performance Dashboard",
+  "subtitle": "Key enrollment and infrastructure metrics across years",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Enrolment 2024",
+    "sql": "SELECT SUM(\"Girls 2024\" + \"Boys 2024\") AS total_enrolment FROM school_enrolment_by_year",
+    "unit": "students"
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Girls vs Boys 2024",
+    "sql": "SELECT 'Girls' AS gender, SUM(\"Girls 2024\") AS count FROM school_enrolment_by_year UNION ALL SELECT 'Boys', SUM(\"Boys 2024\") FROM school_enrolment_by_year",
+    "x": "gender",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "line",
+    "title": "Enrollment Trend 2022-2024",
+    "sql": "SELECT '2022' AS year, SUM(\"Girls 2022\" + \"Boys 2022\") AS total FROM school_enrolment_by_year UNION ALL SELECT '2023', SUM(\"Girls 2023\" + \"Boys 2023\") FROM school_enrolment_by_year UNION ALL SELECT '2024', SUM(\"Girls 2024\" + \"Boys 2024\") FROM school_enrolment_by_year ORDER BY year",
+    "x": "year",
+    "y": [
+     "total"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "pie",
+    "title": "Infrastructure Availability",
+    "sql": "SELECT 'Toilets' AS item, SUM(CASE WHEN \"Toilets functional (girls)\"='Yes' THEN 1 ELSE 0 END) AS available, SUM(CASE WHEN \"Toilets functional (girls)\"='No' THEN 1 ELSE 0 END) AS missing FROM school_infrastructure UNION ALL SELECT 'Water', SUM(CASE WHEN \"Drinking water\"='Yes' THEN 1 ELSE 0 END), SUM(CASE WHEN \"Drinking water\"='No' THEN 1 ELSE 0 END) FROM school_infrastructure UNION ALL SELECT 'Electricity', SUM(CASE WHEN \"Electricity\"='Yes' THEN 1 ELSE 0 END), SUM(CASE WHEN \"Electricity\"='No' THEN 1 ELSE 0 END) FROM school_infrastructure",
+    "x": "item",
+    "y": [
+     "available",
+     "missing"
+    ]
+   }
+  ],
+  "narrative": "The dashboard highlights the overall enrollment growth, with a total of {{p1.total_enrolment}} students in 2024. Girls outnumber boys by {{p2.count}} students, indicating a gender balance trend. The enrollment line chart shows a steady rise from {{p3.total}} in 2022 to {{p3.total}} in 2024. Infrastructure gaps are evident: {{p4.available}} toilets, {{p4.missing}} missing, and similar disparities in water and electricity access."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_enrolment"
+   ],
+   "rows": [
+    {
+     "total_enrolment": 9343
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "gender",
+    "count"
+   ],
+   "rows": [
+    {
+     "gender": "Girls",
+     "count": 4893
+    },
+    {
+     "gender": "Boys",
+     "count": 4450
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "year",
+    "total"
+   ],
+   "rows": [
+    {
+     "year": "2022",
+     "total": 8813
+    },
+    {
+     "year": "2023",
+     "total": 9088
+    },
+    {
+     "year": "2024",
+     "total": 9343
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "item",
+    "available",
+    "missing"
+   ],
+   "rows": [
+    {
+     "item": "Toilets",
+     "available": 25,
+     "missing": 15
+    },
+    {
+     "item": "Water",
+     "available": 31,
+     "missing": 9
+    },
+    {
+     "item": "Electricity",
+     "available": 30,
+     "missing": 10
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  }
+ }
+}

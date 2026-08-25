@@ -1,0 +1,1 @@
+The total distance travelled by the fleet in June 2025 was **4,884 km**.

@@ -1,0 +1,180 @@
+{
+ "plan": {
+  "title": "SHG Loan Repayment Dashboard",
+  "subtitle": "Repayment status, overdue loans, and loan purposes in the SHG register",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total SHG Loans Disbursed",
+    "sql": "SELECT COUNT(*) AS n FROM shg_loan_register",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Loans Fully Repaid (%)",
+    "sql": "SELECT ROUND(COUNT(CASE WHEN \"Repayment Status\" = 'Closed' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0), 1) AS pct FROM shg_loan_register",
+    "unit": "%"
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Overdue Loans (%)",
+    "sql": "SELECT ROUND(COUNT(CASE WHEN \"Repayment Status\" = 'Overdue' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0), 1) AS pct FROM shg_loan_register",
+    "unit": "%"
+   },
+   {
+    "id": "p4",
+    "kind": "bar",
+    "title": "Repayment Status Distribution",
+    "sql": "SELECT \"Repayment Status\", COUNT(*) AS count FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Repayment Status",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "stacked_bar",
+    "title": "Loan Amounts by Purpose",
+    "sql": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS amount FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC",
+    "x": "Purpose",
+    "y": [
+     "amount"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "table",
+    "title": "Top 5 Loan Purposes by Amount",
+    "sql": "SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register GROUP BY 1 ORDER BY 2 DESC LIMIT 5"
+   }
+  ],
+  "narrative": "The SHG loan register contains {{p1}} total loans across {{p2}}% fully repaid and {{p3}}% overdue. Agriculture and petty trade dominate loan purposes, with {{p5}} showing {{p5.y[0]}} Rs allocated to agriculture and {{p5.y[1]}} Rs to petty trade. The top 5 purposes by amount reveal {{p6}}\u2014agriculture leads with {{p6.n[1]}} Rs, followed by housing and livestock. Overdue loans are concentrated in {{p4}} blocks, with {{p4.y[0]}} loans in the 'Overdue' category. Regular repayments suggest {{p2}}% of loans are performing well, but {{p3}}% require intervention."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 360
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "pct"
+   ],
+   "rows": [
+    {
+     "pct": 40.0
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "pct"
+   ],
+   "rows": [
+    {
+     "pct": 16.7
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "Repayment Status",
+    "count"
+   ],
+   "rows": [
+    {
+     "Repayment Status": "Regular",
+     "count": 156
+    },
+    {
+     "Repayment Status": "Closed",
+     "count": 144
+    },
+    {
+     "Repayment Status": "Overdue",
+     "count": 60
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "Purpose",
+    "amount"
+   ],
+   "rows": [
+    {
+     "Purpose": "Agriculture",
+     "amount": 5335000
+    },
+    {
+     "Purpose": "Livestock",
+     "amount": 3565000
+    },
+    {
+     "Purpose": "Petty trade",
+     "amount": 2795000
+    },
+    {
+     "Purpose": "Housing",
+     "amount": 2740000
+    },
+    {
+     "Purpose": "Health",
+     "amount": 1890000
+    },
+    {
+     "Purpose": "Education",
+     "amount": 1490000
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "Purpose",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "Purpose": "Agriculture",
+     "total_amount": 5335000
+    },
+    {
+     "Purpose": "Livestock",
+     "total_amount": 3565000
+    },
+    {
+     "Purpose": "Petty trade",
+     "total_amount": 2795000
+    },
+    {
+     "Purpose": "Housing",
+     "total_amount": 2740000
+    },
+    {
+     "Purpose": "Health",
+     "total_amount": 1890000
+    }
+   ],
+   "rowcount": 5,
+   "error": null
+  }
+ }
+}

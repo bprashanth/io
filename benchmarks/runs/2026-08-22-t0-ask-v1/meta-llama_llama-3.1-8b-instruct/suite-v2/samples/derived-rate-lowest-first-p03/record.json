@@ -1,0 +1,103 @@
+{
+  "id": "derived-rate-lowest-first-p03",
+  "task_id": "derived-rate-lowest-first",
+  "pattern": "filter, derive percentage, ascending rank",
+  "question": "which district has lower employed out of enrolled rate in 2023? list everyone low to high",
+  "gold_sql": "SELECT district, ROUND(100.0 * employed_at_6_months / women_enrolled, 1) AS employment_percent FROM livelihoods WHERE year = 2023 ORDER BY employment_percent ASC, district",
+  "expected_rows": [
+    [
+      "Kishanganj",
+      38.0
+    ],
+    [
+      "Purnia",
+      46.0
+    ],
+    [
+      "Gaya",
+      56.0
+    ],
+    [
+      "Nalanda",
+      65.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kishanganj",
+      0.38
+    ],
+    [
+      "Purnia",
+      0.46
+    ],
+    [
+      "Gaya",
+      0.56
+    ],
+    [
+      "Nalanda",
+      0.65
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH rates AS (SELECT district, year, women_enrolled, employed_at_6_months, (employed_at_6_months * 1.0) / NULLIF(NULLIF(women_enrolled, 0), 0) AS employed_out_of_enrolled_rate FROM livelihoods WHERE year = 2023), low_districts AS (SELECT district, employed_out_of_enrolled_rate FROM rates ORDER BY employed_out_of_enrolled_rate NULLS FIRST) SELECT district, employed_out_of_enrolled_rate FROM low_districts",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\nwhich district has lower employed out of enrolled rate in 2023? list everyone low to high",
+      "response": "WITH \n  rates AS (\n    SELECT \n      district,\n      year,\n      women_enrolled,\n      employed_at_6_months,\n      (employed_at_6_months * 1.0) / NULLIF(women_enrolled, 0) AS employed_out_of_enrolled_rate\n    FROM \n      livelihoods\n    WHERE \n      year = 2023\n  ),\n  low_districts AS (\n    SELECT \n      district,\n      employed_out_of_enrolled_rate\n    FROM \n      rates\n    ORDER BY \n      employed_out_of_enrolled_rate\n  )\nSELECT \n  district,\n  employed_out_of_enrolled_rate\nFROM \n  low_districts",
+      "api": {
+        "id": "gen-1787421295-x93Kn0DIDjX8I9uBv7yj",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 332,
+          "completion_tokens": 138,
+          "total_tokens": 470,
+          "cost": 2.764e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 2.764e-05,
+            "upstream_inference_prompt_cost": 1.66e-05,
+            "upstream_inference_completions_cost": 1.104e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 0.334
+      },
+      "duration_seconds": 0.338,
+      "sql_duckdb": "WITH rates AS (SELECT district, year, women_enrolled, employed_at_6_months, (employed_at_6_months * 1.0) / NULLIF(NULLIF(women_enrolled, 0), 0) AS employed_out_of_enrolled_rate FROM livelihoods WHERE year = 2023), low_districts AS (SELECT district, employed_out_of_enrolled_rate FROM rates ORDER BY employed_out_of_enrolled_rate NULLS FIRST) SELECT district, employed_out_of_enrolled_rate FROM low_districts",
+      "rows": [
+        [
+          "Kishanganj",
+          0.38
+        ],
+        [
+          "Purnia",
+          0.46
+        ],
+        [
+          "Gaya",
+          0.56
+        ],
+        [
+          "Nalanda",
+          0.65
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community Health Camp - 14 September</title>
+<style>
+  :root {
+    --primary: #0f766e;
+    --primary-dark: #115e59;
+    --primary-light: #ccfbf1;
+    --accent: #d97706;
+    --text-main: #1f2937;
+    --text-muted: #4b5563;
+    --bg-page: #f8fafc;
+    --bg-card: #ffffff;
+    --border: #e2e8f0;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background-color: var(--bg-page); color: var(--text-main); line-height: 1.5; padding: 20px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 24px; padding: 24px; background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); }
+  h1 { font-size: 1.8rem; color: var(--primary); margin-bottom: 8px; }
+  .tagline { color: var(--text-muted); font-size: 1rem; }
+  
+  /* Countdown */
+  .countdown-box { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px auto 0; max-width: 450px; }
+  .time-card { background: var(--primary-light); padding: 12px; border-radius: var(--radius); text-align: center; }
+  .time-num { font-size: 1.5rem; font-weight: 700; color: var(--primary-dark); }
+  .time-lbl { font-size: 0.75rem; text-transform: uppercase; color: var(--primary); font-weight: 600; }
+
+  .main-grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
+  @media (min-width: 768px) { .main-grid { grid-template-columns: 1fr 1fr; } }
+
+  .card { background: var(--bg-card); padding: 20px; border-radius: var(--radius); border: 1px solid var(--border); }
+  h2 { font-size: 1.25rem; color: var(--text-main); margin-bottom: 16px; border-bottom: 2px solid var(--primary-light); padding-bottom: 8px; }
+
+  /* Form */
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 4px; }
+  input, select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; }
+  input:focus, select:focus { outline: 2px solid var(--primary); border-color: transparent; }
+  button { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: var(--radius); font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  button:hover { background: var(--primary-dark); }
+
+  /* Attendee List */
+  .attendee-list { list-style: none; max-height: 380px; overflow-y: auto; }
+  .attendee-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .attendee-item:last-child { border-bottom: none; }
+  .attendee-name { font-weight: 600; }
+  .attendee-service { background: var(--primary-light); color: var(--primary-dark); font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; }
+  .attendee-time { font-size: 0.75rem; color: var(--text-muted); }
+  .empty-state { text-align: center; color: var(--text-muted); padding: 20px 0; font-size: 0.9rem; }
+  .count-badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Community Health Camp</h1>
+    <p class="tagline">Free general checkups, eye tests, and dental consultations on 14 September</p>
+    <div class="countdown-box" id="countdown">
+      <div class="time-card"><div class="time-num" id="days">00</div><div class="time-lbl">Days</div></div>
+      <div class="time-card"><div class="time-num" id="hours">00</div><div class="time-lbl">Hours</div></div>
+      <div class="time-card"><div class="time-num" id="minutes">00</div><div class="time-lbl">Mins</div></div>
+      <div class="time-card"><div class="time-num" id="seconds">00</div><div class="time-lbl">Secs</div></div>
+    </div>
+  </header>
+
+  <div class="main-grid">
+    <div class="card">
+      <h2>Book Your Slot</h2>
+      <form id="signup-form">
+        <div class="form-group">
+          <label for="fullName">Full Name</label>
+          <input type="text" id="fullName" required placeholder="e.g. Jane Doe">
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" required placeholder="e.g. 555-0199">
+        </div>
+        <div class="form-group">
+          <label for="service">Required Service</label>
+          <select id="service" required>
+            <option value="">Select a service</option>
+            <option value="General Health">General Health Checkup</option>
+            <option value="Eye Examination">Eye Examination</option>
+            <option value="Dental Checkup">Dental Checkup</option>
+            <option value="Blood Pressure & Sugar">Blood Pressure & Sugar Screening</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="slot">Preferred Time</label>
+          <select id="slot" required>
+            <option value="">Select time slot</option>
+            <option value="Morning (9 AM - 11 AM)">Morning (9 AM - 11 AM)</option>
+            <option value="Midday (11 AM - 1 PM)">Midday (11 AM - 1 PM)</option>
+            <option value="Afternoon (2 PM - 4 PM)">Afternoon (2 PM - 4 PM)</option>
+          </select>
+        </div>
+        <button type="submit">Sign Up</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Registered Participants <span class="count-badge" id="reg-count">0</span></h2>
+      <ul class="attendee-list" id="attendee-list">
+        <li class="empty-state" id="empty-msg">No signups yet. Be the first to join!</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Countdown logic: targeting upcoming 14 September
+  function getTargetDate() {
+    var now = new Date();
+    var year = now.getFullYear();
+    var target = new Date(year, 8, 14, 9, 0, 0); // Month 8 is September
+    if (now > target) {
+      target = new Date(year + 1, 8, 14, 9, 0, 0);
+    }
+    return target.getTime();
+  }
+
+  var targetTime = getTargetDate();
+
+  function updateCountdown() {
+    var now = new Date().getTime();
+    var diff = targetTime - now;
+
+    if (diff <= 0) {
+      document.getElementById('days').innerText = '00';
+      document.getElementById('hours').innerText = '00';
+      document.getElementById('minutes').innerText = '00';
+      document.getElementById('seconds').innerText = '00';
+      return;
+    }
+
+    var d = Math.floor(diff / (1000 * 60 * 60 * 24));
+    var h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    var m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    var s = Math.floor((diff % (1000 * 60)) / 1000);
+
+    document.getElementById('days').innerText = d < 10 ? '0' + d : d;
+    document.getElementById('hours').innerText = h < 10 ? '0' + h : h;
+    document.getElementById('minutes').innerText = m < 10 ? '0' + m : m;
+    document.getElementById('seconds').innerText = s < 10 ? '0' + s : s;
+  }
+
+  setInterval(updateCountdown, 1000);
+  updateCountdown();
+
+  // Attendees data initialization
+  var attendees = [];
+  if (window.data && Array.isArray(window.data)) {
+    attendees = window.data;
+  }
+
+  var listEl = document.getElementById('attendee-list');
+  var countEl = document.getElementById('reg-count');
+  var form = document.getElementById('signup-form');
+
+  function renderList() {
+    listEl.innerHTML = '';
+    countEl.innerText = attendees.length;
+
+    if (attendees.length === 0) {
+      var empty = document.createElement('li');
+      empty.className = 'empty-state';
+      empty.innerText = 'No signups yet. Be the first to join!';
+      listEl.appendChild(empty);
+      return;
+    }
+
+    attendees.forEach(function(item) {
+      var li = document.createElement('li');
+      li.className = 'attendee-item';
+      
+      var leftDiv = document.createElement('div');
+      var nameDiv = document.createElement('div');
+      nameDiv.className = 'attendee-name';
+      nameDiv.textContent = item.name;
+      var timeDiv = document.createElement('div');
+      timeDiv.className = 'attendee-time';
+      timeDiv.textContent = item.slot || '';
+      leftDiv.appendChild(nameDiv);
+      leftDiv.appendChild(timeDiv);
+
+      var tagDiv = document.createElement('div');
+      tagDiv.className = 'attendee-service';
+      tagDiv.textContent = item.service;
+
+      li.appendChild(leftDiv);
+      li.appendChild(tagDiv);
+      listEl.appendChild(li);
+    });
+  }
+
+  renderList();
+
+  // Form submission handler
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var nameInput = document.getElementById('fullName');
+    var serviceInput = document.getElementById('service');
+    var slotInput = document.getElementById('slot');
+
+    var newEntry = {
+      name: nameInput.value.trim(),
+      service: serviceInput.value,
+      slot: slotInput.value
+    };
+
+    if (newEntry.name && newEntry.service && newEntry.slot) {
+      attendees.unshift(newEntry);
+      renderList();
+      form.reset();
+    }
+  });
+</script>
+</body>
+</html>

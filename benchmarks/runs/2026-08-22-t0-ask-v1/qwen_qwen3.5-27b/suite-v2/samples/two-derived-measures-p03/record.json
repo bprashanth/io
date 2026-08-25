@@ -1,0 +1,127 @@
+{
+  "id": "two-derived-measures-p03",
+  "task_id": "two-derived-measures",
+  "pattern": "filter two periods and groups, derive two percentages",
+  "question": "only Gaya Nalanda and years 2022-2023. calculate delivery coverage and postnatal coverage over registrations",
+  "gold_sql": "SELECT district, year, ROUND(100.0 * institutional_deliveries / pregnancies_registered, 1) AS delivery_percent, ROUND(100.0 * postnatal_check_48h / pregnancies_registered, 1) AS postnatal_percent FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year IN (2022, 2023) ORDER BY district, year",
+  "expected_rows": [
+    [
+      "Gaya",
+      2022,
+      72.0,
+      63.0
+    ],
+    [
+      "Gaya",
+      2023,
+      75.0,
+      68.0
+    ],
+    [
+      "Nalanda",
+      2022,
+      78.0,
+      72.0
+    ],
+    [
+      "Nalanda",
+      2023,
+      80.0,
+      75.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      2022,
+      0.72,
+      0.63
+    ],
+    [
+      "Gaya",
+      2023,
+      0.75,
+      0.68
+    ],
+    [
+      "Nalanda",
+      2022,
+      0.78,
+      0.72
+    ],
+    [
+      "Nalanda",
+      2023,
+      0.8,
+      0.75
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT district, year, institutional_deliveries * 1.0 / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS delivery_coverage, postnatal_check_48h * 1.0 / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS postnatal_coverage FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year BETWEEN 2022 AND 2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"maternal_services\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"institutional_deliveries\" BIGINT,\n  \"postnatal_check_48h\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"maternal_services\": {\"district\": [\"Gaya\", \"Nalanda\", \"Purnia\"]}}\n\nCURRENT QUESTION:\nonly Gaya Nalanda and years 2022-2023. calculate delivery coverage and postnatal coverage over registrations",
+      "response": "SELECT\n  district,\n  year,\n  institutional_deliveries * 1.0 / NULLIF(pregnancies_registered, 0) AS delivery_coverage,\n  postnatal_check_48h * 1.0 / NULLIF(pregnancies_registered, 0) AS postnatal_coverage\nFROM maternal_services\nWHERE district IN ('Gaya', 'Nalanda')\n  AND year BETWEEN 2022 AND 2023;",
+      "api": {
+        "id": "gen-1787421473-oJPFM9vHJzgXLYVLbaoK",
+        "model": "qwen/qwen3.5-27b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 321,
+          "completion_tokens": 98,
+          "total_tokens": 419,
+          "cost": 0.000215475,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000215475,
+            "upstream_inference_prompt_cost": 6.2595e-05,
+            "upstream_inference_completions_cost": 0.00015288
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.833
+      },
+      "duration_seconds": 1.837,
+      "sql_duckdb": "SELECT district, year, institutional_deliveries * 1.0 / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS delivery_coverage, postnatal_check_48h * 1.0 / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS postnatal_coverage FROM maternal_services WHERE district IN ('Gaya', 'Nalanda') AND year BETWEEN 2022 AND 2023",
+      "rows": [
+        [
+          "Gaya",
+          2022,
+          0.72,
+          0.63
+        ],
+        [
+          "Gaya",
+          2023,
+          0.75,
+          0.68
+        ],
+        [
+          "Nalanda",
+          2022,
+          0.78,
+          0.72
+        ],
+        [
+          "Nalanda",
+          2023,
+          0.8,
+          0.75
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

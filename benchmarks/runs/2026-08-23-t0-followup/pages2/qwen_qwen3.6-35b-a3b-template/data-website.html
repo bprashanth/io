@@ -1,0 +1,248 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scholarship Scheme Progress</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Scholarship Scheme Progress","short_name":"Scholarship","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Scholarship Scheme Progress</h1></header>
+<main>
+<div class="grid">
+  <div class="card">
+    <h3>Total Cases</h3>
+    <div id="total-cases" class="muted">-</div>
+  </div>
+  <div class="card">
+    <h3>Pending Cases</h3>
+    <div id="pending-cases" class="muted">-</div>
+  </div>
+  <div class="card">
+    <h3>Completion Rate</h3>
+    <div id="completion-rate" class="muted">-</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>District-wise Progress</h3>
+  <div class="row" style="margin-bottom:12px">
+    <select id="district-filter">
+      <option value="">All Districts</option>
+    </select>
+    <select id="status-filter">
+      <option value="">All Statuses</option>
+    </select>
+    <button id="export-btn" class="secondary">Export CSV</button>
+  </div>
+  <table id="progress-table">
+    <thead>
+      <tr>
+        <th>District</th>
+        <th>Total</th>
+        <th>Pending</th>
+        <th>Completed</th>
+        <th>Progress</th>
+      </tr>
+    </thead>
+    <tbody id="progress-tbody"></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Pending Cases Details</h3>
+  <div class="row" style="margin-bottom:12px">
+    <input type="text" id="search-pending" placeholder="Search by name, district, or scheme...">
+  </div>
+  <table id="pending-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>District</th>
+        <th>Taluka</th>
+        <th>Scheme</th>
+        <th>Marks %</th>
+        <th>Family Income</th>
+      </tr>
+    </thead>
+    <tbody id="pending-tbody"></tbody>
+  </table>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+(function() {
+  const data = window.data || [];
+  if (!data || !data.length) {
+    document.getElementById('total-cases').textContent = 'No data available';
+    return;
+  }
+
+  const pendingStatuses = ['Pending', 'Under Review', 'Pending Verification', 'Pending Approval', 'Pending Documents'];
+  const isPending = (status) => pendingStatuses.some(ps => status && status.toLowerCase().includes(ps.toLowerCase()));
+
+  // Calculate stats
+  const totalCases = data.length;
+  const pendingCases = data.filter(row => isPending(row['Status'])).length;
+  const completedCases = totalCases - pendingCases;
+  const completionRate = totalCases > 0 ? ((completedCases / totalCases) * 100).toFixed(1) : '0.0';
+
+  document.getElementById('total-cases').textContent = totalCases;
+  document.getElementById('pending-cases').textContent = pendingCases;
+  document.getElementById('completion-rate').textContent = completionRate + '%';
+
+  // District-wise aggregation
+  const districtMap = {};
+  data.forEach(row => {
+    const district = row['District'] || 'Unknown';
+    if (!districtMap[district]) {
+      districtMap[district] = { total: 0, pending: 0, completed: 0 };
+    }
+    districtMap[district].total++;
+    if (isPending(row['Status'])) {
+      districtMap[district].pending++;
+    } else {
+      districtMap[district].completed++;
+    }
+  });
+
+  const districtFilter = document.getElementById('district-filter');
+  const statusFilter = document.getElementById('status-filter');
+  const progressTbody = document.getElementById('progress-tbody');
+  const pendingTbody = document.getElementById('pending-tbody');
+  const searchInput = document.getElementById('search-pending');
+  const exportBtn = document.getElementById('export-btn');
+
+  // Populate status filter options
+  const statusSet = new Set();
+  data.forEach(row => {
+    if (row['Status']) statusSet.add(row['Status']);
+  });
+  statusSet.forEach(status => {
+    const option = document.createElement('option');
+    option.value = status;
+    option.textContent = status;
+    statusFilter.appendChild(option);
+  });
+
+  function getFilteredDistricts() {
+    const selectedDistrict = districtFilter.value;
+    const selectedStatus = statusFilter.value;
+    
+    const filteredDistricts = {};
+    data.forEach(row => {
+      const district = row['District'] || 'Unknown';
+      if (selectedDistrict && district !== selectedDistrict) return;
+      if (selectedStatus && row['Status'] !== selectedStatus) return;
+      
+      if (!filteredDistricts[district]) {
+        filteredDistricts[district] = { total: 0, pending: 0, completed: 0 };
+      }
+      filteredDistricts[district].total++;
+      if (isPending(row['Status'])) {
+        filteredDistricts[district].pending++;
+      } else {
+        filteredDistricts[district].completed++;
+      }
+    });
+    
+    return filteredDistricts;
+  }
+
+  function renderProgressTable() {
+    const filteredDistricts = getFilteredDistricts();
+    progressTbody.innerHTML = '';
+    
+    Object.keys(filteredDistricts).sort().forEach(district => {
+      const stats = filteredDistricts[district];
+      const progressPercent = stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(1) : '0.0';
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${district}</td>
+        <td>${stats.total}</td>
+        <td>${stats.pending}</td>
+        <td>${stats.completed}</td>
+        <td>${progressPercent}%</td>
+      `;
+      progressTbody.appendChild(tr);
+    });
+  }
+
+  function renderPendingTable(searchTerm = '') {
+    pendingTbody.innerHTML = '';
+    const searchTermLower = searchTerm.toLowerCase();
+    
+    const pendingData = data.filter(row => {
+      if (!isPending(row['Status'])) return false;
+      if (!searchTermLower) return true;
+      
+      const name = (row['Name of scheme'] || '').toLowerCase();
+      const district = (row['District'] || '').toLowerCase();
+      const scheme = (row['Name of scheme'] || '').toLowerCase();
+      
+      return name.includes(searchTermLower) || 
+             district.includes(searchTermLower) || 
+             scheme.includes(searchTermLower);
+    });
+    
+    pendingData.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row['Name'] || '-'}</td>
+        <td>${row['District'] || '-'}</td>
+        <td>${row['Taluka'] || '-'}</td>
+        <td>${row['Name of scheme'] || '-'}</td>
+        <td>${row['Marks %'] || '-'}</td>
+        <td>${row['Family Income'] || '-'}</td>
+      `;
+      pendingTbody.appendChild(tr);
+    });
+  }
+
+  function exportData() {
+    const filteredDistricts = getFilteredDistricts();
+    const exportData = Object.keys(filteredDistricts).map(district => {
+      const stats = filteredDistricts[district];
+      const progressPercent = stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(1) : '0.0';
+      return {
+        'District': district,
+        'Total': stats.total,
+        'Pending': stats.pending,
+        'Completed': stats.completed,
+        'Progress %': progressPercent
+      };
+    });
+    
+    const csv = toCSV(exportData);
+    download('district_progress.csv', csv, 'text/csv');
+  }
+
+  districtFilter.addEventListener('change', () => {
+    renderProgressTable();
+    renderPendingTable(searchInput.value);
+  });
+
+  statusFilter.addEventListener('change', () => {
+    renderProgressTable();
+    renderPendingTable(searchInput.value);
+  });
+
+  searchInput.addEventListener('input', () => {
+    renderPendingTable(searchInput.value);
+  });
+
+  exportBtn.addEventListener('click', exportData);
+
+  // Initial render
+  renderProgressTable();
+  renderPendingTable();
+})();
+</script>
+</body></html>

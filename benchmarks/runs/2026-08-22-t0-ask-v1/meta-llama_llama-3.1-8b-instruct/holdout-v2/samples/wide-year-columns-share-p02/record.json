@@ -1,0 +1,311 @@
+{
+  "id": "wide-year-columns-share-p02",
+  "task_id": "wide-year-columns-share",
+  "pattern": "arithmetic across year-named columns, group sum, share",
+  "question": "girls as a share of total students in 2024 for each block",
+  "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ]
+  ],
+  "actual_rows": [
+    [
+      0.5660377144813538
+    ],
+    [
+      0.6538461446762085
+    ],
+    [
+      0.33596837520599365
+    ],
+    [
+      0.46388888359069824
+    ],
+    [
+      0.7394636273384094
+    ],
+    [
+      0.7616822719573975
+    ],
+    [
+      0.6544502377510071
+    ],
+    [
+      0.6059321761131287
+    ],
+    [
+      0.5384615659713745
+    ],
+    [
+      0.4370861053466797
+    ],
+    [
+      0.6590909361839294
+    ],
+    [
+      0.36329588294029236
+    ],
+    [
+      0.4778156876564026
+    ],
+    [
+      0.7447698712348938
+    ],
+    [
+      0.5122615694999695
+    ],
+    [
+      0.4635416567325592
+    ],
+    [
+      0.6000000238418579
+    ],
+    [
+      0.45136186480522156
+    ],
+    [
+      0.5491329431533813
+    ],
+    [
+      0.3842794895172119
+    ],
+    [
+      0.28773584961891174
+    ],
+    [
+      0.4683544337749481
+    ],
+    [
+      0.5392156839370728
+    ],
+    [
+      0.5445544719696045
+    ],
+    [
+      0.5925925970077515
+    ],
+    [
+      0.5040322542190552
+    ],
+    [
+      0.40740740299224854
+    ],
+    [
+      0.40697672963142395
+    ],
+    [
+      0.6540284156799316
+    ],
+    [
+      0.3252427279949188
+    ],
+    [
+      0.6157205104827881
+    ],
+    [
+      0.3580246865749359
+    ],
+    [
+      0.31284916400909424
+    ],
+    [
+      0.6608391404151917
+    ],
+    [
+      0.5620437860488892
+    ],
+    [
+      0.6463414430618286
+    ],
+    [
+      0.5622775554656982
+    ],
+    [
+      0.4131455421447754
+    ],
+    [
+      0.5078369975090027
+    ],
+    [
+      0.6666666865348816
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT CAST(\"Girls 2024\" AS REAL) / NULLIF(NULLIF(\"Girls 2024\" + \"Boys 2024\", 0), 0) AS girls_share FROM school_enrolment_by_year",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}}\n\nCURRENT QUESTION:\ngirls as a share of total students in 2024 for each block",
+      "response": "SELECT CAST(`Girls 2024` AS REAL) / NULLIF(`Girls 2024` + `Boys 2024`, 0) AS girls_share FROM school_enrolment_by_year",
+      "api": {
+        "id": "gen-1787421345-G7UjV6WiwDB8uihQJ06s",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 739,
+          "completion_tokens": 42,
+          "total_tokens": 781,
+          "cost": 1.688e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.688e-05,
+            "upstream_inference_prompt_cost": 1.478e-05,
+            "upstream_inference_completions_cost": 2.1e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 0.888
+      },
+      "duration_seconds": 0.89,
+      "sql_duckdb": "SELECT CAST(\"Girls 2024\" AS REAL) / NULLIF(NULLIF(\"Girls 2024\" + \"Boys 2024\", 0), 0) AS girls_share FROM school_enrolment_by_year",
+      "rows": [
+        [
+          0.5660377144813538
+        ],
+        [
+          0.6538461446762085
+        ],
+        [
+          0.33596837520599365
+        ],
+        [
+          0.46388888359069824
+        ],
+        [
+          0.7394636273384094
+        ],
+        [
+          0.7616822719573975
+        ],
+        [
+          0.6544502377510071
+        ],
+        [
+          0.6059321761131287
+        ],
+        [
+          0.5384615659713745
+        ],
+        [
+          0.4370861053466797
+        ],
+        [
+          0.6590909361839294
+        ],
+        [
+          0.36329588294029236
+        ],
+        [
+          0.4778156876564026
+        ],
+        [
+          0.7447698712348938
+        ],
+        [
+          0.5122615694999695
+        ],
+        [
+          0.4635416567325592
+        ],
+        [
+          0.6000000238418579
+        ],
+        [
+          0.45136186480522156
+        ],
+        [
+          0.5491329431533813
+        ],
+        [
+          0.3842794895172119
+        ],
+        [
+          0.28773584961891174
+        ],
+        [
+          0.4683544337749481
+        ],
+        [
+          0.5392156839370728
+        ],
+        [
+          0.5445544719696045
+        ],
+        [
+          0.5925925970077515
+        ],
+        [
+          0.5040322542190552
+        ],
+        [
+          0.40740740299224854
+        ],
+        [
+          0.40697672963142395
+        ],
+        [
+          0.6540284156799316
+        ],
+        [
+          0.3252427279949188
+        ],
+        [
+          0.6157205104827881
+        ],
+        [
+          0.3580246865749359
+        ],
+        [
+          0.31284916400909424
+        ],
+        [
+          0.6608391404151917
+        ],
+        [
+          0.5620437860488892
+        ],
+        [
+          0.6463414430618286
+        ],
+        [
+          0.5622775554656982
+        ],
+        [
+          0.4131455421447754
+        ],
+        [
+          0.5078369975090027
+        ],
+        [
+          0.6666666865348816
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

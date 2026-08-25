@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Point Survey</title>
+    <style>
+        :root {
+            --primary: #0056b3;
+            --bg: #f4f7f6;
+            --card: #ffffff;
+            --text: #333333;
+            --border: #cccccc;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 { font-size: 1.5rem; margin: 0; color: var(--primary); }
+        h2 { font-size: 1.1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
+        input[type="text"], 
+        input[type="number"], 
+        select, 
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .radio-group { display: flex; gap: 15px; align-items: center; }
+        .radio-group label { font-weight: normal; margin: 0; }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .btn-submit { background-color: var(--primary); color: white; }
+        .btn-gps { background-color: #28a745; color: white; }
+        .btn-export { background-color: #6c757d; color: white; }
+        .btn-clear { background-color: #dc3545; color: white; margin-top: 20px; font-size: 0.8rem; }
+        
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .status {
+            font-size: 0.85rem;
+            text-align: center;
+            margin-top: 5px;
+            min-height: 1.2em;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+
+        .history-item {
+            font-size: 0.8rem;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Water Point Survey</h1>
+    </header>
+
+    <div class="card">
+        <form id="surveyForm">
+            <div class="form-group">
+                <label for="habitation">Habitation / Village Name</label>
+                <input type="text" id="habitation" required>
+            </div>
+
+            <div class="form-group">
+                <label for="pumpType">Pump Type</label>
+                <select id="pumpType" required>
+                    <option value="">-- Select --</option>
+                    <option value="handpump">Handpump</option>
+                    <option value="borehole">Borehole</option>
+                    <option value="standpipe">Standpipe</option>
+                    <option value="well">Open Well</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Is the pump working?</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="working" value="yes" required> Yes</label>
+                    <label><input type="radio" name="working" value="no"> No</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="users">Estimated Daily Users</label>
+                <input type="number" id="users" min="0" required>
+            </div>
+
+            <div class="form-group">
+                <label>GPS Location</label>
+                <button type="button" class="btn-gps" id="btnGps">Get Current Location</button>
+                <div id="gpsStatus" class="status">Not captured</div>
+                <input type="hidden" id="lat">
+                <input type="hidden" id="lng">
+            </div>
+
+            <button type="submit" class="btn-submit">Save Response</button>
+            <div id="formStatus" class="status"></div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Data Management</h2>
+        <button class="btn-export" id="btnExport">Export All Data (JSON)</button>
+        <div id="historyList"></div>
+        <button class="btn-clear" id="btnClear">Clear All Local Data</button>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const form = document.getElementById('surveyForm');
+        const btnGps = document.getElementById('btnGps');
+        const gpsStatus = document.getElementById('gpsStatus');
+        const formStatus = document.getElementById('formStatus');
+        const btnExport = document.getElementById('btnExport');
+        const btnClear = document.getElementById('btnClear');
+        const historyList = document.getElementById('historyList');
+
+        const STORAGE_KEY = 'water_survey_data';
+
+        // Initialize Data
+        let surveyData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+        function updateHistoryUI() {
+            historyList.innerHTML = '';
+            surveyData.slice().reverse().slice(0, 5).forEach(entry => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `<span>${entry.habitation}</span> <span>${new Date(entry.timestamp).toLocaleDateString()}</span>`;
+                historyList.appendChild(div);
+            });
+        }
+
+        // GPS Logic
+        btnGps.addEventListener('click', () => {
+            gpsStatus.textContent = "Locating...";
+            gpsStatus.className = "status";
+            
+            if (!navigator.geolocation) {
+                gpsStatus.textContent = "Geolocation not supported";
+                gpsStatus.className = "status error";
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    document.getElementById('lat').value = pos.coords.latitude;
+                    document.getElementById('lng').value = pos.coords.longitude;
+                    gpsStatus.textContent = `Captured: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+                    gpsStatus.className = "status success";
+                },
+                (err) => {
+                    gpsStatus.textContent = "Error: " + err.message;
+                    gpsStatus.className = "status error";
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+
+        // Form Submission
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const lat = document.getElementById('lat').value;
+            const lng = document.getElementById('lng').value;
+
+            if (!lat || !lng) {
+                formStatus.textContent = "Please capture GPS before saving.";
+                formStatus.className = "status error";
+                return;
+            }
+
+            const entry = {
+                id: Date.now(),
+                timestamp: new Date().toISOString(),
+                habitation: document.getElementById('habitation').value,
+                pumpType: document.getElementById('pumpType').value,
+                working: form.elements['working'].value,
+                users: parseInt(document.getElementById('users').value, 10),
+                location: {
+                    lat: parseFloat(lat),
+                    lng: parseFloat(lng)
+                }
+            };
+
+            surveyData.push(entry);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(surveyData));
+            
+            formStatus.textContent = "Saved successfully!";
+            formStatus.className = "status success";
+            form.reset();
+            gpsStatus.textContent = "Not captured";
+            updateHistoryUI();
+
+            setTimeout(() => {
+                formStatus.textContent = "";
+            }, 3000);
+        });
+
+        // Export Logic
+        btnExport.addEventListener('click', () => {
+            if (surveyData.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+            const blob = new Blob([JSON.stringify(surveyData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `water_survey_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // Clear Logic
+        btnClear.addEventListener('click', () => {
+            if (confirm("Are you sure you want to delete ALL stored responses? This cannot be undone.")) {
+                surveyData = [];
+                localStorage.removeItem(STORAGE_KEY);
+                updateHistoryUI();
+            }
+        });
+
+        // Initial Load
+        updateHistoryUI();
+
+        // Service Worker Registration (Inline Blob)
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', (e) => self.skipWaiting());
+                self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+                self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => new Response("Offline"))));
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log("SW failed", err));
+        }
+    })();
+</script>
+
+</body>
+</html>

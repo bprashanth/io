@@ -1,0 +1,136 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hand Washing Quiz</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Hand Washing Quiz</h1></header>
+<main>
+<div class="card" id="intro">
+<h2>Ready to test your hand washing skills?</h2>
+<p class="muted">Answer all five questions and see how much you know about keeping germs away.</p>
+<button id="startBtn">Start Quiz</button>
+</div>
+<div class="card" id="quizCard" style="display:none">
+<h2 id="qTitle"></h2>
+<div id="options"></div>
+<div class="row" style="margin-top:12px">
+<button id="nextBtn" disabled>Next</button>
+</div>
+</div>
+<div class="card" id="resultCard" style="display:none">
+<h2>Your Score</h2>
+<p id="scoreText"></p>
+<p id="feedback" class="muted"></p>
+<button id="tryAgainBtn">Try Again</button>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+window.data = window.data || {
+questions: [
+{ q: "How long should you scrub your hands with soap?", options: ["5 seconds", "20 seconds", "1 minute"], answer: 1 },
+{ q: "When is the most important time to wash your hands?", options: ["Before eating", "After using the toilet", "Both before eating and after using the toilet"], answer: 2 },
+{ q: "What do you use to make bubbles that help remove germs?", options: ["Water only", "Soap", "Sand"], answer: 1 },
+{ q: "Which part of your hands is easy to forget when washing?", options: ["Fingertips and between fingers", "The top of your head", "Your shoes"], answer: 0 },
+{ q: "What should you do after washing your hands?", options: ["Wipe them on your clothes", "Dry them with a clean towel or air dry", "Leave them wet"], answer: 1 }
+]
+};
+
+let currentQ = 0;
+let score = 0;
+let selected = -1;
+
+const introEl = document.getElementById('intro');
+const quizCard = document.getElementById('quizCard');
+const resultCard = document.getElementById('resultCard');
+const qTitle = document.getElementById('qTitle');
+const optionsEl = document.getElementById('options');
+const nextBtn = document.getElementById('nextBtn');
+const startBtn = document.getElementById('startBtn');
+const tryAgainBtn = document.getElementById('tryAgainBtn');
+const scoreText = document.getElementById('scoreText');
+const feedback = document.getElementById('feedback');
+
+function showIntro() {
+introEl.style.display = 'block';
+quizCard.style.display = 'none';
+resultCard.style.display = 'none';
+}
+
+function startQuiz() {
+currentQ = 0;
+score = 0;
+selected = -1;
+showQuestion();
+}
+
+function showQuestion() {
+const q = window.data.questions[currentQ];
+qTitle.textContent = `Question ${currentQ + 1} of ${window.data.questions.length}: ${q.q}`;
+optionsEl.innerHTML = '';
+selected = -1;
+nextBtn.disabled = true;
+q.options.forEach((opt, i) => {
+const label = document.createElement('label');
+label.style.marginBottom = '8px';
+label.style.cursor = 'pointer';
+const input = document.createElement('input');
+input.type = 'radio';
+input.name = 'answer';
+input.value = i;
+input.style.width = 'auto';
+input.style.marginRight = '8px';
+input.addEventListener('change', () => {
+selected = i;
+nextBtn.disabled = false;
+});
+label.appendChild(input);
+label.appendChild(document.createTextNode(opt));
+optionsEl.appendChild(label);
+});
+introEl.style.display = 'none';
+quizCard.style.display = 'block';
+resultCard.style.display = 'none';
+}
+
+function nextQuestion() {
+if (selected === -1) return;
+const q = window.data.questions[currentQ];
+if (selected === q.answer) score++;
+currentQ++;
+if (currentQ < window.data.questions.length) {
+showQuestion();
+} else {
+showResult();
+}
+}
+
+function showResult() {
+const total = window.data.questions.length;
+scoreText.textContent = `You got ${score} out of ${total} correct!`;
+let msg = '';
+if (score === total) msg = 'Perfect! You are a hand washing hero!';
+else if (score >= Math.ceil(total * 0.7)) msg = 'Great job! Keep up the good hygiene.';
+else if (score >= Math.ceil(total * 0.4)) msg = 'Good effort! Review the tips and try again.';
+else msg = 'Keep practicing! Wash those hands often.';
+feedback.textContent = msg;
+introEl.style.display = 'none';
+quizCard.style.display = 'none';
+resultCard.style.display = 'block';
+}
+
+startBtn.addEventListener('click', startQuiz);
+nextBtn.addEventListener('click', nextQuestion);
+tryAgainBtn.addEventListener('click', startQuiz);
+
+offlineReady();
+</script>
+</body></html>

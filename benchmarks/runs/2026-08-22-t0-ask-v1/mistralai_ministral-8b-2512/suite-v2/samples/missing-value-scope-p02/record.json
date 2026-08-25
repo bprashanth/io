@@ -1,0 +1,91 @@
+{
+  "id": "missing-value-scope-p02",
+  "task_id": "missing-value-scope",
+  "pattern": "null detection without treating missing as zero",
+  "question": "which rows have no quality score? only region and period",
+  "gold_sql": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL ORDER BY region, period",
+  "expected_rows": [
+    [
+      "East",
+      2023
+    ],
+    [
+      "South",
+      2022
+    ],
+    [
+      "West",
+      2022
+    ]
+  ],
+  "actual_rows": [
+    [
+      "South",
+      2022
+    ],
+    [
+      "West",
+      2022
+    ],
+    [
+      "East",
+      2023
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"quality_observations\" (\n  \"region\" VARCHAR,\n  \"period\" BIGINT,\n  \"eligible\" BIGINT,\n  \"completed\" BIGINT,\n  \"quality_score\" DOUBLE,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"quality_observations\": {\"region\": [\"East\", \"North\", \"South\", \"West\"], \"source\": [\"synthetic quality fixture\"]}}\n\nCURRENT QUESTION:\nwhich rows have no quality score? only region and period",
+      "response": "```sql\nSELECT region, period\nFROM quality_observations\nWHERE quality_score IS NULL\n```",
+      "api": {
+        "id": "gen-1787421143-DxxNufeON4cfeaumhoGW",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 286,
+          "completion_tokens": 22,
+          "total_tokens": 308,
+          "cost": 1.164e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.164e-05,
+            "upstream_inference_prompt_cost": 8.34e-06,
+            "upstream_inference_completions_cost": 3.3e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 0.675
+      },
+      "duration_seconds": 0.676,
+      "sql_duckdb": "SELECT region, period FROM quality_observations WHERE quality_score IS NULL",
+      "rows": [
+        [
+          "South",
+          2022
+        ],
+        [
+          "West",
+          2022
+        ],
+        [
+          "East",
+          2023
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

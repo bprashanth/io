@@ -1,0 +1,111 @@
+{
+  "id": "time-change-per-group-p05",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "calculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      10.010009765625
+    ],
+    [
+      15.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH coverage_2023 AS (SELECT district, pregnancies_registered, anc4_completed FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda')), coverage_2021 AS (SELECT district, pregnancies_registered, anc4_completed FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda')) SELECT (CAST(coverage_2023.pregnancies_registered AS REAL) - CAST(coverage_2021.pregnancies_registered AS REAL)) * 100.0 / NULLIF(NULLIF(coverage_2023.anc4_completed, 0), 0) AS change FROM coverage_2023 JOIN coverage_2021 ON coverage_2023.district = coverage_2021.district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+      "response": "SELECT CAST(NULLIF(anc_visits_1.pregnancies_registered - anc_visits_2.pregnancies_registered, 0) * 100.0 / NULLIF(anc_visits_1.anc4_completed, 0) - CAST(NULLIF(anc_visits_2.pregnancies_registered - anc_visits_3.pregnancies_registered, 0) * 100.0 / NULLIF(anc_visits_2.anc4_completed, 0), 0) AS REAL) AS change FROM anc_visits anc_visits_1 JOIN anc_visits anc_visits_2 ON anc_visits_1.district = anc_visits_2.district AND anc_visits_1.year = 2023 AND anc_visits_2.year = 2021 JOIN anc_visits anc_visits_3 ON anc_visits_1.district = anc_visits_3.district AND anc_visits_1.year = 2023 AND anc_visits_3.year = 2021 WHERE anc_visits_1.district IN (\"Gaya\", \"Nalanda\")",
+      "api": {
+        "id": "gen-1787421266-sEgdU0DaWFuBfv1hiAJt",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 305,
+          "completion_tokens": 230,
+          "total_tokens": 535,
+          "cost": 1.76e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.76e-05,
+            "upstream_inference_prompt_cost": 6.1e-06,
+            "upstream_inference_completions_cost": 1.15e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.822
+      },
+      "duration_seconds": 1.822,
+      "error": "ParseError: Required keyword: 'to' missing for <class 'sqlglot.expressions.functions.CastToStrType'>. Line 1, Col: 289.\n  istered - anc_visits_3.pregnancies_registered, 0) * 100.0 / NULLIF(anc_visits_2.anc4_completed, 0), \u001b[4m0\u001b[0m) AS REAL) AS change FROM anc_visits anc_visits_1 JOIN anc_visits anc_visits_2 ON anc_visits_1.distr"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda\n\nREJECTED QUERY ERROR:\nParseError: Required keyword: 'to' missing for <class 'sqlglot.expressions.functions.CastToStrType'>. Line 1, Col: 289.\n  istered - anc_visits_3.pregnancies_registered, 0) * 100.0 / NULLIF(anc_visits_2.anc4_completed, 0), \u001b[4m0\u001b[0m) AS REAL) AS change FROM anc_visits anc_visits_1 JOIN anc_visits anc_visits_2 ON anc_visits_1.distr\nReturn a complete corrected query.",
+      "response": "```sql\nWITH \n  coverage_2023 AS (\n    SELECT \n      district,\n      pregnancies_registered,\n      anc4_completed\n    FROM \n      anc_visits\n    WHERE \n      year = 2023 AND district IN ('Gaya', 'Nalanda')\n  ),\n  coverage_2021 AS (\n    SELECT \n      district,\n      pregnancies_registered,\n      anc4_completed\n    FROM \n      anc_visits\n    WHERE \n      year = 2021 AND district IN ('Gaya', 'Nalanda')\n  )\nSELECT \n  (CAST(coverage_2023.pregnancies_registered AS REAL) - CAST(coverage_2021.pregnancies_registered AS REAL)) * 100.0 / NULLIF(coverage_2023.anc4_completed, 0) AS change\nFROM \n  coverage_2023\nJOIN \n  coverage_2021 ON coverage_2023.district = coverage_2021.district;\n```",
+      "api": {
+        "id": "gen-1787421268-cRRNtrfrHpZZH2KEz2WH",
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 430,
+          "completion_tokens": 198,
+          "total_tokens": 628,
+          "cost": 1.652e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.652e-05,
+            "upstream_inference_prompt_cost": 8.6e-06,
+            "upstream_inference_completions_cost": 7.92e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 13.272
+      },
+      "duration_seconds": 13.276,
+      "sql_duckdb": "WITH coverage_2023 AS (SELECT district, pregnancies_registered, anc4_completed FROM anc_visits WHERE year = 2023 AND district IN ('Gaya', 'Nalanda')), coverage_2021 AS (SELECT district, pregnancies_registered, anc4_completed FROM anc_visits WHERE year = 2021 AND district IN ('Gaya', 'Nalanda')) SELECT (CAST(coverage_2023.pregnancies_registered AS REAL) - CAST(coverage_2021.pregnancies_registered AS REAL)) * 100.0 / NULLIF(NULLIF(coverage_2023.anc4_completed, 0), 0) AS change FROM coverage_2023 JOIN coverage_2021 ON coverage_2023.district = coverage_2021.district",
+      "rows": [
+        [
+          10.010009765625
+        ],
+        [
+          15.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

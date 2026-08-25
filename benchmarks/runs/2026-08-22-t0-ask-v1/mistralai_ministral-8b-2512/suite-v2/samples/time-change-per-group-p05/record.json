@@ -1,0 +1,96 @@
+{
+  "id": "time-change-per-group-p05",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "calculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH coverage_rates AS (SELECT district, NULLIF(SUM(anc4_completed), 0) / NULLIF(NULLIF(SUM(pregnancies_registered), 0), 0) * 100 AS coverage_rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND source = 'synthetic Bihar ANC fixture' GROUP BY district), yearly_rates AS (SELECT district, MAX(CASE WHEN year = 2023 THEN coverage_rate END) AS coverage_rate_2023, MAX(CASE WHEN year = 2021 THEN coverage_rate END) AS coverage_rate_2021 FROM coverage_rates GROUP BY district) SELECT district, (coverage_rate_2023 - coverage_rate_2021) AS percentage_point_change FROM yearly_rates WHERE NOT coverage_rate_2023 IS NULL AND NOT coverage_rate_2021 IS NULL",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda",
+      "response": "```sql\nWITH anc_coverage AS (\n  SELECT\n    district,\n    NULLIF(SUM(anc4_completed), 0) / NULLIF(SUM(pregnancies_registered), 0) * 100 AS coverage_rate\n  FROM anc_visits\n  WHERE district IN ('Gaya', 'Nalanda')\n    AND source = 'synthetic Bihar ANC fixture'\n  GROUP BY district, year\n)\nSELECT\n  district,\n  (coverage_rate_2023 - coverage_rate_2021) AS percentage_point_change\nFROM (\n  SELECT\n    district,\n    MAX(CASE WHEN year = 2023 THEN coverage_rate END) AS coverage_rate_2023,\n    MAX(CASE WHEN year = 2021 THEN coverage_rate END) AS coverage_rate_2021\n  FROM anc_coverage\n  GROUP BY district\n) AS rates;\n```",
+      "api": {
+        "id": "gen-1787421097-kUrL67MujHnMUbsiTbdB",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 313,
+          "completion_tokens": 199,
+          "total_tokens": 512,
+          "cost": 4.224e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.224e-05,
+            "upstream_inference_prompt_cost": 1.239e-05,
+            "upstream_inference_completions_cost": 2.985e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.558
+      },
+      "duration_seconds": 2.562,
+      "error": "BinderException: Binder Error: Referenced column \"year\" not found in FROM clause!\nCandidate bindings: \"coverage_rate\"\n\nLINE 1: ... percentage_point_change FROM (SELECT district, MAX(CASE WHEN year = 2023 THEN coverage_rate END) AS coverage_rate_2023...\n                                                                         ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncalculate 2023 ANC coverage rate minus 2021 rate in percentage points for Gaya and Nalanda\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"year\" not found in FROM clause!\nCandidate bindings: \"coverage_rate\"\n\nLINE 1: ... percentage_point_change FROM (SELECT district, MAX(CASE WHEN year = 2023 THEN coverage_rate END) AS coverage_rate_2023...\n                                                                         ^\nReturn a complete corrected query.",
+      "response": "```sql\nWITH coverage_rates AS (\n    SELECT\n        district,\n        NULLIF(SUM(anc4_completed), 0) / NULLIF(SUM(pregnancies_registered), 0) * 100 AS coverage_rate\n    FROM anc_visits\n    WHERE district IN ('Gaya', 'Nalanda')\n      AND source = 'synthetic Bihar ANC fixture'\n    GROUP BY district\n),\nyearly_rates AS (\n    SELECT\n        district,\n        MAX(CASE WHEN year = 2023 THEN coverage_rate END) AS coverage_rate_2023,\n        MAX(CASE WHEN year = 2021 THEN coverage_rate END) AS coverage_rate_2021\n    FROM coverage_rates\n    GROUP BY district\n)\nSELECT\n    district,\n    (coverage_rate_2023 - coverage_rate_2021) AS percentage_point_change\nFROM yearly_rates\nWHERE coverage_rate_2023 IS NOT NULL AND coverage_rate_2021 IS NOT NULL\n```",
+      "api": {
+        "id": "gen-1787421100-t8kPYlRZHiqUNFJ1Cifp",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 395,
+          "completion_tokens": 226,
+          "total_tokens": 621,
+          "cost": 5.859e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.859e-05,
+            "upstream_inference_prompt_cost": 2.469e-05,
+            "upstream_inference_completions_cost": 3.39e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.224
+      },
+      "duration_seconds": 2.228,
+      "error": "BinderException: Binder Error: Referenced column \"year\" not found in FROM clause!\nCandidate bindings: \"coverage_rate\"\n\nLINE 1: ... BY district), yearly_rates AS (SELECT district, MAX(CASE WHEN year = 2023 THEN coverage_rate END) AS coverage_rate_2023...\n                                                                          ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scholarship Scheme Progress Report</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --bg: #f4f7f6;
+            --text: #333;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 30px;
+            border-bottom: 3px solid var(--accent);
+            padding-bottom: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 1.8rem;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .card h3 {
+            margin: 0;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: var(--secondary);
+        }
+
+        .card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-top: 10px;
+            display: block;
+        }
+
+        .table-container {
+            background: var(--white);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--primary);
+            color: var(--white);
+            padding: 12px 15px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .status-pill {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+
+        .district-group-header {
+            background-color: #ecf0f1;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .no-data {
+            padding: 40px;
+            text-align: center;
+            color: #7f8c8d;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Scholarship Scheme Progress Report</h1>
+    </header>
+
+    <div id="dashboard">
+        <div class="summary-grid" id="summary-stats">
+            <!-- Stats injected here -->
+        </div>
+
+        <div class="table-container">
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>District</th>
+                        <th>Taluka</th>
+                        <th>Scheme Name</th>
+                        <th>Marks %</th>
+                        <th>Family Income</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Data injected here -->
+                </tbody>
+            </table>
+            <div id="empty-state" class="no-data" style="display: none;">
+                No data available. Please ensure window.data is populated.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        function init() {
+            const data = window.data;
+
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                document.getElementById('empty-state').style.display = 'block';
+                document.getElementById('data-table').style.display = 'none';
+                return;
+            }
+
+            renderSummary(data);
+            renderTable(data);
+        }
+
+        function renderSummary(data) {
+            const total = data.length;
+            const pending = data.filter(row => 
+                String(row.Status).toLowerCase().includes('pending')
+            ).length;
+            const completed = data.filter(row => 
+                String(row.Status).toLowerCase().includes('complete') || 
+                String(row.Status).toLowerCase().includes('approved')
+            ).length;
+
+            const container = document.getElementById('summary-stats');
+            container.innerHTML = `
+                <div class="card">
+                    <h3>Total Applications</h3>
+                    <span class="value">${total}</span>
+                </div>
+                <div class="card" style="border-bottom: 4px solid var(--warning)">
+                    <h3>Pending Cases</h3>
+                    <span class="value" style="color: var(--warning)">${pending}</span>
+                </div>
+                <div class="card" style="border-bottom: 4px solid var(--success)">
+                    <h3>Completed</h3>
+                    <span class="value" style="color: var(--success)">${completed}</span>
+                </div>
+            `;
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            // Sort data by District then Taluka
+            const sortedData = [...data].sort((a, b) => {
+                if (a.District < b.District) return -1;
+                if (a.District > b.District) return 1;
+                return 0;
+            });
+
+            let lastDistrict = null;
+
+            sortedData.forEach(row => {
+                // Add district separator row if district changes
+                if (row.District !== lastDistrict) {
+                    const headerRow = document.createElement('tr');
+                    headerRow.className = 'district-group-header';
+                    headerRow.innerHTML = `<td colspan="6">${row.District}</td>`;
+                    tbody.appendChild(headerRow);
+                    lastDistrict = row.District;
+                }
+
+                const tr = document.createElement('tr');
+                
+                // Determine status class
+                let statusClass = '';
+                const statusLower = String(row.Status).toLowerCase();
+                if (statusLower.includes('pending')) statusClass = 'status-pending';
+                else if (statusLower.includes('complete') || statusLower.includes('approved')) statusClass = 'status-completed';
+                else if (statusLower.includes('reject')) statusClass = 'status-rejected';
+
+                tr.innerHTML = `
+                    <td>${row.District}</td>
+                    <td>${row.Taluka}</td>
+                    <td>${row['Name of scheme']}</td>
+                    <td>${row['Marks %']}%</td>
+                    <td>${row['Family Income']}</td>
+                    <td><span class="status-pill ${statusClass}">${row.Status}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Run after a short delay to ensure window.data is injected by external script
+        const checkDataInterval = setInterval(() => {
+            if (window.data) {
+                clearInterval(checkDataInterval);
+                init();
+            }
+        }, 100);
+
+        // Fallback if data is already there
+        if (window.data) {
+            clearInterval(checkDataInterval);
+            init();
+        }
+    })();
+</script>
+
+</body>
+</html>

@@ -12,6 +12,7 @@ machine-specific operational notes.
 | 1 | Can VS Code/Cline + Qwen 3.8 27B match Antigravity for NGO dashboards? | Qwen is the capable open model; Cline is not the event shell. | [stage-1](stage-1-cline-vs-antigravity.md) |
 | 2 | Can a local SQL ladder (Arctic 7B → router → Qwen 27B → DuckDB) replace an agent? | Model ranking holds; router and "30/30" do not; Arctic adds nothing over a 2026 9B; schema-only frontier closes the dashboard gap. | [stage-2](stage-2-local-first-ladder.md) |
 | 3 | Can stock Antigravity be used on beneficiary data without the data leaving the laptop? | Yes: the privacy-shield extension (local GLiNER + vault proxy), verified in the real IDE. | [stage-3](stage-3-privacy-shield.md) |
+| 4 | Which small model is the "Laptop" tier of the io dial, and how far does it go in the Ask and Build lanes? | Qwen 3.5 9B for both lanes under a plan/receipt contract; the laptop types dates, normalises spellings and renders; a desktop shim (`app/io-desktop`) to test it. | [stage-4](stage-4-t0-model-and-io-desktop.md) |
 
 The final event stack is a combination: Antigravity (Part 3) with the shield
 for private files; the local/DGX model tiers and DuckDB calculation (stage 2)

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Field Expense Tracker</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      color: #24292e;
+      background-color: #f4f6f8;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header {
+      margin-bottom: 24px;
+    }
+    header h1 {
+      font-size: 24px;
+      color: #0f3c4c;
+      margin-bottom: 4px;
+    }
+    header p {
+      color: #586069;
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    @media (min-width: 768px) {
+      .grid {
+        grid-template-columns: 320px 1fr;
+      }
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: #0f3c4c;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #eaecef;
+      padding-bottom: 8px;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #444d56;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 14px;
+      border: 1px solid #d0d7de;
+      border-radius: 4px;
+      background-color: #fff;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #0366d6;
+      box-shadow: 0 0 0 3px rgba(3,102,214,0.2);
+    }
+    button {
+      width: 100%;
+      background-color: #1b7c54;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #145f40;
+    }
+    .total-box {
+      background-color: #e8f5e9;
+      border: 1px solid #c8e6c9;
+      border-radius: 6px;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .total-box .label {
+      font-size: 13px;
+      color: #2e7d32;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .total-box .amount {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1b5e20;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid #eaecef;
+    }
+    th {
+      background-color: #f6f8fa;
+      font-weight: 600;
+      color: #444d56;
+    }
+    td.amount-col, th.amount-col {
+      text-align: right;
+    }
+    .btn-delete {
+      background: none;
+      border: none;
+      color: #cb2431;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 6px;
+      width: auto;
+      text-decoration: underline;
+    }
+    .btn-delete:hover {
+      background: none;
+      color: #9e1c23;
+    }
+    .empty-message {
+      text-align: center;
+      color: #6a737d;
+      padding: 16px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Field Expense Tracker</h1>
+    <p>Record, manage, and review project expenses on site.</p>
+  </header>
+
+  <div class="grid">
+    <!-- Left Column: Form & Breakdown -->
+    <div>
+      <div class="card">
+        <h2>Add New Expense</h2>
+        <form id="expenseForm">
+          <div class="form-group">
+            <label for="expDate">Date</label>
+            <input type="date" id="expDate" required>
+          </div>
+          <div class="form-group">
+            <label for="expHead">Expense Head</label>
+            <select id="expHead" required>
+              <option value="">-- Select Head --</option>
+              <option value="Travel & Fuel">Travel & Fuel</option>
+              <option value="Food & Refreshments">Food & Refreshments</option>
+              <option value="Lodging & Stay">Lodging & Stay</option>
+              <option value="Community Meetings">Community Meetings</option>
+              <option value="Printing & Stationery">Printing & Stationery</option>
+              <option value="Emergency & Medical">Emergency & Medical</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="expAmount">Amount</label>
+            <input type="number" id="expAmount" min="0.01" step="0.01" placeholder="0.00" required>
+          </div>
+          <button type="submit">Add Expense</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Totals by Head</h2>
+        <div id="headsContainer">
+          <table id="headsTable">
+            <thead>
+              <tr>
+                <th>Head</th>
+                <th class="amount-col">Total</th>
+              </tr>
+            </thead>
+            <tbody id="headsTbody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Running Total & Log -->
+    <div>
+      <div class="total-box">
+        <div class="label">Total Field Expenses</div>
+        <div class="amount" id="grandTotal">0.00</div>
+      </div>
+
+      <div class="card">
+        <h2>Expense History</h2>
+        <div style="overflow-x: auto;">
+          <table id="expenseTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Head</th>
+                <th class="amount-col">Amount</th>
+                <th style="width: 40px;"></th>
+              </tr>
+            </thead>
+            <tbody id="expenseTbody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // In-memory data store initialized from window.data if provided
+    var expenses = [];
+
+    if (window.data && Array.isArray(window.data)) {
+      expenses = window.data.map(function(item, index) {
+        return {
+          id: item.id || Date.now() + index,
+          date: item.date || '',
+          head: item.head || 'Other',
+          amount: parseFloat(item.amount) || 0
+        };
+      });
+    }
+
+    var form = document.getElementById('expenseForm');
+    var dateInput = document.getElementById('expDate');
+    var headInput = document.getElementById('expHead');
+    var amountInput = document.getElementById('expAmount');
+    
+    var grandTotalEl = document.getElementById('grandTotal');
+    var expenseTbody = document.getElementById('expenseTbody');
+    var headsTbody = document.getElementById('headsTbody');
+
+    // Default to today's date
+    try {
+      dateInput.value = new Date().toISOString().split('T')[0];
+    } catch(e) {}
+
+    function formatNumber(num) {
+      return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function render() {
+      // 1. Render History Table
+      expenseTbody.innerHTML = '';
+      if (expenses.length === 0) {
+        var row = document.createElement('tr');
+        row.innerHTML = '<td colspan="4" class="empty-message">No expenses recorded yet.</td>';
+        expenseTbody.appendChild(row);
+      } else {
+        expenses.forEach(function(exp) {
+          var tr = document.createElement('tr');
+          
+          var tdDate = document.createElement('td');
+          tdDate.textContent = exp.date;
+          
+          var tdHead = document.createElement('td');
+          tdHead.textContent = exp.head;
+          
+          var tdAmount = document.createElement('td');
+          tdAmount.className = 'amount-col';
+          tdAmount.textContent = formatNumber(exp.amount);
+
+          var tdAction = document.createElement('td');
+          var delBtn = document.createElement('button');
+          delBtn.className = 'btn-delete';
+          delBtn.textContent = 'Delete';
+          delBtn.type = 'button';
+          delBtn.onclick = function() {
+            deleteExpense(exp.id);
+          };
+          tdAction.appendChild(delBtn);
+
+          tr.appendChild(tdDate);
+          tr.appendChild(tdHead);
+          tr.appendChild(tdAmount);
+          tr.appendChild(tdAction);
+
+          expenseTbody.appendChild(tr);
+        });
+      }
+
+      // 2. Calculate Totals
+      var total = 0;
+      var headTotals = {};
+
+      expenses.forEach(function(exp) {
+        total += exp.amount;
+        headTotals[exp.head] = (headTotals[exp.head] || 0) + exp.amount;
+      });
+
+      grandTotalEl.textContent = formatNumber(total);
+
+      // 3. Render Totals by Head
+      headsTbody.innerHTML = '';
+      var heads = Object.keys(headTotals);
+      if (heads.length === 0) {
+        var hRow = document.createElement('tr');
+        hRow.innerHTML = '<td colspan="2" class="empty-message">No data</td>';
+        headsTbody.appendChild(hRow);
+      } else {
+        heads.sort().forEach(function(head) {
+          var tr = document.createElement('tr');
+          
+          var tdHead = document.createElement('td');
+          tdHead.textContent = head;
+          
+          var tdAmount = document.createElement('td');
+          tdAmount.className = 'amount-col';
+          tdAmount.textContent = formatNumber(headTotals[head]);
+
+          tr.appendChild(tdHead);
+          tr.appendChild(tdAmount);
+          headsTbody.appendChild(tr);
+        });
+      }
+    }
+
+    function addExpense(e) {
+      e.preventDefault();
+      var date = dateInput.value;
+      var head = headInput.value;
+      var amount = parseFloat(amountInput.value);
+
+      if (!date || !head || isNaN(amount) || amount <= 0) {
+        return;
+      }
+
+      expenses.unshift({
+        id: Date.now() + Math.random(),
+        date: date,
+        head: head,
+        amount: amount
+      });
+
+      amountInput.value = '';
+      render();
+    }
+
+    function deleteExpense(id) {
+      expenses = expenses.filter(function(item) {
+        return item.id !== id;
+      });
+      render();
+    }
+
+    form.addEventListener('submit', addExpense);
+
+    // Initial render
+    render();
+  })();
+</script>
+</body>
+</html>

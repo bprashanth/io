@@ -1,0 +1,91 @@
+{
+  "id": "filter-on-derived-decline-p03",
+  "task_id": "filter-on-derived-decline",
+  "pattern": "keep groups whose derived change is negative, null rounds drop out",
+  "question": "women 15-49 literacy decreased between the two rounds - name those districts",
+  "gold_sql": "SELECT \"District\" FROM district_health_factsheet WHERE \"District\" <> 'State Total' GROUP BY \"District\" HAVING MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Women age 15-49 years who are literate (%)\" END) < MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Women age 15-49 years who are literate (%)\" END) ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Cuttack"
+    ],
+    [
+      "Hazaribagh"
+    ],
+    [
+      "Purnia"
+    ],
+    [
+      "Rohtas"
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Rohtas"
+    ],
+    [
+      "Cuttack"
+    ],
+    [
+      "Purnia"
+    ],
+    [
+      "Hazaribagh"
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH literacy_changes AS (SELECT \"District\", NULLIF(CAST(\"Women age 15-49 years who are literate (%)\" AS REAL), 0) AS literacy_4, NULLIF(LEAD(CAST(\"Women age 15-49 years who are literate (%)\" AS REAL), 1) OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\" NULLS FIRST), 0) AS literacy_5 FROM district_health_factsheet WHERE \"State\" IN ('Bihar', 'Jharkhand', 'Odisha') AND \"District\" IN ('Bhojpur', 'Cuttack', 'Dumka', 'Ganjam', 'Gaya', 'Giridih', 'Gumla', 'Hazaribagh', 'Kalahandi', 'Kishanganj', 'Koraput', 'Madhubani', 'Mayurbhanj', 'Nalanda', 'Palamu', 'Purnia', 'Ranchi', 'Rayagada', 'Rohtas', 'Saran') AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')) SELECT \"District\" FROM literacy_changes WHERE literacy_5 < literacy_4",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nwomen 15-49 literacy decreased between the two rounds - name those districts",
+      "response": "```sql\nWITH literacy_changes AS (\n  SELECT\n    \"District\",\n    NULLIF(\"Women age 15-49 years who are literate (%)\"::FLOAT, 0) AS literacy_4,\n    NULLIF(LEAD(\"Women age 15-49 years who are literate (%)\"::FLOAT, 1) OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\"), 0) AS literacy_5\n  FROM district_health_factsheet\n  WHERE \"State\" IN ('Bihar', 'Jharkhand', 'Odisha')\n    AND \"District\" IN ('Bhojpur', 'Cuttack', 'Dumka', 'Ganjam', 'Gaya', 'Giridih', 'Gumla', 'Hazaribagh', 'Kalahandi', 'Kishanganj', 'Koraput', 'Madhubani', 'Mayurbhanj', 'Nalanda', 'Palamu', 'Purnia', 'Ranchi', 'Rayagada', 'Rohtas', 'Saran')\n    AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')\n)\nSELECT \"District\"\nFROM literacy_changes\nWHERE literacy_5 < literacy_4\n```",
+      "api": {
+        "id": "gen-1787421101-z0htQWPkGCXWF3oqMlAA",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 499,
+          "completion_tokens": 277,
+          "total_tokens": 776,
+          "cost": 0.0001164,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0001164,
+            "upstream_inference_prompt_cost": 7.485e-05,
+            "upstream_inference_completions_cost": 4.155e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.747
+      },
+      "duration_seconds": 2.751,
+      "sql_duckdb": "WITH literacy_changes AS (SELECT \"District\", NULLIF(CAST(\"Women age 15-49 years who are literate (%)\" AS REAL), 0) AS literacy_4, NULLIF(LEAD(CAST(\"Women age 15-49 years who are literate (%)\" AS REAL), 1) OVER (PARTITION BY \"District\" ORDER BY \"Survey Round\" NULLS FIRST), 0) AS literacy_5 FROM district_health_factsheet WHERE \"State\" IN ('Bihar', 'Jharkhand', 'Odisha') AND \"District\" IN ('Bhojpur', 'Cuttack', 'Dumka', 'Ganjam', 'Gaya', 'Giridih', 'Gumla', 'Hazaribagh', 'Kalahandi', 'Kishanganj', 'Koraput', 'Madhubani', 'Mayurbhanj', 'Nalanda', 'Palamu', 'Purnia', 'Ranchi', 'Rayagada', 'Rohtas', 'Saran') AND \"Survey Round\" IN ('NFHS-4', 'NFHS-5')) SELECT \"District\" FROM literacy_changes WHERE literacy_5 < literacy_4",
+      "rows": [
+        [
+          "Rohtas"
+        ],
+        [
+          "Cuttack"
+        ],
+        [
+          "Purnia"
+        ],
+        [
+          "Hazaribagh"
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

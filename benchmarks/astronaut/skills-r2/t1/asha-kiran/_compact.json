@@ -1,0 +1,68 @@
+{
+ "cards": [
+  {
+   "name": "razorpay-campaign-filtering",
+   "kind": "rule",
+   "description": "Filter Razorpay payments by campaign using the 'notes.campaign' column, not a separate 'notes' table.",
+   "trigger": {
+    "table_regex": "razorpay_payments",
+    "question_regex": "campaign"
+   },
+   "claim": "When filtering by campaign in razorpay_payments, use the column 'notes.campaign' directly. Do not treat 'notes' as a table or use dot notation that implies a join.",
+   "evidence": [
+    1,
+    5,
+    9
+   ],
+   "confidence": 0.95,
+   "origin": "compacted",
+   "leaks": [],
+   "fires_on": []
+  },
+  {
+   "name": "donor-payment-source-selection",
+   "kind": "rule",
+   "description": "Use 'razorpay_payments' for questions about captured online payments, not 't_80g_receipts_2025'.",
+   "trigger": {
+    "question_regex": "captured payment|gave twice|donors made more than one"
+   },
+   "claim": "For questions about 'captured payments' or donor payment frequency, query the 'razorpay_payments' table. Do not join with 't_80g_receipts_2025' unless specifically asked for 80G receipt details, as 'razorpay_payments' contains the transaction status and email directly.",
+   "evidence": [
+    2,
+    6,
+    10
+   ],
+   "confidence": 0.9,
+   "origin": "compacted",
+   "leaks": [],
+   "fires_on": []
+  }
+ ],
+ "log_lines": 12,
+ "model": "qwen/qwen3.8-27b",
+ "seconds": 3.82,
+ "usage": {
+  "prompt_tokens": 2438,
+  "completion_tokens": 355,
+  "total_tokens": 2793,
+  "cost": 0.00237724,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00237724,
+   "upstream_inference_prompt_cost": 0.00117024,
+   "upstream_inference_completions_cost": 0.001207
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "raw": "```json\n[\n  {\n    \"name\": \"razorpay-campaign-filtering\",\n    \"kind\": \"rule\",\n    \"description\": \"Filter Razorpay payments by campaign using the 'notes.campaign' column, not a separate 'notes' table.\",\n    \"trigger\": {\n      \"table_regex\": \"razorpay_payments\",\n      \"question_regex\": \"campaign\"\n    },\n    \"claim\": \"When filtering by campaign in razorpay_payments, use the column 'notes.campaign' directly. Do not treat 'notes' as a table or use dot notation that implies a join.\",\n    \"evidence\": [1, 5, 9],\n    \"confidence\": 0.95\n  },\n  {\n    \"name\": \"donor-payment-source-selection\",\n    \"kind\": \"rule\",\n    \"description\": \"Use 'razorpay_payments' for questions about captured online payments, not 't_80g_receipts_2025'.\",\n    \"trigger\": {\n      \"question_regex\": \"captured payment|gave twice|donors made more than one\"\n    },\n    \"claim\": \"For questions about 'captured payments' or donor payment frequency, query the 'razorpay_payments' table. Do not join with 't_80g_receipts_2025' unless specifically asked for 80G receipt details, as 'razorpay_payments' contains the transaction status and email directly.\",\n    \"evidence\": [2, 6, 10],\n    \"confidence\": 0.9\n  }\n]\n```"
+}

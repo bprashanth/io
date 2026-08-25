@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beneficiary Registration</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #27ae60;
+            --error: #e74c3c;
+            --bg: #f4f7f6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        h1 { margin-top: 0; font-size: 1.5rem; text-align: center; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: opacity 0.2s;
+            margin-top: 10px;
+        }
+        .btn-submit { background-color: var(--accent); color: white; }
+        .btn-download { background-color: var(--primary); color: white; }
+        button:hover { opacity: 0.9; }
+        .error-msg { color: var(--error); font-size: 0.8rem; margin-top: 4px; display: none; }
+        .stats {
+            margin-top: 20px;
+            font-size: 0.85rem;
+            text-align: center;
+            color: #666;
+        }
+        .success-toast {
+            position: fixed;
+            bottom: 20px;
+            background: var(--accent);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Beneficiary Registration</h1>
+    <form id="regForm" novalidate>
+        <div class="form-group">
+            <label for="fullName">Full Name</label>
+            <input type="text" id="fullName" required>
+            <div class="error-msg" id="err-fullName">Please enter the full name.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="age">Age</label>
+            <input type="number" id="age" min="0" max="120" required>
+            <div class="error-msg" id="err-age">Please enter a valid age.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="village">Village Name</label>
+            <input type="text" id="village" required>
+            <div class="error-msg" id="err-village">Please enter the village name.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" pattern="[0-9]{10}" required>
+            <div class="error-msg" id="err-phone">Enter a valid 10-digit phone number.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" required>
+                <option value="">-- Select Category --</option>
+                <option value="General">General</option>
+                <option value="OBC">OBC</option>
+                <option value="SC">SC</option>
+                <option value="ST">ST</option>
+                <option value="Other">Other</option>
+            </select>
+            <div class="error-msg" id="err-category">Please select a category.</div>
+        </div>
+
+        <button type="submit" class="btn-submit">Register Beneficiary</button>
+    </form>
+
+    <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #eee;">
+
+    <button id="downloadBtn" class="btn-download">Download All Records (CSV)</button>
+    
+    <div class="stats" id="recordCount">Records saved: 0</div>
+</div>
+
+<div id="toast" class="success-toast">Registration Successful!</div>
+
+<script>
+    (function() {
+        const STORAGE_KEY = 'ngo_beneficiary_data';
+        const form = document.getElementById('regForm');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const recordCountEl = document.getElementById('recordCount');
+        const toast = document.getElementById('toast');
+
+        // Initialize data from window.data if provided, otherwise from localStorage
+        let beneficiaries = window.data || JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+        function updateUI() {
+            recordCountEl.textContent = `Records saved: ${beneficiaries.length}`;
+        }
+
+        function showToast() {
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        function validateField(field) {
+            const errorEl = document.getElementById(`err-${field.id}`);
+            let isValid = field.checkValidity();
+            
+            // Custom phone validation if pattern fails
+            if (field.id === 'phone' && field.value.length !== 10) {
+                isValid = false;
+            }
+
+            if (!isValid) {
+                errorEl.style.display = 'block';
+                field.style.borderColor = 'var(--error)';
+            } else {
+                errorEl.style.display = 'none';
+                field.style.borderColor = '#ccc';
+            }
+            return isValid;
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const fields = Array.from(form.querySelectorAll('input, select'));
+            let isFormValid = true;
+
+            fields.forEach(field => {
+                if (!validateField(field)) {
+                    isFormValid = false;
+                }
+            });
+
+            if (isFormValid) {
+                const entry = {
+                    name: document.getElementById('fullName').value,
+                    age: document.getElementById('age').value,
+                    village: document.getElementById('village').value,
+                    phone: document.getElementById('phone').value,
+                    category: document.getElementById('category').value,
+                    timestamp: new Date().toISOString()
+                };
+
+                beneficiaries.push(entry);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(beneficiaries));
+                
+                form.reset();
+                updateUI();
+                showToast();
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (beneficiaries.length === 0) {
+                alert('No records to download.');
+                return;
+            }
+
+            const headers = ['Name', 'Age', 'Village', 'Phone', 'Category', 'Registration Date'];
+            const csvRows = [headers.join(',')];
+
+            beneficiaries.forEach(b => {
+                const row = [
+                    `"${b.name.replace(/"/g, '""')}"`,
+                    b.age,
+                    `"${b.village.replace(/"/g, '""')}"`,
+                    b.phone,
+                    b.category,
+                    b.timestamp
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `beneficiaries_${new Date().getTime()}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Initial Load
+        updateUI();
+    })();
+</script>
+
+</body>
+</html>

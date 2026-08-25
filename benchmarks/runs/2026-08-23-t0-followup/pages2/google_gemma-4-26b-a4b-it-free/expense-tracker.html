@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Expense Tracker</title>
+    <style>
+        :root {
+            --primary: #2c5e4f;
+            --secondary: #eef2f1;
+            --accent: #d4a373;
+            --text: #333;
+            --white: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        container {
+            width: 100%;
+            max-width: 600px;
+            background: var(--white);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-top: 0;
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 10px;
+        }
+        summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        card {
+            background: var(--secondary);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        card label {
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+        }
+        card span {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+        form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        label {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        input, select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+        th {
+            background: #f8f8f8;
+            color: #666;
+        }
+        head-breakdown {
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+        head-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px dashed #ddd;
+        }
+        empty-state {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Field Expense Tracker</h1>
+
+    <div class="summary-grid">
+        <div class="card">
+            <label>Total Spent</label>
+            <span id="grand-total">$0.00</span>
+        </div>
+        <div class="card">
+            <label>Entries</label>
+            <span id="entry-count">0</span>
+        </div>
+    </div>
+
+    <form id="expense-form">
+        <div class="form-group">
+            <label for="date">Date</label>
+            <input type="date" id="date" required>
+        </div>
+        <div class="form-group">
+            <label for="head">Expense Head</label>
+            <select id="head" required>
+                <option value="">Select Category...</option>
+                <option value="Travel">Travel</option>
+                <option value="Food">Food</option>
+                <option value="Supplies">Supplies</option>
+                <option value="Lodging">Lodging</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="amount">Amount</label>
+            <input type="number" id="amount" step="0.01" placeholder="0.00" required>
+        </div>
+        <button type="submit">Add Expense</button>
+    </form>
+
+    <div class="head-breakdown" id="breakdown-container">
+        <!-- Totals by head will appear here -->
+    </div>
+
+    <div style="margin-top: 30px;">
+        <label style="font-weight: bold; color: var(--primary);">Recent Transactions</label>
+        <table id="expense-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Head</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody id="expense-body">
+                <!-- Rows added via JS -->
+            </tbody>
+        </table>
+        <div id="empty-msg" class="empty-state">No expenses recorded yet.</div>
+    </div>
+</div>
+
+<script>
+    // Data handling
+    let expenses = [];
+
+    // Initialize date to today
+    document.getElementById('date').valueAsDate = new Date();
+
+    const form = document.getElementById('expense-form');
+    const tableBody = document.getElementById('expense-body');
+    const grandTotalEl = document.getElementById('grand-total');
+    const countEl = document.getElementById('entry-count');
+    const breakdownContainer = document.getElementById('breakdown-container');
+    const emptyMsg = document.getElementById('empty-msg');
+
+    function updateUI() {
+        // Clear current view
+        tableBody.innerHTML = '';
+        breakdownContainer.innerHTML = '';
+        
+        if (expenses.length === 0) {
+            emptyMsg.style.display = 'block';
+            grandTotalEl.textContent = '$0.00';
+            countEl.textContent = '0';
+            return;
+        }
+
+        emptyMsg.style.display = 'none';
+        
+        let total = 0;
+        const totalsByHead = {};
+
+        // Sort expenses by date descending
+        expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        expenses.forEach(exp => {
+            // Add to table
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${exp.date}</td>
+                <td>${exp.head}</td>
+                <td>$${parseFloat(exp.amount).toFixed(2)}</td>
+            `;
+            tableBody.appendChild(row);
+
+            // Calculate totals
+            total += parseFloat(exp.amount);
+            totalsByHead[exp.head] = (totalsByHead[exp.head] || 0) + parseFloat(exp.amount);
+        });
+
+        // Update Grand Total
+        grandTotalEl.textContent = `$${total.toFixed(2)}`;
+        countEl.textContent = expenses.length;
+
+        // Update Breakdown
+        const breakdownTitle = document.createElement('div');
+        breakdownTitle.innerHTML = '<strong>Totals by Category</strong>';
+        breakdownContainer.appendChild(breakdownTitle);
+
+        for (const [head, val] of Object.entries(totalsByHead)) {
+            const div = document.createElement('div');
+            div.className = 'head-item';
+            div.innerHTML = `<span>${head}</span><span>$${val.toFixed(2)}</span>`;
+            breakdownContainer.appendChild(div);
+        }
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const newExpense = {
+            date: document.getElementById('date').value,
+            head: document.getElementById('head').value,
+            amount: document.getElementById('amount').value
+        };
+
+        expenses.push(newExpense);
+        form.reset();
+        document.getElementById('date').valueAsDate = new Date();
+        updateUI();
+    });
+
+    // Service Worker Registration for Offline Support
+    if ('serviceWorker' in navigator) {
+        const swCode = `
+            const CACHE_NAME = 'ngo-tracker-v1';
+            self.addEventListener('install', (e) => {
+                e.waitUntil(self.skipWaiting());
+            });
+            self.addEventListener('fetch', (e) => {
+                e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+            });
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch(err => console.log('SW failed', err));
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,291 @@
+{
+  "id": "wide-header-pp-change-excluding-total-rows-p02",
+  "task_id": "wide-header-pp-change-excluding-total-rows",
+  "pattern": "percentage-point change between two labelled rounds on messy headers, state filter, detail rows only",
+  "question": "for each district of Bihar how many points did full immunisation of 12-23 month children move between the two rounds",
+  "gold_sql": "SELECT \"District\", MAX(CASE WHEN \"Survey Round\" = 'NFHS-5' THEN \"Children age 12-23 months fully vaccinated (%)\" END) - MAX(CASE WHEN \"Survey Round\" = 'NFHS-4' THEN \"Children age 12-23 months fully vaccinated (%)\" END) AS change_pp FROM district_health_factsheet WHERE \"State\" = 'Bihar' AND \"District\" <> 'State Total' GROUP BY \"District\" ORDER BY \"District\"",
+  "expected_rows": [
+    [
+      "Bhojpur",
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      4.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Bhojpur",
+      60.7,
+      54.9,
+      -5.800000000000004
+    ],
+    [
+      "Gaya",
+      47.5,
+      55.3,
+      7.799999999999997
+    ],
+    [
+      "Kishanganj",
+      58.6,
+      61.4,
+      2.799999999999997
+    ],
+    [
+      "Madhubani",
+      50.1,
+      53.3,
+      3.1999999999999957
+    ],
+    [
+      "Nalanda",
+      56.6,
+      62.3,
+      5.699999999999996
+    ],
+    [
+      "Purnia",
+      46.8,
+      43.4,
+      -3.3999999999999986
+    ],
+    [
+      "Rohtas",
+      68.5,
+      66.6,
+      -1.9000000000000057
+    ],
+    [
+      "Saran",
+      66.3,
+      70.3,
+      4.0
+    ],
+    [
+      "State Total",
+      60.2,
+      58.4,
+      -1.8000000000000043
+    ],
+    [
+      "State Total",
+      60.2,
+      62.2,
+      2.0
+    ],
+    [
+      "State Total",
+      60.2,
+      63.6,
+      3.3999999999999986
+    ],
+    [
+      "State Total",
+      58.8,
+      58.4,
+      -0.3999999999999986
+    ],
+    [
+      "State Total",
+      58.8,
+      62.2,
+      3.4000000000000057
+    ],
+    [
+      "State Total",
+      58.8,
+      63.6,
+      4.800000000000004
+    ],
+    [
+      "State Total",
+      56.9,
+      58.4,
+      1.5
+    ],
+    [
+      "State Total",
+      56.9,
+      62.2,
+      5.300000000000004
+    ],
+    [
+      "State Total",
+      56.9,
+      63.6,
+      6.700000000000003
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH bihar_districts AS (SELECT DISTINCT \"District\" FROM \"district_health_factsheet\" WHERE \"State\" = 'Bihar'), immunization_change AS (SELECT d.\"District\", n4.\"Children age 12-23 months fully vaccinated (%)\" AS nfhs4, n5.\"Children age 12-23 months fully vaccinated (%)\" AS nfhs5, NULLIF(n5.\"Children age 12-23 months fully vaccinated (%)\" - n4.\"Children age 12-23 months fully vaccinated (%)\", 0) AS percentage_point_change FROM bihar_districts AS d LEFT JOIN \"district_health_factsheet\" AS n4 ON d.\"District\" = n4.\"District\" AND n4.\"Survey Round\" = 'NFHS-4' LEFT JOIN \"district_health_factsheet\" AS n5 ON d.\"District\" = n5.\"District\" AND n5.\"Survey Round\" = 'NFHS-5') SELECT \"District\", nfhs4, nfhs5, percentage_point_change FROM immunization_change ORDER BY \"District\" NULLS FIRST",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"district_health_factsheet\" (\n  \"State\" VARCHAR,\n  \"District\" VARCHAR,\n  \"Survey Round\" VARCHAR,\n  \"Households surveyed\" BIGINT,\n  \"Women age 15-49 years who are literate (%)\" DOUBLE,\n  \"Children age 12-23 months fully vaccinated (%)\" DOUBLE,\n  \"Institutional births (%)\" DOUBLE,\n  \"Children under 5 years who are stunted (%)\" DOUBLE,\n  \"Households with improved sanitation facility (%)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"district_health_factsheet\": {\"State\": [\"Bihar\", \"Jharkhand\", \"Odisha\"], \"District\": [\"Bhojpur\", \"Cuttack\", \"Dumka\", \"Ganjam\", \"Gaya\", \"Giridih\", \"Gumla\", \"Hazaribagh\", \"Kalahandi\", \"Kishanganj\", \"Koraput\", \"Madhubani\", \"Mayurbhanj\", \"Nalanda\", \"Palamu\", \"Purnia\", \"Ranchi\", \"Rayagada\", \"Rohtas\", \"Saran\", \"State Total\"], \"Survey Round\": [\"NFHS-4\", \"NFHS-5\"], \"Source\": [\"District factsheet\", \"State factsheet\"]}}\n\nCURRENT QUESTION:\nfor each district of Bihar how many points did full immunisation of 12-23 month children move between the two rounds",
+      "response": "```sql\nWITH bihar_districts AS (\n  SELECT DISTINCT \"District\"\n  FROM \"district_health_factsheet\"\n  WHERE \"State\" = 'Bihar'\n),\nimmunization_change AS (\n  SELECT\n    d.\"District\",\n    n4.\"Children age 12-23 months fully vaccinated (%)\" AS nfhs4,\n    n5.\"Children age 12-23 months fully vaccinated (%)\" AS nfhs5,\n    NULLIF(n5.\"Children age 12-23 months fully vaccinated (%)\" - n4.\"Children age 12-23 months fully vaccinated (%)\", 0) AS percentage_point_change\n  FROM bihar_districts d\n  LEFT JOIN \"district_health_factsheet\" n4 ON d.\"District\" = n4.\"District\" AND n4.\"Survey Round\" = 'NFHS-4'\n  LEFT JOIN \"district_health_factsheet\" n5 ON d.\"District\" = n5.\"District\" AND n5.\"Survey Round\" = 'NFHS-5'\n)\nSELECT\n  \"District\",\n  nfhs4,\n  nfhs5,\n  percentage_point_change\nFROM immunization_change\nORDER BY \"District\";\n```",
+      "api": {
+        "id": "gen-1787421079-fUpcmecL3On61UtIxggH",
+        "model": "mistralai/ministral-14b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 508,
+          "completion_tokens": 261,
+          "total_tokens": 769,
+          "cost": 8.468e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 8.468e-05,
+            "upstream_inference_prompt_cost": 3.248e-05,
+            "upstream_inference_completions_cost": 5.22e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.473
+      },
+      "duration_seconds": 2.478,
+      "sql_duckdb": "WITH bihar_districts AS (SELECT DISTINCT \"District\" FROM \"district_health_factsheet\" WHERE \"State\" = 'Bihar'), immunization_change AS (SELECT d.\"District\", n4.\"Children age 12-23 months fully vaccinated (%)\" AS nfhs4, n5.\"Children age 12-23 months fully vaccinated (%)\" AS nfhs5, NULLIF(n5.\"Children age 12-23 months fully vaccinated (%)\" - n4.\"Children age 12-23 months fully vaccinated (%)\", 0) AS percentage_point_change FROM bihar_districts AS d LEFT JOIN \"district_health_factsheet\" AS n4 ON d.\"District\" = n4.\"District\" AND n4.\"Survey Round\" = 'NFHS-4' LEFT JOIN \"district_health_factsheet\" AS n5 ON d.\"District\" = n5.\"District\" AND n5.\"Survey Round\" = 'NFHS-5') SELECT \"District\", nfhs4, nfhs5, percentage_point_change FROM immunization_change ORDER BY \"District\" NULLS FIRST",
+      "rows": [
+        [
+          "Bhojpur",
+          60.7,
+          54.9,
+          -5.800000000000004
+        ],
+        [
+          "Gaya",
+          47.5,
+          55.3,
+          7.799999999999997
+        ],
+        [
+          "Kishanganj",
+          58.6,
+          61.4,
+          2.799999999999997
+        ],
+        [
+          "Madhubani",
+          50.1,
+          53.3,
+          3.1999999999999957
+        ],
+        [
+          "Nalanda",
+          56.6,
+          62.3,
+          5.699999999999996
+        ],
+        [
+          "Purnia",
+          46.8,
+          43.4,
+          -3.3999999999999986
+        ],
+        [
+          "Rohtas",
+          68.5,
+          66.6,
+          -1.9000000000000057
+        ],
+        [
+          "Saran",
+          66.3,
+          70.3,
+          4.0
+        ],
+        [
+          "State Total",
+          60.2,
+          58.4,
+          -1.8000000000000043
+        ],
+        [
+          "State Total",
+          60.2,
+          62.2,
+          2.0
+        ],
+        [
+          "State Total",
+          60.2,
+          63.6,
+          3.3999999999999986
+        ],
+        [
+          "State Total",
+          58.8,
+          58.4,
+          -0.3999999999999986
+        ],
+        [
+          "State Total",
+          58.8,
+          62.2,
+          3.4000000000000057
+        ],
+        [
+          "State Total",
+          58.8,
+          63.6,
+          4.800000000000004
+        ],
+        [
+          "State Total",
+          56.9,
+          58.4,
+          1.5
+        ],
+        [
+          "State Total",
+          56.9,
+          62.2,
+          5.300000000000004
+        ],
+        [
+          "State Total",
+          56.9,
+          63.6,
+          6.700000000000003
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

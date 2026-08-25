@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3a4a">
+<title>Water Point Survey</title>
+<style>
+  :root{
+    --ink:#0b3a4a; --ink-2:#123f4d; --ink-3:#1c5568;
+    --paper:#eef4f5; --card:#ffffff;
+    --line:#d3e0e3; --line-2:#c1d3d8;
+    --text:#15303a; --muted:#5c7680;
+    --accent:#0e8f9c; --accent-2:#0a6f7a;
+    --good:#1f8a5b; --bad:#c0492f;
+    --shadow:0 1px 2px rgba(11,58,74,.06), 0 10px 26px rgba(11,58,74,.08);
+    --radius:14px;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; font-family:var(--sans); color:var(--text);
+    background:var(--paper); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:0 16px 40px}
+
+  /* ---------- header ---------- */
+  .top{
+    position:relative; overflow:hidden;
+    background:linear-gradient(160deg,var(--ink) 0%,var(--ink-2) 55%,var(--ink-3) 100%);
+    color:#eaf4f6; padding:26px 18px 40px;
+  }
+  .top::after{
+    content:""; position:absolute; left:0; right:0; bottom:-1px; height:14px;
+    background:
+      radial-gradient(circle at 10px 0, transparent 8px, var(--paper) 8.5px) 0 0/20px 14px repeat-x;
+  }
+  .top .kicker{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em;
+    text-transform:uppercase; color:#8fd0d8; margin:0 0 10px;
+  }
+  .top h1{
+    margin:0; font-size:clamp(26px,7vw,34px); font-weight:800;
+    letter-spacing:-.02em; line-height:1.05;
+  }
+  .top p{margin:10px 0 0; color:#c3dde2; font-size:14px; max-width:46ch}
+  .top .row{display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap}
+  .chip{
+    display:inline-flex; align-items:center; gap:7px;
+    background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18);
+    padding:6px 11px; border-radius:999px; font-size:12.5px; font-weight:600;
+  }
+  .chip .dot{width:8px; height:8px; border-radius:50%; background:#7fe0c0; box-shadow:0 0 0 3px rgba(127,224,192,.25)}
+  .chip .dot.off{background:#f0b48a; box-shadow:0 0 0 3px rgba(240,180,138,.25)}
+  .top .count{
+    margin-left:auto; font-family:var(--mono); font-size:12px;
+    background:rgba(0,0,0,.22); padding:6px 11px; border-radius:999px;
+  }
+
+  /* ---------- tabs ---------- */
+  .tabs{
+    position:sticky; top:0; z-index:20;
+    display:flex; gap:6px; padding:10px 16px;
+    background:rgba(238,244,245,.92); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .tabs button{
+    flex:1; font:inherit; font-weight:700; font-size:14px;
+    padding:10px 8px; border:1px solid var(--line-2); background:var(--card);
+    color:var(--muted); border-radius:10px; cursor:pointer;
+    transition:transform .12s ease, background .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  .tabs button:active{transform:scale(.97)}
+  .tabs button[aria-selected="true"]{
+    background:var(--ink); color:#fff; border-color:var(--ink);
+    box-shadow:var(--shadow);
+  }
+  .tabs .badge{
+    display:inline-block; min-width:20px; padding:1px 6px; margin-left:6px;
+    background:var(--accent); color:#fff; border-radius:999px; font-size:11px;
+    font-family:var(--mono);
+  }
+  .tabs button[aria-selected="true"] .badge{background:rgba(255,255,255,.25)}
+
+  /* ---------- panels ---------- */
+  .panel{display:none; animation:rise .35s ease both}
+  .panel.active{display:block}
+  @keyframes rise{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+
+  /* ---------- form ---------- */
+  .card{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:18px; margin-top:16px;
+  }
+  .card h2{
+    margin:0 0 4px; font-size:15px; font-weight:800; letter-spacing:.01em;
+    display:flex; align-items:center; gap:9px;
+  }
+  .card h2 .num{
+    font-family:var(--mono); font-size:12px; color:var(--accent-2);
+    background:#e6f4f5; border:1px solid #cfe9ec; width:24px; height:24px;
+    display:grid; place-items:center; border-radius:7px;
+  }
+  .card .hint{margin:0 0 14px; font-size:12.5px; color:var(--muted)}
+
+  .field{margin-bottom:16px}
+  .field:last-child{margin-bottom:0}
+  label.lbl{
+    display:block; font-size:13px; font-weight:700; color:var(--ink);
+    margin-bottom:7px;
+  }
+  label.lbl .req{color:var(--bad); margin-left:2px}
+  input[type=text], input[type=number], select, textarea{
+    width:100%; font:inherit; font-size:16px; color:var(--text);
+    padding:12px 13px; border:1.5px solid var(--line-2); border-radius:10px;
+    background:#fbfdfd; transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  textarea{resize:vertical; min-height:74px}
+  input:focus, select:focus, textarea:focus{
+    outline:none; border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(14,143,156,.16); background:#fff;
+  }
+  input.invalid, select.invalid{border-color:var(--bad); box-shadow:0 0 0 3px rgba(192,73,47,.14)}
+  .err{color:var(--bad); font-size:12px; margin-top:6px; min-height:0; display:none}
+  .err.show{display:block}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media (max-width:420px){.grid2{grid-template-columns:1fr}}
+
+  /* segmented yes/no */
+  .seg{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .seg button{
+    font:inherit; font-weight:700; font-size:15px; padding:13px;
+    border:1.5px solid var(--line-2); border-radius:10px; background:#fbfdfd;
+    color:var(--muted); cursor:pointer; transition:all .15s ease;
+  }
+  .seg button:active{transform:scale(.97)}
+  .seg button[data-val="yes"].on{background:#e7f5ee; border-color:var(--good); color:var(--good)}
+  .seg button[data-val="no"].on{background:#fbeae5; border-color:var(--bad); color:var(--bad)}
+
+  /* gps */
+  .gps{
+    border:1.5px dashed var(--line-2); border-radius:12px; padding:14px;
+    background:#f7fbfc;
+  }
+  .gps .status{font-size:13px; color:var(--muted); margin-bottom:10px; display:flex; align-items:center; gap:8px}
+  .gps .status .pulse{width:9px; height:9px; border-radius:50%; background:var(--muted); flex:none}
+  .gps .status.live .pulse{background:var(--good); animation:pulse 1.4s infinite}
+  .gps .status.err .pulse{background:var(--bad)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(31,138,91,.5)}70%{box-shadow:0 0 0 8px rgba(31,138,91,0)}100%{box-shadow:0 0 0 0 rgba(31,138,91,0)}}
+  .gps .coords{font-family:var(--mono); font-size:14px; color:var(--ink); word-break:break-all}
+  .gps .coords b{color:var(--accent-2)}
+  .gps .acc{font-size:12px; color:var(--muted); margin-top:4px}
+  .gps .btns{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap}
+
+  .btn{
+    font:inherit; font-weight:700; font-size:14px; cursor:pointer;
+    padding:11px 16px; border-radius:10px; border:1.5px solid transparent;
+    transition:transform .12s ease, background .15s ease, box-shadow .15s ease;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--accent); color:#fff; box-shadow:0 6px 16px rgba(14,143,156,.28)}
+  .btn.primary:hover{background:var(--accent-2)}
+  .btn.ghost{background:#fff; color:var(--ink); border-color:var(--line-2)}
+  .btn.ghost:hover{background:#f2f7f8}
+  .btn.danger{background:#fff; color:var(--bad); border-color:#e6c3ba}
+  .btn.danger:hover{background:#fbeae5}
+  .btn.block{width:100%; padding:14px; font-size:15px}
+
+  .form-actions{display:flex; gap:10px; margin-top:18px}
+  .form-actions .btn{flex:1}
+
+  /* ---------- records ---------- */
+  .records-head{display:flex; align-items:center; justify-content:space-between; margin-top:16px; gap:10px; flex-wrap:wrap}
+  .records-head h2{margin:0; font-size:18px; font-weight:800}
+  .records-head .sub{font-size:12.5px; color:var(--muted); margin-top:2px}
+  .records-head .actions{display:flex; gap:8px}
+  .records-head .actions .btn{padding:9px 13px; font-size:13px}
+
+  .list{margin-top:14px; display:flex; flex-direction:column; gap:10px}
+  .rec{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:14px; box-shadow:var(--shadow);
+  }
+  .rec .top-row{display:flex; align-items:flex-start; gap:10px}
+  .rec .title{font-weight:800; font-size:15px; color:var(--ink); flex:1; word-break:break-word}
+  .rec .del{
+    border:none; background:transparent; color:var(--muted); cursor:pointer;
+    font-size:18px; line-height:1; padding:2px 6px; border-radius:8px;
+  }
+  .rec .del:hover{background:#fbeae5; color:var(--bad)}
+  .rec .meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+  .tag{
+    font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:999px;
+    background:#eef3f4; color:var(--ink-2); border:1px solid var(--line);
+  }
+  .tag.work{background:#e7f5ee; color:var(--good); border-color:#c6e6d5}
+  .tag.broke{background:#fbeae5; color:var(--bad); border-color:#e6c3ba}
+  .rec .gps-line{font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:9px; word-break:break-all}
+  .rec .when{font-size:11.5px; color:var(--muted); margin-top:8px}
+
+  .empty{
+    text-align:center; padding:44px 20px; color:var(--muted);
+    border:1.5px dashed var(--line-2); border-radius:14px; margin-top:16px;
+  }
+  .empty .big{font-size:34px; margin-bottom:8px}
+  .empty b{color:var(--ink)}
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:22px; transform:translate(-50%,20px);
+    background:var(--ink); color:#fff; padding:12px 18px; border-radius:12px;
+    font-size:14px; font-weight:600; box-shadow:0 12px 30px rgba(0,0,0,.28);
+    opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+    max-width:90vw; z-index:50;
+  }
+  .toast.show{opacity:1; transform:translate(-50%,0)}
+
+  footer{margin-top:26px; text-align:center; font-size:11.5px; color:var(--muted)}
+  footer .mono{font-family:var(--mono)}
+</style>
+</head>
+<body>
+  <header class="top">
+    <p class="kicker">Field Data · Offline</p>
+    <h1>Water Point Survey</h1>
+    <p>Record each water point you visit. Everything is saved on this phone and can be exported as JSON when you are back online.</p>
+    <div class="row">
+      <span class="chip"><span class="dot" id="swDot"></span><span id="swText">Checking offline storage…</span></span>
+      <span class="count" id="topCount">0 saved</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button id="tab-new" role="tab" aria-selected="true" aria-controls="panel-new">New survey</button>
+    <button id="tab-records" role="tab" aria-selected="false" aria-controls="panel-records">
+      Saved <span class="badge" id="recBadge">0</span>
+    </button>
+  </nav>
+
+  <main class="wrap">
+    <!-- ============ NEW SURVEY ============ -->
+    <section id="panel-new" class="panel active" role="tabpanel" aria-labelledby="tab-new">
+      <form id="surveyForm" novalidate>
+        <div class="card">
+          <h2><span class="num">1</span> Where is it?</h2>
+          <p class="hint">Name the place and the type of settlement.</p>
+          <div class="field">
+            <label class="lbl" for="habitation">Habitation / place name <span class="req">*</span></label>
+            <input type="text" id="habitation" name="habitation" autocomplete="off" placeholder="e.g. Ward 4, Riverside">
+            <div class="err" id="err-habitation">Please enter a place name.</div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="settlement">Settlement type</label>
+            <select id="settlement" name="settlement">
+              <option value="">Select…</option>
+              <option>Village</option>
+              <option>Urban / town</option>
+              <option>Slum / informal</option>
+              <option>Rural hamlet</option>
+              <option>School</option>
+              <option>Health facility</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="num">2</span> The water point</h2>
+          <p class="hint">What kind of pump and is it working right now?</p>
+          <div class="field">
+            <label class="lbl" for="pumpType">Pump type <span class="req">*</span></label>
+            <select id="pumpType" name="pumpType">
+              <option value="">Select…</option>
+              <option>Hand pump (India mark II)</option>
+              <option>Hand pump (other)</option>
+              <option>Motorised / electric pump</option>
+              <option>Solar pump</option>
+              <option>Tap stand</option>
+              <option>Borehole (no pump)</option>
+              <option>Spring / natural source</option>
+              <option>Other</option>
+            </select>
+            <div class="err" id="err-pumpType">Please choose a pump type.</div>
+          </div>
+          <div class="field">
+            <label class="lbl">Working right now? <span class="req">*</span></label>
+            <div class="seg" id="workingSeg" role="group" aria-label="Working right now">
+              <button type="button" data-val="yes">Yes, working</button>
+              <button type="button" data-val="no">No, broken</button>
+            </div>
+            <div class="err" id="err-working">Please tell us if it is working.</div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="users">Usual number of users</label>
+            <input type="number" id="users" name="users" inputmode="numeric" min="0" step="1" placeholder="e.g. 120">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="num">3</span> Location (GPS)</h2>
+          <p class="hint">Tap “Get my location” to capture the point from this phone. You can also type it in.</p>
+          <div class="gps">
+            <div class="status" id="gpsStatus"><span class="pulse"></span><span id="gpsStatusText">Not captured yet.</span></div>
+            <div class="coords" id="gpsCoords">—</div>
+            <div class="acc" id="gpsAcc"></div>
+            <div class="btns">
+              <button type="button" class="btn primary" id="gpsBtn">Get my location</button>
+              <button type="button" class="btn ghost" id="gpsClear">Clear</button>
+            </div>
+          </div>
+          <div class="grid2" style="margin-top:14px">
+            <div class="field">
+              <label class="lbl" for="lat">Latitude</label>
+              <input type="text" id="lat" name="lat" inputmode="decimal" placeholder="e.g. 9.9312">
+            </div>
+            <div class="field">
+              <label class="lbl" for="lng">Longitude</label>
+              <input type="text" id="lng" name="lng" inputmode="decimal" placeholder="e.g. 76.2673">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="num">4</span> Notes</h2>
+          <p class="hint">Anything else: repairs needed, water quality, access, photos to take.</p>
+          <div class="field">
+            <label class="lbl" for="notes">Notes</label>
+            <textarea id="notes" name="notes" placeholder="Optional notes…"></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn ghost" id="resetBtn">Clear form</button>
+          <button type="submit" class="btn primary">Save survey</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ============ SAVED RECORDS ============ -->
+    <section id="panel-records" class="panel" role="tabpanel" aria-labelledby="tab-records">
+      <div class="records-head">
+        <div>
+          <h2>Saved surveys</h2>
+          <div class="sub" id="recSub">Stored on this device.</div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="exportBtn">Export JSON</button>
+          <button class="btn danger" id="clearAllBtn">Clear all</button>
+        </div>
+      </div>
+      <div id="recordsList"></div>
+    </section>
+
+    <footer>
+      Data stays on this device until you export it. <span class="mono">v1.0</span>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- optional runtime data ---------- */
+  var DATA = (typeof window.data === "object" && window.data) ? window.data : {};
+  var STORAGE_KEY = DATA.storageKey || "waterpoint.surveys.v1";
+  var ORG_NAME = DATA.orgName || "Water Point Survey";
+
+  /* ---------- storage ---------- */
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    }catch(e){ return []; }
+  }
+  function save(list){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); return true; }
+    catch(e){ return false; }
+  }
+  var records = load();
+
+  /* ---------- element refs ---------- */
+  var $ = function(id){ return document.getElementById(id); };
+  var form = $("surveyForm");
+  var workingSeg = $("workingSeg");
+  var workingVal = "";
+  var gps = { lat:null, lng:null, acc:null, ts:null };
+
+  /* ---------- toast ---------- */
+  var toastEl = $("toast"), toastTimer = null;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove("show"); }, 2600);
+  }
+
+  /* ---------- tabs ---------- */
+  var tabNew = $("tab-new"), tabRec = $("tab-records");

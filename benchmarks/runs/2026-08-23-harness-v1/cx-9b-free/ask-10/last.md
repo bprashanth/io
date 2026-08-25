@@ -1,0 +1,1 @@
+**143 beneficiaries** have received an assistive device.

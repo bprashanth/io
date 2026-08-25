@@ -1,0 +1,127 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scholarship Progress</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Scholarship Progress</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+<div class="grid">
+  <div class="card">
+    <label>Total Applications</label>
+    <div id="total-apps" class="muted">Loading...</div>
+  </div>
+  <div class="card">
+    <label>Approved</label>
+    <div id="approved-count" class="muted">Loading...</div>
+  </div>
+  <div class="card">
+    <label>Pending</label>
+    <div id="pending-count" class="muted">Loading...</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
+    <label>District Summary</label>
+    <div>
+      <button class="secondary" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto">
+    <table id="district-table">
+      <thead>
+        <tr>
+          <th>District</th>
+          <th>Taluka</th>
+          <th>Scheme</th>
+          <th>Applicants</th>
+          <th>Approved</th>
+          <th>Pending</th>
+          <th>Avg Marks</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+document.addEventListener('DOMContentLoaded', () => {
+  const data = window.data || [];
+  if (!data.length) {
+    document.getElementById('total-apps').innerText = '0';
+    document.getElementById('approved-count').innerText = '0';
+    document.getElementById('pending-count').innerText = '0';
+    return;
+  }
+
+  const total = data.length;
+  const approved = data.filter(d => d.Status === 'Approved').length;
+  const pending = data.filter(d => d.Status === 'Pending').length;
+
+  document.getElementById('total-apps').innerText = total;
+  document.getElementById('approved-count').innerText = approved;
+  document.getElementById('pending-count').innerText = pending;
+
+  // Aggregate by District
+  const districtMap = {};
+  data.forEach(row => {
+    const key = `${row.District} | ${row.Taluka}`;
+    if (!districtMap[key]) {
+      districtMap[key] = {
+        district: row.District,
+        taluka: row.Taluka,
+        scheme: row['Name of scheme'],
+        applicants: 0,
+        approved: 0,
+        pending: 0,
+        totalMarks: 0
+      };
+    }
+    const entry = districtMap[key];
+    entry.applicants++;
+    if (row.Status === 'Approved') entry.approved++;
+    if (row.Status === 'Pending') entry.pending++;
+    entry.totalMarks += parseFloat(row['Marks %']) || 0;
+  });
+
+  const rows = Object.values(districtMap).map(d => {
+    const avg = d.applicants > 0 ? (d.totalMarks / d.applicants).toFixed(1) : '0.0';
+    return {
+      'District': d.district,
+      'Taluka': d.taluka,
+      'Scheme': d.scheme,
+      'Applicants': d.applicants,
+      'Approved': d.approved,
+      'Pending': d.pending,
+      'Avg Marks': avg
+    };
+  });
+
+  const tbody = document.querySelector('#district-table tbody');
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.District}</td>
+      <td>${r.Taluka}</td>
+      <td>${r.Scheme}</td>
+      <td>${r.Applicants}</td>
+      <td style="color:var(--accent)">${r.Approved}</td>
+      <td style="color:#dc2626">${r.Pending}</td>
+      <td>${r['Avg Marks']}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+});
+</script>
+</body></html>

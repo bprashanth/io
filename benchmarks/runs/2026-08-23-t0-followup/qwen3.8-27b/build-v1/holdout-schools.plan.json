@@ -1,0 +1,243 @@
+{
+ "plan": {
+  "title": "School Enrolment & Infrastructure Dashboard",
+  "subtitle": "Tracking enrolment trends, gender balance, and facility gaps across schools",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Schools",
+    "sql": "SELECT COUNT(DISTINCT \"School Code\") AS n FROM \"school_enrolment_by_year\"",
+    "unit": ""
+   },
+   {
+    "id": "p2",
+    "kind": "kpi",
+    "title": "Total Enrolment (2024)",
+    "sql": "SELECT SUM(\"Girls 2024\" + \"Boys 2024\") AS n FROM \"school_enrolment_by_year\"",
+    "unit": ""
+   },
+   {
+    "id": "p3",
+    "kind": "kpi",
+    "title": "Schools with Functional Girls' Toilets",
+    "sql": "SELECT COUNT(*) AS n FROM \"school_infrastructure\" WHERE \"Toilets functional (girls)\" = 'Yes'",
+    "unit": ""
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Enrolment Trend by Gender",
+    "sql": "SELECT '2022' AS year, SUM(\"Girls 2022\") AS girls, SUM(\"Boys 2022\") AS boys FROM \"school_enrolment_by_year\" UNION ALL SELECT '2023', SUM(\"Girls 2023\"), SUM(\"Boys 2023\") FROM \"school_enrolment_by_year\" UNION ALL SELECT '2024', SUM(\"Girls 2024\"), SUM(\"Boys 2024\") FROM \"school_enrolment_by_year\" ORDER BY 1",
+    "x": "year",
+    "y": [
+     "girls",
+     "boys"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "bar",
+    "title": "Girls vs Boys Enrolment (2024)",
+    "sql": "SELECT 'Girls' AS gender, SUM(\"Girls 2024\") AS count FROM \"school_enrolment_by_year\" UNION ALL SELECT 'Boys', SUM(\"Boys 2024\") FROM \"school_enrolment_by_year\"",
+    "x": "gender",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p6",
+    "kind": "bar",
+    "title": "Infrastructure Gaps",
+    "sql": "SELECT 'No Girls Toilets' AS gap, COUNT(*) AS count FROM \"school_infrastructure\" WHERE \"Toilets functional (girls)\" = 'No' UNION ALL SELECT 'No Drinking Water', COUNT(*) FROM \"school_infrastructure\" WHERE \"Drinking water\" = 'No' UNION ALL SELECT 'No Electricity', COUNT(*) FROM \"school_infrastructure\" WHERE \"Electricity\" = 'No'",
+    "x": "gap",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p7",
+    "kind": "table",
+    "title": "Schools with Multiple Infrastructure Gaps",
+    "sql": "SELECT \"School Code\", \"Toilets functional (girls)\" AS toilets, \"Drinking water\" AS water, \"Electricity\" AS electricity FROM \"school_infrastructure\" WHERE (\"Toilets functional (girls)\" = 'No' OR \"Drinking water\" = 'No' OR \"Electricity\" = 'No') ORDER BY \"School Code\" LIMIT 10"
+   }
+  ],
+  "narrative": "The dashboard covers {{p1}} schools with a total 2024 enrolment of {{p2}} students. \n\nEnrolment trends show a steady increase from 2022 to 2024 for both genders, with girls' enrolment reaching {{p4[2].girls}} and boys' enrolment reaching {{p4[2].boys}} in 2024. \n\nIn 2024, girls account for {{p5[0].count}} students while boys account for {{p5[1].count}} students. \n\nInfrastructure gaps remain a concern, with {{p6[0].count}} schools lacking functional girls' toilets, {{p6[1].count}} lacking drinking water, and {{p6[2].count}} lacking electricity. \n\nThe table highlights specific schools with multiple gaps, starting with {{p7}}."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 40
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 9343
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "n"
+   ],
+   "rows": [
+    {
+     "n": 25
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p4": {
+   "columns": [
+    "year",
+    "girls",
+    "boys"
+   ],
+   "rows": [
+    {
+     "year": "2022",
+     "girls": 4611,
+     "boys": 4202
+    },
+    {
+     "year": "2023",
+     "girls": 4733,
+     "boys": 4355
+    },
+    {
+     "year": "2024",
+     "girls": 4893,
+     "boys": 4450
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p5": {
+   "columns": [
+    "gender",
+    "count"
+   ],
+   "rows": [
+    {
+     "gender": "Girls",
+     "count": 4893
+    },
+    {
+     "gender": "Boys",
+     "count": 4450
+    }
+   ],
+   "rowcount": 2,
+   "error": null
+  },
+  "p6": {
+   "columns": [
+    "gap",
+    "count"
+   ],
+   "rows": [
+    {
+     "gap": "No Girls Toilets",
+     "count": 15
+    },
+    {
+     "gap": "No Drinking Water",
+     "count": 9
+    },
+    {
+     "gap": "No Electricity",
+     "count": 10
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  },
+  "p7": {
+   "columns": [
+    "School Code",
+    "toilets",
+    "water",
+    "electricity"
+   ],
+   "rows": [
+    {
+     "School Code": 10110023,
+     "toilets": "No",
+     "water": "Yes",
+     "electricity": "Yes"
+    },
+    {
+     "School Code": 10140031,
+     "toilets": "Yes",
+     "water": "Yes",
+     "electricity": "No"
+    },
+    {
+     "School Code": 10190021,
+     "toilets": "No",
+     "water": "Yes",
+     "electricity": "Yes"
+    },
+    {
+     "School Code": 10240005,
+     "toilets": "Yes",
+     "water": "No",
+     "electricity": "Yes"
+    },
+    {
+     "School Code": 10320032,
+     "toilets": "Yes",
+     "water": "No",
+     "electricity": "Yes"
+    },
+    {
+     "School Code": 10370007,
+     "toilets": "Yes",
+     "water": "No",
+     "electricity": "Yes"
+    },
+    {
+     "School Code": 10390020,
+     "toilets": "No",
+     "water": "No",
+     "electricity": "Yes"
+    },
+    {
+     "School Code": 10420004,
+     "toilets": "Yes",
+     "water": "Yes",
+     "electricity": "No"
+    },
+    {
+     "School Code": 10450002,
+     "toilets": "No",
+     "water": "Yes",
+     "electricity": "Yes"
+    },
+    {
+     "School Code": 10460036,
+     "toilets": "No",
+     "water": "Yes",
+     "electricity": "Yes"
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  }
+ }
+}

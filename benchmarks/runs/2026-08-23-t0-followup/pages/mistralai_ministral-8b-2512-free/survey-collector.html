@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Water Point Survey</title>
+    <style>
+        :root {
+            --primary: #2c5f7c;
+            --secondary: #f8f9fa;
+            --error: #dc3545;
+            --success: #28a745;
+        }
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 100%;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin: 1rem;
+        }
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        button:hover {
+            background-color: #1a4a6b;
+        }
+        .status {
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            text-align: center;
+            display: none;
+        }
+        .success {
+            background-color: rgba(40, 167, 69, 0.1);
+            color: var(--success);
+            display: block;
+        }
+        .error {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: var(--error);
+            display: block;
+        }
+        .map-container {
+            width: 100%;
+            height: 200px;
+            margin: 1rem 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .map {
+            width: 100%;
+            height: 100%;
+        }
+        .export-btn {
+            background-color: var(--success);
+            margin-top: 1rem;
+        }
+        .export-btn:hover {
+            background-color: #1e7e58;
+        }
+        .offline-warning {
+            background-color: rgba(255, 215, 0, 0.1);
+            color: #ffd700;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-warning" id="offlineWarning">
+        This form works offline. Responses will be saved and synced when you reconnect.
+    </div>
+
+    <div class="container">
+        <h1>Water Point Survey</h1>
+
+        <form id="surveyForm">
+            <div class="form-group">
+                <label for="habitation">Habitation Name</label>
+                <input type="text" id="habitation" name="habitation" required>
+            </div>
+
+            <div class="form-group">
+                <label for="pumpType">Pump Type</label>
+                <select id="pumpType" name="pumpType" required>
+                    <option value="">Select pump type</option>
+                    <option value="handpump">Hand Pump</option>
+                    <option value="motorized">Motorized</option>
+                    <option value="spring">Spring</option>
+                    <option value="borehole">Borehole</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="working">Is the pump working?</label>
+                <select id="working" name="working" required>
+                    <option value="">Select status</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                    <option value="partially">Partially</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="users">Number of Users</label>
+                <input type="number" id="users" name="users" min="0" required>
+            </div>
+
+            <div class="form-group">
+                <label>Location on Map</label>
+                <div class="map-container">
+                    <canvas id="map" class="map"></canvas>
+                </div>
+                <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="text" id="latitude" name="latitude" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="text" id="longitude" name="longitude" readonly>
+                </div>
+            </div>
+
+            <div class="status" id="statusMessage"></div>
+
+            <button type="submit" id="submitBtn">Save Response</button>
+            <button type="button" id="exportBtn" class="export-btn">Export Responses</button>
+        </form>
+    </div>
+
+    <script>
+        // Initialize service worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(new URL('sw.js', import.meta.url))
+                    .then(registration => console.log('ServiceWorker registration successful'))
+                    .catch(err => console.log('ServiceWorker registration failed: ', err));
+            });
+        }
+
+        // Service Worker script (inline Blob URL)
+        const swScript = `
+            const CACHE_NAME = 'water-survey-v1';
+            const urlsToCache = [
+                '${location.href}'
+            ];
+
+            self.addEventListener('install', event => {
+                event.waitUntil(
+                    caches.open(CACHE_NAME)
+                        .then(cache => cache.addAll(urlsToCache))
+                );
+            });
+
+            self.addEventListener('fetch', event => {
+                event.respondWith(
+                    caches.match(event.request)
+                        .then(response => response || fetch(event.request))
+                );
+            });
+        `;
+
+        // Create Blob URL for service worker
+        const swBlob = new Blob([swScript], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+
+        // Check if data exists in localStorage
+        let responses = JSON.parse(localStorage.getItem('waterSurveyResponses')) || [];
+        let currentId = responses.length > 0 ? Math.max(...responses.map(r => r.id)) + 1 : 1;
+
+        // DOM elements
+        const form = document.getElementById('surveyForm');
+        const statusMessage = document.getElementById('statusMessage');
+        const offlineWarning = document.getElementById('offlineWarning');
+        const exportBtn = document.getElementById('exportBtn');
+        const mapCanvas = document.getElementById('map');
+        const latitudeInput = document.getElementById('latitude');
+        const longitudeInput = document.getElementById('longitude');
+
+        // Check online status
+        function checkOnlineStatus() {
+            if (!navigator.onLine) {
+                offlineWarning.style.display = 'block';
+            } else {
+                offlineWarning.style.display = 'none';
+            }
+        }
+
+        // Initialize map (simple placeholder)
+        function initMap() {
+            const ctx = mapCanvas.getContext('2d');
+            ctx.fillStyle = '#e9ecef';
+            ctx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+            // Draw a simple location marker
+            ctx.fillStyle = '#2c5f7c';
+            ctx.beginPath();
+            ctx.arc(mapCanvas.width / 2, mapCanvas.height / 2, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Get GPS coordinates (simplified for offline use)
+        function getGPS() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        latitudeInput.value = position.coords.latitude;
+                        longitudeInput.value = position.coords.longitude;
+                        initMap();
+                    },
+                    error => {
+                        // Fallback to window.data if available
+                        if (window.data && window.data.latitude && window.data.longitude) {
+                            latitudeInput.value = window.data.latitude;
+                            longitudeInput.value = window.data.longitude;
+                            initMap();
+                        } else {
+                            // Default coordinates if no GPS
+                            latitudeInput.value = '0.0';
+                            longitudeInput.value = '0.0';
+                            initMap();
+                        }
+                    }
+                );
+            } else {
+                // Default coordinates if no GPS
+                latitudeInput.value = '0.0';
+                longitudeInput.value = '0.0';
+                initMap();
+            }
+        }
+
+        // Save response
+        function saveResponse(event) {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const response = {
+                id: currentId++,
+                habitation: formData.get('habitation'),
+                pumpType: formData.get('pumpType'),
+                working: formData.get('working'),
+                users: formData.get('users'),
+                latitude: formData.get('latitude'),
+                longitude: formData.get('longitude'),
+                timestamp: new Date().toISOString()
+            };
+
+            // Add to responses array
+            responses.push(response);
+
+            // Save to localStorage
+            localStorage.setItem('waterSurveyResponses', JSON.stringify(responses));
+
+            // Show success message
+            statusMessage.textContent = 'Response saved successfully!';
+            statusMessage.className = 'status success';
+
+            // Reset form
+            form.reset();
+
+            // Check online status and sync if online
+            if (navigator.onLine) {
+                syncResponses();
+            }
+        }
+
+        // Sync responses with server (placeholder)
+        function syncResponses() {
+            // In a real app, you would send the responses to your server here
+            // For this example, we'll just show a message
+            statusMessage.textContent = 'Responses synced successfully!';
+            statusMessage.className = 'status success';
+
+            // Clear localStorage after sync (in a real app, you might want to keep them)
+            localStorage.removeItem('waterSurveyResponses');
+            responses = [];
+        }
+
+        // Export responses as JSON
+        function exportResponses() {
+            const dataStr = JSON.stringify(responses, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+            const exportFileDefaultName = 'water-survey-responses.json';
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+
+        // Event listeners
+        form.addEventListener('submit', saveResponse);
+        exportBtn.addEventListener('click', exportResponses);
+
+        // Initialize
+        checkOnlineStatus();
+        getGPS();
+    </script>
+
+    <script>
+        // Service Worker script (inline Blob URL)
+        const swScript = `
+            const CACHE_NAME = 'water-survey-v1';
+            const urlsToCache = [
+                '${location.href}'
+            ];
+
+            self.addEventListener('install', event => {
+                event.waitUntil(
+                    caches.open(CACHE_NAME)
+                        .then(cache => cache.addAll(urlsToCache))
+                );
+            });
+
+            self.addEventListener('fetch', event => {
+                event.respondWith(
+                    caches.match(event.request)
+                        .then(response => response || fetch(event.request))
+                );
+            });
+        `;
+
+        // Create Blob URL for service worker
+        const swBlob = new Blob([swScript], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(swUrl)
+                .then(registration => console.log('ServiceWorker registration successful'))
+                .catch(err => console.log('ServiceWorker registration failed: ', err));
+        }
+    </script>
+</body>
+</html>

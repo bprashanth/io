@@ -1,0 +1,141 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hand Washing Quiz</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.quiz-container{margin-bottom:20px}.question{margin-bottom:20px}.question-text{font-size:18px;font-weight:500;margin-bottom:10px}.options{margin-top:10px}.option{margin-bottom:8px}.score-display{font-size:24px;font-weight:600;margin:20px 0}.result{display:none}
+</style></head><body>
+<header><h1>Hand Washing Quiz</h1></header>
+<main>
+  <div class="card quiz-container">
+    <div id="quiz" class="result">
+      <div class="score-display" id="score">0</div>
+      <div class="score-display" id="percentage">0%</div>
+      <p>You got <span id="correct">0</span> out of <span id="total">0</span> questions correct!</p>
+      <button id="tryAgain">Try Again</button>
+    </div>
+
+    <div id="questions" class="result">
+      <div class="question" id="question1">
+        <div class="question-text">1. How long should you wash your hands?</div>
+        <div class="options">
+          <label><input type="radio" name="q1" value="20">20 seconds</label>
+          <label><input type="radio" name="q1" value="10">10 seconds</label>
+          <label><input type="radio" name="q1" value="30">30 seconds</label>
+        </div>
+      </div>
+
+      <div class="question" id="question2">
+        <div class="question-text">2. What should you use to wash your hands?</div>
+        <div class="options">
+          <label><input type="radio" name="q2" value="soap">Soap</label>
+          <label><input type="radio" name="q2" value="water">Just water</label>
+          <label><input type="radio" name="q2" value="hand sanitizer">Hand sanitizer</label>
+        </div>
+      </div>
+
+      <div class="question" id="question3">
+        <div class="question-text">3. When should you wash your hands?</div>
+        <div class="options">
+          <label><input type="radio" name="q3" value="before eating">Before eating</label>
+          <label><input type="radio" name="q3" value="after using the bathroom">After using the bathroom</label>
+          <label><input type="radio" name="q3" value="all of the above">All of the above</label>
+        </div>
+      </div>
+
+      <div class="question" id="question4">
+        <div class="question-text">4. What part of your hands should you scrub?</div>
+        <div class="options">
+          <label><input type="radio" name="q4" value="palms">Palms</label>
+          <label><input type="radio" name="q4" value="between fingers">Between fingers</label>
+          <label><input type="radio" name="q4" value="all of the above">All of the above</label>
+        </div>
+      </div>
+
+      <div class="question" id="question5">
+        <div class="question-text">5. What should you do after washing your hands?</div>
+        <div class="options">
+          <label><input type="radio" name="q5" value="dry with a towel">Dry with a towel</label>
+          <label><input type="radio" name="q5" value="shake dry">Shake dry</label>
+          <label><input type="radio" name="q5" value="nothing">Nothing</label>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// Quiz data
+const quizData = {
+  questions: [
+    { id: 'q1', correctAnswer: '20' },
+    { id: 'q2', correctAnswer: 'soap' },
+    { id: 'q3', correctAnswer: 'all of the above' },
+    { id: 'q4', correctAnswer: 'all of the above' },
+    { id: 'q5', correctAnswer: 'dry with a towel' }
+  ]
+};
+
+// DOM elements
+const quizContainer = document.getElementById('quiz');
+const questionsContainer = document.getElementById('questions');
+const scoreDisplay = document.getElementById('score');
+const percentageDisplay = document.getElementById('percentage');
+const correctDisplay = document.getElementById('correct');
+const totalDisplay = document.getElementById('total');
+const tryAgainButton = document.getElementById('tryAgain');
+
+// Initialize quiz
+function initQuiz() {
+  questionsContainer.classList.remove('result');
+  quizContainer.classList.add('result');
+  let score = 0;
+
+  quizData.questions.forEach(question => {
+    const radioButtons = document.querySelectorAll(`input[name="${question.id}"]`);
+    radioButtons.forEach(radio => {
+      radio.checked = false;
+    });
+  });
+
+  scoreDisplay.textContent = '0';
+  percentageDisplay.textContent = '0%';
+  correctDisplay.textContent = '0';
+  totalDisplay.textContent = quizData.questions.length;
+}
+
+// Check answers and show results
+function checkAnswers() {
+  let score = 0;
+  const total = quizData.questions.length;
+
+  quizData.questions.forEach(question => {
+    const selectedAnswer = document.querySelector(`input[name="${question.id}"]:checked`);
+    if (selectedAnswer && selectedAnswer.value === question.correctAnswer) {
+      score++;
+    }
+  });
+
+  scoreDisplay.textContent = score;
+  percentageDisplay.textContent = `${Math.round((score / total) * 100)}%`;
+  correctDisplay.textContent = score;
+  totalDisplay.textContent = total;
+
+  questionsContainer.classList.add('result');
+  quizContainer.classList.remove('result');
+}
+
+// Event listeners
+tryAgainButton.addEventListener('click', initQuiz);
+
+// Start quiz
+initQuiz();
+</script>
+</body></html>

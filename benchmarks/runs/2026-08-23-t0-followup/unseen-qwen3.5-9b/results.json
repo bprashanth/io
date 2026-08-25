@@ -1,0 +1,795 @@
+{
+ "summary": {
+  "label": "qwen3.5-9b",
+  "ask_passed": 7,
+  "ask_total": 12,
+  "builds": [
+   [
+    "agri",
+    8,
+    0
+   ],
+   [
+    "agri",
+    7,
+    0
+   ],
+   [
+    "mfi",
+    6,
+    0
+   ],
+   [
+    "mfi",
+    6,
+    0
+   ],
+   [
+    "wash",
+    7,
+    0
+   ],
+   [
+    "wash",
+    4,
+    0
+   ]
+  ]
+ },
+ "records": [
+  {
+   "sector": "agri",
+   "question": "average yield per acre by crop",
+   "seconds": 1.5,
+   "passed": true,
+   "why": "5 rows got, 5 expected",
+   "sql": "SELECT \"Crop\", AVG(\"Yield (qtl/acre)\") AS \"Average Yield (qtl/acre)\" FROM \"kharif_2025_yield_yield\" GROUP BY \"Crop\"",
+   "got": [
+    {
+     "Crop": "SOYABEAN",
+     "Average Yield (qtl/acre)": 10.316315789473686
+    },
+    {
+     "Crop": "Groundnut",
+     "Average Yield (qtl/acre)": 7.298000000000001
+    },
+    {
+     "Crop": "cotton",
+     "Average Yield (qtl/acre)": 5.013658536585364
+    },
+    {
+     "Crop": "Tur",
+     "Average Yield (qtl/acre)": 5.486521739130435
+    },
+    {
+     "Crop": "maize",
+     "Average Yield (qtl/acre)": 19.07125
+    }
+   ],
+   "expected": [
+    [
+     "Cotton",
+     5.01
+    ],
+    [
+     "Groundnut",
+     7.3
+    ],
+    [
+     "Maize",
+     19.07
+    ],
+    [
+     "Soyabean",
+     10.32
+    ],
+    [
+     "Tur",
+     5.49
+    ]
+   ]
+  },
+  {
+   "sector": "agri",
+   "question": "top 5 villages by total soyabean area",
+   "seconds": 1.9,
+   "passed": true,
+   "why": "5 rows got, 5 expected",
+   "sql": "SELECT Village, SUM(\"Area (acre)\") AS total_soyabean_area FROM \"kharif_2025_yield_yield\" WHERE \"Crop\" = 'SOYABEAN' GROUP BY Village ORDER BY total_soyabean_area DESC LIMIT 5",
+   "got": [
+    {
+     "Village": "Dhanora",
+     "total_soyabean_area": 22.270000000000003
+    },
+    {
+     "Village": "Kathi",
+     "total_soyabean_area": 20.8
+    },
+    {
+     "Village": "Bilgaon",
+     "total_soyabean_area": 18.19
+    },
+    {
+     "Village": "Waki",
+     "total_soyabean_area": 14.369999999999997
+    },
+    {
+     "Village": "Manibeli",
+     "total_soyabean_area": 13.49
+    }
+   ],
+   "expected": [
+    [
+     "Dhanora",
+     22.27
+    ],
+    [
+     "Kathi",
+     20.8
+    ],
+    [
+     "Bilgaon",
+     18.19
+    ],
+    [
+     "Waki",
+     14.37
+    ],
+    [
+     "Manibeli",
+     13.49
+    ]
+   ]
+  },
+  {
+   "sector": "agri",
+   "question": "which irrigated plots yielded below the crop average",
+   "seconds": 43.8,
+   "passed": true,
+   "why": "50 rows got, 50 expected",
+   "sql": "WITH crop_avg AS (SELECT \"Crop\", AVG(\"Yield (qtl/acre)\") AS avg_yield FROM \"kharif_2025_yield_yield\" GROUP BY \"Crop\") SELECT y.\"Farmer ID\", y.\"Farmer Name\", y.\"Village\", y.\"Crop\", y.\"Variety\", y.\"Area (acre)\", y.\"Yield (qtl/acre)\", y.\"Sowing Date (dd-mm-yyyy)\", y.\"Harvest Date\", y.\"Irrigated (Y/N)\", y.\"Remarks\", ca.avg_yield FROM \"kharif_2025_yield_yield\" AS y JOIN crop_avg AS ca ON y.\"Crop\" = ca.\"Crop\" WHERE y.\"Irrigated (Y/N)\" = 'Y' AND y.\"Yield (qtl/acre)\" < ca.avg_yield",
+   "got": [
+    {
+     "Farmer ID": "NDB-0004",
+     "Farmer Name": "Sunita Vasave",
+     "Village": "Dab",
+     "Crop": "Groundnut",
+     "Variety": "TAG 24",
+     "Area (acre)": 5.83,
+     "Yield (qtl/acre)": 5.0,
+     "Sowing Date (dd-mm-yyyy)": "2025-07-10",
+     "Harvest Date": "2025-10-25",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": "pest damage",
+     "avg_yield": 7.298000000000001
+    },
+    {
+     "Farmer ID": "NDB-0007",
+     "Farmer Name": "Suman Dhangar",
+     "Village": "Bilgaon",
+     "Crop": "Groundnut",
+     "Variety": "TAG 24",
+     "Area (acre)": 2.6,
+     "Yield (qtl/acre)": 5.79,
+     "Sowing Date (dd-mm-yyyy)": "2025-07-01",
+     "Harvest Date": "2025-10-15",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": "pest damage",
+     "avg_yield": 7.298000000000001
+    },
+    {
+     "Farmer ID": "NDB-0011",
+     "Farmer Name": "Tulsiram Valvi",
+     "Village": "Dab",
+     "Crop": "SOYABEAN",
+     "Variety": "MAUS 71",
+     "Area (acre)": 2.69,
+     "Yield (qtl/acre)": 6.44,
+     "Sowing Date (dd-mm-yyyy)": "2025-06-16",
+     "Harvest Date": "2025-10-28",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": null,
+     "avg_yield": 10.316315789473686
+    },
+    {
+     "Farmer ID": "NDB-0013",
+     "Farmer Name": "Kavita Valvi",
+     "Village": "Kathi",
+     "Crop": "SOYABEAN",
+     "Variety": "MAUS 71",
+     "Area (acre)": 4.27,
+     "Yield (qtl/acre)": 8.99,
+     "Sowing Date (dd-mm-yyyy)": "2025-07-09",
+     "Harvest Date": "2025-11-11",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": null,
+     "avg_yield": 10.316315789473686
+    },
+    {
+     "Farmer ID": "NDB-0017",
+     "Farmer Name": "Bhagwan Valvi",
+     "Village": "Dhanora",
+     "Crop": "maize",
+     "Variety": "African Tall",
+     "Area (acre)": 1.58,
+     "Yield (qtl/acre)": 13.16,
+     "Sowing Date (dd-mm-yyyy)": "2025-07-03",
+     "Harvest Date": "2025-11-08",
+     "Irrigated (Y/N)": "Y",
+     "Remarks": null,
+     "avg_yield": 19.07125
+    }
+   ],
+   "expected": [
+    [
+     "NDB-0004",
+     "Sunita Vasave",
+     "Dab",
+     "Groundnut",
+     5.0,
+     7.3
+    ],
+    [
+     "NDB-0007",
+     "Suman Dhangar",
+     "Bilgaon",
+     "Groundnut",
+     5.79,
+     7.3
+    ],
+    [
+     "NDB-0011",
+     "Tulsiram Valvi",
+     "Dab",
+     "Soyabean",
+     6.44,
+     10.32
+    ],
+    [
+     "NDB-0013",
+     "Kavita Valvi",
+     "Kathi",
+     "Soyabean",
+     8.99,
+     10.32
+    ],
+    [
+     "NDB-0017",
+     "Bhagwan Valvi",
+     "Dhanora",
+     "Maize",
+     13.16,
+     19.07
+    ]
+   ]
+  },
+  {
+   "sector": "agri",
+   "question": "total input cost per farmer, highest first (join the two sheets)",
+   "seconds": 74.5,
+   "passed": false,
+   "why": "I couldn't turn that into a query I can run. Last problem: BinderException: Binder Error: Table \"i\" does not have a column named \"Farmer Name\"\n\nCandidate bindings: : \"Farmer ID\"\n\nLINE 1: EXPLAIN SELEC"
+  },
+  {
+   "sector": "agri",
+   "build": "build me a dashboard of the kharif yields - crops, villages, irrigated vs not",
+   "seconds": 89.7,
+   "panels": 8,
+   "panels_failed": [],
+   "error": null,
+   "screenshot": "benchmarks/runs/2026-08-23-t0-followup/unseen-qwen3.5-9b/agri-build-1.png"
+  },
+  {
+   "sector": "agri",
+   "build": "write a short note for the FPO board on this season's yield and input costs",
+   "seconds": 7.5,
+   "panels": 7,
+   "panels_failed": [],
+   "error": null,
+   "screenshot": "benchmarks/runs/2026-08-23-t0-followup/unseen-qwen3.5-9b/agri-build-2.png"
+  },
+  {
+   "sector": "mfi",
+   "question": "total repaid per block from the monthly columns",
+   "seconds": 2.7,
+   "passed": true,
+   "why": "6 rows got, 6 expected",
+   "sql": "SELECT \"Block\", SUM(COALESCE(\"Apr-25\", 0) + COALESCE(\"May-25\", 0) + COALESCE(\"Jun-25\", 0) + COALESCE(\"Jul-25\", 0) + COALESCE(\"Aug-25\", 0) + COALESCE(\"Sep-25\", 0) + COALESCE(\"Oct-25\", 0) + COALESCE(\"Nov-25\", 0) + COALESCE(\"Dec-25\", 0) + COALESCE(\"Jan-26\", 0) + COALESCE(\"Feb-26\", 0) + COALESCE(\"Mar-26\", 0)) AS \"Total Repaid\" FROM \"shg_repayment_ledger\" GROUP BY \"Block\" ORDER BY \"Block\"",
+   "got": [
+    {
+     "Block": "Gobindpur",
+     "Total Repaid": 1752200.0
+    },
+    {
+     "Block": "Hisua",
+     "Total Repaid": 1643810.0
+    },
+    {
+     "Block": "Nawada Sadar",
+     "Total Repaid": 970530.0
+    },
+    {
+     "Block": "Pakribarawan",
+     "Total Repaid": 1228350.0
+    },
+    {
+     "Block": "Rajauli",
+     "Total Repaid": 2248990.0
+    }
+   ],
+   "expected": [
+    [
+     "Gobindpur",
+     1752200
+    ],
+    [
+     "Hisua",
+     1643810
+    ],
+    [
+     "Nawada Sadar",
+     970530
+    ],
+    [
+     "Pakribarawan",
+     1228350
+    ],
+    [
+     "Rajauli",
+     2248990
+    ]
+   ]
+  },
+  {
+   "sector": "mfi",
+   "question": "SHGs whose typed total does not match the sum of months",
+   "seconds": 8.2,
+   "passed": false,
+   "why": "5 rows got, 5 expected",
+   "sql": "WITH monthly_sums AS (SELECT \"SHG Name\", \"Block\", \"Members\", \"Loan Amount\", \"Total Repaid\", \"Overdue (Y/N)\", SUM(COALESCE(\"Apr-25\", 0) + COALESCE(\"May-25\", 0) + COALESCE(\"Jun-25\", 0) + COALESCE(\"Jul-25\", 0) + COALESCE(\"Aug-25\", 0) + COALESCE(\"Sep-25\", 0) + COALESCE(\"Oct-25\", 0) + COALESCE(\"Nov-25\", 0) + COALESCE(\"Dec-25\", 0) + COALESCE(\"Jan-26\", 0) + COALESCE(\"Feb-26\", 0) + COALESCE(\"Mar-26\", 0)) AS sum_of_months FROM \"shg_repayment_ledger\" GROUP BY \"SHG Name\", \"Block\", \"Members\", \"Loan Amount\", \"Total Repaid\", \"Overdue (Y/N)\") SELECT * FROM monthly_sums WHERE \"Total Repaid\" <> sum_of_months",
+   "got": [
+    {
+     "SHG Name": "Vikas Mahila SHG",
+     "Block": "Rajauli",
+     "Members": 15,
+     "Loan Amount": 127273,
+     "Total Repaid": 122110,
+     "Overdue (Y/N)": "N",
+     "sum_of_months": 124610.0
+    },
+    {
+     "SHG Name": "Ganga SHG",
+     "Block": "Hisua",
+     "Members": 14,
+     "Loan Amount": 101656,
+     "Total Repaid": 29900,
+     "Overdue (Y/N)": "Y",
+     "sum_of_months": 34900.0
+    },
+    {
+     "SHG Name": "Tulsi Mahila Sangh",
+     "Block": "Hisua",
+     "Members": 14,
+     "Loan Amount": 89130,
+     "Total Repaid": 57240,
+     "Overdue (Y/N)": "N",
+     "sum_of_months": 56240.0
+    },
+    {
+     "SHG Name": "Vaishnavi Mahila SHG",
+     "Block": "Rajauli",
+     "Members": 8,
+     "Loan Amount": 71403,
+     "Total Repaid": 46360,
+     "Overdue (Y/N)": "N",
+     "sum_of_months": 51360.0
+    },
+    {
+     "SHG Name": "Maa Durga Mahila Samuh",
+     "Block": "Hisua",
+     "Members": 11,
+     "Loan Amount": 144489,
+     "Total Repaid": 80230,
+     "Overdue (Y/N)": "N",
+     "sum_of_months": 77730.0
+    }
+   ],
+   "expected": [
+    [
+     "Ganga SHG",
+     "Hisua",
+     29900,
+     34900,
+     -5000
+    ],
+    [
+     "Maa Durga Mahila Samuh",
+     "Hisua",
+     80230,
+     77730,
+     2500
+    ],
+    [
+     "Tulsi Mahila Sangh",
+     "Hisua",
+     57240,
+     56240,
+     1000
+    ],
+    [
+     "Vaishnavi Mahila SHG",
+     "Rajauli",
+     46360,
+     51360,
+     -5000
+    ],
+    [
+     "Vikas Mahila SHG",
+     "Rajauli",
+     122110,
+     124610,
+     -2500
+    ]
+   ]
+  },
+  {
+   "sector": "mfi",
+   "question": "months with the lowest collections overall",
+   "seconds": 6.7,
+   "passed": false,
+   "why": "1 rows got, 12 expected",
+   "sql": "WITH unpivoted AS (SELECT \"SHG Name\", \"Block\", \"Members\", \"Loan Amount\", \"Total Repaid\", \"Overdue (Y/N)\", month, amount FROM \"shg_repayment_ledger\" UNPIVOT(amount FOR month IN (\"Apr-25\", \"May-25\", \"Jun-25\", \"Jul-25\", \"Aug-25\", \"Sep-25\", \"Oct-25\", \"Nov-25\", \"Dec-25\", \"Jan-26\", \"Feb-26\", \"Mar-26\"))), ranked AS (SELECT month, SUM(amount) AS total_collections, RANK() OVER (ORDER BY SUM(amount) ASC) AS rnk FROM unpivoted GROUP BY month) SELECT month, total_collections FROM ranked WHERE rnk = 1 ORDER BY total_collections ASC",
+   "got": [
+    {
+     "month": "Jan-26",
+     "total_collections": 738090.0
+    }
+   ],
+   "expected": [
+    [
+     "Jan-26",
+     738090
+    ],
+    [
+     "Oct-25",
+     754110
+    ],
+    [
+     "May-25",
+     757590
+    ],
+    [
+     "Jul-25",
+     763110
+    ],
+    [
+     "Feb-26",
+     776540
+    ]
+   ]
+  },
+  {
+   "sector": "mfi",
+   "question": "repayment rate = repaid/loan amount per SHG, lowest 5",
+   "seconds": 1.7,
+   "passed": false,
+   "why": "5 rows got, 5 expected",
+   "sql": "WITH shg_rates AS (SELECT \"SHG Name\", \"Loan Amount\", \"Total Repaid\", \"Total Repaid\" * 1.0 / NULLIF(\"Loan Amount\", 0) AS repayment_rate FROM \"shg_repayment_ledger\") SELECT * FROM (SELECT *, ROW_NUMBER() OVER (ORDER BY repayment_rate ASC) AS rn FROM shg_rates) WHERE rn <= 5",
+   "got": [
+    {
+     "SHG Name": "Maa Durga Mahila Sangh",
+     "Loan Amount": 47029,
+     "Total Repaid": 11870,
+     "repayment_rate": 0.25239745688830295,
+     "rn": 1
+    },
+    {
+     "SHG Name": "Navjyoti Mahila Sangh",
+     "Loan Amount": 116999,
+     "Total Repaid": 29590,
+     "repayment_rate": 0.2529081445140557,
+     "rn": 2
+    },
+    {
+     "SHG Name": "Krishna SHG",
+     "Loan Amount": 36554,
+     "Total Repaid": 9310,
+     "repayment_rate": 0.2546916890080429,
+     "rn": 3
+    },
+    {
+     "SHG Name": "Jyoti Swayam Sahayata Samuh",
+     "Loan Amount": 27286,
+     "Total Repaid": 6960,
+     "repayment_rate": 0.25507586307996777,
+     "rn": 4
+    },
+    {
+     "SHG Name": "Ambika Mahila SHG",
+     "Loan Amount": 122212,
+     "Total Repaid": 31810,
+     "repayment_rate": 0.26028540568847575,
+     "rn": 5
+    }
+   ],
+   "expected": [
+    [
+     "Krishna SHG",
+     "Nawada Sadar",
+     0.25
+    ],
+    [
+     "Maa Durga Mahila Sangh",
+     "Rajauli",
+     0.25
+    ],
+    [
+     "Navjyoti Mahila Sangh",
+     "Hisua",
+     0.25
+    ],
+    [
+     "Ambika Mahila SHG",
+     "Nawada Sadar",
+     0.26
+    ],
+    [
+     "Jyoti Swayam Sahayata Samuh",
+     "Warisaliganj",
+     0.26
+    ]
+   ]
+  },
+  {
+   "sector": "mfi",
+   "build": "build a dashboard of SHG repayments month by month and by block",
+   "seconds": 25.4,
+   "panels": 6,
+   "panels_failed": [],
+   "error": null,
+   "screenshot": "benchmarks/runs/2026-08-23-t0-followup/unseen-qwen3.5-9b/mfi-build-1.png"
+  },
+  {
+   "sector": "mfi",
+   "build": "write me a summary of repayment performance for the bank",
+   "seconds": 185.6,
+   "panels": 6,
+   "panels_failed": [],
+   "error": null,
+   "screenshot": "benchmarks/runs/2026-08-23-t0-followup/unseen-qwen3.5-9b/mfi-build-2.png"
+  },
+  {
+   "sector": "wash",
+   "question": "how many handpumps are not functional per block",
+   "seconds": 1.6,
+   "passed": true,
+   "why": "12 rows got, 12 expected",
+   "sql": "SELECT \"Block\", COUNT(*) AS \"Not Functional Count\" FROM \"handpump_survey\" WHERE \"Status\" = 'Not Functional' GROUP BY \"Block\"",
+   "got": [
+    {
+     "Block": "Bhawanipatna",
+     "Not Functional Count": 4
+    },
+    {
+     "Block": "Semiliguda",
+     "Not Functional Count": 3
+    },
+    {
+     "Block": "Nabarangpur Sadar",
+     "Not Functional Count": 9
+    },
+    {
+     "Block": "Gunupur",
+     "Not Functional Count": 3
+    },
+    {
+     "Block": "Rayagada Sadar",
+     "Not Functional Count": 3
+    }
+   ],
+   "expected": [
+    [
+     "Bhawanipatna",
+     4
+    ],
+    [
+     "Boipariguda",
+     8
+    ],
+    [
+     "Dabugaon",
+     5
+    ],
+    [
+     "Gunupur",
+     3
+    ],
+    [
+     "Junagarh",
+     2
+    ]
+   ]
+  },
+  {
+   "sector": "wash",
+   "question": "average TDS by district for functional pumps",
+   "seconds": 1.5,
+   "passed": true,
+   "why": "4 rows got, 4 expected",
+   "sql": "SELECT \"District\", AVG(\"TDS (ppm)\") AS \"Average TDS (ppm)\" FROM \"handpump_survey\" WHERE \"Status\" = 'Functional' GROUP BY \"District\"",
+   "got": [
+    {
+     "District": "Kalahandi",
+     "Average TDS (ppm)": 649.8846153846154
+    },
+    {
+     "District": "Rayagada",
+     "Average TDS (ppm)": 673.2051282051282
+    },
+    {
+     "District": "Nabarangpur",
+     "Average TDS (ppm)": 606.3333333333334
+    },
+    {
+     "District": "Koraput",
+     "Average TDS (ppm)": 740.575
+    }
+   ],
+   "expected": [
+    [
+     "Kalahandi",
+     649.88
+    ],
+    [
+     "Koraput",
+     740.58
+    ],
+    [
+     "Nabarangpur",
+     606.33
+    ],
+    [
+     "Rayagada",
+     673.21
+    ]
+   ]
+  },
+  {
+   "sector": "wash",
+   "question": "pumps deeper than 200 ft not repaired since 2023",
+   "seconds": 5.2,
+   "passed": false,
+   "why": "65 rows got, 91 expected",
+   "sql": "SELECT \"Depth (ft)\", \"Last Repair\" FROM \"handpump_survey\" WHERE \"Depth (ft)\" > 200 AND \"Last Repair\" < '2023-01-01'",
+   "got": [
+    {
+     "Depth (ft)": 349,
+     "Last Repair": "2017-08-17"
+    },
+    {
+     "Depth (ft)": 221,
+     "Last Repair": "2005-07-28"
+    },
+    {
+     "Depth (ft)": 346,
+     "Last Repair": "2019-04-07"
+    },
+    {
+     "Depth (ft)": 270,
+     "Last Repair": "2008-02-15"
+    },
+    {
+     "Depth (ft)": 218,
+     "Last Repair": "2014-03-05"
+    }
+   ],
+   "expected": [
+    [
+     "Padmapadar",
+     "Semiliguda",
+     "Koraput",
+     349,
+     "Never repaired"
+    ],
+    [
+     "Similipadar",
+     "Kashipur",
+     "Rayagada",
+     349,
+     "2017-08-17"
+    ],
+    [
+     "Tentabasti",
+     "Nabarangpur Sadar",
+     "Nabarangpur",
+     347,
+     "2015-04-06"
+    ],
+    [
+     "Dudumapadar",
+     "Koraput Sadar",
+     "Koraput",
+     346,
+     "2019-04-07"
+    ],
+    [
+     "Kumulisahi",
+     "Nabarangpur Sadar",
+     "Nabarangpur",
+     346,
+     "2022-05-14"
+    ]
+   ]
+  },
+  {
+   "sector": "wash",
+   "question": "total users served by block",
+   "seconds": 0.9,
+   "passed": true,
+   "why": "12 rows got, 12 expected",
+   "sql": "SELECT \"Block\", SUM(\"Users (HH)\") AS \"total_users\" FROM \"handpump_survey\" GROUP BY \"Block\"",
+   "got": [
+    {
+     "Block": "Bhawanipatna",
+     "total_users": 14573
+    },
+    {
+     "Block": "Junagarh",
+     "total_users": 16400
+    },
+    {
+     "Block": "Koraput Sadar",
+     "total_users": 15886
+    },
+    {
+     "Block": "Umerkote",
+     "total_users": 12792
+    },
+    {
+     "Block": "Nabarangpur Sadar",
+     "total_users": 13730
+    }
+   ],
+   "expected": [
+    [
+     "Bhawanipatna",
+     14573
+    ],
+    [
+     "Boipariguda",
+     11753
+    ],
+    [
+     "Dabugaon",
+     9746
+    ],
+    [
+     "Gunupur",
+     9802
+    ],
+    [
+     "Junagarh",
+     16400
+    ]
+   ]
+  },
+  {
+   "sector": "wash",
+   "build": "dashboard of the handpump survey - functionality by block, water quality, repairs",
+   "seconds": 7.9,
+   "panels": 7,
+   "panels_failed": [],
+   "error": null,
+   "screenshot": "benchmarks/runs/2026-08-23-t0-followup/unseen-qwen3.5-9b/wash-build-1.png"
+  },
+  {
+   "sector": "wash",
+   "build": "make a page listing the pumps that need attention",
+   "seconds": 6.0,
+   "panels": 4,
+   "panels_failed": [],
+   "error": null,
+   "screenshot": "benchmarks/runs/2026-08-23-t0-followup/unseen-qwen3.5-9b/wash-build-2.png"
+  }
+ ]
+}

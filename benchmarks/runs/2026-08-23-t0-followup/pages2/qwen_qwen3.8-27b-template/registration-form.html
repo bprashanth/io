@@ -1,0 +1,204 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Beneficiary Registration</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Beneficiary Registration","short_name":"Beneficiary","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Beneficiary Registration</h1></header>
+<main>
+  <div class="card">
+    <h2 style="margin-top:0;font-size:18px">Register a Beneficiary</h2>
+    <form id="regForm" novalidate>
+      <div class="grid">
+        <div>
+          <label for="name">Full Name</label>
+          <input id="name" name="name" type="text" autocomplete="name" placeholder="e.g. Amina Yusuf">
+          <div class="muted" data-err="name"></div>
+        </div>
+        <div>
+          <label for="age">Age</label>
+          <input id="age" name="age" type="number" min="0" max="120" inputmode="numeric" placeholder="e.g. 34">
+          <div class="muted" data-err="age"></div>
+        </div>
+        <div>
+          <label for="village">Village</label>
+          <input id="village" name="village" type="text" placeholder="e.g. Kigamboni">
+          <div class="muted" data-err="village"></div>
+        </div>
+        <div>
+          <label for="phone">Phone</label>
+          <input id="phone" name="phone" type="tel" inputmode="tel" placeholder="e.g. +255 712 345 678">
+          <div class="muted" data-err="phone"></div>
+        </div>
+        <div>
+          <label for="category">Category</label>
+          <select id="category" name="category">
+            <option value="">— Select a category —</option>
+            <option value="Food Security">Food Security</option>
+            <option value="Health">Health</option>
+            <option value="Education">Education</option>
+            <option value="Water &amp; Sanitation">Water &amp; Sanitation</option>
+            <option value="Livelihood">Livelihood</option>
+            <option value="Protection">Protection</option>
+            <option value="Other">Other</option>
+          </select>
+          <div class="muted" data-err="category"></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button type="submit">Save Beneficiary</button>
+        <button type="button" class="secondary" id="clearBtn">Clear Form</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <h2 style="margin:0;font-size:18px">Registered Beneficiaries <span class="muted" id="count"></span></h2>
+      <button type="button" id="downloadBtn">Download CSV</button>
+    </div>
+    <div id="empty" class="muted" style="margin-top:10px">No beneficiaries registered yet.</div>
+    <div id="tableWrap" style="overflow-x:auto;margin-top:10px"></div>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+(function () {
+  var KEY = 'beneficiaries';
+  var form = document.getElementById('regForm');
+  var fields = {
+    name: document.getElementById('name'),
+    age: document.getElementById('age'),
+    village: document.getElementById('village'),
+    phone: document.getElementById('phone'),
+    category: document.getElementById('category')
+  };
+  var errEls = {};
+  document.querySelectorAll('[data-err]').forEach(function (el) { errEls[el.getAttribute('data-err')] = el; });
+  var countEl = document.getElementById('count');
+  var emptyEl = document.getElementById('empty');
+  var tableWrap = document.getElementById('tableWrap');
+
+  function getEntries() { return store.get(KEY, []); }
+  function setEntries(list) { store.set(KEY, list); }
+
+  function setErr(field, msg) {
+    var el = errEls[field];
+    if (el) el.textContent = msg || '';
+    if (fields[field]) fields[field].style.borderColor = msg ? '#dc2626' : '';
+  }
+
+  function validate() {
+    var ok = true;
+    var name = fields.name.value.trim();
+    if (!name) { setErr('name', 'Name is required.'); ok = false; } else { setErr('name', ''); }
+
+    var ageRaw = fields.age.value.trim();
+    var age = Number(ageRaw);
+    if (ageRaw === '' || isNaN(age) || !Number.isInteger(age) || age < 0 || age > 120) {
+      setErr('age', 'Enter a whole number between 0 and 120.'); ok = false;
+    } else { setErr('age', ''); }
+
+    var village = fields.village.value.trim();
+    if (!village) { setErr('village', 'Village is required.'); ok = false; } else { setErr('village', ''); }
+
+    var phone = fields.phone.value.trim();
+    var digits = phone.replace(/[^0-9]/g, '');
+    if (!phone) { setErr('phone', 'Phone is required.'); ok = false; }
+    else if (digits.length < 7 || digits.length > 15) { setErr('phone', 'Enter a valid phone number (7–15 digits).'); ok = false; }
+    else { setErr('phone', ''); }
+
+    var category = fields.category.value;
+    if (!category) { setErr('category', 'Please choose a category.'); ok = false; } else { setErr('category', ''); }
+
+    return ok;
+  }
+
+  function render() {
+    var list = getEntries();
+    countEl.textContent = list.length ? '(' + list.length + ')' : '';
+    if (!list.length) {
+      emptyEl.style.display = '';
+      tableWrap.innerHTML = '';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    var rows = list.map(function (b, i) {
+      return '<tr>' +
+        '<td>' + (i + 1) + '</td>' +
+        '<td>' + escapeHtml(b.name) + '</td>' +
+        '<td>' + escapeHtml(b.age) + '</td>' +
+        '<td>' + escapeHtml(b.village) + '</td>' +
+        '<td>' + escapeHtml(b.phone) + '</td>' +
+        '<td>' + escapeHtml(b.category) + '</td>' +
+        '<td><button type="button" class="secondary" data-del="' + i + '">Delete</button></td>' +
+        '</tr>';
+    }).join('');
+    tableWrap.innerHTML =
+      '<table><thead><tr><th>#</th><th>Name</th><th>Age</th><th>Village</th><th>Phone</th><th>Category</th><th></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!validate()) return;
+    var list = getEntries();
+    list.push({
+      name: fields.name.value.trim(),
+      age: Number(fields.age.value),
+      village: fields.village.value.trim(),
+      phone: fields.phone.value.trim(),
+      category: fields.category.value,
+      savedAt: new Date().toISOString()
+    });
+    setEntries(list);
+    form.reset();
+    Object.keys(errEls).forEach(function (k) { setErr(k, ''); });
+    render();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', function () {
+    form.reset();
+    Object.keys(errEls).forEach(function (k) { setErr(k, ''); });
+  });
+
+  tableWrap.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-del]');
+    if (!btn) return;
+    var idx = Number(btn.getAttribute('data-del'));
+    var list = getEntries();
+    if (idx >= 0 && idx < list.length) {
+      list.splice(idx, 1);
+      setEntries(list);
+      render();
+    }
+  });
+
+  document.getElementById('downloadBtn').addEventListener('click', function () {
+    var list = getEntries();
+    if (!list.length) { alert('No entries to download yet.'); return; }
+    var rows = list.map(function (b) {
+      return { name: b.name, age: b.age, village: b.village, phone: b.phone, category: b.category };
+    });
+    download('beneficiaries.csv', toCSV(rows), 'text/csv');
+  });
+
+  render();
+})();
+</script>
+</body></html>

@@ -1,0 +1,182 @@
+{
+ "plan": {
+  "title": "Donation Dashboard",
+  "subtitle": "Monthly donation trend, top cities, payment modes, and repeat donors",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "kpi",
+    "title": "Total Donations",
+    "sql": "SELECT SUM(\"Amount\") AS total_amount FROM donor_transactions",
+    "unit": "\u20b9"
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Top Cities by Donation Amount",
+    "sql": "SELECT \"City\" AS city, SUM(\"Amount\") AS total_amount FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+    "x": "city",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Payment Modes Distribution",
+    "sql": "SELECT \"Mode\" AS mode, SUM(\"Amount\") AS total_amount FROM donor_transactions GROUP BY 1 ORDER BY 2 DESC",
+    "x": "mode",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "line",
+    "title": "Monthly Donation Trend",
+    "sql": "SELECT DATE_TRUNC('MONTH', TO_DATE(\"Date\", 'DD-MM-YYYY')) AS month, SUM(\"Amount\") AS total_amount FROM donor_transactions GROUP BY 1 ORDER BY 1",
+    "x": "month",
+    "y": [
+     "total_amount"
+    ]
+   },
+   {
+    "id": "p5",
+    "kind": "table",
+    "title": "Repeat Donors",
+    "sql": "SELECT \"Donor\" AS donor, COUNT(*) AS donation_count, SUM(\"Amount\") AS total_amount FROM donor_transactions GROUP BY 1 HAVING COUNT(*) > 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "The dashboard shows that the overall donation volume is {{p1.total_amount}}. The top cities contributing the most are highlighted in {{p2}}. Payment mode preferences are illustrated in {{p3}}. The monthly trend in {{p4}} indicates a steady increase in donations over time. Finally, the table in {{p5}} lists donors who have contributed more than once, showcasing the most loyal supporters."
+ },
+ "results": {
+  "p1": {
+   "columns": [
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "total_amount": 6641021
+    }
+   ],
+   "rowcount": 1,
+   "error": null
+  },
+  "p2": {
+   "columns": [
+    "city",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "city": "Gaya",
+     "total_amount": 787715
+    },
+    {
+     "city": "Bengaluru",
+     "total_amount": 771729
+    },
+    {
+     "city": "Solapur",
+     "total_amount": 729972
+    },
+    {
+     "city": "Thane",
+     "total_amount": 678448
+    },
+    {
+     "city": "Mumbai",
+     "total_amount": 617867
+    },
+    {
+     "city": "Pune",
+     "total_amount": 544876
+    },
+    {
+     "city": "Nashik",
+     "total_amount": 498828
+    },
+    {
+     "city": "Nagpur",
+     "total_amount": 428953
+    },
+    {
+     "city": "Aurangabad",
+     "total_amount": 403921
+    },
+    {
+     "city": "Delhi",
+     "total_amount": 395268
+    }
+   ],
+   "rowcount": 10,
+   "error": null
+  },
+  "p3": {
+   "columns": [
+    "mode",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "mode": "NEFT",
+     "total_amount": 1511602
+    },
+    {
+     "mode": "Card",
+     "total_amount": 1322416
+    },
+    {
+     "mode": "Cash",
+     "total_amount": 1277633
+    },
+    {
+     "mode": "DD",
+     "total_amount": 1250836
+    },
+    {
+     "mode": "UPI",
+     "total_amount": 728176
+    },
+    {
+     "mode": "Cheque",
+     "total_amount": 550358
+    }
+   ],
+   "rowcount": 6,
+   "error": null
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "CatalogException: Catalog Error: Scalar Function with name to_date does not exist!\nDid you mean \"to_days\"?\n\nLINE 1: SELECT DATE_TRUNC('MONTH', TO_DATE(\"Date\", 'DD-MM-YYYY')) AS month, SUM(\"Amount\") AS...\n                                   ^"
+  },
+  "p5": {
+   "columns": [
+    "donor",
+    "donation_count",
+    "total_amount"
+   ],
+   "rows": [
+    {
+     "donor": "Rohit",
+     "donation_count": 2,
+     "total_amount": 3091
+    },
+    {
+     "donor": "Pankaj Pereira",
+     "donation_count": 2,
+     "total_amount": 100648
+    },
+    {
+     "donor": "Rajesh",
+     "donation_count": 2,
+     "total_amount": 60187
+    }
+   ],
+   "rowcount": 3,
+   "error": null
+  }
+ }
+}

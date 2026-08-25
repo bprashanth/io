@@ -1,0 +1,73 @@
+{
+ "plan": {
+  "title": "School Infrastructure and Enrolment",
+  "subtitle": "Tracking school enrolment trends and infrastructure gaps for girls and boys.",
+  "panels": [
+   {
+    "id": "p1",
+    "kind": "line",
+    "title": "School Enrolment Trend",
+    "sql": "SELECT '2022' AS year, SUM(Girls 2022) AS girls_2022 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_enrolment_by_year GROUP BY School Name HAVING COUNT(*) > 0) UNION ALL SELECT '2023' AS year, SUM(Girls 2023) AS girls_2023 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_enrolment_by_year GROUP BY School Name HAVING COUNT(*) > 0) UNION ALL SELECT '2024' AS year, SUM(Girls 2024) AS girls_2024 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_enrolment_by_year GROUP BY School Name HAVING COUNT(*) > 0) ORDER BY 1",
+    "x": "year",
+    "y": [
+     "girls_2022",
+     "girls_2023",
+     "girls_2024"
+    ]
+   },
+   {
+    "id": "p2",
+    "kind": "bar",
+    "title": "Infrastructure Gaps",
+    "sql": "SELECT School Name, 'Toilets functional (girls)' AS infrastructure_item, SUM(CASE WHEN Toilets functional (girls) = 'No' THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2",
+    "x": "School Name",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p3",
+    "kind": "bar",
+    "title": "Infrastructure Gaps - Water & Electricity",
+    "sql": "SELECT School Name, 'Drinking water' AS infrastructure_item, SUM(CASE WHEN Drinking water = 'No' THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2",
+    "x": "School Name",
+    "y": [
+     "count"
+    ]
+   },
+   {
+    "id": "p4",
+    "kind": "table",
+    "title": "Top 10 Schools by Enrolment",
+    "sql": "SELECT School Name, SUM(Girls 2024) AS total_enrolment FROM school_enrolment_by_year GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+   }
+  ],
+  "narrative": "School enrolment has shown a steady increase from 2022 to 2024, with {{p1.girls_2022}} students enrolled in 2022, {{p1.girls_2023}} in 2023, and {{p1.girls_2024}} in 2024.  There are infrastructure gaps in several schools, particularly regarding toilet facilities for girls.  {{p2.count}} schools lack functional toilets for girls.  Similarly, access to drinking water is also a concern for {{p3.count}} schools.  The top 10 schools with the highest enrolment are listed in the table."
+ },
+ "results": {
+  "p1": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expecting ). Line 1, Col: 37.\n  SELECT '2022' AS year, SUM(Girls \u001b[4m2022\u001b[0m) AS girls_2022 FROM school_enrolment_by_year WHERE School Name IN (SELECT School Name FROM school_e"
+  },
+  "p2": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected END after CASE. Line 1, Col: 120.\n  me, 'Toilets functional (girls)' AS infrastructure_item, SUM(CASE WHEN Toilets functional (girls) = \u001b[4m'No'\u001b[0m THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2"
+  },
+  "p3": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expected END after CASE. Line 1, Col: 96.\n  SELECT School Name, 'Drinking water' AS infrastructure_item, SUM(CASE WHEN Drinking water = \u001b[4m'No'\u001b[0m THEN 1 ELSE 0 END) AS count FROM school_infrastructure GROUP BY 1 ORDER BY 2"
+  },
+  "p4": {
+   "columns": [],
+   "rows": [],
+   "rowcount": 0,
+   "error": "ParseError: Expecting ). Line 1, Col: 34.\n  SELECT School Name, SUM(Girls \u001b[4m2024\u001b[0m) AS total_enrolment FROM school_enrolment_by_year GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+  }
+ }
+}

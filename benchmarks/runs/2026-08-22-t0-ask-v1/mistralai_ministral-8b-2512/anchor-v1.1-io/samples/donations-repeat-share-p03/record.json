@@ -1,0 +1,92 @@
+{
+  "id": "donations-repeat-share-p03",
+  "task_id": "donations-repeat-share",
+  "pattern": "group by entity, conditional sum and count, single-row share calculation",
+  "question": "out of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors",
+  "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+  "expected_rows": [
+    [
+      53.51468988030468,
+      55
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH donor_counts AS (SELECT \"Donor\", COUNT(*) AS donation_count FROM donations GROUP BY \"Donor\"), multi_donors AS (SELECT \"Donor\" FROM donor_counts WHERE donation_count > 1), total_amount AS (SELECT SUM(\"Amount\") AS total_amount FROM donations), multi_donor_amount AS (SELECT SUM(\"Amount\") AS rupees_from_multi_donor FROM donations JOIN multi_donors USING (\"Donor\")) SELECT ROUND(CAST((multi_donor_amount.rupees_from_multi_donor * 100.0 / NULLIF(NULLIF(total_amount.total_amount, 0), 0)) AS DECIMAL), 2) AS percent_from_multi_donors, COUNT(DISTINCT multi_donor_amount.\"Donor\") AS number_of_multi_donor_donors FROM multi_donor_amount CROSS JOIN total_amount",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nout of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors",
+      "response": "```sql\nWITH\ndonor_counts AS (\n    SELECT\n        \"Donor\",\n        COUNT(DISTINCT \"Receipt No\") AS donation_count\n    FROM donations\n    GROUP BY \"Donor\"\n),\nmulti_donor_donations AS (\n    SELECT\n        SUM(\"Amount\") AS total_multi_donor_amount\n    FROM donations\n    WHERE \"Donor\" IN (\n        SELECT \"Donor\"\n        FROM donor_counts\n        WHERE donation_count > 1\n    )\n),\ntotal_donations AS (\n    SELECT SUM(\"Amount\") AS total_amount\n    FROM donations\n)\n\nSELECT\n    ROUND((multi_donor_donations.total_multi_donor_amount / NULLIF(total_donations.total_amount, 0)) * 100, 2) AS percent_from_multi_donor,\n    multi_donor_donations.total_multi_donor_amount AS rupees_from_multi_donor,\n    COUNT(DISTINCT CASE WHEN donation_count > 1 THEN \"Donor\" END) AS number_of_multi_donor\nFROM multi_donor_donations, total_donations;\n```",
+      "api": {
+        "id": "gen-1787421808-I0x35Qhv4QryeOPAeKvg",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 460,
+          "completion_tokens": 228,
+          "total_tokens": 688,
+          "cost": 5.136e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.136e-05,
+            "upstream_inference_prompt_cost": 1.716e-05,
+            "upstream_inference_completions_cost": 3.42e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.41
+      },
+      "duration_seconds": 2.416,
+      "error": "BinderException: Binder Error: Referenced column \"donation_count\" not found in FROM clause!\nCandidate bindings: \"total_multi_donor_amount\", \"total_amount\"\n\nLINE 1: ...mount AS rupees_from_multi_donor, COUNT(DISTINCT CASE WHEN donation_count > 1 THEN \"Donor\" END) AS number_of_multi_donor...\n                                                                      ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"donations\" (\n  \"Receipt No\" VARCHAR,\n  \"Date\" VARCHAR,\n  \"Donor\" VARCHAR,\n  \"Amount\" BIGINT,\n  \"Mode\" VARCHAR,\n  \"Campaign\" VARCHAR,\n  \"City\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"donations\": {\"Mode\": [\"Cash\", \"Cheque\", \"Online\", \"UPI\"], \"Campaign\": [\"General Fund\", \"Girl Child Education\", \"Health Camp\", \"Sportathon Fund\", \"Winter Relief\"], \"City\": [\"Aurangabad\", \"Mumbai\", \"Nagpur\", \"Nashik\", \"Pune\", \"Thane\"]}}\n\nCURRENT QUESTION:\nout of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"donation_count\" not found in FROM clause!\nCandidate bindings: \"total_multi_donor_amount\", \"total_amount\"\n\nLINE 1: ...mount AS rupees_from_multi_donor, COUNT(DISTINCT CASE WHEN donation_count > 1 THEN \"Donor\" END) AS number_of_multi_donor...\n                                                                      ^\nReturn a complete corrected query.",
+      "response": "```sql\nWITH donor_counts AS (\n    SELECT\n        \"Donor\",\n        COUNT(*) AS donation_count\n    FROM donations\n    GROUP BY \"Donor\"\n),\nmulti_donors AS (\n    SELECT\n        \"Donor\"\n    FROM donor_counts\n    WHERE donation_count > 1\n),\ntotal_amount AS (\n    SELECT SUM(\"Amount\") AS total_amount\n    FROM donations\n),\nmulti_donor_amount AS (\n    SELECT SUM(\"Amount\") AS rupees_from_multi_donor\n    FROM donations\n    JOIN multi_donors USING (\"Donor\")\n)\nSELECT\n    ROUND((multi_donor_amount.rupees_from_multi_donor * 100.0 / NULLIF(total_amount.total_amount, 0))::NUMERIC, 2) AS percent_from_multi_donors,\n    COUNT(DISTINCT multi_donor_amount.\"Donor\") AS number_of_multi_donor_donors\nFROM multi_donor_amount, total_amount;\n```",
+      "api": {
+        "id": "gen-1787421810-4ooIHojUuB1Hm9m1uFZ7",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 551,
+          "completion_tokens": 205,
+          "total_tokens": 756,
+          "cost": 6.156e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.156e-05,
+            "upstream_inference_prompt_cost": 3.081e-05,
+            "upstream_inference_completions_cost": 3.075e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.221
+      },
+      "duration_seconds": 2.225,
+      "error": "BinderException: Binder Error: Values list \"multi_donor_amount\" does not have a column named \"Donor\"\n\nLINE 1: ...) AS DECIMAL), 2) AS percent_from_multi_donors, COUNT(DISTINCT multi_donor_amount.\"Donor\") AS number_of_multi_donor_donors...\n                                                                          ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

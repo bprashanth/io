@@ -1,0 +1,91 @@
+{
+  "id": "relative-growth-between-years-p02",
+  "task_id": "relative-growth-between-years",
+  "pattern": "relative percent growth of a yearly total, not percentage points",
+  "question": "2024 total loan amount compared to 2023 total, percentage growth",
+  "gold_sql": "SELECT 100.0 * (SUM(CASE WHEN \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) - SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END)) / SUM(CASE WHEN \"Disbursement Date\" >= '2023-01-01' AND \"Disbursement Date\" < '2024-01-01' THEN \"Loan Amount (Rs)\" ELSE 0 END) AS growth_percent FROM shg_loan_register",
+  "expected_rows": [
+    [
+      26.040816326530614
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": false,
+  "sql_duckdb": "WITH yearly_totals AS (SELECT EXTRACT(YEAR FROM \"Disbursement Date\") AS year, SUM(NULLIF(\"Loan Amount (Rs)\", 0)) AS total_loan_amount FROM shg_loan_register WHERE \"Source\" = 'Block MIS export' GROUP BY 1) SELECT year, total_loan_amount, (total_loan_amount / NULLIF(NULLIF((SELECT total_loan_amount FROM yearly_totals WHERE year = 2023), 0), 0) - 1) * 100 AS percentage_growth FROM yearly_totals WHERE year IN (2023, 2024)",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\n2024 total loan amount compared to 2023 total, percentage growth",
+      "response": "```sql\nWITH yearly_totals AS (\n    SELECT\n        EXTRACT(YEAR FROM TO_DATE(\"Disbursement Date\")) AS year,\n        SUM(NULLIF(\"Loan Amount (Rs)\", 0)) AS total_loan_amount\n    FROM shg_loan_register\n    WHERE \"Source\" = 'Block MIS export'\n    GROUP BY 1\n)\nSELECT\n    t1.year AS year,\n    t1.total_loan_amount AS total_loan_amount,\n    (t1.total_loan_amount - t2.total_loan_amount) / NULLIF(t2.total_loan_amount, 0) * 100 AS percentage_growth\nFROM yearly_totals t1\nLEFT JOIN yearly_totals t2 ON t1.year = t2.year + 1\nWHERE t1.year = 2024 OR t2.year = 2023\nORDER BY t1.year;\n```",
+      "api": {
+        "id": "gen-1787421122-7UrxAzIs0k4e7p7fVmj4",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 398,
+          "completion_tokens": 197,
+          "total_tokens": 595,
+          "cost": 5.469e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.469e-05,
+            "upstream_inference_prompt_cost": 2.514e-05,
+            "upstream_inference_completions_cost": 2.955e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.863
+      },
+      "duration_seconds": 1.865,
+      "error": "CatalogException: Catalog Error: Scalar Function with name to_date does not exist!\nDid you mean \"to_days\"?\n\nLINE 1: EXPLAIN WITH yearly_totals AS (SELECT EXTRACT(YEAR FROM TO_DATE(\"Disbursement Date\")) AS year, SUM(NULLIF(\"Loan...\n                                                                ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\n2024 total loan amount compared to 2023 total, percentage growth\n\nREJECTED QUERY ERROR:\nCatalogException: Catalog Error: Scalar Function with name to_date does not exist!\nDid you mean \"to_days\"?\n\nLINE 1: EXPLAIN WITH yearly_totals AS (SELECT EXTRACT(YEAR FROM TO_DATE(\"Disbursement Date\")) AS year, SUM(NULLIF(\"Loan...\n                                                                ^\nReturn a complete corrected query.",
+      "response": "```sql\nWITH yearly_totals AS (\n    SELECT\n        EXTRACT(YEAR FROM \"Disbursement Date\") AS year,\n        SUM(NULLIF(\"Loan Amount (Rs)\", 0)) AS total_loan_amount\n    FROM shg_loan_register\n    WHERE \"Source\" = 'Block MIS export'\n    GROUP BY 1\n)\nSELECT\n    year,\n    total_loan_amount,\n    (total_loan_amount / NULLIF(\n        (SELECT total_loan_amount FROM yearly_totals WHERE year = 2023),\n        0\n    ) - 1) * 100 AS percentage_growth\nFROM yearly_totals\nWHERE year IN (2023, 2024);\n```",
+      "api": {
+        "id": "gen-1787421123-5X9o7KpEkx2KxXJMV5Zn",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 477,
+          "completion_tokens": 162,
+          "total_tokens": 639,
+          "cost": 4.401e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.401e-05,
+            "upstream_inference_prompt_cost": 1.971e-05,
+            "upstream_inference_completions_cost": 2.43e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.534
+      },
+      "duration_seconds": 1.537,
+      "error": "BinderException: Binder Error: No function matches the given name and argument types 'date_part(STRING_LITERAL, VARCHAR)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tdate_part(VARCHAR[], DATE) -> STRUCT()\n\tdate_part(VARCHAR[], INTERVAL) -> STRUCT()\n\tdate_part(VARCHAR[], TIME) -> STRUCT()\n\tdate_part(VARCHAR[], TIMESTAMP) -> STRUCT()\n\tdate_part(VARCHAR[], TIME WITH TIME ZONE) -> STRUCT()\n\tdate_part(VARCHAR[], TIME_NS) -> STRUCT()\n\tdate_part(VARCHAR, DATE) -> BIGINT\n\tdate_part(VARCHAR, INTERVAL) -> BIGINT\n\tdate_part(VARCHAR, TIME) -> BIGINT\n\tdate_part(VARCHAR, TIMESTAMP) -> BIGINT\n\tdate_part(VARCHAR, TIME WITH TIME ZONE) -> BIGINT\n\tdate_part(VARCHAR, TIME_NS) -> BIGINT\n\tdate_part(VARCHAR[], TIMESTAMP WITH TIME ZONE) -> STRUCT()\n\tdate_part(VARCHAR, TIMESTAMP WITH TIME ZONE) -> BIGINT\n\n\nLINE 1: EXPLAIN WITH yearly_totals AS (SELECT EXTRACT(YEAR FROM \"Disbursement Date\") AS year, SUM(NULLIF...\n                                              ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

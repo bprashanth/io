@@ -1,0 +1,205 @@
+{
+ "schema_version": 2,
+ "status": "frozen-anchor-before-first-model-run",
+ "purpose": "Frozen anchor benchmark for the text-to-SQL gate, mirroring three real NGO asks (a sportathon fitness cohort with dropouts, a family-welfare household survey workbook, and a scholarship outreach-vs-application reconciliation with messy school names needing a fuzzy string join) plus two generic patterns (a same-concept/different-header cross-year attendance join, and a repeat-donor share). Questions are terse and do not name columns verbatim. No router, prompt or evaluator rule may be changed after the first model run on this file; a changed rule requires a new anchor version.",
+ "built_by": "benchmarks/v2/build_anchor_v1_fixtures.py (seed 20260823)",
+ "frozen_at": "2026-08-22",
+ "dialect_requested_from_model": "sqlite",
+ "execution_dialect": "duckdb",
+ "comparison": {
+  "numeric_rel_tolerance": 1e-06,
+  "numeric_abs_tolerance": 0.06,
+  "tolerance_note": "Gold values are unrounded. A model answer rounded to one decimal is still equal; an answer off by more than 0.06 absolute is wrong.",
+  "column_names_required": false,
+  "required_columns_may_be_a_projection_of_a_wider_result": true,
+  "equivalent_long_or_grouped_wide_results_accepted": true,
+  "row_order_required_only_for_ranking_tasks": true
+ },
+ "tables": [
+  {
+   "name": "sportathon_baseline",
+   "kind": "csv",
+   "path": "benchmarks/v2/anchor-v1/sportathon_baseline.csv"
+  },
+  {
+   "name": "sportathon_endline",
+   "kind": "csv",
+   "path": "benchmarks/v2/anchor-v1/sportathon_endline.csv"
+  },
+  {
+   "name": "fw_households",
+   "kind": "xlsx",
+   "path": "benchmarks/v2/anchor-v1/fw_households.xlsx",
+   "sheet": "Survey"
+  },
+  {
+   "name": "lpf_outreach",
+   "kind": "csv",
+   "path": "benchmarks/v2/anchor-v1/lpf_outreach.csv"
+  },
+  {
+   "name": "lpf_applications",
+   "kind": "csv",
+   "path": "benchmarks/v2/anchor-v1/lpf_applications.csv"
+  },
+  {
+   "name": "attendance_2023",
+   "kind": "csv",
+   "path": "benchmarks/v2/anchor-v1/attendance_2023.csv"
+  },
+  {
+   "name": "attendance_2024",
+   "kind": "csv",
+   "path": "benchmarks/v2/anchor-v1/attendance_2024.csv"
+  },
+  {
+   "name": "donations",
+   "kind": "csv",
+   "path": "benchmarks/v2/anchor-v1/donations.csv"
+  }
+ ],
+ "tasks": [
+  {
+   "id": "sportathon-improvement-ranking",
+   "order_matters": true,
+   "pattern": "join two same-shape tables on an id, compute a delta, rank top five, dropouts fall out via inner join",
+   "tables": [
+    "sportathon_baseline",
+    "sportathon_endline"
+   ],
+   "gold_sql": "SELECT b.\"Child Name\", e.\"Sit Ups\" - b.\"Sit Ups\" AS situps_improvement FROM sportathon_baseline AS b JOIN sportathon_endline AS e ON b.\"Child ID\" = e.\"Child ID\" ORDER BY situps_improvement DESC, b.\"Child Name\" LIMIT 5",
+   "phrasings": [
+    "top 5 kids who improved the most in situps from baseline to endline",
+    "which five children showed the biggest jump in situp count between the first and second fitness test",
+    "rank the top 5 by how much their situp count went up since baseline, best improver first"
+   ]
+  },
+  {
+   "id": "sportathon-site-average-change",
+   "pattern": "join on id, compute per-row delta, average by group",
+   "tables": [
+    "sportathon_baseline",
+    "sportathon_endline"
+   ],
+   "gold_sql": "SELECT b.\"Location\", AVG(e.\"Shuttle Run sec\" - b.\"Shuttle Run sec\") AS avg_shuttle_change FROM sportathon_baseline AS b JOIN sportathon_endline AS e ON b.\"Child ID\" = e.\"Child ID\" GROUP BY b.\"Location\" ORDER BY b.\"Location\"",
+   "phrasings": [
+    "site wise average change in shuttle run time from baseline to endline, negative means faster",
+    "for each centre how much did the shuttle sprint time change on average between the two tests",
+    "average shuttle run improvement or decline per location, endline minus baseline"
+   ]
+  },
+  {
+   "id": "sportathon-dropouts",
+   "pattern": "anti-join two same-shape tables on an id, project one column",
+   "tables": [
+    "sportathon_baseline",
+    "sportathon_endline"
+   ],
+   "gold_sql": "SELECT b.\"Child Name\" FROM sportathon_baseline AS b WHERE NOT EXISTS (SELECT 1 FROM sportathon_endline AS e WHERE e.\"Child ID\" = b.\"Child ID\") ORDER BY b.\"Child Name\"",
+   "phrasings": [
+    "which children were tested at baseline but missing from the endline",
+    "list kids who dropped out before the second round of testing",
+    "names of children present in the first fitness test but not in the follow up"
+   ]
+  },
+  {
+   "id": "fw-vulnerability-ranking",
+   "order_matters": false,
+   "pattern": "weighted sum of a numeric difference and several yes/no flags, full ranking",
+   "tables": [
+    "fw_households"
+   ],
+   "gold_sql": "SELECT \"HH ID\", (\"Members\" - \"Earners\") + CASE WHEN \"Has Ration Card\" = 'No' THEN 2 ELSE 0 END + CASE WHEN \"Chronic Illness\" = 'Yes' THEN 2 ELSE 0 END + CASE WHEN \"Roof Type\" = 'Kutcha' THEN 1 ELSE 0 END AS vulnerability_score FROM fw_households ORDER BY vulnerability_score DESC, \"HH ID\"",
+   "phrasings": [
+    "score each household as members minus earners, plus 2 if they have no ration card, plus 2 if there is a chronic illness, plus 1 for a kutcha roof - rank highest score first with the household id",
+    "for every household add household size minus number of earners, 2 points for missing ration card, 2 points for chronic illness in the family, 1 point for a kutcha roof - show id and total, most vulnerable on top",
+    "compute a vulnerability score per household as (members - earners) + 2 times no ration card + 2 times chronic illness yes + 1 times kutcha roof, list household id and score sorted highest to lowest"
+   ],
+   "note": "Scores tie across 30 households (small integer composite); the set of (HH ID, score) pairs verifies the formula, order is not gated."
+  },
+  {
+   "id": "fw-income-per-member-missing",
+   "order_matters": true,
+   "pattern": "ratio of two columns excluding null rows, ascending rank",
+   "tables": [
+    "fw_households"
+   ],
+   "gold_sql": "SELECT \"HH ID\", \"Monthly Income Rs\" / \"Members\" AS income_per_member FROM fw_households WHERE \"Monthly Income Rs\" IS NOT NULL ORDER BY income_per_member ASC, \"HH ID\"",
+   "phrasings": [
+    "monthly income divided by family size for each household, skip the ones with income not filled in, lowest first",
+    "per person monthly earning by household excluding blank income entries, ascending order",
+    "rank households by income per family member from lowest to highest, leave out households where income is missing"
+   ]
+  },
+  {
+   "id": "lpf-reconciliation-fuzzy",
+   "pattern": "fuzzy string join with best-match dedup, left join to include zero-count rows, group count",
+   "tables": [
+    "lpf_outreach",
+    "lpf_applications"
+   ],
+   "gold_sql": "WITH best AS (SELECT a.\"Applicant\" AS applicant, o.\"School Name\" AS matched_school, jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) AS sim FROM lpf_applications AS a JOIN lpf_outreach AS o ON jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) >= 0.9 QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Applicant\" ORDER BY sim DESC, o.\"School Name\") = 1) SELECT o.\"School Name\", COUNT(b.applicant) AS applications_received FROM lpf_outreach AS o LEFT JOIN best AS b ON b.matched_school = o.\"School Name\" GROUP BY o.\"School Name\" ORDER BY o.\"School Name\"",
+   "phrasings": [
+    "for each school we contacted, how many applications came in - match school names loosely since spellings differ, include schools with none",
+    "school wise application count matching names approximately even with typos or short forms, zero counted for schools with no applications, alphabetical by school",
+    "how many applications landed per outreach school when we match names even if written a bit differently, show every school including those with zero"
+   ]
+  },
+  {
+   "id": "lpf-gap",
+   "pattern": "fuzzy string join with best-match dedup, group count compared against a stated column, threshold filter",
+   "tables": [
+    "lpf_outreach",
+    "lpf_applications"
+   ],
+   "gold_sql": "WITH best AS (SELECT a.\"Applicant\" AS applicant, o.\"School Name\" AS matched_school, jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) AS sim FROM lpf_applications AS a JOIN lpf_outreach AS o ON jaro_winkler_similarity(lower(trim(a.\"School\")), lower(trim(o.\"School Name\"))) >= 0.9 QUALIFY ROW_NUMBER() OVER (PARTITION BY a.\"Applicant\" ORDER BY sim DESC, o.\"School Name\") = 1) SELECT o.\"School Name\", COUNT(b.applicant) AS applications_received, o.\"Applications Expected\" FROM lpf_outreach AS o LEFT JOIN best AS b ON b.matched_school = o.\"School Name\" GROUP BY o.\"School Name\", o.\"Applications Expected\" HAVING COUNT(b.applicant) < o.\"Applications Expected\" / 2.0 ORDER BY o.\"School Name\"",
+   "phrasings": [
+    "which schools got less than half the applications we expected from them, matching names loosely",
+    "list schools where actual applications received, fuzzy matched, fall short of half the expected number",
+    "schools under-delivering on applications - received less than 50 percent of what was expected, loose name matching"
+   ]
+  },
+  {
+   "id": "attendance-cross-year",
+   "pattern": "union two differently-headered tables after renaming, pivot with conditional aggregation",
+   "tables": [
+    "attendance_2023",
+    "attendance_2024"
+   ],
+   "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_rate_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_rate_2024 FROM combined GROUP BY centre ORDER BY centre",
+   "phrasings": [
+    "centre wise attendance percentage for 2023 and 2024 side by side",
+    "for each centre show the average turnout rate in both years next to each other",
+    "compare average daily attendance rate per centre across the two years, one row each"
+   ]
+  },
+  {
+   "id": "attendance-biggest-drop",
+   "order_matters": true,
+   "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+   "tables": [
+    "attendance_2023",
+    "attendance_2024"
+   ],
+   "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+   "phrasings": [
+    "which centre saw the biggest fall in attendance rate from 2023 to 2024",
+    "rank centres by how much their turnout percentage dropped between the two years, worst first",
+    "where did attendance percentage decline the most year on year"
+   ]
+  },
+  {
+   "id": "donations-repeat-share",
+   "pattern": "group by entity, conditional sum and count, single-row share calculation",
+   "tables": [
+    "donations"
+   ],
+   "gold_sql": "WITH counts AS (SELECT \"Donor\", COUNT(*) AS gifts, SUM(\"Amount\") AS donor_total FROM donations GROUP BY \"Donor\") SELECT 100.0 * SUM(CASE WHEN gifts > 1 THEN donor_total ELSE 0 END) / SUM(donor_total) AS repeat_share_percent, SUM(CASE WHEN gifts > 1 THEN 1 ELSE 0 END) AS repeat_donor_count FROM counts",
+   "phrasings": [
+    "what percent of total donation value comes from people who gave more than once, and how many repeat donors are there",
+    "share of money raised from repeat givers versus one-time givers, in percent, plus a count of repeat givers",
+    "out of all donation rupees collected, what fraction came from donors who contributed on more than one occasion - give percent and the number of such donors"
+   ]
+  }
+ ]
+}

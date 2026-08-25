@@ -1,0 +1,125 @@
+{
+  "id": "cross-table-join-p04",
+  "task_id": "cross-table-join",
+  "pattern": "join on two keys and derive one measure from each table",
+  "question": "district wise 2023: ANC completed over registered and employed over enrolled as percentages from both tables",
+  "gold_sql": "SELECT a.district, ROUND(100.0 * a.anc4_completed / a.pregnancies_registered, 1) AS anc_percent, ROUND(100.0 * l.employed_at_6_months / l.women_enrolled, 1) AS employment_percent FROM anc_visits AS a INNER JOIN livelihoods AS l ON a.district = l.district AND a.year = l.year WHERE a.year = 2023 ORDER BY a.district",
+  "expected_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      74.0,
+      56.0
+    ],
+    [
+      "Nalanda",
+      80.0,
+      65.0
+    ],
+    [
+      "Purnia",
+      67.0,
+      46.0
+    ],
+    [
+      "Kishanganj",
+      61.0,
+      38.0
+    ],
+    [
+      "Patna",
+      86.0,
+      null
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH anc_stats AS (SELECT district, 100.0 * NULLIF(anc4_completed, 0) / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS anc_pct FROM anc_visits WHERE year = 2023), livelihood_stats AS (SELECT district, 100.0 * NULLIF(employed_at_6_months, 0) / NULLIF(NULLIF(women_enrolled, 0), 0) AS livelihood_pct FROM livelihoods WHERE year = 2023) SELECT COALESCE(a.district, l.district) AS district, a.anc_pct, l.livelihood_pct FROM anc_stats AS a FULL OUTER JOIN livelihood_stats AS l ON a.district = l.district",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nCREATE TABLE \"livelihoods\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"women_enrolled\" BIGINT,\n  \"completed_training\" BIGINT,\n  \"employed_at_6_months\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}, \"livelihoods\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Purnia\"], \"source\": [\"synthetic women livelihood outcomes fixture\"]}}\n\nCURRENT QUESTION:\ndistrict wise 2023: ANC completed over registered and employed over enrolled as percentages from both tables",
+      "response": "WITH anc_stats AS (\n  SELECT \n    district,\n    100.0 * NULLIF(anc4_completed, 0) / NULLIF(pregnancies_registered, 0) AS anc_pct\n  FROM anc_visits\n  WHERE year = 2023\n),\nlivelihood_stats AS (\n  SELECT \n    district,\n    100.0 * NULLIF(employed_at_6_months, 0) / NULLIF(women_enrolled, 0) AS livelihood_pct\n  FROM livelihoods\n  WHERE year = 2023\n)\nSELECT \n  COALESCE(a.district, l.district) AS district,\n  a.anc_pct,\n  l.livelihood_pct\nFROM anc_stats a\nFULL OUTER JOIN livelihood_stats l ON a.district = l.district;",
+      "api": {
+        "id": "gen-1787421129-6P1fYdx3zBSnPAehs7cF",
+        "model": "qwen/qwen3.5-35b-a3b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 429,
+          "completion_tokens": 181,
+          "total_tokens": 610,
+          "cost": 0.0003050125,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0003050125,
+            "upstream_inference_prompt_cost": 6.97125e-05,
+            "upstream_inference_completions_cost": 0.0002353
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.341
+      },
+      "duration_seconds": 1.344,
+      "sql_duckdb": "WITH anc_stats AS (SELECT district, 100.0 * NULLIF(anc4_completed, 0) / NULLIF(NULLIF(pregnancies_registered, 0), 0) AS anc_pct FROM anc_visits WHERE year = 2023), livelihood_stats AS (SELECT district, 100.0 * NULLIF(employed_at_6_months, 0) / NULLIF(NULLIF(women_enrolled, 0), 0) AS livelihood_pct FROM livelihoods WHERE year = 2023) SELECT COALESCE(a.district, l.district) AS district, a.anc_pct, l.livelihood_pct FROM anc_stats AS a FULL OUTER JOIN livelihood_stats AS l ON a.district = l.district",
+      "rows": [
+        [
+          "Gaya",
+          74.0,
+          56.0
+        ],
+        [
+          "Nalanda",
+          80.0,
+          65.0
+        ],
+        [
+          "Purnia",
+          67.0,
+          46.0
+        ],
+        [
+          "Kishanganj",
+          61.0,
+          38.0
+        ],
+        [
+          "Patna",
+          86.0,
+          null
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tuition Attendance Register</title>
+<style>
+:root {
+  --primary: #1976d2;
+  --primary-dark: #115293;
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --text: #212121;
+  --text-muted: #666666;
+  --present: #2e7d32;
+  --present-bg: #e8f5e9;
+  --absent: #c62828;
+  --absent-bg: #ffebee;
+  --border: #e0e0e0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+body { background: var(--bg); color: var(--text); padding-bottom: 70px; -webkit-tap-highlight-color: transparent; }
+header { background: var(--primary); color: white; padding: 14px 16px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+header h1 { font-size: 1.15rem; font-weight: 600; }
+header p { font-size: 0.75rem; opacity: 0.9; margin-top: 2px; }
+
+.tabs { display: flex; background: white; border-bottom: 1px solid var(--border); position: sticky; top: 58px; z-index: 90; }
+.tab-btn { flex: 1; padding: 12px 6px; text-align: center; font-size: 0.85rem; font-weight: 600; border: none; background: none; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: #f9fbfd; }
+
+.container { padding: 12px; max-width: 600px; margin: 0 auto; }
+.card { background: var(--card); border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+
+.date-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.date-bar input[type="date"], .date-bar select, .date-bar input[type="month"] { font-size: 0.9rem; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: white; flex: 1; }
+
+.stats-badge { font-size: 0.8rem; font-weight: 600; background: #e3f2fd; color: var(--primary-dark); padding: 4px 8px; border-radius: 4px; display: inline-block; }
+
+.student-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.student-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: white; border: 1px solid var(--border); border-radius: 6px; }
+.student-name { font-size: 0.95rem; font-weight: 500; flex: 1; padding-right: 8px; }
+.student-roll { font-size: 0.75rem; color: var(--text-muted); margin-right: 8px; font-weight: bold; width: 22px; }
+
+.toggle-group { display: flex; gap: 6px; }
+.btn-toggle { border: 1px solid var(--border); background: white; padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.btn-toggle.p-active { background: var(--present); color: white; border-color: var(--present); }
+.btn-toggle.a-active { background: var(--absent); color: white; border-color: var(--absent); }
+
+.btn-primary { background: var(--primary); color: white; border: none; padding: 10px 14px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; width: 100%; cursor: pointer; text-align: center; }
+.btn-secondary { background: #eee; color: #333; border: 1px solid #ccc; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+
+.bulk-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.bulk-actions button { flex: 1; padding: 8px; font-size: 0.8rem; border-radius: 4px; border: 1px solid var(--border); background: #fff; cursor: pointer; }
+
+/* Roster Manager */
+.roster-input-wrap { display: flex; gap: 8px; margin-bottom: 12px; }
+.roster-input-wrap input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.9rem; }
+.btn-remove { color: var(--absent); background: none; border: none; font-size: 1.1rem; padding: 4px 8px; cursor: pointer; }
+
+/* Table */
+.summary-table-wrap { overflow-x: auto; margin-top: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+th, td { padding: 8px 6px; border-bottom: 1px solid var(--border); }
+th { background: #fafafa; color: var(--text-muted); font-weight: 600; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+
+.empty-msg { text-align: center; padding: 24px 8px; color: var(--text-muted); font-size: 0.9rem; }
+.hidden { display: none !important; }
+.info-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tuition Attendance Register</h1>
+  <p>Offline Mobile Tracker for 25 Students</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('mark')">Mark Today</button>
+  <button class="tab-btn" onclick="switchTab('summary')">Monthly View</button>
+  <button class="tab-btn" onclick="switchTab('roster')">Student List</button>
+</div>
+
+<div class="container">
+  
+  <!-- TAB 1: DAILY ATTENDANCE -->
+  <div id="tab-mark">
+    <div class="card">
+      <div class="date-bar">
+        <label style="font-size:0.85rem; font-weight:600;" for="recordDate">Date:</label>
+        <input type="date" id="recordDate" onchange="loadAttendanceForDate()">
+      </div>
+      <div class="bulk-actions">
+        <button onclick="markAll('P')">Mark All Present</button>
+        <button onclick="markAll('A')">Mark All Absent</button>
+        <button onclick="clearDateAttendance()">Clear</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+        <span class="stats-badge" id="dailyStats">Present: 0 | Absent: 0</span>
+        <span id="saveIndicator" style="font-size:0.75rem; color:var(--present); font-weight:600;">Saved auto</span>
+      </div>
+    </div>
+
+    <ul class="student-list" id="markList"></ul>
+    <div id="emptyMarkWarning" class="card empty-msg hidden">
+      No students found. Please switch to the "Student List" tab to add names.
+    </div>
+  </div>
+
+  <!-- TAB 2: MONTHLY SUMMARY -->
+  <div id="tab-summary" class="hidden">
+    <div class="card">
+      <div class="date-bar">
+        <label style="font-size:0.85rem; font-weight:600;" for="monthSelect">Month:</label>
+        <input type="month" id="monthSelect" onchange="renderSummary()">
+      </div>
+      <p class="info-note">Calculates total present days and percentage for the selected month.</p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-weight:600; font-size:0.9rem;">Total Class Days Run:</span>
+        <span id="totalClassDays" style="font-weight:700; color:var(--primary);">0</span>
+      </div>
+      <div class="summary-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:28px;">#</th>
+              <th>Student Name</th>
+              <th class="text-center">Attended</th>
+              <th class="text-right">Percent</th>
+            </tr>
+          </thead>
+          <tbody id="summaryTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: STUDENT ROSTER SETUP -->
+  <div id="tab-roster" class="hidden">
+    <div class="card">
+      <h3 style="font-size:0.95rem; margin-bottom:6px;">Add Student</h3>
+      <div class="roster-input-wrap">
+        <input type="text" id="newStudentName" placeholder="Type student full name" onkeydown="if(event.key==='Enter') addStudent()">
+        <button class="btn-secondary" onclick="addStudent()">Add</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="info-note" id="rosterCount">Enrolled: 0 / 25 kids</span>
+        <button class="btn-secondary" style="font-size:0.75rem; padding:4px 8px;" onclick="loadSampleRoster()">Load 25 Sample Names</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:0.95rem; margin-bottom:8px;">Registered Names</h3>
+      <ul class="student-list" id="rosterList"></ul>
+      <div id="emptyRosterWarning" class="empty-msg hidden">
+        No names added yet. Type a name above or click "Load 25 Sample Names".
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// --- Service Worker Blob (Enables full PWA / offline support) ---
+const swScript = `
+  const CACHE = 'tuition-att-v1';
+  self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
+  self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+  self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+`;
+if ('serviceWorker' in navigator) {
+  const blob = new Blob([swScript], { type: 'application/javascript' });
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(function(){});
+}
+
+// --- Data Models & Storage Keys ---
+const ROSTER_KEY = 'tuition_roster';
+const ATT_KEY = 'tuition_attendance';
+
+let students = [];
+let attendance = {}; // Format: { "YYYY-MM-DD": { "studentId": "P" | "A" } }
+
+function initData() {
+  const savedRoster = localStorage.getItem(ROSTER_KEY);
+  const savedAtt = localStorage.getItem(ATT_KEY);
+
+  if (window.data && Array.isArray(window.data.students)) {
+    students = window.data.students;
+  } else if (savedRoster) {
+    try { students = JSON.parse(savedRoster); } catch (e) { students = []; }
+  } else {
+    // Default starting list if empty
+    students = [];
+  }
+
+  if (window.data && window.data.attendance) {
+    attendance = window.data.attendance;
+  } else if (savedAtt) {
+    try { attendance = JSON.parse(savedAtt); } catch (e) { attendance = {}; }
+  } else {
+    attendance = {};
+  }
+
+  // Set default dates
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('recordDate').value = today;
+  document.getElementById('monthSelect').value = today.substring(0, 7);
+
+  renderRoster();
+  loadAttendanceForDate();
+}
+
+function saveData() {
+  localStorage.setItem(ROSTER_KEY, JSON.stringify(students));
+  localStorage.setItem(ATT_KEY, JSON.stringify(attendance));
+}
+
+// --- Navigation Tabs ---
+function switchTab(tabId) {
+  document.querySelectorAll('.tabs .tab-btn').forEach((btn, idx) => {
+    btn.classList.toggle('active', 
+      (tabId === 'mark' && idx === 0) || 
+      (tabId === 'summary' && idx === 1) || 
+      (tabId === 'roster' && idx === 2)
+    );
+  });
+  document.getElementById('tab-mark').classList.toggle('hidden', tabId !== 'mark');
+  document.getElementById('tab-summary').classList.toggle('hidden', tabId !== 'summary');
+  document.getElementById('tab-roster').classList.toggle('hidden', tabId !== 'roster');
+
+  if (tabId === 'mark') loadAttendanceForDate();
+  if (tabId === 'summary') renderSummary();
+  if (tabId === 'roster') renderRoster();
+}
+
+// --- Student Roster Logic ---
+function addStudent() {
+  const input = document.getElementById('newStudentName');
+  const name = input.value.trim();
+  if (!name) return;
+
+  const newId = 's_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+  students.push({ id: newId, name: name });
+  input.value = '';
+  saveData();
+  renderRoster();
+}
+
+function removeStudent(id) {
+  if (confirm("Remove this student? Historical attendance records will remain saved.")) {
+    students = students.filter(s => s.id !== id);
+    saveData();
+    renderRoster();
+  }
+}
+
+function loadSampleRoster() {
+  if (students.length > 0 && !confirm("Replace current list with 25 sample student names?")) return;
+  const sampleNames = [
+    "Aarav Sharma", "Ananya Patel", "Amit Kumar", "Bhavna Sen", "Chetan Das",
+    "Divya Nair", "Deepak Gupta", "Esha Roy", "Farhan Ali", "Gita Joshi",
+    "Harish Verma", "Ishaan Reddy", "Jaya Mehta", "Karan Singh", "Kavita Rao",
+    "Manoj Yadav", "Neha Mishra", "Pooja Thakur", "Priya Ghosh", "Rahul Jain",
+    "Ritu Shah", "Sanjay Bhat", "Sneha Pillai", "Vikram Malhotra", "Zoya Khan"
+  ];
+  students = sampleNames.map((name, i) => ({ id: 's_' + (i + 1), name: name }));
+  saveData();
+  renderRoster();
+  loadAttendanceForDate();
+}
+
+function renderRoster() {
+  const list = document.getElementById('rosterList');
+  const empty = document.getElementById('emptyRosterWarning');
+  const countSpan = document.getElementById('rosterCount');
+  
+  countSpan.textContent = `Enrolled: ${students.length} / 25 kids`;
+  list.innerHTML = '';
+
+  if (students.length === 0) {
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  students.forEach((s, idx) => {
+    const li = document.createElement('li');
+    li.className = 'student-item';
+    li.innerHTML = `
+      <span class="student-roll">${idx + 1}.</span>
+      <span class="student-name">${escapeHtml(s.name)}</span>
+      <button class="btn-remove" title="Delete" onclick="removeStudent('${s.id}')">&times;</button>
+    `;
+    list.appendChild(li);
+  });
+}
+
+// --- Daily Attendance Marking ---
+function loadAttendanceForDate() {
+  const date = document.getElementById('recordDate').value;
+  const list = document.getElementById('markList');
+  const empty = document.getElementById('emptyMarkWarning');
+
+  list.innerHTML = '';
+  if (students.length === 0) {
+    empty.classList.remove('hidden');
+    updateDailyStats();
+    return;
+  }
+  empty.classList.add('hidden');
+
+  const dayRecord = attendance[date] || {};
+
+  students.forEach((s, idx) => {
+    const status = dayRecord[s.id] || ''; // 'P', 'A', or ''
+    const li = document.createElement('li');
+    li.className = 'student-item';
+    li.innerHTML = `
+      <span class="student-roll">${idx + 1}.</span>
+      <span class="student-name">${escapeHtml(s.name)}</span>
+      <div class="toggle-group">
+        <button type="button" class="btn-toggle ${status === 'P' ? 'p-active' : ''}" onclick="setAttendance('${s.id}', 'P')">Present</button>
+        <button type="button" class="btn-toggle ${status === 'A' ? 'a-active' : ''}" onclick="setAttendance('${s.id}', 'A')">Absent</button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+
+  updateDailyStats();
+}
+
+function setAttendance(studentId, status) {
+  const date = document.getElementById('recordDate').value;
+  if (!date) return;
+
+  if (!attendance[date]) {
+    attendance[date] = {};
+  }
+
+  // Toggle off if clicked again
+  if (attendance[date][studentId] === status) {
+    delete attendance[date][studentId];
+  } else {
+    attendance[date][studentId] = status;
+  }
+
+  saveData();
+  loadAttendanceForDate();
+}
+
+function markAll(status) {
+  const date = document.getElementById('recordDate').value;
+  if (!date || students.length === 0) return;
+
+  if (!attendance[date]) attendance[date] = {};
+  students.forEach(s => {
+    attendance[date][s.id] = status;
+  });
+
+  saveData();
+  loadAttendanceForDate();
+}
+
+function clearDateAttendance() {
+  const date = document.getElementById('recordDate').value;
+  if (!date) return;
+  if (attendance[date]) {
+    delete attendance[date];
+    saveData();
+    loadAttendanceForDate();
+  }
+}
+
+function updateDailyStats() {
+  const date = document.getElementById('recordDate').value;
+  const dayRecord = attendance[date] || {};
+  let p = 0, a = 0;
+  students.forEach(s => {
+    if (dayRecord[s.id] === 'P') p++;
+    if (dayRecord[s.id] === 'A') a++;
+  });
+  document.getElementById('dailyStats').textContent = `Present: ${p} | Absent: ${a} | Unmarked: ${students.length - (p + a)}`;
+}
+
+// --- Monthly Summary Logic ---
+function renderSummary() {
+  const monthStr = document.getElementById('monthSelect').value; // 'YYYY-MM'
+  const tbody = document.getElementById('summaryTableBody');
+  tbody.innerHTML = '';
+
+  if (!monthStr) return;
+
+  // Find all recorded dates in this month where at least one student was marked
+  const datesInMonth = Object.keys(attendance).filter(d => d.startsWith(monthStr) && Object.keys(attendance[d]).length > 0);
+  const totalDays = datesInMonth.length;
+  document.getElementById('totalClassDays').textContent = totalDays;
+
+  if (students.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding:16px;">No students enrolled.</td></tr>`;
+    return;
+  }
+
+  if (totalDays === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding:16px;">No attendance recorded for this month.</td></tr>`;
+    return;
+  }
+
+  students.forEach((s, idx) => {
+    let presentCount = 0;
+    datesInMonth.forEach(d => {
+      if (attendance[d] && attendance[d][s.id] === 'P') {
+        presentCount++;
+      }
+    });
+
+    const percent = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--text-muted);">${idx + 1}</td>
+      <td style="font-weight:500;">${escapeHtml(s.name)}</td>
+      <td class="text-center">${presentCount} / ${totalDays}</td>
+      <td class="text-right" style="font-weight:600; color:${percent >= 75 ? 'var(--present)' : 'var(--absent)'}">${percent}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+window.addEventListener('DOMContentLoaded', initData);
+</script>
+</body>
+</html>

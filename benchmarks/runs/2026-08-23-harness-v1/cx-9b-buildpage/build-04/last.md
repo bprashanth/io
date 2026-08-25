@@ -1,0 +1,3 @@
+The dashboard has been created at ```io_out/page.html```. 
+
+The page shows current stock of 960 devices total across 7 device types (Braille kit, Hearing aid, Tricycle, Wheelchair, Crutches, Walking stick, Calipers), 143 beneficiaries with assistive devices served out of 210 total registered beneficiaries, and a breakdown of beneficiaries by disability type: Locomotor (31), Multiple Disability (24), Visual Impairment (24), Intellectual Disability (22), Speech and Language Disability (22), and Hearing Impairment (20).

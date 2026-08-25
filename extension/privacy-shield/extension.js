@@ -39,7 +39,9 @@ async function choosePort() {
   const base = cfg().get("port") || 8765;
   for (let p = base; p < base + 20; p++) {
     chosenPort = p;
-    if (await getJson(`http://127.0.0.1:${p}/shield/status.json`)) return p;   // our daemon, adopt
+    const st = await getJson(`http://127.0.0.1:${p}/shield/status.json`);
+    if (st && (!st.server || path.resolve(st.server) === path.resolve(serverDir()))) return p;   // our daemon, adopt
+    if (st) continue;                                            // a foreign shield daemon: leave it alone
     if (await portFree(p)) return p;
   }
   chosenPort = null;
@@ -51,13 +53,21 @@ function serverDir() {
   return path.join(ctx.extensionPath, "server");
 }
 
+function envDir() {
+  // The Python env lives in globalStorage, NOT in the versioned extension folder:
+  // the IDE deletes the old extension folder on every update, which used to take
+  // the 1.7 GB venv and model cache with it (measured 2026-08-25).
+  return path.join(stateDir(), "env");
+}
+
 function pythonPath() {
   const custom = cfg().get("pythonPath");
   if (custom) return custom;
-  const venv = os.platform() === "win32"
-    ? path.join(serverDir(), ".venv", "Scripts", "python.exe")
-    : path.join(serverDir(), ".venv", "bin", "python");
-  return fs.existsSync(venv) ? venv : null;
+  const cand = os.platform() === "win32"
+    ? [path.join(envDir(), ".venv", "Scripts", "python.exe"), path.join(serverDir(), ".venv", "Scripts", "python.exe")]
+    : [path.join(envDir(), ".venv", "bin", "python"), path.join(serverDir(), ".venv", "bin", "python")];
+  for (const c of cand) if (fs.existsSync(c)) return c;   // legacy in-extension venv still honoured
+  return null;
 }
 
 function stateDir() {
@@ -162,7 +172,10 @@ function relaunch(withShield) {
 
 // ---- daemon ------------------------------------------------------------------
 async function daemonAlive() {
-  return !!(await getJson(`${proxyUrl()}/shield/status.json`));
+  const s = await getJson(`${proxyUrl()}/shield/status.json`);
+  if (!s) return false;
+  if (s.server && path.resolve(s.server) !== path.resolve(serverDir())) return false;  // someone else's daemon (another profile/version): do not adopt
+  return true;
 }
 
 function daemonCommand() {
@@ -174,8 +187,9 @@ function daemonCommand() {
   const numbers = cfg().get("numbers");
   if (numbers) args.push("--numbers", String(numbers));
   if (cfg().get("annotate")) args.push("--annotate");
+  const hf = fs.existsSync(path.join(envDir(), "hf-cache")) ? path.join(envDir(), "hf-cache") : path.join(serverDir(), "hf-cache");
   const env = { ...process.env, PII_THREADS: String(cfg().get("threads") || 4),
-    HF_HOME: path.join(serverDir(), "hf-cache"), PYTHONUNBUFFERED: "1" };
+    HF_HOME: hf, PYTHONUNBUFFERED: "1" };
   delete env.CLOUD_CODE_URL; // the daemon itself must talk to Google directly
   delete env.ELECTRON_RUN_AS_NODE;
   return { py, args, env, log: path.join(stateDir(), "daemon.out") };
@@ -208,7 +222,7 @@ async function startDaemon() {
   const py = pythonPath();
   if (!py) {
     const pick = await vscode.window.showErrorMessage(
-      "Privacy Shield: Python environment not found. Run the one-time install (needs internet, ~200 MB).",
+      "Privacy Shield: Python environment not found. Run the one-time install (needs internet, about a 500 MB download, 1.7 GB on disk).",
       "Install now");
     if (pick === "Install now") await install();
     return false;
@@ -359,15 +373,15 @@ async function refresh() {
     // The daemon is up but no model call has passed through it in this session yet,
     // so routing is unproven. This clears on the first shielded agent message; if it
     // never clears while the agent answers, traffic is bypassing the shield.
-    statusBar.text = "$(shield) Shield on · awaiting first call";
+    statusBar.text = "$(shield) Shield on - awaiting first call";
     statusBar.tooltip = `Privacy Shield is running on ${proxyUrl()} and Antigravity is pointed at it, ` +
       "but no model call has arrived yet. The first agent message verifies routing." +
       (languageServerUsesProxy() ? "" : "\nIf this persists after a chat message, run 'Privacy Shield: Enable' and choose Relaunch.");
     statusBar.backgroundColor = undefined;
   } else {
-    const peek = s.peek ? " · PEEK" : "";
-    const blocked = s.blocked ? ` · ${s.blocked} blocked` : "";
-    statusBar.text = `$(shield) ${s.calls} calls · ${Math.round(s.redact_ms_last)} ms · vault ${s.vault_entries}${blocked}${peek}`;
+    const peek = s.peek ? " - PEEK" : "";
+    const blocked = s.blocked ? ` - ${s.blocked} blocked` : "";
+    statusBar.text = `$(shield) ${s.calls} calls - ${Math.round(s.redact_ms_last)} ms - vault ${s.vault_entries}${blocked}${peek}`;
     statusBar.tooltip = `Privacy Shield active on ${proxyUrl()}\n` +
       `redaction total ${Math.round(s.redact_ms_total)} ms, upstream ${Math.round(s.upstream_ms_total)} ms, ` +
       `${s.bytes_out} bytes sent, ${s.spans_total} values hidden, cache ${s.cache_hits}/${s.cache_hits + s.cache_misses}` +

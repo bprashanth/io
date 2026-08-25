@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hand Washing Hero Quiz</title>
+<style>
+  :root{
+    --ink:#123a4a;
+    --ink-soft:#3f6b7a;
+    --paper:#f4fbfd;
+    --card:#ffffff;
+    --line:#d3e8ef;
+    --teal:#0e9aa7;
+    --teal-deep:#0a6f7a;
+    --teal-soft:#d6f1f4;
+    --coral:#ff6f5e;
+    --coral-deep:#e8503f;
+    --sun:#ffc23c;
+    --sun-soft:#fff2cf;
+    --good:#2fae6b;
+    --good-soft:#e2f6ec;
+    --bad:#e8503f;
+    --bad-soft:#fdeae7;
+    --shadow:0 18px 40px -22px rgba(14,154,167,.55);
+    --radius:22px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 85% -10%, #eafcff 0%, rgba(234,252,255,0) 60%),
+      radial-gradient(900px 500px at -10% 110%, #fff6e2 0%, rgba(255,246,226,0) 55%),
+      var(--paper);
+    min-height:100vh;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:26px 18px 60px;}
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex;align-items:center;gap:16px;
+    background:var(--card);
+    border:2px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px 20px;
+    box-shadow:var(--shadow);
+    position:relative;overflow:hidden;
+  }
+  header::after{
+    content:"";position:absolute;inset:auto -30px -60px auto;
+    width:150px;height:150px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff, var(--teal-soft));
+    opacity:.5;
+  }
+  .logo{
+    width:64px;height:64px;flex:0 0 64px;
+    display:grid;place-items:center;
+    background:linear-gradient(160deg,var(--teal),var(--teal-deep));
+    border-radius:18px;
+    box-shadow:inset 0 -6px 12px rgba(0,0,0,.12);
+    position:relative;z-index:1;
+  }
+  .logo svg{width:40px;height:40px;}
+  .titles h1{
+    margin:0;font-size:clamp(1.5rem,4.5vw,2.1rem);
+    letter-spacing:-.5px;line-height:1.05;
+  }
+  .titles h1 .accent{color:var(--coral);}
+  .titles p{margin:4px 0 0;color:var(--ink-soft);font-size:.98rem;}
+
+  /* ---------- Progress ---------- */
+  .progress{
+    margin:20px 2px 18px;
+    display:flex;align-items:center;gap:14px;
+  }
+  .progress .label{
+    font-weight:700;font-size:.9rem;color:var(--teal-deep);
+    white-space:nowrap;
+  }
+  .bar{
+    flex:1;height:16px;background:var(--teal-soft);
+    border-radius:999px;overflow:hidden;
+    border:2px solid var(--line);
+  }
+  .bar > i{
+    display:block;height:100%;width:0;
+    background:linear-gradient(90deg,var(--sun),var(--coral));
+    border-radius:999px;
+    transition:width .5s cubic-bezier(.2,.8,.2,1);
+  }
+
+  /* ---------- Card / question ---------- */
+  .card{
+    background:var(--card);
+    border:2px solid var(--line);
+    border-radius:var(--radius);
+    padding:26px 24px;
+    box-shadow:var(--shadow);
+    position:relative;
+  }
+  .q-emoji{
+    font-size:2.6rem;line-height:1;
+    display:inline-block;
+    animation:bob 2.4s ease-in-out infinite;
+  }
+  @keyframes bob{0%,100%{transform:translateY(0) rotate(-4deg);}50%{transform:translateY(-8px) rotate(4deg);}}
+  .q-text{
+    font-size:clamp(1.25rem,4vw,1.7rem);
+    font-weight:700;margin:10px 0 20px;letter-spacing:-.3px;
+  }
+  .options{display:grid;gap:12px;}
+  .opt{
+    display:flex;align-items:center;gap:14px;
+    width:100%;text-align:left;
+    font:inherit;font-size:1.05rem;font-weight:600;color:var(--ink);
+    background:#fbfeff;
+    border:2px solid var(--line);
+    border-radius:16px;
+    padding:14px 16px;cursor:pointer;
+    transition:transform .12s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  }
+  .opt:hover{transform:translateX(4px);border-color:var(--teal);box-shadow:0 8px 18px -12px rgba(14,154,167,.6);}
+  .opt:focus-visible{outline:3px solid var(--sun);outline-offset:2px;}
+  .opt .key{
+    flex:0 0 34px;height:34px;border-radius:10px;
+    display:grid;place-items:center;
+    background:var(--teal-soft);color:var(--teal-deep);
+    font-weight:800;font-size:1rem;
+    transition:background .15s ease,color .15s ease;
+  }
+  .opt:hover .key{background:var(--teal);color:#fff;}
+  .opt .mark{margin-left:auto;font-size:1.3rem;font-weight:800;opacity:0;transform:scale(.4);transition:.2s ease;}
+  .opt.correct{background:var(--good-soft);border-color:var(--good);}
+  .opt.correct .key{background:var(--good);color:#fff;}
+  .opt.correct .mark{opacity:1;transform:scale(1);color:var(--good);}
+  .opt.wrong{background:var(--bad-soft);border-color:var(--bad);}
+  .opt.wrong .key{background:var(--bad);color:#fff;}
+  .opt.wrong .mark{opacity:1;transform:scale(1);color:var(--bad);}
+  .opt:disabled{cursor:default;}
+  .opt:disabled:hover{transform:none;box-shadow:none;}
+
+  .feedback{
+    margin-top:18px;min-height:1.2em;
+    font-weight:700;font-size:1.05rem;
+    display:flex;align-items:center;gap:8px;
+    opacity:0;transform:translateY(6px);transition:.25s ease;
+  }
+  .feedback.show{opacity:1;transform:none;}
+  .feedback.good{color:var(--good);}
+  .feedback.bad{color:var(--bad);}
+
+  .next-row{margin-top:22px;display:flex;justify-content:flex-end;}
+  .btn{
+    font:inherit;font-weight:800;font-size:1.05rem;
+    border:none;border-radius:14px;cursor:pointer;
+    padding:14px 26px;color:#fff;
+    background:linear-gradient(160deg,var(--coral),var(--coral-deep));
+    box-shadow:0 12px 22px -12px rgba(232,80,63,.8);
+    transition:transform .12s ease, box-shadow .15s ease, filter .15s ease;
+  }
+  .btn:hover{transform:translateY(-2px);filter:brightness(1.04);}
+  .btn:active{transform:translateY(0);}
+  .btn:focus-visible{outline:3px solid var(--sun);outline-offset:3px;}
+  .btn.ghost{
+    background:var(--teal-soft);color:var(--teal-deep);
+    box-shadow:none;border:2px solid var(--teal);
+  }
+  .btn.ghost:hover{background:var(--teal);color:#fff;}
+
+  /* ---------- Result ---------- */
+  .result{text-align:center;}
+  .result .big{font-size:4rem;line-height:1;animation:bob 2.4s ease-in-out infinite;}
+  .score-ring{
+    width:150px;height:150px;margin:14px auto 6px;position:relative;
+  }
+  .score-ring svg{transform:rotate(-90deg);}
+  .score-ring .track{stroke:var(--teal-soft);}
+  .score-ring .fill{stroke:var(--teal);stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1);}
+  .score-ring .num{
+    position:absolute;inset:0;display:grid;place-items:center;
+    font-size:2.4rem;font-weight:800;color:var(--teal-deep);
+  }
+  .score-ring .num small{font-size:1rem;font-weight:700;color:var(--ink-soft);}
+  .result h2{margin:8px 0 4px;font-size:clamp(1.5rem,5vw,2rem);}
+  .result p{color:var(--ink-soft);font-size:1.05rem;margin:0 auto 22px;max-width:44ch;}
+  .result .btn{margin:0 auto;}
+
+  /* ---------- Intro ---------- */
+  .intro{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;}
+  .intro .big{font-size:4rem;line-height:1;animation:bob 2.4s ease-in-out infinite;}
+  .intro h2{margin:6px 0 4px;font-size:clamp(1.5rem,5vw,2rem);}
+  .intro p{color:var(--ink-soft);max-width:46ch;margin:0 auto 20px;font-size:1.05rem;}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:24px;}
+  .chip{
+    background:var(--sun-soft);border:2px solid var(--sun);
+    color:#8a5a00;font-weight:700;font-size:.9rem;
+    padding:8px 14px;border-radius:999px;
+  }
+
+  /* ---------- Bubbles ---------- */
+  .bubbles{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+  .bubble{
+    position:absolute;bottom:-40px;border-radius:50%;
+    background:radial-gradient(circle at 32% 30%, rgba(255,255,255,.9), rgba(14,154,167,.18));
+    border:1px solid rgba(14,154,167,.25);
+    animation:rise linear infinite;
+  }
+  @keyframes rise{
+    0%{transform:translateY(0) translateX(0);opacity:0;}
+    10%{opacity:.7;}
+    100%{transform:translateY(-110vh) translateX(30px);opacity:0;}
+  }
+  .wrap,header,.progress,.card{position:relative;z-index:1;}
+
+  @media (max-width:480px){
+    .card{padding:22px 18px;}
+    .opt{font-size:1rem;padding:13px 14px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important;}
+  }
+</style>
+</head>
+<body>
+  <div class="bubbles" id="bubbles" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <header>
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 2.5c3.2 3.6 6 6.6 6 10a6 6 0 1 1-12 0c0-3.4 2.8-6.4 6-10z" fill="#fff"/>
+          <path d="M9.5 13.5a2.5 2.5 0 0 0 2.5 2.5" stroke="#0e9aa7" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="titles">
+        <h1>Hand Washing <span class="accent">Hero</span> Quiz</h1>
+        <p>Five quick questions. How much do you know about clean hands?</p>
+      </div>
+    </header>
+
+    <div class="progress" id="progress" hidden>
+      <span class="label" id="progressLabel">Question 1 of 5</span>
+      <div class="bar"><i id="barFill"></i></div>
+    </div>
+
+    <main class="card" id="stage" aria-live="polite"></main>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---- Data: read from window.data if present, else a safe default ---- */
+  var data = (typeof window !== "undefined" && window.data && window.data.questions)
+    ? window.data
+    : {
+        questions: [
+          {
+            emoji:"🧼",
+            text:"When should you wash your hands?",
+            options:["Only when they look dirty","Before eating and after using the toilet","Only at night before bed"],
+            answer:1,
+            explain:"Wash before eating and after using the toilet to keep germs away."
+          },
+          {
+            emoji:"⏱️",
+            text:"How long should you rub your hands with soap?",
+            options:["About 20 seconds","Just 2 seconds","A full 5 minutes"],
+            answer:0,
+            explain:"About 20 seconds is perfect — that's about two songs of 'Happy Birthday'."
+          },
+          {
+            emoji:"🫧",
+            text:"Which part of your hands do people often forget to wash?",
+            options:["The backs of the hands","The fingertips and between the fingers","The palms"],
+            answer:1,
+            explain:"Don't forget your fingertips and the spaces between your fingers!"
+          },
+          {
+            emoji:"🚰",
+            text:"What is the best way to dry your hands?",
+            options:["A clean towel or paper towel","Your shirt","Leave them wet"],
+            answer:0,
+            explain:"Use a clean towel or paper towel. Wet hands spread germs more easily."
+          },
+          {
+            emoji:"🦠",
+            text:"Why is hand washing so important?",
+            options:["It makes your hands smell nice","It helps stop germs from making you sick","It makes your hands softer"],
+            answer:1,
+            explain:"Washing your hands helps stop germs from making you and others sick."
+          }
+        ]
+      };
+
+  var questions = data.questions;
+  var total = questions.length;
+
+  var stage = document.getElementById("stage");
+  var progress = document.getElementById("progress");
+  var progressLabel = document.getElementById("progressLabel");
+  var barFill = document.getElementById("barFill");
+
+  var current = 0;
+  var score = 0;
+  var answered = false;
+
+  var keys = ["A","B","C","D"];
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function updateProgress(){
+    progressLabel.textContent = "Question " + (current + 1) + " of " + total;
+    barFill.style.width = ((current) / total * 100) + "%";
+  }
+
+  function renderQuestion(){
+    answered = false;
+    var q = questions[current];
+    updateProgress();
+
+    var html = "";
+    html += '<div class="q-emoji" aria-hidden="true">' + esc(q.emoji || "❓") + "</div>";
+    html += '<div class="q-text">' + esc(q.text) + "</div>";
+    html += '<div class="options" role="group" aria-label="Answer choices">';
+    for (var i = 0; i < q.options.length; i++){
+      html += '<button class="opt" data-i="' + i + '" type="button">'
+            +   '<span class="key">' + keys[i] + "</span>"
+            +   '<span class="txt">' + esc(q.options[i]) + "</span>"
+            +   '<span class="mark" aria-hidden="true"></span>'
+            + "</button>";
+    }
+    html += "</div>";
+    html += '<div class="feedback" id="feedback"></div>';
+    html += '<div class="next-row"><button class="btn" id="nextBtn" type="button" hidden>Next question →</button></div>';
+
+    stage.innerHTML = html;
+
+    var opts = stage.querySelectorAll(".opt");
+    for (var j = 0; j < opts.length; j++){
+      opts[j].addEventListener("click", function(){
+        choose(parseInt(this.getAttribute("data-i"), 10));
+      });
+    }
+    var nextBtn = document.getElementById("nextBtn");
+    nextBtn.addEventListener("click", next);
+  }
+
+  function choose(i){
+    if (answered) return;
+    answered = true;
+    var q = questions[current];
+    var opts = stage.querySelectorAll(".opt");
+    var fb = document.getElementById("feedback");
+
+    for (var j = 0; j < opts.length; j++){
+      opts[j].disabled = true;
+      if (j === q.answer){
+        opts[j].classList.add("correct");
+        opts[j].querySelector(".mark").textContent = "✓";
+      }
+    }
+
+    var isRight = (i === q.answer);
+    if (isRight){
+      score++;
+      fb.className = "feedback show good";
+      fb.textContent = "🎉 Correct! " + q.explain;
+    } else {
+      opts[i].classList.add("wrong");
+      opts[i].querySelector(".mark").textContent = "✕";
+      fb.className = "feedback show bad";
+      fb.textContent = "Not quite. " + q.explain;
+    }
+
+    barFill.style.width = ((current + 1) / total * 100) + "%";
+
+    var nextBtn = document.getElementById("nextBtn");
+    nextBtn.hidden = false;
+    nextBtn.textContent = (current === total - 1) ? "See my score 🏆" : "Next question →";
+    nextBtn.focus();
+  }
+
+  function next(){
+    current++;
+    if (current < total){
+      renderQuestion();
+    } else {
+      renderResult();
+    }
+  }
+
+  function renderResult(){
+    progress.hidden = true;
+    var pct = Math.round((score / total) * 100);
+    var r = 62, c = 2 * Math.PI * r;
+    var offset = c * (1 - pct / 100);
+
+    var face, title, msg;
+    if (pct === 100){ face="🏆"; title="Perfect score!"; msg="You are a true Hand Washing Hero. Every single one was right!"; }
+    else if (pct >= 60){ face="🌟"; title="Great job!"; msg="You know a lot about clean hands. Keep it up!"; }
+    else if (pct >= 40){ face="👍"; title="Good try!"; msg="You're on your way. Try again to get a higher score!"; }
+    else { face="💪"; title="Keep practicing!"; msg="Everyone learns by trying. Give it another go!"; }
+
+    var html = "";
+    html += '<div class="result">';
+    html += '<div class="big" aria-hidden="true">' + face + "</div>";
+    html += '<div class="score-ring">';
+    html += '<svg width="150" height="150" viewBox="0 0 150 150">';
+    html += '<circle class="track" cx="75" cy="75" r="' + r + '" fill="none" stroke-width="14"/>';
+    html += '<circle class="fill" id="ringFill" cx="75" cy="75" r="' + r + '" fill="none" stroke-width="14" '
+          + 'stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + c.toFixed(1) + '"/>';
+    html += "</svg>";
+    html += '<div class="num">' + score + '<small> / ' + total + "</small></div>";
+    html += "</div>";
+    html += "<h2>" + esc(title) + "</h2>";
+    html += "<p>" + esc(msg) + "</p>";
+    html += '<button class="btn" id="retryBtn" type="button">Try again 🔄</button>';
+    html += "</div>";
+
+    stage.innerHTML = html;
+
+    var ring = document.getElementById("ringFill");
+    // animate the ring after paint
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        ring.style.strokeDashoffset = offset.toFixed(1);
+      });
+    });
+
+    document.getElementById("retryBtn").addEventListener("click", restart);
+    document.getElementById("retryBtn").focus();
+  }
+
+  function restart(){
+    current = 0;
+    score = 0;
+    progress.hidden = false;
+    renderQuestion();
+  }
+
+  /* ---- Decorative bubbles ---- */
+  (function makeBubbles(){
+    var box = document.getElementById("bubbles");
+    var n = 14;
+    for (var i = 0; i < n; i++){
+      var b = document.createElement("span");
+      b.className = "bubble";
+      var size = 12 + Math.random() * 40;
+      b.style.width = size + "px";
+      b.style.height = size + "px";
+      b.style.left = (Math.random() * 100) + "vw";
+      b.style.animationDuration = (9 + Math.random() * 12) + "s";
+      b.style.animationDelay = (-Math.random() * 12) + "s";
+      box.appendChild(b);
+    }
+  })();
+
+  /* ---- Start ---- */
+  renderQuestion();
+})();
+</script>
+</body>
+</html>

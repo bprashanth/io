@@ -1,0 +1,87 @@
+{
+  "id": "time-change-per-group-p02",
+  "task_id": "time-change-per-group",
+  "pattern": "conditional aggregation and percentage-point change",
+  "question": "compare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+  "gold_sql": "WITH rates AS (SELECT district, year, 100.0 * anc4_completed / pregnancies_registered AS rate FROM anc_visits WHERE district IN ('Gaya', 'Nalanda') AND year IN (2021, 2023)) SELECT district, ROUND(MAX(CASE WHEN year = 2023 THEN rate END) - MAX(CASE WHEN year = 2021 THEN rate END), 1) AS change_pp FROM rates GROUP BY district ORDER BY district",
+  "expected_rows": [
+    [
+      "Gaya",
+      8.0
+    ],
+    [
+      "Nalanda",
+      7.0
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Gaya",
+      66.0,
+      74.0,
+      8.0
+    ],
+    [
+      "Nalanda",
+      73.0,
+      80.0,
+      7.0
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "WITH gaya_2021 AS (SELECT NULLIF(\"pregnancies_registered\", 0) AS numerator, NULLIF(\"anc4_completed\", 0) AS denominator, (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(NULLIF(\"pregnancies_registered\", 0), 0)) AS pct_anc4_2021 FROM anc_visits WHERE district = 'Gaya' AND year = 2021 AND source = 'synthetic Bihar ANC fixture'), gaya_2023 AS (SELECT NULLIF(\"pregnancies_registered\", 0) AS numerator, NULLIF(\"anc4_completed\", 0) AS denominator, (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(NULLIF(\"pregnancies_registered\", 0), 0)) AS pct_anc4_2023 FROM anc_visits WHERE district = 'Gaya' AND year = 2023 AND source = 'synthetic Bihar ANC fixture'), nalanda_2021 AS (SELECT NULLIF(\"pregnancies_registered\", 0) AS numerator, NULLIF(\"anc4_completed\", 0) AS denominator, (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(NULLIF(\"pregnancies_registered\", 0), 0)) AS pct_anc4_2021 FROM anc_visits WHERE district = 'Nalanda' AND year = 2021 AND source = 'synthetic Bihar ANC fixture'), nalanda_2023 AS (SELECT NULLIF(\"pregnancies_registered\", 0) AS numerator, NULLIF(\"anc4_completed\", 0) AS denominator, (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(NULLIF(\"pregnancies_registered\", 0), 0)) AS pct_anc4_2023 FROM anc_visits WHERE district = 'Nalanda' AND year = 2023 AND source = 'synthetic Bihar ANC fixture') SELECT 'Gaya' AS district, pct_anc4_2021, pct_anc4_2023, (pct_anc4_2023 - pct_anc4_2021) AS percentage_point_change FROM gaya_2021 CROSS JOIN gaya_2023 UNION ALL SELECT 'Nalanda' AS district, pct_anc4_2021, pct_anc4_2023, (pct_anc4_2023 - pct_anc4_2021) AS percentage_point_change FROM nalanda_2021 CROSS JOIN nalanda_2023",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"anc_visits\" (\n  \"district\" VARCHAR,\n  \"year\" BIGINT,\n  \"pregnancies_registered\" BIGINT,\n  \"anc4_completed\" BIGINT,\n  \"source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"anc_visits\": {\"district\": [\"Gaya\", \"Kishanganj\", \"Nalanda\", \"Patna\", \"Purnia\"], \"source\": [\"synthetic Bihar ANC fixture\"]}}\n\nCURRENT QUESTION:\ncompare 2021 with 2023 for Gaya and Nalanda, percentage-point change in ANC4 completed divided by registered",
+      "response": "```sql\nWITH gaya_2021 AS (\n  SELECT\n    NULLIF(\"pregnancies_registered\", 0) AS numerator,\n    NULLIF(\"anc4_completed\", 0) AS denominator,\n    (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(\"pregnancies_registered\", 0)) AS pct_anc4_2021\n  FROM anc_visits\n  WHERE district = 'Gaya' AND year = 2021 AND source = 'synthetic Bihar ANC fixture'\n),\ngaya_2023 AS (\n  SELECT\n    NULLIF(\"pregnancies_registered\", 0) AS numerator,\n    NULLIF(\"anc4_completed\", 0) AS denominator,\n    (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(\"pregnancies_registered\", 0)) AS pct_anc4_2023\n  FROM anc_visits\n  WHERE district = 'Gaya' AND year = 2023 AND source = 'synthetic Bihar ANC fixture'\n),\nnalanda_2021 AS (\n  SELECT\n    NULLIF(\"pregnancies_registered\", 0) AS numerator,\n    NULLIF(\"anc4_completed\", 0) AS denominator,\n    (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(\"pregnancies_registered\", 0)) AS pct_anc4_2021\n  FROM anc_visits\n  WHERE district = 'Nalanda' AND year = 2021 AND source = 'synthetic Bihar ANC fixture'\n),\nnalanda_2023 AS (\n  SELECT\n    NULLIF(\"pregnancies_registered\", 0) AS numerator,\n    NULLIF(\"anc4_completed\", 0) AS denominator,\n    (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(\"pregnancies_registered\", 0)) AS pct_anc4_2023\n  FROM anc_visits\n  WHERE district = 'Nalanda' AND year = 2023 AND source = 'synthetic Bihar ANC fixture'\n)\nSELECT\n  'Gaya' AS district,\n  pct_anc4_2021,\n  pct_anc4_2023,\n  (pct_anc4_2023 - pct_anc4_2021) AS percentage_point_change\nFROM gaya_2021, gaya_2023\n\nUNION ALL\n\nSELECT\n  'Nalanda' AS district,\n  pct_anc4_2021,\n  pct_anc4_2023,\n  (pct_anc4_2023 - pct_anc4_2021) AS percentage_point_change\nFROM nalanda_2021, nalanda_2023\n```",
+      "api": {
+        "id": "gen-1787421086-JeHsCXP91zci79W2L9Ft",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 317,
+          "completion_tokens": 666,
+          "total_tokens": 983,
+          "cost": 0.00011289,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00011289,
+            "upstream_inference_prompt_cost": 1.299e-05,
+            "upstream_inference_completions_cost": 9.99e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 5.689
+      },
+      "duration_seconds": 5.702,
+      "sql_duckdb": "WITH gaya_2021 AS (SELECT NULLIF(\"pregnancies_registered\", 0) AS numerator, NULLIF(\"anc4_completed\", 0) AS denominator, (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(NULLIF(\"pregnancies_registered\", 0), 0)) AS pct_anc4_2021 FROM anc_visits WHERE district = 'Gaya' AND year = 2021 AND source = 'synthetic Bihar ANC fixture'), gaya_2023 AS (SELECT NULLIF(\"pregnancies_registered\", 0) AS numerator, NULLIF(\"anc4_completed\", 0) AS denominator, (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(NULLIF(\"pregnancies_registered\", 0), 0)) AS pct_anc4_2023 FROM anc_visits WHERE district = 'Gaya' AND year = 2023 AND source = 'synthetic Bihar ANC fixture'), nalanda_2021 AS (SELECT NULLIF(\"pregnancies_registered\", 0) AS numerator, NULLIF(\"anc4_completed\", 0) AS denominator, (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(NULLIF(\"pregnancies_registered\", 0), 0)) AS pct_anc4_2021 FROM anc_visits WHERE district = 'Nalanda' AND year = 2021 AND source = 'synthetic Bihar ANC fixture'), nalanda_2023 AS (SELECT NULLIF(\"pregnancies_registered\", 0) AS numerator, NULLIF(\"anc4_completed\", 0) AS denominator, (NULLIF(\"anc4_completed\", 0) * 100.0 / NULLIF(NULLIF(\"pregnancies_registered\", 0), 0)) AS pct_anc4_2023 FROM anc_visits WHERE district = 'Nalanda' AND year = 2023 AND source = 'synthetic Bihar ANC fixture') SELECT 'Gaya' AS district, pct_anc4_2021, pct_anc4_2023, (pct_anc4_2023 - pct_anc4_2021) AS percentage_point_change FROM gaya_2021 CROSS JOIN gaya_2023 UNION ALL SELECT 'Nalanda' AS district, pct_anc4_2021, pct_anc4_2023, (pct_anc4_2023 - pct_anc4_2021) AS percentage_point_change FROM nalanda_2021 CROSS JOIN nalanda_2023",
+      "rows": [
+        [
+          "Gaya",
+          66.0,
+          74.0,
+          8.0
+        ],
+        [
+          "Nalanda",
+          73.0,
+          80.0,
+          7.0
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

@@ -1,0 +1,24 @@
+Based on the loan ledger data, here are the answers:
+
+## Answer: SHGs with Highest Outstanding Loan Balance (as of September)
+
+The **ShG with the highest outstanding loan balance** is:
+
+| SHG ID | SHG Name | Outstanding Balance | September Installment |
+|--------|----------|---------------------|----------------------|
+| **SHG-0050** | **Kavita Mahila Bachat Gat 50** | **₹75,000.00** | ₹6,250.00 |
+
+**Top 10 SHGs by Outstanding Balance (September):**
+
+| Rank | SHG ID | SHG Name | Outstanding Balance |
+|------|--------|----------|---------------------|
+| 1 | SHG-0050 | Kavita Mahila Bachat Gat 50 | ₹75,000.00 |
+| 2 | SHG-0025 | Kavita Mahila Bachat Gat 25 | ₹72,222.20 |
+| 3 | SHG-0014 | Vaishali Mahila Bachat Gat 14 | ₹72,222.20 |
+| 4 | SHG-0010 | Shabana Mahila Bachat Gat 10 | ₹70,588.25 |
+| 5 | SHG-0006 | Deepa Mahila Bachat Gat 6 | ₹66,666.67 |
+| 6 | SHG-0161 | Rukhsar Mahila Bachat Gat 161 | ₹66,666.66 |
+| 7 | SHG-0042 | Snehal Mahila Bachat Gat 42 | ₹66,666.65 |
+| 8 | SHG-0145 | Deepa Mahila Bachat Gat 145 | ₹64,705.90 |
+| 9 | SHG-0173 | Rani Mahila Bachat Gat 173 | ₹62,500.00 |
+| 10 | SHG-0157 | Vandana Mahila Bachat Gat 157 | ₹62,499.99 |

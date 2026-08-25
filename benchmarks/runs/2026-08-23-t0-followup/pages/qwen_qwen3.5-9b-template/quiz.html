@@ -1,0 +1,130 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hand Washing Quiz</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Hand Washing Quiz</h1></header>
+<main>
+<div class="card">
+  <form id="quiz-form">
+    <div class="grid">
+      <div>
+        <label>1. How long should you wash your hands?</label>
+        <select name="q1" required>
+          <option value="">Select an answer</option>
+          <option value="wrong">Until they smell good</option>
+          <option value="correct">For at least 20 seconds</option>
+          <option value="wrong">Just a quick rub</option>
+        </select>
+      </div>
+      <div>
+        <label>2. What should you use to wash your hands?</label>
+        <select name="q2" required>
+          <option value="">Select an answer</option>
+          <option value="wrong">Just water</option>
+          <option value="correct">Soap and water</option>
+          <option value="wrong">Hand sanitizer only</option>
+        </select>
+      </div>
+      <div>
+        <label>3. When should you wash your hands?</label>
+        <select name="q3" required>
+          <option value="">Select an answer</option>
+          <option value="wrong">Only when they look dirty</option>
+          <option value="correct">Before eating and after using the toilet</option>
+          <option value="wrong">Only on Mondays</option>
+        </select>
+      </div>
+      <div>
+        <label>4. What is the best way to dry your hands?</label>
+        <select name="q4" required>
+          <option value="">Select an answer</option>
+          <option value="wrong">A shared towel</option>
+          <option value="correct">A paper towel or air dryer</option>
+          <option value="wrong">Your shirt</option>
+        </select>
+      </div>
+      <div>
+        <label>5. Why is hand washing important?</label>
+        <select name="q5" required>
+          <option value="">Select an answer</option>
+          <option value="wrong">To make them smell nice</option>
+          <option value="correct">To stop germs and keep us healthy</option>
+          <option value="wrong">To save water</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:20px;justify-content:flex-end">
+      <button type="submit">Check Score</button>
+    </div>
+  </form>
+</div>
+<div id="result-card" class="card" style="display:none">
+  <h2>Quiz Results</h2>
+  <p id="score-text"></p>
+  <p id="feedback-text" class="muted"></p>
+  <div class="row" style="margin-top:20px">
+    <button id="retry-btn" class="secondary">Try Again</button>
+  </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+// YOUR CODE HERE
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('quiz-form');
+  const resultCard = document.getElementById('result-card');
+  const scoreText = document.getElementById('score-text');
+  const feedbackText = document.getElementById('feedback-text');
+  const retryBtn = document.getElementById('retry-btn');
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    let score = 0;
+    const total = 5;
+
+    for (let i = 1; i <= total; i++) {
+      const answer = formData.get(`q${i}`);
+      if (answer === 'correct') {
+        score++;
+      }
+    }
+
+    const percentage = (score / total) * 100;
+    let message = '';
+    let color = '';
+
+    if (score === total) {
+      message = 'Fantastic job! You are a hygiene expert!';
+      color = '#16a34a'; // green
+    } else if (score >= 3) {
+      message = 'Good work! Keep practicing to get a perfect score.';
+      color = '#ca8a04'; // yellow
+    } else {
+      message = 'Keep trying! Remember to wash your hands for 20 seconds.';
+      color = '#dc2626'; // red
+    }
+
+    scoreText.textContent = `You scored ${score} out of ${total} (${percentage}%)`;
+    scoreText.style.color = color;
+    feedbackText.textContent = message;
+    resultCard.style.display = 'block';
+    resultCard.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  retryBtn.addEventListener('click', () => {
+    resultCard.style.display = 'none';
+    form.reset();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+</script>
+</body></html>

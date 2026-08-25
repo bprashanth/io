@@ -1,0 +1,159 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hand Washing Quiz</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Hand Washing Quiz","short_name":"Quiz","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Hand Washing Quiz</h1></header>
+<main>
+<div class="card" id="intro">
+  <p>Hi! Let's see how much you know about keeping your hands clean. Answer all <span id="qcount"></span> questions, then check your score. Good luck! 🧼</p>
+  <button id="startBtn">Start Quiz</button>
+</div>
+<div class="card" id="quiz" hidden>
+  <div class="row" style="justify-content:space-between">
+    <span class="muted" id="progress"></span>
+    <span class="muted" id="scoreNow"></span>
+  </div>
+  <h2 id="qtext" style="margin:12px 0 4px"></h2>
+  <div id="options"></div>
+  <div class="row" style="margin-top:14px">
+    <button id="nextBtn" class="secondary" disabled>Next</button>
+  </div>
+</div>
+<div class="card" id="result" hidden>
+  <h2 id="resultTitle"></h2>
+  <p id="resultMsg"></p>
+  <p class="muted" id="resultScore"></p>
+  <button id="againBtn">Try Again</button>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+const data = (typeof window.data !== 'undefined' && window.data) ? window.data : {
+  questions: [
+    { q: "How long should you scrub your hands with soap?", options: ["2 seconds", "20 seconds", "5 minutes"], answer: 1 },
+    { q: "When is the most important time to wash your hands?", options: ["Before eating", "After using the toilet", "Both before eating and after using the toilet"], answer: 2 },
+    { q: "What do you need to wash your hands properly?", options: ["Just water", "Soap and water", "Only your fingers"], answer: 1 },
+    { q: "Which part of your hands do people often forget to wash?", options: ["Your palms", "Your fingertips and thumbs", "Your wrists"], answer: 1 },
+    { q: "Why is hand washing important?", options: ["It makes your hands smell nice", "It stops germs and keeps you healthy", "It makes your hands shiny"], answer: 1 }
+  ]
+};
+
+const questions = data.questions || [];
+let current = 0, score = 0, answered = false;
+
+const intro = document.getElementById('intro');
+const quiz = document.getElementById('quiz');
+const result = document.getElementById('result');
+const qcount = document.getElementById('qcount');
+const progress = document.getElementById('progress');
+const scoreNow = document.getElementById('scoreNow');
+const qtext = document.getElementById('qtext');
+const options = document.getElementById('options');
+const nextBtn = document.getElementById('nextBtn');
+const resultTitle = document.getElementById('resultTitle');
+const resultMsg = document.getElementById('resultMsg');
+const resultScore = document.getElementById('resultScore');
+
+qcount.textContent = questions.length;
+
+function showIntro() {
+  intro.hidden = false;
+  quiz.hidden = true;
+  result.hidden = true;
+}
+
+function startQuiz() {
+  current = 0;
+  score = 0;
+  intro.hidden = true;
+  result.hidden = true;
+  quiz.hidden = false;
+  renderQuestion();
+}
+
+function renderQuestion() {
+  answered = false;
+  const item = questions[current];
+  progress.textContent = "Question " + (current + 1) + " of " + questions.length;
+  scoreNow.textContent = "Score: " + score;
+  qtext.textContent = item.q;
+  options.innerHTML = "";
+  item.options.forEach(function (opt, i) {
+    const btn = document.createElement('button');
+    btn.className = "secondary";
+    btn.style.width = "100%";
+    btn.style.textAlign = "left";
+    btn.style.marginBottom = "8px";
+    btn.textContent = opt;
+    btn.addEventListener('click', function () { selectAnswer(i, btn); });
+    options.appendChild(btn);
+  });
+  nextBtn.disabled = true;
+  nextBtn.textContent = (current === questions.length - 1) ? "See My Score" : "Next";
+}
+
+function selectAnswer(i, btn) {
+  if (answered) return;
+  answered = true;
+  const item = questions[current];
+  const buttons = options.querySelectorAll('button');
+  buttons.forEach(function (b, bi) {
+    b.disabled = true;
+    if (bi === item.answer) {
+      b.style.background = "#16a34a";
+      b.style.borderColor = "#16a34a";
+      b.style.color = "#fff";
+    } else if (bi === i) {
+      b.style.background = "#dc2626";
+      b.style.borderColor = "#dc2626";
+      b.style.color = "#fff";
+    }
+  });
+  if (i === item.answer) score++;
+  scoreNow.textContent = "Score: " + score;
+  nextBtn.disabled = false;
+}
+
+function nextQuestion() {
+  if (!answered) return;
+  current++;
+  if (current >= questions.length) {
+    showResult();
+  } else {
+    renderQuestion();
+  }
+}
+
+function showResult() {
+  quiz.hidden = true;
+  result.hidden = false;
+  const total = questions.length;
+  const pct = total ? Math.round((score / total) * 100) : 0;
+  let title, msg;
+  if (pct === 100) { title = "Perfect! 🌟"; msg = "You are a hand-washing superstar!"; }
+  else if (pct >= 60) { title = "Great job! 👏"; msg = "You know a lot about keeping your hands clean."; }
+  else { title = "Keep practicing! 💪"; msg = "Wash your hands often to stay healthy. Try again!"; }
+  resultTitle.textContent = title;
+  resultMsg.textContent = msg;
+  resultScore.textContent = "You got " + score + " out of " + total + " correct (" + pct + "%).";
+  store.set('handwash_best', Math.max(store.get('handwash_best', 0), score));
+}
+
+document.getElementById('startBtn').addEventListener('click', startQuiz);
+nextBtn.addEventListener('click', nextQuestion);
+document.getElementById('againBtn').addEventListener('click', startQuiz);
+
+showIntro();
+</script>
+</body></html>

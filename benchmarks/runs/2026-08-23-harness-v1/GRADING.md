@@ -1,0 +1,1 @@
+Harness final messages are graded by: digit-group commas removed, rupee signs removed; a single-value gold must appear in the message; a multi-row gold requires every expected row (numbers parsed, text as substrings, values the question states are optional) to appear on some line of the message.

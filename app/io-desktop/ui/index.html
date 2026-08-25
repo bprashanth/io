@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>io</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#f6f7fb;--side:#eef0f6;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--ok:#16a34a;--warn:#b45309;--bad:#dc2626}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:var(--bg);display:flex}
+aside{width:290px;flex:none;background:var(--side);border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+aside h1{font-size:20px;margin:0;display:flex;align-items:center;gap:8px}aside h1 small{font-weight:400;color:var(--muted);font-size:12px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.box h2{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--ink)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff}
+label{font-size:12px;color:var(--muted);display:block;margin:8px 0 2px}
+.files{font-size:13px}.files div{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed var(--line);min-width:0}.files div span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.files span.m{color:var(--muted);white-space:nowrap;font-size:12px}
+.dial{display:flex;gap:4px}.dial button{flex:1;font-size:12px}.dial button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+#log{flex:1;overflow:auto;padding:24px 32px;display:flex;flex-direction:column;gap:18px}
+.turn{max-width:1100px}
+.q{background:var(--ink);color:#fff;border-radius:14px 14px 4px 14px;padding:10px 14px;display:inline-block;max-width:70%;float:right}
+.a{clear:both;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:10px}
+.a .meta{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.a .meta b{font-weight:600;color:var(--ink)}.egress{display:inline-flex;gap:6px;align-items:center}.egress i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.err{color:var(--bad)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.kpi{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.kpi-title{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi-value{font-size:28px;font-weight:700;margin:2px 0}.kpi-label{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel{min-width:0}.panel header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}.panel header h3{font-size:14px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.dl{font-size:12px;padding:4px 9px;color:var(--accent)}
+.tablewrap{overflow-x:auto;max-height:420px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{color:var(--muted);font-weight:600;background:#fafafa;position:sticky;top:0}td.num{text-align:right;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-bottom:4px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+.warn{font-size:12px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;margin:8px 0 0}
+.note{font-size:12px;color:var(--muted);margin:6px 0 0}.empty{color:var(--muted);font-style:italic}
+details.receipt{margin-top:8px;font-size:12px;color:var(--muted)}details.receipt pre{white-space:pre-wrap;background:#f3f4f6;padding:8px;border-radius:8px;font-size:11px;color:#374151}
+svg{max-width:760px}svg text{font-family:inherit}
+iframe.page{width:100%;height:640px;border:1px solid var(--line);border-radius:10px;background:#fff}
+form#ask{display:flex;gap:10px;padding:14px 32px 20px;border-top:1px solid var(--line);background:var(--card)}
+form#ask input{flex:1;padding:12px 14px;border-radius:12px;font-size:15px}
+.hint{font-size:12px;color:var(--muted);padding:0 32px 10px;background:var(--card)}
+.thinking{color:var(--muted);font-style:italic}
+.steps{font-size:13px;color:var(--muted)}.step{padding:2px 0}.step.now{color:var(--ink)}
+.modal{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center}.modal.open{display:flex}
+.modal .box{width:440px}
+</style>
+</head>
+<body>
+<aside>
+  <h1>io <small>private by default</small></h1>
+  <div class="box">
+    <h2>Folder</h2>
+    <div id="folder" style="font-size:13px;color:var(--muted);word-break:break-all">No folder open</div>
+    <div style="display:flex;gap:6px;margin-top:8px"><button id="pick" class="primary">Open folder…</button><button id="typepath">Type a path</button></div>
+    <div class="files" id="files"></div>
+  </div>
+  <div class="box">
+    <h2>Reach</h2>
+    <div class="dial"><button data-reach="laptop">Laptop</button><button data-reach="t4gc">T4GC</button><button data-reach="frontier">Frontier</button></div>
+    <p class="note" id="reach-note"></p>
+  </div>
+  <div class="box">
+    <h2>Model <button id="settings" style="float:right;font-size:12px;padding:2px 8px">Settings</button></h2>
+    <div id="modelline" style="font-size:13px"></div>
+  </div>
+  <div class="box">
+    <h2>Egress this session</h2>
+    <div id="egress" style="font-size:13px">calls <b id="e-calls">0</b> · rows sent <b id="e-rows">0</b> · bytes <b id="e-bytes">0</b></div>
+  </div>
+  <div class="box" id="astro" style="display:none">
+    <h2>Astronaut <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0">on</span></h2>
+    <p class="note" style="margin:0 0 8px">io does not self-learn; it asks permission to remember.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button id="compact" class="primary">Propose skills from my usage</button><button id="author">Add a skill</button></div>
+    <div id="skills" class="files" style="margin-top:8px"></div>
+    <div style="margin-top:10px"><label style="margin:0 0 2px">Telegram bot token <span id="tg-state"></span></label><div style="display:flex;gap:6px"><input id="tg-token" type="password" placeholder="from @BotFather"><button id="tg-start">Run bot</button></div><p class="note" id="tg-note"></p></div>
+  </div>
+  <button id="reset">New conversation</button>
+</aside>
+
+<div class="modal" id="why"><div class="box" style="width:560px"><h2>How io read this file</h2><div id="why-body" style="font-size:13px"></div><div style="text-align:right;margin-top:12px"><button id="why-close">Close</button></div></div></div>
+
+<div class="modal" id="cards"><div class="box" style="width:760px;max-height:90vh;overflow:auto"><h2 id="cards-title">Proposed skills</h2><p class="note" id="cards-note"></p><div id="cards-body"></div><div style="text-align:right;margin-top:12px"><button id="cards-close">Close</button></div></div></div>
+
+<div class="modal" id="openreview"><div class="box" style="width:640px;max-height:88vh;overflow:auto"><h2>What leaves the laptop in Open mode</h2>
+<p class="note">Your files go to the model you chose on the dial — with these values replaced by tokens (NAME_001, PHONE_002 …). The real values never leave; answers are translated back here.</p>
+<div id="openreview-body" style="font-size:13px"></div>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button id="or-cancel">Cancel</button><button id="or-ok" class="primary">Looks right — continue</button></div></div></div>
+
+<div class="modal" id="wizard"><div class="box" style="width:640px;max-height:90vh;overflow:auto"><h2>Add a skill</h2>
+  <label>Name</label><input id="w-name" placeholder="e.g. households-column-names">
+  <label>What kind of skill?</label>
+  <select id="w-kind"><option value="hint">Hint — tell the model how to read a table (units, what blank means, which row is current)</option><option value="rule">Rule — how a kind of question should be answered</option><option value="mapping">Mapping — same thing, different column names across files</option><option value="parse">Correction — how a file is read (dates month-first, header on row N)</option></select>
+  <label>When should it apply?</label>
+  <div id="w-when-table"><select id="w-table"></select><p class="note">Fires on any table that has these columns (edit the list):</p><input id="w-cols" placeholder="comma-separated column names"></div>
+  <div id="w-when-q" style="display:none"><input id="w-qregex" placeholder="words the question contains, e.g. dropped out|dropout"><p class="note">A regular expression matched against the question.</p></div>
+  <label id="w-what-label">What should io do?</label>
+  <textarea id="w-claim" rows="3" style="font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px" placeholder="One or two sentences, e.g. amounts in this table are in paise; divide by 100 for rupees."></textarea>
+  <div id="w-parse" style="display:none"><label>File</label><select id="w-file"></select><label>Dates in this file are</label><select id="w-dayfirst"><option value="">leave as detected</option><option value="false">month first (US style, 03/04 = 4 March)</option><option value="true">day first (Indian style, 03/04 = 3 April)</option></select><label>Header is on row (blank = detect)</label><input id="w-header" placeholder="e.g. 3"></div>
+  <div id="w-map" style="display:none"><label>New common name</label><input id="w-newcol" placeholder="households_reached"><label>Columns that mean the same thing (comma-separated, across files)</label><input id="w-variants" placeholder="No. of HH, Households reached, HH Covered"></div>
+  <p class="note" id="w-preview"></p>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button id="w-cancel">Cancel</button><button id="w-test">Preview</button><button id="w-save" class="primary">Save skill</button></div>
+</div></div>
+<main>
+  <div id="log"><p class="thinking" id="welcome">Open a folder of CSV / Excel files, then ask a question ("average marks by taluka") or ask for a page ("build me a dashboard", "write a summary for the board").</p></div>
+  <div class="hint" style="display:flex;gap:6px;align-items:center"><span>Lane:</span>
+    <span class="dial" id="lanes" style="display:flex;gap:4px"><button data-lane="auto" class="on">Auto</button><button data-lane="ask" title="one query, computed here, receipted">Ask</button><button data-lane="build" title="the model plans panels; the laptop computes every figure">Build</button><button data-lane="page" title="the model writes an app/form/page; your rows poured in locally">App</button><button data-lane="open" title="Antigravity-style: your files (tokenised) go to the big model, it does whatever you ask; answers rehydrated here">Open</button></span>
+    <span class="note" id="lane-note" style="margin:0"></span></div>
+  <form id="ask"><input id="q" placeholder="Ask about your data…" autocomplete="off"><button class="primary" id="send">Send</button></form>
+</main>
+
+<div class="modal" id="cfg"><div class="box">
+  <h2>Model settings</h2>
+  <label>Source</label>
+  <select id="c-source"><option value="openrouter">OpenRouter (key, remote small model)</option><option value="local">Local server (llama.cpp / Ollama, OpenAI-compatible)</option></select>
+  <div id="c-remote">
+    <label>OpenRouter model</label><input id="c-model" placeholder="qwen/qwen3.5-9b">
+    <label>OpenRouter key <span id="c-keystate"></span></label><input id="c-key" type="password" placeholder="sk-or-…">
+  </div>
+  <div id="c-local" style="display:none">
+    <label>Endpoint</label><input id="c-lep" placeholder="http://127.0.0.1:8080/v1">
+    <label>Model name (as the server knows it)</label><input id="c-lmodel" placeholder="local">
+  </div>
+  <label style="margin-top:12px"><input type="checkbox" id="c-astro" style="width:auto"> Astronaut mode — skills: propose from usage, author by hand, see why</label>
+  <label>Trusted model for proposing skills (T4GC)</label><input id="c-t1" placeholder="qwen/qwen3.8-27b">
+  <label>Frontier model for proposing skills</label><input id="c-t2" placeholder="google/gemini-3.7-flash">
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button id="c-cancel">Cancel</button><button id="c-save" class="primary">Save</button></div>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const log = $('#log');
+let state = {config:{}}, egress = {calls:0, rows:0, bytes:0};
+let lane = 'auto'; let openReviewed = false; let pendingOpen = null;
+const fmtB = n => n > 1e6 ? (n/1e6).toFixed(1)+' MB' : n > 1e3 ? (n/1e3).toFixed(1)+' kB' : n+' B';
+
+async function api(path, body){ const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {}); return r.json(); }
+
+function renderState(){
+  $('#folder').textContent = state.folder || 'No folder open';
+  $('#files').innerHTML = (state.tables||[]).map((t, i) => t.error ? `<div><span>${t.file}</span><span class=m style="color:var(--bad)">could not read</span></div>` : `<div class=fileline data-i="${i}" style="cursor:pointer" title="click: how io read this"><span>${t.file}${t.sheet?' › '+t.sheet:''}${(t.why&&t.why.skills&&t.why.skills.length)?' <b style="color:var(--accent)">●</b>':''}</span><span class=m>${t.rows}×${t.columns.length}</span></div>`).join('');
+  document.querySelectorAll('.fileline').forEach(el => el.onclick = () => showWhy(state.tables[+el.dataset.i]));
+  const c = state.config || {};
+  document.querySelectorAll('[data-reach]').forEach(b => { b.classList.toggle('on', (c.reach||'laptop') === b.dataset.reach); b.onclick = async () => { await api('/api/config', {reach: b.dataset.reach}); await load(); }; });
+  $('#reach-note').textContent = {laptop: 'Only column names leave this laptop. Rows never do.', t4gc: 'The trusted sector server may help. In Open mode it sees your files with private values tokenised.', frontier: 'A frontier model may help. In Open mode it sees your files with private values tokenised.'}[c.reach||'laptop'];
+  $('#astro').style.display = c.astronaut ? '' : 'none';
+  if (c.astronaut) loadSkills();
+  $('#tg-state').textContent = c.telegram_token ? '(saved)' : '';
+  $('#modelline').textContent = c.source === 'local' ? `Local · ${c.local_model||'local'} @ ${c.local_endpoint}` : `OpenRouter · ${c.model} · key ${c.api_key ? 'set' : 'missing'}`;
+  $('#e-calls').textContent = egress.calls; $('#e-rows').textContent = egress.rows; $('#e-bytes').textContent = fmtB(egress.bytes);
+}
+
+async function load(){ state = await api('/api/state'); if (state.history) for (const t of state.history) if (t.egress) { egress.calls += t.egress.calls || 1; egress.bytes += t.egress.prompt_bytes || 0; } renderState(); }
+
+$('#pick').onclick = async () => {
+  let path = null;
+  if (window.io && window.io.pickFolder) path = await window.io.pickFolder();
+  if (!path) path = prompt('Folder path');
+  if (path) openFolder(path);
+};
+$('#typepath').onclick = () => { const p = prompt('Folder path'); if (p) openFolder(p); };
+async function openFolder(path){
+  const r = await api('/api/folder', {path});
+  if (r.error) { alert(r.error); return; }
+  state.folder = r.folder; state.tables = r.tables; log.innerHTML = ''; renderState();
+  addSystem(`Loaded ${r.tables.filter(t=>!t.error).length} table(s) from ${r.folder}. Nothing was sent anywhere.`);
+}
+function addSystem(text){ const d = document.createElement('p'); d.className = 'thinking'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
+
+document.querySelectorAll('#lanes [data-lane]').forEach(b => b.onclick = () => { lane = b.dataset.lane; document.querySelectorAll('#lanes [data-lane]').forEach(x => x.classList.toggle('on', x === b)); $('#lane-note').textContent = b.title || ''; });
+
+async function showOpenReview(){
+  const r = await api('/api/open/review');
+  if (r.error) { alert(r.error); return false; }
+  $('#openreview-body').innerHTML = r.files.map(f => `<p style="margin:8px 0"><b>${f.file}</b> — ${f.rows} rows${f.hidden.length ? '<br>hidden: ' + f.hidden.map(h => `<code>${h.column}</code> (${h.why})`).join(', ') : '<br>nothing flagged'}</p>`).join('');
+  $('#openreview').classList.add('open');
+  return true;
+}
+$('#or-cancel').onclick = () => { $('#openreview').classList.remove('open'); pendingOpen = null; };
+$('#or-ok').onclick = () => { $('#openreview').classList.remove('open'); openReviewed = true; if (pendingOpen) { const t = pendingOpen; pendingOpen = null; send(t); } };
+
+$('#ask').onsubmit = async e => {
+  e.preventDefault();
+  const text = $('#q').value.trim(); if (!text) return;
+  if (lane === 'open' && !openReviewed) { pendingOpen = text; $('#q').value = ''; await showOpenReview(); return; }
+  send(text);
+};
+async function send(text){
+  $('#q').value = ''; $('#send').disabled = true;
+  const turn = document.createElement('div'); turn.className = 'turn';
+  turn.innerHTML = `<div class=q></div><div class=a><div class=steps><span class=thinking>Starting…</span></div></div>`;
+  turn.querySelector('.q').textContent = text;
+  log.appendChild(turn); log.scrollTop = log.scrollHeight;
+  const stepsEl = turn.querySelector('.steps'); const t0 = Date.now();
+  const ticker = setInterval(async () => {
+    try { const p = await api('/api/progress'); const secs = Math.round((Date.now() - t0) / 1000);
+      stepsEl.innerHTML = p.steps.map((s, i) => `<div class="${i === p.steps.length - 1 ? 'step now' : 'step'}">${i === p.steps.length - 1 ? '⏳' : '✓'} ${s.text}</div>`).join('') + `<div class=step style="color:var(--muted)">${secs}s · small local-tier model, thanks for waiting</div>`;
+    } catch (e) {}
+  }, 700);
+  const r = await api('/api/ask', {text, lane});
+  clearInterval(ticker);
+  const a = turn.querySelector('.a');
+  if (r.id) { turn.dataset.id = r.id; turn.dataset.lane = r.lane; }
+  if (r.error) { a.innerHTML = `<span class=err></span>`; a.querySelector('.err').textContent = r.error; }
+  else if (r.lane === 'open') {
+    if (r.answer) a.innerHTML = `<div style="white-space:pre-wrap">${r.answer.replace(/</g,'&lt;')}</div>` + metaLine(r);
+    else a.innerHTML = `<iframe class=page src="/api/page/${r.id}"></iframe><p class=note>Open mode: the model saw your files with private values tokenised and built this freely — figures are the model's own arithmetic, not receipted queries. <a href="/api/download-page/${r.id}">Download the page</a></p>` + metaLine(r);
+  }
+  else if (r.lane === 'ask') {
+    a.innerHTML = r.html + (r.scope_note ? `<p class=note style="color:var(--warn)">⚠ ${r.scope_note}</p>` : '') + metaLine(r);
+    a.querySelectorAll('button.dl').forEach(b => b.onclick = () => window.open(`/api/csv/${r.id}/a1`));
+  } else if (r.lane === 'page') {
+    a.innerHTML = `<iframe class=page src="/api/page/${r.id}" data-probe='${JSON.stringify(r.data_probe||[]).replace(/'/g,"&#39;")}'></iframe><p class=note>Page written by the model${r.data_table ? `; your rows from <b>${r.data_table}</b> are poured in by this laptop when the page opens (the model never saw them). Figures on it are computed by the page's own code, not receipted.` : '.'} <a href="/api/download-page/${r.id}">Download the page</a></p>${r.script_errors && r.script_errors.length ? `<p class=note style="color:var(--warn)">⚠ The page's code still has a syntax error after one repair: ${r.script_errors[0]}</p>` : ''}` + metaLine(r)
+  } else {
+    a.innerHTML = `<iframe class=page src="/api/page/${r.id}"></iframe>` + metaLine(r) + (r.panels_failed && r.panels_failed.length ? `<p class=note>${r.panels_failed.length} panel(s) could not be computed and say so on the page.</p>` : '') + (r.lint_removed && r.lint_removed.length ? `<p class=note>Removed ${r.lint_removed.length} number(s) the model typed itself (not from a query).</p>` : '');
+  }
+  if (r.lane === 'page') watchPage(a.querySelector('iframe.page'), r.id, a);
+  if (r.egress) { egress.calls += r.egress.calls || 1; egress.bytes += r.egress.prompt_bytes || 0; egress.rows += r.egress.rows_sent || 0; renderState(); }
+  $('#send').disabled = false; log.scrollTop = log.scrollHeight; $('#q').focus();
+};
+// the built page reports runtime errors; one repair round-trip, then reload
+function watchPage(frame, id, a){
+  let tried = false;
+  frame.addEventListener('load', async () => {
+    await new Promise(r => setTimeout(r, 700));
+    let errs = [], noData = false;
+    try {
+      errs = frame.contentWindow.__ioErrors || [];
+      const probe = frame.dataset.probe ? JSON.parse(frame.dataset.probe) : [];
+      if (probe.length) { const txt = frame.contentDocument.body.innerText; noData = !probe.some(v => txt.includes(String(v))); }
+    } catch (e) { return; }
+    if ((!errs.length && !noData) || tried) return;
+    tried = true;
+    const what = errs.length ? `threw an error when it ran (${errs[0]})` : 'does not show your data — it made content up';
+    const note = document.createElement('p'); note.className = 'note'; note.style.color = 'var(--warn)';
+    note.textContent = `The page ${what}. Asking the model to fix it…`; a.appendChild(note);
+    const r = await api('/api/page-repair/' + id, {errors: errs, no_data_shown: noData});
+    if (r.repaired) { note.textContent = 'Repaired once (' + what + '); reloaded.'; frame.src = `/api/page/${id}?v=${Date.now()}`; egress.calls += 1; renderState(); }
+    else note.textContent = 'Still wrong after one repair: the page ' + what + ' — try rephrasing, or raise the dial.';
+  });
+}
+function metaLine(r){
+  const e = r.egress || {};
+  const sent = r.lane === 'open' ? `sent: ${e.rows_sent||0} tokenised rows (0 real names/numbers — checked) · ${fmtB(e.prompt_bytes||0)}` : `sent: column names only · rows: 0 · ${fmtB(e.prompt_bytes||0)}`;
+  return `<div class=meta><span class=egress><i></i> ${sent}</span><span>lane: <b>${r.lane}</b></span><span>model: <b>${e.model||''}</b> · ${e.seconds||0}s${e.calls>1?' · '+e.calls+' calls':''}</span>${r.lane==='ask'?`<span>${r.rowcount} row(s) · from ${(r.tables_used||[]).join(', ')}</span>`:(r.lane==='page'||r.lane==='open')?`<span>${r.bytes?fmtB(r.bytes)+' page':'answer'}</span>`:`<span>${r.panels} panel(s)</span>`}${r.attempts>1?`<span>${r.attempts} attempts</span>`:''}</div>`;
+}
+$('#reset').onclick = async () => { await api('/api/reset', {}); log.innerHTML=''; addSystem('New conversation. The tables are still loaded.'); };
+
+// settings
+$('#settings').onclick = () => { const c = state.config||{}; $('#c-source').value = c.source||'openrouter'; $('#c-model').value = c.model||''; $('#c-key').value=''; $('#c-keystate').textContent = c.api_key ? '(a key is saved; leave blank to keep it)' : '(none saved)'; $('#c-lep').value = c.local_endpoint||''; $('#c-lmodel').value = c.local_model||''; $('#c-astro').checked = !!c.astronaut; $('#c-t1').value = c.t1_model||''; $('#c-t2').value = c.t2_model||''; toggleSrc(); $('#cfg').classList.add('open'); };
+function toggleSrc(){ const local = $('#c-source').value==='local'; $('#c-remote').style.display = local?'none':''; $('#c-local').style.display = local?'':'none'; }
+$('#c-source').onchange = toggleSrc;
+$('#c-cancel').onclick = () => $('#cfg').classList.remove('open');
+$('#c-save').onclick = async () => {
+  const body = {source:$('#c-source').value, model:$('#c-model').value.trim(), local_endpoint:$('#c-lep').value.trim(), local_model:$('#c-lmodel').value.trim(), astronaut:$('#c-astro').checked, t1_model:$('#c-t1').value.trim(), t2_model:$('#c-t2').value.trim()};
+  if ($('#c-key').value.trim()) body.api_key = $('#c-key').value.trim();
+  const r = await api('/api/config', body); if (r.config) state.config = r.config; renderState(); $('#cfg').classList.remove('open');
+};
+// ---- astronaut: see why, skills, compaction cards, wizard, telegram
+function showWhy(t){
+  const w = t.why || {}; const rows = [];
+  rows.push(`<b>${t.file}${t.sheet?' › '+t.sheet:''}</b> → table <code>${t.table}</code>, ${t.rows} rows, ${t.columns.length} columns`);
+  if (w.header_row) rows.push(`Header found on row ${w.header_row}${w.rows_before_header?` (${w.rows_before_header} title/blank row${w.rows_before_header>1?'s':''} above it skipped)`:''}`);
+  if (w.blocks) rows.push(`${w.blocks.length} stacked blocks merged, titles kept in a <code>block</code> column: ${w.blocks.slice(0,3).join('; ')}${w.blocks.length>3?' …':''}`);
+  if (w.dates_typed) rows.push(`Dates typed: ${w.dates_typed.join(', ')}`);
+  if (w.numbers_from_text) rows.push(`Numbers read from text (commas, ₹): ${w.numbers_from_text.join(', ')}`);
+  if (w.ids_kept_as_text) rows.push(`Long identifiers kept as text (not numbers): ${w.ids_kept_as_text.join(', ')}`);
+  if (w.merged_case) rows.push(`Spelling variants differing only by case/spaces merged in: ${w.merged_case.join(', ')}`);
+  if (w.normalised_join_columns) rows.push(`Spelling-normalised join column(s) added: ${w.normalised_join_columns.join(', ')}`);
+  if (w.mappings) rows.push(`Mapping skills added columns: ${w.mappings.map(m => m.skill + ' → ' + m.added.join(', ')).join('; ')}`);
+  rows.push(`Skills fired on this table: ${(w.skills && w.skills.length) ? w.skills.join(', ') : 'none'}`);
+  rows.push(`<button id="why-fix" data-file="${t.file}">This was read wrong — correct it</button>`);
+  $('#why-body').innerHTML = rows.map(r => `<p style="margin:6px 0">${r}</p>`).join('');
+  $('#why').classList.add('open');
+  $('#why-fix').onclick = () => { $('#why').classList.remove('open'); $('#author').onclick(); $('#w-kind').value = 'parse'; wizardMode(); $('#w-file').value = t.file; $('#w-name').value = 'read-' + t.file.replace(/\W+/g, '-').toLowerCase(); };
+}
+$('#why-close').onclick = () => $('#why').classList.remove('open');
+
+async function loadSkills(){
+  const r = await api('/api/skills'); const sk = r.skills || [];
+  $('#skills').innerHTML = sk.length ? sk.map(s => `<div><span title="${(s.description||'').replace(/"/g,'&quot;')}">${s.name} <span class=m>${s.kind}${s._layer!=='builtin'?' · '+s._layer:''}</span></span><span class=m>${s.fires_on && s.fires_on.length ? '● '+s.fires_on.length : ''}${s._layer!=='builtin'?` <a href="#" data-del="${s.name}">✕</a>`:''}</span></div>`).join('') : '<p class=note>No skills yet.</p>';
+  document.querySelectorAll('[data-del]').forEach(a => a.onclick = async e => { e.preventDefault(); await api('/api/skills/delete', {name:a.dataset.del}); await load(); });
+}
+
+function cardHtml(c, i){
+  const payload = c.kind === 'mapping' ? JSON.stringify(c.mapping||{}, null, 1) : c.kind === 'template' ? JSON.stringify(c.template||{}, null, 1) : (c.claim||'');
+  return `<div class=card data-i="${i}" style="border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;background:#fff">
+    <div style="display:flex;justify-content:space-between;gap:8px"><b><input value="${(c.name||'').replace(/"/g,'&quot;')}" class=c-name style="width:260px;padding:4px"></b><span class=m>${c.kind} · confidence ${c.confidence ?? '–'}</span></div>
+    <p style="margin:6px 0">${c.description||''}</p>
+    <label>When it applies (trigger)</label><textarea class=c-trigger rows=2 style="font:12px monospace;width:100%">${JSON.stringify(c.trigger||{})}</textarea>
+    <label>What it does</label><textarea class=c-payload rows=3 style="font:12px monospace;width:100%">${payload.replace(/</g,'&lt;')}</textarea>
+    <p class=note>${c.fires_on && c.fires_on.length ? 'Would fire now on: '+c.fires_on.join(', ') : (c.trigger && c.trigger.question_regex ? 'Fires on matching questions' : 'Fires on nothing loaded right now')}${c.evidence ? ' · evidence: log lines '+c.evidence.join(', ') : ''}</p>
+    ${c.leaks && c.leaks.length ? `<p class=note style="color:var(--bad)">Blocked: contains data values (${c.leaks.join(', ')})</p>` : ''}
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class=c-discard>Discard</button><button class="primary c-approve" ${c.leaks && c.leaks.length ? 'disabled' : ''}>Approve</button></div></div>`;
+}
+function readCard(el, c){
+  const out = {...c}; out.name = el.querySelector('.c-name').value.trim();
+  try { out.trigger = JSON.parse(el.querySelector('.c-trigger').value); } catch (e) { alert('Trigger must be JSON'); return null; }
+  const p = el.querySelector('.c-payload').value;
+  if (c.kind === 'mapping') { try { out.mapping = JSON.parse(p); } catch (e) { alert('Mapping must be JSON'); return null; } }
+  else if (c.kind === 'template') { try { out.template = JSON.parse(p); } catch (e) { alert('Template must be JSON'); return null; } }
+  else out.claim = p;
+  delete out.fires_on; delete out.leaks; return out;
+}
+function showCards(cards, title, note){
+  $('#cards-title').textContent = title; $('#cards-note').textContent = note || '';
+  $('#cards-body').innerHTML = cards.length ? cards.map(cardHtml).join('') : '<p class=note>Nothing to propose from this usage yet — ask more questions, especially ones that went wrong.</p>';
+  $('#cards-body').querySelectorAll('.card').forEach(el => {
+    const c = cards[+el.dataset.i];
+    el.querySelector('.c-discard').onclick = () => el.remove();
+    el.querySelector('.c-approve').onclick = async () => { const sk = readCard(el, c); if (!sk) return; const r = await api('/api/skills/save', {skill: sk, layer: 'folder'}); if (r.error) { alert(r.error); return; } el.innerHTML = `<p>✓ Saved <b>${sk.name}</b> — it takes effect on the next question.</p>`; await load(); };
+  });
+  $('#cards').classList.add('open');
+}
+$('#cards-close').onclick = () => $('#cards').classList.remove('open');
+
+$('#compact').onclick = async () => {
+  const c = state.config || {};
+  const tier = confirm(`A remote model will help write your skills. It will see your questions and queries — never your data values.\n\nOK = trusted model (${c.t1_model})\nCancel = choose the frontier model instead`) ? 't1' : (confirm(`Use the frontier model (${c.t2_model}) instead? It will see the same: questions and queries, no data values.`) ? 't2' : null);
+  if (!tier) return;
+  $('#compact').disabled = true; $('#compact').textContent = 'Reading your usage…';
+  const r = await api('/api/astronaut/compact', {tier});
+  $('#compact').disabled = false; $('#compact').textContent = 'Propose skills from my usage';
+  if (r.error) { alert(r.error); return; }
+  egress.calls += 1; egress.bytes += 0; renderState();
+  showCards(r.cards || [], `Proposed skills (${r.model}, ${r.seconds}s)`, `From ${r.log_lines} logged question(s) in this folder. Edit, then approve or discard each.`);
+};
+
+// wizard
+function wizardMode(){ const k = $('#w-kind').value; $('#w-when-table').style.display = (k === 'rule' || k === 'parse') ? 'none' : ''; $('#w-when-q').style.display = k === 'rule' ? '' : 'none'; $('#w-map').style.display = k === 'mapping' ? '' : 'none'; $('#w-parse').style.display = k === 'parse' ? '' : 'none'; $('#w-claim').style.display = (k === 'mapping' || k === 'parse') ? 'none' : ''; $('#w-what-label').style.display = (k === 'mapping' || k === 'parse') ? 'none' : ''; }
+$('#w-kind').onchange = wizardMode;
+$('#author').onclick = () => { const ts = (state.tables||[]).filter(t => t.table); $('#w-file').innerHTML = [...new Set(ts.map(t => t.file))].map(f => `<option value="${f}">${f}</option>`).join(''); $('#w-table').innerHTML = ts.map(t => `<option value="${t.table}">${t.file}${t.sheet?' › '+t.sheet:''}</option>`).join(''); $('#w-table').onchange = () => { const t = ts.find(x => x.table === $('#w-table').value); $('#w-cols').value = t ? t.columns.slice(0, 3).join(', ') : ''; }; $('#w-table').onchange(); $('#w-preview').textContent = ''; wizardMode(); $('#wizard').classList.add('open'); };
+$('#w-cancel').onclick = () => $('#wizard').classList.remove('open');
+function wizardSkill(){
+  const kind = $('#w-kind').value; const sk = {name: $('#w-name').value.trim() || 'my-skill', kind, origin: 'authored', description: ''};
+  if (kind === 'rule') sk.trigger = {question_regex: $('#w-qregex').value.trim()};
+  else if (kind === 'parse') { sk.trigger = {file_glob: $('#w-file').value}; sk.parse = {}; if ($('#w-dayfirst').value) sk.parse.dayfirst = $('#w-dayfirst').value === 'true'; if ($('#w-header').value.trim()) sk.parse.header_row = +$('#w-header').value.trim(); sk.description = 'How ' + $('#w-file').value + ' is read: ' + JSON.stringify(sk.parse); sk.origin = 'correction'; }
+  else sk.trigger = {columns_all: $('#w-cols').value.split(',').map(x => x.trim()).filter(Boolean)};
+  if (kind === 'mapping') { const u = {}; u[$('#w-newcol').value.trim()] = $('#w-variants').value.split(',').map(x => x.trim()).filter(Boolean); sk.mapping = {unify: u}; sk.description = 'Columns that mean the same thing get one common name: ' + $('#w-newcol').value.trim(); }
+  else { sk.claim = $('#w-claim').value.trim(); sk.description = sk.claim.slice(0, 90); }
+  return sk;
+}
+$('#w-test').onclick = async () => { const r = await api('/api/skills/preview', {skill: wizardSkill()}); $('#w-preview').textContent = (r.leaks && r.leaks.length) ? 'Blocked: contains data values: ' + r.leaks.join(', ') : (r.fires_on && r.fires_on.length ? 'Would fire on: ' + r.fires_on.join(', ') : (r.question_trigger ? 'Fires on matching questions.' : 'Fires on nothing loaded right now — check the columns.')); };
+$('#w-save').onclick = async () => { const r = await api('/api/skills/save', {skill: wizardSkill(), layer: 'folder'}); if (r.error) { alert(r.error); return; } $('#wizard').classList.remove('open'); addSystem('Skill saved; it applies from the next question. Click a file to see where it fired.'); await load(); };
+
+// telegram
+$('#tg-start').onclick = async () => { const tok = $('#tg-token').value.trim(); const r = await api('/api/telegram/start', tok ? {token: tok} : {}); $('#tg-note').textContent = r.error ? r.error : `Bot @${r.username} is running from this laptop. Message it on Telegram; /reach shows the dial.`; if (!r.error) { $('#tg-token').value = ''; await load(); } };
+
+load();
+
+// live: when a file in the folder is saved, pages re-run their receipts and the last answer is recomputed
+let lastVersion = null;
+setInterval(async () => {
+  try {
+    const st = await api('/api/state');
+    if (lastVersion === null) { lastVersion = st.version; return; }
+    if (st.version !== lastVersion) {
+      lastVersion = st.version; state.tables = st.tables; renderState();
+      document.querySelectorAll('iframe.page').forEach(f => { f.src = f.src.split('?')[0] + '?v=' + st.version; });
+      const asks = [...document.querySelectorAll('.turn')].filter(t => t.dataset.lane === 'ask' && t.dataset.id);
+      for (const t of asks.slice(-3)) {
+        const r = await api('/api/rerun/' + t.dataset.id);
+        if (r.html) { const a = t.querySelector('.a'); const meta = a.querySelector('.meta'); a.innerHTML = r.html + (meta ? meta.outerHTML : ''); }
+      }
+      addSystem(`Files changed on disk at ${st.changed_at} — answers and pages recomputed locally, no model call.`);
+    }
+  } catch (e) {}
+}, 3000);
+</script>
+</body>
+</html>

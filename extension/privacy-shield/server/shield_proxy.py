@@ -786,13 +786,15 @@ def make_handler(shield: Shield, annotate: bool):
                 with LOCK:
                     snap = dict(STATS)
                 snap.update(vault_entries=len(shield.vault.display), cache_entries=len(shield.cache),
-                            peek=PEEK["on"], pending_review=bool(shield.pending))
+                            peek=PEEK["on"], pending_review=bool(shield.pending),
+                            tokens_est_out=int(snap.get("bytes_out", 0) / 4),
+                            server=os.path.dirname(os.path.abspath(__file__)))
                 if url.path.endswith(".json"):
                     return self.send_local(200, json.dumps(snap, indent=1).encode())
                 rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in snap.items())
                 html = ("<meta http-equiv=refresh content=2><title>Privacy shield</title><body style='font-family:sans-serif'>"
                         f"<h3>Privacy shield</h3><table border=1 cellpadding=4>{rows}</table>"
-                        "<p><a href=/shield/vault>vault</a> · <a href=/shield/last-request>last request (wire view)</a> · "
+                        "<p><a href=/shield/vault>vault</a> - <a href=/shield/last-request>last request (wire view)</a> - "
                         "<a href='/shield/peek?on=1'>peek on</a> / <a href='/shield/peek?on=0'>peek off</a></p></body>")
                 return self.send_local(200, html.encode(), "text/html")
             if url.path == "/shield/vault":
@@ -811,7 +813,7 @@ def make_handler(shield: Shield, annotate: bool):
                 html = ("<title>wire view</title><body style='font-family:monospace;white-space:pre-wrap'>"
                         f"<form>search what left the laptop: <input name=q value='{q}'><button>find</button>"
                         f"{'' if hits is None else f' → {hits} hits'}</form>"
-                        f"<p>{LAST_REQUEST['path']} at {LAST_REQUEST['when']} · {len(body)} bytes</p><hr>"
+                        f"<p>{LAST_REQUEST['path']} at {LAST_REQUEST['when']} - {len(body)} bytes</p><hr>"
                         + body.replace("&", "&amp;").replace("<", "&lt;") + "</body>")
                 return self.send_local(200, html.encode(), "text/html")
             return self._fwd()

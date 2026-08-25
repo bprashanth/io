@@ -1,0 +1,118 @@
+{
+  "id": "share-of-total-by-category-text-date-year-p01",
+  "task_id": "share-of-total-by-category-text-date-year",
+  "pattern": "year filter on a text date, group sum, share of grand total, rank",
+  "question": "2024 loans: total amount by purpose and each purpose's share of the total in percent, biggest first",
+  "gold_sql": "WITH y AS (SELECT \"Purpose\", SUM(\"Loan Amount (Rs)\") AS total_amount FROM shg_loan_register WHERE \"Disbursement Date\" >= '2024-01-01' AND \"Disbursement Date\" < '2025-01-01' GROUP BY \"Purpose\") SELECT \"Purpose\", total_amount, 100.0 * total_amount / SUM(total_amount) OVER () AS share_percent FROM y ORDER BY total_amount DESC, \"Purpose\"",
+  "expected_rows": [
+    [
+      "Agriculture",
+      2000000,
+      25.906735751295336
+    ],
+    [
+      "Livestock",
+      1595000,
+      20.66062176165803
+    ],
+    [
+      "Petty trade",
+      1435000,
+      18.588082901554404
+    ],
+    [
+      "Housing",
+      1245000,
+      16.126943005181346
+    ],
+    [
+      "Education",
+      830000,
+      10.751295336787564
+    ],
+    [
+      "Health",
+      615000,
+      7.966321243523316
+    ]
+  ],
+  "actual_rows": null,
+  "row_order_required": true,
+  "sql_duckdb": "WITH Loans2024 AS (SELECT \"Purpose\", \"Loan Amount (Rs)\" FROM shg_loan_register WHERE SUBSTRING(\"Disbursement Date\", 1, 4) = '2024'), TotalLoanAmount AS (SELECT SUM(\"Loan Amount (Rs)\") AS TotalAmount FROM Loans2024) SELECT L.\"Purpose\", L.\"Loan Amount (Rs)\", (L.\"Loan Amount (Rs\" / NULLIF(T.TotalAmount, 0)) * 100 AS Percentage FROM Loans2024 AS L CROSS JOIN TotalLoanAmount AS T ORDER BY L.\"Loan Amount (Rs\" DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\n2024 loans: total amount by purpose and each purpose's share of the total in percent, biggest first",
+      "response": "```sql\nWITH Loans2024 AS (\n  SELECT\n    \"Purpose\",\n    \"Loan Amount (Rs)\"\n  FROM shg_loan_register\n  WHERE\n    SUBSTR(\"Disbursement Date\", 1, 4) = '2024'\n),\nTotalLoanAmount AS (\n  SELECT\n    SUM(\"Loan Amount (Rs)\") AS TotalAmount\n  FROM Loans2024\n)\nSELECT\n  L.\"Purpose\",\n  L.\"Loan Amount (Rs)\",\n  (\n    L.\"Loan Amount (Rs\"\n  ) * 100 / T.\"TotalAmount\" AS Percentage\nFROM Loans2024 AS L\nJOIN TotalLoanAmount AS T\n  ON 1 = 1\nORDER BY\n  L.\"Loan Amount (Rs\") DESC;\n```",
+      "api": {
+        "id": "gen-1787420951-b9gQEB7sgYmh32kw2exo",
+        "model": "google/gemma-3-12b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 417,
+          "completion_tokens": 180,
+          "total_tokens": 597,
+          "cost": 4.785e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 4.785e-05,
+            "upstream_inference_prompt_cost": 2.085e-05,
+            "upstream_inference_completions_cost": 2.7e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.726
+      },
+      "duration_seconds": 4.728,
+      "error": "ParseError: Invalid expression / Unexpected token. Line 24, Col: 22.\n  S Percentage\nFROM Loans2024 AS L\nJOIN TotalLoanAmount AS T\n  ON 1 = 1\nORDER BY\n  L.\"Loan Amount (Rs\"\u001b[4m)\u001b[0m DESC;"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"shg_loan_register\" (\n  \"Loan ID\" VARCHAR,\n  \"Disbursement Date\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"SHG Name\" VARCHAR,\n  \"Member Count\" BIGINT,\n  \"Loan Amount (Rs)\" BIGINT,\n  \"Purpose\" VARCHAR,\n  \"Repayment Status\" VARCHAR,\n  \"Amount Repaid (Rs)\" DOUBLE,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"shg_loan_register\": {\"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\", \"Fatehpur\", \"Wazirganj\"], \"Purpose\": [\"Agriculture\", \"Education\", \"Health\", \"Housing\", \"Livestock\", \"Petty trade\"], \"Repayment Status\": [\"Closed\", \"Overdue\", \"Regular\"], \"Source\": [\"Block MIS export\"]}}\n\nCURRENT QUESTION:\n2024 loans: total amount by purpose and each purpose's share of the total in percent, biggest first\n\nREJECTED QUERY ERROR:\nParseError: Invalid expression / Unexpected token. Line 24, Col: 22.\n  S Percentage\nFROM Loans2024 AS L\nJOIN TotalLoanAmount AS T\n  ON 1 = 1\nORDER BY\n  L.\"Loan Amount (Rs\"\u001b[4m)\u001b[0m DESC;\nReturn a complete corrected query.",
+      "response": "```sql\nWITH Loans2024 AS (\n  SELECT\n    \"Purpose\",\n    \"Loan Amount (Rs)\"\n  FROM shg_loan_register\n  WHERE\n    SUBSTR(\"Disbursement Date\", 1, 4) = '2024'\n), TotalLoanAmount AS (\n  SELECT\n    SUM(\"Loan Amount (Rs)\") AS TotalAmount\n  FROM Loans2024\n)\nSELECT\n  L.\"Purpose\",\n  L.\"Loan Amount (Rs)\",\n  (\n    L.\"Loan Amount (Rs\" / T.TotalAmount\n  ) * 100 AS Percentage\nFROM Loans2024 AS L\nCROSS JOIN TotalLoanAmount AS T\nORDER BY\n  L.\"Loan Amount (Rs\" DESC;\n```",
+      "api": {
+        "id": "gen-1787420956-vdNg0AcnbpFQZu1x1XnJ",
+        "model": "google/gemma-3-12b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 500,
+          "completion_tokens": 171,
+          "total_tokens": 671,
+          "cost": 5.065e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.065e-05,
+            "upstream_inference_prompt_cost": 2.5e-05,
+            "upstream_inference_completions_cost": 2.565e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 4.804
+      },
+      "duration_seconds": 4.806,
+      "error": "BinderException: Binder Error: Values list \"L\" does not have a column named \"Loan Amount (Rs\"\n\nLINE 1: ... FROM Loans2024) SELECT L.\"Purpose\", L.\"Loan Amount (Rs)\", (L.\"Loan Amount (Rs\" / NULLIF(T.TotalAmount, 0)) * 100 AS...\n                                                                       ^"
+    }
+  ],
+  "passed": false,
+  "failure_class": "request_or_execution"
+}

@@ -1,0 +1,162 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Health Camp Signup</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Health Camp Signup","short_name":"Signup","start_url":".","display":"standalone","background_color":"#f6f7fb","theme_color":"#2563eb"}'>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+</style></head><body>
+<header><h1>Health Camp Signup</h1></header>
+<main>
+<!-- YOUR MARKUP HERE -->
+<div class="grid">
+  <div class="card">
+    <h2>Event Details</h2>
+    <p><strong>Date:</strong> <span id="eventDate">14 September</span></p>
+    <p><strong>Time:</strong> 09:00 - 16:00</p>
+    <p><strong>Location:</strong> Community Center, Main Hall</p>
+    <p><strong>Services:</strong> Free checkups, blood pressure, diabetes screening, and health education.</p>
+  </div>
+  <div class="card">
+    <h2>Countdown</h2>
+    <div id="countdown" class="row">
+      <div><span id="days">00</span> Days</div>
+      <div><span id="hours">00</span> Hours</div>
+      <div><span id="minutes">00</span> Minutes</div>
+      <div><span id="seconds">00</span> Seconds</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Sign Up</h2>
+  <form id="signupForm">
+    <div class="row">
+      <div>
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" required placeholder="e.g. John Doe">
+      </div>
+      <div>
+        <label for="phone">Phone Number</label>
+        <input type="tel" id="phone" name="phone" required placeholder="e.g. 0712345678">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="age">Age</label>
+        <input type="number" id="age" name="age" min="1" max="120" required>
+      </div>
+      <div>
+        <label for="service">Service Needed</label>
+        <select id="service" name="service">
+          <option value="General Checkup">General Checkup</option>
+          <option value="Blood Pressure">Blood Pressure</option>
+          <option value="Diabetes Screening">Diabetes Screening</option>
+          <option value="Dental Checkup">Dental Checkup</option>
+          <option value="Health Education">Health Education</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="notes">Additional Notes</label>
+        <textarea id="notes" name="notes" rows="3" placeholder="Any specific conditions or requests?"></textarea>
+      </div>
+    </div>
+    <button type="submit">Register Now</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Registered Participants</h2>
+  <div id="participantList">
+    <p class="muted">Loading list...</p>
+  </div>
+  <div class="row" style="margin-top:12px;">
+    <button class="secondary" onclick="exportCSV()">Export List (CSV)</button>
+    <button class="secondary" onclick="exportJSON()">Export List (JSON)</button>
+  </div>
+</div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, 'participants', JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+offlineReady();
+// YOUR CODE HERE
+const eventDate = new Date('2024-09-14T09:00:00').getTime();
+
+function updateCountdown() {
+  const now = new Date().getTime();
+  const distance = eventDate - now;
+  if (distance < 0) {
+    document.getElementById('countdown').innerHTML = '<span class="muted">Event has passed.</span>';
+    return;
+  }
+  const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+  document.getElementById('days').textContent = String(days).padStart(2, '0');
+  document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+  document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+  document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+}
+setInterval(updateCountdown, 1000);
+updateCountdown();
+
+document.getElementById('signupForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const participants = store.get('participants', []);
+  const newEntry = {
+    id: Date.now(),
+    name: document.getElementById('name').value,
+    phone: document.getElementById('phone').value,
+    age: document.getElementById('age').value,
+    service: document.getElementById('service').value,
+    notes: document.getElementById('notes').value,
+    timestamp: new Date().toISOString()
+  };
+  participants.push(newEntry);
+  store.set('participants', participants);
+  renderList();
+  this.reset();
+  alert('Registration successful!');
+});
+
+function renderList() {
+  const list = document.getElementById('participantList');
+  const participants = store.get('participants', []);
+  if (participants.length === 0) {
+    list.innerHTML = '<p class="muted">No participants registered yet.</p>';
+    return;
+  }
+  let html = '<table><thead><tr><th>Name</th><th>Phone</th><th>Age</th><th>Service</th><th>Notes</th></tr></thead><tbody>';
+  participants.forEach(p => {
+    html += `<tr>
+      <td>${p.name}</td>
+      <td>${p.phone}</td>
+      <td>${p.age}</td>
+      <td>${p.service}</td>
+      <td>${p.notes || '-'}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  list.innerHTML = html;
+}
+renderList();
+
+function exportCSV() {
+  const participants = store.get('participants', []);
+  const csv = toCSV(participants);
+  download('health_camp_participants.csv', csv, 'text/csv');
+}
+function exportJSON() {
+  const participants = store.get('participants', []);
+  download('health_camp_participants.json', JSON.stringify(participants, null, 2), 'application/json');
+}
+</script>
+</body></html>

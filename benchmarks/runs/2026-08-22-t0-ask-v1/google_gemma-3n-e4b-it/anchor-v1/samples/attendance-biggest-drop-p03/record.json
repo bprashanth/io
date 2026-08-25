@@ -1,0 +1,125 @@
+{
+  "id": "attendance-biggest-drop-p03",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "where did attendance percentage decline the most year on year",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Wadala Balwadi",
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH yearly_attendance AS (SELECT Centre, SUM(CASE WHEN Month = 'April' THEN \"Avg Daily Present\" ELSE 0 END) AS April_Present, SUM(CASE WHEN Month = 'August' THEN \"Avg Daily Present\" ELSE 0 END) AS August_Present, SUM(CASE WHEN Month = 'December' THEN \"Avg Daily Present\" ELSE 0 END) AS December_Present, SUM(CASE WHEN Month = 'February' THEN \"Avg Daily Present\" ELSE 0 END) AS February_Present, SUM(CASE WHEN Month = 'January' THEN \"Avg Daily Present\" ELSE 0 END) AS January_Present, SUM(CASE WHEN Month = 'July' THEN \"Avg Daily Present\" ELSE 0 END) AS July_Present, SUM(CASE WHEN Month = 'June' THEN \"Avg Daily Present\" ELSE 0 END) AS June_Present, SUM(CASE WHEN Month = 'March' THEN \"Avg Daily Present\" ELSE 0 END) AS March_Present, SUM(CASE WHEN Month = 'May' THEN \"Avg Daily Present\" ELSE 0 END) AS May_Present, SUM(CASE WHEN Month = 'November' THEN \"Avg Daily Present\" ELSE 0 END) AS November_Present, SUM(CASE WHEN Month = 'October' THEN \"Avg Daily Present\" ELSE 0 END) AS October_Present, SUM(CASE WHEN Month = 'September' THEN \"Avg Daily Present\" ELSE 0 END) AS September_Present FROM \"attendance_2023\" GROUP BY Centre) SELECT Centre, (((April_Present - April_Present) / NULLIF(April_Present, 0)) * 100) AS April_Change, (((August_Present - August_Present) / NULLIF(August_Present, 0)) * 100) AS August_Change, (((December_Present - December_Present) / NULLIF(December_Present, 0)) * 100) AS December_Change, (((February_Present - February_Present) / NULLIF(February_Present, 0)) * 100) AS February_Change, (((January_Present - January_Present) / NULLIF(January_Present, 0)) * 100) AS January_Change, (((July_Present - July_Present) / NULLIF(July_Present, 0)) * 100) AS July_Change, (((June_Present - June_Present) / NULLIF(June_Present, 0)) * 100) AS June_Change, (((March_Present - March_Present) / NULLIF(March_Present, 0)) * 100) AS March_Change, (((May_Present - May_Present) / NULLIF(May_Present, 0)) * 100) AS May_Change, (((November_Present - November_Present) / NULLIF(November_Present, 0)) * 100) AS November_Change, (((October_Present - October_Present) / NULLIF(October_Present, 0)) * 100) AS October_Change, (((September_Present - September_Present) / NULLIF(September_Present, 0)) * 100) AS September_Change FROM yearly_attendance ORDER BY ABS(April_Change) DESC LIMIT 1",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nwhere did attendance percentage decline the most year on year",
+      "response": "```sql\nWITH yearly_attendance AS (\n  SELECT\n    Centre,\n    SUM(CASE WHEN Month = 'April' THEN Avg Daily Present ELSE 0 END) AS April_Present,\n    SUM(CASE WHEN Month = 'August' THEN Avg Daily Present ELSE 0 END) AS August_Present,\n    SUM(CASE WHEN Month = 'December' THEN Avg Daily Present ELSE 0 END) AS December_Present,\n    SUM(CASE WHEN Month = 'February' THEN Avg Daily Present ELSE 0 END) AS February_Present,\n    SUM(CASE WHEN Month = 'January' THEN Avg Daily Present ELSE 0 END) AS January_Present,\n    SUM(CASE WHEN Month = 'July' THEN Avg Daily Present ELSE 0 END) AS July_Present,\n    SUM(CASE WHEN Month = 'June' THEN Avg Daily Present ELSE 0 END) AS June_Present,\n    SUM(CASE WHEN Month = 'March' THEN Avg Daily Present ELSE 0 END) AS March_Present,\n    SUM(CASE WHEN Month = 'May' THEN Avg Daily Present ELSE 0 END) AS May_Present,\n    SUM(CASE WHEN Month = 'November' THEN Avg Daily Present ELSE 0 END) AS November_Present,\n    SUM(CASE WHEN Month = 'October' THEN Avg Daily Present ELSE 0 END) AS October_Present,\n    SUM(CASE WHEN Month = 'September' THEN Avg Daily Present ELSE 0 END) AS September_Present\n  FROM \"attendance_2023\"\n  GROUP BY\n    Centre\n), yearly_attendance_2024 AS (\n  SELECT\n    centre_name,\n    SUM(CASE WHEN month = 'April' THEN average_attendance ELSE 0 END) AS April_Present,\n    SUM(CASE WHEN month = 'August' THEN average_attendance ELSE 0 END) AS August_Present,\n    SUM(CASE WHEN month = 'December' THEN average_attendance ELSE 0 END) AS December_Present,\n    SUM(CASE WHEN month = 'February' THEN average_attendance ELSE 0 END) AS February_Present,\n    SUM(CASE WHEN month = 'January' THEN average_attendance ELSE 0 END) AS January_Present,\n    SUM(CASE WHEN month = 'July' THEN average_attendance ELSE 0 END) AS July_Present,\n    SUM(CASE WHEN month = 'June' THEN average_attendance ELSE 0 END) AS June_Present,\n    SUM(CASE WHEN month = 'March' THEN average_attendance ELSE 0 END) AS March_Present,\n    SUM(CASE WHEN month = 'May' THEN average_attendance ELSE 0 END) AS May_Present,\n    SUM(CASE WHEN month = 'November' THEN average_attendance ELSE 0 END) AS November_Present,\n    SUM(CASE WHEN month = 'October' THEN average_attendance ELSE 0 END) AS October_Present,\n    SUM(CASE WHEN month = 'September' THEN average_attendance ELSE 0 END) AS September_Present\n  FROM \"attendance_2024\"\n  GROUP BY\n    centre_name\n)\nSELECT\n  a.Centre,\n  (\n    (\n      (\n        (\n          (\n            (\n              (\n                (\n                  (\n                    (\n                      (\n                        (\n                          (\n                            (\n                              (\n                                (\n                                  (\n                                    (\n                                      (\n                                        (\n                                          (\n                                            (\n                                              (\n                                                (\n                                                  (\n                                                    (\n                                                      (\n                                                        (\n                                                          (\n                                                            (\n                                                              (\n                                                                (\n                                                                  (\n                                                                    (\n                                                                      (\n                                                                        (\n                                                                          (\n                                                                            (\n                                                                              (\n                                                                                (\n                                                                                  (\n                                                                                    (\n                                                                                      (\n                                                                                        (\n                                                                                          (\n                                                                                            (\n                                                                                             (\n                                                                                               (\n                                                                                                 April_Present - April_Present\n                                                                                               )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             )\n                                                                                             ",
+      "api": {
+        "id": "gen-1787421004-pjtjInxqPIIDO0fcyJlr",
+        "model": "google/gemma-3n-e4b-it",
+        "finish_reason": "length",
+        "usage": {
+          "prompt_tokens": 525,
+          "completion_tokens": 1024,
+          "total_tokens": 1549,
+          "cost": 0.00015438,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00015438,
+            "upstream_inference_prompt_cost": 3.15e-05,
+            "upstream_inference_completions_cost": 0.00012288
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 16.897
+      },
+      "duration_seconds": 16.899,
+      "error": "ParseError: Expected END after CASE. Line 4, Col: 42.\n  WITH yearly_attendance AS (\n  SELECT\n    Centre,\n    SUM(CASE WHEN Month = 'April' THEN \u001b[4mAvg\u001b[0m Daily Present ELSE 0 END) AS April_Present,\n    SUM(CASE WHEN Month = 'August' THEN Avg Daily Prese"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nwhere did attendance percentage decline the most year on year\n\nREJECTED QUERY ERROR:\nParseError: Expected END after CASE. Line 4, Col: 42.\n  WITH yearly_attendance AS (\n  SELECT\n    Centre,\n    SUM(CASE WHEN Month = 'April' THEN \u001b[4mAvg\u001b[0m Daily Present ELSE 0 END) AS April_Present,\n    SUM(CASE WHEN Month = 'August' THEN Avg Daily Prese\nReturn a complete corrected query.",
+      "response": "```sql\nWITH yearly_attendance AS (\n  SELECT\n    Centre,\n    SUM(CASE WHEN Month = 'April' THEN \"Avg Daily Present\" ELSE 0 END) AS April_Present,\n    SUM(CASE WHEN Month = 'August' THEN \"Avg Daily Present\" ELSE 0 END) AS August_Present,\n    SUM(CASE WHEN Month = 'December' THEN \"Avg Daily Present\" ELSE 0 END) AS December_Present,\n    SUM(CASE WHEN Month = 'February' THEN \"Avg Daily Present\" ELSE 0 END) AS February_Present,\n    SUM(CASE WHEN Month = 'January' THEN \"Avg Daily Present\" ELSE 0 END) AS January_Present,\n    SUM(CASE WHEN Month = 'July' THEN \"Avg Daily Present\" ELSE 0 END) AS July_Present,\n    SUM(CASE WHEN Month = 'June' THEN \"Avg Daily Present\" ELSE 0 END) AS June_Present,\n    SUM(CASE WHEN Month = 'March' THEN \"Avg Daily Present\" ELSE 0 END) AS March_Present,\n    SUM(CASE WHEN Month = 'May' THEN \"Avg Daily Present\" ELSE 0 END) AS May_Present,\n    SUM(CASE WHEN Month = 'November' THEN \"Avg Daily Present\" ELSE 0 END) AS November_Present,\n    SUM(CASE WHEN Month = 'October' THEN \"Avg Daily Present\" ELSE 0 END) AS October_Present,\n    SUM(CASE WHEN Month = 'September' THEN \"Avg Daily Present\" ELSE 0 END) AS September_Present\n  FROM \"attendance_2023\"\n  GROUP BY Centre\n)\nSELECT\n  Centre,\n  (\n    (\n      (\n        April_Present - April_Present\n      ) / April_Present\n    ) * 100\n  ) AS April_Change,\n  (\n    (\n      (\n        August_Present - August_Present\n      ) / August_Present\n    ) * 100\n  ) AS August_Change,\n  (\n    (\n      (\n        December_Present - December_Present\n      ) / December_Present\n    ) * 100\n  ) AS December_Change,\n  (\n    (\n      (\n        February_Present - February_Present\n      ) / February_Present\n    ) * 100\n  ) AS February_Change,\n  (\n    (\n      (\n        January_Present - January_Present\n      ) / January_Present\n    ) * 100\n  ) AS January_Change,\n  (\n    (\n      (\n        July_Present - July_Present\n      ) / July_Present\n    ) * 100\n  ) AS July_Change,\n  (\n    (\n      (\n        June_Present - June_Present\n      ) / June_Present\n    ) * 100\n  ) AS June_Change,\n  (\n    (\n      (\n        March_Present - March_Present\n      ) / March_Present\n    ) * 100\n  ) AS March_Change,\n  (\n    (\n      (\n        May_Present - May_Present\n      ) / May_Present\n    ) * 100\n  ) AS May_Change,\n  (\n    (\n      (\n        November_Present - November_Present\n      ) / November_Present\n    ) * 100\n  ) AS November_Change,\n  (\n    (\n      (\n        October_Present - October_Present\n      ) / October_Present\n    ) * 100\n  ) AS October_Change,\n  (\n    (\n      (\n        September_Present - September_Present\n      ) / September_Present\n    ) * 100\n  ) AS September_Change\nFROM yearly_attendance\nORDER BY ABS(April_Change) DESC\nLIMIT 1;\n```",
+      "api": {
+        "id": "gen-1787421021-WXYeOpzj31Eums6VtEN1",
+        "model": "google/gemma-3n-e4b-it",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 621,
+          "completion_tokens": 877,
+          "total_tokens": 1498,
+          "cost": 0.0001425,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0001425,
+            "upstream_inference_prompt_cost": 3.726e-05,
+            "upstream_inference_completions_cost": 0.00010524
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 16.553
+      },
+      "duration_seconds": 16.572,
+      "sql_duckdb": "WITH yearly_attendance AS (SELECT Centre, SUM(CASE WHEN Month = 'April' THEN \"Avg Daily Present\" ELSE 0 END) AS April_Present, SUM(CASE WHEN Month = 'August' THEN \"Avg Daily Present\" ELSE 0 END) AS August_Present, SUM(CASE WHEN Month = 'December' THEN \"Avg Daily Present\" ELSE 0 END) AS December_Present, SUM(CASE WHEN Month = 'February' THEN \"Avg Daily Present\" ELSE 0 END) AS February_Present, SUM(CASE WHEN Month = 'January' THEN \"Avg Daily Present\" ELSE 0 END) AS January_Present, SUM(CASE WHEN Month = 'July' THEN \"Avg Daily Present\" ELSE 0 END) AS July_Present, SUM(CASE WHEN Month = 'June' THEN \"Avg Daily Present\" ELSE 0 END) AS June_Present, SUM(CASE WHEN Month = 'March' THEN \"Avg Daily Present\" ELSE 0 END) AS March_Present, SUM(CASE WHEN Month = 'May' THEN \"Avg Daily Present\" ELSE 0 END) AS May_Present, SUM(CASE WHEN Month = 'November' THEN \"Avg Daily Present\" ELSE 0 END) AS November_Present, SUM(CASE WHEN Month = 'October' THEN \"Avg Daily Present\" ELSE 0 END) AS October_Present, SUM(CASE WHEN Month = 'September' THEN \"Avg Daily Present\" ELSE 0 END) AS September_Present FROM \"attendance_2023\" GROUP BY Centre) SELECT Centre, (((April_Present - April_Present) / NULLIF(April_Present, 0)) * 100) AS April_Change, (((August_Present - August_Present) / NULLIF(August_Present, 0)) * 100) AS August_Change, (((December_Present - December_Present) / NULLIF(December_Present, 0)) * 100) AS December_Change, (((February_Present - February_Present) / NULLIF(February_Present, 0)) * 100) AS February_Change, (((January_Present - January_Present) / NULLIF(January_Present, 0)) * 100) AS January_Change, (((July_Present - July_Present) / NULLIF(July_Present, 0)) * 100) AS July_Change, (((June_Present - June_Present) / NULLIF(June_Present, 0)) * 100) AS June_Change, (((March_Present - March_Present) / NULLIF(March_Present, 0)) * 100) AS March_Change, (((May_Present - May_Present) / NULLIF(May_Present, 0)) * 100) AS May_Change, (((November_Present - November_Present) / NULLIF(November_Present, 0)) * 100) AS November_Change, (((October_Present - October_Present) / NULLIF(October_Present, 0)) * 100) AS October_Change, (((September_Present - September_Present) / NULLIF(September_Present, 0)) * 100) AS September_Change FROM yearly_attendance ORDER BY ABS(April_Change) DESC LIMIT 1",
+      "rows": [
+        [
+          "Wadala Balwadi",
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

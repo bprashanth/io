@@ -1,0 +1,67 @@
+{
+  "id": "attendance-biggest-drop-p01",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "which centre saw the biggest fall in attendance rate from 2023 to 2024 - use the average of the monthly rates per centre, give the fall in percentage points as a positive number",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH aligned_2023 /* Align tables with matching names */ AS (SELECT \"Centre\" AS centre_name, \"Month\", \"Enrolled Kids\" AS enrolment, \"Avg Daily Present\" AS average_attendance FROM attendance_2023), aligned_2024 AS (SELECT \"centre_name\", \"month\", \"enrolment\", \"average_attendance\" FROM attendance_2024), monthly_rates_2023 /* Calculate monthly rates */ AS (SELECT centre_name, month, enrolment, average_attendance, NULLIF(average_attendance, 0) / NULLIF(NULLIF(enrolment, 0), 0) * 100 AS attendance_rate FROM aligned_2023), monthly_rates_2024 AS (SELECT centre_name, month, enrolment, average_attendance, NULLIF(average_attendance, 0) / NULLIF(NULLIF(enrolment, 0), 0) * 100 AS attendance_rate FROM aligned_2024), valid_centres /* Join with known centres */ AS (SELECT DISTINCT centre_name FROM aligned_2023 WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')), avg_rates_2023 /* Calculate average rates per centre */ AS (SELECT centre_name, AVG(attendance_rate) AS avg_attendance_rate_2023 FROM monthly_rates_2023 WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') GROUP BY centre_name), avg_rates_2024 AS (SELECT centre_name, AVG(attendance_rate) AS avg_attendance_rate_2024 FROM monthly_rates_2024 WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') GROUP BY centre_name), fall_calculations /* Calculate percentage point falls */ AS (SELECT ar2023.centre_name, ar2023.avg_attendance_rate_2023, ar2024.avg_attendance_rate_2024, ar2023.avg_attendance_rate_2023 - ar2024.avg_attendance_rate_2024 AS percentage_point_fall FROM avg_rates_2023 AS ar2023 JOIN avg_rates_2024 AS ar2024 ON ar2023.centre_name = ar2024.centre_name) /* Find the centre with the biggest fall */ SELECT centre_name, percentage_point_fall FROM fall_calculations ORDER BY percentage_point_fall DESC LIMIT 1",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nQuote column names with double quotes when they contain spaces or odd characters. When two tables describe the same thing with different column names, UNION ALL them with aligned aliases.\n\nFor approximate name matching across tables use jaro_winkler_similarity(lower(trim(a)), lower(trim(b))) >= 0.9, keep only the single best match per row (QUALIFY ROW_NUMBER() OVER (PARTITION BY row ORDER BY similarity DESC) = 1), then LEFT JOIN from the reference table so rows with zero matches are kept.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nwhich centre saw the biggest fall in attendance rate from 2023 to 2024 - use the average of the monthly rates per centre, give the fall in percentage points as a positive number",
+      "response": "```sql\nWITH\n-- Align tables with matching names\naligned_2023 AS (\n  SELECT\n    \"Centre\" AS centre_name,\n    \"Month\",\n    \"Enrolled Kids\" AS enrolment,\n    \"Avg Daily Present\" AS average_attendance\n  FROM attendance_2023\n),\n\naligned_2024 AS (\n  SELECT\n    \"centre_name\",\n    \"month\",\n    \"enrolment\",\n    \"average_attendance\"\n  FROM attendance_2024\n),\n\n-- Calculate monthly rates\nmonthly_rates_2023 AS (\n  SELECT\n    centre_name,\n    month,\n    enrolment,\n    average_attendance,\n    NULLIF(average_attendance, 0) / NULLIF(enrolment, 0) * 100 AS attendance_rate\n  FROM aligned_2023\n),\n\nmonthly_rates_2024 AS (\n  SELECT\n    centre_name,\n    month,\n    enrolment,\n    average_attendance,\n    NULLIF(average_attendance, 0) / NULLIF(enrolment, 0) * 100 AS attendance_rate\n  FROM aligned_2024\n),\n\n-- Join with known centres\nvalid_centres AS (\n  SELECT DISTINCT centre_name\n  FROM aligned_2023\n  WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n),\n\n-- Calculate average rates per centre\navg_rates_2023 AS (\n  SELECT\n    centre_name,\n    AVG(attendance_rate) AS avg_attendance_rate_2023\n  FROM monthly_rates_2023\n  WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n  GROUP BY centre_name\n),\n\navg_rates_2024 AS (\n  SELECT\n    centre_name,\n    AVG(attendance_rate) AS avg_attendance_rate_2024\n  FROM monthly_rates_2024\n  WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n  GROUP BY centre_name\n),\n\n-- Calculate percentage point falls\nfall_calculations AS (\n  SELECT\n    ar2023.centre_name,\n    ar2023.avg_attendance_rate_2023,\n    ar2024.avg_attendance_rate_2024,\n    ar2023.avg_attendance_rate_2023 - ar2024.avg_attendance_rate_2024 AS percentage_point_fall\n  FROM avg_rates_2023 ar2023\n  JOIN avg_rates_2024 ar2024 ON ar2023.centre_name = ar2024.centre_name\n)\n\n-- Find the centre with the biggest fall\nSELECT\n  centre_name,\n  percentage_point_fall\nFROM fall_calculations\nORDER BY percentage_point_fall DESC\nLIMIT 1;\n```",
+      "api": {
+        "id": "gen-1787421766-g8fDypbo4iuykdEfLlHK",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 662,
+          "completion_tokens": 799,
+          "total_tokens": 1461,
+          "cost": 0.00015003,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 512,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00015003,
+            "upstream_inference_prompt_cost": 3.018e-05,
+            "upstream_inference_completions_cost": 0.00011985
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 9.001
+      },
+      "duration_seconds": 9.016,
+      "sql_duckdb": "WITH aligned_2023 /* Align tables with matching names */ AS (SELECT \"Centre\" AS centre_name, \"Month\", \"Enrolled Kids\" AS enrolment, \"Avg Daily Present\" AS average_attendance FROM attendance_2023), aligned_2024 AS (SELECT \"centre_name\", \"month\", \"enrolment\", \"average_attendance\" FROM attendance_2024), monthly_rates_2023 /* Calculate monthly rates */ AS (SELECT centre_name, month, enrolment, average_attendance, NULLIF(average_attendance, 0) / NULLIF(NULLIF(enrolment, 0), 0) * 100 AS attendance_rate FROM aligned_2023), monthly_rates_2024 AS (SELECT centre_name, month, enrolment, average_attendance, NULLIF(average_attendance, 0) / NULLIF(NULLIF(enrolment, 0), 0) * 100 AS attendance_rate FROM aligned_2024), valid_centres /* Join with known centres */ AS (SELECT DISTINCT centre_name FROM aligned_2023 WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')), avg_rates_2023 /* Calculate average rates per centre */ AS (SELECT centre_name, AVG(attendance_rate) AS avg_attendance_rate_2023 FROM monthly_rates_2023 WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') GROUP BY centre_name), avg_rates_2024 AS (SELECT centre_name, AVG(attendance_rate) AS avg_attendance_rate_2024 FROM monthly_rates_2024 WHERE centre_name IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') GROUP BY centre_name), fall_calculations /* Calculate percentage point falls */ AS (SELECT ar2023.centre_name, ar2023.avg_attendance_rate_2023, ar2024.avg_attendance_rate_2024, ar2023.avg_attendance_rate_2023 - ar2024.avg_attendance_rate_2024 AS percentage_point_fall FROM avg_rates_2023 AS ar2023 JOIN avg_rates_2024 AS ar2024 ON ar2023.centre_name = ar2024.centre_name) /* Find the centre with the biggest fall */ SELECT centre_name, percentage_point_fall FROM fall_calculations ORDER BY percentage_point_fall DESC LIMIT 1",
+      "rows": [
+        [
+          "Kurla Balwadi",
+          20.509871180359326
+        ]
+      ]
+    }
+  ],
+  "passed": true,
+  "failure_class": null
+}

@@ -1,0 +1,123 @@
+{
+  "id": "attendance-biggest-drop-p02",
+  "task_id": "attendance-biggest-drop",
+  "pattern": "union two differently-headered tables, pivot, compute a difference, rank",
+  "question": "rank centres by how much their turnout percentage dropped between the two years, worst first",
+  "gold_sql": "WITH combined AS (SELECT \"Centre\" AS centre, 2023 AS year, \"Avg Daily Present\" / \"Enrolled Kids\" * 100.0 AS rate FROM attendance_2023 UNION ALL SELECT centre_name AS centre, 2024 AS year, average_attendance / enrolment * 100.0 AS rate FROM attendance_2024) , by_year AS (SELECT centre, AVG(CASE WHEN year = 2023 THEN rate END) AS avg_2023, AVG(CASE WHEN year = 2024 THEN rate END) AS avg_2024 FROM combined GROUP BY centre) SELECT centre, avg_2023 - avg_2024 AS drop_pp FROM by_year ORDER BY drop_pp DESC, centre LIMIT 1",
+  "expected_rows": [
+    [
+      "Kurla Balwadi",
+      20.509871180359326
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Govandi Balwadi",
+      4.666106403717468
+    ],
+    [
+      "Dharavi Balwadi",
+      4.148417367614325
+    ],
+    [
+      "Wadala Balwadi",
+      1.1282741690733122
+    ],
+    [
+      "Chembur Balwadi",
+      0.08599116343001967
+    ],
+    [
+      "Mankhurd Balwadi",
+      -1.8807187392427356
+    ],
+    [
+      "Worli Balwadi",
+      -2.7356435341622345
+    ],
+    [
+      "Sion Balwadi",
+      -4.951436416269181
+    ],
+    [
+      "Kurla Balwadi",
+      -20.509871180359312
+    ]
+  ],
+  "row_order_required": true,
+  "sql_duckdb": "WITH turnout_2023 /* Calculate turnout percentage for each centre in 2023 */ AS (SELECT \"Centre\", \"Month\", NULLIF(\"Avg Daily Present\", 0) / NULLIF(NULLIF(\"Enrolled Kids\", 0), 0) * 100 AS turnout_percentage_2023 FROM attendance_2023 WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), turnout_2024 /* Calculate turnout percentage for each centre in 2024 */ AS (SELECT \"centre_name\" AS \"Centre\", \"month\" AS \"Month\", NULLIF(\"average_attendance\", 0) / NULLIF(NULLIF(\"enrolment\", 0), 0) * 100 AS turnout_percentage_2024 FROM attendance_2024 WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), turnout_change /* Join and calculate percentage-point change */ AS (SELECT t2023.\"Centre\", t2023.\"Month\", t2023.turnout_percentage_2023, t2024.turnout_percentage_2024, t2024.turnout_percentage_2024 - t2023.turnout_percentage_2023 AS percentage_point_change FROM turnout_2023 AS t2023 JOIN turnout_2024 AS t2024 ON t2023.\"Centre\" = t2024.\"Centre\" AND t2023.\"Month\" = t2024.\"Month\") /* Rank centres by percentage-point change (worst first) */ SELECT \"Centre\", AVG(percentage_point_change) AS avg_percentage_point_change FROM turnout_change GROUP BY \"Centre\" ORDER BY avg_percentage_point_change DESC",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"attendance_2023\" (\n  \"Centre\" VARCHAR,\n  \"Month\" VARCHAR,\n  \"Enrolled Kids\" BIGINT,\n  \"Avg Daily Present\" BIGINT\n);\n\nCREATE TABLE \"attendance_2024\" (\n  \"centre_name\" VARCHAR,\n  \"month\" VARCHAR,\n  \"enrolment\" BIGINT,\n  \"average_attendance\" BIGINT\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"attendance_2023\": {\"Centre\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"Month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}, \"attendance_2024\": {\"centre_name\": [\"Chembur Balwadi\", \"Dharavi Balwadi\", \"Govandi Balwadi\", \"Kurla Balwadi\", \"Mankhurd Balwadi\", \"Sion Balwadi\", \"Wadala Balwadi\", \"Worli Balwadi\"], \"month\": [\"April\", \"August\", \"December\", \"February\", \"January\", \"July\", \"June\", \"March\", \"May\", \"November\", \"October\", \"September\"]}}\n\nCURRENT QUESTION:\nrank centres by how much their turnout percentage dropped between the two years, worst first",
+      "response": "```sql\nWITH\n-- Calculate turnout percentage for each centre in 2023\nturnout_2023 AS (\n    SELECT\n        \"Centre\",\n        \"Month\",\n        NULLIF(\"Avg Daily Present\", 0) / NULLIF(\"Enrolled Kids\", 0) * 100 AS turnout_percentage_2023\n    FROM attendance_2023\n    WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n),\n\n-- Calculate turnout percentage for each centre in 2024\nturnout_2024 AS (\n    SELECT\n        \"centre_name\" AS \"Centre\",\n        \"month\" AS \"Month\",\n        NULLIF(\"average_attendance\", 0) / NULLIF(\"enrolment\", 0) * 100 AS turnout_percentage_2024\n    FROM attendance_2024\n    WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi')\n    AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')\n),\n\n-- Join and calculate percentage-point change\nturnout_change AS (\n    SELECT\n        t2023.\"Centre\",\n        t2023.\"Month\",\n        t2023.turnout_percentage_2023,\n        t2024.turnout_percentage_2024,\n        t2024.turnout_percentage_2024 - t2023.turnout_percentage_2023 AS percentage_point_change\n    FROM turnout_2023 t2023\n    JOIN turnout_2024 t2024\n        ON t2023.\"Centre\" = t2024.\"Centre\"\n        AND t2023.\"Month\" = t2024.\"Month\"\n)\n\n-- Rank centres by percentage-point change (worst first)\nSELECT\n    \"Centre\",\n    AVG(percentage_point_change) AS avg_percentage_point_change\nFROM turnout_change\nGROUP BY \"Centre\"\nORDER BY avg_percentage_point_change DESC;\n```",
+      "api": {
+        "id": "gen-1787421540-fchCAk4DNVgcNm5t6oCY",
+        "model": "mistralai/ministral-8b-2512",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 528,
+          "completion_tokens": 627,
+          "total_tokens": 1155,
+          "cost": 0.00012141,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 384,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00012141,
+            "upstream_inference_prompt_cost": 2.736e-05,
+            "upstream_inference_completions_cost": 9.405e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 6.679
+      },
+      "duration_seconds": 6.691,
+      "sql_duckdb": "WITH turnout_2023 /* Calculate turnout percentage for each centre in 2023 */ AS (SELECT \"Centre\", \"Month\", NULLIF(\"Avg Daily Present\", 0) / NULLIF(NULLIF(\"Enrolled Kids\", 0), 0) * 100 AS turnout_percentage_2023 FROM attendance_2023 WHERE \"Centre\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"Month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), turnout_2024 /* Calculate turnout percentage for each centre in 2024 */ AS (SELECT \"centre_name\" AS \"Centre\", \"month\" AS \"Month\", NULLIF(\"average_attendance\", 0) / NULLIF(NULLIF(\"enrolment\", 0), 0) * 100 AS turnout_percentage_2024 FROM attendance_2024 WHERE \"centre_name\" IN ('Chembur Balwadi', 'Dharavi Balwadi', 'Govandi Balwadi', 'Kurla Balwadi', 'Mankhurd Balwadi', 'Sion Balwadi', 'Wadala Balwadi', 'Worli Balwadi') AND \"month\" IN ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December')), turnout_change /* Join and calculate percentage-point change */ AS (SELECT t2023.\"Centre\", t2023.\"Month\", t2023.turnout_percentage_2023, t2024.turnout_percentage_2024, t2024.turnout_percentage_2024 - t2023.turnout_percentage_2023 AS percentage_point_change FROM turnout_2023 AS t2023 JOIN turnout_2024 AS t2024 ON t2023.\"Centre\" = t2024.\"Centre\" AND t2023.\"Month\" = t2024.\"Month\") /* Rank centres by percentage-point change (worst first) */ SELECT \"Centre\", AVG(percentage_point_change) AS avg_percentage_point_change FROM turnout_change GROUP BY \"Centre\" ORDER BY avg_percentage_point_change DESC",
+      "rows": [
+        [
+          "Govandi Balwadi",
+          4.666106403717468
+        ],
+        [
+          "Dharavi Balwadi",
+          4.148417367614325
+        ],
+        [
+          "Wadala Balwadi",
+          1.1282741690733122
+        ],
+        [
+          "Chembur Balwadi",
+          0.08599116343001967
+        ],
+        [
+          "Mankhurd Balwadi",
+          -1.8807187392427356
+        ],
+        [
+          "Worli Balwadi",
+          -2.7356435341622345
+        ],
+        [
+          "Sion Balwadi",
+          -4.951436416269181
+        ],
+        [
+          "Kurla Balwadi",
+          -20.509871180359312
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

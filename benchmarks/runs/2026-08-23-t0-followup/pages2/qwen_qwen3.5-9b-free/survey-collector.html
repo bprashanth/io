@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Water Point Survey</title>
+<style>
+  :root {
+    --primary: #007bff;
+    --success: #28a745;
+    --danger: #dc3545;
+    --bg: #f4f7f6;
+    --card: #ffffff;
+    --text: #333333;
+    --border: #e0e0e0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 20px;
+    line-height: 1.5;
+  }
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: var(--card);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 20px;
+  }
+  h1 { font-size: 1.5rem; margin-top: 0; text-align: center; color: var(--primary); }
+  .section { margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+  .section:last-child { border-bottom: none; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.95rem; }
+  .hint { font-size: 0.8rem; color: #666; margin-bottom: 10px; display: block; }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 1rem;
+    margin-bottom: 15px;
+    background: #fff;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+  }
+  .row { display: flex; gap: 15px; }
+  .col { flex: 1; }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    margin-bottom: 10px;
+  }
+  .btn:active { opacity: 0.8; }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-secondary { background: #6c757d; color: white; }
+  .status {
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    font-size: 0.9rem;
+    text-align: center;
+    display: none;
+  }
+  .status.error { background: #f8d7da; color: #721c24; display: block; }
+  .status.success { background: #d4edda; color: #155724; display: block; }
+  .status.info { background: #d1ecf1; color: #0c5460; display: block; }
+  .gps-box {
+    background: #e9ecef;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    text-align: center;
+    margin-bottom: 10px;
+    color: #495057;
+  }
+  .hidden { display: none; }
+  .export-area { margin-top: 20px; border-top: 2px dashed var(--border); padding-top: 20px; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 10px; }
+  .data-table th, .data-table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+  .data-table th { background: #f8f9fa; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Water Point Survey</h1>
+  
+  <div id="statusBox" class="status"></div>
+
+  <form id="surveyForm">
+    <!-- Section 1: Habitation -->
+    <div class="section">
+      <h3>1. Habitation</h3>
+      <label for="village">Village / Location Name</label>
+      <input type="text" id="village" name="village" required placeholder="e.g. North District">
+      
+      <label for="household">Household ID / Number</label>
+      <input type="text" id="household" name="household" required placeholder="e.g. HH-001">
+    </div>
+
+    <!-- Section 2: Pump Type -->
+    <div class="section">
+      <h3>2. Pump Type</h3>
+      <label for="pumpType">Pump Type</label>
+      <select id="pumpType" name="pumpType" required>
+        <option value="">Select Type...</option>
+        <option value="Hand Pump">Hand Pump</option>
+        <option value="Solar Pump">Solar Pump</option>
+        <option value="Electric Pump">Electric Pump</option>
+        <option value="Gravity Feed">Gravity Feed</option>
+        <option value="Borehole">Borehole</option>
+        <option value="Other">Other</option>
+      </select>
+      
+      <label for="pumpBrand">Brand / Model</label>
+      <input type="text" id="pumpBrand" name="pumpBrand" placeholder="e.g. Al-Khwarizmi">
+    </div>
+
+    <!-- Section 3: Working Status -->
+    <div class="section">
+      <h3>3. Working Status</h3>
+      <label for="isWorking">Is the pump working?</label>
+      <select id="isWorking" name="isWorking" required>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+      
+      <label for="waterQuality">Water Quality</label>
+      <select id="waterQuality" name="waterQuality">
+        <option value="good">Good</option>
+        <option value="fair">Fair</option>
+        <option value="poor">Poor</option>
+        <option value="contaminated">Contaminated</option>
+      </select>
+    </div>
+
+    <!-- Section 4: Users -->
+    <div class="section">
+      <h3>4. Users</h3>
+      <label for="dailyUsers">Average Daily Users</label>
+      <input type="number" id="dailyUsers" name="dailyUsers" min="0" placeholder="e.g. 50">
+      
+      <label for="distance">Distance from House (Meters)</label>
+      <input type="number" id="distance" name="distance" min="0" placeholder="e.g. 150">
+    </div>
+
+    <!-- Section 5: GPS -->
+    <div class="section">
+      <h3>5. GPS Location</h3>
+      <div id="gpsStatus" class="gps-box">Waiting for GPS...</div>
+      <input type="hidden" id="lat" name="latitude">
+      <input type="hidden" id="lng" name="longitude">
+      <button type="button" id="btnGetGPS" class="btn btn-secondary">Get Current Location</button>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Response</button>
+  </form>
+
+  <div class="export-area">
+    <h3>Stored Data</h3>
+    <button id="btnExport" class="btn btn-success">Export JSON</button>
+    <button id="btnClear" class="btn btn-danger">Clear All Data</button>
+    <div id="exportContainer" class="hidden">
+      <p>Downloaded file: <span id="fileName"></span></p>
+      <textarea id="jsonPreview" style="width:100%; height:100px; font-family:monospace; font-size:0.8rem;"></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+  // --- Data Management ---
+  const DB_KEY = 'water_survey_data';
+  let surveyData = [];
+
+  // Initialize
+  function init() {
+    loadFromStorage();
+    checkGPS();
+    setupEventListeners();
+  }
+
+  function loadFromStorage() {
+    try {
+      const stored = localStorage.getItem(DB_KEY);
+      if (stored) {
+        surveyData = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error("Error loading data", e);
+      surveyData = [];
+    }
+  }
+
+  function saveToStorage() {
+    try {
+      localStorage.setItem(DB_KEY, JSON.stringify(surveyData));
+      updateStatus('success', 'Data saved successfully.');
+    } catch (e) {
+      updateStatus('error', 'Storage full or error saving.');
+    }
+  }
+
+  function updateStatus(type, message) {
+    const box = document.getElementById('statusBox');
+    box.className = `status ${type}`;
+    box.textContent = message;
+    setTimeout(() => { box.style.display = 'none'; }, 3000);
+  }
+
+  // --- Form Handling ---
+  function setupEventListeners() {
+    document.getElementById('surveyForm').addEventListener('submit', handleFormSubmit);
+    document.getElementById('btnGetGPS').addEventListener('click', getGPS);
+    document.getElementById('btnExport').addEventListener('click', exportJSON);
+    document.getElementById('btnClear').addEventListener('click', clearData);
+  }
+
+  function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    // Gather Data
+    const entry = {
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      village: document.getElementById('village').value,
+      household: document.getElementById('household').value,
+      pumpType: document.getElementById('pumpType').value,
+      pumpBrand: document.getElementById('pumpBrand').value,
+      isWorking: document.getElementById('isWorking').value,
+      waterQuality: document.getElementById('waterQuality').value,
+      dailyUsers: document.getElementById('dailyUsers').value,
+      distance: document.getElementById('distance').value,
+      latitude: document.getElementById('lat').value,
+      longitude: document.getElementById('lng').value
+    };
+
+    // Validation
+    if (!entry.latitude || !entry.longitude) {
+      updateStatus('error', 'GPS coordinates are required. Please get location.');
+      return;
+    }
+
+    // Save
+    surveyData.push(entry);
+    saveToStorage();
+    
+    // Reset Form
+    document.getElementById('surveyForm').reset();
+    document.getElementById('gpsStatus').textContent = "Waiting for GPS...";
+    document.getElementById('lat').value = "";
+    document.getElementById('lng').value = "";
+    updateStatus('success', 'Response saved!');
+  }
+
+  // --- GPS Logic ---
+  function checkGPS() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
+          document.getElementById('lng').value = pos.coords.longitude.toFixed(6);
+          document.getElementById('gpsStatus').textContent = "GPS Active: " + pos.coords.latitude.toFixed(4) + ", " + pos.coords.longitude.toFixed(4);
+          document.getElementById('gpsStatus').style.color = "green";
+        },
+        (err) => {
+          document.getElementById('gpsStatus').textContent = "GPS Error: " + err.message;
+          document.getElementById('gpsStatus').style.color = "red";
+        }
+      );
+    } else {
+      document.getElementById('gpsStatus').textContent = "Geolocation not supported.";
+    }
+  }
+
+  function getGPS() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
+          document.getElementById('lng').value = pos.coords.longitude.toFixed(6);
+          document.getElementById('gpsStatus').textContent = "Location Captured: " + pos.coords.latitude.toFixed(4) + ", " + pos.coords.longitude.toFixed(4);
+          document.getElementById('gpsStatus').style.color = "green";
+        },
+        (err) => {
+          updateStatus('error', 'Failed to get location. Check permissions.');
+        }
+      );
+    } else {
+      updateStatus('error', 'Geolocation not supported.');
+    }
+  }
+
+  // --- Export Logic ---
+  function exportJSON() {
+    if (surveyData.length === 0) {
+      updateStatus('error', 'No data to export.');
+      return;
+    }
+
+    const dataStr = JSON.stringify(surveyData, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `water_survey_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Show preview
+    document.getElementById('exportContainer').classList.remove('hidden');
+    document.getElementById('fileName').textContent = a.download;
+    document.getElementById('jsonPreview').value = dataStr;
+  }
+
+  function clearData() {
+    if (confirm("Are you sure you want to delete all stored responses?")) {
+      surveyData = [];
+      saveToStorage();
+      document.getElementById('exportContainer').classList.add('hidden');
+      updateStatus('success', 'All data cleared.');
+    }
+  }
+
+  // Start
+  init();
+</script>
+
+</body>
+</html>

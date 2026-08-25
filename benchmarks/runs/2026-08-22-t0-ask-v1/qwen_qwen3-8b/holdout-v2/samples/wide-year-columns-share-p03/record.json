@@ -1,0 +1,427 @@
+{
+  "id": "wide-year-columns-share-p03",
+  "task_id": "wide-year-columns-share",
+  "pattern": "arithmetic across year-named columns, group sum, share",
+  "question": "2024 girls percentage of all enrolled children, per block",
+  "gold_sql": "SELECT \"Block\", 100.0 * SUM(\"Girls 2024\") / (SUM(\"Girls 2024\") + SUM(\"Boys 2024\")) AS girls_share_percent FROM school_enrolment_by_year GROUP BY \"Block\" ORDER BY \"Block\"",
+  "expected_rows": [
+    [
+      "Atri",
+      53.900375939849624
+    ],
+    [
+      "Barachatti",
+      55.376344086021504
+    ],
+    [
+      "Belaganj",
+      52.563091482649845
+    ],
+    [
+      "Dobhi",
+      48.09971393543114
+    ]
+  ],
+  "actual_rows": [
+    [
+      "Atri",
+      32.267884322678846
+    ],
+    [
+      "Barachatti",
+      32.33830845771144
+    ],
+    [
+      "Belaganj",
+      32.857142857142854
+    ],
+    [
+      "Dobhi",
+      33.80281690140845
+    ],
+    [
+      "Atri",
+      36.81241184767278
+    ],
+    [
+      "Barachatti",
+      33.07573415765069
+    ],
+    [
+      "Belaganj",
+      34.53887884267631
+    ],
+    [
+      "Dobhi",
+      35.81183611532625
+    ],
+    [
+      "Atri",
+      31.57894736842105
+    ],
+    [
+      "Barachatti",
+      31.856540084388186
+    ],
+    [
+      "Belaganj",
+      35.42673107890499
+    ],
+    [
+      "Dobhi",
+      34.14322250639386
+    ],
+    [
+      "Atri",
+      33.44748858447488
+    ],
+    [
+      "Barachatti",
+      36.15733736762481
+    ],
+    [
+      "Belaganj",
+      36.051080550098234
+    ],
+    [
+      "Dobhi",
+      34.65703971119134
+    ],
+    [
+      "Atri",
+      38.62212943632568
+    ],
+    [
+      "Barachatti",
+      36.45390070921986
+    ],
+    [
+      "Belaganj",
+      34.53093812375249
+    ],
+    [
+      "Dobhi",
+      33.726067746686304
+    ],
+    [
+      "Atri",
+      34.193548387096776
+    ],
+    [
+      "Barachatti",
+      38.53658536585366
+    ],
+    [
+      "Belaganj",
+      37.98882681564246
+    ],
+    [
+      "Dobhi",
+      33.70411568409344
+    ],
+    [
+      "Atri",
+      32.23880597014925
+    ],
+    [
+      "Barachatti",
+      33.83356070941337
+    ],
+    [
+      "Belaganj",
+      32.53012048192771
+    ],
+    [
+      "Dobhi",
+      34.44592790387183
+    ],
+    [
+      "Atri",
+      33.59872611464968
+    ],
+    [
+      "Barachatti",
+      36.72014260249554
+    ],
+    [
+      "Belaganj",
+      32.29901269393512
+    ],
+    [
+      "Dobhi",
+      36.986301369863014
+    ],
+    [
+      "Atri",
+      34.89278752436647
+    ],
+    [
+      "Barachatti",
+      33.64705882352941
+    ],
+    [
+      "Belaganj",
+      36.147757255936675
+    ],
+    [
+      "Dobhi",
+      31.47792706333973
+    ],
+    [
+      "Atri",
+      34.43627450980392
+    ],
+    [
+      "Barachatti",
+      33.75594294770206
+    ],
+    [
+      "Belaganj",
+      33.72093023255814
+    ],
+    [
+      "Dobhi",
+      31.30016051364366
+    ]
+  ],
+  "row_order_required": false,
+  "sql_duckdb": "SELECT \"Block\", (100.0 * (\"Girls 2024\" + \"Boys 2024\") / NULLIF(NULLIF((\"Girls 2022\" + \"Girls 2023\" + \"Girls 2024\" + \"Boys 2022\" + \"Boys 2023\" + \"Boys 2024\"), 0), 0)) AS \"2024 Girls Percentage of All Enrolled\" FROM school_enrolment_by_year WHERE \"Block\" IN ('Atri', 'Barachatti', 'Belaganj', 'Dobhi')",
+  "attempts": [
+    {
+      "attempt": 1,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}}\n\nCURRENT QUESTION:\n2024 girls percentage of all enrolled children, per block",
+      "response": "SELECT \n  \"Block\",\n  (100.0 * \"Girls 2024\") / NULLIF((\"Girls 2024\" + \"Boys 2024\"), 0) AS \"2024 Girls Percentage\"\nFROM \n  school_enrolment_by_year\nWHERE \n  \"Block\" IN (\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\");",
+      "api": {
+        "id": "gen-1787420623-Q4ESt9MFeZTK8TqsYTQG",
+        "model": "qwen/qwen3-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 754,
+          "completion_tokens": 91,
+          "total_tokens": 845,
+          "cost": 0.000129623,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000129623,
+            "upstream_inference_prompt_cost": 8.8218e-05,
+            "upstream_inference_completions_cost": 4.1405e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 1.817
+      },
+      "duration_seconds": 1.819,
+      "error": "BinderException: Binder Error: Referenced column \"Atri\" not found in FROM clause!\nCandidate bindings: \"Source\"\n\nLINE 1: ... Percentage\" FROM school_enrolment_by_year WHERE \"Block\" IN (\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\")\n                                                                        ^"
+    },
+    {
+      "attempt": 2,
+      "prompt": "You translate ordinary questions into exactly one read-only DuckDB SELECT or WITH query.\n\nReturn SQL only. Never write files, install software, calculate values yourself, or invent columns.\n\nUse only the supplied schema. Preserve relevant scope from earlier turns unless the newest question changes it.\n\nA requested rate must use its stated numerator and denominator. Percentage-point change means later percentage minus earlier percentage, not relative growth.\n\nWhen the user explicitly asks for percent or percentage, multiply numerator divided by denominator by 100.\n\nWhen the user asks to compare years or groups without asking for a change, keep those year/group columns and requested measures in the output.\n\nWhen several known category values are named, filter them separately with IN rather than concatenating them.\n\nUse NULLIF for denominators. Missing values remain missing and are not zero.\n\nSCHEMA:\nCREATE TABLE \"school_enrolment_by_year\" (\n  \"School Code\" BIGINT,\n  \"School Name\" VARCHAR,\n  \"Block\" VARCHAR,\n  \"Girls 2022\" BIGINT,\n  \"Girls 2023\" BIGINT,\n  \"Girls 2024\" BIGINT,\n  \"Boys 2022\" BIGINT,\n  \"Boys 2023\" BIGINT,\n  \"Boys 2024\" BIGINT,\n  \"Source\" VARCHAR\n);\n\nKNOWN CATEGORICAL VALUES (local or trusted 27B tier only):\n{\"school_enrolment_by_year\": {\"School Name\": [\"Adarsh Vidyalaya Amas\", \"Adarsh Vidyalaya Bankat\", \"Adarsh Vidyalaya Chakand\", \"Adarsh Vidyalaya Khizarsarai\", \"Adarsh Vidyalaya Lodipur\", \"Adarsh Vidyalaya Rampur\", \"Buniyadi Vidyalaya Bankat\", \"Buniyadi Vidyalaya Chakand\", \"Buniyadi Vidyalaya Khizarsarai\", \"Buniyadi Vidyalaya Lodipur\", \"Kanya Vidyalaya Amas\", \"Kanya Vidyalaya Bankat\", \"Kanya Vidyalaya Bhadeya\", \"Kanya Vidyalaya Khizarsarai\", \"Kanya Vidyalaya Tetariya\", \"Madhya Vidyalaya Bhadeya\", \"Madhya Vidyalaya Chakand\", \"Madhya Vidyalaya Karmauni\", \"Madhya Vidyalaya Khizarsarai\", \"Navin Vidyalaya Amas\", \"Navin Vidyalaya Chakand\", \"Navin Vidyalaya Rampur\", \"Navin Vidyalaya Tetariya\", \"Prathmik Vidyalaya Bhadeya\", \"Prathmik Vidyalaya Chakand\", \"Prathmik Vidyalaya Khizarsarai\", \"Prathmik Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Bankat\", \"Rajkiya Vidyalaya Chakand\", \"Rajkiya Vidyalaya Khizarsarai\", \"Rajkiya Vidyalaya Lodipur\", \"Rajkiya Vidyalaya Sonbarsa\", \"Rajkiya Vidyalaya Tetariya\", \"Utkramit Vidyalaya Karmauni\", \"Utkramit Vidyalaya Tetariya\"], \"Block\": [\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\"], \"Source\": [\"UDISE-style school return\"]}}\n\nCURRENT QUESTION:\n2024 girls percentage of all enrolled children, per block\n\nREJECTED QUERY ERROR:\nBinderException: Binder Error: Referenced column \"Atri\" not found in FROM clause!\nCandidate bindings: \"Source\"\n\nLINE 1: ... Percentage\" FROM school_enrolment_by_year WHERE \"Block\" IN (\"Atri\", \"Barachatti\", \"Belaganj\", \"Dobhi\")\n                                                                        ^\nReturn a complete corrected query.",
+      "response": "SELECT \n  \"Block\", \n  (100.0 * (\"Girls 2024\" + \"Boys 2024\") / NULLIF((\"Girls 2022\" + \"Girls 2023\" + \"Girls 2024\" + \"Boys 2022\" + \"Boys 2023\" + \"Boys 2024\"), 0)) AS \"2024 Girls Percentage of All Enrolled\"\nFROM \n  school_enrolment_by_year\nWHERE \n  \"Block\" IN ('Atri', 'Barachatti', 'Belaganj', 'Dobhi')",
+      "api": {
+        "id": "gen-1787420625-ikMWczGdyyd16ZOSAkuC",
+        "model": "qwen/qwen3-8b",
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 831,
+          "completion_tokens": 144,
+          "total_tokens": 975,
+          "cost": 0.000162747,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000162747,
+            "upstream_inference_prompt_cost": 9.7227e-05,
+            "upstream_inference_completions_cost": 6.552e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "duration_seconds": 2.374
+      },
+      "duration_seconds": 2.378,
+      "sql_duckdb": "SELECT \"Block\", (100.0 * (\"Girls 2024\" + \"Boys 2024\") / NULLIF(NULLIF((\"Girls 2022\" + \"Girls 2023\" + \"Girls 2024\" + \"Boys 2022\" + \"Boys 2023\" + \"Boys 2024\"), 0), 0)) AS \"2024 Girls Percentage of All Enrolled\" FROM school_enrolment_by_year WHERE \"Block\" IN ('Atri', 'Barachatti', 'Belaganj', 'Dobhi')",
+      "rows": [
+        [
+          "Atri",
+          32.267884322678846
+        ],
+        [
+          "Barachatti",
+          32.33830845771144
+        ],
+        [
+          "Belaganj",
+          32.857142857142854
+        ],
+        [
+          "Dobhi",
+          33.80281690140845
+        ],
+        [
+          "Atri",
+          36.81241184767278
+        ],
+        [
+          "Barachatti",
+          33.07573415765069
+        ],
+        [
+          "Belaganj",
+          34.53887884267631
+        ],
+        [
+          "Dobhi",
+          35.81183611532625
+        ],
+        [
+          "Atri",
+          31.57894736842105
+        ],
+        [
+          "Barachatti",
+          31.856540084388186
+        ],
+        [
+          "Belaganj",
+          35.42673107890499
+        ],
+        [
+          "Dobhi",
+          34.14322250639386
+        ],
+        [
+          "Atri",
+          33.44748858447488
+        ],
+        [
+          "Barachatti",
+          36.15733736762481
+        ],
+        [
+          "Belaganj",
+          36.051080550098234
+        ],
+        [
+          "Dobhi",
+          34.65703971119134
+        ],
+        [
+          "Atri",
+          38.62212943632568
+        ],
+        [
+          "Barachatti",
+          36.45390070921986
+        ],
+        [
+          "Belaganj",
+          34.53093812375249
+        ],
+        [
+          "Dobhi",
+          33.726067746686304
+        ],
+        [
+          "Atri",
+          34.193548387096776
+        ],
+        [
+          "Barachatti",
+          38.53658536585366
+        ],
+        [
+          "Belaganj",
+          37.98882681564246
+        ],
+        [
+          "Dobhi",
+          33.70411568409344
+        ],
+        [
+          "Atri",
+          32.23880597014925
+        ],
+        [
+          "Barachatti",
+          33.83356070941337
+        ],
+        [
+          "Belaganj",
+          32.53012048192771
+        ],
+        [
+          "Dobhi",
+          34.44592790387183
+        ],
+        [
+          "Atri",
+          33.59872611464968
+        ],
+        [
+          "Barachatti",
+          36.72014260249554
+        ],
+        [
+          "Belaganj",
+          32.29901269393512
+        ],
+        [
+          "Dobhi",
+          36.986301369863014
+        ],
+        [
+          "Atri",
+          34.89278752436647
+        ],
+        [
+          "Barachatti",
+          33.64705882352941
+        ],
+        [
+          "Belaganj",
+          36.147757255936675
+        ],
+        [
+          "Dobhi",
+          31.47792706333973
+        ],
+        [
+          "Atri",
+          34.43627450980392
+        ],
+        [
+          "Barachatti",
+          33.75594294770206
+        ],
+        [
+          "Belaganj",
+          33.72093023255814
+        ],
+        [
+          "Dobhi",
+          31.30016051364366
+        ]
+      ]
+    }
+  ],
+  "passed": false,
+  "failure_class": "semantic_result_mismatch"
+}

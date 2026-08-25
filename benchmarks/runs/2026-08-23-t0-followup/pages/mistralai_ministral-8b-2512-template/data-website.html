@@ -1,0 +1,124 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scholarship Scheme Progress</title>
+<style>
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--bg:#f6f7fb}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px}h1{font-size:22px;margin:0}main{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}label{display:block;font-size:13px;color:var(--muted);margin:8px 0 2px}
+input,select,textarea{font:inherit;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}button{font:inherit;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}button.secondary{background:#fff;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.status-pending{background-color:#fef3c7;border-left:4px solid #ea580c}.status-approved{background-color:#dcfce7;border-left:4px solid #16a34a}.status-rejected{background-color:#fee2e2;border-left:4px solid #dc2626}
+</style></head><body>
+<header><h1>Scholarship Scheme Progress</h1></header>
+<main>
+  <div class="card">
+    <h2>District-wise Summary</h2>
+    <div class="row">
+      <div class="grid">
+        <div v-for="district in districts" class="card">
+          <h3>{{ district.name }}</h3>
+          <div class="row">
+            <div>
+              <p><strong>Total Applications:</strong> {{ district.total }}</p>
+              <p><strong>Pending:</strong> {{ district.pending }}</p>
+              <p><strong>Approved:</strong> {{ district.approved }}</p>
+              <p><strong>Rejected:</strong> {{ district.rejected }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Pending Cases</h2>
+    <div class="row">
+      <button @click="exportPending">Export Pending Cases</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>District</th>
+          <th>Taluka</th>
+          <th>Name</th>
+          <th>Scheme</th>
+          <th>Marks %</th>
+          <th>Family Income</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="caseItem in pendingCases" :class="caseItem.status">
+          <td>{{ caseItem.District }}</td>
+          <td>{{ caseItem.Taluka }}</td>
+          <td>{{ caseItem.Name }}</td>
+          <td>{{ caseItem['Name of scheme'] }}</td>
+          <td>{{ caseItem['Marks %'] }}</td>
+          <td>{{ caseItem['Family Income'] }}</td>
+          <td>{{ caseItem.Status }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<script>
+// helper: offline storage and CSV/JSON export (keep as is)
+const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: type || 'text/plain'})); a.download = name; a.click(); }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n'); }
+function offlineReady() { if (!('serviceWorker' in navigator)) return; const sw = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>{});"; try { navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw], {type: 'text/javascript'}))).catch(()=>{}); } catch (e) {} }
+
+// YOUR CODE HERE
+const app = {
+  data() {
+    return {
+      districts: [],
+      pendingCases: []
+    }
+  },
+  methods: {
+    exportPending() {
+      download('pending_cases.csv', toCSV(this.pendingCases))
+    }
+  },
+  mounted() {
+    if (window.data && window.data.length) {
+      const statusCounts = {}
+      const districtData = {}
+
+      // Initialize district data
+      window.data.forEach(item => {
+        const district = item.District
+        if (!districtData[district]) {
+          districtData[district] = {
+            name: district,
+            total: 0,
+            pending: 0,
+            approved: 0,
+            rejected: 0
+          }
+        }
+      })
+
+      // Count statuses and populate district data
+      window.data.forEach(item => {
+        const district = item.District
+        districtData[district].total++
+        if (item.Status === 'Pending') {
+          districtData[district].pending++
+          this.pendingCases.push(item)
+        } else if (item.Status === 'Approved') {
+          districtData[district].approved++
+        } else if (item.Status === 'Rejected') {
+          districtData[district].rejected++
+        }
+      })
+
+      // Convert to array for Vue
+      this.districts = Object.values(districtData)
+    }
+  }
+}
+
+const vm = Vue.createApp(app)
+vm.mount('#app')
+</script>
+</body></html>
