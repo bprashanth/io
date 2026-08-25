@@ -498,7 +498,7 @@ class Shield:
                            and not re.fullmatch(TOKEN_RE.pattern, v.strip().strip("'\"`"), re.I)),
                           key=len, reverse=True)
             self._leak_re = re.compile(
-                r"(?<![\w@.])(?:" + "|".join(re.escape(v) for v in vals) + r")(?![\w@.])", re.I) if vals else None
+                r"(?<![\w@.])(?:" + "|".join(re.escape(v) for v in vals) + r")(?!(?:[\w@]|\.[\w@]))", re.I) if vals else None  # same boundary as known_regex: a plain sentence period must not hide a leak
             self._leak_n = n
         return self._leak_re
 
