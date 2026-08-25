@@ -338,12 +338,24 @@ copy of it — do not commit generated dashboards into the corpus).
    (walk, consistency pass, last-line defence, leak check). Under that CPU
    load the GIL starves the status handler past the extension's 1.5 s poll
    timeout → the bar flips to "Shield starting…" and back; the aborted polls
-   are the BrokenPipeError spam below. Fixes: chunk or trie-compile the
-   known regex; stop rebuilding it on every vault growth tick during scans;
-   collapse the 3–4 full-body passes into one; serve /shield/status.json
-   from a snapshot updated outside the hot path (or a tiny separate thread
-   priority). Measure redact_ms in shield.log before/after with the 4.5k
-   corpus vault.
+   are the BrokenPipeError spam below. The vault is NOT too big — io carries the
+   same size fine because it redacts each file once, caches the result, and
+   runs ONE known-values pass per user question over a payload it composed
+   itself. The plugin instead runs 3–4 vault passes per agent call over the
+   full history, and its leak check is O(vault): ~4,500 separate re.search
+   calls per request. Adopt io's discipline — now sound because
+   discovery-at-rest froze the vault between rescans:
+   (a) stamp redact_string cache entries with a vault generation; a cache hit
+   returns the string with no regex (today it re-applies known_regex "in case
+   the vault grew" — it no longer does mid-flight);
+   (b) precompile ONE leak regex per vault generation and replace the ~4,500
+   per-value searches with a single search;
+   (c) collapse the consistency re-walk and the last-line body pass — both
+   existed to repair in-flight minting order effects that no longer exist;
+   (d) only then, if still needed: chunk/trie-compile the alternation, and
+   serve /shield/status.json from a snapshot kept off the hot path.
+   Measure redact_ms in shield.log before/after with the 4.5k corpus vault;
+   target: warm-path calls under ~100 ms and no status-poll flicker.
 3. **Status-poll log spam.** Every 2 s poll that disconnects early writes a
    BrokenPipeError traceback to `daemon.out` (dozens per hour, drowns real
    errors). Wrap `send_local`/status writes in a BrokenPipe/ConnectionReset
