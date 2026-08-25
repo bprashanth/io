@@ -354,6 +354,7 @@ def call_model(prompt: str) -> tuple[str, dict]:
 
 
 SHARED: dict = {}
+SHARE_IDS: dict = {}
 SHARE_SRV: list = []
 
 def lan_ip() -> str:
@@ -663,8 +664,17 @@ class H(BaseHTTPRequestHandler):
                 if not t:
                     return self._json({"error": "no page"}, 404)
                 port = ensure_share_server()
-                SHARED[t["id"]] = t["page"]
-                return self._json({"url": f"http://{lan_ip()}:{port}/p/{t['id']}"})
+                # turn ids restart on every folder load, so the share id must not be
+                # the turn id (measured: three folders in one session all shared /p/3,
+                # each overwriting the last). One monotonic id per shared page; sharing
+                # the same page again keeps its link.
+                key = (str(S.folder), t["id"])
+                sid = SHARE_IDS.get(key)
+                if sid is None:
+                    sid = len(SHARE_IDS) + 1
+                    SHARE_IDS[key] = sid
+                SHARED[sid] = t["page"]
+                return self._json({"url": f"http://{lan_ip()}:{port}/p/{sid}"})
             if self.path == "/api/accept":
                 with S.lock:
                     if not S.redacted:
