@@ -355,6 +355,31 @@ class Shield:
     def _hide_contact_names(self, text: str) -> str:
         return self.CONTACT_NAME.sub(lambda m: self.vault.token(m.group(1), "person_name"), text)
 
+    # Words that start sentences in questions and also appear inside vault values
+    # often enough to be noise for the partial-name pass.
+    PARTIAL_STOP = {"what", "which", "show", "give", "list", "tell", "the", "and", "for", "how",
+                    "who", "now", "only", "compare", "make", "dashboard", "table", "download",
+                    "source", "average", "total", "read", "build", "run", "open", "same", "email",
+                    "phone", "name", "village", "please", "answer"}
+
+    def _partial_names(self, text: str) -> str:
+        """A bare first name or village fragment in user text ("give me Priya's
+        email") must not leave even though only the full value is in the vault.
+        One matching NAME/PLACE value: substitute its token so the model keeps the
+        linkage. Several: mint a token for the fragment itself (privacy first)."""
+        for word in set(re.findall(r"\b[A-Z][a-z]{2,}\b", text)):
+            if word.casefold() in self.PARTIAL_STOP or TOKEN_RE.search(word):
+                continue
+            options = [(t, v) for t, v in self.vault.candidates(word)
+                       if t.split("_")[0] in {"NAME", "PLACE"}
+                       and re.fullmatch(r"[A-Za-z][A-Za-z .'-]*", v)   # clean values only, not span-noise
+                       and re.search(rf"\b{re.escape(word)}\b", v, re.I)]
+            if len(options) == 1:
+                text = re.sub(rf"\b{re.escape(word)}\b", options[0][0], text)
+            elif len(options) > 1:
+                text = re.sub(rf"\b{re.escape(word)}\b", self.vault.token(word, "person_name"), text)
+        return text
+
     def redact_string(self, text: str) -> tuple[str, int, bool]:
         if len(text) < 3:
             return text, 0, True
@@ -371,7 +396,7 @@ class Shield:
                 redacted, spans = self.redact_table(table, classes)
                 pre_r, e1 = redact_text(pre, self.vault, self.data_engine, classes=DIRECT | {"long_number"})
                 rest_r, e2 = redact_text(rest, self.vault, self.data_engine, classes=DIRECT | {"long_number"})
-                out = self._hide_contact_names(pre_r + redacted + rest_r)
+                out = self._partial_names(self._hide_contact_names(pre_r + redacted + rest_r))
                 self.cache[key] = out
                 return out, spans + len(e1) + len(e2), False
             except Exception:
@@ -381,6 +406,7 @@ class Shield:
         redacted, events = redact_text(text, self.vault, engine, classes=DIRECT | {"long_number"})
         if kind == "data":
             redacted = self._hide_contact_names(redacted)
+        redacted = self._partial_names(redacted)
         self.cache[key] = redacted
         return redacted, len(events), False
 

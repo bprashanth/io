@@ -1,6 +1,6 @@
 # PII masking & rehydration proxy for Antigravity
 
-Status: **built and working** — extension `privacy-shield-0.2.3.vsix`
+Status: **built and working** — extension `privacy-shield-0.2.5.vsix`
 (`extension/privacy-shield/`), verified end-to-end on Antigravity 1.107.0 on
 the Linux x64 laptop (apt `1.23.2-1776332190`, 0.2.2, Claude Sonnet 4.6 and
 Gemini 3.6 Flash) and on the DGX arm64 build (0.2.3, Gemini 3.6/3.7 Flash,
@@ -213,6 +213,31 @@ Routing note for this build: the setting-before-relaunch rule from the laptop
 holds on arm64 too; the env variable is kept as well. Both machines now run
 the same recipe.
 
+## Clean-install verification, 2026-08-25 (x86 laptop)
+
+Re-ran the participant flow end-to-end on a from-scratch install: apt purge →
+apt install `antigravity=1.23.2-1776332190` (→ `antigravity --version` =
+1.107.0) + `apt-mark hold`, extension 0.2.5, Python env living in
+globalStorage (survives extension updates — verified: two update cycles kept
+the 1.7 GB env). Corpus: `tests/test_pii_data.csv` + `.xlsx` (adversarial
+headers: emails under `Comm_Route`, phones under `Loc_Pin`, PANs under
+`Tax_Code`). Dashboard built and rendered with real values locally; 0 wire
+hits for every value; follow-ups on Gemini 3.6 Flash and Claude Sonnet 4.6
+both clean, including the agent grepping the real-valued `dashboard.html` on
+disk (known values re-tokenised on the way out: 0 hits).
+
+Two more gaps found and fixed in 0.2.5:
+
+- **Bare first names in typed questions** ("give me Priya's email") left
+  unredacted: only full values were in the vault and the span model misses
+  short possessives. The partial-name pass from the io app is now wired into
+  the proxy: a capitalised fragment matching exactly one known NAME/PLACE
+  value gets that token (model keeps the linkage); matching several, it gets
+  its own token (privacy first — the model then asks for the full name rather
+  than guessing a person).
+- The partial pass only considers clean name-shaped vault values, so
+  span-noise entries (`"Row 5: ['Priya Venkatesan'"`) can't poison it.
+
 ## Known limits & brittleness (honest list)
 
 1. **Internal knob dependency.** Routing rests on `jetski.cloudCodeUrl` +
@@ -245,7 +270,16 @@ the same recipe.
 8. **Cross-platform**: everything above is measured on Linux x64 only. The
    relaunch helper has macOS/Windows code paths that are untested; Windows has
    no `/proc` for future cmdline verification.
-9. **Environmental, not shield**: this laptop's Antigravity intermittently
+9. **Aggregations over hidden values are impossible by design**: "count by
+   email domain" on a hidden email column comes back token-based — the model
+   never sees domains. Demo scripting: keep such a column with `don't hide`,
+   or accept the gap.
+10. **The vault is global and accumulates across sessions/workspaces** (it
+   lives in globalStorage). People from earlier datasets stay known — good
+   for consistency, but bare-name fragments can become ambiguous across
+   datasets. Between participants or demos, run "Privacy Shield: Forget this
+   session's vault".
+11. **Environmental, not shield**: this laptop's Antigravity intermittently
    fails `run_command` ("failed to check terminal shell support") with the
    shield off too; and its browser subagent could not download its playwright
    driver. Watch for these at the event venue — they look like shield bugs and
