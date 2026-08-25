@@ -1,9 +1,19 @@
 # PII masking & rehydration proxy for Antigravity
 
-Status: **0.3.0 — "discovery at rest" architecture, working but with open
-polish bugs** (see §Current state and §Open bugs). Extension
-`extension/privacy-shield-0.3.0.vsix`, pinned platform Antigravity 1.107.0
-(apt `1.23.2-1776332190`). Earlier verification history: 0.2.2 laptop +
+Status: **0.3.1 — packaged and IDE-verified on the DGX (2026-08-25 late)**.
+Extension `extension/privacy-shield-0.3.1.vsix`, pinned platform Antigravity
+1.107.0 (apt `1.23.2`). The 0.3.1 in-IDE run verified: corpus scan under a
+minute (json dropped from the at-rest scan - 8 files not 18), live "Scanning
+files n/m" status, clean vault (all file-derived), hands-off dashboard build
+with zero flicker ("Shield on" through a 40-call build), daemon.out free of
+tracebacks, folder limit live (red "Folder too big" + in-chat "Nothing was
+sent" on a 120-file folder), and full-name asks wire-clean. It also CAUGHT a
+real leak: the known-values boundary refused names followed by a period
+("Sunil Paswan." fell back to the bare-Sunil fragment and the surname left
+raw). Fixed in all three engine copies (one-line lookahead change), verified
+in-IDE and on the io question path; see chronology 2026-08-26 appendix.
+Remaining known gap: the daemon scans the FIRST workspace folder at spawn -
+opening a different folder needs a daemon restart (Disable/Enable). Earlier verification history: 0.2.2 laptop +
 0.2.3 DGX (2026-08-22), clean-install + smoke ladder 0.2.5→0.2.8
 (2026-08-25). This document is the living design record; where the original
 proposal (bottom) disagrees with "As built", "As built" wins.
