@@ -331,16 +331,29 @@ copy of it — do not commit generated dashboards into the corpus).
    or cap doc scan size harder (400 KB cap exists; the cost is GLiNER, so cap
    by characters actually scanned); parallelise per-file (PII_THREADS exists);
    and/or surface scan progress in the held-call message ("done in ~Ns").
-2. **Status-poll log spam.** Every 2 s poll that disconnects early writes a
+2. **"Shield starting…" flicker under load = status-poll starvation, and it
+   shares a root with the log spam.** With a large vault (the full corpus
+   mints ~4,500 entries) the known-values pass compiles a huge regex
+   alternation and every model call runs it over ~60 KB bodies several times
+   (walk, consistency pass, last-line defence, leak check). Under that CPU
+   load the GIL starves the status handler past the extension's 1.5 s poll
+   timeout → the bar flips to "Shield starting…" and back; the aborted polls
+   are the BrokenPipeError spam below. Fixes: chunk or trie-compile the
+   known regex; stop rebuilding it on every vault growth tick during scans;
+   collapse the 3–4 full-body passes into one; serve /shield/status.json
+   from a snapshot updated outside the hot path (or a tiny separate thread
+   priority). Measure redact_ms in shield.log before/after with the 4.5k
+   corpus vault.
+3. **Status-poll log spam.** Every 2 s poll that disconnects early writes a
    BrokenPipeError traceback to `daemon.out` (dozens per hour, drowns real
    errors). Wrap `send_local`/status writes in a BrokenPipe/ConnectionReset
    catch, or silence `http.server`'s per-request exception logging for those.
-3. **"Privacy Shield: Show daemon log" shows an empty output channel.** The
+4. **"Privacy Shield: Show daemon log" shows an empty output channel.** The
    daemon is spawned detached and writes to
    `~/.config/Antigravity/User/globalStorage/insight-out.privacy-shield/daemon.out`
    — the command should open that file (`vscode.window.showTextDocument`) not
    the extension output channel.
-4. **Not re-verified end-to-end after the 0.3.0 switch on this machine**: the
+5. **Not re-verified end-to-end after the 0.3.0 switch on this machine**: the
    full dashboard smoke (build → follow-ups → egress 0-hits, both model
    families) passed standalone against a copy of the small shield-dash corpus,
    and scan/watcher/gate behaviours were verified against a standalone daemon
