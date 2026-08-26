@@ -48,4 +48,11 @@ No wedges, no stalls; reload-to-home between folders worked as designed.
 **Bug found by the bench and fixed**: share ids were turn ids, and turn ids restart on every
 folder load - all three themes shared `/p/3`, each overwriting the last. An NGO sharing two
 dashboards would silently break their first link. Fix: one monotonic share id per shared
-page (re-sharing the same page keeps its link). Verified with a two-folder share run.
+page (re-sharing the same page keeps its link). Verified: two folders share as /p/1 and /p/2,
+distinct, each serving its own org's content (93KB attendance page, 112KB disbursement page).
+
+**Startup wedge, root-caused and fixed**: "loading the on-device scanner" could hang forever -
+caught live with a CLOSE-WAIT socket to the HF CDN and the warm-up thread blocked 6.5 hours at
+0% CPU. The hub's startup check has no timeout. Fix: when the model is cached, load fully
+offline (HF_HUB_OFFLINE) - in the io service and the shield daemon env. Warm-up is now ~4 s
+deterministic; a "scanner ready" step replaces the lingering "loading..." label.
