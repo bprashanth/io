@@ -14,6 +14,8 @@ import os
 import re
 import sys
 import threading
+import random
+import uuid
 import time
 import traceback
 import urllib.request
@@ -43,6 +45,8 @@ CONF = Path(os.environ.get("IO_HOME") or (Path.home() / ".config" / "io"))
 CONF.mkdir(parents=True, exist_ok=True)
 DECISIONS_PATH = CONF / "decisions.json"
 FOLDERS_PATH = CONF / "folders.json"
+VOTES_PATH = FOLDERS_PATH.with_name("votes.json")
+COMPARE_LOG = str(FOLDERS_PATH.with_name("compare-log.jsonl"))
 
 REASON = {
     "hidden": "hidden",
@@ -124,6 +128,7 @@ class State:
         self.decisions = saved
         self.folder = folder
         self.tables, self.redacted, self.turns = [], {}, []
+        self.conversation_id = uuid.uuid4().hex[:12]
         self.docs = []
         self.pmap = PseudonymMap(CONF / f"vault-{hashlib.sha256(str(folder).encode()).hexdigest()[:12]}-local-only.json")
         det = self.get_detector()
@@ -367,6 +372,9 @@ def call_model(prompt: str, model_override: str | None = None) -> tuple[str, dic
     if not text and msg.get("reasoning"):
         text = msg["reasoning"]          # thinking-only reply: better the reasoning than a blank answer
     meta = {"model": raw.get("model", model), "seconds": round(time.monotonic() - t0, 1)}
+    u = raw.get("usage") or {}
+    if u:
+        meta["tokens_in"], meta["tokens_out"] = u.get("prompt_tokens"), u.get("completion_tokens")
     fr = raw["choices"][0].get("finish_reason")
     if fr and fr != "stop":
         meta["finish"] = fr
@@ -419,7 +427,12 @@ def ensure_share_server() -> int:
     return port
 
 
+COMPARE_MODELS = [("9b", "qwen/qwen3.5-9b"), ("27b", "qwen/qwen3.8-27b"), ("frontier", "google/gemini-3.7-flash")]
+
+
 def chat(question: str, model: str | None = None) -> dict:
+    if S.turns and S.turns[-1].get("pending_vote"):
+        return {"error": "pick an answer first: choose one of the three, or say no difference or all bad."}
     if not S.redacted:
         S.step("hiding what you marked")
         S.build_vault()
@@ -477,26 +490,95 @@ def chat(question: str, model: str | None = None) -> dict:
     if leaks:
         return {"error": f"stopped: {len(leaks)} private value(s) were about to leave, {', '.join(leaks[:3])}"}
     parts = ([f"{sent_rows} rows"] if sent_rows else []) + ([f"{sent_lines} lines"] if sent_lines else [])
-    S.step("asking: " + (" + ".join(parts) if parts else "nothing") + " go as codes")
-    raw, meta = call_model(payload, model)
+    S.step("asking 3 models: " + (" + ".join(parts) if parts else "nothing") + " go as codes")
+
+    def materialise(raw):
+        out = {"answer_sent": raw if "<html" not in raw.lower() else "(page)"}
+        if "<html" in raw.lower() or "<!doctype" in raw.lower():
+            i = raw.lower().find("<!doctype")
+            i = i if i >= 0 else raw.lower().find("<html")
+            j = raw.lower().rfind("</html>")
+            page = S.pmap.rehydrate(raw[i:(j + 7) if j > 0 else None])
+            data = {t["name"]: json.loads(t["frame"].to_json(orient="records")) for t in S.tables}
+            inject = "<script>window.data = " + json.dumps(data, ensure_ascii=False).replace("</", "<\\/") + ";</script>"
+            k = page.lower().find("<head>")
+            out["page"] = (page[:k + 6] + inject + page[k + 6:]) if k >= 0 else inject + page
+        else:
+            out["answer"] = S.pmap.rehydrate(raw)
+        return out
+
+    results: list = [None, None, None]
+
+    def one(i: int, mid: str) -> None:
+        try:
+            raw, meta = call_model(payload, mid)
+            results[i] = {"alias": COMPARE_MODELS[i][0], **materialise(raw), **meta}
+        except Exception as exc:  # noqa: BLE001
+            results[i] = {"alias": COMPARE_MODELS[i][0], "answer": f"(no answer: {str(exc)[:120]})",
+                          "answer_sent": "", "model": mid, "seconds": 0, "error": True}
+
+    ths = [threading.Thread(target=one, args=(i, mid)) for i, (_a, mid) in enumerate(COMPARE_MODELS)]
+    for th in ths:
+        th.start()
+    for th in ths:
+        th.join()
     S.step("translating codes back")
-    turn = {"q": question, "q_sent": q, "answer_sent": raw if "<html" not in raw.lower() else "(page)",
-            "sent_rows": sent_rows, "sent_lines": sent_lines, "bytes": len(payload), "files_used": use if mentioned else [], **meta}
-    if "<html" in raw.lower() or "<!doctype" in raw.lower():
-        i = raw.lower().find("<!doctype")
-        i = i if i >= 0 else raw.lower().find("<html")
-        j = raw.lower().rfind("</html>")
-        page = S.pmap.rehydrate(raw[i:(j + 7) if j > 0 else None])
-        data = {t["name"]: json.loads(t["frame"].to_json(orient="records")) for t in S.tables}
-        inject = "<script>window.data = " + json.dumps(data, ensure_ascii=False).replace("</", "<\\/") + ";</script>"
-        k = page.lower().find("<head>")
-        turn["page"] = (page[:k + 6] + inject + page[k + 6:]) if k >= 0 else inject + page
-    else:
-        turn["answer"] = S.pmap.rehydrate(raw)
+    random.shuffle(results)
+    turn = {"q": question, "q_sent": q, "sent_rows": sent_rows, "sent_lines": sent_lines,
+            "bytes": len(payload), "files_used": use if mentioned else [],
+            "cands": results, "pending_vote": True}
     S.turns.append(turn)
     turn["id"] = len(S.turns)
     S.step("done")
-    return turn
+    return client_view(turn)
+
+
+def client_view(turn: dict) -> dict:
+    """What the browser may see. Blind: no model names, no aliases, ever."""
+    if turn.get("pending_vote"):
+        return {"id": turn["id"], "q": turn["q"], "pending": True,
+                "sent_rows": turn["sent_rows"], "sent_lines": turn["sent_lines"],
+                "cands": [{"i": i, "answer": c.get("answer"), "has_page": bool(c.get("page"))}
+                          for i, c in enumerate(turn["cands"])]}
+    out = {k: turn.get(k) for k in ("id", "q", "answer", "sent_rows", "sent_lines", "seconds", "files_used")}
+    out["model"] = "3 models"
+    out["has_page"] = bool(turn.get("page"))
+    out["skipped"] = turn.get("skipped", False)
+    return out
+
+
+def resolve_vote(turn: dict, pick) -> dict:
+    cands = turn["cands"]
+    if isinstance(pick, int):
+        chosen, outcome = cands[pick], cands[pick]["alias"]
+    elif pick == "tie":
+        chosen, outcome = random.choice([c for c in cands if not c.get("error")] or cands), "tie"
+    else:
+        chosen, outcome = None, "none"
+    if chosen is not None:
+        for k in ("answer", "page", "answer_sent", "seconds"):
+            if chosen.get(k) is not None:
+                turn[k] = chosen[k]
+    else:
+        turn["skipped"] = True
+        turn["answer_sent"] = ""
+    turn["outcome"] = outcome
+    turn["pending_vote"] = False
+    tally = json.loads(VOTES_PATH.read_text()) if VOTES_PATH.exists() else {}
+    tally[outcome] = tally.get(outcome, 0) + 1
+    tally["total"] = tally.get("total", 0) + 1
+    VOTES_PATH.write_text(json.dumps(tally, indent=1))
+    rec = {"t": time.time(), "conversation": S.conversation_id, "turn": turn["id"],
+           "folder": str(getattr(S, "folder", "") or ""), "q_sent": turn["q_sent"], "outcome": outcome,
+           "cands": [{"alias": c["alias"], "position": i, "model": c.get("model"),
+                      "seconds": c.get("seconds"), "tokens_in": c.get("tokens_in"),
+                      "tokens_out": c.get("tokens_out"), "page": "page" in c,
+                      "error": c.get("error", False),
+                      "answer_sent": (c.get("answer_sent") or "")[:2000]}
+                     for i, c in enumerate(cands)]}
+    with open(COMPARE_LOG, "a") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return client_view(turn)
 
 
 class H(BaseHTTPRequestHandler):
@@ -522,6 +604,14 @@ class H(BaseHTTPRequestHandler):
                                "folder": str(S.folder) if S.folder else None,
                                "files": [{"name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns)} for t in S.tables],
                                "vault": len(S.pmap.display) if S.pmap else 0, "progress": S.progress[-4:]})
+        m = re.match(r"^/api/cpage/(\d+)/(\d)$", p)
+        if m:
+            t = next((x for x in S.turns if x.get("id") == int(m.group(1))), None)
+            c = (t or {}).get("cands", [])
+            page = c[int(m.group(2))].get("page") if len(c) > int(m.group(2)) else None
+            return self._send(200, page.encode(), "text/html; charset=utf-8") if page else self._send(404, b"")
+        if p == "/api/votes":
+            return self._json(json.loads(VOTES_PATH.read_text()) if VOTES_PATH.exists() else {})
         m = re.match(r"^/api/page/(\d+)$", p)
         if m:
             t = next((x for x in S.turns if x.get("id") == int(m.group(1)) and x.get("page")), None)
@@ -680,6 +770,14 @@ class H(BaseHTTPRequestHandler):
                 folders = [x for x in folders if x["path"] != body.get("path")]
                 FOLDERS_PATH.write_text(json.dumps(folders, indent=1))
                 return self._json({"folders": folders})
+            if self.path == "/api/vote":
+                with S.lock:
+                    t = next((x for x in S.turns if x.get("id") == int(body["id"])), None)
+                    if not t or not t.get("pending_vote"):
+                        return self._json({"error": "nothing to vote on"}, 400)
+                    pick = body.get("pick")
+                    pick = int(pick) if isinstance(pick, int) or (isinstance(pick, str) and pick.isdigit()) else pick
+                    return self._json(resolve_vote(t, pick))
             if self.path == "/api/share":
                 t = next((x for x in S.turns if x.get("id") == int(body["id"]) and x.get("page")), None)
                 if not t:

@@ -92,13 +92,18 @@ td.tok{background:var(--hibg);color:var(--hi)}
 
 /* input bar */
 #bar{padding:16px 24px 22px}
-#mpick{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:5;background:var(--bg);color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:4px 22px 4px 8px;font-size:12px;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none}
-#mpick-v{position:absolute;right:20px;top:50%;transform:translateY(-50%);z-index:6;color:var(--dim);font-size:11px;pointer-events:none}
+.cmp{display:flex;gap:10px;margin-top:10px;align-items:stretch}
+.cmp .card2{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+.cmp .body{padding:12px 14px;overflow-y:auto;max-height:300px;font-size:14px;line-height:1.55;white-space:pre-wrap;flex:1}
+.cmp iframe{width:100%;height:300px;border:none;background:#fff}
+.cmp .pickbtn{margin:8px;padding:7px 10px;font-size:13px}
+.cmpx{display:flex;gap:10px;margin-top:8px}
+.cmpx button{font-size:12px;color:var(--dim)}
 #mpick:hover{color:var(--ink)}
 #barin{max-width:860px;margin:0 auto;position:relative}
-#mirror{position:absolute;inset:0;padding:14px 96px 14px 34px;pointer-events:none;white-space:pre-wrap;overflow:hidden;font:inherit;line-height:1.5;color:var(--ink)}
+#mirror{position:absolute;inset:0;padding:14px 18px 14px 34px;pointer-events:none;white-space:pre-wrap;overflow:hidden;font:inherit;line-height:1.5;color:var(--ink)}
 #mirror s{color:var(--dim);text-decoration-color:var(--hi)}
-#q{padding:13px 96px 13px 34px;border-radius:16px;resize:none;height:52px;background:var(--panel);color:transparent;caret-color:var(--ink)}
+#q{padding:13px 18px 13px 34px;border-radius:16px;resize:none;height:52px;background:var(--panel);color:transparent;caret-color:var(--ink)}
 #q::placeholder{color:var(--dim)}
 #q:disabled{opacity:.45}
 #chev{position:absolute;left:14px;top:14px;color:var(--dim)}
@@ -155,11 +160,6 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <div id="mirror"></div>
     <textarea id="q" placeholder="ready when you are..." rows="1"></textarea>
     <span id="chev">&gt;</span>
-    <select id="mpick" title="which model answers">
-      <option value="google/gemini-3.7-flash" selected>frontier</option>
-      <option value="qwen/qwen3.8-27b">t4gc</option>
-      <option value="qwen/qwen3.5-9b">laptop</option>
-    </select><span id="mpick-v">v</span>
   </div>
   <div id="note"></div>
 </div>
@@ -476,9 +476,11 @@ q.addEventListener('keydown', async e => {
   el.querySelector('.q').textContent = text;
   $('#thread').appendChild(el); $('#thread').scrollTop = 1e9;
   const tick = setInterval(async () => { const st = await api('/api/state'); if (st.progress.length) el.querySelector('.working').textContent = st.progress[st.progress.length-1] + '…'; }, 700);
-  const r = await api('/api/chat', {text, model: document.getElementById('mpick') ? document.getElementById('mpick').value : undefined});
-  clearInterval(tick); q.disabled = false; q.focus();
+  const r = await api('/api/chat', {text});
+  clearInterval(tick);
   const w = el.querySelector('.working'); w.className = 'a';
+  if (r.pending) { renderCompare(el, w, r); return; }
+  q.disabled = false; q.focus();
   if (r.error) w.textContent = r.error;
   else if (r.has_page) {
     w.innerHTML = `<iframe src="/api/page/${r.id}"></iframe><div class="share"><a data-id="${r.id}">share on your network</a><span class="shareurl"></span></div>`;
@@ -492,6 +494,42 @@ q.addEventListener('keydown', async e => {
   const t = await api('/api/terms'); terms = t.terms || terms;
   $('#thread').scrollTop = 1e9;
 });
+function metaLine(r){
+  const parts = []; if (r.sent_rows) parts.push(`${r.sent_rows} rows`); if (r.sent_lines) parts.push(`${r.sent_lines} lines`);
+  return `${parts.length ? parts.join(' + ') : 'nothing'} sent as codes, 3 models, ${r.seconds != null ? r.seconds + 's' : 'voted'}`;
+}
+function finishTurn(el, w, r){
+  q.disabled = false; q.focus();
+  if (r.skipped) { w.textContent = 'all three marked bad. Ask again, maybe differently.'; }
+  else if (r.has_page) {
+    w.innerHTML = `<iframe src="/api/page/${r.id}"></iframe><div class="share"><a data-id="${r.id}">share on your network</a><span class="shareurl"></span></div>`;
+    w.querySelector('.share a').onclick = async e => {
+      const sr = await api('/api/share', {id: +e.target.dataset.id});
+      if (sr.url) { const sp = w.querySelector('.shareurl'); sp.textContent = sr.url; try { await navigator.clipboard.writeText(sr.url); sp.textContent = sr.url + '  (copied)'; } catch(_){} }
+    };
+  } else w.textContent = r.answer || '';
+  const sMeta = document.createElement('div'); sMeta.className = 'sent'; sMeta.textContent = metaLine(r); el.appendChild(sMeta);
+  $('#thread').scrollTop = 1e9;
+}
+function renderCompare(el, w, r){
+  q.disabled = true;
+  const cards = r.cands.map(c => `<div class="card2">` +
+    (c.has_page ? `<iframe src="/api/cpage/${r.id}/${c.i}"></iframe>` : `<div class="body"></div>`) +
+    `<button class="pickbtn go" data-i="${c.i}">choose this answer</button></div>`).join('');
+  w.innerHTML = `<div class="cmp">${cards}</div><div class="cmpx"><button data-p="tie">no difference</button><button data-p="none">all bad</button></div>`;
+  const bodies = w.querySelectorAll('.body');
+  let bi = 0;
+  r.cands.forEach(c => { if (!c.has_page) { bodies[bi++].textContent = c.answer || ''; } });
+  const vote = async pick => {
+    const res = await api('/api/vote', {id: r.id, pick});
+    if (res.error) { alert(res.error); return; }
+    w.innerHTML = ''; w.className = 'a';
+    finishTurn(el, w, res);
+  };
+  w.querySelectorAll('.pickbtn').forEach(b => b.onclick = () => vote(+b.dataset.i));
+  w.querySelectorAll('.cmpx button').forEach(b => b.onclick = () => vote(b.dataset.p));
+  $('#thread').scrollTop = 1e9;
+}
 paintMirror();
 </script>
 </body>
