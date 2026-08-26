@@ -330,8 +330,8 @@ S = State()
 PROMPT = """You are helping someone understand their files. The files are below as CSV. Values like NAME_001,
 PHONE_002, PLACE_003 are stand-ins; treat them as ordinary labels and never mention that they are stand-ins.
 
-Answer questions directly and briefly, computing from the data. If a page or dashboard is the better answer,
-return one complete self-contained HTML document (inline CSS/JS, no external URLs) and nothing else — and in
+Answer questions directly and briefly, in plain text, computing from the data. Only when the user explicitly
+asks for a page, dashboard, chart or map, return one complete self-contained HTML document (inline CSS/JS, no external URLs) and nothing else — and in
 that case DO NOT embed the rows: at runtime the full data is available as window.data, an object with one array
 of row objects per file ({keys}); compute every figure in JavaScript from window.data.
 
