@@ -242,6 +242,9 @@ function daemonCommand() {
   const hf = fs.existsSync(path.join(envDir(), "hf-cache")) ? path.join(envDir(), "hf-cache") : path.join(serverDir(), "hf-cache");
   const env = { ...process.env, PII_THREADS: String(cfg().get("threads") || 4),
     HF_HOME: hf, PYTHONUNBUFFERED: "1" };
+  // Cached model => load offline. The hub's startup check can hang forever on a dropped
+  // connection (measured in the io app: CLOSE-WAIT socket, warm-up blocked for hours).
+  if (fs.existsSync(path.join(hf, "hub"))) { env.HF_HUB_OFFLINE = "1"; env.TRANSFORMERS_OFFLINE = "1"; }
   delete env.CLOUD_CODE_URL; // the daemon itself must talk to Google directly
   delete env.ELECTRON_RUN_AS_NODE;
   return { py, args, env, log: path.join(stateDir(), "daemon.out") };

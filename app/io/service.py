@@ -24,6 +24,13 @@ import pandas as pd
 
 HERE = Path(__file__).resolve().parent
 os.environ.setdefault("HF_HOME", str(HERE / "hf-cache"))   # model weights live with the app
+# When the scanner is already cached, load it offline. The hub's startup HTTPS check has no
+# timeout, and a dropped connection leaves the warm-up thread blocked forever on a dead
+# socket - the "stuck at loading the on-device scanner" wedge (seen live: CLOSE-WAIT to the
+# HF CDN, 0% CPU, 6.5 hours).
+if any((HERE / "hf-cache" / "hub").glob("models--knowledgator--*")) if (HERE / "hf-cache" / "hub").is_dir() else False:
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 sys.path.insert(0, str(HERE / "engine"))                    # the shield's tested modules, vendored unchanged
 
 from columns import classify_columns  # noqa: E402
@@ -101,6 +108,7 @@ class State:
                 try:
                     gl = build_engine(f"gliner:{GLINER_MODEL}")
                     self.detector = lambda t: regex_engine(t) + gl(t)
+                    self.step("scanner ready")   # never leave "loading..." as the last visible word
                 except Exception:  # noqa: BLE001
                     traceback.print_exc()
                     self.detector = regex_engine
