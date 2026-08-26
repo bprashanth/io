@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Chat Frequency Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --border-color: #334155;
+            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        .brand h1 {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #a5b4fc, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background-color: var(--bg-tertiary);
+            border-color: var(--primary-color);
+        }
+
+        /* Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title i {
+            color: var(--primary-color);
+        }
+
+        /* Plot Styling */
+        .plot-container {
+            background-color: #0b0f19;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            position: relative;
+            overflow: visible;
+        }
+
+        .scatter-svg {
+            width: 100%;
+            height: auto;
+            overflow: visible;
+        }
+
+        .scatter-dot {
+            transition: r 0.2s, stroke-width 0.2s;
+            cursor: pointer;
+        }
+
+        .scatter-dot:hover, .scatter-dot.active {
+            r: 9px;
+            stroke-width: 2.5px;
+            stroke: #a5b4fc;
+        }
+
+        .glow-dot.active-glow {
+            opacity: 0.4;
+        }
+
+        .x-axis-label {
+            cursor: pointer;
+            transition: fill 0.2s;
+        }
+
+        .x-axis-label:hover, .x-axis-label.active-label {
+            fill: #a5b4fc;
+            font-weight: bold;
+        }
+
+        /* Table Styling */
+        .table-container {
+            max-height: 380px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 8px;
+            border-bottom: 2px solid var(--border-color);
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        tr:hover, tr.active-row {
+            background-color: var(--primary-glow);
+        }
+
+        tr.active-row td {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* Message Drawer */
+        .message-section {
+            margin-top: 4px;
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .active-sender-badge {
+            background-color: var(--primary-glow);
+            border: 1px solid var(--primary-color);
+            color: var(--text-primary);
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .chat-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #0b0f19;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .chat-message {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 16px;
+            align-self: flex-start;
+            max-width: 80%;
+        }
+
+        .chat-message.self {
+            align-self: flex-end;
+            background-color: var(--primary-glow);
+            border-color: var(--primary-color);
+        }
+
+        .message-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 6px;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+        }
+
+        .msg-sender {
+            font-weight: 600;
+            color: #a5b4fc;
+        }
+
+        .msg-text {
+            font-size: 0.88rem;
+            line-height: 1.45;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="brand">
+                <h1>WhatsApp Chat Insights</h1>
+                <p>Interactive sender frequency analysis and communication logs</p>
+            </div>
+            <a href="household_dashboard.html" class="back-btn">
+                <i class="fa-solid fa-arrow-left"></i> Household Dashboard
+            </a>
+        </header>
+
+        <!-- Main Grid -->
+        <div class="dashboard-grid">
+            <!-- Plot Card -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fa-solid fa-chart-line"></i> Message Count Scatter Plot
+                </div>
+                <div class="plot-container">
+                    <svg viewBox="0 0 900 420" class="scatter-svg">
+<defs>
+  <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur stdDeviation="6" result="blur" />
+    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+  </filter>
+  <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#818cf8" />
+    <stop offset="100%" stop-color="#4f46e5" />
+  </linearGradient>
+</defs>
+<line x1="60" y1="360.0" x2="860" y2="360.0" class="grid-line" stroke="#334155" stroke-dasharray="4,4" stroke-width="0.8"/>
+<text x="48" y="364.0" class="axis-text" fill="#94a3b8" font-size="11" text-anchor="end">0</text>
+<line x1="60" y1="298.0" x2="860" y2="298.0" class="grid-line" stroke="#334155" stroke-dasharray="4,4" stroke-width="0.8"/>
+<text x="48" y="302.0" class="axis-text" fill="#94a3b8" font-size="11" text-anchor="end">5</text>
+<line x1="60" y1="236.0" x2="860" y2="236.0" class="grid-line" stroke="#334155" stroke-dasharray="4,4" stroke-width="0.8"/>
+<text x="48" y="240.0" class="axis-text" fill="#94a3b8" font-size="11" text-anchor="end">10</text>
+<line x1="60" y1="174.0" x2="860" y2="174.0" class="grid-line" stroke="#334155" stroke-dasharray="4,4" stroke-width="0.8"/>
+<text x="48" y="178.0" class="axis-text" fill="#94a3b8" font-size="11" text-anchor="end">15</text>
+<line x1="60" y1="112.0" x2="860" y2="112.0" class="grid-line" stroke="#334155" stroke-dasharray="4,4" stroke-width="0.8"/>
+<text x="48" y="116.0" class="axis-text" fill="#94a3b8" font-size="11" text-anchor="end">20</text>
+<line x1="60" y1="50.0" x2="860" y2="50.0" class="grid-line" stroke="#334155" stroke-dasharray="4,4" stroke-width="0.8"/>
+<text x="48" y="54.0" class="axis-text" fill="#94a3b8" font-size="11" text-anchor="end">25</text>
+<line x1="60.0" y1="360" x2="60.0" y2="74.80000000000001" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="60.0" cy="74.80000000000001" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="sarla menon"/>
+<circle cx="60.0" cy="74.80000000000001" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="sarla menon" data-count="23" onclick="selectSender('sarla menon')">
+  <title>sarla menon: 23 messages</title>
+</circle>
+<text x="60.0" y="62.80000000000001" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">23</text>
+<text x="60.0" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 60.0 378)" onclick="selectSender('sarla menon')" style="cursor: pointer;">sarla menon</text>
+<line x1="132.72727272727275" y1="360" x2="132.72727272727275" y2="74.80000000000001" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="132.72727272727275" cy="74.80000000000001" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="Chandra Balasaheb"/>
+<circle cx="132.72727272727275" cy="74.80000000000001" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="Chandra Balasaheb" data-count="23" onclick="selectSender('Chandra Balasaheb')">
+  <title>Chandra Balasaheb: 23 messages</title>
+</circle>
+<text x="132.72727272727275" y="62.80000000000001" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">23</text>
+<text x="132.72727272727275" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 132.72727272727275 378)" onclick="selectSender('Chandra Balasaheb')" style="cursor: pointer;">Chandra Balasaheb</text>
+<line x1="205.45454545454547" y1="360" x2="205.45454545454547" y2="112.0" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="205.45454545454547" cy="112.0" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="shrikant chaudhary"/>
+<circle cx="205.45454545454547" cy="112.0" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="shrikant chaudhary" data-count="20" onclick="selectSender('shrikant chaudhary')">
+  <title>shrikant chaudhary: 20 messages</title>
+</circle>
+<text x="205.45454545454547" y="100.0" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">20</text>
+<text x="205.45454545454547" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 205.45454545454547 378)" onclick="selectSender('shrikant chaudhary')" style="cursor: pointer;">shrikant chaudhary</text>
+<line x1="278.1818181818182" y1="360" x2="278.1818181818182" y2="136.8" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="278.1818181818182" cy="136.8" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="Deepa DSouza"/>
+<circle cx="278.1818181818182" cy="136.8" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="Deepa DSouza" data-count="18" onclick="selectSender('Deepa DSouza')">
+  <title>Deepa DSouza: 18 messages</title>
+</circle>
+<text x="278.1818181818182" y="124.80000000000001" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">18</text>
+<text x="278.1818181818182" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 278.1818181818182 378)" onclick="selectSender('Deepa DSouza')" style="cursor: pointer;">Deepa DSouza</text>
+<line x1="350.90909090909093" y1="360" x2="350.90909090909093" y2="174.0" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="350.90909090909093" cy="174.0" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="Sarojini Gill"/>
+<circle cx="350.90909090909093" cy="174.0" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="Sarojini Gill" data-count="15" onclick="selectSender('Sarojini Gill')">
+  <title>Sarojini Gill: 15 messages</title>
+</circle>
+<text x="350.90909090909093" y="162.0" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">15</text>
+<text x="350.90909090909093" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 350.90909090909093 378)" onclick="selectSender('Sarojini Gill')" style="cursor: pointer;">Sarojini Gill</text>
+<line x1="423.6363636363636" y1="360" x2="423.6363636363636" y2="198.79999999999998" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="423.6363636363636" cy="198.79999999999998" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="Ramu Bansal"/>
+<circle cx="423.6363636363636" cy="198.79999999999998" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="Ramu Bansal" data-count="13" onclick="selectSender('Ramu Bansal')">
+  <title>Ramu Bansal: 13 messages</title>
+</circle>
+<text x="423.6363636363636" y="186.79999999999998" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">13</text>
+<text x="423.6363636363636" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 423.6363636363636 378)" onclick="selectSender('Ramu Bansal')" style="cursor: pointer;">Ramu Bansal</text>
+<line x1="496.3636363636364" y1="360" x2="496.3636363636364" y2="198.79999999999998" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="496.3636363636364" cy="198.79999999999998" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="kalpana agarwal"/>
+<circle cx="496.3636363636364" cy="198.79999999999998" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="kalpana agarwal" data-count="13" onclick="selectSender('kalpana agarwal')">
+  <title>kalpana agarwal: 13 messages</title>
+</circle>
+<text x="496.3636363636364" y="186.79999999999998" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">13</text>
+<text x="496.3636363636364" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 496.3636363636364 378)" onclick="selectSender('kalpana agarwal')" style="cursor: pointer;">kalpana agarwal</text>
+<line x1="569.090909090909" y1="360" x2="569.090909090909" y2="198.79999999999998" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="569.090909090909" cy="198.79999999999998" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="SHOBHA SALUNKHE"/>
+<circle cx="569.090909090909" cy="198.79999999999998" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="SHOBHA SALUNKHE" data-count="13" onclick="selectSender('SHOBHA SALUNKHE')">
+  <title>SHOBHA SALUNKHE: 13 messages</title>
+</circle>
+<text x="569.090909090909" y="186.79999999999998" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">13</text>
+<text x="569.090909090909" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 569.090909090909 378)" onclick="selectSender('SHOBHA SALUNKHE')" style="cursor: pointer;">SHOBHA SALUNKHE</text>
+<line x1="641.8181818181819" y1="360" x2="641.8181818181819" y2="211.20000000000002" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="641.8181818181819" cy="211.20000000000002" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="Khan Saraswati"/>
+<circle cx="641.8181818181819" cy="211.20000000000002" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="Khan Saraswati" data-count="12" onclick="selectSender('Khan Saraswati')">
+  <title>Khan Saraswati: 12 messages</title>
+</circle>
+<text x="641.8181818181819" y="199.20000000000002" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">12</text>
+<text x="641.8181818181819" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 641.8181818181819 378)" onclick="selectSender('Khan Saraswati')" style="cursor: pointer;">Khan Saraswati</text>
+<line x1="714.5454545454545" y1="360" x2="714.5454545454545" y2="236.0" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="714.5454545454545" cy="236.0" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="Mane Snehal"/>
+<circle cx="714.5454545454545" cy="236.0" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="Mane Snehal" data-count="10" onclick="selectSender('Mane Snehal')">
+  <title>Mane Snehal: 10 messages</title>
+</circle>
+<text x="714.5454545454545" y="224.0" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">10</text>
+<text x="714.5454545454545" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 714.5454545454545 378)" onclick="selectSender('Mane Snehal')" style="cursor: pointer;">Mane Snehal</text>
+<line x1="787.2727272727273" y1="360" x2="787.2727272727273" y2="236.0" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="787.2727272727273" cy="236.0" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="Radha Krishnan"/>
+<circle cx="787.2727272727273" cy="236.0" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="Radha Krishnan" data-count="10" onclick="selectSender('Radha Krishnan')">
+  <title>Radha Krishnan: 10 messages</title>
+</circle>
+<text x="787.2727272727273" y="224.0" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">10</text>
+<text x="787.2727272727273" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 787.2727272727273 378)" onclick="selectSender('Radha Krishnan')" style="cursor: pointer;">Radha Krishnan</text>
+<line x1="860.0" y1="360" x2="860.0" y2="236.0" class="guide-line" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+<circle cx="860.0" cy="236.0" r="9" class="glow-dot" fill="#6366f1" opacity="0" filter="url(#glow)" data-sender="sachin rao"/>
+<circle cx="860.0" cy="236.0" r="6.5" class="scatter-dot" fill="url(#grad)" stroke="#ffffff" stroke-width="1.5" data-sender="sachin rao" data-count="10" onclick="selectSender('sachin rao')">
+  <title>sachin rao: 10 messages</title>
+</circle>
+<text x="860.0" y="224.0" class="dot-label" fill="#f8fafc" font-size="10.5" font-weight="600" text-anchor="middle">10</text>
+<text x="860.0" y="378" class="x-axis-label" fill="#f8fafc" font-size="10.5" text-anchor="end" transform="rotate(-35 860.0 378)" onclick="selectSender('sachin rao')" style="cursor: pointer;">sachin rao</text>
+</svg>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fa-solid fa-list-ol"></i> Senders Frequency
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Sender</th>
+                                <th style="text-align: right;">Messages</th>
+                                <th style="text-align: right;">Ratio</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sender-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Drawer -->
+        <div class="card message-section">
+            <div class="message-header">
+                <div class="card-title" style="margin-bottom: 0;">
+                    <i class="fa-solid fa-comments"></i> Communication Logs
+                </div>
+                <div class="active-sender-badge" id="active-sender-title">
+                    Showing all messages
+                </div>
+            </div>
+            <div class="chat-list" id="chat-list-container">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Script -->
+    <script>
+        const messages = [
+  {
+    "date": "01/03/26",
+    "time": "12:17",
+    "sender": "shrikant chaudhary",
+    "text": "noted"
+  },
+  {
+    "date": "01/03/26",
+    "time": "14:30",
+    "sender": "sarla menon",
+    "text": "Kal Kalyanpur jana hai session ke liye."
+  },
+  {
+    "date": "01/03/26",
+    "time": "17:06",
+    "sender": "Ramu Bansal",
+    "text": "Kal Karpi jana hai session ke liye."
+  },
+  {
+    "date": "02/03/26",
+    "time": "10:10",
+    "sender": "Mane Snehal",
+    "text": "Beneficiary Lily Fernandes se baat hui, number 078666-49395 save kar lo."
+  },
+  {
+    "date": "02/03/26",
+    "time": "12:17",
+    "sender": "Ramu Bansal",
+    "text": "Beneficiary balasaheb fernandes se baat hui, number +91 87270 54730 save kar lo."
+  },
+  {
+    "date": "03/03/26",
+    "time": "11:24",
+    "sender": "Chandra Balasaheb",
+    "text": "Dattatray Rajgurunagar mein rehte hai, unki beti 12 saal ki hai."
+  },
+  {
+    "date": "03/03/26",
+    "time": "20:40",
+    "sender": "Ramu Bansal",
+    "text": "POOJA GADHAVE Karpi mein rehte hai, unki beti 45 saal ki hai."
+  },
+  {
+    "date": "03/03/26",
+    "time": "20:09",
+    "sender": "Radha Krishnan",
+    "text": "Champa Chandra ka number hai 077531-46525, call kar lena."
+  },
+  {
+    "date": "03/03/26",
+    "time": "08:48",
+    "sender": "Chandra Balasaheb",
+    "text": "Total 8 gaon cover ho gaye is hafte."
+  },
+  {
+    "date": "03/03/26",
+    "time": "21:14",
+    "sender": "sarla menon",
+    "text": "Amit Rai Loni Kalbhor mein rehte hai, unki beti 33 saal ki hai."
+  },
+  {
+    "date": "04/03/26",
+    "time": "07:48",
+    "sender": "Chandra Balasaheb",
+    "text": "Anthony aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "05/03/26",
+    "time": "20:57",
+    "sender": "Sarojini Gill",
+    "text": "Kal Devipur jana hai session ke liye."
+  },
+  {
+    "date": "05/03/26",
+    "time": "21:55",
+    "sender": "sarla menon",
+    "text": "Rizwan Mathew ka number hai 073657-52095, call kar lena."
+  },
+  {
+    "date": "05/03/26",
+    "time": "13:09",
+    "sender": "Sarojini Gill",
+    "text": "Krishna Rodrigues aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "06/03/26",
+    "time": "18:38",
+    "sender": "Deepa DSouza",
+    "text": "kal milte hai"
+  },
+  {
+    "date": "07/03/26",
+    "time": "15:28",
+    "sender": "Deepa DSouza",
+    "text": "15 forms complete kiye aaj."
+  },
+  {
+    "date": "07/03/26",
+    "time": "08:33",
+    "sender": "Deepa DSouza",
+    "text": "Sita Nair ka number hai 078590-89365, call kar lena."
+  },
+  {
+    "date": "08/03/26",
+    "time": "13:30",
+    "sender": "kalpana agarwal",
+    "text": "Sarojini Bhagat ka number hai 6159853514, call kar lena."
+  },
+  {
+    "date": "08/03/26",
+    "time": "17:37",
+    "sender": "Radha Krishnan",
+    "text": "Xavier Mishra ka number hai 9610852292, call kar lena."
+  },
+  {
+    "date": "08/03/26",
+    "time": "21:11",
+    "sender": "Chandra Balasaheb",
+    "text": "Kal Sahebganj jana hai session ke liye."
+  },
+  {
+    "date": "09/03/26",
+    "time": "19:59",
+    "sender": "sarla menon",
+    "text": "Beneficiary Reddy Divya se baat hui, number 060439-16870 save kar lo."
+  },
+  {
+    "date": "09/03/26",
+    "time": "10:25",
+    "sender": "Chandra Balasaheb",
+    "text": "Kal Rampur Sokho jana hai session ke liye."
+  },
+  {
+    "date": "10/03/26",
+    "time": "08:53",
+    "sender": "Khan Saraswati",
+    "text": "Kal Mahuar jana hai session ke liye."
+  },
+  {
+    "date": "10/03/26",
+    "time": "08:07",
+    "sender": "Chandra Balasaheb",
+    "text": "Session 2 ghante chala."
+  },
+  {
+    "date": "10/03/26",
+    "time": "20:04",
+    "sender": "Mane Snehal",
+    "text": "Beneficiary ashok naidu se baat hui, number 7320893050 save kar lo."
+  },
+  {
+    "date": "10/03/26",
+    "time": "10:25",
+    "sender": "Ramu Bansal",
+    "text": "Total 8 gaon cover ho gaye is hafte."
+  },
+  {
+    "date": "10/03/26",
+    "time": "14:05",
+    "sender": "Mane Snehal",
+    "text": "Kal Deopur jana hai session ke liye."
+  },
+  {
+    "date": "10/03/26",
+    "time": "20:38",
+    "sender": "sachin rao",
+    "text": "N. I. Krishnan aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "10/03/26",
+    "time": "07:18",
+    "sender": "Ramu Bansal",
+    "text": "Baliram Siddiqui aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "10/03/26",
+    "time": "10:54",
+    "sender": "shrikant chaudhary",
+    "text": "Kal Chandpur jana hai session ke liye."
+  },
+  {
+    "date": "11/03/26",
+    "time": "07:29",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Sharma Tara Chandwara mein rehte hai, unki beti 49 saal ki hai."
+  },
+  {
+    "date": "12/03/26",
+    "time": "18:52",
+    "sender": "sachin rao",
+    "text": "Beneficiary F. E. Pawar se baat hui, number 089774-85001 save kar lo."
+  },
+  {
+    "date": "13/03/26",
+    "time": "14:50",
+    "sender": "Ramu Bansal",
+    "text": "theek hai"
+  },
+  {
+    "date": "13/03/26",
+    "time": "19:58",
+    "sender": "Deepa DSouza",
+    "text": "Kal Nira jana hai session ke liye."
+  },
+  {
+    "date": "13/03/26",
+    "time": "14:07",
+    "sender": "Sarojini Gill",
+    "text": "Ravi Joshi ka number hai +91 88914 26322, call kar lena."
+  },
+  {
+    "date": "13/03/26",
+    "time": "17:22",
+    "sender": "Sarojini Gill",
+    "text": "Ramu Naidu aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "13/03/26",
+    "time": "09:22",
+    "sender": "Mane Snehal",
+    "text": "Kal Kesnand jana hai session ke liye."
+  },
+  {
+    "date": "13/03/26",
+    "time": "17:21",
+    "sender": "Radha Krishnan",
+    "text": "PRATIBHA RAO aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "13/03/26",
+    "time": "20:50",
+    "sender": "kalpana agarwal",
+    "text": "Beneficiary Balasaheb Thomas se baat hui, number +91 76415 23706 save kar lo."
+  },
+  {
+    "date": "13/03/26",
+    "time": "12:58",
+    "sender": "Mane Snehal",
+    "text": "F. B. Pereira Nanded Phata mein rehte hai, unki beti 51 saal ki hai."
+  },
+  {
+    "date": "14/03/26",
+    "time": "08:55",
+    "sender": "shrikant chaudhary",
+    "text": "Beneficiary Sushila Thomas se baat hui, number +91 65567 58496 save kar lo."
+  },
+  {
+    "date": "14/03/26",
+    "time": "07:09",
+    "sender": "Khan Saraswati",
+    "text": "kal milte hai"
+  },
+  {
+    "date": "14/03/26",
+    "time": "14:50",
+    "sender": "sachin rao",
+    "text": "ok"
+  },
+  {
+    "date": "14/03/26",
+    "time": "08:00",
+    "sender": "Deepa DSouza",
+    "text": "kalpana deshpande aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "14/03/26",
+    "time": "19:16",
+    "sender": "sarla menon",
+    "text": "theek hai"
+  },
+  {
+    "date": "14/03/26",
+    "time": "09:48",
+    "sender": "Sarojini Gill",
+    "text": "Sunita Qureshi ka number hai +91 63889 10602, call kar lena."
+  },
+  {
+    "date": "14/03/26",
+    "time": "09:58",
+    "sender": "Chandra Balasaheb",
+    "text": "noted"
+  },
+  {
+    "date": "14/03/26",
+    "time": "20:30",
+    "sender": "shrikant chaudhary",
+    "text": "Beneficiary Amina Waghmare se baat hui, number +91 63720 58138 save kar lo."
+  },
+  {
+    "date": "14/03/26",
+    "time": "15:25",
+    "sender": "sarla menon",
+    "text": "Kal Bakhtiyarpur Tola jana hai session ke liye."
+  },
+  {
+    "date": "14/03/26",
+    "time": "16:05",
+    "sender": "Khan Saraswati",
+    "text": "Suvarna ka number hai +91 77810 43932, call kar lena."
+  },
+  {
+    "date": "14/03/26",
+    "time": "15:23",
+    "sender": "Chandra Balasaheb",
+    "text": "noted"
+  },
+  {
+    "date": "14/03/26",
+    "time": "17:49",
+    "sender": "Radha Krishnan",
+    "text": "Rekha Deshpande aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "14/03/26",
+    "time": "17:34",
+    "sender": "kalpana agarwal",
+    "text": "Report kiranper753@gmail.com pe bhejo please, aaj hi."
+  },
+  {
+    "date": "14/03/26",
+    "time": "20:59",
+    "sender": "shrikant chaudhary",
+    "text": "Kal Basaith jana hai session ke liye."
+  },
+  {
+    "date": "14/03/26",
+    "time": "20:30",
+    "sender": "Chandra Balasaheb",
+    "text": "Mahesh Kaur aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "14/03/26",
+    "time": "19:33",
+    "sender": "shrikant chaudhary",
+    "text": "Reddy Mahesh aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "14/03/26",
+    "time": "14:49",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Beneficiary Ismail Rao se baat hui, number 7363140762 save kar lo."
+  },
+  {
+    "date": "14/03/26",
+    "time": "13:27",
+    "sender": "sachin rao",
+    "text": "Beneficiary Vimla Mirza se baat hui, number 6270521193 save kar lo."
+  },
+  {
+    "date": "14/03/26",
+    "time": "12:20",
+    "sender": "Chandra Balasaheb",
+    "text": "Dagdu Siddiqui Paroo mein rehte hai, unki beti 33 saal ki hai."
+  },
+  {
+    "date": "15/03/26",
+    "time": "10:54",
+    "sender": "Chandra Balasaheb",
+    "text": "Nirmala Yadav aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "16/03/26",
+    "time": "12:26",
+    "sender": "sarla menon",
+    "text": "Savita ka number hai 6623995418, call kar lena."
+  },
+  {
+    "date": "17/03/26",
+    "time": "12:17",
+    "sender": "Khan Saraswati",
+    "text": "V. H. Nair ka Aadhaar number 350097133106 list mein verify karna hai."
+  },
+  {
+    "date": "17/03/26",
+    "time": "17:23",
+    "sender": "Ramu Bansal",
+    "text": "Aaj 45 bacchon ka checkup hua."
+  },
+  {
+    "date": "17/03/26",
+    "time": "13:13",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "RUKHSANA SAYYED ka number hai +91 61079 59247, call kar lena."
+  },
+  {
+    "date": "18/03/26",
+    "time": "11:54",
+    "sender": "sarla menon",
+    "text": "Suresh Siddiqui aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "18/03/26",
+    "time": "15:10",
+    "sender": "kalpana agarwal",
+    "text": "Sarla Deshmukh ka number hai 074501-70197, call kar lena."
+  },
+  {
+    "date": "18/03/26",
+    "time": "09:44",
+    "sender": "shrikant chaudhary",
+    "text": "noted"
+  },
+  {
+    "date": "18/03/26",
+    "time": "15:39",
+    "sender": "shrikant chaudhary",
+    "text": "Budget 5000 rupaye approve hua."
+  },
+  {
+    "date": "18/03/26",
+    "time": "10:00",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Beneficiary navjot bhoir se baat hui, number +91 87517 60725 save kar lo."
+  },
+  {
+    "date": "18/03/26",
+    "time": "18:31",
+    "sender": "shrikant chaudhary",
+    "text": "Sunil Rai ka number hai 9560680166, call kar lena."
+  },
+  {
+    "date": "19/03/26",
+    "time": "12:23",
+    "sender": "Deepa DSouza",
+    "text": "Simran Deshpande aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "19/03/26",
+    "time": "09:45",
+    "sender": "Chandra Balasaheb",
+    "text": "Kul kharcha 1200 rupaye hua."
+  },
+  {
+    "date": "19/03/26",
+    "time": "20:08",
+    "sender": "Chandra Balasaheb",
+    "text": "Bapu Waghmare Bakhtiyarpur Tola mein rehte hai, unki beti 14 saal ki hai."
+  },
+  {
+    "date": "19/03/26",
+    "time": "14:23",
+    "sender": "Khan Saraswati",
+    "text": "theek hai"
+  },
+  {
+    "date": "20/03/26",
+    "time": "12:01",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Total 8 gaon cover ho gaye is hafte."
+  },
+  {
+    "date": "21/03/26",
+    "time": "09:02",
+    "sender": "Sarojini Gill",
+    "text": "Session 2 ghante chala."
+  },
+  {
+    "date": "21/03/26",
+    "time": "13:41",
+    "sender": "kalpana agarwal",
+    "text": "shobha paswan ka number hai +91 82881 07210, call kar lena."
+  },
+  {
+    "date": "21/03/26",
+    "time": "07:21",
+    "sender": "sachin rao",
+    "text": "Champa aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "22/03/26",
+    "time": "14:04",
+    "sender": "shrikant chaudhary",
+    "text": "Beneficiary farooq bhoir se baat hui, number +91 71268 44134 save kar lo."
+  },
+  {
+    "date": "22/03/26",
+    "time": "21:09",
+    "sender": "sarla menon",
+    "text": "Budget 5000 rupaye approve hua."
+  },
+  {
+    "date": "22/03/26",
+    "time": "11:56",
+    "sender": "Ramu Bansal",
+    "text": "Aakash ka number hai 083552-23687, call kar lena."
+  },
+  {
+    "date": "22/03/26",
+    "time": "18:54",
+    "sender": "Mane Snehal",
+    "text": "Kal Dobhi jana hai session ke liye."
+  },
+  {
+    "date": "23/03/26",
+    "time": "10:17",
+    "sender": "Ramu Bansal",
+    "text": "Kal Harnaut Tola jana hai session ke liye."
+  },
+  {
+    "date": "24/03/26",
+    "time": "20:30",
+    "sender": "sarla menon",
+    "text": "done"
+  },
+  {
+    "date": "24/03/26",
+    "time": "13:37",
+    "sender": "Ramu Bansal",
+    "text": "Beneficiary Verma Navjot se baat hui, number +91 86038 65199 save kar lo."
+  },
+  {
+    "date": "25/03/26",
+    "time": "20:17",
+    "sender": "Chandra Balasaheb",
+    "text": "noted"
+  },
+  {
+    "date": "25/03/26",
+    "time": "16:48",
+    "sender": "Radha Krishnan",
+    "text": "Sakina Bhoir Talegaon Dhamdhere mein rehte hai, unki beti 47 saal ki hai."
+  },
+  {
+    "date": "25/03/26",
+    "time": "09:01",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Beneficiary Aslam Kaur se baat hui, number 6522217710 save kar lo."
+  },
+  {
+    "date": "26/03/26",
+    "time": "10:31",
+    "sender": "Deepa DSouza",
+    "text": "done"
+  },
+  {
+    "date": "26/03/26",
+    "time": "10:47",
+    "sender": "Radha Krishnan",
+    "text": "Gadhave Pooja ka number hai 8290916230, call kar lena."
+  },
+  {
+    "date": "26/03/26",
+    "time": "09:00",
+    "sender": "Khan Saraswati",
+    "text": "Beneficiary aslam chettiar se baat hui, number +91 75790 25597 save kar lo."
+  },
+  {
+    "date": "26/03/26",
+    "time": "12:45",
+    "sender": "Deepa DSouza",
+    "text": "Session 2 ghante chala."
+  },
+  {
+    "date": "26/03/26",
+    "time": "21:49",
+    "sender": "Chandra Balasaheb",
+    "text": "60% attendance thi aaj."
+  },
+  {
+    "date": "27/03/26",
+    "time": "16:04",
+    "sender": "Radha Krishnan",
+    "text": "Kumari Namdev Rajgurunagar mein rehte hai, unki beti 42 saal ki hai."
+  },
+  {
+    "date": "28/03/26",
+    "time": "15:22",
+    "sender": "sachin rao",
+    "text": "Pankaj Sheikh aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "28/03/26",
+    "time": "09:14",
+    "sender": "sachin rao",
+    "text": "Kavita Kale aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "29/03/26",
+    "time": "08:48",
+    "sender": "shrikant chaudhary",
+    "text": "60% attendance thi aaj."
+  },
+  {
+    "date": "30/03/26",
+    "time": "20:17",
+    "sender": "Sarojini Gill",
+    "text": "Beneficiary SUVARNA JADHAV se baat hui, number +91 73451 58928 save kar lo."
+  },
+  {
+    "date": "30/03/26",
+    "time": "20:36",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Irfan Agarwal aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "30/03/26",
+    "time": "18:59",
+    "sender": "Khan Saraswati",
+    "text": "Indira ka number hai +91 69604 03898, call kar lena."
+  },
+  {
+    "date": "31/03/26",
+    "time": "13:21",
+    "sender": "kalpana agarwal",
+    "text": "bhagyashree mahato aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "31/03/26",
+    "time": "10:02",
+    "sender": "sarla menon",
+    "text": "Beneficiary Yadav Aakash se baat hui, number 088329-35557 save kar lo."
+  },
+  {
+    "date": "31/03/26",
+    "time": "19:26",
+    "sender": "Chandra Balasaheb",
+    "text": "15 forms complete kiye aaj."
+  },
+  {
+    "date": "31/03/26",
+    "time": "21:36",
+    "sender": "sarla menon",
+    "text": "Priyanka Dhillon aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "31/03/26",
+    "time": "20:47",
+    "sender": "sarla menon",
+    "text": "Beneficiary Iqbal Qureshi se baat hui, number 080493-31188 save kar lo."
+  },
+  {
+    "date": "31/03/26",
+    "time": "09:27",
+    "sender": "Sarojini Gill",
+    "text": "Shankar Joshi ka number hai 069726-29292, call kar lena."
+  },
+  {
+    "date": "31/03/26",
+    "time": "15:36",
+    "sender": "kalpana agarwal",
+    "text": "Gopal Manjari mein rehte hai, unki beti 6 saal ki hai."
+  },
+  {
+    "date": "31/03/26",
+    "time": "07:32",
+    "sender": "Deepa DSouza",
+    "text": "Manoj Nair Bariarpur mein rehte hai, unki beti 56 saal ki hai."
+  },
+  {
+    "date": "31/03/26",
+    "time": "21:02",
+    "sender": "Deepa DSouza",
+    "text": "noted"
+  },
+  {
+    "date": "31/03/26",
+    "time": "20:45",
+    "sender": "Deepa DSouza",
+    "text": "Kal Paroo jana hai session ke liye."
+  },
+  {
+    "date": "31/03/26",
+    "time": "20:30",
+    "sender": "Deepa DSouza",
+    "text": "noted"
+  },
+  {
+    "date": "31/03/26",
+    "time": "09:01",
+    "sender": "sarla menon",
+    "text": "ok"
+  },
+  {
+    "date": "31/03/26",
+    "time": "20:34",
+    "sender": "Khan Saraswati",
+    "text": "Beneficiary santosh george se baat hui, number 9665233525 save kar lo."
+  },
+  {
+    "date": "31/03/26",
+    "time": "12:22",
+    "sender": "Chandra Balasaheb",
+    "text": "Vandana Sayyed aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "01/04/26",
+    "time": "19:36",
+    "sender": "kalpana agarwal",
+    "text": "Kal Shirur jana hai session ke liye."
+  },
+  {
+    "date": "02/04/26",
+    "time": "12:27",
+    "sender": "Deepa DSouza",
+    "text": "Simran aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "02/04/26",
+    "time": "20:42",
+    "sender": "Sarojini Gill",
+    "text": "Beneficiary BALIRAM NAIDU se baat hui, number 6927460848 save kar lo."
+  },
+  {
+    "date": "02/04/26",
+    "time": "12:21",
+    "sender": "sarla menon",
+    "text": "Shobha Chaudhary Chakan mein rehte hai, unki beti 52 saal ki hai."
+  },
+  {
+    "date": "02/04/26",
+    "time": "14:03",
+    "sender": "sarla menon",
+    "text": "Suvarna Deshpande aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "02/04/26",
+    "time": "08:32",
+    "sender": "kalpana agarwal",
+    "text": "O. K. Kumar Guraru mein rehte hai, unki beti 11 saal ki hai."
+  },
+  {
+    "date": "03/04/26",
+    "time": "17:57",
+    "sender": "kalpana agarwal",
+    "text": "Aaj 45 bacchon ka checkup hua."
+  },
+  {
+    "date": "03/04/26",
+    "time": "16:50",
+    "sender": "Radha Krishnan",
+    "text": "haan bhej diya"
+  },
+  {
+    "date": "04/04/26",
+    "time": "19:14",
+    "sender": "Sarojini Gill",
+    "text": "Divya Qureshi ka number hai 6616059936, call kar lena."
+  },
+  {
+    "date": "04/04/26",
+    "time": "19:48",
+    "sender": "shrikant chaudhary",
+    "text": "Aaj 45 bacchon ka checkup hua."
+  },
+  {
+    "date": "04/04/26",
+    "time": "18:19",
+    "sender": "Khan Saraswati",
+    "text": "Kal Atri jana hai session ke liye."
+  },
+  {
+    "date": "05/04/26",
+    "time": "13:38",
+    "sender": "Deepa DSouza",
+    "text": "Snehal Reddy ka number hai +91 91459 55721, call kar lena."
+  },
+  {
+    "date": "05/04/26",
+    "time": "11:41",
+    "sender": "sarla menon",
+    "text": "Sarita Khan ka number hai +91 93066 40215, call kar lena."
+  },
+  {
+    "date": "05/04/26",
+    "time": "11:58",
+    "sender": "kalpana agarwal",
+    "text": "Vikram ka number hai +91 63123 24537, call kar lena."
+  },
+  {
+    "date": "05/04/26",
+    "time": "20:44",
+    "sender": "Mane Snehal",
+    "text": "Beneficiary Mukesh Pathan se baat hui, number 7202731707 save kar lo."
+  },
+  {
+    "date": "06/04/26",
+    "time": "12:37",
+    "sender": "Deepa DSouza",
+    "text": "Zainab Rai aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "06/04/26",
+    "time": "13:16",
+    "sender": "Khan Saraswati",
+    "text": "Budget 5000 rupaye approve hua."
+  },
+  {
+    "date": "06/04/26",
+    "time": "19:20",
+    "sender": "sarla menon",
+    "text": "SHAKUNTALA RAO aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "06/04/26",
+    "time": "17:59",
+    "sender": "shrikant chaudhary",
+    "text": "Meeting 3 baje hai kal."
+  },
+  {
+    "date": "06/04/26",
+    "time": "13:44",
+    "sender": "Deepa DSouza",
+    "text": "E. V. Chavan ka number hai 085253-47427, call kar lena."
+  },
+  {
+    "date": "07/04/26",
+    "time": "18:52",
+    "sender": "Chandra Balasaheb",
+    "text": "Ramdas Bajwa ka number hai +91 82227 85936, call kar lena."
+  },
+  {
+    "date": "07/04/26",
+    "time": "16:18",
+    "sender": "Chandra Balasaheb",
+    "text": "Suvarna Saswad mein rehte hai, unki beti 70 saal ki hai."
+  },
+  {
+    "date": "07/04/26",
+    "time": "10:13",
+    "sender": "Deepa DSouza",
+    "text": "SUDHA GAIKWAD Motipur mein rehte hai, unki beti 55 saal ki hai."
+  },
+  {
+    "date": "08/04/26",
+    "time": "19:45",
+    "sender": "shrikant chaudhary",
+    "text": "theek hai"
+  },
+  {
+    "date": "08/04/26",
+    "time": "08:36",
+    "sender": "Chandra Balasaheb",
+    "text": "Prakash Gadhave ka number hai +91 60280 12713, call kar lena."
+  },
+  {
+    "date": "08/04/26",
+    "time": "09:32",
+    "sender": "Radha Krishnan",
+    "text": "Stephen Kumar Chikhali mein rehte hai, unki beti 33 saal ki hai."
+  },
+  {
+    "date": "08/04/26",
+    "time": "13:09",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Kal Devipur jana hai session ke liye."
+  },
+  {
+    "date": "09/04/26",
+    "time": "07:02",
+    "sender": "sarla menon",
+    "text": "Kal Nira jana hai session ke liye."
+  },
+  {
+    "date": "09/04/26",
+    "time": "10:16",
+    "sender": "Sarojini Gill",
+    "text": "zainab bansal Chandwara mein rehte hai, unki beti 14 saal ki hai."
+  },
+  {
+    "date": "09/04/26",
+    "time": "17:55",
+    "sender": "shrikant chaudhary",
+    "text": "Session 2 ghante chala."
+  },
+  {
+    "date": "09/04/26",
+    "time": "12:04",
+    "sender": "sarla menon",
+    "text": "Rekha ka number hai 082782-04572, call kar lena."
+  },
+  {
+    "date": "09/04/26",
+    "time": "17:05",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Session 2 ghante chala."
+  },
+  {
+    "date": "10/04/26",
+    "time": "17:32",
+    "sender": "shrikant chaudhary",
+    "text": "theek hai"
+  },
+  {
+    "date": "10/04/26",
+    "time": "19:03",
+    "sender": "Chandra Balasaheb",
+    "text": "Snehal Pathan ka number hai +91 91064 49310, call kar lena."
+  },
+  {
+    "date": "10/04/26",
+    "time": "09:55",
+    "sender": "sachin rao",
+    "text": "Beneficiary DSouza Vimla se baat hui, number 9591021597 save kar lo."
+  },
+  {
+    "date": "10/04/26",
+    "time": "14:59",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Priyanka Gadhave ka number hai 7821352007, call kar lena."
+  },
+  {
+    "date": "10/04/26",
+    "time": "21:07",
+    "sender": "shrikant chaudhary",
+    "text": "Kal Motipur jana hai session ke liye."
+  },
+  {
+    "date": "11/04/26",
+    "time": "09:38",
+    "sender": "kalpana agarwal",
+    "text": "V. N. Kadam Sahebganj mein rehte hai, unki beti 49 saal ki hai."
+  },
+  {
+    "date": "11/04/26",
+    "time": "19:59",
+    "sender": "Mane Snehal",
+    "text": "Sudha Chettiar Bakhtiyarpur Tola mein rehte hai, unki beti 52 saal ki hai."
+  },
+  {
+    "date": "11/04/26",
+    "time": "11:58",
+    "sender": "sarla menon",
+    "text": "shabana george ka number hai 9655263559, call kar lena."
+  },
+  {
+    "date": "11/04/26",
+    "time": "08:37",
+    "sender": "Khan Saraswati",
+    "text": "Joseph Gaikwad ka number hai 9387873069, call kar lena."
+  },
+  {
+    "date": "11/04/26",
+    "time": "15:01",
+    "sender": "Deepa DSouza",
+    "text": "Total 8 gaon cover ho gaye is hafte."
+  },
+  {
+    "date": "11/04/26",
+    "time": "14:41",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Prasad Rakesh aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "11/04/26",
+    "time": "16:48",
+    "sender": "shrikant chaudhary",
+    "text": "yashwant kumar aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "11/04/26",
+    "time": "20:12",
+    "sender": "Ramu Bansal",
+    "text": "Kal Nanded Phata jana hai session ke liye."
+  },
+  {
+    "date": "11/04/26",
+    "time": "12:43",
+    "sender": "sarla menon",
+    "text": "Beneficiary Kumar Indira se baat hui, number 076084-27312 save kar lo."
+  },
+  {
+    "date": "11/04/26",
+    "time": "19:32",
+    "sender": "Mane Snehal",
+    "text": "Beneficiary Mohan Dhillon se baat hui, number 7181566844 save kar lo."
+  },
+  {
+    "date": "11/04/26",
+    "time": "14:29",
+    "sender": "kalpana agarwal",
+    "text": "Nirmala Mathew ka number hai 7046657859, call kar lena."
+  },
+  {
+    "date": "11/04/26",
+    "time": "18:50",
+    "sender": "Ramu Bansal",
+    "text": "Thakur Grace aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "11/04/26",
+    "time": "12:35",
+    "sender": "Mane Snehal",
+    "text": "Beneficiary Siddiqui Saraswati se baat hui, number +91 92242 55927 save kar lo."
+  },
+  {
+    "date": "12/04/26",
+    "time": "12:52",
+    "sender": "Radha Krishnan",
+    "text": "Ayesha ka number hai +91 70573 90097, call kar lena."
+  },
+  {
+    "date": "12/04/26",
+    "time": "12:17",
+    "sender": "sarla menon",
+    "text": "Kal Kharadi jana hai session ke liye."
+  },
+  {
+    "date": "12/04/26",
+    "time": "14:05",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Popat ka number hai +91 75516 84221, call kar lena."
+  },
+  {
+    "date": "12/04/26",
+    "time": "18:55",
+    "sender": "Sarojini Gill",
+    "text": "C. B. Gadhave ka number hai +91 92848 00861, call kar lena."
+  },
+  {
+    "date": "12/04/26",
+    "time": "20:46",
+    "sender": "shrikant chaudhary",
+    "text": "Kul kharcha 1200 rupaye hua."
+  },
+  {
+    "date": "13/04/26",
+    "time": "16:40",
+    "sender": "sachin rao",
+    "text": "SHAKUNTALA KUSHWAHA aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "13/04/26",
+    "time": "14:22",
+    "sender": "Sarojini Gill",
+    "text": "haan bhej diya"
+  },
+  {
+    "date": "13/04/26",
+    "time": "12:43",
+    "sender": "Sarojini Gill",
+    "text": "Kal Chakan jana hai session ke liye."
+  },
+  {
+    "date": "13/04/26",
+    "time": "14:12",
+    "sender": "Chandra Balasaheb",
+    "text": "Kal Paroo jana hai session ke liye."
+  },
+  {
+    "date": "13/04/26",
+    "time": "08:51",
+    "sender": "Sarojini Gill",
+    "text": "Simran Kushwaha ka number hai +91 76698 92460, call kar lena."
+  },
+  {
+    "date": "13/04/26",
+    "time": "20:06",
+    "sender": "sachin rao",
+    "text": "Meeting 3 baje hai kal."
+  },
+  {
+    "date": "14/04/26",
+    "time": "20:50",
+    "sender": "shrikant chaudhary",
+    "text": "Beneficiary RAHUL VERMA se baat hui, number 7895786062 save kar lo."
+  },
+  {
+    "date": "15/04/26",
+    "time": "12:34",
+    "sender": "SHOBHA SALUNKHE",
+    "text": "Sakina Waghmare Uruli Kanchan mein rehte hai, unki beti 29 saal ki hai."
+  },
+  {
+    "date": "15/04/26",
+    "time": "14:14",
+    "sender": "Khan Saraswati",
+    "text": "done"
+  },
+  {
+    "date": "15/04/26",
+    "time": "17:51",
+    "sender": "Ramu Bansal",
+    "text": "Balasaheb Kadam aaj camp me aayi thi, follow up karna hai."
+  },
+  {
+    "date": "15/04/26",
+    "time": "18:56",
+    "sender": "Chandra Balasaheb",
+    "text": "deepak kushwaha aaj camp me aayi thi, follow up karna hai."
+  }
+];
+        const sortedSenders = [
+  [
+    "sarla menon",
+    23
+  ],
+  [
+    "Chandra Balasaheb",
+    23
+  ],
+  [
+    "shrikant chaudhary",
+    20
+  ],
+  [
+    "Deepa DSouza",
+    18
+  ],
+  [
+    "Sarojini Gill",
+    15
+  ],
+  [
+    "Ramu Bansal",
+    13
+  ],
+  [
+    "kalpana agarwal",
+    13
+  ],
+  [
+    "SHOBHA SALUNKHE",
+    13
+  ],
+  [
+    "Khan Saraswati",
+    12
+  ],
+  [
+    "Mane Snehal",
+    10
+  ],
+  [
+    "Radha Krishnan",
+    10
+  ],
+  [
+    "sachin rao",
+    10
+  ]
+];
+        let activeSender = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            populateTable();
+            renderMessages();
+        });
+
+        function populateTable() {
+            const tbody = document.getElementById('sender-table-body');
+            tbody.innerHTML = '';
+            
+            const totalMsgs = messages.length;
+
+            sortedSenders.forEach(([name, count]) => {
+                const ratio = ((count / totalMsgs) * 100).toFixed(1) + '%';
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-sender', name);
+                tr.onclick = () => selectSender(name);
+                
+                tr.innerHTML = `
+                    <td><strong>${name}</strong></td>
+                    <td style="text-align: right; font-weight: 500;">${count}</td>
+                    <td style="text-align: right; color: var(--text-secondary); font-size: 0.8rem;">${ratio}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('chat-list-container');
+            container.innerHTML = '';
+
+            const filtered = activeSender 
+                ? messages.filter(m => m.sender === activeSender)
+                : messages;
+
+            filtered.forEach(m => {
+                const isSelf = m.sender === activeSender;
+                const div = document.createElement('div');
+                div.className = `chat-message ${isSelf ? 'self' : ''}`;
+
+                div.innerHTML = `
+                    <div class="message-meta">
+                        <span class="msg-sender">${m.sender}</span>
+                        <span>${m.date} ${m.time}</span>
+                    </div>
+                    <div class="msg-text">${m.text}</div>
+                `;
+                container.appendChild(div);
+            });
+            
+            // Auto scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function selectSender(senderName) {
+            const titleBadge = document.getElementById('active-sender-title');
+            
+            // Toggle selection
+            if (activeSender === senderName) {
+                activeSender = null;
+                titleBadge.textContent = 'Showing all messages';
+                
+                // Clear UI states
+                document.querySelectorAll('tr').forEach(r => r.classList.remove('active-row'));
+                document.querySelectorAll('.scatter-dot').forEach(dot => dot.classList.remove('active'));
+                document.querySelectorAll('.glow-dot').forEach(dot => dot.classList.remove('active-glow'));
+                document.querySelectorAll('.x-axis-label').forEach(lbl => lbl.classList.remove('active-label'));
+            } else {
+                activeSender = senderName;
+                titleBadge.textContent = `Showing messages from: ${senderName}`;
+                
+                // Set table row active
+                document.querySelectorAll('tr').forEach(r => {
+                    if (r.getAttribute('data-sender') === senderName) {
+                        r.classList.add('active-row');
+                        r.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } else {
+                        r.classList.remove('active-row');
+                    }
+                });
+
+                // Set plot circle active
+                document.querySelectorAll('.scatter-dot').forEach(dot => {
+                    if (dot.getAttribute('data-sender') === senderName) {
+                        dot.classList.add('active');
+                    } else {
+                        dot.classList.remove('active');
+                    }
+                });
+
+                document.querySelectorAll('.glow-dot').forEach(dot => {
+                    if (dot.getAttribute('data-sender') === senderName) {
+                        dot.classList.add('active-glow');
+                    } else {
+                        dot.classList.remove('active-glow');
+                    }
+                });
+
+                // Set label active
+                document.querySelectorAll('.x-axis-label').forEach(lbl => {
+                    if (lbl.textContent === senderName) {
+                        lbl.classList.add('active-label');
+                    } else {
+                        lbl.classList.remove('active-label');
+                    }
+                });
+            }
+
+            renderMessages();
+        }
+    </script>
+</body>
+</html>
