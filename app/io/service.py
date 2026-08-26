@@ -476,7 +476,8 @@ def chat(question: str, model: str | None = None) -> dict:
     leaks = S.leak_check(payload)
     if leaks:
         return {"error": f"stopped: {len(leaks)} private value(s) were about to leave, {', '.join(leaks[:3])}"}
-    S.step(f"asking: {sent_rows} rows, {sent_lines} lines go as codes")
+    parts = ([f"{sent_rows} rows"] if sent_rows else []) + ([f"{sent_lines} lines"] if sent_lines else [])
+    S.step("asking: " + (" + ".join(parts) if parts else "nothing") + " go as codes")
     raw, meta = call_model(payload, model)
     S.step("translating codes back")
     turn = {"q": question, "q_sent": q, "answer_sent": raw if "<html" not in raw.lower() else "(page)",
