@@ -12,7 +12,7 @@ Before starting, install all three:
 - The privacy shield
 - io
 
-Pick one packet folder. Open its `PROMPTS.md`, use the data mentioned there, and ask the suggested questions in the same order.
+Pick one packet folder. Open its `PROMPTS.md`, use the data mentioned there, and ask the suggested questions in the same order. When you shelter a packet in io, pick the `data/` folder itself, not the packet folder around it - io reads one folder, without subfolders.
 
 ## Packets
 

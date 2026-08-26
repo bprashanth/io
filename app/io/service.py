@@ -168,7 +168,8 @@ class State:
         n_files = len(self.tables) + len(self.docs)
         folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
         folders = [x for x in folders if x["path"] != str(folder)]
-        folders.insert(0, {"path": str(folder), "name": folder.name, "files": n_files})
+        label = folder.name if folder.name != "data" else f"{folder.parent.name}/data"   # five packets all called data/ must not collide on the shelf
+        folders.insert(0, {"path": str(folder), "name": label, "files": n_files})
         FOLDERS_PATH.write_text(json.dumps(folders[:24], indent=1))
 
     @staticmethod
@@ -341,15 +342,19 @@ of row objects per file ({keys}); compute every figure in JavaScript from window
 """
 
 
-def call_model(prompt: str) -> tuple[str, dict]:
+def call_model(prompt: str, model_override: str | None = None) -> tuple[str, dict]:
     p = S.provider
     if p.get("server"):
         url, key, model = p["server"].rstrip("/") + "/chat/completions", p.get("api_key", ""), p.get("model") or "local"
     else:
         url, key, model = "https://openrouter.ai/api/v1/chat/completions", p.get("api_key", ""), p.get("model") or "google/gemini-3.7-flash"
+    if model_override:
+        model = model_override
     body = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0, "max_tokens": 16000}
     if re.match(r"google/gemini|openai/gpt-oss|openai/o", model):
         body["reasoning"] = {"effort": "low"}
+    elif re.match(r"qwen/", model):
+        body["reasoning"] = {"enabled": False}   # thinking-mode qwen otherwise spends minutes emitting only reasoning tokens
     headers = {"Content-Type": "application/json"}
     if key:
         headers["Authorization"] = f"Bearer {key}"
@@ -357,8 +362,15 @@ def call_model(prompt: str) -> tuple[str, dict]:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
     with urllib.request.urlopen(req, timeout=600) as r:
         raw = json.load(r)
-    text = raw["choices"][0]["message"].get("content") or ""
-    return text, {"model": raw.get("model", model), "seconds": round(time.monotonic() - t0, 1)}
+    msg = raw["choices"][0]["message"]
+    text = msg.get("content") or ""
+    if not text and msg.get("reasoning"):
+        text = msg["reasoning"]          # thinking-only reply: better the reasoning than a blank answer
+    meta = {"model": raw.get("model", model), "seconds": round(time.monotonic() - t0, 1)}
+    fr = raw["choices"][0].get("finish_reason")
+    if fr and fr != "stop":
+        meta["finish"] = fr
+    return text, meta
 
 
 SHARED: dict = {}
@@ -407,7 +419,7 @@ def ensure_share_server() -> int:
     return port
 
 
-def chat(question: str) -> dict:
+def chat(question: str, model: str | None = None) -> dict:
     if not S.redacted:
         S.step("hiding what you marked")
         S.build_vault()
@@ -465,7 +477,7 @@ def chat(question: str) -> dict:
     if leaks:
         return {"error": f"stopped: {len(leaks)} private value(s) were about to leave, {', '.join(leaks[:3])}"}
     S.step(f"asking: {sent_rows} rows, {sent_lines} lines go as codes")
-    raw, meta = call_model(payload)
+    raw, meta = call_model(payload, model)
     S.step("translating codes back")
     turn = {"q": question, "q_sent": q, "answer_sent": raw if "<html" not in raw.lower() else "(page)",
             "sent_rows": sent_rows, "sent_lines": sent_lines, "bytes": len(payload), "files_used": use if mentioned else [], **meta}
@@ -691,7 +703,7 @@ class H(BaseHTTPRequestHandler):
                 return self._json({"vault": len(S.pmap.display)})
             if self.path == "/api/chat":
                 with S.lock:
-                    r = chat(body["text"])
+                    r = chat(body["text"], body.get("model") or None)
                 return self._json({k: v for k, v in r.items() if k != "page"} | ({"has_page": True} if r.get("page") else {}))
         except Exception as exc:  # noqa: BLE001
             traceback.print_exc()
