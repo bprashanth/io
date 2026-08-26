@@ -2,15 +2,17 @@
 
 <img src="assets/io.jpg" alt="Jupiter and Io" width="360" align="left" style="margin-right: 15px; margin-bottom: 10px;">
 
-This repository is working toward an event experience more than a specific product currently. The event: user
-(typically someone from the social sector, eg working at a NPO) drops in a
-CSV/workbook or PDF/chat dump, asks a few short plain-language question (no
-engineering hints, coding etc) and gets a correct desktop dashboard which they
-can refine without debugging an agent or installing a new stack for every file.
+This repository is working toward an event experience more than a specific
+product. At the event, users (typically someone from the social sector, eg
+working at a NPO) will point some AI at a directory containing data files like
+CSVs/workbooks, PDFs/chat dumps and ask a few plain-language question. The goal
+of this event it to show them how to get a correct desktop dashboard which they
+can refine without debugging an agent or installing a new stack.
 
-Two things potentially ship from here: the privacy shield plugin for Antigravity
-(a shield for the common Antigravity user) and the io desktop app (for the
-serious privacy user). Depending on user feedback, the io app can grow. 
+Two things can ship out of this repo: a privacy plugin for Antigravity and the
+io desktop app. Depending on user feedback, the io app can grow. The
+Antigravity plugin is more of illustrative purposes as we don't control the
+settings it relies on and they seem to be buried in the documentation. 
 
 ## Quick start
 
