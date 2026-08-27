@@ -286,22 +286,68 @@ The download and pip watchdogs added along the way did not fix Windows. They are
 right for event wifi - a stalled TLS socket that never errors is a real failure mode this
 repo has already been bitten by once - but they were not the bug.
 
-## Not done yet
+## The offline (fat) packs, all three
 
-**No fat artifact for Windows or macOS.** The `fat` job is gated behind a
-`workflow_dispatch` input because each artifact is roughly 1-2 GB. Only linux-arm64 has
-actually been built and smoked offline, locally: 930 MB AppImage, provider screen with
-`first_run_install: false` and no data dir written at all.
+Run **33084523518**. Every one built on its own target OS - the wheels inside are compiled,
+so a payload made anywhere else is useless - packed into `resources/`, and smoked with a
+fresh data dir to prove it installs nothing.
+
+| | file | size | provider screen | shelf | vs thin |
+|---|---|---|---|---|---|
+| **win-x64** | `io-win-x64-offline.zip` | **1.3 GB** | **5.7 s** | 24.5 s | 139.3 s |
+| **mac-arm64** | `io-mac-arm64-offline.dmg` | **804 MB** | **4.2 s** | 19.0 s | 50.5 s |
+| **linux-x64** | `io-linux-x64-offline.tar.gz` | **951 MB** | 20.5 s | 37.5 s | 60.8 s |
+| | `io-linux-x86_64-offline.AppImage` | 995 MB | | | |
+
+All three report `first_run_install: false`, and none of them produced an `install.log` at
+all - the file is never created because the installer never runs. That is the evidence, not
+the timing.
+
+The spec guessed "~2 GB on a USB stick". Every platform comes in under that, Windows
+included, and every file is under the 2 GB per-asset cap on GitHub releases.
+
+Linux's 20.5 s is an artefact of the bench, not the product: the runner has no libfuse2, so
+the AppImage self-extracts ~1 GB to /tmp before it starts. The tar.gz has no such cost and
+is the artifact the install doc points at anyway.
+
+## A third Windows-only bug, from the same family
+
+The offline Windows pack would not build at all. The payload baked fine; 7-Zip then refused
+it, 120 times:
+
+    WARNING: The directory name is invalid.
+    .\resources\hf-cache\hub\models--knowledgator--...\snapshots\<rev>\pytorch_model.bin
+
+Every warning under `resources\hf-cache`, none under `resources\runtime`. The HuggingFace
+cache stores `snapshots/<rev>/<file>` as a symlink into `blobs/<sha>`; harmless where it was
+created, fatal once the tree is archived on Windows. It never appeared on Linux because
+mksquashfs handles symlinks natively - which is exactly why the local arm64 fat AppImage had
+built cleanly and told me nothing.
+
+`bootstrap.js` now replaces every symlink in the cache with a **hard link** to the same blob:
+identical bytes, identical disk usage, but an ordinary directory entry. Verified on the real
+480 MB cache - 10 symlinks to 0, size unchanged, scanner still loads offline in 1.8 s with
+the expected detections.
+
+That is three Windows-only defects in a row (GNU tar, `import resource`, HF symlinks) and
+none of them were packaging problems. All three were code that had only ever run on POSIX,
+and all three would have hit a participant's laptop rather than a runner.
+
+## Not done yet
 
 **No Windows or macOS install doc.** They wait on the two screenshots a runner cannot
 produce: SmartScreen "More info -> Run anyway" on first launch of the unsigned exe, and
 Gatekeeper's right-click -> Open on the un-notarized .app. Those need one real Windows
-laptop and one real Mac. `installation/INSTALL-linux.md` is written and linked from the
-README.
+laptop and one real Mac. `installation/INSTALL-linux.md` is written and linked from README.
 
-**Nothing is signed.** A code-signing certificate removes SmartScreen; an Apple Developer
-ID plus notarization removes Gatekeeper. Neither is needed for the event, both are part of
-the build-optimisation conversation.
+**Nothing is signed.** A code-signing certificate removes SmartScreen; an Apple Developer ID
+plus notarization removes Gatekeeper. Neither is needed for the event.
 
-The work order says to stop here and discuss build optimisation - sizes, fat-zip logistics,
-signing - before going further.
+**Nothing is published anywhere durable.** The artifacts live as GitHub Actions artifacts,
+which need a signed-in GitHub account to download even on a public repo - awkward for
+handing to an organiser. A GitHub release gives plain public URLs and every file fits under
+the 2 GB cap; S3 is the alternative if the URLs need to be controlled.
+
+**Linux ships two offline artifacts** (951 MB tar.gz + 995 MB AppImage) where the event
+only needs the tar.gz, since the AppImage needs a libfuse2 that Ubuntu 24.04 does not
+install. Dropping the offline AppImage halves the Linux offline payload.
