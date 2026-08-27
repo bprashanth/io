@@ -217,14 +217,91 @@ difference is entirely runner-to-PyPI and runner-to-HF throughput. A genuine fir
 Local cold run with the tar fix, packaged arm64 build: install 76 s, provider screen 78.2 s,
 shelf 82.0 s.
 
+## Green on all three
+
+Run **33077672572**, cold first run on clean runners, driving the real shipped artifact
+the way a participant would (unzip the zip, mount the dmg, extract the tarball):
+
+| | install | provider screen | shelf | artifact |
+|---|---|---|---|---|
+| **win-x64** | 2m 16s | 139.3 s | 150.1 s | 106 MB zip |
+| **linux-x64** | 51 s | 60.8 s | 67.4 s | 200 MB (AppImage + tar.gz) |
+| **mac-arm64** | 49 s | 50.5 s | 60.4 s | 94 MB dmg |
+
+Screenshots, `install.log` and `io.log` for each in
+`benchmarks/runs/2026-08-27-packaging-ci/`. Windows is slower for the obvious reason: its
+torch wheel is 121.9 MB against 111.2 MB on macOS, and Defender reads every file in
+site-packages as pip writes it.
+
+It took four CI runs. What the three failures were:
+
+1. `io-linux-x86_64.AppImage` vs `io-linux-x64.AppImage` - electron-builder names AppImage
+   artifacts by `x86_64` while `${arch}` is `x64` everywhere else. Staging looked for a
+   name that was never produced. Artifacts are now resolved by glob.
+2. A tar.gz check that could not pass, because the workflow's `--linux AppImage` on the
+   command line overrides the target list in the config, so no tarball was built.
+3. The two real ones, below.
+
+## The two real Windows bugs
+
+Neither was a packaging problem. Both were in code that had only ever run on POSIX.
+
+**GNU tar reads `C:\...` as a remote host.** `-f C:\Users\...\cpython.tar.gz` is parsed as
+`host:path`, so tar tried to resolve a machine called "C":
+
+    tar (child): Cannot connect to C: resolve failed
+
+Reproduced here against GNU tar 1.35 with a byte-identical message. The assumption I
+carried over from `installation/windows.md` - Windows 10+ has bsdtar in System32 - is true,
+but Git for Windows puts GNU tar ahead of it on PATH, and both the runner and plenty of
+participants have Git for Windows. Fixed twice over: ask for `System32\tar.exe` by name,
+and pass only basenames from a `cwd` so no argument carries a drive letter either way.
+
+**`import resource` is POSIX-only.** With tar fixed the install completed - "scanner
+cached", "done in 1m 59s" - and then the service died instantly. `engine/detect.py` had a
+bare module-scope `import resource`, a module Windows does not have, so `service.py` died
+at import before binding a port. torch and gliner are imported lazily inside functions and
+were never the suspect. The single use is peak-RSS reporting in the benchmark CLI, code the
+desktop app never runs; it is now an optional import with a `_max_rss_mb()` helper that
+returns None where the platform cannot report it.
+
+**This one is not only io's problem.** `extension/privacy-shield/server/detect.py` and
+`benchmarks/pii/detect.py` are the other two copies of that file and still carry the same
+line. Out of scope for this work order, but the shield has the same latent Windows failure.
+
+## What the two hangs cost, and what fixed them
+
+Both Windows failures were fast, clean errors that presented as 40 minutes of silence,
+twice, because nothing carried the error out of the runner. The fixes that mattered were
+not the timeouts - they were:
+
+- `install.log` and `io.log` collected by the smoke on both the pass and the fail path.
+- `io.log` moved out of Electron's `userData` (a different directory per platform, and not
+  where anyone looks) into the data dir beside `install.log`, now recording the spawn
+  command, spawn errors and the service exit code.
+- Under `IO_SMOKE`, failure paths log and exit instead of opening a modal dialog. A modal
+  in an automated run burns the entire budget before the harness can report anything.
+
+The download and pip watchdogs added along the way did not fix Windows. They are still
+right for event wifi - a stalled TLS socket that never errors is a real failure mode this
+repo has already been bitten by once - but they were not the bug.
+
 ## Not done yet
 
-No fat artifact has been built for Windows or macOS. The `fat` job is gated behind a
-`workflow_dispatch` input because each artifact is about 2 GB; only the linux-arm64 fat
-build has actually been made and smoked, locally.
+**No fat artifact for Windows or macOS.** The `fat` job is gated behind a
+`workflow_dispatch` input because each artifact is roughly 1-2 GB. Only linux-arm64 has
+actually been built and smoked offline, locally: 930 MB AppImage, provider screen with
+`first_run_install: false` and no data dir written at all.
 
-No install docs yet. They wait on the SmartScreen and Gatekeeper screenshots, which need a
-real machine rather than a runner.
+**No Windows or macOS install doc.** They wait on the two screenshots a runner cannot
+produce: SmartScreen "More info -> Run anyway" on first launch of the unsigned exe, and
+Gatekeeper's right-click -> Open on the un-notarized .app. Those need one real Windows
+laptop and one real Mac. `installation/INSTALL-linux.md` is written and linked from the
+README.
 
-The user asked to stop and discuss build optimisation (sizes, fat-zip logistics, signing)
-once the smoke passes on all three.
+**Nothing is signed.** A code-signing certificate removes SmartScreen; an Apple Developer
+ID plus notarization removes Gatekeeper. Neither is needed for the event, both are part of
+the build-optimisation conversation.
+
+The work order says to stop here and discuss build optimisation - sizes, fat-zip logistics,
+signing - before going further.
