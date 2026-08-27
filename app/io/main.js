@@ -57,13 +57,13 @@ async function ensureRuntime() {
   const began = Date.now();
   const elapsed = () => {
     const s = Math.round((Date.now() - began) / 1000);
-    return s < 90 ? `${s}s so far` : `${Math.floor(s / 60)}m ${s % 60}s so far`;
+    return s < 90 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
   };
   let latest = { phase: 'python', detail: 'starting' };
   const tick = setInterval(() => {
     if (!splash || splash.isDestroyed()) return;
     splash.webContents.executeJavaScript(
-      `window.ioProgress(${JSON.stringify({ note: `${NOTE[latest.phase] || ''} - ${elapsed()}` })})`
+      `window.ioProgress(${JSON.stringify({ note: `${NOTE[latest.phase] || ''} - ${elapsed()} so far` })})`
     ).catch(() => {});
   }, 1000);
   // The splash gets every event; the log gets one line per real change. A download fires a
@@ -77,7 +77,7 @@ async function ensureRuntime() {
     latest = p;
     if (!splash || splash.isDestroyed()) return;
     splash.webContents.executeJavaScript(
-      `window.ioProgress(${JSON.stringify({ detail: p.detail, frac: p.frac, note: `${NOTE[p.phase] || ''} - ${elapsed()}` })})`
+      `window.ioProgress(${JSON.stringify({ detail: p.detail, frac: p.frac, note: `${NOTE[p.phase] || ''} - ${elapsed()} so far` })})`
     ).catch(() => {});
   };
 
