@@ -34,11 +34,11 @@ h1{font-weight:600;font-size:28px;margin:0 0 6px} .dim{color:#8b8f96}
 td,th{padding:6px 12px;border-bottom:1px solid #2f343a;text-align:left} th{color:#8b8f96;font-weight:500}
 </style></head><body>
 <h1>Which answer did the room prefer?</h1>
-<div class=dim>Every vote was blind: three unnamed answers, same question, same coded data. %(total)s votes so far.</div>
+<div class=dim>total: %(total)s</div>
 <div class=row>
-<div class=big><div class="n hi">%(9b)s</div><div class=l>the laptop model (9B)</div></div>
-<div class=big><div class="n hi">%(27b)s</div><div class=l>the mid model (27B)</div></div>
-<div class=big><div class="n hi">%(frontier)s</div><div class=l>the frontier model</div></div>
+<div class=big><div class="n hi">%(9b)s</div><div class=l>the laptop model (9B)</div><div class=l>%(sub_9b)s</div></div>
+<div class=big><div class="n hi">%(27b)s</div><div class=l>the mid model (27B)</div><div class=l>%(sub_27b)s</div></div>
+<div class=big><div class="n hi">%(frontier)s</div><div class=l>the frontier model</div><div class=l>%(sub_frontier)s</div></div>
 <div class=big><div class=n>%(tie)s</div><div class=l>no difference</div></div>
 <div class=big><div class=n>%(none)s</div><div class=l>all bad</div></div>
 </div>
@@ -64,12 +64,24 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         t, rows = tally()
         total = sum(t.get(a, 0) for a in ALIASES)
-        WHY = {"style": "formatting and style", "correctness": "others were wrong"}
+        WHY = {"style": "formatting and style", "correctness": "others were wrong",
+               "more-correct": "more correct", "written-better": "written better",
+               "cost-less": "time / tokens less", "not-sure": "not sure",
+               "wrong-answers": "wrong answers", "bad-writing": "bad writing",
+               "cost-high": "time / tokens high"}
         last = "".join(f"<tr><td>{time.strftime('%H:%M', time.localtime(r.get('t', 0)))}</td>"
                        f"<td>{(r.get('q_sent') or '')[:90]}</td><td class=hi>{r.get('outcome')}</td>"
                        f"<td>{WHY.get(r.get('why'), '')}</td></tr>"
                        for r in rows[-12:][::-1])
-        html = PAGE % {**{a: t.get(a, 0) for a in ALIASES}, "total": total, "rows": last}
+        subs = {}
+        for a in ("9b", "27b", "frontier"):
+            secs, toks, n = 0.0, 0, 0
+            for r in rows:
+                for c in r.get("cands", []):
+                    if c.get("alias") == a and c.get("seconds") is not None:
+                        secs += c["seconds"]; toks += c.get("tokens_out") or 0; n += 1
+            subs["sub_" + a] = f"avg {secs/n:.1f}s, {toks//n} tokens" if n else ""
+        html = PAGE % {**{a: t.get(a, 0) for a in ALIASES}, **subs, "total": total, "rows": last}
         return self._send(200, html.encode())
 
 if __name__ == "__main__":

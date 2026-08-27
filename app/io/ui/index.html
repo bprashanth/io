@@ -93,7 +93,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
 /* input bar */
 #bar{padding:16px 24px 22px}
 .chips{display:flex;gap:12px;margin:14px 0 18px}
-.chip{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;font-size:13.5px;line-height:1.5;color:var(--dim);cursor:pointer;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-height:66px}
+.chip{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:12px 16px;font-size:13.5px;line-height:1.5;color:var(--dim);cursor:pointer}
 .chip.sel{border-color:var(--hi);color:var(--ink)}
 .reading{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:26px 32px;font-size:15px;line-height:1.75;max-height:56vh;overflow-y:auto}
 .reading iframe{width:100%;height:52vh;border:none;background:#fff;border-radius:8px}
@@ -106,9 +106,13 @@ td.tok{background:var(--hibg);color:var(--hi)}
 .reading table{border-collapse:collapse;margin:12px 0;width:100%}
 .reading td,.reading th{border:1px solid var(--line);padding:6px 10px;text-align:left;font-size:13.5px}
 .reading .openfull{font-size:13px;color:var(--hi);display:inline-block;margin-top:10px}
-.voterow{display:flex;gap:12px;margin-top:16px;align-items:stretch}
-.choosebox{display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:12px;padding:8px 14px}
-.choosebox label{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px;cursor:pointer}
+.voterow{display:flex;gap:12px;margin-top:16px;align-items:flex-start}
+.voterow > .plain{align-self:center;padding:10px 16px}
+.choosebox{display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:12px;padding:10px 16px}
+.whys{display:flex;flex-direction:column;gap:5px}
+.chip .prev{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.chip .sub{color:var(--dim);font-size:11.5px;margin-top:6px}
+.choosebox label{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
 .choosebox label:hover{color:var(--ink)}
 .choosebox input{accent-color:var(--hi)}
 .voterow .go[disabled]{opacity:.4;cursor:default}
@@ -559,16 +563,28 @@ function renderCompare(el, w, r){
   q.disabled = true;
   let sel = 0, why = null;
   const plain = t => t.replace(/[#*`|_]+/g, ' ').replace(/\s+/g, ' ').trim();
-  const chips = r.cands.map((c, k) => `<div class="chip" data-k="${k}">${c.has_page ? 'a full page - click to view' : esc(plain(c.answer || '').slice(0, 170))}</div>`).join('');
+  const sub = c => `${c.seconds != null ? c.seconds + 's' : ''}${c.tokens ? ', ' + c.tokens + ' tokens' : ''}`;
+  const chips = r.cands.map((c, k) => `<div class="chip" data-k="${k}"><div class="prev">${c.has_page ? 'a full page - click to view' : esc(plain(c.answer || '').slice(0, 170))}</div><div class="sub">${sub(c)}</div></div>`).join('');
   w.innerHTML = `<div class="chips">${chips}</div><div class="reading"></div>
     <div class="voterow">
       <div class="choosebox">
         <button class="go" id="pickgo" disabled>choose this answer</button>
-        <label><input type="radio" name="why${r.id}" value="style">like the formatting and style</label>
-        <label><input type="radio" name="why${r.id}" value="correctness">other answers were not correct</label>
+        <div class="whys">
+          <label><input type="radio" name="why${r.id}" value="more-correct">more correct than others</label>
+          <label><input type="radio" name="why${r.id}" value="written-better">written better</label>
+          <label><input type="radio" name="why${r.id}" value="cost-less">time / tokens less</label>
+          <label><input type="radio" name="why${r.id}" value="not-sure">not sure</label>
+        </div>
+      </div>
+      <div class="choosebox">
+        <button class="plain" id="badgo" disabled>all bad</button>
+        <div class="whys">
+          <label><input type="radio" name="bad${r.id}" value="wrong-answers">wrong answers</label>
+          <label><input type="radio" name="bad${r.id}" value="bad-writing">bad writing</label>
+          <label><input type="radio" name="bad${r.id}" value="cost-high">time / tokens high</label>
+        </div>
       </div>
       <button class="plain" data-p="tie">no difference</button>
-      <button class="plain" data-p="none">all bad</button>
     </div>`;
   const reading = w.querySelector('.reading');
   const showSel = () => {
@@ -580,7 +596,9 @@ function renderCompare(el, w, r){
   };
   showSel();
   w.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { sel = +ch.dataset.k; showSel(); });
+  let badWhy = null;
   w.querySelectorAll(`input[name="why${r.id}"]`).forEach(rb => rb.onchange = () => { why = rb.value; w.querySelector('#pickgo').disabled = false; });
+  w.querySelectorAll(`input[name="bad${r.id}"]`).forEach(rb => rb.onchange = () => { badWhy = rb.value; w.querySelector('#badgo').disabled = false; });
   const vote = async (pick, whyv) => {
     const res = await api('/api/vote', {id: r.id, pick, why: whyv || null});
     if (res.error) { alert(res.error); return; }
@@ -588,7 +606,8 @@ function renderCompare(el, w, r){
     finishTurn(el, w, res);
   };
   w.querySelector('#pickgo').onclick = () => vote(r.cands[sel].i, why);
-  w.querySelectorAll('.voterow .plain').forEach(b => b.onclick = () => vote(b.dataset.p));
+  w.querySelector('#badgo').onclick = () => vote('none', badWhy);
+  w.querySelectorAll('.voterow > .plain').forEach(b => b.onclick = () => vote(b.dataset.p));
   $('#thread').scrollTop = 1e9;
 }
 

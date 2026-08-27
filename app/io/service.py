@@ -538,7 +538,8 @@ def client_view(turn: dict) -> dict:
     if turn.get("pending_vote"):
         return {"id": turn["id"], "q": turn["q"], "pending": True,
                 "sent_rows": turn["sent_rows"], "sent_lines": turn["sent_lines"],
-                "cands": [{"i": i, "answer": c.get("answer"), "has_page": bool(c.get("page"))}
+                "cands": [{"i": i, "answer": c.get("answer"), "has_page": bool(c.get("page")),
+                           "seconds": c.get("seconds"), "tokens": c.get("tokens_out")}
                           for i, c in enumerate(turn["cands"])]}
     out = {k: turn.get(k) for k in ("id", "q", "answer", "sent_rows", "sent_lines", "seconds", "files_used")}
     out["model"] = "3 models"
