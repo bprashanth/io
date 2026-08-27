@@ -64,22 +64,33 @@ and a hand-written `.icns` (8 entries, header length matches file size, every pa
 re-decodes). Conversion was done by the codex CLI per the work order; the verification is
 first-party.
 
-**Cold smoke, packaged AppImage, empty data dir** (`installation/smoke/smoke.js`, driven
-over CDP on 9802 with the service on 8811+, so the primary agent's 8801/8802/8850/8890 were
-never touched - confirmed still listening afterwards):
+**Cold smoke, the packaged artifacts** (`installation/smoke/smoke.js`, driven over CDP with
+the service on 8821+/8831+/8841+, so the primary agent's 8801/8802/8850/8890 were never
+touched - confirmed still listening afterwards):
 
-| | thin, nothing installed | warm, everything present |
-|---|---|---|
-| window open | 1.0 s | 2.0 s |
-| provider screen | **88.2 s** | **2.1 s** |
-| shelf rendered | 93.4 s | 6.6 s |
-| ran an install | yes | no |
+| | thin, empty data dir | fat, offline | warm |
+|---|---|---|---|
+| artifact | 104 MB AppImage | 930 MB AppImage | 104 MB AppImage |
+| window open | 1.0 s | 9.0 s | 1.0 s |
+| provider screen | **82.2 s** | **9.4 s** | **1.1 s** |
+| shelf rendered | 87.0 s | 17.6 s | 5.9 s |
+| installed anything | yes | no | no |
 
-Screenshots in `installation/smoke/out-linux-arm64-{thin,warm}/`. The warm column is the
-same code path a fat build takes - everything present, `first_run_install: false` - so 2.1 s
-is the number a participant with the offline zip should see. Caveat on the 88.2 s: pip's
-local wheel cache on this box was warm from earlier runs, so a genuinely first-time
-install on event wifi will be slower. CI on a clean runner will give the honest figure.
+Screenshots and `results.json` in `benchmarks/runs/2026-08-27-packaging-linux/`. Three
+things worth reading off that table:
+
+- **The fat build is genuinely offline.** `first_run_install: false` is a before/after fact
+  about `<data>/runtime`, not a guess: the fat run left no data dir on disk at all.
+- **930 MB, not 2 GB.** The payload is 1.9 GB on disk (1.4 GB runtime + 480 MB cache);
+  squashfs takes the AppImage to 930 MB. The Windows zip will not compress as well, but the
+  spec's "~2 GB on a USB stick" is pessimistic.
+- **The fat build's 9.4 s is an artefact of this box, not the product.** Without FUSE the
+  AppImage has to extract 930 MB to /tmp before it runs (`APPIMAGE_EXTRACT_AND_RUN=1`).
+  A machine with FUSE mounts it instead, which is the 1.1 s warm column.
+
+Caveat on 82.2 s: pip's local wheel cache on this box was warm from earlier runs, so a
+genuinely first-time install on event wifi will be slower. CI on a clean runner gives the
+honest figure.
 
 ## One real bug the smoke caught
 
@@ -93,7 +104,7 @@ and those are not daemon threads, so the interpreter cannot finalise. With a **w
 the same snippet exits in 4.5 s, which is why the standalone payload build had looked fine
 and why this would have been an intermittent, unreproducible "it hung on my laptop" at the
 event. `bootstrap.js` now flushes and calls `os._exit(0)` once the cache is warm. With that
-in, the cold run finishes in 88 s.
+in, the cold run finishes in 82 s.
 
 This is the whole argument for smoking the real artifact rather than checking that a build
 compiles.

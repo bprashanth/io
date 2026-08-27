@@ -34,6 +34,22 @@ const BUDGET_MIN = Number(arg('budget-min', 25));   // thin cold start downloads
 if (!EXE) { console.error('need --exe'); process.exit(2); }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+let CHILD = null;
+async function teardown() {
+  if (!CHILD || CHILD.exitCode !== null) return;
+  const pid = CHILD.pid;
+  try {
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    } else {
+      process.kill(-pid, 'SIGTERM');       // the group, not just the wrapper
+      await sleep(2000);
+      try { process.kill(-pid, 'SIGKILL'); } catch {}
+    }
+  } catch {}
+  await sleep(500);
+}
 const steps = [];
 const T0 = Date.now();
 const mark = (name, extra = {}) => {
@@ -92,14 +108,24 @@ async function main() {
   const runtimeBefore = fs.existsSync(path.join(dataDir, 'runtime'));
 
   mark('launch', { note: `${path.basename(EXE)} cdp=${CDP} data=${dataDir}` });
+  // detached puts the app in its own process group. An AppImage is a wrapper around the
+  // real Electron binary, and Electron itself forks zygote, gpu and renderer children plus
+  // the python service - killing only the wrapper leaves all of that alive, still holding
+  // the CDP port. The next run then quietly attaches to the previous run's app.
   const child = spawn(EXE, [`--remote-debugging-port=${CDP}`, '--no-sandbox'], {
     env: { ...process.env, IO_PORT_BASE: String(PORT_BASE), IO_DATA_DIR: dataDir, IO_HOME: confDir },
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: process.platform !== 'win32',
   });
+  CHILD = child;
   const appLog = fs.createWriteStream(path.join(OUT, 'app.log'), { flags: 'a' });
   child.stdout.pipe(appLog); child.stderr.pipe(appLog);
   let exited = null;
   child.on('exit', c => { exited = c; });
+
+  // If something is already answering on this CDP port it is not ours, and attaching to it
+  // would report a passing smoke for the wrong process.
+  if (await cdpUp()) throw new Error(`something is already listening on CDP ${CDP}; pick another --cdp`);
 
   const deadline = Date.now() + BUDGET_MIN * 60_000;
   while (!(await cdpUp())) {
@@ -183,12 +209,10 @@ async function main() {
   console.log('\nPASS  cold start to provider screen: ' + result.cold_start_s + 's');
 
   await browser.close();
-  child.kill();
-  await sleep(500);
-  try { process.kill(child.pid, 'SIGKILL'); } catch {}
 }
 
-main().catch(async e => {
+main().then(teardown).catch(async e => {
+  await teardown();
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, 'results.json'),
     JSON.stringify({ label: LABEL, ok: false, error: String(e.message || e), steps }, null, 2));
