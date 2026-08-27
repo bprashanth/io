@@ -22,6 +22,24 @@ OpenAI-compatible, tool calls supported.
 4. Seagate (USB spinning disk, ~130 MB/s, exFAT): server startup **12 s** - lazy mmap
    makes "loading" instant; the disk is billed per expert fault instead.
 
+5. **Seagate streaming: DNF.** Three consecutive 200-token requests all timed out at
+   30 minutes with zero tokens; the drive sat at 98% util / 93 MB/s the whole time and
+   ds4 was still warming its expert cache. Experts are ~6.75 MiB random reads; a
+   spinning USB drive collapses there. **Streaming an 81 GiB MoE needs NVMe-class
+   (USB4/Thunderbolt) media - a spinning event drive is a hard no.**
+6. **Fallback measured on the same drive - and it wins.** Qwen3.8-27B UD-Q4_K_M
+   (17 GiB, unsloth GGUF) pulled onto the Seagate: llama.cpp loads it in **111 s**
+   (dense loads are sequential - the one thing a spinning disk does fine), then runs
+   from RAM at **4.05 tok/s CPU-only** (12 threads, contended box; a Mac's Metal path
+   would be several times faster). Fits the 32 GB budget with room. Already 3x the
+   ds4 floor here and above the proposal's 1.5-2 tok/s bar.
+
+## Emerging recommendation
+
+On this evidence: for THIS class of drive, the event kit's "big local brain" should be
+**Qwen3.8-27B Q4 loaded whole from the SSD into RAM**, not DS4 streaming. DS4 streaming
+remains attractive only with NVMe media and a quiet Metal machine (the 36 GB M4 Max
+reports), and should be re-tested there before being promised.
+
 ## Pending
-seagate cold/warm battery; dashboard-length request; planner eval (3 mock tools);
-memory peak tracking; fallback decision (Qwen3.8-27B 4-bit on same SSD).
+planner eval (3 mock tools) against ds4 on internal NVMe - tool-call discipline result.
