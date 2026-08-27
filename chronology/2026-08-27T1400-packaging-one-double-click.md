@@ -143,8 +143,42 @@ distros that still carry libfuse2.
   produced `io-linux-x86_64.AppImage` while the workflow looked for `io-linux-x64.AppImage`.
   My local arm64 build never showed it because arm64 stays `arm64`. The workflow now
   resolves every artifact by glob instead of by constructed name, on all three platforms.
-- **Windows x64: build and staging passed**, smoke was still running at the time of
-  writing.
+- **Windows x64: built and staged fine, then the first run wedged.** Window open at 1.2 s,
+  splash at 2.1 s, then nothing for the entire 40 minute budget:
+  `the app window never loaded the service`.
+
+  The splash screenshot the smoke captured says "downloading python 3.12.14", but that
+  frame is from t=2.1 s and says nothing about where it actually stopped - a point worth
+  being honest about, because the install log lives in a temp data dir the workflow never
+  uploaded. The run produced no evidence of its own failure.
+
+## What the Windows wedge changed
+
+Three fixes, none of them Windows-specific, because "it hung and left no log" is the
+failure mode that matters at an event.
+
+1. **Every download has a deadline.** `download()` had no timeout at all: a TLS connection
+   that opens and then delivers nothing never errors, never retries, and never gives up.
+   That is the same shape as the HF hub hang `service.py` already carries a comment about,
+   and I had reproduced it in the installer. Now 30 s to first response, 60 s between
+   chunks, four attempts with backoff, and a truncation check against content-length.
+   Verified against a black-hole address (10.255.255.1): fails cleanly in 63 s with
+   `no response in 30s (after 2 attempts)` instead of hanging forever.
+
+2. **Every child process has an inactivity watchdog.** pip and the model warm-up had no
+   timeout either. Eight minutes of silence now kills the child and reports it with the
+   captured tail.
+
+3. **The install log leaves the machine.** The smoke copies `<data>/install.log` next to
+   the screenshots on both the pass and the fail path, so a failed CI run is diagnosable
+   without a second run. The log is also deduplicated - a download fired one line per
+   chunk, which is not a log anyone can read.
+
+Also corrected while measuring: the splash claimed the python download was "about 11 MB".
+That was the embeddable-zip figure from `installation/windows.md`, carried over by mistake.
+The real python-build-standalone tarballs are 46 MB on win-x64, 109 MB on linux-x64, 25 MB
+on macOS. The splash now quotes the actual content-length instead of any baked-in number,
+and carries an elapsed clock so a slow first run reads as slow rather than frozen.
 
 ## Not done yet
 

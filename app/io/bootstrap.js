@@ -32,40 +32,65 @@ function pythonTarball() {
 
 // GitHub release assets redirect to a CDN, so follow redirects. Retry, because an event
 // venue's wifi drops connections and a half-written tarball is worse than a clear failure.
-function download(url, dest, onProgress = noop, tries = 3) {
+function download(url, dest, onProgress = noop, tries = 4) {
+  // Every socket here gets a deadline. A stalled TLS connection that never errors and
+  // never delivers a byte is not a hypothetical: it is what wedged the Windows runner for
+  // the full 40 minute budget on an 11 MB file, and it is the same shape as the HF hub
+  // hang that service.py already carries a comment about. No timeout means no failure,
+  // no retry, and a splash that sits on "downloading" forever.
+  const CONNECT_MS = 30_000;   // to first response
+  const IDLE_MS = 60_000;      // between chunks once the body is flowing
   return new Promise((resolve, reject) => {
     const attempt = left => {
       const tmp = `${dest}.part`;
+      let settled = false;
       const fail = err => {
+        if (settled) return;
+        settled = true;
         fs.rmSync(tmp, { force: true });
-        if (left > 1) return setTimeout(() => attempt(left - 1), 2000);
-        reject(err);
+        if (left > 1) {
+          const wait = (tries - left + 1) * 3000;   // back off a little each time
+          onProgress(null, `${err.message}; retrying in ${wait / 1000}s`);
+          return setTimeout(() => attempt(left - 1), wait);
+        }
+        reject(new Error(`${err.message} (after ${tries} attempts) while fetching ${url}`));
       };
+      const done = v => { if (!settled) { settled = true; resolve(v); } };
+
       const get = (u, hops = 0) => {
         if (hops > 5) return fail(new Error('too many redirects'));
-        https.get(u, { headers: { 'User-Agent': 'io-installer' } }, res => {
+        const req = https.get(u, { headers: { 'User-Agent': 'io-installer' }, timeout: CONNECT_MS }, res => {
           if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
             res.resume();
+            req.setTimeout(0);
             return get(new URL(res.headers.location, u).toString(), hops + 1);
           }
           if (res.statusCode !== 200) {
             res.resume();
-            return fail(new Error(`HTTP ${res.statusCode} for ${u}`));
+            return fail(new Error(`HTTP ${res.statusCode}`));
           }
           const total = Number(res.headers['content-length'] || 0);
           let seen = 0;
+          let idle = setTimeout(() => req.destroy(new Error('connection stalled')), IDLE_MS);
           const out = fs.createWriteStream(tmp);
           res.on('data', c => {
+            clearTimeout(idle);
+            idle = setTimeout(() => req.destroy(new Error('connection stalled')), IDLE_MS);
             seen += c.length;
-            if (total) onProgress(seen / total);
+            if (total) onProgress(seen / total, null, total);
           });
           res.pipe(out);
           out.on('finish', () => out.close(() => {
+            clearTimeout(idle);
+            if (total && seen !== total) return fail(new Error(`truncated: got ${seen} of ${total} bytes`));
             fs.renameSync(tmp, dest);
-            resolve(dest);
+            done(dest);
           }));
-          out.on('error', fail);
-        }).on('error', fail);
+          out.on('error', e => { clearTimeout(idle); fail(e); });
+          res.on('error', e => { clearTimeout(idle); fail(e); });
+        });
+        req.on('timeout', () => req.destroy(new Error(`no response in ${CONNECT_MS / 1000}s`)));
+        req.on('error', fail);
       };
       get(url);
     };
@@ -84,18 +109,38 @@ function haveTar() {
   });
 }
 
+// Same lesson as download(): a child that stops talking must eventually be declared dead.
+// pip and the model warm-up both print steadily, so silence for this long means wedged -
+// a stalled index connection, a dead mirror - and waiting forever just moves the failure
+// to someone's laptop at the event, where there is no log to read.
+const QUIET_MS = 8 * 60_000;
+
 function run(cmd, args, opts = {}, onLine = noop) {
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args, { ...opts, stdio: ['ignore', 'pipe', 'pipe'] });
     let tail = '';
+    let done = false;
+    let quiet = null;
+    const finish = fn => (...a) => { if (done) return; done = true; clearTimeout(quiet); fn(...a); };
+    const settleOk = finish(resolve);
+    const settleErr = finish(reject);
+    const arm = () => {
+      clearTimeout(quiet);
+      quiet = setTimeout(() => {
+        p.kill('SIGKILL');
+        settleErr(new Error(`${cmd} produced no output for ${QUIET_MS / 60000} minutes and was stopped\n${tail}`));
+      }, QUIET_MS);
+    };
     const feed = buf => {
+      arm();
       tail = (tail + buf.toString()).slice(-4000);
       buf.toString().split(/\r?\n/).filter(Boolean).forEach(onLine);
     };
+    arm();
     p.stdout.on('data', feed);
     p.stderr.on('data', feed);
-    p.on('error', reject);
-    p.on('exit', code => code === 0 ? resolve() : reject(new Error(`${cmd} exited ${code}\n${tail}`)));
+    p.on('error', settleErr);
+    p.on('exit', code => code === 0 ? settleOk() : settleErr(new Error(`${cmd} exited ${code}\n${tail}`)));
   });
 }
 
@@ -124,8 +169,12 @@ async function install({ dest, onProgress = noop }) {
   if (!pythonIn(runtimeDir)) {
     const { name, url } = pythonTarball();
     const tgz = path.join(dest, name);
-    say('python', `downloading python ${PINS.python.version}`, 0);
-    await download(url, tgz, f => say('python', `downloading python ${PINS.python.version}`, f));
+    // The tarball is 25 MB on macOS and 109 MB on linux-x64, so quote the real
+    // content-length rather than a number baked in from one platform.
+    const label = mb => `downloading python ${PINS.python.version}${mb ? ` (${mb} MB)` : ''}`;
+    say('python', label(), 0);
+    await download(url, tgz, (f, note, total) =>
+      say('python', note || label(total ? Math.round(total / 1e6) : 0), f));
     say('python', 'unpacking python');
     fs.rmSync(runtimeDir, { recursive: true, force: true });
     fs.mkdirSync(runtimeDir, { recursive: true });
@@ -178,7 +227,7 @@ async function install({ dest, onProgress = noop }) {
   return { runtimeDir, hfCache, python: py };
 }
 
-module.exports = { install, pythonIn, PINS };
+module.exports = { install, download, pythonIn, PINS };
 
 if (require.main === module) {
   const i = process.argv.indexOf('--dest');

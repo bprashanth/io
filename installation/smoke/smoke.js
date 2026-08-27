@@ -36,6 +36,18 @@ if (!EXE) { console.error('need --exe'); process.exit(2); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 let CHILD = null;
+let DATA_DIR = null;
+
+// The installer's log lives in the data dir, which is a temp path CI never uploads. Copy it
+// next to the screenshots so a failed run is diagnosable without a second run.
+function saveInstallLog() {
+  try {
+    if (!DATA_DIR) return;
+    const src = path.join(DATA_DIR, 'install.log');
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(OUT, 'install.log'));
+  } catch {}
+}
+
 async function teardown() {
   if (!CHILD || CHILD.exitCode !== null) return;
   const pid = CHILD.pid;
@@ -101,6 +113,7 @@ async function main() {
   const dataDir = arg('data') ? path.resolve(arg('data')) : path.join(tmp, 'data');
   const confDir = path.join(tmp, 'conf');       // keeps ~/.config/io untouched
   const folder = fixture(path.join(tmp, 'sample'));
+  DATA_DIR = dataDir;
   const shot = n => path.join(OUT, `${n}.png`);
 
   // Snapshot before launch so "did this run install anything" is a before/after fact,
@@ -208,12 +221,14 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(result, null, 2));
   console.log('\nPASS  cold start to provider screen: ' + result.cold_start_s + 's');
 
+  saveInstallLog();
   await browser.close();
 }
 
 main().then(teardown).catch(async e => {
   await teardown();
   fs.mkdirSync(OUT, { recursive: true });
+  saveInstallLog();
   fs.writeFileSync(path.join(OUT, 'results.json'),
     JSON.stringify({ label: LABEL, ok: false, error: String(e.message || e), steps }, null, 2));
   console.error('\nFAIL  ' + (e.message || e));
