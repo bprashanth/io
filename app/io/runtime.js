@@ -20,8 +20,35 @@ const os = require('os');
 const WIN = process.platform === 'win32';
 const MAC = process.platform === 'darwin';
 
+// Portable mode: a folder named io-data sitting next to the app makes io keep everything
+// it writes inside that folder - the python env, the model cache, decisions, and the vault.
+// That is what turns a USB stick into a self-contained io: plug it into someone's laptop,
+// shelter folders that live on their disk, and leave nothing of your own behind when you
+// pull the stick out. Create the folder to switch it on; delete it to go back to normal.
+//
+// "Next to the app" differs per platform: beside io.exe on Windows, beside the AppImage or
+// the extracted folder on Linux, and beside io.app on macOS (not buried inside the bundle,
+// which is read-only once signed).
+function portableDir() {
+  if (process.env.IO_PORTABLE) return path.resolve(process.env.IO_PORTABLE);
+  const beside = [];
+  // APPIMAGE is set by the AppImage runtime and points at the .AppImage file itself;
+  // process.execPath would point into the temporary mount, which vanishes on exit.
+  if (process.env.APPIMAGE) beside.push(path.dirname(process.env.APPIMAGE));
+  const exeDir = path.dirname(process.execPath);
+  beside.push(exeDir);
+  if (MAC) beside.push(path.resolve(exeDir, '..', '..', '..'));   // out of io.app/Contents/MacOS
+  for (const dir of beside) {
+    const candidate = path.join(dir, 'io-data');
+    try { if (fs.statSync(candidate).isDirectory()) return candidate; } catch { /* not there */ }
+  }
+  return null;
+}
+
 function dataDir() {
   if (process.env.IO_DATA_DIR) return path.resolve(process.env.IO_DATA_DIR);
+  const portable = portableDir();
+  if (portable) return portable;
   if (WIN) return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'io');
   if (MAC) return path.join(os.homedir(), 'Library', 'Application Support', 'io');
   return path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share'), 'io');
@@ -87,4 +114,4 @@ function hasScanner(cacheDir) {
   return false;
 }
 
-module.exports = { resolve, dataDir, pythonIn, hasScanner };
+module.exports = { resolve, dataDir, portableDir, pythonIn, hasScanner };

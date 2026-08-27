@@ -14,6 +14,17 @@ let proc = null;
 let env = null;
 let splash = null;
 
+// Electron keeps its own state - Chromium's cache, cookies, GPU cache, preferences - under
+// userData, which is ~/.config/io, %APPDATA%\io or ~/Library/Application Support/io. That
+// path is Electron's, not ours: IO_DATA_DIR does not move it. In portable mode it has to
+// move too, or a USB stick still leaves Chromium droppings on every laptop it touches.
+// This must run before app.whenReady(), because Electron fixes the path on first use.
+const PORTABLE = runtime.portableDir();
+if (PORTABLE) {
+  app.setPath('userData', path.join(PORTABLE, 'electron'));
+  app.setPath('sessionData', path.join(PORTABLE, 'electron'));
+}
+
 const freePort = s => new Promise(res => { const srv = net.createServer(); srv.once('error', () => res(freePort(s + 1))); srv.listen(s, '127.0.0.1', () => srv.close(() => res(s))); });
 const waitFor = (url, n = 600) => new Promise((res, rej) => { const t = k => http.get(url, r => { r.resume(); res(); }).on('error', () => k ? setTimeout(() => t(k - 1), 250) : rej(new Error('service did not start'))); t(n); });
 
@@ -134,6 +145,10 @@ async function start() {
   // one turns the offline fast path off and sends it to the network at startup.
   const senv = { ...process.env };
   if (runtime.hasScanner(env.hfCache)) senv.HF_HOME = env.hfCache;
+  // decisions.json, folders.json and the per-folder vault live in IO_HOME. In portable mode
+  // they belong on the stick with everything else - the vault above all, since it is the
+  // one file that maps codes back to real names.
+  if (PORTABLE && !process.env.IO_HOME) senv.IO_HOME = path.join(PORTABLE, 'config');
 
   const port = await freePort(PORT_BASE);
   // Both logs live in the data dir. io.log used to go to Electron's userData, which is a
@@ -143,6 +158,7 @@ async function start() {
   const logPath = path.join(env.dataDir, 'io.log');
   const log = fs.createWriteStream(logPath, { flags: 'a' });
   log.write(`\n--- ${new Date().toISOString()} ${python} ${env.service} ${port} ---\n`);
+  log.write(PORTABLE ? `portable mode: everything stays under ${PORTABLE}\n` : 'normal mode: data in the user profile\n');
   proc = spawn(python, [env.service, String(port)], { stdio: ['ignore', 'pipe', 'pipe'], env: senv });
   proc.stdout.pipe(log); proc.stderr.pipe(log);
   // A spawn that never starts writes nothing to stdout, so say so explicitly.
