@@ -12,7 +12,7 @@ Before starting, install all three:
 - The privacy shield
 - io
 
-Pick one packet folder. Open its `PROMPTS.md`, use the data mentioned there, and ask the suggested questions in the same order.
+Pick one packet folder. Open its `PROMPTS.md`, use the data mentioned there, and ask the suggested questions in the same order. When you shelter a packet in io, pick the `data/` folder itself, not the packet folder around it - io reads one folder, without subfolders.
 
 ## Packets
 
@@ -21,6 +21,11 @@ Pick one packet folder. Open its `PROMPTS.md`, use the data mentioned there, and
 - [lila-scholarships](lila-scholarships/PROMPTS.md): scholarship applicant data
 - [chats-and-documents](chats-and-documents/PROMPTS.md): chat and document data
 - [open-data](open-data/PROMPTS.md): public-style programme data
+- [asha-kiran](asha-kiran/PROMPTS.md): donor CRM, payments, and receipts
+- [sunrise-shiksha](sunrise-shiksha/PROMPTS.md): student enrolment and assessments
+- [krishi-jal-vikas](krishi-jal-vikas/PROMPTS.md): monthly MIS workbook
+- [graded-corpus](graded-corpus/PROMPTS.md): 40 questions with written answers, for comparing models
+- [adversarial-pii](adversarial-pii/PROMPTS.md): try to make the shield leak
 
 ## Verification
 
