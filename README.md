@@ -68,10 +68,14 @@ that left.
 
 **B. io, the desktop app**
 
-1. `cd app/io && ./install.sh` (~Windows: `install.ps1`~ currently doesn't work). One time: makes its
-   own venv and caches the scanner model.
-2. Double-click `run.sh` (or `npm start`). Give it an API key or a server
-   address; it is kept in memory only. Ask the organizers for this. 
+1. Download io for your machine and start it. Nothing else needs to be installed - no
+   Python, no Node, no admin password. Per-platform steps, including the one security
+   prompt each OS shows:
+   [Linux](installation/INSTALL-linux.md) - Windows and macOS to follow.
+   The first start sets itself up and needs internet once; after that io works offline.
+   (From a git checkout instead: `cd app/io && ./install.sh`, then `./run.sh`.)
+2. Give it an API key or a server address; it is kept in memory only. Ask the
+   organizers for this. 
 3. Add a sheltered dir, review the highlights, the "Preview" button shows
    exactly what leaves, then ask. 
 4. Cheat sheet; use `@` while you chat to address specific files, and `~name~` looks up a person (or any pii) in the vault and redacts it from your request. 
