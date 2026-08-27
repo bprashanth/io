@@ -58,7 +58,8 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Expand-Archive -Path app/io/dist/io-win-x64.zip -DestinationPath staged -Force
+          $zip = Get-ChildItem app/io/dist/*.zip | Select-Object -First 1
+          Expand-Archive -Path $zip.FullName -DestinationPath staged -Force
           "IO_EXE=$PWD\staged\io.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: stage the artifact (linux)
@@ -66,19 +67,33 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          chmod +x app/io/dist/io-linux-x64.AppImage
-          echo "IO_EXE=$PWD/app/io/dist/io-linux-x64.AppImage" >> $GITHUB_ENV
+          APP=$(ls app/io/dist/*.AppImage | head -1)
+          chmod +x "$APP"
+          echo "IO_EXE=$PWD/$APP" >> $GITHUB_ENV
+          # the runner has no libfuse2 either, so the AppImage has to self-extract
           echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
 
       - name: stage the artifact (mac)
         if: matrix.os == 'macos-14'
         shell: bash
         run: |
-          hdiutil attach app/io/dist/io-mac-arm64.dmg -mountpoint /Volumes/io -nobrowse -quiet
+          DMG=$(ls app/io/dist/*.dmg | head -1)
+          hdiutil attach "$DMG" -mountpoint /Volumes/io -nobrowse -quiet
           cp -R /Volumes/io/io.app staged-io.app
           hdiutil detach /Volumes/io -quiet
           xattr -dr com.apple.quarantine staged-io.app || true
           echo "IO_EXE=$PWD/staged-io.app/Contents/MacOS/io" >> $GITHUB_ENV
+
+      - name: the tar.gz is the no-FUSE path, so check it is usable
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          TGZ=$(ls app/io/dist/*.tar.gz | head -1)
+          echo "checking $TGZ"
+          mkdir -p tgz-check && tar -xzf "$TGZ" -C tgz-check --strip-components=1
+          test -x tgz-check/io || { echo "no runnable io in the tarball"; exit 1; }
+          test -f tgz-check/resources/io/service.py || { echo "no service.py in the tarball"; exit 1; }
+          echo "tar.gz ok: $(du -sh "$TGZ" | cut -f1)"
 
       - name: smoke (cold start, first run installs everything)
         working-directory: installation/smoke
@@ -110,6 +125,7 @@ jobs:
           path: |
             app/io/dist/*.zip
             app/io/dist/*.AppImage
+            app/io/dist/*.tar.gz
             app/io/dist/*.dmg
           if-no-files-found: error
 
@@ -148,7 +164,8 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Expand-Archive -Path app/io/dist/io-win-x64-offline.zip -DestinationPath staged -Force
+          $zip = Get-ChildItem app/io/dist/*.zip | Select-Object -First 1
+          Expand-Archive -Path $zip.FullName -DestinationPath staged -Force
           "IO_EXE=$PWD\staged\io.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: stage the artifact (linux)
@@ -156,15 +173,18 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          chmod +x app/io/dist/io-linux-x64-offline.AppImage
-          echo "IO_EXE=$PWD/app/io/dist/io-linux-x64-offline.AppImage" >> $GITHUB_ENV
+          APP=$(ls app/io/dist/*.AppImage | head -1)
+          chmod +x "$APP"
+          echo "IO_EXE=$PWD/$APP" >> $GITHUB_ENV
+          # the runner has no libfuse2 either, so the AppImage has to self-extract
           echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
 
       - name: stage the artifact (mac)
         if: matrix.os == 'macos-14'
         shell: bash
         run: |
-          hdiutil attach app/io/dist/io-mac-arm64-offline.dmg -mountpoint /Volumes/io -nobrowse -quiet
+          DMG=$(ls app/io/dist/*.dmg | head -1)
+          hdiutil attach "$DMG" -mountpoint /Volumes/io -nobrowse -quiet
           cp -R /Volumes/io/io.app staged-io.app
           hdiutil detach /Volumes/io -quiet
           xattr -dr com.apple.quarantine staged-io.app || true
@@ -200,5 +220,6 @@ jobs:
           path: |
             app/io/dist/*offline*.zip
             app/io/dist/*offline*.AppImage
+            app/io/dist/*offline*.tar.gz
             app/io/dist/*offline*.dmg
           if-no-files-found: error

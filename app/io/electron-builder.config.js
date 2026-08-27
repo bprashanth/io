@@ -55,7 +55,15 @@ module.exports = {
   },
 
   linux: {
-    target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
+    // Two targets on purpose. The AppImage is the pretty one-file artifact, but it needs
+    // libfuse2, which Ubuntu 24.04 no longer installs - a plain double-click there dies with
+    // "dlopen(): error loading libfuse.so.2", and the fix is `apt install libfuse2t64`, which
+    // wants the admin password we promised never to need. The tar.gz has no such dependency:
+    // extract it anywhere and run ./io. That is the one we point people at.
+    target: [
+      { target: 'AppImage', arch: ['x64', 'arm64'] },
+      { target: 'tar.gz', arch: ['x64', 'arm64'] },
+    ],
     icon: 'icons/icon.png',
     category: 'Office',
     synopsis: 'Ask questions about a folder of files, without the files leaving.',

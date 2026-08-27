@@ -109,12 +109,51 @@ in, the cold run finishes in 82 s.
 This is the whole argument for smoking the real artifact rather than checking that a build
 compiles.
 
+## The AppImage does not survive a modern Ubuntu
+
+Found while writing the "test it on your laptop" instructions, not by CI - CI sets
+`APPIMAGE_EXTRACT_AND_RUN=1` and never sees it.
+
+On Ubuntu 24.04 a plain double-click of the AppImage fails outright:
+
+    dlopen(): error loading libfuse.so.2
+    AppImages require FUSE to run.
+
+24.04 ships libfuse3 and no longer installs libfuse2. The documented fix is
+`sudo apt install libfuse2t64` - the admin password the whole artifact exists to avoid.
+This box reproduces it exactly. Two workarounds do work without admin
+(`APPIMAGE_EXTRACT_AND_RUN=1 ./io.AppImage`, or `--appimage-extract` then run
+`squashfs-root/AppRun`) but neither is a double-click, and neither is something to put in
+front of a participant.
+
+So Linux now ships **both** targets. The `tar.gz` has no FUSE dependency at all: extract
+anywhere, run `./io`. That is the one the install doc will point at; the AppImage stays for
+distros that still carry libfuse2.
+
+## CI, first run
+
+`.github/workflows/package.yml`, run 33066644751, pushed to `windows`.
+
+- **macOS arm64: pass.** Real DMG, mounted and copied out the way a person would, cold
+  first run on a clean runner: provider screen at **53.7 s**, shelf at 63.5 s, install ran.
+  Screenshots came back as workflow artifacts. This is a cleaner number than the local
+  Linux 82.2 s because the runner's pip cache is genuinely empty - nothing was warm.
+- **Linux x64: failed on staging, not on the app.** electron-builder names AppImage
+  artifacts by `x86_64`, not the `x64` that `${arch}` uses everywhere else, so the build
+  produced `io-linux-x86_64.AppImage` while the workflow looked for `io-linux-x64.AppImage`.
+  My local arm64 build never showed it because arm64 stays `arm64`. The workflow now
+  resolves every artifact by glob instead of by constructed name, on all three platforms.
+- **Windows x64: build and staging passed**, smoke was still running at the time of
+  writing.
+
 ## Not done yet
 
-Windows and macOS have never been run. `.github/workflows/package.yml` is the bench for
-both - build, unpack the real artifact the way a participant would, cold smoke over CDP,
-screenshots as artifacts - but it has not been dispatched. The fat job is gated behind a
-`workflow_dispatch` input because each artifact is about 2 GB.
+No fat artifact has been built for Windows or macOS. The `fat` job is gated behind a
+`workflow_dispatch` input because each artifact is about 2 GB; only the linux-arm64 fat
+build has actually been made and smoked, locally.
+
+No install docs yet. They wait on the SmartScreen and Gatekeeper screenshots, which need a
+real machine rather than a runner.
 
 The user asked to stop and discuss build optimisation (sizes, fat-zip logistics, signing)
 once the smoke passes on all three.
