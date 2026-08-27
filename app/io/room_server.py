@@ -68,10 +68,10 @@ class H(BaseHTTPRequestHandler):
                "more-correct": "more correct", "written-better": "written better",
                "cost-less": "time / tokens less", "not-sure": "not sure",
                "wrong-answers": "wrong answers", "bad-writing": "bad writing",
-               "cost-high": "time / tokens high"}
+               "cost-high": "time / tokens high", "citations": "citations"}
         last = "".join(f"<tr><td>{time.strftime('%H:%M', time.localtime(r.get('t', 0)))}</td>"
                        f"<td>{(r.get('q_sent') or '')[:90]}</td><td class=hi>{r.get('outcome')}</td>"
-                       f"<td>{WHY.get(r.get('why'), '')}</td></tr>"
+                       f"<td>{WHY.get(r.get('why'), (r.get('why') or '')[:40])}</td></tr>"
                        for r in rows[-12:][::-1])
         subs = {}
         for a in ("9b", "27b", "frontier"):

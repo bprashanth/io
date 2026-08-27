@@ -108,8 +108,10 @@ td.tok{background:var(--hibg);color:var(--hi)}
 .reading .openfull{font-size:13px;color:var(--hi);display:inline-block;margin-top:10px}
 .voterow{display:flex;gap:12px;margin-top:16px;align-items:flex-start}
 .voterow > .plain{align-self:center;padding:10px 16px}
-.choosebox{display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:12px;padding:10px 16px}
-.whys{display:flex;flex-direction:column;gap:5px}
+.choosebox{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex:1;min-width:0}
+.choosebox > button{width:100%}
+.whys{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
+.whyother{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px;color:var(--ink);outline:none;flex:1;min-width:110px}
 .chip .prev{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .chip .sub{color:var(--dim);font-size:11.5px;margin-top:6px}
 .choosebox label{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
@@ -572,8 +574,10 @@ function renderCompare(el, w, r){
         <div class="whys">
           <label><input type="radio" name="why${r.id}" value="more-correct">more correct than others</label>
           <label><input type="radio" name="why${r.id}" value="written-better">written better</label>
+          <label><input type="radio" name="why${r.id}" value="citations">citations</label>
           <label><input type="radio" name="why${r.id}" value="cost-less">time / tokens less</label>
           <label><input type="radio" name="why${r.id}" value="not-sure">not sure</label>
+          <input class="whyother" id="whyother${r.id}" placeholder="other">
         </div>
       </div>
       <div class="choosebox">
@@ -582,6 +586,7 @@ function renderCompare(el, w, r){
           <label><input type="radio" name="bad${r.id}" value="wrong-answers">wrong answers</label>
           <label><input type="radio" name="bad${r.id}" value="bad-writing">bad writing</label>
           <label><input type="radio" name="bad${r.id}" value="cost-high">time / tokens high</label>
+          <input class="whyother" id="badother${r.id}" placeholder="other">
         </div>
       </div>
       <button class="plain" data-p="tie">no difference</button>
@@ -597,16 +602,20 @@ function renderCompare(el, w, r){
   showSel();
   w.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { sel = +ch.dataset.k; showSel(); });
   let badWhy = null;
+  const otherPick = w.querySelector(`#whyother${r.id}`), otherBad = w.querySelector(`#badother${r.id}`);
   w.querySelectorAll(`input[name="why${r.id}"]`).forEach(rb => rb.onchange = () => { why = rb.value; w.querySelector('#pickgo').disabled = false; });
   w.querySelectorAll(`input[name="bad${r.id}"]`).forEach(rb => rb.onchange = () => { badWhy = rb.value; w.querySelector('#badgo').disabled = false; });
+  otherPick.oninput = () => { if (otherPick.value.trim()) { w.querySelector('#pickgo').disabled = false; } };
+  otherBad.oninput = () => { if (otherBad.value.trim()) { w.querySelector('#badgo').disabled = false; } };
+  const finalWhy = (radio, box) => box.value.trim() ? 'other: ' + box.value.trim().slice(0, 120) : radio;
   const vote = async (pick, whyv) => {
     const res = await api('/api/vote', {id: r.id, pick, why: whyv || null});
     if (res.error) { alert(res.error); return; }
     w.innerHTML = ''; w.className = 'a';
     finishTurn(el, w, res);
   };
-  w.querySelector('#pickgo').onclick = () => vote(r.cands[sel].i, why);
-  w.querySelector('#badgo').onclick = () => vote('none', badWhy);
+  w.querySelector('#pickgo').onclick = () => vote(r.cands[sel].i, finalWhy(why, otherPick));
+  w.querySelector('#badgo').onclick = () => vote('none', finalWhy(badWhy, otherBad));
   w.querySelectorAll('.voterow > .plain').forEach(b => b.onclick = () => vote(b.dataset.p));
   $('#thread').scrollTop = 1e9;
 }
