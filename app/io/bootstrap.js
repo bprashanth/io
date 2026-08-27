@@ -98,12 +98,28 @@ function download(url, dest, onProgress = noop, tries = 4) {
   });
 }
 
-// Every platform we ship to has tar: bsdtar in System32 since Windows 10 1803, and the
-// real thing on macOS and Linux. Checked up front so the failure is a sentence, not a
-// stack trace four minutes in.
+// Which tar we get matters. Windows has had bsdtar in System32 since Windows 10 1803, but
+// a machine with Git for Windows installed puts GNU tar ahead of it on PATH - and GNU tar
+// reads an argument containing a colon as host:path, so a perfectly ordinary destination
+// like C:\Users\me\AppData\Local\io becomes an attempt to reach a host called "C":
+//
+//     tar (child): Cannot connect to C: resolve failed
+//
+// That is what killed the first two Windows CI runs. Ask for System32's bsdtar by name
+// where it exists, and pass only relative paths either way (see the extract below), so it
+// works whichever tar answers.
+function tarExe() {
+  if (WIN) {
+    const sys = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+    if (fs.existsSync(sys)) return sys;
+  }
+  return 'tar';
+}
+
+// Checked up front so the failure is a sentence, not a stack trace four minutes in.
 function haveTar() {
   return new Promise(resolve => {
-    const p = spawn('tar', ['--version'], { stdio: 'ignore' });
+    const p = spawn(tarExe(), ['--version'], { stdio: 'ignore' });
     p.on('error', () => resolve(false));
     p.on('exit', code => resolve(code === 0));
   });
@@ -178,8 +194,12 @@ async function install({ dest, onProgress = noop }) {
     say('python', 'unpacking python');
     fs.rmSync(runtimeDir, { recursive: true, force: true });
     fs.mkdirSync(runtimeDir, { recursive: true });
-    // the tarball's single top-level dir is "python/"; strip it so runtime/ is the root
-    await run('tar', ['-xzf', tgz, '--strip-components=1', '-C', runtimeDir]);
+    // Every path here is relative to dest, deliberately: an absolute Windows path carries
+    // a drive-letter colon, and GNU tar treats that as a remote host. Both the archive and
+    // the destination live directly under dest, so basenames are enough.
+    // The tarball's single top-level dir is "python/"; strip it so runtime/ is the root.
+    await run(tarExe(), ['-xzf', path.basename(tgz), '--strip-components=1', '-C', path.basename(runtimeDir)],
+      { cwd: dest });
     fs.rmSync(tgz, { force: true });
     if (!pythonIn(runtimeDir)) throw new Error('python did not unpack as expected');
   }
