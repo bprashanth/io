@@ -167,6 +167,37 @@ function pythonIn(dir) {
   return tries.find(p => fs.existsSync(p)) || null;
 }
 
+// The HuggingFace cache stores snapshots/<rev>/<file> as a symlink into blobs/<sha>. That
+// is fine on the machine that created it, and fatal when the tree gets archived: 7-Zip on
+// Windows refuses every one of them ("The directory name is invalid" x120) and the fat zip
+// build fails outright. Hard links carry the same bytes at the same cost, but they are
+// ordinary directory entries that any archiver reads without following anything.
+function desymlink(dir, onNote = noop) {
+  let swapped = 0, copied = 0;
+  const walk = d => {
+    let entries;
+    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = path.join(d, e.name);
+      if (e.isSymbolicLink()) {
+        let target;
+        try { target = path.resolve(d, fs.readlinkSync(full)); } catch { continue; }
+        if (!fs.existsSync(target)) continue;          // dangling: leave it alone
+        try {
+          fs.unlinkSync(full);
+          try { fs.linkSync(target, full); swapped++; }
+          catch { fs.copyFileSync(target, full); copied++; }   // e.g. across devices
+        } catch { /* nothing sensible to do per-file */ }
+      } else if (e.isDirectory()) {
+        walk(full);
+      }
+    }
+  };
+  walk(dir);
+  if (swapped || copied) onNote(`flattened ${swapped + copied} symlinks in the model cache`);
+  return { swapped, copied };
+}
+
 /**
  * @param dest      directory that will hold runtime/ and hf-cache/
  * @param onProgress ({phase, detail, frac}) - frac is 0..1 within the phase, or null
@@ -243,11 +274,15 @@ async function install({ dest, onProgress = noop }) {
   ].join('\n')], { env: { ...process.env, HF_HOME: hfCache } },
     line => say('model', line.slice(0, 70)));
 
+  // Do this every time, not just when baking a payload: one code path is easier to trust
+  // than "only on Windows, only for the fat build", and hard links cost nothing.
+  desymlink(hfCache, note => say('model', note));
+
   say('done', 'ready');
   return { runtimeDir, hfCache, python: py };
 }
 
-module.exports = { install, download, pythonIn, PINS };
+module.exports = { install, download, desymlink, pythonIn, PINS };
 
 if (require.main === module) {
   const i = process.argv.indexOf('--dest');
