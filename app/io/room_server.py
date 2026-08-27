@@ -42,7 +42,7 @@ td,th{padding:6px 12px;border-bottom:1px solid #2f343a;text-align:left} th{color
 <div class=big><div class=n>%(tie)s</div><div class=l>no difference</div></div>
 <div class=big><div class=n>%(none)s</div><div class=l>all bad</div></div>
 </div>
-<table><tr><th>when</th><th>question (coded)</th><th>choice</th></tr>%(rows)s</table>
+<table><tr><th>when</th><th>question (coded)</th><th>choice</th><th>why</th></tr>%(rows)s</table>
 </body></html>"""
 
 class H(BaseHTTPRequestHandler):
@@ -64,8 +64,10 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         t, rows = tally()
         total = sum(t.get(a, 0) for a in ALIASES)
+        WHY = {"style": "formatting and style", "correctness": "others were wrong"}
         last = "".join(f"<tr><td>{time.strftime('%H:%M', time.localtime(r.get('t', 0)))}</td>"
-                       f"<td>{(r.get('q_sent') or '')[:90]}</td><td class=hi>{r.get('outcome')}</td></tr>"
+                       f"<td>{(r.get('q_sent') or '')[:90]}</td><td class=hi>{r.get('outcome')}</td>"
+                       f"<td>{WHY.get(r.get('why'), '')}</td></tr>"
                        for r in rows[-12:][::-1])
         html = PAGE % {**{a: t.get(a, 0) for a in ALIASES}, "total": total, "rows": last}
         return self._send(200, html.encode())

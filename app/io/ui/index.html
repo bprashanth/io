@@ -92,14 +92,27 @@ td.tok{background:var(--hibg);color:var(--hi)}
 
 /* input bar */
 #bar{padding:16px 24px 22px}
-.cmp{display:flex;gap:10px;margin-top:10px;align-items:stretch}
-.cmp .card2{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
-.cmp .body{padding:12px 14px;overflow-y:auto;max-height:300px;font-size:14px;line-height:1.55;white-space:pre-wrap;flex:1}
-.cmp iframe{width:100%;height:300px;border:none;background:#fff}
-.cmp .pickbtn{margin:8px;padding:7px 10px;font-size:13px}
-.cmp .openfull{font-size:12px;color:var(--hi);padding:4px 12px 0;text-align:center;cursor:pointer}
-.cmpx{display:flex;gap:10px;margin-top:8px}
-.cmpx button{font-size:12px;color:var(--dim)}
+.chips{display:flex;gap:12px;margin:14px 0 18px}
+.chip{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;font-size:13.5px;line-height:1.5;color:var(--dim);cursor:pointer;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-height:66px}
+.chip.sel{border-color:var(--hi);color:var(--ink)}
+.reading{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:26px 32px;font-size:15px;line-height:1.75;max-height:56vh;overflow-y:auto}
+.reading iframe{width:100%;height:52vh;border:none;background:#fff;border-radius:8px}
+.reading h2{font-size:19px;margin:22px 0 10px;font-weight:600}
+.reading h3{font-size:16px;margin:18px 0 8px;font-weight:600}
+.reading p{margin:10px 0}
+.reading ul,.reading ol{margin:10px 0;padding-left:26px}
+.reading li{margin:5px 0}
+.reading code{background:var(--bg);border-radius:4px;padding:1px 5px;font-size:13px}
+.reading table{border-collapse:collapse;margin:12px 0;width:100%}
+.reading td,.reading th{border:1px solid var(--line);padding:6px 10px;text-align:left;font-size:13.5px}
+.reading .openfull{font-size:13px;color:var(--hi);display:inline-block;margin-top:10px}
+.voterow{display:flex;gap:12px;margin-top:16px;align-items:stretch}
+.choosebox{display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:12px;padding:8px 14px}
+.choosebox label{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px;cursor:pointer}
+.choosebox label:hover{color:var(--ink)}
+.choosebox input{accent-color:var(--hi)}
+.voterow .go[disabled]{opacity:.4;cursor:default}
+.voterow .plain{font-size:13px;color:var(--dim)}
 #mpick:hover{color:var(--ink)}
 #barin{max-width:860px;margin:0 auto;position:relative}
 #mirror{position:absolute;inset:0;padding:14px 18px 14px 34px;pointer-events:none;white-space:pre-wrap;overflow:hidden;font:inherit;line-height:1.5;color:var(--ink)}
@@ -509,29 +522,76 @@ function finishTurn(el, w, r){
       const sr = await api('/api/share', {id: +e.target.dataset.id});
       if (sr.url) { const sp = w.querySelector('.shareurl'); sp.textContent = sr.url; try { await navigator.clipboard.writeText(sr.url); sp.textContent = sr.url + '  (copied)'; } catch(_){} }
     };
-  } else w.textContent = r.answer || '';
+  } else w.innerHTML = '<div class="reading">' + md(r.answer || '') + '</div>';
   const sMeta = document.createElement('div'); sMeta.className = 'sent'; sMeta.textContent = metaLine(r); el.appendChild(sMeta);
   $('#thread').scrollTop = 1e9;
 }
+function esc(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function md(src){
+  const lines = esc(src || '').split('\n');
+  let out = [], list = null, table = null;
+  const inline = t => t.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\*([^*]+)\*/g, '<i>$1</i>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  const closeList = () => { if (list) { out.push(list.tag === 'ul' ? '</ul>' : '</ol>'); list = null; } };
+  const closeTable = () => { if (table) { out.push('</table>'); table = null; } };
+  for (const ln of lines) {
+    const t = ln.trim();
+    if (/^\|.*\|$/.test(t)) {
+      closeList();
+      if (/^\|[\s:|-]+\|$/.test(t)) continue;
+      if (!table) { out.push('<table>'); table = {header: true}; }
+      const cells = t.slice(1, -1).split('|').map(c => inline(c.trim()));
+      const tag = table.header ? 'th' : 'td'; table.header = false;
+      out.push('<tr>' + cells.map(c => `<${tag}>${c}</${tag}>`).join('') + '</tr>');
+      continue;
+    }
+    closeTable();
+    let m;
+    if ((m = t.match(/^(#{1,3})\s+(.*)/))) { closeList(); const h = Math.min(m[1].length + 1, 3); out.push(`<h${h}>${inline(m[2])}</h${h}>`); }
+    else if ((m = t.match(/^[-*]\s+(.*)/))) { if (!list || list.tag !== 'ul') { closeList(); out.push('<ul>'); list = {tag: 'ul'}; } out.push(`<li>${inline(m[1])}</li>`); }
+    else if ((m = t.match(/^\d+[.)]\s+(.*)/))) { if (!list || list.tag !== 'ol') { closeList(); out.push('<ol>'); list = {tag: 'ol'}; } out.push(`<li>${inline(m[1])}</li>`); }
+    else if (t === '') { closeList(); }
+    else { closeList(); out.push(`<p>${inline(t)}</p>`); }
+  }
+  closeList(); closeTable();
+  return out.join('');
+}
 function renderCompare(el, w, r){
   q.disabled = true;
-  const cards = r.cands.map(c => `<div class="card2">` +
-    (c.has_page ? `<iframe src="/api/cpage/${r.id}/${c.i}"></iframe><a class="openfull" href="/api/cpage/${r.id}/${c.i}" target="_blank">open full page</a>` : `<div class="body"></div>`) +
-    `<button class="pickbtn go" data-i="${c.i}">choose this answer</button></div>`).join('');
-  w.innerHTML = `<div class="cmp">${cards}</div><div class="cmpx"><button data-p="tie">no difference</button><button data-p="none">all bad</button></div>`;
-  const bodies = w.querySelectorAll('.body');
-  let bi = 0;
-  r.cands.forEach(c => { if (!c.has_page) { bodies[bi++].textContent = c.answer || ''; } });
-  const vote = async pick => {
-    const res = await api('/api/vote', {id: r.id, pick});
+  let sel = 0, why = null;
+  const plain = t => t.replace(/[#*`|_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const chips = r.cands.map((c, k) => `<div class="chip" data-k="${k}">${c.has_page ? 'a full page - click to view' : esc(plain(c.answer || '').slice(0, 170))}</div>`).join('');
+  w.innerHTML = `<div class="chips">${chips}</div><div class="reading"></div>
+    <div class="voterow">
+      <div class="choosebox">
+        <button class="go" id="pickgo" disabled>choose this answer</button>
+        <label><input type="radio" name="why${r.id}" value="style">like the formatting and style</label>
+        <label><input type="radio" name="why${r.id}" value="correctness">other answers were not correct</label>
+      </div>
+      <button class="plain" data-p="tie">no difference</button>
+      <button class="plain" data-p="none">all bad</button>
+    </div>`;
+  const reading = w.querySelector('.reading');
+  const showSel = () => {
+    w.querySelectorAll('.chip').forEach((ch, k) => ch.classList.toggle('sel', k === sel));
+    const c = r.cands[sel];
+    reading.innerHTML = c.has_page
+      ? `<iframe src="/api/cpage/${r.id}/${c.i}"></iframe><a class="openfull" href="/api/cpage/${r.id}/${c.i}" target="_blank">open full page</a>`
+      : md(c.answer || '');
+  };
+  showSel();
+  w.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { sel = +ch.dataset.k; showSel(); });
+  w.querySelectorAll(`input[name="why${r.id}"]`).forEach(rb => rb.onchange = () => { why = rb.value; w.querySelector('#pickgo').disabled = false; });
+  const vote = async (pick, whyv) => {
+    const res = await api('/api/vote', {id: r.id, pick, why: whyv || null});
     if (res.error) { alert(res.error); return; }
     w.innerHTML = ''; w.className = 'a';
     finishTurn(el, w, res);
   };
-  w.querySelectorAll('.pickbtn').forEach(b => b.onclick = () => vote(+b.dataset.i));
-  w.querySelectorAll('.cmpx button').forEach(b => b.onclick = () => vote(b.dataset.p));
+  w.querySelector('#pickgo').onclick = () => vote(r.cands[sel].i, why);
+  w.querySelectorAll('.voterow .plain').forEach(b => b.onclick = () => vote(b.dataset.p));
   $('#thread').scrollTop = 1e9;
 }
+
 paintMirror();
 </script>
 </body>

@@ -547,7 +547,7 @@ def client_view(turn: dict) -> dict:
     return out
 
 
-def resolve_vote(turn: dict, pick) -> dict:
+def resolve_vote(turn: dict, pick, why: str | None = None) -> dict:
     cands = turn["cands"]
     if isinstance(pick, int):
         chosen, outcome = cands[pick], cands[pick]["alias"]
@@ -563,13 +563,14 @@ def resolve_vote(turn: dict, pick) -> dict:
         turn["skipped"] = True
         turn["answer_sent"] = ""
     turn["outcome"] = outcome
+    turn["why"] = why
     turn["pending_vote"] = False
     tally = json.loads(VOTES_PATH.read_text()) if VOTES_PATH.exists() else {}
     tally[outcome] = tally.get(outcome, 0) + 1
     tally["total"] = tally.get("total", 0) + 1
     VOTES_PATH.write_text(json.dumps(tally, indent=1))
     rec = {"t": time.time(), "conversation": S.conversation_id, "turn": turn["id"],
-           "folder": str(getattr(S, "folder", "") or ""), "q_sent": turn["q_sent"], "outcome": outcome,
+           "folder": str(getattr(S, "folder", "") or ""), "q_sent": turn["q_sent"], "outcome": outcome, "why": why,
            "cands": [{"alias": c["alias"], "position": i, "model": c.get("model"),
                       "seconds": c.get("seconds"), "tokens_in": c.get("tokens_in"),
                       "tokens_out": c.get("tokens_out"), "page": "page" in c,
@@ -787,7 +788,7 @@ class H(BaseHTTPRequestHandler):
                         return self._json({"error": "nothing to vote on"}, 400)
                     pick = body.get("pick")
                     pick = int(pick) if isinstance(pick, int) or (isinstance(pick, str) and pick.isdigit()) else pick
-                    return self._json(resolve_vote(t, pick))
+                    return self._json(resolve_vote(t, pick, (body.get("why") or None)))
             if self.path == "/api/share":
                 t = next((x for x in S.turns if x.get("id") == int(body["id"]) and x.get("page")), None)
                 if not t:
