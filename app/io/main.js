@@ -87,7 +87,8 @@ async function ensureRuntime() {
     log.write(`FAILED: ${e && e.stack || e}\n`);
     clearInterval(tick);
     closeSplash();
-    dialog.showErrorBox('io could not finish setting up',
+    if (process.env.IO_SMOKE) console.error(`io setup failed: ${e.message || e}; see ${logPath}`);
+    else dialog.showErrorBox('io could not finish setting up',
       `${e.message || e}\n\nThe full log is at:\n${logPath}\n\nIf this was a network drop, starting io again picks up where it left off.`);
     app.exit(1);
     return;
@@ -123,7 +124,9 @@ async function start() {
 
   const python = env.python || borrowedPython();
   if (!python) {
-    dialog.showErrorBox('io', 'No python runtime was found and the setup did not produce one.');
+    const msg = 'No python runtime was found and the setup did not produce one.';
+    if (process.env.IO_SMOKE) console.error(`io: ${msg}`);
+    else dialog.showErrorBox('io', msg);
     return app.exit(1);
   }
 
@@ -133,9 +136,18 @@ async function start() {
   if (runtime.hasScanner(env.hfCache)) senv.HF_HOME = env.hfCache;
 
   const port = await freePort(PORT_BASE);
+  // Both logs live in the data dir. io.log used to go to Electron's userData, which is a
+  // different directory on every platform and is not where anyone - or CI - thinks to look
+  // when the service fails to come up.
+  fs.mkdirSync(env.dataDir, { recursive: true });
+  const logPath = path.join(env.dataDir, 'io.log');
+  const log = fs.createWriteStream(logPath, { flags: 'a' });
+  log.write(`\n--- ${new Date().toISOString()} ${python} ${env.service} ${port} ---\n`);
   proc = spawn(python, [env.service, String(port)], { stdio: ['ignore', 'pipe', 'pipe'], env: senv });
-  const log = fs.createWriteStream(path.join(app.getPath('userData'), 'io.log'), { flags: 'a' });
   proc.stdout.pipe(log); proc.stderr.pipe(log);
+  // A spawn that never starts writes nothing to stdout, so say so explicitly.
+  proc.on('error', e => log.write(`spawn failed: ${e && e.stack || e}\n`));
+  proc.on('exit', (code, sig) => log.write(`service exited code=${code} signal=${sig}\n`));
 
   // Loading torch and the scanner off a cold disk takes a while the first time - minutes on
   // an older Windows laptop, because Defender reads every file in site-packages as it goes.
@@ -156,7 +168,11 @@ async function start() {
     win.show();
   } catch (e) {
     closeSplash();
-    dialog.showErrorBox('io', `${e.message}\n\nThe service log is at:\n${path.join(app.getPath('userData'), 'io.log')}`);
+    log.write(`FAILED to reach the service: ${e.message}\n`);
+    // Under the smoke there is nobody to click OK, and a modal here just burns the
+    // harness's whole budget before it can report anything.
+    if (process.env.IO_SMOKE) { console.error(`io: ${e.message}; see ${logPath}`); return app.exit(1); }
+    dialog.showErrorBox('io', `${e.message}\n\nThe service log is at:\n${logPath}`);
     app.quit();
   }
 }

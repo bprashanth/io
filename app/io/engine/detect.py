@@ -18,7 +18,10 @@ import argparse
 import json
 import os
 import re
-import resource
+try:
+    import resource                      # POSIX only; absent on Windows
+except ModuleNotFoundError:              # noqa: S110
+    resource = None
 import sys
 import time
 from pathlib import Path
@@ -274,6 +277,13 @@ def score_table(engine: Callable[[str], list[Span]], path: Path, gold: dict[str,
     }
 
 
+def _max_rss_mb():
+    """Peak RSS in MB, or None where the platform cannot report it (Windows)."""
+    if resource is None:
+        return None
+    return round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--engine", action="append", required=True)
@@ -310,7 +320,7 @@ def main() -> int:
                               "seconds": record["seconds"]}), flush=True)
         results[spec] = {
             "load_seconds": load_seconds,
-            "max_rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024),
+            "max_rss_mb": _max_rss_mb(),
             "threads": os.environ.get("PII_THREADS", "4"),
             "files": per_file,
         }

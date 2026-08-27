@@ -41,11 +41,13 @@ let DATA_DIR = null;
 // The installer's log lives in the data dir, which is a temp path CI never uploads. Copy it
 // next to the screenshots so a failed run is diagnosable without a second run.
 function saveInstallLog() {
-  try {
-    if (!DATA_DIR) return;
-    const src = path.join(DATA_DIR, 'install.log');
-    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(OUT, 'install.log'));
-  } catch {}
+  for (const name of ['install.log', 'io.log']) {
+    try {
+      if (!DATA_DIR) return;
+      const src = path.join(DATA_DIR, name);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(OUT, name));
+    } catch {}
+  }
 }
 
 async function teardown() {
@@ -126,7 +128,7 @@ async function main() {
   // the python service - killing only the wrapper leaves all of that alive, still holding
   // the CDP port. The next run then quietly attaches to the previous run's app.
   const child = spawn(EXE, [`--remote-debugging-port=${CDP}`, '--no-sandbox'], {
-    env: { ...process.env, IO_PORT_BASE: String(PORT_BASE), IO_DATA_DIR: dataDir, IO_HOME: confDir },
+    env: { ...process.env, IO_PORT_BASE: String(PORT_BASE), IO_DATA_DIR: dataDir, IO_HOME: confDir, IO_SMOKE: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
   });
@@ -161,6 +163,7 @@ async function main() {
 
   let page = null;
   while (!page) {
+    if (exited !== null) throw new Error(`io exited with code ${exited} before the service came up (see io.log)`);
     if (Date.now() > deadline) throw new Error('the app window never loaded the service');
     page = await appPage(browser);
     if (!page) await sleep(1000);
