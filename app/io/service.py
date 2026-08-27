@@ -578,6 +578,16 @@ def resolve_vote(turn: dict, pick) -> dict:
                      for i, c in enumerate(cands)]}
     with open(COMPARE_LOG, "a") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    room = S.provider.get("room")
+    if room:
+        def push():
+            try:
+                req = urllib.request.Request(room.rstrip("/") + "/vote", data=json.dumps(rec).encode(),
+                                             headers={"Content-Type": "application/json"})
+                urllib.request.urlopen(req, timeout=5).read()
+            except Exception:
+                pass                      # the room board is best-effort, never block a vote
+        threading.Thread(target=push, daemon=True).start()
     return client_view(turn)
 
 
@@ -686,7 +696,7 @@ class H(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         try:
             if self.path == "/api/provider":
-                for k in ("api_key", "server", "model"):
+                for k in ("api_key", "server", "model", "room"):
                     if k in body:
                         S.provider[k] = body[k].strip()
                 S.provider = {k: v for k, v in S.provider.items() if v}
