@@ -26,6 +26,8 @@ env:
 jobs:
   thin:
     name: thin ${{ matrix.label }}
+    # A fat-only dispatch has no reason to rebuild and re-smoke the thin matrix.
+    if: github.event_name != 'workflow_dispatch' || !inputs.fat
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -159,6 +161,12 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npx electron-builder --config electron-builder.config.js ${{ matrix.target }}
+
+      # Per-file sizes, not the combined artifact zip: what matters for a USB stick and for
+      # the 2 GB per-file cap on GitHub release assets is how big each single file is.
+      - name: how big is each artifact
+        shell: bash
+        run: ls -lh app/io/dist/ | grep -vE 'unpacked|builder-debug' || true
 
       - name: stage the artifact (windows)
         if: matrix.os == 'windows-latest'
