@@ -1,0 +1,204 @@
+name: package
+
+# One run produces every artifact. The thin builds are smoked cold on all three platforms
+# on every push; the fat (offline, pre-baked) builds are ~2 GB each, so they are opt-in.
+#
+# Smoke scope is startup only: app opens, first run installs, service comes up, provider
+# screen, shelf renders. No API key, no model request.
+
+on:
+  push:
+    branches: [windows, main]
+    paths:
+      - 'app/io/**'
+      - 'installation/**'
+      - '.github/workflows/package.yml'
+  workflow_dispatch:
+    inputs:
+      fat:
+        description: 'also build the offline (fat) artifacts - slow, ~2 GB each'
+        type: boolean
+        default: false
+
+env:
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # nothing is signed for the event
+
+jobs:
+  thin:
+    name: thin ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, label: win-x64,   target: '--win zip --x64' }
+          - { os: ubuntu-latest,  label: linux-x64, target: '--linux AppImage --x64' }
+          - { os: macos-14,       label: mac-arm64, target: '--mac dmg --arm64' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: build the app
+        working-directory: app/io
+        run: |
+          npm install --no-audit --no-fund
+          npx electron-builder --config electron-builder.config.js ${{ matrix.target }}
+
+      - name: list what came out
+        working-directory: app/io
+        shell: bash
+        run: ls -lh dist/ || true
+
+      # Unpack the artifact the way a participant would, so the smoke drives the real
+      # shipped thing rather than the staging directory next to it.
+      # Git Bash on the Windows runner has no unzip, so use PowerShell for this one step.
+      - name: stage the artifact (windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path app/io/dist/io-win-x64.zip -DestinationPath staged -Force
+          "IO_EXE=$PWD\staged\io.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: stage the artifact (linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          chmod +x app/io/dist/io-linux-x64.AppImage
+          echo "IO_EXE=$PWD/app/io/dist/io-linux-x64.AppImage" >> $GITHUB_ENV
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+
+      - name: stage the artifact (mac)
+        if: matrix.os == 'macos-14'
+        shell: bash
+        run: |
+          hdiutil attach app/io/dist/io-mac-arm64.dmg -mountpoint /Volumes/io -nobrowse -quiet
+          cp -R /Volumes/io/io.app staged-io.app
+          hdiutil detach /Volumes/io -quiet
+          xattr -dr com.apple.quarantine staged-io.app || true
+          echo "IO_EXE=$PWD/staged-io.app/Contents/MacOS/io" >> $GITHUB_ENV
+
+      - name: smoke (cold start, first run installs everything)
+        working-directory: installation/smoke
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund
+          RUN="node smoke.js --exe \"$IO_EXE\" --out out --label ${{ matrix.label }}-thin --cdp 9800 --port-base 8811 --budget-min 40"
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            xvfb-run -a --server-args="-screen 0 1400x900x24" bash -c "$RUN"
+          else
+            bash -c "$RUN"
+          fi
+
+      - name: what the smoke saw
+        if: always()
+        shell: bash
+        run: cat installation/smoke/out/results.json || echo 'no results.json'
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.label }}-thin
+          path: installation/smoke/out/
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: io-${{ matrix.label }}
+          path: |
+            app/io/dist/*.zip
+            app/io/dist/*.AppImage
+            app/io/dist/*.dmg
+          if-no-files-found: error
+
+  fat:
+    name: offline ${{ matrix.label }}
+    if: github.event_name == 'workflow_dispatch' && inputs.fat
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, label: win-x64,   target: '--win zip --x64' }
+          - { os: ubuntu-latest,  label: linux-x64, target: '--linux AppImage --x64' }
+          - { os: macos-14,       label: mac-arm64, target: '--mac dmg --arm64' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      # The payload has to be built on the target OS and arch: the wheels inside it are
+      # compiled, so a Linux payload is useless to a Windows participant.
+      - name: bake the payload (python runtime + model cache)
+        working-directory: app/io
+        run: node bootstrap.js --dest payload
+
+      - name: pack with the payload inside
+        working-directory: app/io
+        env:
+          IO_FAT: '1'
+        run: |
+          npm install --no-audit --no-fund
+          npx electron-builder --config electron-builder.config.js ${{ matrix.target }}
+
+      - name: stage the artifact (windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path app/io/dist/io-win-x64-offline.zip -DestinationPath staged -Force
+          "IO_EXE=$PWD\staged\io.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: stage the artifact (linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          chmod +x app/io/dist/io-linux-x64-offline.AppImage
+          echo "IO_EXE=$PWD/app/io/dist/io-linux-x64-offline.AppImage" >> $GITHUB_ENV
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+
+      - name: stage the artifact (mac)
+        if: matrix.os == 'macos-14'
+        shell: bash
+        run: |
+          hdiutil attach app/io/dist/io-mac-arm64-offline.dmg -mountpoint /Volumes/io -nobrowse -quiet
+          cp -R /Volumes/io/io.app staged-io.app
+          hdiutil detach /Volumes/io -quiet
+          xattr -dr com.apple.quarantine staged-io.app || true
+          echo "IO_EXE=$PWD/staged-io.app/Contents/MacOS/io" >> $GITHUB_ENV
+
+      - name: smoke, and prove nothing was installed at run time
+        working-directory: installation/smoke
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund
+          RUN="node smoke.js --exe \"$IO_EXE\" --out out --label ${{ matrix.label }}-fat --cdp 9800 --port-base 8811 --budget-min 15"
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            xvfb-run -a --server-args="-screen 0 1400x900x24" bash -c "$RUN"
+          else
+            bash -c "$RUN"
+          fi
+          node -e "
+            const r = require('./out/results.json');
+            if (r.first_run_install) { console.error('FAIL: the fat build still ran a first-run install'); process.exit(1); }
+            console.log('offline confirmed: no install ran, provider screen in ' + r.cold_start_s + 's');
+          "
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.label }}-fat
+          path: installation/smoke/out/
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: io-${{ matrix.label }}-offline
+          path: |
+            app/io/dist/*offline*.zip
+            app/io/dist/*offline*.AppImage
+            app/io/dist/*offline*.dmg
+          if-no-files-found: error

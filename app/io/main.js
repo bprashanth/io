@@ -6,58 +6,134 @@ const fs = require('fs');
 const http = require('http');
 const net = require('net');
 
-const HERE = __dirname;
-let proc = null;
+const runtime = require('./runtime');
+const bootstrap = require('./bootstrap');
 
-function pythonExe() {
-  // own env first (created by install.sh); else the installed privacy-shield extension's venv
-  const own = path.join(HERE, '.venv', process.platform === 'win32' ? 'Scripts\\python.exe' : 'bin/python');
-  if (fs.existsSync(own)) return own;
-  const shield = path.join(process.env.HOME || '', '.antigravity', 'extensions');
-  if (fs.existsSync(shield)) {
-    for (const d of fs.readdirSync(shield)) {
-      if (d.startsWith('insight-out.privacy-shield')) {
-        const p = path.join(shield, d, 'server', '.venv', 'bin', 'python');
-        if (fs.existsSync(p)) return p;
-      }
-    }
-  }
-  return process.platform === 'win32' ? 'python' : 'python3';
-}
+const PORT_BASE = Number(process.env.IO_PORT_BASE || 8801);
+let proc = null;
+let env = null;
+let splash = null;
 
 const freePort = s => new Promise(res => { const srv = net.createServer(); srv.once('error', () => res(freePort(s + 1))); srv.listen(s, '127.0.0.1', () => srv.close(() => res(s))); });
-const waitFor = (url, n = 240) => new Promise((res, rej) => { const t = k => http.get(url, r => { r.resume(); res(); }).on('error', () => k ? setTimeout(() => t(k - 1), 250) : rej(new Error('service did not start'))); t(n); });
+const waitFor = (url, n = 600) => new Promise((res, rej) => { const t = k => http.get(url, r => { r.resume(); res(); }).on('error', () => k ? setTimeout(() => t(k - 1), 250) : rej(new Error('service did not start'))); t(n); });
 
-function firstRunSetup() {
-  const own = path.join(HERE, '.venv', process.platform === 'win32' ? 'Scripts\\python.exe' : 'bin/python');
-  if (fs.existsSync(own)) return null;
-  const shield = path.join(process.env.HOME || '', '.antigravity', 'extensions');
-  if (fs.existsSync(shield) && fs.readdirSync(shield).some(d => d.startsWith('insight-out.privacy-shield'))) return null;
-  // first run: build the environment with a small splash
-  const splash = new BrowserWindow({ width: 420, height: 180, frame: false, backgroundColor: '#1a1d21' });
-  splash.loadURL('data:text/html,' + encodeURIComponent('<body style="background:#1a1d21;color:#8b9096;font:15px system-ui;display:flex;align-items:center;justify-content:center;height:100%"><div style="text-align:center"><div style="color:#e8e6e1;font-size:22px;margin-bottom:8px">io</div>setting up — first time only<br>(a few minutes)</div></body>'));
-  return new Promise(res => {
-    const cmd = process.platform === 'win32'
-      ? spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', path.join(HERE, 'install.ps1')], { cwd: HERE })
-      : spawn('bash', [path.join(HERE, 'install.sh')], { cwd: HERE });
-    const log = fs.createWriteStream(path.join(HERE, 'install.log'), { flags: 'a' });
-    cmd.stdout.pipe(log); cmd.stderr.pipe(log);
-    cmd.on('exit', () => { splash.close(); res(null); });
-  });
+// The privacy-shield extension carries the same tested venv, so a developer with the
+// plugin installed can borrow it instead of building a second copy of torch. A shipped
+// build never borrows: it owns its runtime, or it installs one. Half-borrowed is how you
+// get an app that starts against an empty model cache and then hangs on the first scan.
+function borrowedPython() {
+  if (app.isPackaged) return null;
+  const dir = path.join(process.env.HOME || '', '.antigravity', 'extensions');
+  if (!fs.existsSync(dir)) return null;
+  for (const d of fs.readdirSync(dir)) {
+    if (!d.startsWith('insight-out.privacy-shield')) continue;
+    const p = path.join(dir, d, 'server', '.venv', 'bin', 'python');
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
 }
 
+// First run only. A packaged fat build never gets here: its runtime and model cache
+// shipped inside resources/, so env.ready is already true.
+async function ensureRuntime() {
+  if (env.ready) return;
+  if (!env.python && borrowedPython()) return;   // dev checkout with the plugin installed
+
+  await openSplash();
+
+  const logPath = path.join(env.dataDir, 'install.log');
+  fs.mkdirSync(env.dataDir, { recursive: true });
+  const log = fs.createWriteStream(logPath, { flags: 'a' });
+  log.write(`\n--- ${new Date().toISOString()} ${process.platform}-${process.arch} ---\n`);
+
+  const NOTE = {
+    python: 'about 11 MB',
+    packages: 'about 1.2 GB on disk. Windows Defender scans every file, so an older laptop can sit here for several minutes.',
+    model: 'about 500 MB over the network',
+  };
+  const show = p => {
+    log.write(`[${p.phase}] ${p.detail}${p.frac != null ? ` ${Math.round(p.frac * 100)}%` : ''}\n`);
+    if (!splash || splash.isDestroyed()) return;
+    splash.webContents.executeJavaScript(
+      `window.ioProgress(${JSON.stringify({ detail: p.detail, frac: p.frac, note: NOTE[p.phase] || '' })})`
+    ).catch(() => {});
+  };
+
+  try {
+    await bootstrap.install({ dest: env.dataDir, onProgress: show });
+  } catch (e) {
+    log.write(`FAILED: ${e && e.stack || e}\n`);
+    closeSplash();
+    dialog.showErrorBox('io could not finish setting up',
+      `${e.message || e}\n\nThe full log is at:\n${logPath}\n\nIf this was a network drop, starting io again picks up where it left off.`);
+    app.exit(1);
+    return;
+  }
+  env = runtime.resolve({ packaged: app.isPackaged });   // re-resolve: the paths exist now
+}
+
+async function openSplash() {
+  if (splash && !splash.isDestroyed()) return splash;
+  splash = new BrowserWindow({
+    width: 440, height: 210, frame: false, resizable: false, show: false,
+    backgroundColor: '#1a1d21', webPreferences: { contextIsolation: true },
+  });
+  await splash.loadFile(path.join(__dirname, 'splash.html'));
+  splash.show();
+  return splash;
+}
+
+const tellSplash = (detail, note) => {
+  if (!splash || splash.isDestroyed()) return;
+  splash.webContents.executeJavaScript(
+    `window.ioProgress(${JSON.stringify({ detail, note: note || '', frac: null })})`
+  ).catch(() => {});
+};
+
+const closeSplash = () => { if (splash && !splash.isDestroyed()) splash.destroy(); splash = null; };
+
 async function start() {
-  const setup = firstRunSetup();
-  if (setup) await setup;
-  const port = await freePort(8801);
-  proc = spawn(pythonExe(), [path.join(HERE, 'service.py'), String(port)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  env = runtime.resolve({ packaged: app.isPackaged });
+  await ensureRuntime();
+
+  const python = env.python || borrowedPython();
+  if (!python) {
+    dialog.showErrorBox('io', 'No python runtime was found and the setup did not produce one.');
+    return app.exit(1);
+  }
+
+  // Only point the service at a cache that actually holds the scanner. Handing it an empty
+  // one turns the offline fast path off and sends it to the network at startup.
+  const senv = { ...process.env };
+  if (runtime.hasScanner(env.hfCache)) senv.HF_HOME = env.hfCache;
+
+  const port = await freePort(PORT_BASE);
+  proc = spawn(python, [env.service, String(port)], { stdio: ['ignore', 'pipe', 'pipe'], env: senv });
   const log = fs.createWriteStream(path.join(app.getPath('userData'), 'io.log'), { flags: 'a' });
   proc.stdout.pipe(log); proc.stderr.pipe(log);
-  const win = new BrowserWindow({ width: 1200, height: 820, title: 'io', backgroundColor: '#1a1d21',
-    webPreferences: { preload: path.join(HERE, 'preload.js'), contextIsolation: true } });
+
+  // Loading torch and the scanner off a cold disk takes a while the first time - minutes on
+  // an older Windows laptop, because Defender reads every file in site-packages as it goes.
+  // Keep the splash up and say so, rather than showing an empty window that looks hung.
+  await openSplash();
+  tellSplash('starting the on-device scanner', 'the first start after setup is the slow one');
+
+  const win = new BrowserWindow({
+    width: 1200, height: 820, title: 'io', backgroundColor: '#1a1d21', show: false,
+    icon: path.join(__dirname, 'icons', 'icon.png'),
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
+  });
   win.setMenuBarVisibility(false);
-  try { await waitFor(`http://127.0.0.1:${port}/api/state`); await win.loadURL(`http://127.0.0.1:${port}/`); }
-  catch (e) { dialog.showErrorBox('io', e.message); app.quit(); }
+  try {
+    await waitFor(`http://127.0.0.1:${port}/api/state`);
+    await win.loadURL(`http://127.0.0.1:${port}/`);
+    closeSplash();
+    win.show();
+  } catch (e) {
+    closeSplash();
+    dialog.showErrorBox('io', `${e.message}\n\nThe service log is at:\n${path.join(app.getPath('userData'), 'io.log')}`);
+    app.quit();
+  }
 }
 
 ipcMain.handle('pick-folder', async () => { const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); return r.canceled ? null : r.filePaths[0]; });

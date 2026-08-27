@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>io</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #1a1d21; color: #8b9096;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-user-select: none; user-select: none;
+  }
+  .box { width: 360px; text-align: center; }
+  .mark { color: #e8e6e1; font-size: 26px; letter-spacing: .02em; margin-bottom: 10px; }
+  .detail { min-height: 2.6em; padding: 0 8px; }
+  .bar { height: 3px; background: #2a2e33; border-radius: 2px; margin-top: 14px; overflow: hidden; }
+  .fill { height: 100%; width: 0; background: #6f7c8a; transition: width .25s ease; }
+  .fill.idle { width: 100%; animation: sweep 1.6s ease-in-out infinite; transform-origin: left; }
+  @keyframes sweep { 0% { transform: scaleX(.08); opacity: .5 } 50% { transform: scaleX(.55); opacity: 1 } 100% { transform: scaleX(.08); opacity: .5 } }
+  .note { margin-top: 12px; font-size: 12px; color: #5d646b; }
+</style>
+<div class="box">
+  <div class="mark">io</div>
+  <div class="detail" id="detail">setting up, first time only</div>
+  <div class="bar"><div class="fill idle" id="fill"></div></div>
+  <div class="note" id="note"></div>
+</div>
+<script>
+  // main.js drives this with executeJavaScript; keeping the state here means the splash
+  // stays honest about which of the three long steps is actually running.
+  window.ioProgress = function (p) {
+    var detail = document.getElementById('detail');
+    var fill = document.getElementById('fill');
+    var note = document.getElementById('note');
+    if (p.detail) detail.textContent = p.detail;
+    if (typeof p.frac === 'number') {
+      fill.classList.remove('idle');
+      fill.style.width = Math.max(2, Math.round(p.frac * 100)) + '%';
+    } else {
+      fill.classList.add('idle');
+      fill.style.width = '';
+    }
+    if (p.note != null) note.textContent = p.note;
+  };
+</script>

@@ -25,12 +25,16 @@ from pathlib import Path
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-os.environ.setdefault("HF_HOME", str(HERE / "hf-cache"))   # model weights live with the app
+# In a git checkout the weights sit next to the app. In a packaged build they are either
+# baked into resources (fat) or under the user's data dir (thin), and the shell passes the
+# location in. Either way HF_HOME is the single source of truth from here on.
+HF_HOME = Path(os.environ.get("HF_HOME") or (HERE / "hf-cache"))
+os.environ["HF_HOME"] = str(HF_HOME)
 # When the scanner is already cached, load it offline. The hub's startup HTTPS check has no
 # timeout, and a dropped connection leaves the warm-up thread blocked forever on a dead
 # socket - the "stuck at loading the on-device scanner" wedge (seen live: CLOSE-WAIT to the
 # HF CDN, 0% CPU, 6.5 hours).
-if any((HERE / "hf-cache" / "hub").glob("models--knowledgator--*")) if (HERE / "hf-cache" / "hub").is_dir() else False:
+if (HF_HOME / "hub").is_dir() and any((HF_HOME / "hub").glob("models--knowledgator--*")):
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 sys.path.insert(0, str(HERE / "engine"))                    # the shield's tested modules, vendored unchanged
