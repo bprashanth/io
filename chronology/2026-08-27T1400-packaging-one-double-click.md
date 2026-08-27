@@ -152,33 +152,70 @@ distros that still carry libfuse2.
   being honest about, because the install log lives in a temp data dir the workflow never
   uploaded. The run produced no evidence of its own failure.
 
-## What the Windows wedge changed
+## The Windows failure: GNU tar, not the network
 
-Three fixes, none of them Windows-specific, because "it hung and left no log" is the
-failure mode that matters at an event.
+Two Windows runs failed identically - window open at 1.2 s, splash at 2.1 s, then nothing
+until the 40 minute budget expired. Neither run produced any evidence of its own failure:
+the install log lives in a temp data dir the workflow did not upload, and the single splash
+screenshot is from t=2.1 s, so it shows where the install *started*, not where it stopped.
+I read that screenshot as "hung downloading python" and was wrong to.
 
-1. **Every download has a deadline.** `download()` had no timeout at all: a TLS connection
-   that opens and then delivers nothing never errors, never retries, and never gives up.
-   That is the same shape as the HF hub hang `service.py` already carries a comment about,
-   and I had reproduced it in the installer. Now 30 s to first response, 60 s between
-   chunks, four attempts with backoff, and a truncation check against content-length.
-   Verified against a black-hole address (10.255.255.1): fails cleanly in 63 s with
-   `no response in 30s (after 2 attempts)` instead of hanging forever.
+So the first fix was the blind spot, and the third run said it outright:
 
-2. **Every child process has an inactivity watchdog.** pip and the model warm-up had no
-   timeout either. Eight minutes of silence now kills the child and reports it with the
-   captured tail.
+    [python] downloading python 3.12.14 (46 MB) 100%
+    [python] unpacking python
+    FAILED: Error: tar exited 2
+    tar (child): Cannot connect to C: resolve failed
+    gzip: stdin: unexpected end of file
 
-3. **The install log leaves the machine.** The smoke copies `<data>/install.log` next to
-   the screenshots on both the pass and the fail path, so a failed CI run is diagnosable
-   without a second run. The log is also deduplicated - a download fired one line per
-   chunk, which is not a log anyone can read.
+**GNU tar parses an `-f` argument containing a colon as `host:path`.** So
+`-f C:\Users\...\cpython.tar.gz` is not a file, it is an attempt to resolve a network host
+called "C". The download had finished cleanly at 100%. Reproduced here against GNU tar 1.35
+with a byte-identical error message; the relative form extracts fine.
+
+The bad assumption was mine, inherited from `installation/windows.md`: Windows 10+ has
+bsdtar in `System32`. It does - but a machine with **Git for Windows** puts GNU tar ahead of
+it on PATH, and the runner has Git for Windows. So will plenty of participants.
+
+Two changes, kept together because laptops vary more than runners do:
+- `tarExe()` asks for `%SystemRoot%\System32\tar.exe` by name on Windows rather than
+  taking whatever PATH offers.
+- The extract runs with `cwd` set to the destination and passes only basenames, so no
+  argument carries a drive letter whichever tar answers.
+
+### What the two hardening fixes were, and were not
+
+Before the log existed I hardened the two places a hang could hide. **Neither fixed
+Windows** - the real bug was a fast, clean failure the whole time. They stand on their own
+merits for event wifi, and they are why the third run was diagnosable in three minutes
+instead of forty minutes of silence:
+
+1. **`download()` had no timeout at all.** A TLS connection that opens and delivers nothing
+   never errors, never retries, never gives up - the same shape as the HF hub hang
+   `service.py` already carries a comment about, reproduced in my own installer. Now 30 s
+   to first response, 60 s between chunks, four attempts with backoff, truncation checked
+   against content-length. Verified against a black-hole address: fails in 63 s.
+2. **`run()` had no timeout either.** Eight minutes of child silence now kills it and
+   reports the captured tail.
+3. **The install log leaves the machine.** The smoke copies `<data>/install.log` next to the
+   screenshots on both paths. The log is deduplicated too - a download was writing one line
+   per chunk.
 
 Also corrected while measuring: the splash claimed the python download was "about 11 MB".
-That was the embeddable-zip figure from `installation/windows.md`, carried over by mistake.
-The real python-build-standalone tarballs are 46 MB on win-x64, 109 MB on linux-x64, 25 MB
-on macOS. The splash now quotes the actual content-length instead of any baked-in number,
-and carries an elapsed clock so a slow first run reads as slow rather than frozen.
+That is the embeddable-zip figure from `installation/windows.md`, carried over by mistake.
+The real tarballs are 46 MB on win-x64, 109 MB on linux-x64, 25 MB on macOS. The splash now
+quotes the actual content-length and carries an elapsed clock, so a slow first run on an old
+laptop reads as slow rather than frozen.
+
+## Timings are a range, not a number
+
+macOS passed twice on clean runners with very different results: **53.7 s** to the provider
+screen on the first run, **124.2 s** on the second, same code path. The install log shows the
+difference is entirely runner-to-PyPI and runner-to-HF throughput. A genuine first run is
+"one to two minutes", not a fixed figure, and the install doc says exactly that.
+
+Local cold run with the tar fix, packaged arm64 build: install 76 s, provider screen 78.2 s,
+shelf 82.0 s.
 
 ## Not done yet
 
