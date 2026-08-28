@@ -60,7 +60,7 @@ async function ensureRuntime() {
   const NOTE = {
     python: 'a self-contained python, no installer and no admin',
     packages: 'about 1.2 GB on disk. Windows Defender scans every file, so an older laptop can sit here for several minutes.',
-    model: 'about 500 MB over the network',
+    model: 'the part that spots names and numbers, and never phones home',
   };
 
   // A first run on an old laptop is genuinely slow, and a screen that has not changed in
@@ -169,7 +169,7 @@ async function start() {
   // an older Windows laptop, because Defender reads every file in site-packages as it goes.
   // Keep the splash up and say so, rather than showing an empty window that looks hung.
   await openSplash();
-  tellSplash('starting the on-device scanner', 'the first start after setup is the slow one');
+  tellSplash('starting the on-device privacy model', 'teaching it to keep a secret. only slow the first time.');
 
   const win = new BrowserWindow({
     width: 1200, height: 820, title: 'io', backgroundColor: '#1a1d21', show: false,
