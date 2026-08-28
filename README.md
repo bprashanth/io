@@ -43,15 +43,23 @@ that left.
 
 **B. io, the desktop app**
 
-**io install:**
+Find your machine, download, unzip, double-click. Nothing else to install.
+
+| your machine | download |
+|---|---|
+| Windows | [io-win-x64-offline.zip](https://github.com/bprashanth/io/releases/latest) |
+| macOS (Apple Silicon) | [io-mac-arm64-offline.dmg](https://github.com/bprashanth/io/releases/latest) |
+| Linux | [io-linux-x64-offline.tar.gz](https://github.com/bprashanth/io/releases/latest) |
+
+These carry everything inside them: they download nothing, start in a few seconds, and run
+from a USB stick without installing anything on the computer.
+
+Step by step, including the one security prompt each OS shows:
 [macOS](installation/INSTALL-mac.md) -
 [Windows](installation/INSTALL-windows.md) -
 [Linux](installation/INSTALL-linux.md)
 
-1. Download the release for your machine, unzip it, double-click io. Nothing else needs to
-   be installed - no Python, no Node, no admin password. The first start sets itself up and
-   needs internet once; after that io works offline. Each page above also covers the one
-   security prompt that OS shows, and what to do if it will not start.
+1. Start io.
 2. Give it an API key or a server address; it is kept in memory only. Ask the
    organizers for this. 
 3. Add a sheltered dir, review the highlights, the "Preview" button shows
