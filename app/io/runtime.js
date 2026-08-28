@@ -37,7 +37,12 @@ function portableDir() {
   if (process.env.APPIMAGE) beside.push(path.dirname(process.env.APPIMAGE));
   const exeDir = path.dirname(process.execPath);
   beside.push(exeDir);
-  if (MAC) beside.push(path.resolve(exeDir, '..', '..', '..'));   // out of io.app/Contents/MacOS
+  if (MAC) {
+    // io.app/Contents/MacOS/io -> look beside the bundle, where a user would put the folder,
+    // and also inside Contents/, which is the only place a dmg can ship it pre-made.
+    beside.push(path.resolve(exeDir, '..', '..', '..'));
+    beside.push(path.resolve(exeDir, '..'));
+  }
   for (const dir of beside) {
     const candidate = path.join(dir, 'io-data');
     try { if (fs.statSync(candidate).isDirectory()) return candidate; } catch { /* not there */ }

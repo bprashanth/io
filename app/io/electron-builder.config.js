@@ -30,6 +30,33 @@ if (FAT) {
     }
     extraResources.push({ from: src, to: part });
   }
+
+  // The offline build exists for USB sticks, so ship it already portable: an io-data folder
+  // beside the executable is what switches that on, and asking a participant to create a
+  // folder before the app will behave is a step that gets skipped. An archive cannot carry
+  // an empty directory, so put a readable note in it - which also explains the folder to
+  // anyone who finds it and wonders whether it is safe to delete.
+  const marker = path.join(PAYLOAD, 'io-data');
+  fs.mkdirSync(marker, { recursive: true });
+  fs.writeFileSync(path.join(marker, 'README.txt'),
+    [
+      'This folder is what makes io portable.',
+      '',
+      'While it sits next to the io program, io keeps everything it writes inside it:',
+      'the python it runs on, the on-device scanner, your folder list, your corrections,',
+      'and the vault that maps codes back to real names.',
+      '',
+      'That means you can run io from this drive on someone else\'s computer, point it at',
+      'folders on their disk, and leave nothing of yours behind when you unplug it.',
+      '',
+      'Delete this folder and io goes back to storing its data in your user account',
+      'in the normal way.',
+      '',
+    ].join('\n'));
+  // On Windows and Linux ../io-data lands beside the executable. On macOS it lands in
+  // io.app/Contents/io-data, because a dmg cannot place a writable folder next to the
+  // bundle - runtime.js looks in both places for exactly this reason.
+  extraResources.push({ from: marker, to: '../io-data' });
 }
 
 const suffix = FAT ? '-offline' : '';
