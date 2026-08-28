@@ -2,6 +2,8 @@
 
 You do not need Python. You do not need Node. You do not need an admin password.
 
+Download from [the releases page](https://github.com/bprashanth/io/releases/latest).
+
 ## Which file to take
 
 Take the **tar.gz**. It works on every distribution.
@@ -99,6 +101,15 @@ If you do want to run the AppImage without installing anything, this works:
 chmod +x io-linux-x86_64.AppImage
 APPIMAGE_EXTRACT_AND_RUN=1 ./io-linux-x86_64.AppImage
 ```
+
+## If it will not start
+
+Two fallbacks, in order:
+
+1. Ask the organizers for the USB stick. It has a version with everything already inside
+   it: it downloads nothing and starts in seconds.
+2. Build it from this repository instead:
+   [running io from source](INSTALL-from-source.md). Needs python 3.10+ and node 18+.
 
 ## The offline build
 
