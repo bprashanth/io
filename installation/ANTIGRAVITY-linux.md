@@ -37,6 +37,11 @@ antigravity --version               # must print 1.107.0
 
 **NOTE**: if you want to turn off permission requests for the term of this session, you can find the setting that say "Auto Execute" and "Review Policy" and set them to "Always Proceed". You can always turn this back to "Request Review" later. These settings are found in the bottom right corner of antigravity.
 
+## First time you open it
+
+It asks a few setup questions. Three of them matter, and one of those decides whether the
+privacy shield runs at all: [what to pick, with screenshots](ANTIGRAVITY-first-run.md).
+
 ## Then
 
 Install the privacy shield: back to the [README](../README.md#a-the-privacy-shield-in-antigravity).

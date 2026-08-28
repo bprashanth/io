@@ -19,6 +19,11 @@ the plugin.
 Command palette, "Preferences: Open Settings (UI)", search for **update mode**, set it to
 **none**. Then quit and reopen Antigravity.
 
+## First time you open it
+
+It asks a few setup questions. Three of them matter, and one of those decides whether the
+privacy shield runs at all: [what to pick, with screenshots](ANTIGRAVITY-first-run.md).
+
 ## Then
 
 Install the privacy shield: back to the [README](../README.md#a-the-privacy-shield-in-antigravity).

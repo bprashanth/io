@@ -26,6 +26,9 @@ Install Antigravity first, then the two things below.
 The plugin is pinned to Antigravity **1.107.0** (released as 1.23.2). A newer version will
 not match it, so each page also says how to stop it updating itself.
 
+First time you open Antigravity it asks a few setup questions. Three of them matter:
+[what to pick, with screenshots](installation/ANTIGRAVITY-first-run.md).
+
 **NOTE**: if you want to turn off permission requests for the term of this session, you can find the setting that say "Auto Execute" and "Review Policy" and set them to "Always Proceed". You can always turn this back to "Request Review" later. These settings are found in the bottom right corner of antigravity. 
 
 **A. The privacy shield in Antigravity**
