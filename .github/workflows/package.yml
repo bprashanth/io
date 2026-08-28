@@ -181,11 +181,16 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          APP=$(ls app/io/dist/*.AppImage | head -1)
-          chmod +x "$APP"
-          echo "IO_EXE=$PWD/$APP" >> $GITHUB_ENV
-          # the runner has no libfuse2 either, so the AppImage has to self-extract
-          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+          # Smoke the tarball, not the AppImage. It is the artifact the install doc points
+          # at (no libfuse2 needed), and without FUSE the offline AppImage self-extracts
+          # another 2.6 GB into /tmp on top of the payload and both artifacts already on
+          # disk - that filled the runner and left AppRun half-written, exiting 127.
+          rm -rf app/io/dist/linux-unpacked app/io/dist/linux-x64-unpacked
+          TGZ=$(ls app/io/dist/*.tar.gz | head -1)
+          mkdir -p staged && tar -xzf "$TGZ" -C staged --strip-components=1
+          test -x staged/io
+          echo "IO_EXE=$PWD/staged/io" >> $GITHUB_ENV
+          df -h / | tail -1
 
       - name: stage the artifact (mac)
         if: matrix.os == 'macos-14'
