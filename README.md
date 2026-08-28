@@ -12,7 +12,11 @@ can refine without debugging an agent or installing a new stack.
 Two prototypes in this repo: a privacy plugin for Antigravity and the
 io desktop app. Depending on user feedback, the io app can grow. The
 Antigravity plugin is more for illustrative purposes as we don't control the
-settings it relies on. 
+settings it relies on.
+
+The main goal at the event is to answer the following questions: 
+1. If privacy is a blocker for using AI, what is the minimum viable solution? - this depends on the kind of data our users will have. If it is primarily excel, tokenization might work well. If it is semi-structured like whatsapp chat logs but the user can outline what is "private",  tokenization might work well. If it is data that cannot be reviewed, i.e. images/videos/lat-lon etc, tokenization is a terrrible solution. 
+2. In cases where tokenization doesn't work - help users evaluate other models of trust. 3 main ones: trust nobody (data never leaves laptop), trust T4GC (data stays in our servers), trust MNC as long as access control and the right Terms are in place. What we would like is the performance/accuracy/intelligence of the frontier models developed at MNCs, but with the other two trust models. The three way blind test is geaered toward helping us understand this. 
 
 ## Quick start
 
@@ -55,6 +59,60 @@ These packs carry everything needed to run the app inside them.
 4. Cheat sheet; use `@` while you chat to address specific files, and `~name~` looks up a person (or any pii) in the vault and redacts it from your request. 
 
 Details and flow: [`app/io/README.md`](app/io/README.md).
+
+**C. The room board (organizers only)**
+
+Every question in io is answered by three models at once, unlabelled. Each person picks the
+answer they preferred. The board is the projector view of what the room chose.
+
+*Before people arrive:*
+
+1. On your laptop, start the board. `room_server.py` needs nothing but python itself, and
+   it is attached to [the releases page](https://github.com/bprashanth/io/releases/latest)
+   as a single small file. From a git checkout it is already there:
+   ```
+   cd app/io && python3 room_server.py        # port 8890
+   ```
+   If there is no python on your machine, use the one inside an offline build. Put
+   `room_server.py` in the folder you unzipped and run, from inside it:
+   ```
+   ./resources/runtime/bin/python3 room_server.py     # macOS, Linux
+   resources\runtime\python.exe room_server.py        # Windows
+   ```
+2. Find your address: `hostname -I | awk '{print $1}'`. The board is
+   `http://<that address>:8890`. Open it on the projector; it refreshes itself every three
+   seconds.
+3. Everyone has to be on the same wifi as you. The first time you start it your firewall
+   may ask to allow incoming connections: allow it.
+
+*What to tell each person, once:*
+
+- the API key (or the server address, if you are running your own)
+- the board address, `http://<your address>:8890`
+
+*What each person does, in this order:*
+
+1. Start io. The first screen asks for the API key. Paste it there.
+2. Then click the gear in the top right, paste the board address into **room server**, and
+   click OK. The gear is not on the key screen, so this is a second step, not part of the
+   first.
+
+Doing it any time before their first vote is fine. Doing it right after the key is simpler
+than remembering later, because a vote cast before the address is set never reaches the
+board and there is no way to send it again.
+
+*Then, for every question:*
+
+Three answers come back, in a random order, with no model names. The person picks one, or
+says no difference, or all bad, and optionally why. io will not take the next question
+until they pick. Each pick appears on the board within a few seconds.
+
+*What leaves the laptop when they vote:* the question and answers exactly as the models saw
+them, which is to say with names and numbers already replaced by codes, plus how long each
+model took and the path of the folder they pointed io at. Real names are not in it. It goes
+to your laptop on the local wifi, not to the internet, and it lands in `room-votes.jsonl`
+next to where you started the board.
+
 
 **B. The privacy shield in Antigravity (optional, linux only)**
 
