@@ -9,14 +9,14 @@ CSVs/workbooks, PDFs/chat dumps and ask a few plain-language question. The goal
 of this event it to show them how to get a correct desktop dashboard which they
 can refine without debugging an agent or installing a new stack.
 
-Two things can ship out of this repo: a privacy plugin for Antigravity and the
+Two prototypes in this repo: a privacy plugin for Antigravity and the
 io desktop app. Depending on user feedback, the io app can grow. The
-Antigravity plugin is more of illustrative purposes as we don't control the
-settings it relies on and they seem to be buried in the documentation. 
+Antigravity plugin is more for illustrative purposes as we don't control the
+settings it relies on. 
 
 ## Quick start
 
-Install Antigravity first, then the two things below.
+Install Antigravity first, then the io app.
 
 **Antigravity install:**
 [macOS](installation/ANTIGRAVITY-mac.md) -
@@ -26,12 +26,37 @@ Install Antigravity first, then the two things below.
 The plugin is pinned to Antigravity **1.107.0** (released as 1.23.2). A newer version will
 not match it, so each page also says how to stop it updating itself.
 
-First time you open Antigravity it asks a few setup questions. Three of them matter:
-[what to pick, with screenshots](installation/ANTIGRAVITY-first-run.md).
+First time you open Antigravity it asks a few setup questions. The important ones are here:
+[installation screenshots](installation/ANTIGRAVITY-first-run.md).
 
 **NOTE**: if you want to turn off permission requests for the term of this session, you can find the setting that say "Auto Execute" and "Review Policy" and set them to "Always Proceed". You can always turn this back to "Request Review" later. These settings are found in the bottom right corner of antigravity. 
 
-**A. The privacy shield in Antigravity**
+**A. io, the desktop app**
+
+Find your machine > download > unzip > click/double-click.
+
+| your machine | download |
+|---|---|
+| Windows | [io-win-x64-offline.zip](https://github.com/bprashanth/io/releases/latest) |
+| macOS (Apple Silicon) | [io-mac-arm64-offline.dmg](https://github.com/bprashanth/io/releases/latest) |
+| Linux | [io-linux-x64-offline.tar.gz](https://github.com/bprashanth/io/releases/latest) |
+
+These packs carry everything needed to run the app inside them.
+
+[macOS](installation/INSTALL-mac.md) -
+[Windows](installation/INSTALL-windows.md) -
+[Linux](installation/INSTALL-linux.md)
+
+1. Start io.
+2. Give it an API key or a server address; it is kept in memory only. Ask the
+   organizers for this. 
+3. Add a local dir, review the highlights, the "Preview" button shows
+   the tokenized versions of data that leaves your laptop. 
+4. Cheat sheet; use `@` while you chat to address specific files, and `~name~` looks up a person (or any pii) in the vault and redacts it from your request. 
+
+Details and flow: [`app/io/README.md`](app/io/README.md).
+
+**B. The privacy shield in Antigravity (optional, linux only)**
 
 1. Extensions view (the 4 small boxes on the left panel), "Install from VSIX",
    pick `extension/privacy-shield-0.3.0.vsix`.
@@ -41,35 +66,8 @@ needs python3 on the machine) and asks for one relaunch.
 3. The status bar shows `N calls - X ms - vault M`. The status page has the
    audit: bytes and rough tokens out, what was hidden, the exact last request
 that left.
-4. Anything wrong, or uninstalling:
+4. Anything wrong or uninstalling:
    [`extension/privacy-shield/TROUBLESHOOTING.md`](extension/privacy-shield/TROUBLESHOOTING.md).
-
-**B. io, the desktop app**
-
-Find your machine, download, unzip, double-click. Nothing else to install.
-
-| your machine | download |
-|---|---|
-| Windows | [io-win-x64-offline.zip](https://github.com/bprashanth/io/releases/latest) |
-| macOS (Apple Silicon) | [io-mac-arm64-offline.dmg](https://github.com/bprashanth/io/releases/latest) |
-| Linux | [io-linux-x64-offline.tar.gz](https://github.com/bprashanth/io/releases/latest) |
-
-These carry everything inside them: they download nothing, start in a few seconds, and run
-from a USB stick without installing anything on the computer.
-
-Step by step, including the one security prompt each OS shows:
-[macOS](installation/INSTALL-mac.md) -
-[Windows](installation/INSTALL-windows.md) -
-[Linux](installation/INSTALL-linux.md)
-
-1. Start io.
-2. Give it an API key or a server address; it is kept in memory only. Ask the
-   organizers for this. 
-3. Add a sheltered dir, review the highlights, the "Preview" button shows
-   exactly what leaves, then ask. 
-4. Cheat sheet; use `@` while you chat to address specific files, and `~name~` looks up a person (or any pii) in the vault and redacts it from your request. 
-
-Details and flow: [`app/io/README.md`](app/io/README.md).
 
 ## Developers: Repository map
 

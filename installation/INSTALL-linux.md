@@ -16,8 +16,7 @@ Take the **tar.gz**. It works on every distribution.
 Not sure which you have? Run `uname -m`. If it says `x86_64` take the x64 file. If it
 says `aarch64` take the arm64 one.
 
-There is also an `.AppImage`. Skip it unless you already know you want it. See the note at
-the bottom for why.
+There is also an `.AppImage`. Skip it unless you already know you want it. See the note at the bottom for why.
 
 ## Install
 
@@ -115,4 +114,5 @@ Two fallbacks, in order:
 
 For events without reliable wifi there is a second, much larger file with everything
 already inside it. It does no downloading at all and reaches the provider screen in a
-couple of seconds. Ask the organizers for it if you need it.
+couple of seconds. Ask the organizers for it if you need it.:w
+
