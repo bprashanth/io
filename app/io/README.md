@@ -2,9 +2,14 @@
 
 Point io at a folder. It shows what will leave as codes; you correct it by clicking. Then talk.
 
-- Start: `cd app/io && npm install && npm start` (needs Node 18+; Python comes from the installed
-  privacy-shield extension's venv, which carries the tested scanner — GLiNER, CPU-only).
+- Start: `cd app/io && ./install.sh` once, then `./run.sh`. That builds io's own python env
+  in `.venv` and caches the scanner in `hf-cache`, using the versions pinned in `pins.json`.
+  Full instructions, including Windows: [installation/INSTALL-from-source.md](../../installation/INSTALL-from-source.md).
+  A developer with the privacy-shield extension installed can skip the env - io will borrow
+  the extension's venv, which carries the same tested scanner (GLiNER, CPU-only).
   Headless: run `service.py 8801` with that venv and open `http://127.0.0.1:8801/`.
+- Packaged builds carry their own python and model and need nothing installed; see
+  `installation/` for how they are built and what is verified.
 - Provider: an OpenRouter API key, or any OpenAI-compatible server address. Kept in memory;
   asked again on restart. Model defaults to `google/gemini-3.7-flash`; change it in settings (⚙).
 - The sheet view highlights what the scanner flagged, with the reason under each header.

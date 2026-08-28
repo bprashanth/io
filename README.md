@@ -70,10 +70,13 @@ that left.
 
 1. Download io for your machine and start it. Nothing else needs to be installed - no
    Python, no Node, no admin password. Per-platform steps, including the one security
-   prompt each OS shows:
-   [Linux](installation/INSTALL-linux.md) - Windows and macOS to follow.
-   The first start sets itself up and needs internet once; after that io works offline.
-   (From a git checkout instead: `cd app/io && ./install.sh`, then `./run.sh`.)
+   prompt each OS shows: [Linux](installation/INSTALL-linux.md) - Windows and macOS to
+   follow. The first start sets itself up and needs internet once; after that io works
+   offline. There is also an offline build that installs nothing at all and runs from a
+   USB stick, keeping everything it writes on the stick.
+   **If a download will not start on your machine**, build it from this repository
+   instead: [running io from source](installation/INSTALL-from-source.md) (needs python
+   3.10+ and node 18+).
 2. Give it an API key or a server address; it is kept in memory only. Ask the
    organizers for this. 
 3. Add a sheltered dir, review the highlights, the "Preview" button shows
