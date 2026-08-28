@@ -60,7 +60,7 @@ These packs carry everything needed to run the app inside them.
 
 Details and flow: [`app/io/README.md`](app/io/README.md).
 
-**C. The room board (organizers only)**
+**C. The room board**
 
 Every question in io is answered by three models at once, unlabelled. Each person picks the
 answer they preferred. The board is the projector view of what the room chose.
