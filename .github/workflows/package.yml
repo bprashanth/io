@@ -23,6 +23,10 @@ on:
         description: 'publish the artifacts straight to this release tag, e.g. v0.3.0 (blank = do not publish)'
         type: string
         default: ''
+      only:
+        description: 'build only platforms whose label contains this, e.g. mac (blank = all)'
+        type: string
+        default: ''
 
 permissions:
   contents: write        # publishing release assets from the runner
@@ -31,23 +35,40 @@ env:
   CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # nothing is signed for the event
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          all='[
+            {"os":"windows-latest","label":"win-x64","target":"--win zip --x64"},
+            {"os":"ubuntu-latest","label":"linux-x64","target":"--linux AppImage tar.gz --x64"},
+            {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"},
+            {"os":"macos-13","label":"mac-x64","target":"--mac dmg --x64"}
+          ]'
+          only='${{ inputs.only }}'
+          if [ -n "$only" ]; then
+            picked=$(echo "$all" | jq -c --arg o "$only" '[.[] | select(.label | contains($o))]')
+          else
+            picked=$(echo "$all" | jq -c '.')
+          fi
+          echo "building: $(echo "$picked" | jq -r '[.[].label] | join(", ")')"
+          echo "matrix=$picked" >> "$GITHUB_OUTPUT"
+
   thin:
     name: thin ${{ matrix.label }}
     # A fat-only dispatch has no reason to rebuild and re-smoke the thin matrix.
     if: github.event_name != 'workflow_dispatch' || !inputs.fat
+    needs: plan
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: windows-latest, label: win-x64,   target: '--win zip --x64' }
-          - { os: ubuntu-latest,  label: linux-x64, target: '--linux AppImage tar.gz --x64' }
-          - { os: macos-14,       label: mac-arm64, target: '--mac dmg --arm64' }
-          # Intel Macs need an Intel runner for the offline build: the payload's wheels are
-          # compiled, so an arm64 runner cannot produce an x64 one. macos-13 is the last
-          # Intel image GitHub offers.
-          - { os: macos-13,       label: mac-x64,   target: '--mac dmg --x64' }
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -159,19 +180,13 @@ jobs:
   fat:
     name: offline ${{ matrix.label }}
     if: github.event_name == 'workflow_dispatch' && inputs.fat
+    needs: plan
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: windows-latest, label: win-x64,   target: '--win zip --x64' }
-          - { os: ubuntu-latest,  label: linux-x64, target: '--linux AppImage tar.gz --x64' }
-          - { os: macos-14,       label: mac-arm64, target: '--mac dmg --arm64' }
-          # Intel Macs need an Intel runner for the offline build: the payload's wheels are
-          # compiled, so an arm64 runner cannot produce an x64 one. macos-13 is the last
-          # Intel image GitHub offers.
-          - { os: macos-13,       label: mac-x64,   target: '--mac dmg --x64' }
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
