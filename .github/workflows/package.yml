@@ -44,17 +44,17 @@ jobs:
       - id: pick
         shell: bash
         run: |
-          # mac-x64 builds on an arm64 runner. Electron cross-builds an Intel dmg fine, and
-          # macos-13 - the last Intel image - would not schedule at all: two attempts sat
-          # queued for over two hours. That works for the thin build, which carries no
-          # payload. It does NOT work for the offline build, whose payload is compiled
-          # wheels that must be built on the architecture they run on, so mac-x64 is left
-          # out of the fat matrix rather than shipped wrong.
+          # No Intel Mac target, and it is not a packaging limitation. torch 2.2.2 is the
+          # last release with a macOS x86_64 wheel, checked against PyPI directly, while
+          # transformers 5.13.1 requires torch>=2.4. So the scanner stack cannot be
+          # installed on an Intel Mac at any pin: the app builds, then dies on first run
+          # with "No matching distribution found for torch". Supporting it would mean
+          # downgrading transformers and gliner too and revalidating the scanner against a
+          # different model chain, which is a research question, not a build flag.
           all='[
             {"os":"windows-latest","label":"win-x64","target":"--win zip --x64"},
             {"os":"ubuntu-latest","label":"linux-x64","target":"--linux AppImage tar.gz --x64"},
-            {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"},
-            {"os":"macos-14","label":"mac-x64","target":"--mac dmg --x64"}
+            {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"}
           ]'
           only='${{ inputs.only }}'
           if [ -n "$only" ]; then
@@ -62,7 +62,7 @@ jobs:
           else
             picked=$(echo "$all" | jq -c '.')
           fi
-          fat=$(echo "$picked" | jq -c '[.[] | select(.label != "mac-x64")]')
+          fat=$(echo "$picked" | jq -c '.')
           echo "thin: $(echo "$picked" | jq -r '[.[].label] | join(", ")')"
           echo "fat:  $(echo "$fat" | jq -r '[.[].label] | join(", ")')"
           echo "matrix=$picked" >> "$GITHUB_OUTPUT"

@@ -333,6 +333,33 @@ That is three Windows-only defects in a row (GNU tar, `import resource`, HF syml
 none of them were packaging problems. All three were code that had only ever run on POSIX,
 and all three would have hit a participant's laptop rather than a runner.
 
+## Intel Macs cannot be supported, and it is not a packaging problem
+
+The work order asked for a mac-x64 build. It cannot be made, and the reason is worth
+recording so nobody spends another day on it.
+
+macos-13, the last Intel image GitHub offers, would not schedule at all: two dispatches sat
+queued for over two hours before being cancelled. Electron will happily cross-build an
+Intel dmg on an arm64 runner, so that was tried next. The build and the dmg were fine. The
+first run was not:
+
+    ERROR: Could not find a version that satisfies the requirement torch==2.13.0
+           (from versions: 2.2.0, 2.2.1, 2.2.2)
+
+Checked against PyPI directly rather than trusting the message: **torch 2.2.2 is the last
+release with a macOS x86_64 wheel**; 2.13.0 ships `macosx_14_0_arm64` only. And pinning
+back does not rescue it, because **transformers 5.13.1 requires torch>=2.4**. There is no
+pin of our stack that installs on an Intel Mac.
+
+Supporting Intel Macs would mean downgrading transformers and gliner as well and
+revalidating the scanner against a different model chain - a research question, not a build
+flag, and untestable here without an Intel Mac. So mac-x64 is out of the matrix, and
+`installation/INSTALL-mac.md` says plainly that Intel Macs are not supported and points
+those users at a Windows or Linux machine.
+
+This is the third time on this job that "the artifact built" and "the artifact runs" turned
+out to be different questions, and the smoke is the only reason the difference was visible.
+
 ## Not done yet
 
 **No Windows or macOS install doc.** They wait on the two screenshots a runner cannot

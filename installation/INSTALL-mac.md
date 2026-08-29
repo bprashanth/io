@@ -6,8 +6,14 @@ You do not need Python. You do not need Node. You never need an administrator pa
    Which one depends on your Mac. Apple menu, About This Mac: an M1/M2/M3/M4 is Apple
    Silicon, anything saying Intel is Intel.
    - Apple Silicon: **io-mac-arm64-offline.dmg**. Downloads nothing, opens in seconds.
-   - Intel: **io-mac-x64.dmg**. There is no offline build for Intel Macs, so this one
-     downloads about 1.9 GB the first time it starts. It needs internet once.
+   - There is also a smaller **io-mac-arm64.dmg**. It downloads about 1.9 GB the first
+     time it starts, and needs internet once. Take it only if you would rather download
+     less now.
+
+   **Intel Macs are not supported.** The on-device scanner io uses needs a version of
+   PyTorch that no longer ships for Intel Macs, so io cannot install itself there. If your
+   Mac says Intel under About This Mac, use a Windows or Linux machine, or ask the
+   organizers.
 2. Double-click the .dmg, then drag **io** out of it into a folder of your own, for
    example your Desktop or your home folder.
 
