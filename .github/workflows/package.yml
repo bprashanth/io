@@ -19,6 +19,13 @@ on:
         description: 'also build the offline (fat) artifacts - slow, ~2 GB each'
         type: boolean
         default: false
+      release_tag:
+        description: 'publish the artifacts straight to this release tag, e.g. v0.3.0 (blank = do not publish)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write        # publishing release assets from the runner
 
 env:
   CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # nothing is signed for the event
@@ -117,6 +124,20 @@ jobs:
         if: always()
         shell: bash
         run: cat installation/smoke/out/results.json || echo 'no results.json'
+
+      - name: publish to the release
+        if: inputs.release_tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG='${{ inputs.release_tag }}'
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "io $TAG" --notes "built by the package workflow" --target "$GITHUB_SHA"
+          shopt -s nullglob
+          files=(app/io/dist/*.zip app/io/dist/*.AppImage app/io/dist/*.tar.gz app/io/dist/*.dmg)
+          echo "uploading ${#files[@]} file(s): ${files[*]}"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -227,6 +248,20 @@ jobs:
             if (r.first_run_install) { console.error('FAIL: the fat build still ran a first-run install'); process.exit(1); }
             console.log('offline confirmed: no install ran, provider screen in ' + r.cold_start_s + 's');
           "
+
+      - name: publish to the release
+        if: inputs.release_tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG='${{ inputs.release_tag }}'
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "io $TAG" --notes "built by the package workflow" --target "$GITHUB_SHA"
+          shopt -s nullglob
+          files=(app/io/dist/*.zip app/io/dist/*.AppImage app/io/dist/*.tar.gz app/io/dist/*.dmg)
+          echo "uploading ${#files[@]} file(s): ${files[*]}"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
 
       - uses: actions/upload-artifact@v4
         if: always()
