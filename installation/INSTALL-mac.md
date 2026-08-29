@@ -5,10 +5,9 @@ You do not need Python. You do not need Node. You never need an administrator pa
 1. Download from [the releases page](https://github.com/bprashanth/io/releases/latest).
    Which one depends on your Mac. Apple menu, About This Mac: an M1/M2/M3/M4 is Apple
    Silicon, anything saying Intel is Intel.
-   - Apple Silicon: **io-mac-arm64-offline.dmg**
-   - Intel: **io-mac-x64-offline.dmg**
-   These offline files download nothing. The smaller files are **io-mac-arm64.dmg**
-   and **io-mac-x64.dmg**. They download about 1.9 GB on first start.
+   - Apple Silicon: **io-mac-arm64-offline.dmg**. Downloads nothing, opens in seconds.
+   - Intel: **io-mac-x64.dmg**. There is no offline build for Intel Macs, so this one
+     downloads about 1.9 GB the first time it starts. It needs internet once.
 2. Double-click the .dmg, then drag **io** out of it into a folder of your own, for
    example your Desktop or your home folder.
 

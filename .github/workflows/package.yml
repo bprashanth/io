@@ -39,15 +39,22 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.pick.outputs.matrix }}
+      matrix_fat: ${{ steps.pick.outputs.matrix_fat }}
     steps:
       - id: pick
         shell: bash
         run: |
+          # mac-x64 builds on an arm64 runner. Electron cross-builds an Intel dmg fine, and
+          # macos-13 - the last Intel image - would not schedule at all: two attempts sat
+          # queued for over two hours. That works for the thin build, which carries no
+          # payload. It does NOT work for the offline build, whose payload is compiled
+          # wheels that must be built on the architecture they run on, so mac-x64 is left
+          # out of the fat matrix rather than shipped wrong.
           all='[
             {"os":"windows-latest","label":"win-x64","target":"--win zip --x64"},
             {"os":"ubuntu-latest","label":"linux-x64","target":"--linux AppImage tar.gz --x64"},
             {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"},
-            {"os":"macos-13","label":"mac-x64","target":"--mac dmg --x64"}
+            {"os":"macos-14","label":"mac-x64","target":"--mac dmg --x64"}
           ]'
           only='${{ inputs.only }}'
           if [ -n "$only" ]; then
@@ -55,8 +62,11 @@ jobs:
           else
             picked=$(echo "$all" | jq -c '.')
           fi
-          echo "building: $(echo "$picked" | jq -r '[.[].label] | join(", ")')"
+          fat=$(echo "$picked" | jq -c '[.[] | select(.label != "mac-x64")]')
+          echo "thin: $(echo "$picked" | jq -r '[.[].label] | join(", ")')"
+          echo "fat:  $(echo "$fat" | jq -r '[.[].label] | join(", ")')"
           echo "matrix=$picked" >> "$GITHUB_OUTPUT"
+          echo "matrix_fat=$fat" >> "$GITHUB_OUTPUT"
 
   thin:
     name: thin ${{ matrix.label }}
@@ -186,7 +196,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+        include: ${{ fromJSON(needs.plan.outputs.matrix_fat) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
