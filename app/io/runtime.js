@@ -45,7 +45,15 @@ function portableDir() {
   }
   for (const dir of beside) {
     const candidate = path.join(dir, 'io-data');
-    try { if (fs.statSync(candidate).isDirectory()) return candidate; } catch { /* not there */ }
+    try {
+      if (!fs.statSync(candidate).isDirectory()) continue;
+      // Existing is not enough, it has to be writable. A dmg mounts read-only, and an .app
+      // dragged into /Applications is owned by root on a managed Mac - in both cases the
+      // folder is right there and every write into it fails. Falling back to the user's
+      // profile is far better than starting and then dying on the first log line.
+      fs.accessSync(candidate, fs.constants.W_OK);
+      return candidate;
+    } catch { /* not there, or not ours to write to */ }
   }
   return null;
 }

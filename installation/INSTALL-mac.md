@@ -9,7 +9,14 @@ You do not need Python. You do not need Node. You never need an administrator pa
    - Intel: **io-mac-x64-offline.dmg**
    These offline files download nothing. The smaller files are **io-mac-arm64.dmg**
    and **io-mac-x64.dmg**. They download about 1.9 GB on first start.
-2. Double-click the .dmg, then drag **io** into Applications.
+2. Double-click the .dmg, then drag **io** out of it into a folder of your own, for
+   example your Desktop or your home folder.
+
+   Two notes if you are working from a USB stick. Keep the .dmg on the stick by all means,
+   it opens from there fine. But copy io out of it onto the Mac before running: a Mac app
+   cannot run from a USB stick formatted for Windows, and it cannot keep its own data while
+   it sits inside the disk image, which is read-only. Dropping it in your own folder rather
+   than Applications also means it never needs an administrator password.
 
 ## The one prompt you will see
 
