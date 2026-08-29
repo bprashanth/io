@@ -114,6 +114,11 @@ td.tok{background:var(--hibg);color:var(--hi)}
    line up at both ends instead of stepping */
 .whys{display:flex;flex-direction:column;gap:7px;align-items:stretch;flex:1}
 .whys .whyother{margin-top:auto;flex:none}
+/* Picking a reason arms that box. The armed button lights up the same orange as the
+   selected answer, so it is clear what pressing it will do. While "all bad" is armed the
+   answer chip drops its highlight - nothing is being chosen, so nothing should look chosen. */
+.choosebox.armed > button{border-color:var(--hi);color:var(--hi)}
+.chips.stood-down .chip.sel{border-color:var(--line);color:var(--dim)}
 .eventbits{display:flex;flex-direction:column;gap:10px;margin-top:2px;padding-top:12px;border-top:1px solid var(--line)}
 .eventbits input{font-size:13px}
 #s-consent p.consent{margin:0 0 14px;text-align:left;line-height:1.65;color:var(--dim);font-size:13.5px}
@@ -632,10 +637,25 @@ function renderCompare(el, w, r){
   w.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { sel = +ch.dataset.k; showSel(); });
   let badWhy = null;
   const otherPick = w.querySelector(`#whyother${r.id}`), otherBad = w.querySelector(`#badother${r.id}`);
-  w.querySelectorAll(`input[name="why${r.id}"]`).forEach(rb => rb.onchange = () => { why = rb.value; w.querySelector('#pickgo').disabled = false; });
-  w.querySelectorAll(`input[name="bad${r.id}"]`).forEach(rb => rb.onchange = () => { badWhy = rb.value; w.querySelector('#badgo').disabled = false; });
-  otherPick.oninput = () => { if (otherPick.value.trim()) { w.querySelector('#pickgo').disabled = false; } };
-  otherBad.oninput = () => { if (otherBad.value.trim()) { w.querySelector('#badgo').disabled = false; } };
+  const boxes = w.querySelectorAll('.choosebox');
+  // Choosing an answer and calling them all bad are opposite votes, so arming one disarms
+  // the other rather than leaving both lit and the reader guessing which button applies.
+  const arm = which => {
+    boxes[0].classList.toggle('armed', which === 'pick');
+    boxes[1].classList.toggle('armed', which === 'bad');
+    w.querySelector('.chips').classList.toggle('stood-down', which === 'bad');
+    if (which === 'bad') {
+      w.querySelectorAll(`input[name="why${r.id}"]`).forEach(x => x.checked = false);
+      otherPick.value = ''; why = null; w.querySelector('#pickgo').disabled = true;
+    } else {
+      w.querySelectorAll(`input[name="bad${r.id}"]`).forEach(x => x.checked = false);
+      otherBad.value = ''; badWhy = null; w.querySelector('#badgo').disabled = true;
+    }
+  };
+  w.querySelectorAll(`input[name="why${r.id}"]`).forEach(rb => rb.onchange = () => { arm('pick'); why = rb.value; w.querySelector('#pickgo').disabled = false; });
+  w.querySelectorAll(`input[name="bad${r.id}"]`).forEach(rb => rb.onchange = () => { arm('bad'); badWhy = rb.value; w.querySelector('#badgo').disabled = false; });
+  otherPick.oninput = () => { if (otherPick.value.trim()) { arm('pick'); w.querySelector('#pickgo').disabled = false; } };
+  otherBad.oninput = () => { if (otherBad.value.trim()) { arm('bad'); w.querySelector('#badgo').disabled = false; } };
   const finalWhy = (radio, box) => box.value.trim() ? 'other: ' + box.value.trim().slice(0, 120) : radio;
   const vote = async (pick, whyv) => {
     const res = await api('/api/vote', {id: r.id, pick, why: whyv || null});
