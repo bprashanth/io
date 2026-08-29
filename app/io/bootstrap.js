@@ -271,8 +271,14 @@ async function install({ dest, onProgress = noop }) {
   //    with 62 threads and 11 open sockets. To a participant that is a splash that never
   //    goes away. The cache is fully written by the time from_pretrained returns, so
   //    leaving without finalising the interpreter costs nothing.
+  // The model step is allowed to fail. Some machines simply cannot run it - an Intel Mac
+  // has no PyTorch build at all - and dying here left those people with no app rather than
+  // a lesser one. On failure we record why, and the app offers the choices from there.
   say('model', 'downloading the on-device scanner (about 500 MB)');
   fs.mkdirSync(hfCache, { recursive: true });
+  const markerPath = path.join(dest, 'scanner-unavailable.txt');
+  fs.rmSync(markerPath, { force: true });
+  try {
   await run(py, ['-c', [
     'import os, sys',
     'from gliner import GLiNER',
@@ -282,13 +288,21 @@ async function install({ dest, onProgress = noop }) {
     'os._exit(0)',
   ].join('\n')], { env: { ...process.env, HF_HOME: hfCache } },
     line => say('model', line.slice(0, 70)));
+  } catch (e) {
+    const why = String(e && e.message || e).split('\n').filter(Boolean).slice(-3).join(' ').slice(0, 400);
+    fs.writeFileSync(markerPath, why + '\n');
+    say('model', 'the on-device scanner could not be installed here');
+    desymlink(hfCache, note => say('model', note));
+    say('done', 'ready without the local scanner');
+    return { runtimeDir, hfCache, python: py, scanner: false, scannerError: why };
+  }
 
   // Do this every time, not just when baking a payload: one code path is easier to trust
   // than "only on Windows, only for the fat build", and hard links cost nothing.
   desymlink(hfCache, note => say('model', note));
 
   say('done', 'ready');
-  return { runtimeDir, hfCache, python: py };
+  return { runtimeDir, hfCache, python: py, scanner: true };
 }
 
 module.exports = { install, download, desymlink, pythonIn, PINS };

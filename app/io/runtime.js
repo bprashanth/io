@@ -120,7 +120,10 @@ function resolve(opts = {}) {
     python: pythonIn(runtimeDir),
     service: path.join(appDir, 'service.py'),
     bundled: runtimeDir === bundledRuntime,
-    ready: !!pythonIn(runtimeDir) && hasScanner(hfCache),
+    // Why the scanner is missing, if a previous run already found out it cannot be
+    // installed here. Without this the app would retry the whole download every start.
+    scannerError: scannerError(data),
+    ready: !!pythonIn(runtimeDir) && (hasScanner(hfCache) || !!scannerError(data)),
   };
 }
 
@@ -143,4 +146,9 @@ function hasScanner(cacheDir) {
   return false;
 }
 
-module.exports = { resolve, dataDir, portableDir, pythonIn, hasScanner };
+function scannerError(dataDir) {
+  try { return fs.readFileSync(path.join(dataDir, 'scanner-unavailable.txt'), 'utf8').trim() || null; }
+  catch { return null; }
+}
+
+module.exports = { resolve, dataDir, portableDir, pythonIn, hasScanner, scannerError };

@@ -145,6 +145,9 @@ async function start() {
   // one turns the offline fast path off and sends it to the network at startup.
   const senv = { ...process.env };
   if (runtime.hasScanner(env.hfCache)) senv.HF_HOME = env.hfCache;
+  // Tell the service the local scanner is not available here, and why, so it can offer
+  // the choice rather than silently dropping to pattern matching.
+  if (env.scannerError) senv.IO_SCANNER_UNAVAILABLE = env.scannerError;
   // decisions.json, folders.json and the per-folder vault live in IO_HOME. In portable mode
   // they belong on the stick with everything else - the vault above all, since it is the
   // one file that maps codes back to real names.

@@ -640,6 +640,12 @@ class H(BaseHTTPRequestHandler):
         p = self.path.split("?")[0]
         if p in ("/", "/index.html"):
             return self._send(200, (UI / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if p == "/api/scanner":
+            return self._json({
+                "unavailable": os.environ.get("IO_SCANNER_UNAVAILABLE") or None,
+                "mode": S.scanner_mode() if S.detector is not None else None,
+                "server": bool((S.provider.get("scanner_server") or "").strip()),
+            })
         if p == "/api/state":
             return self._json({"provider": {"set": bool(S.provider), "model": S.provider.get("model"), "server": bool(S.provider.get("server"))},
                                "folder": str(S.folder) if S.folder else None,
@@ -727,6 +733,14 @@ class H(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         try:
             if self.path == "/api/provider":
+                # Changing the privacy server has to rebuild the detector. The service warms
+                # it at startup, so by the time anyone answers the question it is already
+                # built - and without this the answer silently did nothing.
+                if "scanner_server" in body and (body.get("scanner_server") or "").strip() != (S.provider.get("scanner_server") or "").strip():
+                    with S.det_lock:
+                        S.detector = None
+                        S.text_detector = None
+                        S._scanner_mode = None
                 for k in ("api_key", "server", "model", "room", "org", "scanner_server"):
                     if k in body:
                         S.provider[k] = body[k].strip()
