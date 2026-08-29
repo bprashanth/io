@@ -101,6 +101,29 @@ GLINER_TO_CLASS = {
 }
 
 
+def make_server(url: str, timeout: float = 30.0) -> Callable[[str], list[Span]]:
+    """Ask a privacy server to scan, for machines that cannot run the model themselves.
+
+    The text goes over the network unredacted - that is unavoidable, the server is being
+    asked to find the private values in it. io asks the person before ever using this.
+    """
+    import urllib.request
+
+    endpoint = url.rstrip("/")
+    if not endpoint.endswith("/scan"):
+        endpoint += "/scan"
+
+    def run(text: str) -> list[Span]:
+        req = urllib.request.Request(
+            endpoint, data=json.dumps({"text": text}).encode(),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            payload = json.loads(r.read())
+        return [(int(a), int(b), str(c), float(d)) for a, b, c, d in payload.get("spans", [])]
+
+    return run
+
+
 def make_gliner(model_id: str, threshold: float = 0.4, chunk_chars: int = 1500) -> Callable[[str], list[Span]]:
     import torch
     from gliner import GLiNER
@@ -196,6 +219,8 @@ def build_engine(spec: str) -> Callable[[str], list[Span]]:
         return lambda t: regex_engine(t) + long_digits_engine(t)
     if spec.startswith("gliner:"):
         return make_gliner(spec.split(":", 1)[1])
+    if spec.startswith("server:"):
+        return make_server(spec.split(":", 1)[1])
     if spec == "presidio":
         return make_presidio()
     if spec.startswith("llm:"):
