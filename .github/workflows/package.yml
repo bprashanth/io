@@ -44,17 +44,15 @@ jobs:
       - id: pick
         shell: bash
         run: |
-          # No Intel Mac target, and it is not a packaging limitation. torch 2.2.2 is the
-          # last release with a macOS x86_64 wheel, checked against PyPI directly, while
-          # transformers 5.13.1 requires torch>=2.4. So the scanner stack cannot be
-          # installed on an Intel Mac at any pin: the app builds, then dies on first run
-          # with "No matching distribution found for torch". Supporting it would mean
-          # downgrading transformers and gliner too and revalidating the scanner against a
-          # different model chain, which is a research question, not a build flag.
+          # EXPERIMENT BRANCH ONLY. mac-x64 is back, cross-built on an arm64 runner and
+          # smoked under Rosetta, to find out whether the downgraded darwin-x64 pins in
+          # pins.json (torch 2.2.2, onnxruntime 1.23.2) actually install and load the
+          # scanner. It is deliberately never published to a release from here.
           all='[
             {"os":"windows-latest","label":"win-x64","target":"--win zip --x64"},
             {"os":"ubuntu-latest","label":"linux-x64","target":"--linux AppImage tar.gz --x64"},
-            {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"}
+            {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"},
+            {"os":"macos-14","label":"mac-x64","target":"--mac dmg --x64"}
           ]'
           only='${{ inputs.only }}'
           if [ -n "$only" ]; then

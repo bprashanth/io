@@ -242,8 +242,17 @@ async function install({ dest, onProgress = noop }) {
     { env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' } },
     line => { if (/^(Collecting|Downloading|Installing|Successfully)/.test(line)) say('packages', label + ' - ' + line.slice(0, 70)); });
 
-  const torch = PINS.packages.find(p => p.startsWith('torch=='));
-  const rest = PINS.packages.filter(p => p !== torch);
+  // Some platforms cannot install the versions everything else uses, because the wheels do
+  // not exist for them. An override replaces a pin of the same package and adds any others.
+  const key = `${process.platform}-${process.arch}`;
+  const overrides = (PINS.packageOverrides || {})[key] || [];
+  const nameOf = spec => spec.split('==')[0].toLowerCase();
+  const overridden = new Set(overrides.map(nameOf));
+  const wanted = PINS.packages.filter(p => !overridden.has(nameOf(p))).concat(overrides);
+  if (overrides.length) say('packages', `using ${key} pins: ${overrides.join(' ')}`);
+
+  const torch = wanted.find(p => p.startsWith('torch=='));
+  const rest = wanted.filter(p => p !== torch);
 
   say('packages', 'preparing pip');
   await pip(['--upgrade', 'pip'], 'pip');
