@@ -378,3 +378,40 @@ the 2 GB cap; S3 is the alternative if the URLs need to be controlled.
 **Linux ships two offline artifacts** (951 MB tar.gz + 995 MB AppImage) where the event
 only needs the tar.gz, since the AppImage needs a libfuse2 that Ubuntu 24.04 does not
 install. Dropping the offline AppImage halves the Linux offline payload.
+
+## Postscript: how far the Intel Mac downgrade actually got
+
+Tried on the branch `mac-intel-try`, never merged, never released. Worth recording because
+the first answer here was too pessimistic and the second was too optimistic.
+
+**Too pessimistic first.** I said transformers' `torch>=2.4` made a downgrade impossible.
+It does not: that requirement lives in transformers' optional `[torch]` extra, which gliner
+never requests, so pip never enforces it. With `torch==2.2.2` and `onnxruntime==1.23.2`
+pinned for darwin-x64 only, **the install succeeded** - which was the real unknown.
+
+**Then it failed one layer up.** The run reached the model warm-up and died importing
+transformers 5.13.1 against torch 2.2.2:
+
+    File .../transformers/core_model_loading.py
+        ) -> tuple[int, list[str], list[nn.Module]]:
+    NameError: name 'nn' is not defined
+
+transformers 5.13 is written against a much newer torch; with 2.2.2 an import path is not
+taken and an annotation refers to a name that was never bound. Installing cleanly cannot
+rule this out, which is the whole reason the smoke exists.
+
+**And the next step cascades.** gliner allows transformers down to 4.51.3, but 4.51.3
+requires `huggingface-hub<1.0` against our pinned 1.28.0, so that would have to move too.
+Each fix uncovers the next. The end state is torch two major versions back, transformers
+one, huggingface_hub one - a second dependency stack that shares almost nothing with the
+one every benchmark in this repo was run against.
+
+Two overrides that were wrong along the way, both mine: `tokenizers==0.23.1` conflicted
+with transformers' `<=0.23.0`, and it never needed overriding at all because 0.22.2 already
+ships `macosx_10_12_x86_64`. Only torch and onnxruntime genuinely lack Intel Mac builds.
+
+**Stopped here.** Not because it is provably impossible, but because success would mean
+shipping an unbenchmarked scanner stack to the one platform that cannot be tested - no
+Intel Mac here, and macos-13 would not schedule in two attempts over two hours. Rosetta on
+an arm64 runner exercises the install and the import, which is how these three failures
+were found, but it is not proof that a real Intel Mac works.
