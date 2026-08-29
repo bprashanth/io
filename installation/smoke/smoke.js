@@ -182,6 +182,15 @@ async function main() {
   // a dead address, never contacted: this smoke asks nothing
   await page.fill('#p-server', 'http://127.0.0.1:9/v1');
   await page.click('#p-go');
+
+  // Start leads to the consent screen, then the shelf. Tolerate either landing, so this
+  // keeps working whichever side of that change the build under test is from.
+  await page.waitForSelector('#s-consent.on, #s-home.on', { timeout: 60_000 });
+  if (await page.locator('#s-consent.on').count()) {
+    await page.screenshot({ path: shot('02b-consent') });
+    mark('consent_screen');
+    await page.click('#c-ok');
+  }
   await page.waitForSelector('#s-home.on', { timeout: 60_000 });
   mark('home_screen');
   await page.screenshot({ path: shot('03-home') });
