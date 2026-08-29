@@ -575,6 +575,7 @@ def resolve_vote(turn: dict, pick, why: str | None = None) -> dict:
     tally["total"] = tally.get("total", 0) + 1
     VOTES_PATH.write_text(json.dumps(tally, indent=1))
     rec = {"t": time.time(), "conversation": S.conversation_id, "turn": turn["id"],
+           "org": (S.provider.get("org") or "").strip()[:80] or None,
            "folder": str(getattr(S, "folder", "") or ""), "q_sent": turn["q_sent"], "outcome": outcome, "why": why,
            "cands": [{"alias": c["alias"], "position": i, "model": c.get("model"),
                       "seconds": c.get("seconds"), "tokens_in": c.get("tokens_in"),
@@ -702,7 +703,7 @@ class H(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         try:
             if self.path == "/api/provider":
-                for k in ("api_key", "server", "model", "room"):
+                for k in ("api_key", "server", "model", "room", "org"):
                     if k in body:
                         S.provider[k] = body[k].strip()
                 S.provider = {k: v for k, v in S.provider.items() if v}

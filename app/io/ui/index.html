@@ -17,9 +17,9 @@ input:focus,textarea:focus{border-color:var(--hi)}
 /* screens */
 .screen{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px}
 .screen.on{display:flex}
-#s-provider .card{width:400px;display:flex;flex-direction:column;gap:10px}
-#s-provider h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
-#s-provider p{margin:0 0 6px;text-align:center}
+#s-provider .card, #s-consent .card{width:400px;display:flex;flex-direction:column;gap:10px}
+#s-provider h1, #s-consent h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
+#s-provider p, #s-consent p{margin:0 0 6px;text-align:center}
 #shelf{width:460px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .fol{display:flex;align-items:baseline;gap:10px;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--line)}
 .fol:last-child{border-bottom:none}
@@ -106,17 +106,25 @@ td.tok{background:var(--hibg);color:var(--hi)}
 .reading table{border-collapse:collapse;margin:12px 0;width:100%}
 .reading td,.reading th{border:1px solid var(--line);padding:6px 10px;text-align:left;font-size:13.5px}
 .reading .openfull{font-size:13px;color:var(--hi);display:inline-block;margin-top:10px}
-.voterow{display:flex;gap:12px;margin-top:16px;align-items:flex-start}
-.voterow > .plain{align-self:center;padding:10px 16px}
-.choosebox{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex:1;min-width:0}
+.voterow{display:flex;gap:12px;margin-top:16px;align-items:stretch}
+.choosebox{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex:1 1 0;min-width:0}
 .choosebox > button{width:100%}
-.whys{display:flex;flex-direction:column;gap:7px;align-items:stretch}
+/* all three buttons sit on the same line at the top of the row, and both "optional: why"
+   boxes are pushed to the bottom, so a box with five reasons and a box with three still
+   line up at both ends instead of stepping */
+.whys{display:flex;flex-direction:column;gap:7px;align-items:stretch;flex:1}
+.whys .whyother{margin-top:auto;flex:none}
+.eventbits{display:flex;flex-direction:column;gap:10px;margin-top:2px;padding-top:12px;border-top:1px solid var(--line)}
+.eventbits input{font-size:13px}
+#s-consent p.consent{margin:0 0 14px;text-align:left;line-height:1.65;color:var(--dim);font-size:13.5px}
 .whyother{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px;color:var(--ink);outline:none;flex:1;min-width:110px}
 .chip .prev{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .chip .sub{color:var(--dim);font-size:11.5px;margin-top:6px}
 .choosebox label{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
 .choosebox label:hover{color:var(--ink)}
+.choosebox label:has(input:checked){color:var(--ink)}
 .choosebox input{accent-color:var(--hi)}
+.choosebox input[type=radio]{appearance:auto;-webkit-appearance:radio}
 .whys input[type=radio]{width:auto;padding:0;margin:0;flex:none}
 .voterow .go[disabled]{opacity:.4;cursor:default}
 .voterow .plain{font-size:13px;color:var(--dim)}
@@ -147,7 +155,23 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <p class="dim">io needs an AI provider.</p>
     <input id="p-key" type="password" placeholder="API key" autocomplete="off">
     <input id="p-server" placeholder="or server address" autocomplete="off">
+    <div class="eventbits">
+      <input id="p-room" placeholder="room server (optional, from the organizers)" autocomplete="off">
+      <input id="p-org" placeholder="your organisation (optional)" autocomplete="off">
+    </div>
     <button class="go" id="p-go">Start</button>
+  </div>
+</div>
+
+<div class="screen" id="s-consent">
+  <div class="card">
+    <h1>io</h1>
+    <p class="consent">Data submitted through this app in the form of questions/prompts can be
+    used to improve the app. This data will never be shared with anyone, and will only be used
+    to analyse patterns arising from or related to this event. If you would like to continue
+    with the event but would NOT like your data to be used in this way, please notify the
+    organizers.</p>
+    <button class="go" id="c-ok">OK</button>
   </div>
 </div>
 
@@ -205,6 +229,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
   <input id="st-server" placeholder="or server address">
   <input id="st-model" placeholder="model">
   <input id="st-room" placeholder="room server (optional, for the event board)">
+  <input id="st-org" placeholder="your organisation (optional)">
   <div style="display:flex;justify-content:flex-end;gap:8px"><button id="st-x">Close</button><button class="go" id="st-ok">Save</button></div>
 </div></div>
 
@@ -226,22 +251,23 @@ async function renderShelf(){
 document.addEventListener('click', () => $('#ctx').style.display = 'none');
 $('#ctx-un').onclick = async () => { await api('/api/folders/remove', {path: decodeURIComponent($('#ctx').dataset.p)}); renderShelf(); };
 (async () => { const st = await api('/api/state'); if (st.provider.set) { show('#s-home'); renderShelf(); } })();
-function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = id === '#s-provider' ? 'none' : ''; }
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent') ? 'none' : ''; }
 
 // provider
 $('#p-go').onclick = async () => {
   const key = $('#p-key').value.trim(), server = $('#p-server').value.trim();
   if (!key && !server) { $('#p-key').focus(); return; }
-  await api('/api/provider', {api_key: key, server});
-  show('#s-home'); renderShelf();
+  await api('/api/provider', {api_key: key, server, room: $('#p-room').value.trim(), org: $('#p-org').value.trim()});
+  show('#s-consent');
 };
+$('#c-ok').onclick = () => { show('#s-home'); renderShelf(); };
 
 // settings
 $('#gear').onclick = () => $('#settings').classList.add('on');
 $('#br-x').onclick = () => $('#browser').classList.remove('on');
 $('#br-open').onclick = () => { const p = $('#br-path').dataset.path; if (p) { $('#browser').classList.remove('on'); openFolder(p); } };  // the button already shows the file count
 $('#st-x').onclick = () => $('#settings').classList.remove('on');
-$('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-key').value.trim(), server: $('#st-server').value.trim(), model: $('#st-model').value.trim(), room: $('#st-room').value.trim()}); $('#settings').classList.remove('on'); };
+$('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-key').value.trim(), server: $('#st-server').value.trim(), model: $('#st-model').value.trim(), room: $('#st-room').value.trim(), org: $('#st-org').value.trim()}); $('#settings').classList.remove('on'); };
 
 // folder
 async function browseTo(path){
@@ -590,7 +616,9 @@ function renderCompare(el, w, r){
           <input class="whyother" id="badother${r.id}" placeholder="optional: why..">
         </div>
       </div>
-      <button class="plain" data-p="tie">no difference</button>
+      <div class="choosebox single">
+        <button class="plain" data-p="tie">no difference</button>
+      </div>
     </div>`;
   const reading = w.querySelector('.reading');
   const showSel = () => {
@@ -617,7 +645,7 @@ function renderCompare(el, w, r){
   };
   w.querySelector('#pickgo').onclick = () => vote(r.cands[sel].i, finalWhy(why, otherPick));
   w.querySelector('#badgo').onclick = () => vote('none', finalWhy(badWhy, otherBad));
-  w.querySelectorAll('.voterow > .plain').forEach(b => b.onclick = () => vote(b.dataset.p));
+  w.querySelectorAll('.voterow .plain[data-p]').forEach(b => b.onclick = () => vote(b.dataset.p));
   $('#thread').scrollTop = 1e9;
 }
 

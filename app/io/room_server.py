@@ -2,6 +2,14 @@
 """The room board: every io laptop pushes its blind-compare votes here; the projector
 shows the live tally. Stdlib only. Run: python3 room_server.py [port]  (default 8890).
 Point each laptop at it in io settings: room server = http://<this-machine>:8890
+
+Votes land in room-votes.jsonl next to wherever this was started, and GET /votes.jsonl
+hands the whole file back for taking away afterwards.
+
+Each vote carries the organisation the participant typed, if they typed one. The board
+deliberately does not break the tally down by organisation and does not print it in the
+recent-votes table: a room can be small enough that "which org preferred what" is the same
+as naming a person. It is in the log for later analysis, not on the wall.
 """
 import json, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -62,6 +70,11 @@ class H(BaseHTTPRequestHandler):
             f.write(body.decode("utf8", "replace").strip() + "\n")
         return self._send(200, b'{"ok": true}', "application/json")
     def do_GET(self):
+        # The raw log, for the organizer to take away after the event. Every vote is in
+        # here, including which organisation sent it.
+        if self.path == "/votes.jsonl":
+            body = LOG.read_bytes() if LOG.exists() else b""
+            return self._send(200, body, "application/x-ndjson")
         t, rows = tally()
         total = sum(t.get(a, 0) for a in ALIASES)
         WHY = {"style": "formatting and style", "correctness": "others were wrong",

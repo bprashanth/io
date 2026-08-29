@@ -2,9 +2,11 @@
 
 You do not need Python. You do not need Node. You never need an administrator password.
 
-1. Download **io-mac-arm64.dmg** from [the releases page](https://github.com/bprashanth/io/releases/latest).
-   This is for Apple Silicon. If your Mac says Intel under the apple menu, About This Mac,
-   ask the organizers instead.
+1. Download from [the releases page](https://github.com/bprashanth/io/releases/latest).
+   Which one depends on your Mac. Apple menu, About This Mac: an M1/M2/M3/M4 is Apple
+   Silicon, anything saying Intel is Intel.
+   - Apple Silicon: **io-mac-arm64-offline.dmg**
+   - Intel: **io-mac-x64-offline.dmg**
 2. Double-click the .dmg, then drag **io** into Applications.
 
 ## The one prompt you will see

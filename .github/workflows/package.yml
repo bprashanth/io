@@ -37,6 +37,10 @@ jobs:
           - { os: windows-latest, label: win-x64,   target: '--win zip --x64' }
           - { os: ubuntu-latest,  label: linux-x64, target: '--linux AppImage tar.gz --x64' }
           - { os: macos-14,       label: mac-arm64, target: '--mac dmg --arm64' }
+          # Intel Macs need an Intel runner for the offline build: the payload's wheels are
+          # compiled, so an arm64 runner cannot produce an x64 one. macos-13 is the last
+          # Intel image GitHub offers.
+          - { os: macos-13,       label: mac-x64,   target: '--mac dmg --x64' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -76,7 +80,7 @@ jobs:
           echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
 
       - name: stage the artifact (mac)
-        if: matrix.os == 'macos-14'
+        if: startsWith(matrix.os, 'macos')
         shell: bash
         run: |
           DMG=$(ls app/io/dist/*.dmg | head -1)
@@ -143,6 +147,10 @@ jobs:
           - { os: windows-latest, label: win-x64,   target: '--win zip --x64' }
           - { os: ubuntu-latest,  label: linux-x64, target: '--linux AppImage tar.gz --x64' }
           - { os: macos-14,       label: mac-arm64, target: '--mac dmg --arm64' }
+          # Intel Macs need an Intel runner for the offline build: the payload's wheels are
+          # compiled, so an arm64 runner cannot produce an x64 one. macos-13 is the last
+          # Intel image GitHub offers.
+          - { os: macos-13,       label: mac-x64,   target: '--mac dmg --x64' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -193,7 +201,7 @@ jobs:
           df -h / | tail -1
 
       - name: stage the artifact (mac)
-        if: matrix.os == 'macos-14'
+        if: startsWith(matrix.os, 'macos')
         shell: bash
         run: |
           DMG=$(ls app/io/dist/*.dmg | head -1)

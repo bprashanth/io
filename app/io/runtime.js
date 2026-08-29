@@ -63,10 +63,26 @@ function dataDir() {
 // keeps working untouched.
 function pythonIn(dir) {
   if (!dir) return null;
-  const tries = WIN
-    ? [path.join(dir, 'python.exe'), path.join(dir, 'Scripts', 'python.exe')]
-    : [path.join(dir, 'bin', 'python3'), path.join(dir, 'bin', 'python')];
-  return tries.find(p => fs.existsSync(p)) || null;
+  if (WIN) {
+    return [path.join(dir, 'python.exe'), path.join(dir, 'Scripts', 'python.exe')]
+      .find(p => fs.existsSync(p)) || null;
+  }
+  const bin = path.join(dir, 'bin');
+  const named = [path.join(bin, 'python3'), path.join(bin, 'python')].find(p => fs.existsSync(p));
+  if (named) return named;
+  // bin/python3 and bin/python are both symlinks to bin/python3.12, and a filesystem that
+  // cannot store symlinks drops them - exFAT, which is what a USB stick shared between
+  // Windows, macOS and Linux has to be. The real interpreter is still there under its
+  // versioned name, so fall back to it rather than declaring there is no python.
+  try {
+    const versioned = fs.readdirSync(bin)
+      .filter(f => /^python3\.\d+$/.test(f))
+      .sort()
+      .map(f => path.join(bin, f))
+      .find(p => { try { return fs.statSync(p).isFile(); } catch { return false; } });
+    if (versioned) return versioned;
+  } catch { /* no bin dir at all */ }
+  return null;
 }
 
 function resolve(opts = {}) {
