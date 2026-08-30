@@ -36,6 +36,7 @@ if (!EXE) { console.error('need --exe'); process.exit(2); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 let CHILD = null;
+let SCANNER_OFFERED = false;
 let DATA_DIR = null;
 
 // The installer's log lives in the data dir, which is a temp path CI never uploads. Copy it
@@ -195,6 +196,21 @@ async function main() {
     mark('consent_screen');
     await page.click('#c-ok');
   }
+
+  // A machine that cannot run the scanner is offered a privacy server here. Decline it:
+  // the smoke has no server and this path has to work on its own. Recorded either way,
+  // so a platform silently losing its scanner shows up in the results rather than
+  // passing quietly.
+  await page.waitForSelector('#s-scanner.on, #s-home.on', { timeout: 60_000 });
+  let scannerOffered = false;
+  if (await page.locator('#s-scanner.on').count()) {
+    scannerOffered = true;
+    await page.screenshot({ path: shot('02c-no-scanner') });
+    const why = await page.$eval('#sc-why', e => e.textContent.trim()).catch(() => '');
+    mark('scanner_unavailable', { note: why.slice(0, 90) });
+    await page.click('#sc-no');
+  }
+  SCANNER_OFFERED = scannerOffered;
   await page.waitForSelector('#s-home.on', { timeout: 60_000 });
   mark('home_screen');
   await page.screenshot({ path: shot('03-home') });
@@ -227,6 +243,7 @@ async function main() {
     cold_start_s: steps.find(s => s.step === 'provider_screen').at_s,
     total_s: Number(((Date.now() - T0) / 1000).toFixed(1)),
     first_run_install: installed,
+    scanner_unavailable: SCANNER_OFFERED,
     splash_seen: !!sp,
     data_dir: dataDir,
     service_port: servicePort,
