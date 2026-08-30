@@ -28,3 +28,25 @@ Point io at a folder. It shows what will leave as codes; you correct it by click
 
 Engine: `benchmarks/pii/{columns,detect,pseudonymize}.py` and the app's vendored copies - the
 privacy-shield modules, unchanged.
+
+## Scripts in this folder
+
+- `install.sh` - one-time setup for running from a git checkout. Builds `.venv` and caches
+  the scanner using the versions pinned in `pins.json`. Not needed for a downloaded build.
+- `run.sh` - start io from a checkout. Runs `install.sh` first if it has not been run.
+- `usb_copy.sh` - put the builds and the event data onto every plugged-in USB stick at once.
+  Run it from the root of the repo:
+
+      ./app/io/usb_copy.sh --builds bin        # copy to every stick it finds
+      ./app/io/usb_copy.sh --dry-run           # list the drives, write nothing
+
+  It finds drives the kernel reports as removable or hotplug, unpacks each archive once
+  into a staging folder and reuses it, then copies to every stick in parallel. Each stick
+  gets `insightout/io/` (the unpacked builds, plus any .dmg carried as-is for a Mac to
+  open) and `insightout/data/` (the sample data from `simulations/foundation-without/data`).
+  Running it again after plugging in more sticks is cheap: it skips whatever is already
+  there.
+- `privacy_server.py` - runs the scanner for machines that cannot run it themselves. Read
+  the notes at the top of that file before starting one: the text sent to it is not
+  redacted.
+- `room_server.py` - the projector board that collects the blind-comparison votes.
