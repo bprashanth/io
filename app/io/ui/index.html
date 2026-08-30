@@ -171,17 +171,17 @@ td.tok{background:var(--hibg);color:var(--hi)}
 <div class="screen" id="s-scanner">
   <div class="card">
     <h1>io</h1>
-    <p class="dim">The private-data scanner could not be installed on this computer.</p>
-    <p class="consent" id="sc-why"></p>
-    <p class="consent">io can ask a privacy server to do the scanning instead. Your files stay
-    here, but the text being checked is sent to that server as it is, before anything is
-    hidden, because finding the names and numbers in it is the whole job. Only use a server
-    the organizers gave you.</p>
+    <p class="dim" id="sc-head">The private-data scanner is not running on this computer.</p>
+    <p class="consent"><b>What went wrong</b><br><span id="sc-why"></span></p>
+    <p class="consent"><b>What this means</b><br>io can ask a privacy server to do the
+    scanning instead. Your files stay here, but the text being checked is sent to that
+    server as it is. Only use a server the organizers gave you.</p>
     <input id="sc-url" placeholder="privacy server address (from the organizers)" autocomplete="off">
     <button class="go" id="sc-yes">Use the privacy server</button>
-    <button class="plain" id="sc-no">Carry on without it</button>
+    <button class="plain" id="sc-no">Don't use the privacy server</button>
     <p class="consent dim" id="sc-note">Without it io still hides phone numbers, Aadhaar and
-    account numbers and emails, but it will not spot people's names.</p>
+    account numbers and emails, but it will not spot people's names, place names and other
+    finer details in free text.</p>
   </div>
 </div>
 
@@ -273,7 +273,7 @@ async function renderShelf(){
 }
 document.addEventListener('click', () => $('#ctx').style.display = 'none');
 $('#ctx-un').onclick = async () => { await api('/api/folders/remove', {path: decodeURIComponent($('#ctx').dataset.p)}); renderShelf(); };
-(async () => { const st = await api('/api/state'); if (st.provider.set) { show('#s-home'); renderShelf(); } })();
+(async () => { const st = await api('/api/state'); if (st.provider.set) { await afterConsent(); } })();
 function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent' || id === '#s-scanner') ? 'none' : ''; }
 
 // provider
@@ -287,7 +287,7 @@ async function afterConsent(){
   let sc = {};
   try { sc = await api('/api/scanner'); } catch (e) { sc = {}; }
   if (sc.unavailable && !sc.server) {
-    $('#sc-why').textContent = 'What went wrong: ' + String(sc.unavailable).slice(0, 300);
+    $('#sc-why').textContent = String(sc.unavailable).slice(0, 300);
     show('#s-scanner');
     return;
   }

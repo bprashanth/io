@@ -123,8 +123,13 @@ class State:
                     self.detector = lambda t: regex_engine(t) + gl(t)
                     self._scanner_mode = "local"
                     self.step("scanner ready")   # never leave "loading..." as the last visible word
-                except Exception:  # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001
                     traceback.print_exc()
+                    # Remember why, so the app can offer the same choice it offers when the
+                    # install already knew this machine could not run it. A model that
+                    # installs and then fails to load - out of memory, a broken cache, a
+                    # library the machine will not load - looks identical to the person.
+                    self.scanner_error = f"{type(exc).__name__}: {exc}".strip()[:400]
                     # No local model. If the person has explicitly agreed to a privacy
                     # server, use it: the text goes there unredacted, so this only ever
                     # happens on an answer they gave. Otherwise fall back to regex, which
@@ -641,9 +646,13 @@ class H(BaseHTTPRequestHandler):
         if p in ("/", "/index.html"):
             return self._send(200, (UI / "index.html").read_bytes(), "text/html; charset=utf-8")
         if p == "/api/scanner":
+            # Two ways to end up without a scanner: the install already knew this machine
+            # could not run one, or it loaded and then failed here. Report either, so the
+            # app can offer a privacy server in both cases.
+            why = os.environ.get("IO_SCANNER_UNAVAILABLE") or getattr(S, "scanner_error", None)
             return self._json({
-                "unavailable": os.environ.get("IO_SCANNER_UNAVAILABLE") or None,
-                "mode": S.scanner_mode() if S.detector is not None else None,
+                "unavailable": why or None,
+                "mode": getattr(S, "_scanner_mode", None) if S.detector is not None else None,
                 "server": bool((S.provider.get("scanner_server") or "").strip()),
             })
         if p == "/api/state":
