@@ -50,7 +50,7 @@ jobs:
           # scanner. It is deliberately never published to a release from here.
           all='[
             {"os":"windows-latest","label":"win-x64","target":"--win zip --x64"},
-            {"os":"ubuntu-latest","label":"linux-x64","target":"--linux AppImage tar.gz --x64"},
+            {"os":"ubuntu-latest","label":"linux-x64","target":"--linux tar.gz --x64"},
             {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"},
             {"os":"macos-14","label":"mac-x64","target":"--mac dmg --x64"}
           ]'
@@ -111,11 +111,10 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          APP=$(ls app/io/dist/*.AppImage | head -1)
-          chmod +x "$APP"
-          echo "IO_EXE=$PWD/$APP" >> $GITHUB_ENV
-          # the runner has no libfuse2 either, so the AppImage has to self-extract
-          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+          TGZ=$(ls app/io/dist/*.tar.gz | head -1)
+          mkdir -p staged && tar -xzf "$TGZ" -C staged --strip-components=1
+          test -x staged/io
+          echo "IO_EXE=$PWD/staged/io" >> $GITHUB_ENV
 
       - name: stage the artifact (mac)
         if: startsWith(matrix.os, 'macos')
@@ -128,7 +127,7 @@ jobs:
           xattr -dr com.apple.quarantine staged-io.app || true
           echo "IO_EXE=$PWD/staged-io.app/Contents/MacOS/io" >> $GITHUB_ENV
 
-      - name: the tar.gz is the no-FUSE path, so check it is usable
+      - name: the tarball is the linux artifact, so check it is usable
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
@@ -166,7 +165,7 @@ jobs:
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "io $TAG" --notes "built by the package workflow" --target "$GITHUB_SHA"
           shopt -s nullglob
-          files=(app/io/dist/*.zip app/io/dist/*.AppImage app/io/dist/*.tar.gz app/io/dist/*.dmg)
+          files=(app/io/dist/*.zip app/io/dist/*.tar.gz app/io/dist/*.dmg)
           echo "uploading ${#files[@]} file(s): ${files[*]}"
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
 
@@ -182,7 +181,6 @@ jobs:
           name: io-${{ matrix.label }}
           path: |
             app/io/dist/*.zip
-            app/io/dist/*.AppImage
             app/io/dist/*.tar.gz
             app/io/dist/*.dmg
           if-no-files-found: error
@@ -235,10 +233,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          # Smoke the tarball, not the AppImage. It is the artifact the install doc points
-          # at (no libfuse2 needed), and without FUSE the offline AppImage self-extracts
-          # another 2.6 GB into /tmp on top of the payload and both artifacts already on
-          # disk - that filled the runner and left AppRun half-written, exiting 127.
+          # The tarball is the only linux artifact now.
           rm -rf app/io/dist/linux-unpacked app/io/dist/linux-x64-unpacked
           TGZ=$(ls app/io/dist/*.tar.gz | head -1)
           mkdir -p staged && tar -xzf "$TGZ" -C staged --strip-components=1
@@ -284,7 +279,7 @@ jobs:
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "io $TAG" --notes "built by the package workflow" --target "$GITHUB_SHA"
           shopt -s nullglob
-          files=(app/io/dist/*.zip app/io/dist/*.AppImage app/io/dist/*.tar.gz app/io/dist/*.dmg)
+          files=(app/io/dist/*.zip app/io/dist/*.tar.gz app/io/dist/*.dmg)
           echo "uploading ${#files[@]} file(s): ${files[*]}"
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
 
@@ -300,7 +295,6 @@ jobs:
           name: io-${{ matrix.label }}-offline
           path: |
             app/io/dist/*offline*.zip
-            app/io/dist/*offline*.AppImage
             app/io/dist/*offline*.tar.gz
             app/io/dist/*offline*.dmg
           if-no-files-found: error

@@ -286,7 +286,9 @@ $('#p-go').onclick = async () => {
 async function afterConsent(){
   let sc = {};
   try { sc = await api('/api/scanner'); } catch (e) { sc = {}; }
-  if (sc.unavailable && !sc.server) {
+  // Ask once. Someone who has already said no should not be asked again every time the
+  // window reloads or they reopen the app.
+  if (sc.unavailable && !sc.server && !sc.declined) {
     $('#sc-why').textContent = String(sc.unavailable).slice(0, 300);
     show('#s-scanner');
     return;
@@ -300,7 +302,10 @@ $('#sc-yes').onclick = async () => {
   await api('/api/provider', {scanner_server: url});
   show('#s-home'); renderShelf();
 };
-$('#sc-no').onclick = () => { show('#s-home'); renderShelf(); };
+$('#sc-no').onclick = async () => {
+  await api('/api/provider', {scanner_declined: '1'});
+  show('#s-home'); renderShelf();
+};
 
 // settings
 $('#gear').onclick = () => $('#settings').classList.add('on');

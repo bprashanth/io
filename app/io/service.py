@@ -654,6 +654,7 @@ class H(BaseHTTPRequestHandler):
                 "unavailable": why or None,
                 "mode": getattr(S, "_scanner_mode", None) if S.detector is not None else None,
                 "server": bool((S.provider.get("scanner_server") or "").strip()),
+                "declined": bool((S.provider.get("scanner_declined") or "").strip()),
             })
         if p == "/api/state":
             return self._json({"provider": {"set": bool(S.provider), "model": S.provider.get("model"), "server": bool(S.provider.get("server"))},
@@ -750,7 +751,7 @@ class H(BaseHTTPRequestHandler):
                         S.detector = None
                         S.text_detector = None
                         S._scanner_mode = None
-                for k in ("api_key", "server", "model", "room", "org", "scanner_server"):
+                for k in ("api_key", "server", "model", "room", "org", "scanner_server", "scanner_declined"):
                     if k in body:
                         S.provider[k] = body[k].strip()
                 S.provider = {k: v for k, v in S.provider.items() if v}

@@ -95,15 +95,15 @@ module.exports = {
     // executableName directly and never sees the launcher, so it gets the flag this way.
     executableName: 'io-bin',
     executableArgs: ['--no-sandbox'],
-    // Two targets on purpose. The AppImage is the pretty one-file artifact, but it needs
-    // libfuse2, which Ubuntu 24.04 no longer installs - a plain double-click there dies with
-    // "dlopen(): error loading libfuse.so.2", and the fix is `apt install libfuse2t64`, which
-    // wants the admin password we promised never to need. The tar.gz has no such dependency:
-    // extract it anywhere and run ./io. That is the one we point people at.
-    target: [
-      { target: 'AppImage', arch: ['x64', 'arm64'] },
-      { target: 'tar.gz', arch: ['x64', 'arm64'] },
-    ],
+    // tar.gz only. The AppImage was dropped after four separate problems, each verified:
+    // it needs libfuse2 that Ubuntu 24.04 no longer ships, so a double-click dies with
+    // "dlopen(): error loading libfuse.so.2"; its AppRun execs the binary directly and
+    // bypasses the launcher that handles Chromium's setuid sandbox, so it core-dumps the
+    // same way the tarball used to (executableArgs only reaches the .desktop entry, which
+    // nobody uses when launching the file itself); it doubled the offline payload at about
+    // a gigabyte; and the install docs already told people to use the tarball. Extract the
+    // tarball anywhere and run ./io.
+    target: [{ target: 'tar.gz', arch: ['x64', 'arm64'] }],
     icon: 'icons/icon.png',
     category: 'Office',
     synopsis: 'Ask questions about a folder of files, without the files leaving.',
