@@ -60,7 +60,9 @@ jobs:
           else
             picked=$(echo "$all" | jq -c '.')
           fi
-          fat=$(echo "$picked" | jq -c '.')
+          # No offline pack for Intel Mac. The payload is the scanner, and there is no
+          # PyTorch to put in it, so the job would only ever fail.
+          fat=$(echo "$picked" | jq -c '[.[] | select(.label != "mac-x64")]')
           echo "thin: $(echo "$picked" | jq -r '[.[].label] | join(", ")')"
           echo "fat:  $(echo "$fat" | jq -r '[.[].label] | join(", ")')"
           echo "matrix=$picked" >> "$GITHUB_OUTPUT"

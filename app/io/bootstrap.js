@@ -274,6 +274,21 @@ async function install({ dest, onProgress = noop }) {
   //    an Intel Mac has had no PyTorch wheel since 2.2.2, and the transformers we need
   //    wants a newer torch than that. Those machines get only what reads files, which is
   //    about 100 MB rather than 1.9 GB, and io offers them a privacy server instead.
+  //    torch comes from the CPU-only index on Windows and Linux so we do not
+  //    drag in a couple of GB of CUDA. macOS wheels on PyPI are already CPU/MPS.
+  const pip = (args, label) => run(py, ['-m', 'pip', 'install', '--no-input', '--disable-pip-version-check', ...args],
+    { env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' } },
+    line => { if (/^(Collecting|Downloading|Installing|Successfully)/.test(line)) say('packages', label + ' - ' + line.slice(0, 70)); });
+
+  // Some platforms cannot install the versions everything else uses, because the wheels do
+  // not exist for them. An override replaces a pin of the same package and adds any others.
+  const key = `${process.platform}-${process.arch}`;
+  const overrides = (PINS.packageOverrides || {})[key] || [];
+  const nameOf = spec => spec.split('==')[0].toLowerCase();
+  const overridden = new Set(overrides.map(nameOf));
+  const wanted = PINS.packages.filter(p => !overridden.has(nameOf(p))).concat(overrides);
+  if (overrides.length) say('packages', `using ${key} pins: ${overrides.join(' ')}`);
+
   const platformKey = `${process.platform}-${process.arch}`;
   const noScanner = (PINS.scannerUnsupported || []).includes(platformKey);
   const scannerPkgs = new Set((PINS.scannerPackages || []).map(n => n.toLowerCase()));
@@ -290,21 +305,6 @@ async function install({ dest, onProgress = noop }) {
     say('done', 'ready without the local scanner');
     return { runtimeDir, hfCache, python: py, scanner: false, scannerError: fs.readFileSync(markerPath, 'utf8').trim() };
   }
-
-  //    torch comes from the CPU-only index on Windows and Linux so we do not
-  //    drag in a couple of GB of CUDA. macOS wheels on PyPI are already CPU/MPS.
-  const pip = (args, label) => run(py, ['-m', 'pip', 'install', '--no-input', '--disable-pip-version-check', ...args],
-    { env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' } },
-    line => { if (/^(Collecting|Downloading|Installing|Successfully)/.test(line)) say('packages', label + ' - ' + line.slice(0, 70)); });
-
-  // Some platforms cannot install the versions everything else uses, because the wheels do
-  // not exist for them. An override replaces a pin of the same package and adds any others.
-  const key = `${process.platform}-${process.arch}`;
-  const overrides = (PINS.packageOverrides || {})[key] || [];
-  const nameOf = spec => spec.split('==')[0].toLowerCase();
-  const overridden = new Set(overrides.map(nameOf));
-  const wanted = PINS.packages.filter(p => !overridden.has(nameOf(p))).concat(overrides);
-  if (overrides.length) say('packages', `using ${key} pins: ${overrides.join(' ')}`);
 
   const torch = wanted.find(p => p.startsWith('torch=='));
   const rest = wanted.filter(p => p !== torch);
