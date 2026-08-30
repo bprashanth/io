@@ -19,6 +19,27 @@ let splash = null;
 // path is Electron's, not ours: IO_DATA_DIR does not move it. In portable mode it has to
 // move too, or a USB stick still leaves Chromium droppings on every laptop it touches.
 // This must run before app.whenReady(), because Electron fixes the path on first use.
+// Chromium's setuid sandbox helper has to be owned by root with mode 4755. Nothing we
+// ship can arrange that: the zip, tarball and dmg are all unpacked by an ordinary user,
+// and asking for sudo is the one thing this app promised never to do. When the helper is
+// not usable Electron aborts outright - "The SUID sandbox helper binary was found, but is
+// not configured correctly", core dumped, before any of our code runs. Seen on a
+// participant's Ubuntu laptop. Our own smoke passed --no-sandbox and so never saw it.
+//
+// So: keep the sandbox when the helper is properly installed, and only stand it down when
+// it would otherwise be a crash. This must happen at module scope, before app is ready.
+if (process.platform === 'linux') {
+  let usable = false;
+  try {
+    const st = fs.statSync(path.join(path.dirname(process.execPath), 'chrome-sandbox'));
+    usable = st.uid === 0 && (st.mode & 0o4000) !== 0;
+  } catch { /* no helper at all */ }
+  if (!usable) {
+    app.commandLine.appendSwitch('no-sandbox');
+    app.commandLine.appendSwitch('disable-setuid-sandbox');
+  }
+}
+
 const PORTABLE = runtime.portableDir();
 if (PORTABLE) {
   app.setPath('userData', path.join(PORTABLE, 'electron'));

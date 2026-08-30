@@ -1,0 +1,21 @@
+#!/bin/sh
+# io launcher, Linux.
+#
+# Chromium's setuid sandbox helper must be owned by root with mode 4755. Nothing shipped
+# in a tarball can arrange that, because an ordinary user unpacks it and this app promised
+# never to ask for a password. When the helper is not usable Electron aborts before any of
+# our own code runs, with "The SUID sandbox helper binary was found, but is not configured
+# correctly" and a core dump.
+#
+# So check the helper. If it is properly installed, keep the sandbox. If it is not, start
+# without it rather than not starting at all.
+here=$(cd "$(dirname "$0")" && pwd)
+helper="$here/chrome-sandbox"
+if [ -u "$helper" ] && [ -O "$helper" ] 2>/dev/null; then
+  : # owned by us and setuid, unusual but leave it alone
+fi
+if [ ! -u "$helper" ] || [ "$(stat -c %u "$helper" 2>/dev/null)" != "0" ]; then
+  ELECTRON_DISABLE_SANDBOX=1
+  export ELECTRON_DISABLE_SANDBOX
+fi
+exec "$here/io-bin" "$@"

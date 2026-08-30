@@ -127,7 +127,11 @@ async function main() {
   // real Electron binary, and Electron itself forks zygote, gpu and renderer children plus
   // the python service - killing only the wrapper leaves all of that alive, still holding
   // the CDP port. The next run then quietly attaches to the previous run's app.
-  const child = spawn(EXE, [`--remote-debugging-port=${CDP}`, '--no-sandbox'], {
+  // Deliberately NOT passing --no-sandbox. Passing it hid a crash that hit a real user:
+  // the shipped chrome-sandbox helper is not setuid root, so Electron aborted before any
+  // of our code ran. The launcher deals with that now, and the smoke has to run the way a
+  // double-click does or it will hide the next one too.
+  const child = spawn(EXE, [`--remote-debugging-port=${CDP}`], {
     env: { ...process.env, IO_PORT_BASE: String(PORT_BASE), IO_DATA_DIR: dataDir, IO_HOME: confDir, IO_SMOKE: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',

@@ -84,7 +84,17 @@ module.exports = {
     artifactName: `io-win-\${arch}${suffix}.\${ext}`,
   },
 
+  // The launcher goes next to the binary, not into resources/. Linux only: it exists to
+  // deal with Chromium's setuid sandbox helper, which Windows and macOS do not have.
+  extraFiles: process.platform === 'linux' || process.env.IO_TARGET_LINUX
+    ? [{ from: 'launcher/io', to: 'io' }]
+    : [],
+
   linux: {
+    // The real binary is io-bin; 'io' is the launcher above. AppImage's AppRun execs the
+    // executableName directly and never sees the launcher, so it gets the flag this way.
+    executableName: 'io-bin',
+    executableArgs: ['--no-sandbox'],
     // Two targets on purpose. The AppImage is the pretty one-file artifact, but it needs
     // libfuse2, which Ubuntu 24.04 no longer installs - a plain double-click there dies with
     // "dlopen(): error loading libfuse.so.2", and the fix is `apt install libfuse2t64`, which
