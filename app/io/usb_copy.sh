@@ -6,6 +6,7 @@
 #   ./app/io/usb_copy.sh --verify        # check drives that were already copied
 #   ./app/io/usb_copy.sh --builds DIR    # where the archives are (default: ./bin)
 #   ./app/io/usb_copy.sh --target DIR    # copy here instead of hunting sticks (repeatable)
+#   ./app/io/usb_copy.sh --verify --manifest FILE   # check against this manifest instead
 #
 # Run it from the root of this repo. Plug in as many sticks as you like, in a hub or one
 # at a time, and run it again after each batch: it copies to all of them at once and skips
@@ -26,6 +27,7 @@ while [ $# -gt 0 ]; do
     --target) TARGETS+=("$2"); shift 2 ;;   # repeatable, mostly for testing
     --dry-run|-n) DRY=1; shift ;;
     --verify) VERIFY=1; shift ;;
+    --manifest) REF_MANIFEST="$2"; shift 2 ;;
     -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
@@ -73,7 +75,10 @@ unpack_builds() {
     if [ -d "$out" ]; then
       local want have
       case "$f" in
-        *.tar.gz) want=$(tar -tzf "$f" 2>/dev/null | grep -vc '/$') ;;
+        # tar -t lists a directory without a trailing slash when the archive was built
+        # that way; counting "no slash = file" overcounted this pack by 2011 dirs and
+        # re-unpacked complete staging on every run. -tv shows the type letter instead.
+        *.tar.gz) want=$(tar -tvzf "$f" 2>/dev/null | grep -cv '^d') ;;
         *.zip)    want=$(unzip -Z1 "$f" 2>/dev/null | grep -vc '/$') ;;
       esac
       # -type f alone undercounts: tar and zip list a symlink as an entry, so an archive
@@ -123,9 +128,12 @@ copy_to() {
     # after rsync had already finished - which is exactly why runs never ended and the
     # manifest at the end was never reached. -L sends the file a symlink points at instead
     # of the link, which exFAT can hold, and rsync exits 0. Verified on a real vfat image.
-    rsync -a -L --info=progress2 --no-inc-recursive "$STAGE"/ "$dest/io/" 2>&1
+    # --modify-window=2: FAT stores mtimes at 2-second resolution and rounds down, so
+    # half the files look "changed" to a re-run and were re-copied in full. Two seconds
+    # of tolerance skips them; a truncated file still differs in size and is repaired.
+    rsync -a -L --modify-window=2 --info=progress2 --no-inc-recursive "$STAGE"/ "$dest/io/" 2>&1
     local rc1=$?
-    rsync -a -L "$DATA_SRC"/ "$dest/data/" 2>&1
+    rsync -a -L --modify-window=2 "$DATA_SRC"/ "$dest/data/" 2>&1
     local rc2=$?
     # 24 means a source file vanished while we read it; harmless. Anything else is real,
     # and is reported rather than answered by silently copying everything a second way.
@@ -159,11 +167,29 @@ verify_drive() {
   # not on one line with mp: bash makes every name in a single `local` local first, which
   # unsets it, so a later assignment on the same line would read an empty mp under set -u
   local man="$mp/insightout/MANIFEST.txt"
+  local note=""
   if [ ! -f "$man" ]; then
-    printf '  %-28s NO MANIFEST - copied before this check existed, or never finished\n' "$(basename "$mp")"
-    return 1
+    # A drive that lost power before the end never got its manifest, but it can still be
+    # judged against the reference manifest from the same builds - that is what the copy
+    # would have written. Found automatically in staging or the log dir, or --manifest FILE.
+    if [ -n "${REF_MANIFEST:-}" ] && [ -f "$REF_MANIFEST" ]; then
+      man="$REF_MANIFEST"
+      note="  [no manifest on drive; checked against reference]"
+    else
+      printf '  %-28s NO MANIFEST - never finished, and no reference manifest found (--manifest FILE)\n' "$(basename "$mp")"
+      return 1
+    fi
   fi
-  local missing=0 wrong=0 total=0
+  local missing=0 wrong=0 total=0 collided=0
+  # FAT and exFAT are case-insensitive: two manifest entries differing only in case (the
+  # runtime's terminfo ships Eterm and eterm, both real files) land on ONE file on the
+  # stick, and which size survives depends on copy order. A mismatch whose actual size
+  # equals a case-twin's manifest size is that, not damage; a truncated file matches
+  # neither twin and still fails.
+  local -A twin_sizes=()
+  while IFS=$'\t' read -r lc sizes; do twin_sizes["$lc"]=" $sizes "; done < <(
+    awk '{lc=tolower($0); sub(/^[0-9]+ /,"",lc); key[lc]=key[lc]" "$1; n[lc]++}
+         END{for(k in n) if(n[k]>1) printf "%s\t%s\n", k, key[k]}' "$man")
   while read -r size rel; do
     [ -z "${rel:-}" ] && continue
     total=$((total+1))
@@ -171,14 +197,25 @@ verify_drive() {
     if [ ! -f "$f" ]; then missing=$((missing+1))
     else
       local actual; actual=$(stat -c %s "$f" 2>/dev/null || echo -1)
-      [ "$actual" = "$size" ] || wrong=$((wrong+1))
+      if [ "$actual" != "$size" ]; then
+        local lc=${rel,,}
+        case "${twin_sizes[$lc]:-}" in
+          *" $actual "*) collided=$((collided+1)) ;;
+          *) wrong=$((wrong+1)) ;;
+        esac
+      fi
     fi
   done < "$man"
+  local coll=""
+  [ "$collided" -gt 0 ] && coll=", $collided case-twins merged by FAT"
   if [ "$missing" -eq 0 ] && [ "$wrong" -eq 0 ]; then
-    printf '  %-28s COMPLETE  %s files all present and the right size\n' "$(basename "$mp")" "$total"
+    printf '  %-28s COMPLETE  %s files all present and the right size%s%s\n' "$(basename "$mp")" "$total" "$coll" "$note"
+    # It passed against the reference, so it has earned the manifest it was missing; write
+    # it on so the next verify of this drive stands on its own.
+    [ -n "$note" ] && { cp -f "$man" "$mp/insightout/MANIFEST.txt" 2>/dev/null || true; }
     return 0
   fi
-  printf '  %-28s INCOMPLETE  %s missing, %s wrong size, of %s\n' "$(basename "$mp")" "$missing" "$wrong" "$total"
+  printf '  %-28s INCOMPLETE  %s missing, %s wrong size, of %s%s%s\n' "$(basename "$mp")" "$missing" "$wrong" "$total" "$coll" "$note"
   return 1
 }
 
@@ -197,6 +234,13 @@ for m in "${STICKS[@]}"; do
 done
 
 if [ "$VERIFY" = "1" ]; then
+  # For drives that never finished: prefer the manifest in staging (freshest), then the
+  # durable copy the last copy run left in the log dir.
+  if [ -z "${REF_MANIFEST:-}" ]; then
+    for c in "$STAGE/../io-usb-manifest.txt" "./usb_copy-logs/io-usb-manifest.txt"; do
+      [ -f "$c" ] && { REF_MANIFEST="$c"; break; }
+    done
+  fi
   say
   say "checking each drive against the manifest written when it was copied"
   bad=0
@@ -222,8 +266,11 @@ unpack_builds
 # hashes: a truncated or missing file is what a power cut leaves behind, and that shows up
 # here in seconds instead of the half hour it takes to sha256 eighty thousand files off a
 # USB stick. --verify --deep does the hashes when you want certainty.
-( cd "$STAGE" && find . -type f -printf '%s %p\n' | sed 's|^\([0-9]*\) \./|\1 io/|' ; \
-  cd "$OLDPWD/$DATA_SRC" && find . -type f -printf '%s %p\n' | sed 's|^\([0-9]*\) \./|\1 data/|' ) \
+# find -L, because the copy uses rsync -L: every symlink in staging lands on the drive as
+# a real file with the target's size, so the manifest must list it that way too. Without
+# -L the ~1000 python-runtime links were copied but never verified.
+( cd "$STAGE" && find -L . -type f -printf '%s %p\n' | sed 's|^\([0-9]*\) \./|\1 io/|' ; \
+  cd "$OLDPWD/$DATA_SRC" && find -L . -type f -printf '%s %p\n' | sed 's|^\([0-9]*\) \./|\1 data/|' ) \
   2>/dev/null | LC_ALL=C sort -k2 > "$STAGE/../io-usb-manifest.txt"
 TOTAL_KB=$(du -sk "$STAGE" "$DATA_SRC" 2>/dev/null | awk '{s+=$1} END{print s+0}')
 # Progress is counted in files, not bytes. Bytes lie on exFAT: it allocates in 32 KB
@@ -242,6 +289,9 @@ say "copying $((TOTAL_KB/1024)) MB in $TOTAL_FILES files to ${#STICKS[@]} drive(
 say "  a USB stick is slow with many small files; expect this to take a while"
 LOGDIR="${LOGDIR_OVERRIDE:-./usb_copy-logs}"
 mkdir -p "$LOGDIR"
+# A durable copy of the manifest, outside /tmp: --verify falls back to it for a drive
+# that lost power before its own MANIFEST.txt was written, even after a reboot.
+cp -f "$STAGE/../io-usb-manifest.txt" "$LOGDIR/io-usb-manifest.txt" 2>/dev/null || true
 say "  logs: $LOGDIR/  (kept, one file per drive)"
 pids=()
 for m in "${STICKS[@]}"; do
