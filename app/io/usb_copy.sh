@@ -115,9 +115,26 @@ copy_to() {
     # keeps its timestamp and is never repaired. Tested - a truncated file survived a
     # re-run. rsync's default compares size and mtime, which still skips everything
     # unchanged and does fix a truncated file.
-    rsync -a --info=progress2 --no-inc-recursive "$STAGE"/ "$dest/io/" 2>&1 \
-      || cp -r "$STAGE"/. "$dest/io/" 2>&1
-    rsync -a "$DATA_SRC"/ "$dest/data/" 2>&1 || cp -r "$DATA_SRC"/. "$dest/data/" 2>&1
+    #
+    # -L is what makes this work on a USB stick. The packs carry ~1000 symlinks inside the
+    # bundled python runtime, and exFAT cannot store a symlink at all, so plain -a fails on
+    # every one of them and exits 23. The old fallback treated any non-zero exit as "rsync
+    # is unusable" and re-copied the entire 3.5 GB with cp -r, on every drive, on every run,
+    # after rsync had already finished - which is exactly why runs never ended and the
+    # manifest at the end was never reached. -L sends the file a symlink points at instead
+    # of the link, which exFAT can hold, and rsync exits 0. Verified on a real vfat image.
+    rsync -a -L --info=progress2 --no-inc-recursive "$STAGE"/ "$dest/io/" 2>&1
+    local rc1=$?
+    rsync -a -L "$DATA_SRC"/ "$dest/data/" 2>&1
+    local rc2=$?
+    # 24 means a source file vanished while we read it; harmless. Anything else is real,
+    # and is reported rather than answered by silently copying everything a second way.
+    for rc in "$rc1" "$rc2"; do
+      case "$rc" in
+        0|24) ;;
+        *) echo "  rsync exited $rc - this drive is NOT complete, see the errors above"; exit 1 ;;
+      esac
+    done
     # The instructions travel with the drive. Someone who picks this up without the
     # room's wifi, or without an organizer next to them, still knows what to do.
     [ -f "$HERE_DIR/START-HERE.txt" ] && cp -f "$HERE_DIR/START-HERE.txt" "$mp/START-HERE.txt"
@@ -214,12 +231,10 @@ TOTAL_KB=$(du -sk "$STAGE" "$DATA_SRC" 2>/dev/null | awk '{s+=$1} END{print s+0}
 # 100 while thousands of files are still to come.
 #
 # Count exactly what the drive can be counted for, plus the MANIFEST written into
-# insightout/ at the end. Regular files only, deliberately: the packs carry about a
-# thousand symlinks inside the bundled python runtime, and exFAT cannot store a symlink
-# at all, so counting them here made a full copy read 98% forever on a USB stick.
-# The unpack check above is a different comparison - staging against the archive listing,
-# both on a filesystem that does have symlinks - and counts them there on purpose.
-count_entries() { find "$1" -type f 2>/dev/null | wc -l; }
+# insightout/ at the end. Symlinks count because the copy uses -L, which materialises
+# each one as a real file on the drive - so a source symlink does become a destination
+# file, even on exFAT, which cannot store links.
+count_entries() { find "$1" \( -type f -o -type l \) 2>/dev/null | wc -l; }
 FILES=$(count_entries "$STAGE")
 TOTAL_FILES=$(( FILES + $(count_entries "$DATA_SRC") + 1 ))
 say
