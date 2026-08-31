@@ -55,3 +55,8 @@ privacy-shield modules, unchanged.
   the notes at the top of that file before starting one: the text sent to it is not
   redacted.
 - `room_server.py` - the projector board that collects the blind-comparison votes.
+
+The whole distribution and event-day process is one page:
+[installation/DISTRIBUTION.md](../../installation/DISTRIBUTION.md). On the day,
+`./installation/scripts/event_start.sh` from the repo root starts both servers and prints
+the addresses to read out.

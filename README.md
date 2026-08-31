@@ -60,6 +60,13 @@ These packs carry everything needed to run the app inside them.
 
 Details and flow: [`app/io/README.md`](app/io/README.md).
 
+**Organizers:** [installation/DISTRIBUTION.md](installation/DISTRIBUTION.md) is the whole
+job in one page - building, putting it on USB drives, and running the event. On the day:
+
+```
+./installation/scripts/event_start.sh      # starts both servers, prints the addresses
+```
+
 **C. The room board**
 
 Every question in io is answered by three models at once, unlabelled. Each person picks the

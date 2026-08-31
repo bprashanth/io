@@ -202,6 +202,10 @@ unpack_builds
   2>/dev/null | LC_ALL=C sort -k2 > "$STAGE/../io-usb-manifest.txt"
 TOTAL_KB=$(du -sk "$STAGE" "$DATA_SRC" 2>/dev/null | awk '{s+=$1} END{print s+0}')
 FILES=$(find "$STAGE" -type f 2>/dev/null | wc -l)
+# Progress is counted in files, not bytes. Bytes lie on exFAT: it allocates in 32 KB
+# clusters, so du on the destination runs well above the source and the percentage pegs at
+# 100 while thousands of files are still to come. Counting files is exact and comparable.
+TOTAL_FILES=$(( FILES + $(find "$DATA_SRC" -type f 2>/dev/null | wc -l) ))
 say
 say "copying $((TOTAL_KB/1024)) MB in $FILES files to ${#STICKS[@]} drive(s) at once"
 say "  a USB stick is slow with many small files; expect this to take a while"
@@ -224,8 +228,8 @@ while :; do
   [ "$running" -eq 0 ] && break
   line=""
   for m in "${STICKS[@]}"; do
-    got=$(du -sk "$m/insightout" 2>/dev/null | awk '{print $1+0}')
-    pct=0; [ "${TOTAL_KB:-0}" -gt 0 ] && pct=$(( got * 100 / TOTAL_KB ))
+    got=$(find "$m/insightout" -type f 2>/dev/null | wc -l)
+    pct=0; [ "${TOTAL_FILES:-0}" -gt 0 ] && pct=$(( got * 100 / TOTAL_FILES ))
     [ "$pct" -gt 100 ] && pct=100
     line="$line $(basename "$m")=${pct}%"
   done
