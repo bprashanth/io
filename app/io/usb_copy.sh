@@ -126,7 +126,10 @@ copy_to() {
     # each of the eight copies blocked until all eight had finished writing back. -f waits
     # for just this drive.
     sync -f "$dest" 2>/dev/null || sync
-    echo "  done: $(du -sh "$dest" 2>/dev/null | cut -f1) on $mp"
+    # Deliberately not du: walking ~75k files back off a slow exFAT stick, on eight
+    # drives at once, took longer than the copy it was reporting on. The size is already
+    # known from the source, and the file count is the number that actually matters.
+    echo "  done: ~$(( ${TOTAL_KB:-0} / 1024 )) MB on $mp"
   } > "$log" 2>&1
 }
 
