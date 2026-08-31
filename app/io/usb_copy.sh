@@ -76,7 +76,9 @@ unpack_builds() {
         *.tar.gz) want=$(tar -tzf "$f" 2>/dev/null | grep -vc '/$') ;;
         *.zip)    want=$(unzip -Z1 "$f" 2>/dev/null | grep -vc '/$') ;;
       esac
-      have=$(find "$out" -type f 2>/dev/null | wc -l)
+      # -type f alone undercounts: tar and zip list a symlink as an entry, so an archive
+      # holding one never matched and was thrown away and re-extracted on every run.
+      have=$(find "$out" \( -type f -o -type l \) 2>/dev/null | wc -l)
       if [ "${want:-0}" -gt 0 ] && [ "$have" -eq "$want" ]; then
         say "  already unpacked: $base ($have files)"; n=$((n+1)); continue
       fi
@@ -201,13 +203,18 @@ unpack_builds
   cd "$OLDPWD/$DATA_SRC" && find . -type f -printf '%s %p\n' | sed 's|^\([0-9]*\) \./|\1 data/|' ) \
   2>/dev/null | LC_ALL=C sort -k2 > "$STAGE/../io-usb-manifest.txt"
 TOTAL_KB=$(du -sk "$STAGE" "$DATA_SRC" 2>/dev/null | awk '{s+=$1} END{print s+0}')
-FILES=$(find "$STAGE" -type f 2>/dev/null | wc -l)
 # Progress is counted in files, not bytes. Bytes lie on exFAT: it allocates in 32 KB
 # clusters, so du on the destination runs well above the source and the percentage pegs at
-# 100 while thousands of files are still to come. Counting files is exact and comparable.
-TOTAL_FILES=$(( FILES + $(find "$DATA_SRC" -type f 2>/dev/null | wc -l) ))
+# 100 while thousands of files are still to come.
+#
+# Count exactly what the drive will be counted for, or the number lies a second time:
+# symlinks as well as regular files, plus the MANIFEST written into insightout/ at the end.
+# Getting this wrong by one file is how 100% came to mean "nearly".
+count_entries() { find "$1" \( -type f -o -type l \) 2>/dev/null | wc -l; }
+FILES=$(count_entries "$STAGE")
+TOTAL_FILES=$(( FILES + $(count_entries "$DATA_SRC") + 1 ))
 say
-say "copying $((TOTAL_KB/1024)) MB in $FILES files to ${#STICKS[@]} drive(s) at once"
+say "copying $((TOTAL_KB/1024)) MB in $TOTAL_FILES files to ${#STICKS[@]} drive(s) at once"
 say "  a USB stick is slow with many small files; expect this to take a while"
 LOGDIR="${LOGDIR_OVERRIDE:-./usb_copy-logs}"
 mkdir -p "$LOGDIR"
@@ -228,13 +235,17 @@ while :; do
   [ "$running" -eq 0 ] && break
   line=""
   for m in "${STICKS[@]}"; do
-    got=$(find "$m/insightout" -type f 2>/dev/null | wc -l)
+    got=$(count_entries "$m/insightout")
     pct=0; [ "${TOTAL_FILES:-0}" -gt 0 ] && pct=$(( got * 100 / TOTAL_FILES ))
     [ "$pct" -gt 100 ] && pct=100
     line="$line $(basename "$m")=${pct}%"
   done
-  printf '\r  [%4ds] %d copying:%s        ' "$(( $(date +%s) - started ))" "$running" "$line"
-  sleep 3
+  elapsed=$(( $(date +%s) - started ))
+  printf '\r  [%4ds] %d copying:%s        ' "$elapsed" "$running" "$line"
+  # Each poll walks every file already on the drive, competing with the copy for the same
+  # slow bus. Frequent early, when the operator wants to see it move; sparse later, when
+  # they just want it to finish.
+  if [ "$elapsed" -lt 60 ]; then sleep 3; else sleep 15; fi
 done
 printf '\r%*s\r' 78 ''
 
