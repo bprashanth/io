@@ -66,8 +66,22 @@ unpack_builds() {
     [ -e "$f" ] || continue
     local base; base=$(basename "$f"); base=${base%.tar.gz}; base=${base%.zip}
     local out="$STAGE/$base"
-    if [ -d "$out" ] && [ -n "$(ls -A "$out" 2>/dev/null)" ]; then
-      say "  already unpacked: $base"; n=$((n+1)); continue
+    # Non-empty is not the same as complete. An unpack interrupted by a power cut leaves a
+    # partial tree, and reusing it silently shipped a short copy to every drive - seven
+    # sticks all 3,060 files light, and nothing said so. Count what the archive holds and
+    # compare before trusting what is on disk.
+    if [ -d "$out" ]; then
+      local want have
+      case "$f" in
+        *.tar.gz) want=$(tar -tzf "$f" 2>/dev/null | grep -vc '/$') ;;
+        *.zip)    want=$(unzip -Z1 "$f" 2>/dev/null | grep -vc '/$') ;;
+      esac
+      have=$(find "$out" -type f 2>/dev/null | wc -l)
+      if [ "${want:-0}" -gt 0 ] && [ "$have" -eq "$want" ]; then
+        say "  already unpacked: $base ($have files)"; n=$((n+1)); continue
+      fi
+      say "  re-unpacking $base: has $have files, expected ${want:-?}"
+      rm -rf "$out"
     fi
     say "  unpacking $base ..."
     rm -rf "$out"; mkdir -p "$out"
