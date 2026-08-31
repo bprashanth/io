@@ -29,6 +29,7 @@ while [ $# -gt 0 ]; do
 done
 
 DATA_SRC="simulations/foundation-without/data"
+HERE_DIR=$(cd "$(dirname "$0")" && pwd)
 say() { printf '%s\n' "$*"; }
 die() { printf 'usb_copy: %s\n' "$*" >&2; exit 1; }
 
@@ -95,6 +96,9 @@ copy_to() {
     rsync -a --update --info=progress2 --no-inc-recursive "$STAGE"/ "$dest/io/" 2>&1 \
       || cp -ru "$STAGE"/. "$dest/io/" 2>&1
     rsync -a --update "$DATA_SRC"/ "$dest/data/" 2>&1 || cp -ru "$DATA_SRC"/. "$dest/data/" 2>&1
+    # The instructions travel with the drive. Someone who picks this up without the
+    # room's wifi, or without an organizer next to them, still knows what to do.
+    [ -f "$HERE_DIR/START-HERE.txt" ] && cp -f "$HERE_DIR/START-HERE.txt" "$mp/START-HERE.txt"
     sync
     echo "  done: $(du -sh "$dest" 2>/dev/null | cut -f1) on $mp"
   } > "$log" 2>&1
