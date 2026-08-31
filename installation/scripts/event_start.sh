@@ -34,11 +34,38 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ "$WANT_BOARD" = "0" ] && [ "$WANT_SCANNER" = "0" ] && [ "$STOP" = "0" ]; then
+  echo "--board-only and --scanner-only together leave nothing to start" >&2; exit 2
+fi
+
 APP="app/io"
 [ -f "$APP/room_server.py" ] || { echo "run this from the root of the repo" >&2; exit 1; }
 
 RUN="${TMPDIR:-/tmp}/io-event"
 mkdir -p "$RUN"
+
+script_for() { [ "$1" = "board" ] && echo room_server.py || echo privacy_server.py; }
+
+# A pid file outlives a crash, and by then the number may belong to something else
+# entirely. Killing that on --stop would be a very unpleasant surprise on the machine
+# running the projector, so check the pid is really the server before touching it.
+ours() {
+  local pid="$1" want="$2"
+  [ -n "${pid:-}" ] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  ps -p "$pid" -o args= 2>/dev/null | grep -q -- "$want"
+}
+
+# "started" should mean "answering", not "the process has not exited yet".
+wait_ready() {
+  local port="$1" pid="$2" limit="$3" i=0
+  while [ "$i" -lt "$limit" ]; do
+    kill -0 "$pid" 2>/dev/null || return 2          # died while we waited
+    (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null && { exec 3<&- 2>/dev/null; return 0; }
+    sleep 1; i=$((i+1))
+  done
+  return 1
+}
 
 stop_all() {
   local stopped=0
@@ -46,9 +73,11 @@ stop_all() {
     local pf="$RUN/$name.pid"
     [ -f "$pf" ] || continue
     local pid; pid=$(cat "$pf" 2>/dev/null || true)
-    if [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
+    if ours "${pid:-}" "$(script_for "$name")"; then
       kill "$pid" 2>/dev/null && stopped=$((stopped+1))
       echo "  stopped $name (pid $pid)"
+    elif [ -n "${pid:-}" ]; then
+      echo "  $name was not running (pid $pid belongs to something else now)"
     fi
     rm -f "$pf"
   done
@@ -78,10 +107,13 @@ IP=$(lan_ip)
 [ -n "${IP:-}" ] || IP="<this machine's address>"
 
 start_one() {
-  local name="$1" script="$2" port="$3" py="$4"
+  local name="$1" script="$2" port="$3" py="$4" ready="${5:-10}"
   local log="$RUN/$name.log" pf="$RUN/$name.pid"
-  if [ -f "$pf" ] && kill -0 "$(cat "$pf" 2>/dev/null)" 2>/dev/null; then
-    echo "  $name already running (pid $(cat "$pf"))"; return 0
+  if [ -f "$pf" ]; then
+    if ours "$(cat "$pf" 2>/dev/null)" "$(basename "$script")"; then
+      echo "  $name already running (pid $(cat "$pf"))"; return 0
+    fi
+    rm -f "$pf"    # stale, from a crash or a reboot
   fi
   if command -v ss >/dev/null && ss -ltn 2>/dev/null | grep -q ":$port "; then
     echo "  $name NOT started: something is already listening on port $port."
@@ -90,15 +122,19 @@ start_one() {
   fi
   ( cd "$APP" && exec "$py" "$(basename "$script")" "$port" ) > "$log" 2>&1 &
   echo $! > "$pf"
-  sleep 1
-  if kill -0 "$(cat "$pf")" 2>/dev/null; then
-    echo "  $name started (pid $(cat "$pf")), log: $log"
-  else
-    echo "  $name FAILED to start, last lines of $log:"; tail -5 "$log" | sed 's/^/      /'
-    rm -f "$pf"; return 1
-  fi
+  local pid; pid=$(cat "$pf")
+  wait_ready "$port" "$pid" "$ready"
+  case $? in
+    0) echo "  $name started (pid $pid), log: $log" ;;
+    2) echo "  $name FAILED to start, last lines of $log:"
+       tail -5 "$log" | sed 's/^/      /'; rm -f "$pf"; return 1 ;;
+    *) echo "  $name is running (pid $pid) but has not answered on port $port after ${ready}s."
+       echo "      it may still be loading. Watch $log; if it never answers, stop and retry."
+       tail -3 "$log" | sed 's/^/      /' ;;
+  esac
 }
 
+trap 'echo; echo "stopping"; stop_all; exit 0' INT TERM
 echo "starting the event servers"
 if [ "$WANT_BOARD" = "1" ]; then
   start_one board "$APP/room_server.py" "$BOARD_PORT" "$PY_PLAIN" || WANT_BOARD=0
@@ -111,7 +147,7 @@ if [ "$WANT_SCANNER" = "1" ]; then
     WANT_SCANNER=0
   else
     echo "  privacy server is loading the scanner, this takes a few seconds"
-    start_one scanner "$APP/privacy_server.py" "$SCANNER_PORT" "$PY_FULL" || WANT_SCANNER=0
+    start_one scanner "$APP/privacy_server.py" "$SCANNER_PORT" "$PY_FULL" 120 || WANT_SCANNER=0
   fi
 fi
 
@@ -136,16 +172,22 @@ echo "  votes are appended to $APP/room-votes.jsonl"
 echo "  stop both with: ./installation/scripts/event_start.sh --stop"
 echo "=================================================================="
 
-# Wait, so Ctrl-C stops both, and so the operator can see it is alive.
-trap 'echo; echo "stopping"; stop_all; exit 0' INT TERM
+# Wait here, so Ctrl-C stops both and the operator can see it is alive.
 echo
 echo "running. Ctrl-C to stop."
 while :; do
   sleep 5
+  left=0
   for name in board scanner; do
     pf="$RUN/$name.pid"
     [ -f "$pf" ] || continue
-    kill -0 "$(cat "$pf" 2>/dev/null)" 2>/dev/null || {
-      echo "  WARNING: $name stopped unexpectedly, see $RUN/$name.log"; rm -f "$pf"; }
+    if ours "$(cat "$pf" 2>/dev/null)" "$(script_for "$name")"; then
+      left=$((left+1))
+    else
+      echo "  WARNING: $name stopped, see $RUN/$name.log"; rm -f "$pf"
+    fi
   done
+  # Nothing left to watch. This happens when --stop was run from another window, or
+  # when both servers died; either way sitting here saying "running" would be a lie.
+  [ "$left" = "0" ] && { echo; echo "nothing is running any more."; exit 0; }
 done

@@ -94,6 +94,8 @@ Then unplug and replug it so it mounts, or `usb_copy` will not see it.
 
 Starts both servers and prints the addresses to read out. `--stop` stops them, `--board-only`
 and `--scanner-only` start one, and `BOARD_PORT` / `SCANNER_PORT` move them if a port is busy.
+It says a server has started only once that server actually answers on its port, and it exits
+on its own if both servers stop, so the window is never claiming to run something that is not.
 
 - **room board**, default 8890. Put it on the projector; it refreshes itself every three
   seconds and shows what the room preferred. Votes append to `app/io/room-votes.jsonl`, and
