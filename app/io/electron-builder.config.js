@@ -21,6 +21,10 @@ const extraResources = [
   // The organizer's projector board. Stdlib only, so the bundled python can run it and an
   // organizer does not need a git checkout or a system python to put it on screen.
   { from: 'room_server.py', to: 'io/room_server.py' },
+  // The privacy server, for the same reason: stdlib only, so the bundled python can run
+  // it and an organizer without a git checkout can still stand one up for a laptop that
+  // cannot run the scanner itself.
+  { from: 'privacy_server.py', to: 'io/privacy_server.py' },
   { from: 'engine', to: 'io/engine', filter: ['**/*.py'] },
   { from: 'ui', to: 'io/ui' },
 ];
@@ -84,16 +88,26 @@ module.exports = {
     artifactName: `io-win-\${arch}${suffix}.\${ext}`,
   },
 
+  // The launcher goes next to the binary, not into resources/. Linux only: it exists to
+  // deal with Chromium's setuid sandbox helper, which Windows and macOS do not have.
+  extraFiles: process.platform === 'linux' || process.env.IO_TARGET_LINUX
+    ? [{ from: 'launcher/io', to: 'io' }]
+    : [],
+
   linux: {
-    // Two targets on purpose. The AppImage is the pretty one-file artifact, but it needs
-    // libfuse2, which Ubuntu 24.04 no longer installs - a plain double-click there dies with
-    // "dlopen(): error loading libfuse.so.2", and the fix is `apt install libfuse2t64`, which
-    // wants the admin password we promised never to need. The tar.gz has no such dependency:
-    // extract it anywhere and run ./io. That is the one we point people at.
-    target: [
-      { target: 'AppImage', arch: ['x64', 'arm64'] },
-      { target: 'tar.gz', arch: ['x64', 'arm64'] },
-    ],
+    // The real binary is io-bin; 'io' is the launcher above. AppImage's AppRun execs the
+    // executableName directly and never sees the launcher, so it gets the flag this way.
+    executableName: 'io-bin',
+    executableArgs: ['--no-sandbox'],
+    // tar.gz only. The AppImage was dropped after four separate problems, each verified:
+    // it needs libfuse2 that Ubuntu 24.04 no longer ships, so a double-click dies with
+    // "dlopen(): error loading libfuse.so.2"; its AppRun execs the binary directly and
+    // bypasses the launcher that handles Chromium's setuid sandbox, so it core-dumps the
+    // same way the tarball used to (executableArgs only reaches the .desktop entry, which
+    // nobody uses when launching the file itself); it doubled the offline payload at about
+    // a gigabyte; and the install docs already told people to use the tarball. Extract the
+    // tarball anywhere and run ./io.
+    target: [{ target: 'tar.gz', arch: ['x64', 'arm64'] }],
     icon: 'icons/icon.png',
     category: 'Office',
     synopsis: 'Ask questions about a folder of files, without the files leaving.',

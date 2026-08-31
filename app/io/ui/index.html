@@ -17,9 +17,9 @@ input:focus,textarea:focus{border-color:var(--hi)}
 /* screens */
 .screen{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px}
 .screen.on{display:flex}
-#s-provider .card, #s-consent .card{width:400px;display:flex;flex-direction:column;gap:10px}
-#s-provider h1, #s-consent h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
-#s-provider p, #s-consent p{margin:0 0 6px;text-align:center}
+#s-provider .card, #s-consent .card, #s-scanner .card{width:400px;display:flex;flex-direction:column;gap:10px}
+#s-provider h1, #s-consent h1, #s-scanner h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
+#s-provider p, #s-consent p, #s-scanner p{margin:0 0 6px;text-align:center}
 #shelf{width:460px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .fol{display:flex;align-items:baseline;gap:10px;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--line)}
 .fol:last-child{border-bottom:none}
@@ -114,9 +114,14 @@ td.tok{background:var(--hibg);color:var(--hi)}
    line up at both ends instead of stepping */
 .whys{display:flex;flex-direction:column;gap:7px;align-items:stretch;flex:1}
 .whys .whyother{margin-top:auto;flex:none}
+/* Picking a reason arms that box. The armed button lights up the same orange as the
+   selected answer, so it is clear what pressing it will do. While "all bad" is armed the
+   answer chip drops its highlight - nothing is being chosen, so nothing should look chosen. */
+.choosebox.armed > button{border-color:var(--hi);color:var(--hi)}
+.chips.stood-down .chip.sel{border-color:var(--line);color:var(--dim)}
 .eventbits{display:flex;flex-direction:column;gap:10px;margin-top:2px;padding-top:12px;border-top:1px solid var(--line)}
 .eventbits input{font-size:13px}
-#s-consent p.consent{margin:0 0 14px;text-align:left;line-height:1.65;color:var(--dim);font-size:13.5px}
+#s-consent p.consent, #s-scanner p.consent{margin:0 0 14px;text-align:left;line-height:1.65;color:var(--dim);font-size:13.5px}
 .whyother{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px;color:var(--ink);outline:none;flex:1;min-width:110px}
 .chip .prev{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .chip .sub{color:var(--dim);font-size:11.5px;margin-top:6px}
@@ -160,6 +165,23 @@ td.tok{background:var(--hibg);color:var(--hi)}
       <input id="p-org" placeholder="your organisation (optional)" autocomplete="off">
     </div>
     <button class="go" id="p-go">Start</button>
+  </div>
+</div>
+
+<div class="screen" id="s-scanner">
+  <div class="card">
+    <h1>io</h1>
+    <p class="dim" id="sc-head">The private-data scanner is not running on this computer.</p>
+    <p class="consent"><b>What went wrong</b><br><span id="sc-why"></span></p>
+    <p class="consent"><b>What this means</b><br>io can ask a privacy server to do the
+    scanning instead. Your files stay here, but the text being checked is sent to that
+    server as it is. Only use a server the organizers gave you.</p>
+    <input id="sc-url" placeholder="privacy server address (from the organizers)" autocomplete="off">
+    <button class="go" id="sc-yes">Use the privacy server</button>
+    <button class="plain" id="sc-no">Don't use the privacy server</button>
+    <p class="consent dim" id="sc-note">Without it io still hides phone numbers, Aadhaar and
+    account numbers and emails, but it will not spot people's names, place names and other
+    finer details in free text.</p>
   </div>
 </div>
 
@@ -230,6 +252,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
   <input id="st-model" placeholder="model">
   <input id="st-room" placeholder="room server (optional, for the event board)">
   <input id="st-org" placeholder="your organisation (optional)">
+  <input id="st-scanner" placeholder="privacy server (only if the local scanner failed)">
   <div style="display:flex;justify-content:flex-end;gap:8px"><button id="st-x">Close</button><button class="go" id="st-ok">Save</button></div>
 </div></div>
 
@@ -250,8 +273,8 @@ async function renderShelf(){
 }
 document.addEventListener('click', () => $('#ctx').style.display = 'none');
 $('#ctx-un').onclick = async () => { await api('/api/folders/remove', {path: decodeURIComponent($('#ctx').dataset.p)}); renderShelf(); };
-(async () => { const st = await api('/api/state'); if (st.provider.set) { show('#s-home'); renderShelf(); } })();
-function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent') ? 'none' : ''; }
+(async () => { const st = await api('/api/state'); if (st.provider.set) { await afterConsent(); } })();
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent' || id === '#s-scanner') ? 'none' : ''; }
 
 // provider
 $('#p-go').onclick = async () => {
@@ -260,14 +283,36 @@ $('#p-go').onclick = async () => {
   await api('/api/provider', {api_key: key, server, room: $('#p-room').value.trim(), org: $('#p-org').value.trim()});
   show('#s-consent');
 };
-$('#c-ok').onclick = () => { show('#s-home'); renderShelf(); };
+async function afterConsent(){
+  let sc = {};
+  try { sc = await api('/api/scanner'); } catch (e) { sc = {}; }
+  // Ask once. Someone who has already said no should not be asked again every time the
+  // window reloads or they reopen the app.
+  if (sc.unavailable && !sc.server && !sc.declined) {
+    $('#sc-why').textContent = String(sc.unavailable).slice(0, 300);
+    show('#s-scanner');
+    return;
+  }
+  show('#s-home'); renderShelf();
+}
+$('#c-ok').onclick = afterConsent;
+$('#sc-yes').onclick = async () => {
+  const url = $('#sc-url').value.trim();
+  if (!url) { $('#sc-url').focus(); return; }
+  await api('/api/provider', {scanner_server: url});
+  show('#s-home'); renderShelf();
+};
+$('#sc-no').onclick = async () => {
+  await api('/api/provider', {scanner_declined: '1'});
+  show('#s-home'); renderShelf();
+};
 
 // settings
 $('#gear').onclick = () => $('#settings').classList.add('on');
 $('#br-x').onclick = () => $('#browser').classList.remove('on');
 $('#br-open').onclick = () => { const p = $('#br-path').dataset.path; if (p) { $('#browser').classList.remove('on'); openFolder(p); } };  // the button already shows the file count
 $('#st-x').onclick = () => $('#settings').classList.remove('on');
-$('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-key').value.trim(), server: $('#st-server').value.trim(), model: $('#st-model').value.trim(), room: $('#st-room').value.trim(), org: $('#st-org').value.trim()}); $('#settings').classList.remove('on'); };
+$('#st-ok').onclick = async () => { await api('/api/provider', {api_key: $('#st-key').value.trim(), server: $('#st-server').value.trim(), model: $('#st-model').value.trim(), room: $('#st-room').value.trim(), org: $('#st-org').value.trim(), scanner_server: $('#st-scanner').value.trim()}); $('#settings').classList.remove('on'); };
 
 // folder
 async function browseTo(path){
@@ -632,10 +677,25 @@ function renderCompare(el, w, r){
   w.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { sel = +ch.dataset.k; showSel(); });
   let badWhy = null;
   const otherPick = w.querySelector(`#whyother${r.id}`), otherBad = w.querySelector(`#badother${r.id}`);
-  w.querySelectorAll(`input[name="why${r.id}"]`).forEach(rb => rb.onchange = () => { why = rb.value; w.querySelector('#pickgo').disabled = false; });
-  w.querySelectorAll(`input[name="bad${r.id}"]`).forEach(rb => rb.onchange = () => { badWhy = rb.value; w.querySelector('#badgo').disabled = false; });
-  otherPick.oninput = () => { if (otherPick.value.trim()) { w.querySelector('#pickgo').disabled = false; } };
-  otherBad.oninput = () => { if (otherBad.value.trim()) { w.querySelector('#badgo').disabled = false; } };
+  const boxes = w.querySelectorAll('.choosebox');
+  // Choosing an answer and calling them all bad are opposite votes, so arming one disarms
+  // the other rather than leaving both lit and the reader guessing which button applies.
+  const arm = which => {
+    boxes[0].classList.toggle('armed', which === 'pick');
+    boxes[1].classList.toggle('armed', which === 'bad');
+    w.querySelector('.chips').classList.toggle('stood-down', which === 'bad');
+    if (which === 'bad') {
+      w.querySelectorAll(`input[name="why${r.id}"]`).forEach(x => x.checked = false);
+      otherPick.value = ''; why = null; w.querySelector('#pickgo').disabled = true;
+    } else {
+      w.querySelectorAll(`input[name="bad${r.id}"]`).forEach(x => x.checked = false);
+      otherBad.value = ''; badWhy = null; w.querySelector('#badgo').disabled = true;
+    }
+  };
+  w.querySelectorAll(`input[name="why${r.id}"]`).forEach(rb => rb.onchange = () => { arm('pick'); why = rb.value; w.querySelector('#pickgo').disabled = false; });
+  w.querySelectorAll(`input[name="bad${r.id}"]`).forEach(rb => rb.onchange = () => { arm('bad'); badWhy = rb.value; w.querySelector('#badgo').disabled = false; });
+  otherPick.oninput = () => { if (otherPick.value.trim()) { arm('pick'); w.querySelector('#pickgo').disabled = false; } };
+  otherBad.oninput = () => { if (otherBad.value.trim()) { arm('bad'); w.querySelector('#badgo').disabled = false; } };
   const finalWhy = (radio, box) => box.value.trim() ? 'other: ' + box.value.trim().slice(0, 120) : radio;
   const vote = async (pick, whyv) => {
     const res = await api('/api/vote', {id: r.id, pick, why: whyv || null});

@@ -45,7 +45,15 @@ function portableDir() {
   }
   for (const dir of beside) {
     const candidate = path.join(dir, 'io-data');
-    try { if (fs.statSync(candidate).isDirectory()) return candidate; } catch { /* not there */ }
+    try {
+      if (!fs.statSync(candidate).isDirectory()) continue;
+      // Existing is not enough, it has to be writable. A dmg mounts read-only, and an .app
+      // dragged into /Applications is owned by root on a managed Mac - in both cases the
+      // folder is right there and every write into it fails. Falling back to the user's
+      // profile is far better than starting and then dying on the first log line.
+      fs.accessSync(candidate, fs.constants.W_OK);
+      return candidate;
+    } catch { /* not there, or not ours to write to */ }
   }
   return null;
 }
@@ -112,7 +120,10 @@ function resolve(opts = {}) {
     python: pythonIn(runtimeDir),
     service: path.join(appDir, 'service.py'),
     bundled: runtimeDir === bundledRuntime,
-    ready: !!pythonIn(runtimeDir) && hasScanner(hfCache),
+    // Why the scanner is missing, if a previous run already found out it cannot be
+    // installed here. Without this the app would retry the whole download every start.
+    scannerError: scannerError(data),
+    ready: !!pythonIn(runtimeDir) && (hasScanner(hfCache) || !!scannerError(data)),
   };
 }
 
@@ -135,4 +146,9 @@ function hasScanner(cacheDir) {
   return false;
 }
 
-module.exports = { resolve, dataDir, portableDir, pythonIn, hasScanner };
+function scannerError(dataDir) {
+  try { return fs.readFileSync(path.join(dataDir, 'scanner-unavailable.txt'), 'utf8').trim() || null; }
+  catch { return null; }
+}
+
+module.exports = { resolve, dataDir, portableDir, pythonIn, hasScanner, scannerError };

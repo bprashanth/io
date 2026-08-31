@@ -6,17 +6,18 @@ Download from [the releases page](https://github.com/bprashanth/io/releases/late
 
 ## Which file to take
 
-Take the **tar.gz**. It works on every distribution.
+Both work on every distribution.
 
 | your machine | file |
 |---|---|
 | a normal laptop (Intel or AMD) | `io-linux-x64.tar.gz` |
 | an ARM laptop | `io-linux-arm64.tar.gz` |
 
+There is no .AppImage any more. It needed a system library that recent Ubuntu no longer
+installs, and it could not start without asking for an administrator password.
+
 Not sure which you have? Run `uname -m`. If it says `x86_64` take the x64 file. If it
 says `aarch64` take the arm64 one.
-
-There is also an `.AppImage`. Skip it unless you already know you want it. See the note at the bottom for why.
 
 ## Install
 
@@ -79,27 +80,6 @@ the scanner.
 If the setup stops with an error, it tells you where the log is. The log is
 `~/.local/share/io/install.log`, and the last few lines say what it was doing. A dropped
 connection is the common one. Starting io again picks up where it left off.
-
-## Why not the AppImage
-
-An AppImage is one file you double-click, which is nicer. But it needs a system library
-called libfuse2, and Ubuntu 24.04 and later no longer install it. On those machines a
-double-click fails with:
-
-```
-dlopen(): error loading libfuse.so.2
-AppImages require FUSE to run.
-```
-
-The fix for that is `sudo apt install libfuse2t64`, which needs an admin password. The
-tar.gz needs nothing, so that is the one we point people at.
-
-If you do want to run the AppImage without installing anything, this works:
-
-```
-chmod +x io-linux-x86_64.AppImage
-APPIMAGE_EXTRACT_AND_RUN=1 ./io-linux-x86_64.AppImage
-```
 
 ## If it will not start
 

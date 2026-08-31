@@ -160,6 +160,15 @@ function run(cmd, args, opts = {}, onLine = noop) {
   });
 }
 
+// Free space on the drive that will hold the install, in GB, or null if it cannot be read.
+function freeSpace(dir) {
+  try {
+    let probe = dir;
+    while (!fs.existsSync(probe) && path.dirname(probe) !== probe) probe = path.dirname(probe);
+    return fs.statfsSync(probe).bavail * fs.statfsSync(probe).bsize / 1e9;
+  } catch { return null; }
+}
+
 function pythonIn(dir) {
   const tries = WIN
     ? [path.join(dir, 'python.exe'), path.join(dir, 'Scripts', 'python.exe')]
@@ -208,6 +217,31 @@ async function install({ dest, onProgress = noop }) {
   const hfCache = path.join(dest, 'hf-cache');
   fs.mkdirSync(dest, { recursive: true });
 
+  // Before downloading 1.9 GB onto a machine that cannot hold it or run it, look. A laptop
+  // that fills its disk or swaps itself to a standstill is a worse experience than being
+  // told up front and offered a privacy server. The thresholds are deliberately generous:
+  // this only fires when it is clearly not going to work.
+  const room = freeSpace(dest);
+  const ram = os.totalmem() / 1e9;
+  if (room !== null && room < 3.5) {
+    fs.writeFileSync(path.join(dest, 'scanner-unavailable.txt'),
+      `There is about ${room.toFixed(1)} GB free on this drive and the scanner needs a little ` +
+      `over 2 GB, plus room to unpack it. Free some space and start io again to try, or use ` +
+      `a privacy server.\n`);
+    say('done', 'not enough space for the scanner');
+    return { runtimeDir, hfCache, python: pythonIn(runtimeDir), scanner: false, retryable: true,
+             scannerError: fs.readFileSync(path.join(dest, 'scanner-unavailable.txt'), 'utf8').trim() };
+  }
+  if (ram && ram < 3.5) {
+    fs.writeFileSync(path.join(dest, 'scanner-unavailable.txt'),
+      `This computer has about ${ram.toFixed(1)} GB of memory and the scanner needs roughly ` +
+      `1.5 GB while it runs, which would leave very little for anything else. Use a privacy ` +
+      `server, or start io again to install it anyway.\n`);
+    say('done', 'not enough memory for the scanner');
+    return { runtimeDir, hfCache, python: pythonIn(runtimeDir), scanner: false, retryable: true,
+             scannerError: fs.readFileSync(path.join(dest, 'scanner-unavailable.txt'), 'utf8').trim() };
+  }
+
   if (!await haveTar()) {
     throw new Error('tar was not found. On Windows 10 or 11 it lives in C:\\Windows\\System32; on macOS and Linux it is standard.');
   }
@@ -236,14 +270,44 @@ async function install({ dest, onProgress = noop }) {
   }
   const py = pythonIn(runtimeDir);
 
-  // 2. packages. torch comes from the CPU-only index on Windows and Linux so we do not
+  // 2. packages. Some platforms cannot run the scanner at all, so they do not install it:
+  //    an Intel Mac has had no PyTorch wheel since 2.2.2, and the transformers we need
+  //    wants a newer torch than that. Those machines get only what reads files, which is
+  //    about 100 MB rather than 1.9 GB, and io offers them a privacy server instead.
+  //    torch comes from the CPU-only index on Windows and Linux so we do not
   //    drag in a couple of GB of CUDA. macOS wheels on PyPI are already CPU/MPS.
   const pip = (args, label) => run(py, ['-m', 'pip', 'install', '--no-input', '--disable-pip-version-check', ...args],
     { env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' } },
     line => { if (/^(Collecting|Downloading|Installing|Successfully)/.test(line)) say('packages', label + ' - ' + line.slice(0, 70)); });
 
-  const torch = PINS.packages.find(p => p.startsWith('torch=='));
-  const rest = PINS.packages.filter(p => p !== torch);
+  // Some platforms cannot install the versions everything else uses, because the wheels do
+  // not exist for them. An override replaces a pin of the same package and adds any others.
+  const key = `${process.platform}-${process.arch}`;
+  const overrides = (PINS.packageOverrides || {})[key] || [];
+  const nameOf = spec => spec.split('==')[0].toLowerCase();
+  const overridden = new Set(overrides.map(nameOf));
+  const wanted = PINS.packages.filter(p => !overridden.has(nameOf(p))).concat(overrides);
+  if (overrides.length) say('packages', `using ${key} pins: ${overrides.join(' ')}`);
+
+  const platformKey = `${process.platform}-${process.arch}`;
+  const noScanner = (PINS.scannerUnsupported || []).includes(platformKey);
+  const scannerPkgs = new Set((PINS.scannerPackages || []).map(n => n.toLowerCase()));
+  const markerPath = path.join(dest, 'scanner-unavailable.txt');
+  if (noScanner) {
+    say('packages', 'this computer cannot run the on-device scanner, installing the rest');
+    const readers = PINS.packages.filter(p => !scannerPkgs.has(p.split('==')[0].toLowerCase()));
+    await pip(readers, 'packages');
+    fs.mkdirSync(hfCache, { recursive: true });
+    fs.writeFileSync(markerPath,
+      `This computer is ${platformKey}. The scanner needs PyTorch, and PyTorch has shipped ` +
+      `no build for it since 2.2.2, which is older than the rest of io needs. Nothing is ` +
+      `broken here and reinstalling will not change it.\n`);
+    say('done', 'ready without the local scanner');
+    return { runtimeDir, hfCache, python: py, scanner: false, scannerError: fs.readFileSync(markerPath, 'utf8').trim() };
+  }
+
+  const torch = wanted.find(p => p.startsWith('torch=='));
+  const rest = wanted.filter(p => p !== torch);
 
   say('packages', 'preparing pip');
   await pip(['--upgrade', 'pip'], 'pip');
@@ -262,8 +326,13 @@ async function install({ dest, onProgress = noop }) {
   //    with 62 threads and 11 open sockets. To a participant that is a splash that never
   //    goes away. The cache is fully written by the time from_pretrained returns, so
   //    leaving without finalising the interpreter costs nothing.
+  // The model step is allowed to fail. Some machines simply cannot run it - an Intel Mac
+  // has no PyTorch build at all - and dying here left those people with no app rather than
+  // a lesser one. On failure we record why, and the app offers the choices from there.
   say('model', 'downloading the on-device scanner (about 500 MB)');
   fs.mkdirSync(hfCache, { recursive: true });
+  fs.rmSync(markerPath, { force: true });
+  try {
   await run(py, ['-c', [
     'import os, sys',
     'from gliner import GLiNER',
@@ -273,13 +342,21 @@ async function install({ dest, onProgress = noop }) {
     'os._exit(0)',
   ].join('\n')], { env: { ...process.env, HF_HOME: hfCache } },
     line => say('model', line.slice(0, 70)));
+  } catch (e) {
+    const why = String(e && e.message || e).split('\n').filter(Boolean).slice(-3).join(' ').slice(0, 400);
+    fs.writeFileSync(markerPath, why + '\n');
+    say('model', 'the on-device scanner could not be installed here');
+    desymlink(hfCache, note => say('model', note));
+    say('done', 'ready without the local scanner');
+    return { runtimeDir, hfCache, python: py, scanner: false, scannerError: why };
+  }
 
   // Do this every time, not just when baking a payload: one code path is easier to trust
   // than "only on Windows, only for the fat build", and hard links cost nothing.
   desymlink(hfCache, note => say('model', note));
 
   say('done', 'ready');
-  return { runtimeDir, hfCache, python: py };
+  return { runtimeDir, hfCache, python: py, scanner: true };
 }
 
 module.exports = { install, download, desymlink, pythonIn, PINS };

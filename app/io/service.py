@@ -109,6 +109,11 @@ class State:
                 self.text_detector = regex_engine
         return self.text_detector
 
+    def scanner_mode(self) -> str:
+        """Which scanner is actually in use: 'local', 'server' or 'regex'."""
+        self.get_detector()
+        return getattr(self, "_scanner_mode", "regex")
+
     def get_detector(self):
         with self.det_lock:
             if self.detector is None:
@@ -116,10 +121,34 @@ class State:
                 try:
                     gl = build_engine(f"gliner:{GLINER_MODEL}")
                     self.detector = lambda t: regex_engine(t) + gl(t)
+                    self._scanner_mode = "local"
                     self.step("scanner ready")   # never leave "loading..." as the last visible word
-                except Exception:  # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001
                     traceback.print_exc()
+                    # Remember why, so the app can offer the same choice it offers when the
+                    # install already knew this machine could not run it. A model that
+                    # installs and then fails to load - out of memory, a broken cache, a
+                    # library the machine will not load - looks identical to the person.
+                    self.scanner_error = f"{type(exc).__name__}: {exc}".strip()[:400]
+                    # No local model. If the person has explicitly agreed to a privacy
+                    # server, use it: the text goes there unredacted, so this only ever
+                    # happens on an answer they gave. Otherwise fall back to regex, which
+                    # finds numbers and ids but not people's names.
+                    remote = (self.provider.get("scanner_server") or "").strip()
+                    if remote:
+                        try:
+                            self.step("using the privacy server")
+                            rs = build_engine(f"server:{remote}")
+                            rs("warm up")            # fail here rather than mid-scan
+                            self.detector = lambda t: regex_engine(t) + rs(t)
+                            self._scanner_mode = "server"
+                            self.step("privacy server ready")
+                            return self.detector
+                        except Exception:  # noqa: BLE001
+                            traceback.print_exc()
+                            self.step("the privacy server did not answer, using patterns only")
                     self.detector = regex_engine
+                    self._scanner_mode = "regex"
         return self.detector
 
     @staticmethod
@@ -616,6 +645,17 @@ class H(BaseHTTPRequestHandler):
         p = self.path.split("?")[0]
         if p in ("/", "/index.html"):
             return self._send(200, (UI / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if p == "/api/scanner":
+            # Two ways to end up without a scanner: the install already knew this machine
+            # could not run one, or it loaded and then failed here. Report either, so the
+            # app can offer a privacy server in both cases.
+            why = os.environ.get("IO_SCANNER_UNAVAILABLE") or getattr(S, "scanner_error", None)
+            return self._json({
+                "unavailable": why or None,
+                "mode": getattr(S, "_scanner_mode", None) if S.detector is not None else None,
+                "server": bool((S.provider.get("scanner_server") or "").strip()),
+                "declined": bool((S.provider.get("scanner_declined") or "").strip()),
+            })
         if p == "/api/state":
             return self._json({"provider": {"set": bool(S.provider), "model": S.provider.get("model"), "server": bool(S.provider.get("server"))},
                                "folder": str(S.folder) if S.folder else None,
@@ -703,7 +743,15 @@ class H(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         try:
             if self.path == "/api/provider":
-                for k in ("api_key", "server", "model", "room", "org"):
+                # Changing the privacy server has to rebuild the detector. The service warms
+                # it at startup, so by the time anyone answers the question it is already
+                # built - and without this the answer silently did nothing.
+                if "scanner_server" in body and (body.get("scanner_server") or "").strip() != (S.provider.get("scanner_server") or "").strip():
+                    with S.det_lock:
+                        S.detector = None
+                        S.text_detector = None
+                        S._scanner_mode = None
+                for k in ("api_key", "server", "model", "room", "org", "scanner_server", "scanner_declined"):
                     if k in body:
                         S.provider[k] = body[k].strip()
                 S.provider = {k: v for k, v in S.provider.items() if v}

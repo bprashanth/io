@@ -19,28 +19,66 @@ on:
         description: 'also build the offline (fat) artifacts - slow, ~2 GB each'
         type: boolean
         default: false
+      release_tag:
+        description: 'publish the artifacts straight to this release tag, e.g. v0.3.0 (blank = do not publish)'
+        type: string
+        default: ''
+      only:
+        description: 'build only platforms whose label contains this, e.g. mac (blank = all)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write        # publishing release assets from the runner
 
 env:
   CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # nothing is signed for the event
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      matrix_fat: ${{ steps.pick.outputs.matrix_fat }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          # EXPERIMENT BRANCH ONLY. mac-x64 is back, cross-built on an arm64 runner and
+          # smoked under Rosetta, to find out whether the downgraded darwin-x64 pins in
+          # pins.json (torch 2.2.2, onnxruntime 1.23.2) actually install and load the
+          # scanner. It is deliberately never published to a release from here.
+          all='[
+            {"os":"windows-latest","label":"win-x64","target":"--win zip --x64"},
+            {"os":"ubuntu-latest","label":"linux-x64","target":"--linux tar.gz --x64"},
+            {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"},
+            {"os":"macos-14","label":"mac-x64","target":"--mac dmg --x64"}
+          ]'
+          only='${{ inputs.only }}'
+          if [ -n "$only" ]; then
+            picked=$(echo "$all" | jq -c --arg o "$only" '[.[] | select(.label | contains($o))]')
+          else
+            picked=$(echo "$all" | jq -c '.')
+          fi
+          # No offline pack for Intel Mac. The payload is the scanner, and there is no
+          # PyTorch to put in it, so the job would only ever fail.
+          fat=$(echo "$picked" | jq -c '[.[] | select(.label != "mac-x64")]')
+          echo "thin: $(echo "$picked" | jq -r '[.[].label] | join(", ")')"
+          echo "fat:  $(echo "$fat" | jq -r '[.[].label] | join(", ")')"
+          echo "matrix=$picked" >> "$GITHUB_OUTPUT"
+          echo "matrix_fat=$fat" >> "$GITHUB_OUTPUT"
+
   thin:
     name: thin ${{ matrix.label }}
     # A fat-only dispatch has no reason to rebuild and re-smoke the thin matrix.
     if: github.event_name != 'workflow_dispatch' || !inputs.fat
+    needs: plan
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: windows-latest, label: win-x64,   target: '--win zip --x64' }
-          - { os: ubuntu-latest,  label: linux-x64, target: '--linux AppImage tar.gz --x64' }
-          - { os: macos-14,       label: mac-arm64, target: '--mac dmg --arm64' }
-          # Intel Macs need an Intel runner for the offline build: the payload's wheels are
-          # compiled, so an arm64 runner cannot produce an x64 one. macos-13 is the last
-          # Intel image GitHub offers.
-          - { os: macos-13,       label: mac-x64,   target: '--mac dmg --x64' }
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -73,11 +111,10 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          APP=$(ls app/io/dist/*.AppImage | head -1)
-          chmod +x "$APP"
-          echo "IO_EXE=$PWD/$APP" >> $GITHUB_ENV
-          # the runner has no libfuse2 either, so the AppImage has to self-extract
-          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+          TGZ=$(ls app/io/dist/*.tar.gz | head -1)
+          mkdir -p staged && tar -xzf "$TGZ" -C staged --strip-components=1
+          test -x staged/io
+          echo "IO_EXE=$PWD/staged/io" >> $GITHUB_ENV
 
       - name: stage the artifact (mac)
         if: startsWith(matrix.os, 'macos')
@@ -90,7 +127,7 @@ jobs:
           xattr -dr com.apple.quarantine staged-io.app || true
           echo "IO_EXE=$PWD/staged-io.app/Contents/MacOS/io" >> $GITHUB_ENV
 
-      - name: the tar.gz is the no-FUSE path, so check it is usable
+      - name: the tarball is the linux artifact, so check it is usable
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
@@ -118,6 +155,20 @@ jobs:
         shell: bash
         run: cat installation/smoke/out/results.json || echo 'no results.json'
 
+      - name: publish to the release
+        if: inputs.release_tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG='${{ inputs.release_tag }}'
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "io $TAG" --notes "built by the package workflow" --target "$GITHUB_SHA"
+          shopt -s nullglob
+          files=(app/io/dist/*.zip app/io/dist/*.tar.gz app/io/dist/*.dmg)
+          echo "uploading ${#files[@]} file(s): ${files[*]}"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -130,7 +181,6 @@ jobs:
           name: io-${{ matrix.label }}
           path: |
             app/io/dist/*.zip
-            app/io/dist/*.AppImage
             app/io/dist/*.tar.gz
             app/io/dist/*.dmg
           if-no-files-found: error
@@ -138,19 +188,13 @@ jobs:
   fat:
     name: offline ${{ matrix.label }}
     if: github.event_name == 'workflow_dispatch' && inputs.fat
+    needs: plan
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: windows-latest, label: win-x64,   target: '--win zip --x64' }
-          - { os: ubuntu-latest,  label: linux-x64, target: '--linux AppImage tar.gz --x64' }
-          - { os: macos-14,       label: mac-arm64, target: '--mac dmg --arm64' }
-          # Intel Macs need an Intel runner for the offline build: the payload's wheels are
-          # compiled, so an arm64 runner cannot produce an x64 one. macos-13 is the last
-          # Intel image GitHub offers.
-          - { os: macos-13,       label: mac-x64,   target: '--mac dmg --x64' }
+        include: ${{ fromJSON(needs.plan.outputs.matrix_fat) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -189,10 +233,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          # Smoke the tarball, not the AppImage. It is the artifact the install doc points
-          # at (no libfuse2 needed), and without FUSE the offline AppImage self-extracts
-          # another 2.6 GB into /tmp on top of the payload and both artifacts already on
-          # disk - that filled the runner and left AppRun half-written, exiting 127.
+          # The tarball is the only linux artifact now.
           rm -rf app/io/dist/linux-unpacked app/io/dist/linux-x64-unpacked
           TGZ=$(ls app/io/dist/*.tar.gz | head -1)
           mkdir -p staged && tar -xzf "$TGZ" -C staged --strip-components=1
@@ -228,6 +269,20 @@ jobs:
             console.log('offline confirmed: no install ran, provider screen in ' + r.cold_start_s + 's');
           "
 
+      - name: publish to the release
+        if: inputs.release_tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG='${{ inputs.release_tag }}'
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "io $TAG" --notes "built by the package workflow" --target "$GITHUB_SHA"
+          shopt -s nullglob
+          files=(app/io/dist/*.zip app/io/dist/*.tar.gz app/io/dist/*.dmg)
+          echo "uploading ${#files[@]} file(s): ${files[*]}"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -240,7 +295,6 @@ jobs:
           name: io-${{ matrix.label }}-offline
           path: |
             app/io/dist/*offline*.zip
-            app/io/dist/*offline*.AppImage
             app/io/dist/*offline*.tar.gz
             app/io/dist/*offline*.dmg
           if-no-files-found: error
