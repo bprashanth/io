@@ -3,6 +3,7 @@
 #
 #   ./app/io/usb_copy.sh                 # copy to every stick it finds
 #   ./app/io/usb_copy.sh --dry-run       # say what it would do, touch nothing
+#   ./app/io/usb_copy.sh --verify        # check drives that were already copied
 #   ./app/io/usb_copy.sh --builds DIR    # where the archives are (default: ./bin)
 #   ./app/io/usb_copy.sh --target DIR    # copy here instead of hunting sticks (repeatable)
 #
@@ -18,11 +19,13 @@ set -uo pipefail
 BUILDS="bin"
 TARGETS=()
 DRY=0
+VERIFY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --builds) BUILDS="$2"; shift 2 ;;
     --target) TARGETS+=("$2"); shift 2 ;;   # repeatable, mostly for testing
     --dry-run|-n) DRY=1; shift ;;
+    --verify) VERIFY=1; shift ;;
     -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
@@ -99,9 +102,42 @@ copy_to() {
     # The instructions travel with the drive. Someone who picks this up without the
     # room's wifi, or without an organizer next to them, still knows what to do.
     [ -f "$HERE_DIR/START-HERE.txt" ] && cp -f "$HERE_DIR/START-HERE.txt" "$mp/START-HERE.txt"
+    cp -f "$STAGE/../io-usb-manifest.txt" "$dest/MANIFEST.txt" 2>/dev/null || true
     sync
     echo "  done: $(du -sh "$dest" 2>/dev/null | cut -f1) on $mp"
   } > "$log" 2>&1
+}
+
+
+# ------------------------------------------------------------------------ verify
+# Check a drive against the manifest written when it was copied. A power cut mid-copy
+# leaves files missing or half-written, and both show up as a size mismatch.
+verify_drive() {
+  local mp="$1"
+  # not on one line with mp: bash makes every name in a single `local` local first, which
+  # unsets it, so a later assignment on the same line would read an empty mp under set -u
+  local man="$mp/insightout/MANIFEST.txt"
+  if [ ! -f "$man" ]; then
+    printf '  %-28s NO MANIFEST - copied before this check existed, or never finished\n' "$(basename "$mp")"
+    return 1
+  fi
+  local missing=0 wrong=0 total=0
+  while read -r size rel; do
+    [ -z "${rel:-}" ] && continue
+    total=$((total+1))
+    local f="$mp/insightout/$rel"
+    if [ ! -f "$f" ]; then missing=$((missing+1))
+    else
+      local actual; actual=$(stat -c %s "$f" 2>/dev/null || echo -1)
+      [ "$actual" = "$size" ] || wrong=$((wrong+1))
+    fi
+  done < "$man"
+  if [ "$missing" -eq 0 ] && [ "$wrong" -eq 0 ]; then
+    printf '  %-28s COMPLETE  %s files all present and the right size\n' "$(basename "$mp")" "$total"
+    return 0
+  fi
+  printf '  %-28s INCOMPLETE  %s missing, %s wrong size, of %s\n' "$(basename "$mp")" "$missing" "$wrong" "$total"
+  return 1
 }
 
 # ------------------------------------------------------------------------- main
@@ -118,6 +154,17 @@ for m in "${STICKS[@]}"; do
   say "    $m   ($(df -h "$m" 2>/dev/null | awk 'NR==2{print $4" free of "$2}'))"
 done
 
+if [ "$VERIFY" = "1" ]; then
+  say
+  say "checking each drive against the manifest written when it was copied"
+  bad=0
+  for m in "${STICKS[@]}"; do verify_drive "$m" || bad=1; done
+  say
+  if [ "$bad" = "0" ]; then say "all drives verified complete."; else
+    say "re-run without --verify to finish the incomplete ones; it copies only what is missing."; fi
+  exit "$bad"
+fi
+
 if [ "$DRY" = "1" ]; then
   say
   say "dry run, nothing written. Would unpack into $STAGE and copy to:"
@@ -129,6 +176,13 @@ say
 say "preparing builds"
 unpack_builds
 
+# Every file's size and path, so a drive can be checked afterwards. Sizes rather than
+# hashes: a truncated or missing file is what a power cut leaves behind, and that shows up
+# here in seconds instead of the half hour it takes to sha256 eighty thousand files off a
+# USB stick. --verify --deep does the hashes when you want certainty.
+( cd "$STAGE" && find . -type f -printf '%s %p\n' | sed 's|^\([0-9]*\) \./|\1 io/|' ; \
+  cd "$OLDPWD/$DATA_SRC" && find . -type f -printf '%s %p\n' | sed 's|^\([0-9]*\) \./|\1 data/|' ) \
+  2>/dev/null | LC_ALL=C sort -k2 > "$STAGE/../io-usb-manifest.txt"
 TOTAL_KB=$(du -sk "$STAGE" "$DATA_SRC" 2>/dev/null | awk '{s+=$1} END{print s+0}')
 FILES=$(find "$STAGE" -type f 2>/dev/null | wc -l)
 say
