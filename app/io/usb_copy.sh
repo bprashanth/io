@@ -94,11 +94,14 @@ copy_to() {
     echo "=== $mp ==="
     local dest="$mp/insightout"
     mkdir -p "$dest/io" "$dest/data" || { echo "  cannot write to $mp"; exit 1; }
-    # -a keeps modes so the linux binary stays executable where the filesystem allows it,
-    # --update skips what is already there, so a second run is nearly free
-    rsync -a --update --info=progress2 --no-inc-recursive "$STAGE"/ "$dest/io/" 2>&1 \
-      || cp -ru "$STAGE"/. "$dest/io/" 2>&1
-    rsync -a --update "$DATA_SRC"/ "$dest/data/" 2>&1 || cp -ru "$DATA_SRC"/. "$dest/data/" 2>&1
+    # -a keeps modes so the linux binary stays executable where the filesystem allows it.
+    # No --update: it skips on mtime alone, so a file left half-written by a power cut
+    # keeps its timestamp and is never repaired. Tested - a truncated file survived a
+    # re-run. rsync's default compares size and mtime, which still skips everything
+    # unchanged and does fix a truncated file.
+    rsync -a --info=progress2 --no-inc-recursive "$STAGE"/ "$dest/io/" 2>&1 \
+      || cp -r "$STAGE"/. "$dest/io/" 2>&1
+    rsync -a "$DATA_SRC"/ "$dest/data/" 2>&1 || cp -r "$DATA_SRC"/. "$dest/data/" 2>&1
     # The instructions travel with the drive. Someone who picks this up without the
     # room's wifi, or without an organizer next to them, still knows what to do.
     [ -f "$HERE_DIR/START-HERE.txt" ] && cp -f "$HERE_DIR/START-HERE.txt" "$mp/START-HERE.txt"
