@@ -46,6 +46,11 @@ privacy-shield modules, unchanged.
   open) and `insightout/data/` (the sample data from `simulations/foundation-without/data`).
   Running it again after plugging in more sticks is cheap: it skips whatever is already
   there.
+
+  It prints how much it is about to copy and how far each drive has got, and keeps a log
+  per drive in `usb_copy-logs/`. Expect it to take a while and do not read that as a hang:
+  the offline Windows pack alone is about 41,000 files, and a USB stick writes many small
+  files far more slowly than its rated speed.
 - `privacy_server.py` - runs the scanner for machines that cannot run it themselves. Read
   the notes at the top of that file before starting one: the text sent to it is not
   redacted.

@@ -125,24 +125,39 @@ say
 say "preparing builds"
 unpack_builds
 
+TOTAL_KB=$(du -sk "$STAGE" "$DATA_SRC" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+FILES=$(find "$STAGE" -type f 2>/dev/null | wc -l)
 say
-say "copying to ${#STICKS[@]} drive(s) at once"
-LOGDIR=$(mktemp -d); pids=()
+say "copying $((TOTAL_KB/1024)) MB in $FILES files to ${#STICKS[@]} drive(s) at once"
+say "  a USB stick is slow with many small files; expect this to take a while"
+LOGDIR="${LOGDIR_OVERRIDE:-./usb_copy-logs}"
+mkdir -p "$LOGDIR"
+say "  logs: $LOGDIR/  (kept, one file per drive)"
+pids=()
 for m in "${STICKS[@]}"; do
   safe=$(printf '%s' "$m" | tr -c 'A-Za-z0-9' '_')
   copy_to "$m" "$LOGDIR/$safe.log" &
   pids+=($!)
 done
-# a spinner beats silence when several sticks are writing at once
-i=0; spin='|/-\'
+# Report real progress, not a spinner: how much has actually landed on each drive against
+# how much is coming. Forty minutes of silence is indistinguishable from a hang, and these
+# packs are ~100k small files, which a USB stick writes far slower than its rated speed.
+started=$(date +%s)
 while :; do
   running=0
   for p in "${pids[@]}"; do kill -0 "$p" 2>/dev/null && running=$((running+1)); done
   [ "$running" -eq 0 ] && break
-  printf '\r  %s %d of %d still copying ' "${spin:i++%4:1}" "$running" "${#STICKS[@]}"
-  sleep 1
+  line=""
+  for m in "${STICKS[@]}"; do
+    got=$(du -sk "$m/insightout" 2>/dev/null | awk '{print $1+0}')
+    pct=0; [ "${TOTAL_KB:-0}" -gt 0 ] && pct=$(( got * 100 / TOTAL_KB ))
+    [ "$pct" -gt 100 ] && pct=100
+    line="$line $(basename "$m")=${pct}%"
+  done
+  printf '\r  [%4ds] %d copying:%s        ' "$(( $(date +%s) - started ))" "$running" "$line"
+  sleep 3
 done
-printf '\r%*s\r' 40 ''
+printf '\r%*s\r' 78 ''
 
 fail=0
 for p in "${pids[@]}"; do wait "$p" || fail=1; done
@@ -150,7 +165,6 @@ for f in "$LOGDIR"/*.log; do
   [ -e "$f" ] || continue
   grep -E '^=== |^  done:|cannot write' "$f" | sed 's/^/  /'
 done
-rm -rf "$LOGDIR"
 
 say
 if [ "$fail" = "0" ]; then
