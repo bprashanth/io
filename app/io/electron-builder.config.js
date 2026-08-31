@@ -21,6 +21,10 @@ const extraResources = [
   // The organizer's projector board. Stdlib only, so the bundled python can run it and an
   // organizer does not need a git checkout or a system python to put it on screen.
   { from: 'room_server.py', to: 'io/room_server.py' },
+  // The privacy server, for the same reason: stdlib only, so the bundled python can run
+  // it and an organizer without a git checkout can still stand one up for a laptop that
+  // cannot run the scanner itself.
+  { from: 'privacy_server.py', to: 'io/privacy_server.py' },
   { from: 'engine', to: 'io/engine', filter: ['**/*.py'] },
   { from: 'ui', to: 'io/ui' },
 ];
