@@ -122,7 +122,10 @@ copy_to() {
     # room's wifi, or without an organizer next to them, still knows what to do.
     [ -f "$HERE_DIR/START-HERE.txt" ] && cp -f "$HERE_DIR/START-HERE.txt" "$mp/START-HERE.txt"
     cp -f "$STAGE/../io-usb-manifest.txt" "$dest/MANIFEST.txt" 2>/dev/null || true
-    sync
+    # sync with no argument flushes every filesystem on the machine, so with eight sticks
+    # each of the eight copies blocked until all eight had finished writing back. -f waits
+    # for just this drive.
+    sync -f "$dest" 2>/dev/null || sync
     echo "  done: $(du -sh "$dest" 2>/dev/null | cut -f1) on $mp"
   } > "$log" 2>&1
 }
@@ -207,10 +210,13 @@ TOTAL_KB=$(du -sk "$STAGE" "$DATA_SRC" 2>/dev/null | awk '{s+=$1} END{print s+0}
 # clusters, so du on the destination runs well above the source and the percentage pegs at
 # 100 while thousands of files are still to come.
 #
-# Count exactly what the drive will be counted for, or the number lies a second time:
-# symlinks as well as regular files, plus the MANIFEST written into insightout/ at the end.
-# Getting this wrong by one file is how 100% came to mean "nearly".
-count_entries() { find "$1" \( -type f -o -type l \) 2>/dev/null | wc -l; }
+# Count exactly what the drive can be counted for, plus the MANIFEST written into
+# insightout/ at the end. Regular files only, deliberately: the packs carry about a
+# thousand symlinks inside the bundled python runtime, and exFAT cannot store a symlink
+# at all, so counting them here made a full copy read 98% forever on a USB stick.
+# The unpack check above is a different comparison - staging against the archive listing,
+# both on a filesystem that does have symlinks - and counts them there on purpose.
+count_entries() { find "$1" -type f 2>/dev/null | wc -l; }
 FILES=$(count_entries "$STAGE")
 TOTAL_FILES=$(( FILES + $(count_entries "$DATA_SRC") + 1 ))
 say
