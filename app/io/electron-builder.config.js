@@ -29,13 +29,44 @@ const extraResources = [
   { from: 'ui', to: 'io/ui' },
 ];
 
+// A participant copies this whole folder off a USB stick, and on Windows that is a slow,
+// per-file operation - so the file COUNT is what hurts, not the megabytes. Roughly 40% of
+// the runtime is files that are never read while the app runs:
+//
+//   torch/include   C++ headers, read only when compiling an extension against torch.
+//                   Nothing here does; verified nothing imports torch.utils.cpp_extension.
+//   */tests/        the test suites packages ship - mostly pandas, sympy, numpy, networkx.
+//   *.pyi           type stubs, for type checkers only.
+//   *.a  *.lib      static and import libraries, inputs to a linker, not to python.
+//   licenses/       third-party attribution text nested inside dist-info. Also the only
+//                   thing in the pack long enough to hit Windows' 260-character path limit.
+//
+// Directories named tests/ or test/ only - never a file called tests.py. jinja2/tests.py
+// is a real module that jinja2 imports at module level, and matching on the name rather
+// than the directory would silently break every template. mpmath imports its own .tests
+// too, but from inside runtests(), so it never runs here.
+//
+// Checked by pruning a real runtime and re-running the scanner over a fixed corpus: the
+// same spans, labels and offsets came back, and service.py, pandas, torch, transformers,
+// gliner, sympy, mpmath, jinja2, networkx, onnxruntime and the pdf reader all still import.
+const RUNTIME_FILTER = [
+  '**/*',
+  '!**/site-packages/torch/include/**',
+  '!**/site-packages/**/tests/**',
+  '!**/site-packages/**/test/**',
+  '!**/*.dist-info/licenses/**',
+  '!**/*.pyi',
+  '!**/*.a',
+  '!**/*.lib',
+];
+
 if (FAT) {
   for (const part of ['runtime', 'hf-cache']) {
     const src = path.join(PAYLOAD, part);
     if (!fs.existsSync(src)) {
       throw new Error(`IO_FAT=1 but ${src} is missing. Run: node bootstrap.js --dest ${PAYLOAD}`);
     }
-    extraResources.push({ from: src, to: part });
+    extraResources.push({ from: src, to: part, filter: part === 'runtime' ? RUNTIME_FILTER : undefined });
   }
 
   // The offline build exists for USB sticks, so ship it already portable: an io-data folder
