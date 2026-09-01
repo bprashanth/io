@@ -35,6 +35,12 @@ First time you open Antigravity it asks a few setup questions. The important one
 
 **NOTE**: if you want to turn off permission requests for the term of this session, you can find the setting that say "Auto Execute" and "Review Policy" and set them to "Always Proceed". You can always turn this back to "Request Review" later. These settings are found in the bottom right corner of antigravity. 
 
+**Organizers:** [installation/DISTRIBUTION.md](installation/DISTRIBUTION.md) 
+
+Outside the event, there are two big pieces needed to run the setup. 
+A. The desktop app
+B. A room local server 
+
 **A. io, the desktop app**
 
 Find your machine > download > unzip > click/double-click.
@@ -60,17 +66,9 @@ These packs carry everything needed to run the app inside them.
 
 Details and flow: [`app/io/README.md`](app/io/README.md).
 
-**Organizers:** [installation/DISTRIBUTION.md](installation/DISTRIBUTION.md) is the whole
-job in one page - building, putting it on USB drives, and running the event. On the day:
+**B. The room board**
 
-```
-./installation/scripts/event_start.sh      # starts both servers, prints the addresses
-```
-
-**C. The room board**
-
-Every question in io is answered by three models at once, unlabelled. Each person picks the
-answer they preferred. The board is the projector view of what the room chose.
+Every question in io is answered by three models at once and the room server shows these stats. 
 
 *Before people arrive:*
 

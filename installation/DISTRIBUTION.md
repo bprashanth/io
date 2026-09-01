@@ -1,9 +1,8 @@
 # Getting io onto laptops, and running the event
 
-Everything an organizer does, in order. Start to finish this is a repo checkout, a set of
-USB drives, and two servers on the day.
+Organizer flow on the day of the event. 
 
-## 1. Get the builds
+## 1. Get the builds [Pre-Event]
 
 Built by `.github/workflows/package.yml`, one run per flavour:
 
@@ -11,7 +10,7 @@ Built by `.github/workflows/package.yml`, one run per flavour:
 gh workflow run package.yml --ref main -f fat=false     # thin, all platforms
 gh workflow run package.yml --ref main -f fat=true      # offline, all platforms
 gh workflow run package.yml --ref main -f only=mac      # just one platform
-gh workflow run package.yml --ref main -f fat=true -f release_tag=v0.3.0   # publish as well
+gh workflow run package.yml --ref main -f fat=true -f release_tag=v0.3.1   # publish as well
 ```
 
 `release_tag` makes each runner upload straight to that release, which is much faster than
@@ -20,10 +19,12 @@ pulling several gigabytes down and pushing them back.
 Then put the archives in `bin/` at the root of the repo:
 
 ```
-gh release download v0.3.0 --dir bin
+gh release download v0.3.1 --dir bin
 ```
 
-### What exists, and what does not
+(insert the latest release number if it's not `0.3.1` by checking this repo's releases page). 
+
+__What this contains__
 
 | platform | offline (no download) | thin (downloads on first start) |
 |---|---|---|
@@ -32,13 +33,12 @@ gh release download v0.3.0 --dir bin
 | macOS Apple Silicon | `io-mac-arm64-offline.dmg` | `io-mac-arm64.dmg` |
 | macOS Intel | **none, and none is possible** | `io-mac-x64.dmg` |
 
-There is no Intel Mac offline build because there is nothing to put in it: PyTorch has
-shipped no macOS x86_64 wheel since 2.2.2, and the rest of the stack needs a newer torch
-than that. An Intel Mac runs io without the local scanner and is offered a privacy server
-instead. There is no `.AppImage` either; it needed a library recent Ubuntu does not ship
-and could not start without an administrator password.
+There is no Intel Mac offline build (not possible because currently supported
+pytorch libraries don't support mac-intel). So mac intel users are confined to
+the online only flow - meaning the gliner server must run on a non-mac-intel
+machine. 
 
-## 2. Put it on the drives
+## 2. Put it on the drives [Pre-Event]
 
 Plug in as many drives as you like and run, from the root of the repo:
 
@@ -57,16 +57,16 @@ insightout/data/            sample data to try
 insightout/MANIFEST.txt     every file and its size, for --verify
 ```
 
-About 6.3 GB and 77,861 files per drive. On exFAT `du` reports around 7.5 GB, because it
-allocates in 32 KB clusters and most of those files are small. **Budget 16 GB drives.**
+**Budget 16 GB drives.**
+About 6.3 GB and 77,861 files per drive. 
 
 Expect it to take a while and do not read that as a hang: the Windows offline pack alone is
 37,306 files, and a stick writes many small files far more slowly than its rated speed. The
 script prints a per-drive percentage counted in files.
 
-### Verifying, and repairing
+__Verifying, and repairing__
 
-`--verify` compares every file against `MANIFEST.txt` and reports COMPLETE or INCOMPLETE.
+Running `usb_copy.sh --verify` compares every file against `MANIFEST.txt` and reports COMPLETE or INCOMPLETE.
 Re-running the copy repairs whatever is missing or the wrong size, and skips the rest.
 
 If a drive was interrupted mid-copy its filesystem may be damaged. `fsck.exfat` will say
@@ -78,24 +78,23 @@ sudo umount /dev/sdX1 && sudo mkfs.exfat -n "LABEL" /dev/sdX1
 
 Then unplug and replug it so it mounts, or `usb_copy` will not see it.
 
-### Which drives can be run from directly
+## At the event 
 
-- **Windows: yes.** The zip has no symlinks and Windows has no executable bit.
-- **Linux: yes**, but copy it off first for speed. exFAT cannot store symlinks, so the app
-  finds its interpreter by versioned name instead.
-- **macOS: no.** A `.app` bundle is held together by symlinks, which exFAT cannot store.
-  The `.dmg` sits on the drive fine; copy the app out of it onto the Mac.
+1. Organizer setup
+2. Participant setup (usb)
+3. Participant acttions (outside-in) 
+4. If someone cannot install something 
 
-## 3. On the day
+## 1. Orgranizer Team
 
 ```
 ./installation/scripts/event_start.sh
 ```
 
-Starts both servers and prints the addresses to read out. `--stop` stops them, `--board-only`
+Starts two servers and prints the addresses to read out. `--stop` stops them, `--board-only`
 and `--scanner-only` start one, and `BOARD_PORT` / `SCANNER_PORT` move them if a port is busy.
 It says a server has started only once that server actually answers on its port, and it exits
-on its own if both servers stop, so the window is never claiming to run something that is not.
+on its own if both servers stop.
 
 - **room board**, default 8890. Put it on the projector; it refreshes itself every three
   seconds and shows what the room preferred. Votes append to `app/io/room-votes.jsonl`, and
@@ -105,30 +104,38 @@ on its own if both servers stop, so the window is never claiming to run somethin
 Everyone must be on the same wifi as that machine, and the first start may raise a firewall
 prompt to allow incoming connections.
 
-### The privacy server, and what it costs
+## 2. Participatn setup (usb) 
 
-Text sent to it is **not redacted**. It cannot be: finding the private values in it is the
-job. So a laptop using it sends real names and numbers across the room's network to the
-organizer's machine. io asks the person before it ever does this, and names the server.
+Plug the drive into each laptop and do the following: 
 
-Give that address only to people whose io tells them the scanner cannot run. Everyone else
-scans on their own machine and nothing leaves it. The alternative, if someone would rather
-not, is pattern matching only: it still finds phone numbers, Aadhaar and account numbers and
-emails, but not people's names or place names in free text.
+__Windows__
 
-## 4. What each participant does
+1. Open `insightout\io\io-win-x64-offline`
+2. Copy that whole folder to their computer (desktop is fine). 
+    - IFF they don't have space, tell them to wait while you copy it to other computers, then give them the usb (they can run it directly from the usb). 
+3. Double click the exe. Windows smartscreen will show a warning, click "Run Anyway". 
 
-`START-HERE.txt` on the drive covers it, one section per computer. In short: copy the folder
-for their machine, run it, and dismiss one security prompt, because io is not signed.
+__MacOS: Silicon__
 
-- Windows: SmartScreen, More info, Run anyway
-- macOS: right-click, Open, Open. A plain double-click is blocked the first time
-- Linux: allow the file to run as a program, or `./io` in a terminal
+1. Double click `insightout/io/io-mac-arm64-offline.dmg`
+2. Drag `io` out of the dmg onto their Desktop or home folder (DO NOT DRAG IT INTO APPLICATIONS OR THE APP TRAY)
+3. Right-click `io` -> open -> open again. A plain double-click will be blocked the first time. 
 
-Then io asks for an API key or a server address, shows a short note about data, and is ready
+__MacOS: Intel__
+
+Same as above, but for `io-mac-x64.dmg`. It will say the scanner can't run on an Intel Mac. This is expected, you will hav to use the local address of the privacy-server you started on your laptop (see previous section).
+
+__Linux__
+
+1. Copy `insightout/io/io-linux-x64-offline` to their home dir 
+2. `./io` in a terminal, or right click -> Properties -> Permissions -> "Allow executing file as program" 
+
+## 3. Participatn Actions 
+
+Starting io asks for an API key or a server address, shows a short note about data, and is ready
 for a folder. There is sample data at `insightout/data`.
 
-## 5. If someone cannot install it
+## 4. If someone cannot install something 
 
 In order:
 
@@ -138,7 +145,7 @@ In order:
 4. **From source**, if a download will not start at all:
    [running io from source](INSTALL-from-source.md). Needs python 3.10+ and node 18+.
 
-## Where the details live
+## More info
 
 - [Windows](INSTALL-windows.md), [macOS](INSTALL-mac.md), [Linux](INSTALL-linux.md)
 - [Antigravity, per platform](ANTIGRAVITY-linux.md) and [what to pick on first run](ANTIGRAVITY-first-run.md)
