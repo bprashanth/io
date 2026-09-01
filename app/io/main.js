@@ -169,6 +169,9 @@ async function start() {
   // Tell the service the local scanner is not available here, and why, so it can offer
   // the choice rather than silently dropping to pattern matching.
   if (env.scannerError) senv.IO_SCANNER_UNAVAILABLE = env.scannerError;
+  // UTF-8 everywhere: Windows' cp1252 default turned a rupee sign in a log line into a
+  // crashed vote (2026-09-01). One env var retires the whole bug class.
+  senv.PYTHONUTF8 = '1';
   // decisions.json, folders.json and the per-folder vault live in IO_HOME. In portable mode
   // they belong on the stick with everything else - the vault above all, since it is the
   // one file that maps codes back to real names.

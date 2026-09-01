@@ -12,6 +12,9 @@ button.go{border-color:var(--hi);color:var(--hi)}
 input,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;outline:none;width:100%}
 input:focus,textarea:focus{border-color:var(--hi)}
 .dim{color:var(--dim)}
+#acts{position:fixed;top:14px;right:44px;z-index:5;display:flex;gap:14px}
+#acts .act{background:none;border:none;color:var(--dim);font-size:12.5px;cursor:pointer;padding:6px 2px}
+#acts .act:hover{color:var(--ink)}
 #gear{position:fixed;top:14px;right:16px;color:var(--dim);cursor:pointer;font-size:17px;z-index:5;background:none;border:none;padding:4px}
 
 /* screens */
@@ -152,6 +155,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
 </style>
 </head>
 <body>
+<div id="acts" style="display:none"><button class="act" id="act-folders">folders</button><button class="act" id="act-forget">forget this chat</button><button class="act" id="act-reload">reload</button></div>
 <button id="gear" style="display:none">⚙</button>
 
 <div class="screen on" id="s-provider">
@@ -273,8 +277,30 @@ async function renderShelf(){
 }
 document.addEventListener('click', () => $('#ctx').style.display = 'none');
 $('#ctx-un').onclick = async () => { await api('/api/folders/remove', {path: decodeURIComponent($('#ctx').dataset.p)}); renderShelf(); };
+function oops(msg){ alert(msg + "\n\nPress reload (top right); if it happens again, forget this chat."); }
+$('#act-reload').onclick = () => location.reload();
+$('#act-forget').onclick = async () => { await api('/api/chat/reset', {}); $('#thread').innerHTML = ''; q.disabled = false; q.value = ''; paintMirror(); q.focus(); };
+$('#act-folders').onclick = () => { show('#s-home'); renderShelf(); };
+function appendTurn(t){
+  const el = document.createElement('div'); el.className = 'msg';
+  el.innerHTML = `<div class="q"></div><div class="a"></div>`;
+  el.querySelector('.q').textContent = t.q;
+  $('#thread').appendChild(el);
+  const w = el.querySelector('.a');
+  if (t.pending) { w.className = 'working'; renderCompare(el, w, t); }
+  else finishTurn(el, w, t);
+}
+function resumeChat(st){
+  accepted = true;
+  files = (st.files || []).concat(st.docs || []);
+  api('/api/terms').then(t => { terms = t.terms || []; paintMirror(); });
+  $('#thread').innerHTML = '';
+  (st.turns || []).forEach(appendTurn);
+  show('#s-chat');
+  $('#thread').scrollTop = 1e9;
+}
 (async () => { const st = await api('/api/state'); if (st.provider.set) { await afterConsent(); } })();
-function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent' || id === '#s-scanner') ? 'none' : ''; }
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent' || id === '#s-scanner') ? 'none' : ''; $('#acts').style.display = (id === '#s-chat') ? 'flex' : 'none'; }
 
 // provider
 $('#p-go').onclick = async () => {
@@ -293,6 +319,8 @@ async function afterConsent(){
     show('#s-scanner');
     return;
   }
+  const st = await api('/api/state');
+  if (st.folder && st.accepted) { resumeChat(st); return; }
   show('#s-home'); renderShelf();
 }
 $('#c-ok').onclick = afterConsent;
@@ -347,7 +375,9 @@ async function openFolder(path){
   const r = await api('/api/folder', {path});
   scanning = false;
   clearInterval(poll);
-  if (r.error) { alert(r.error); show(accepted ? '#s-chat' : '#s-home'); return; }
+  if (r.error) { oops(r.error); show(accepted ? '#s-chat' : '#s-home'); return; }
+  const st = await api('/api/state');
+  if (st.accepted) { resumeChat(st); return; }   // a folder scanned and accepted before: straight back into its chat
   files = r.files; skipped = r.skipped || []; tab = 0; accepted = false; renderSheet();
 }
 
@@ -699,7 +729,7 @@ function renderCompare(el, w, r){
   const finalWhy = (radio, box) => box.value.trim() ? 'other: ' + box.value.trim().slice(0, 120) : radio;
   const vote = async (pick, whyv) => {
     const res = await api('/api/vote', {id: r.id, pick, why: whyv || null});
-    if (res.error) { alert(res.error); return; }
+    if (res.error) { if (/nothing to vote/.test(res.error)) { location.reload(); return; } oops(res.error); return; }
     w.innerHTML = ''; w.className = 'a';
     finishTurn(el, w, res);
   };

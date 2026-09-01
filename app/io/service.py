@@ -79,6 +79,9 @@ RULE = {
 
 class State:
     def __init__(self) -> None:
+        self.sessions: dict = {}
+        self.accepted = False
+        self.fsig = None
         self.provider: dict = {}          # memory only: api_key | server, model
         self.folder: Path | None = None
         self.tables: list[dict] = []      # {file, sheet, name, frame, classes, decided, spans}
@@ -155,12 +158,37 @@ class State:
     def header_key(columns: list[str]) -> str:
         return hashlib.sha256("|".join(sorted(str(c).strip().lower() for c in columns)).encode()).hexdigest()[:16]
 
+    SESSION_FIELDS = ("tables", "docs", "redacted", "decisions", "kept", "skipped", "turns", "conversation_id", "pmap", "accepted", "fsig")
+
+    def folder_sig(self, folder: Path):
+        sig = []
+        for f in sorted(folder.iterdir()):
+            if f.is_file() and not f.name.startswith((".", "~$")):
+                st = f.stat()
+                sig.append((f.name, int(st.st_mtime), st.st_size))
+        return sig
+
+    def stash_session(self) -> None:
+        if getattr(self, "folder", None):
+            self.sessions[str(self.folder)] = {k: getattr(self, k, None) for k in self.SESSION_FIELDS}
+
     def load_folder(self, folder: Path) -> None:
+        # Switching folders must not throw away finished work: scans are stashed in
+        # memory, and coming back to a folder whose files are unchanged is instant.
+        self.stash_session()
+        cached = self.sessions.get(str(folder))
+        if cached and cached.get("fsig") == self.folder_sig(folder):
+            for k in self.SESSION_FIELDS:
+                setattr(self, k, cached.get(k))
+            self.folder = folder
+            self.step("restored " + folder.name)
+            return
         saved = json.loads(DECISIONS_PATH.read_text()) if DECISIONS_PATH.exists() else {}
         self.kept = saved.pop("_kept", {}) if isinstance(saved, dict) else {}
         self.decisions = saved
         self.folder = folder
         self.tables, self.redacted, self.turns = [], {}, []
+        self.accepted = False
         self.conversation_id = uuid.uuid4().hex[:12]
         self.docs = []
         self.pmap = PseudonymMap(CONF / f"vault-{hashlib.sha256(str(folder).encode()).hexdigest()[:12]}-local-only.json")
@@ -209,6 +237,7 @@ class State:
         label = folder.name if folder.name != "data" else f"{folder.parent.name}/data"   # five packets all called data/ must not collide on the shelf
         folders.insert(0, {"path": str(folder), "name": label, "files": n_files})
         FOLDERS_PATH.write_text(json.dumps(folders[:24], indent=1))
+        self.fsig = self.folder_sig(folder)   # remembered so coming back skips the rescan
 
     @staticmethod
     def effective(t: dict) -> dict[str, str]:
@@ -398,8 +427,17 @@ def call_model(prompt: str, model_override: str | None = None) -> tuple[str, dic
         headers["Authorization"] = f"Bearer {key}"
     t0 = time.monotonic()
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
-    with urllib.request.urlopen(req, timeout=600) as r:
-        raw = json.load(r)
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                raw = json.load(r)
+            break
+        except urllib.error.HTTPError:
+            raise                           # a real server answer (401, 429...): retrying will not change it
+        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError):
+            if attempt == 2:
+                raise
+            time.sleep(1.5)                 # dropped sockets and wifi blips usually heal in one beat
     msg = raw["choices"][0]["message"]
     text = msg.get("content") or ""
     if not text and msg.get("reasoning"):
@@ -556,6 +594,16 @@ def chat(question: str, model: str | None = None) -> dict:
     for th in ths:
         th.join()
     S.step("translating codes back")
+    if all(c.get("error") for c in results):
+        detail = (results[0].get("answer") or "")[:160]
+        turn = {"q": question, "q_sent": q, "sent_rows": sent_rows, "sent_lines": sent_lines,
+                "bytes": len(payload), "files_used": use if mentioned else [],
+                "answer": "No model could be reached - check the wifi and ask again. " + detail,
+                "answer_sent": "", "seconds": 0, "skipped": False}
+        S.turns.append(turn)
+        turn["id"] = len(S.turns)
+        S.step("done")
+        return client_view(turn)
     random.shuffle(results)
     turn = {"q": question, "q_sent": q, "sent_rows": sent_rows, "sent_lines": sent_lines,
             "bytes": len(payload), "files_used": use if mentioned else [],
@@ -598,11 +646,6 @@ def resolve_vote(turn: dict, pick, why: str | None = None) -> dict:
         turn["answer_sent"] = ""
     turn["outcome"] = outcome
     turn["why"] = why
-    turn["pending_vote"] = False
-    tally = json.loads(VOTES_PATH.read_text()) if VOTES_PATH.exists() else {}
-    tally[outcome] = tally.get(outcome, 0) + 1
-    tally["total"] = tally.get("total", 0) + 1
-    VOTES_PATH.write_text(json.dumps(tally, indent=1))
     rec = {"t": time.time(), "conversation": S.conversation_id, "turn": turn["id"],
            "org": (S.provider.get("org") or "").strip()[:80] or None,
            "folder": str(getattr(S, "folder", "") or ""), "q_sent": turn["q_sent"], "outcome": outcome, "why": why,
@@ -612,8 +655,18 @@ def resolve_vote(turn: dict, pick, why: str | None = None) -> dict:
                       "error": c.get("error", False),
                       "answer_sent": (c.get("answer_sent") or "")[:2000]}
                      for i, c in enumerate(cands)]}
-    with open(COMPARE_LOG, "a") as f:
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    # Telemetry must never fail the vote. A vote that half-fails leaves the screen and
+    # the server disagreeing about whether it happened - the "nothing to vote on" wedge
+    # (found on Windows 2026-09-01: the log write below hit cp1252 on a rupee sign).
+    try:
+        tally = json.loads(VOTES_PATH.read_text()) if VOTES_PATH.exists() else {}
+        tally[outcome] = tally.get(outcome, 0) + 1
+        tally["total"] = tally.get("total", 0) + 1
+        VOTES_PATH.write_text(json.dumps(tally, indent=1))
+        with open(COMPARE_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        traceback.print_exc()
     room = S.provider.get("room")
     if room:
         def push():
@@ -624,6 +677,7 @@ def resolve_vote(turn: dict, pick, why: str | None = None) -> dict:
             except Exception:
                 pass                      # the room board is best-effort, never block a vote
         threading.Thread(target=push, daemon=True).start()
+    turn["pending_vote"] = False           # the vote is done only after everything above ran
     return client_view(turn)
 
 
@@ -659,7 +713,10 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/state":
             return self._json({"provider": {"set": bool(S.provider), "model": S.provider.get("model"), "server": bool(S.provider.get("server"))},
                                "folder": str(S.folder) if S.folder else None,
+                               "accepted": bool(getattr(S, "accepted", False)),
                                "files": [{"name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns)} for t in S.tables],
+                               "docs": [{"name": d["name"]} for d in getattr(S, "docs", [])],
+                               "turns": [client_view(t) for t in S.turns],
                                "vault": len(S.pmap.display) if S.pmap else 0, "progress": S.progress[-4:]})
         m = re.match(r"^/api/cpage/(\d+)/(\d)$", p)
         if m:
@@ -835,6 +892,10 @@ class H(BaseHTTPRequestHandler):
                 folders = [x for x in folders if x["path"] != body.get("path")]
                 FOLDERS_PATH.write_text(json.dumps(folders, indent=1))
                 return self._json({"folders": folders})
+            if self.path == "/api/chat/reset":
+                with S.lock:
+                    S.turns = []           # the chat is forgotten; the scan, vault and decisions survive
+                return self._json({"ok": True})
             if self.path == "/api/vote":
                 with S.lock:
                     t = next((x for x in S.turns if x.get("id") == int(body["id"])), None)
@@ -864,6 +925,7 @@ class H(BaseHTTPRequestHandler):
                     if not S.redacted:
                         S.step("hiding what you marked")
                         S.build_vault()
+                    S.accepted = True
                 return self._json({"vault": len(S.pmap.display)})
             if self.path == "/api/chat":
                 with S.lock:
