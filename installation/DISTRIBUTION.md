@@ -145,6 +145,110 @@ In order:
 4. **From source**, if a download will not start at all:
    [running io from source](INSTALL-from-source.md). Needs python 3.10+ and node 18+.
 
+## When the copy looks stuck
+
+Copying ~3.5 GB of ~80,000 small files to eight sticks at once is slow, and almost every
+"it has hung" turns out to be either real work or a number that is lying. Diagnose in
+this order.
+
+**1. Read the rsync logs, not the drives.** This is the only signal that costs the drives
+nothing, and it is rsync's own counter rather than anything the script computes:
+
+```bash
+for f in usb_copy-logs/*.log; do
+  printf '%-22s %s\n' "$(basename "$f" .log | sed 's/.*_//')" \
+    "$(tr '\r' '\n' < "$f" | grep -oE 'xfr#[0-9]+, to-chk=[0-9]+/[0-9]+' | tail -1)"
+done
+```
+
+Run it twice, sixty seconds apart. `to-chk` falling or `xfr#` rising means it is working.
+`to-chk` is the position in the walk through the whole list; `xfr#` is files actually
+written, and it stays low on a drive that is mostly already correct, because rsync skips
+what matches. `to-chk`'s total counts directories too, so it is larger than the file-only
+percentage the script prints. The two numbers disagreeing is normal.
+
+**2. Ask what the processes are doing.**
+
+```bash
+ps -eo pid,stat,etimes,wchan:20,args --sort=-etimes | grep -E 'rsync|cp |usb_copy' | grep -v grep
+```
+
+`STAT` of `D` is blocked on disk I/O, which is the normal state for a USB stick. **A `cp -r`
+in this list means a bug has returned** - see below.
+
+**3. Only then conclude it is stuck.** Ctrl-C is safe: rsync removes its in-flight temp
+file on SIGINT, so a drive is left holding complete files and nothing half-written. Re-run
+to resume; it skips what is already correct.
+
+### Things that were wrong here before, and what they looked like
+
+Each of these presented as "the copy has hung". They are fixed, but knowing the shape of
+them makes a relapse obvious.
+
+- **rsync fails on exFAT and a fallback re-copies everything.** The packs carry ~1,000
+  symlinks inside the bundled python runtime, and exFAT cannot store a symlink. Plain
+  `rsync -a` therefore exits 23, and the old code read any non-zero exit as "rsync is
+  unusable" and re-copied all 3.5 GB with `cp -r`, on every drive, on every run, *after*
+  rsync had already finished. Runs never ended, and `MANIFEST.txt` - written last - was
+  never reached, so `--verify` could only report NO MANIFEST. Fixed by `rsync -a -L`,
+  which sends the file a symlink points at. To check the fix is present on a real stick,
+  no root needed:
+
+  ```bash
+  mkdir -p /tmp/lt && echo hi > /tmp/lt/a && ln -s a /tmp/lt/l
+  M=/media/$USER/SOMESTICK
+  rsync -a    /tmp/lt/ "$M/_probe/"; echo "plain -a exit=$?"   # 23 on exFAT
+  rm -rf "$M/_probe"
+  rsync -a -L /tmp/lt/ "$M/_probe/"; echo "with -L  exit=$?"   # 0
+  rm -rf "$M/_probe"
+  ```
+
+- **Progress measured in bytes.** exFAT allocates in 32 KB clusters, so the destination
+  reads larger than the source and the percentage pegs at 100 with thousands of files
+  still to come. It counts files now.
+
+- **Progress counting things the drive cannot hold.** Counting symlinks in the total made
+  a finished copy read 98% forever, because exFAT never stores them. Whatever the
+  denominator counts must be what actually lands - with `-L`, a source symlink does become
+  a destination file, so it counts again.
+
+- **`du` on the destination.** Walking ~75,000 files back off a stick, on eight drives at
+  once, took longer than parts of the copy it was reporting on. Do not add one; use the
+  manifest or the logs.
+
+- **A bare `sync`.** It flushes every filesystem on the machine, so all eight copies waited
+  for the slowest drive after their own data was safely down. `sync -f` waits for one.
+
+- **Staging thrown away every run.** Staging is unpacked once and reused, and validates
+  itself by counting files *and symlinks* against the archive listing. When it counted only
+  regular files, any archive holding a symlink never matched, so every run deleted and
+  re-extracted gigabytes before copying anything. If you see `re-unpacking` on every run
+  rather than `already unpacked`, that check is broken again.
+
+### Testing a change to usb_copy.sh
+
+**A directory on the normal filesystem is not a valid test target.** `rsync -a` exits 0
+there and hides the entire class of bug above. Test against a real stick, or against a
+FAT image if you have root:
+
+```bash
+dd if=/dev/zero of=/tmp/t.img bs=1M count=600 && mkfs.vfat -F 32 /tmp/t.img
+mkdir -p /tmp/tmnt && sudo mount -o loop,uid=$(id -u),gid=$(id -g) /tmp/t.img /tmp/tmnt
+./app/io/usb_copy.sh --builds ./bin --target /tmp/tmnt
+./app/io/usb_copy.sh --builds ./bin --target /tmp/tmnt --verify
+```
+
+### A drive whose filesystem is damaged
+
+An interrupted copy can corrupt exFAT. Needs root, so if sudo prompts, ask rather than
+working around it.
+
+```bash
+sudo fsck.exfat -n /dev/sdXN          # inspect, changes nothing
+sudo umount /dev/sdXN
+sudo mkfs.exfat -n IONAME /dev/sdXN   # reformat, then re-run usb_copy
+```
+
 ## More info
 
 - [Windows](INSTALL-windows.md), [macOS](INSTALL-mac.md), [Linux](INSTALL-linux.md)
