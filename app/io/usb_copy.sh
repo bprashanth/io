@@ -6,6 +6,7 @@
 #   ./app/io/usb_copy.sh --verify        # check drives that were already copied
 #   ./app/io/usb_copy.sh --builds DIR    # where the archives are (default: ./bin)
 #   ./app/io/usb_copy.sh --target DIR    # copy here instead of hunting sticks (repeatable)
+#   ./app/io/usb_copy.sh --platform win  # only these platforms (win,mac,linux; default all)
 #   ./app/io/usb_copy.sh --verify --manifest FILE   # check against this manifest instead
 #
 # Run it from the root of this repo. Plug in as many sticks as you like, in a hub or one
@@ -19,6 +20,12 @@ set -uo pipefail
 
 BUILDS="bin"
 TARGETS=()
+# Which platforms to put on the drive. All three by default, because a drive handed to a
+# room does not know who will pick it up. Narrow it when you are preparing a stick for
+# people you have already asked - a Windows-only drive is a third of the size and a third
+# of the files, which on a USB stick is most of the wait.
+PLATFORMS="win mac linux"
+
 DRY=0
 VERIFY=0
 while [ $# -gt 0 ]; do
@@ -28,18 +35,43 @@ while [ $# -gt 0 ]; do
     --dry-run|-n) DRY=1; shift ;;
     --verify) VERIFY=1; shift ;;
     --manifest) REF_MANIFEST="$2"; shift 2 ;;
+    --platform|--platforms) PLATFORMS=$(printf '%s' "$2" | tr ',' ' '); shift 2 ;;
     -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
+
+for p in $PLATFORMS; do
+  case "$p" in
+    win|mac|linux) ;;
+    *) echo "usb_copy: unknown platform '$p'. Use win, mac, linux, or a comma-separated list." >&2; exit 2 ;;
+  esac
+done
+
+# Does this archive belong to a platform that was asked for? The build names carry the
+# platform, so match on that rather than keeping a list that drifts from the filenames.
+wanted() {
+  local name; name=$(basename "$1")
+  local p
+  for p in $PLATFORMS; do
+    case "$name" in *-"$p"-*|*-"$p".*) return 0 ;; esac
+  done
+  return 1
+}
 
 DATA_SRC="simulations/foundation-without/data"
 HERE_DIR=$(cd "$(dirname "$0")" && pwd)
 say() { printf '%s\n' "$*"; }
 die() { printf 'usb_copy: %s\n' "$*" >&2; exit 1; }
 
-[ -d "$BUILDS" ] || die "no builds directory at '$BUILDS'. Pass --builds DIR, or put the archives in ./bin"
-[ -d "$DATA_SRC" ] || die "run this from the root of the repo: '$DATA_SRC' not found"
+# --verify reads MANIFEST.txt off the drive and nothing else, so it must keep working after
+# the builds and the staging copy have been deleted to reclaim disk. Requiring them here
+# meant a drive could not be checked once you had cleaned up - which is exactly when you
+# want to check it.
+if [ "$VERIFY" = "0" ]; then
+  [ -d "$BUILDS" ] || die "no builds directory at '$BUILDS'. Pass --builds DIR, or put the archives in ./bin"
+  [ -d "$DATA_SRC" ] || die "run this from the root of the repo: '$DATA_SRC' not found"
+fi
 
 # ---------------------------------------------------------------- find the sticks
 # A stick is a mounted filesystem on a device the kernel calls removable or hotplug.
@@ -60,12 +92,18 @@ find_sticks() {
 # --------------------------------------------------------------- unpack the builds
 # Unpacked once into a staging dir and reused, so plugging in ten sticks does not mean
 # unpacking ten times.
+# Staging is keyed to the platform selection. Sharing one directory meant a --platform win
+# run copied whatever a previous all-platforms run had left lying in it, which is the
+# opposite of what was asked for.
 STAGE="${TMPDIR:-/tmp}/io-usb-stage"
+[ "$(printf '%s\n' $PLATFORMS | sort | tr '\n' ' ')" = "linux mac win " ] \
+  || STAGE="$STAGE-$(printf '%s\n' $PLATFORMS | sort | tr '\n' '-' | sed 's/-$//')"
 unpack_builds() {
   mkdir -p "$STAGE"
   local n=0
   for f in "$BUILDS"/*.tar.gz "$BUILDS"/*.zip; do
     [ -e "$f" ] || continue
+    wanted "$f" || continue
     local base; base=$(basename "$f"); base=${base%.tar.gz}; base=${base%.zip}
     local out="$STAGE/$base"
     # Non-empty is not the same as complete. An unpack interrupted by a power cut leaves a
@@ -101,11 +139,12 @@ unpack_builds() {
   # dmg files cannot be unpacked here, so they travel as-is for a Mac to open
   for f in "$BUILDS"/*.dmg; do
     [ -e "$f" ] || continue
+    wanted "$f" || continue
     cp -n "$f" "$STAGE/" 2>/dev/null || true
     say "  carrying $(basename "$f") as-is (a Mac opens it)"
     n=$((n+1))
   done
-  [ "$n" -gt 0 ] || die "no .tar.gz, .zip or .dmg found in '$BUILDS'"
+  [ "$n" -gt 0 ] || die "no build for [$PLATFORMS] found in '$BUILDS'"
 }
 
 # ------------------------------------------------------------------- copy to one
@@ -222,6 +261,7 @@ verify_drive() {
 # ------------------------------------------------------------------------- main
 say "usb_copy"
 say "  builds from : $BUILDS"
+say "  platforms   : $PLATFORMS"
 say "  data from   : $DATA_SRC"
 
 mapfile -t STICKS < <(find_sticks)

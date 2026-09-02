@@ -1,28 +1,44 @@
-# Getting io onto laptops, and running the event
+# Running the event
 
-Organizer flow on the day of the event. 
+Organizer flow on the day of the event.
 
 ## 1. Get the builds [Pre-Event]
 
-Built by `.github/workflows/package.yml`, one run per flavour:
+Built by `.github/workflows/package.yml`:
 
 ```
 gh workflow run package.yml --ref main -f fat=false     # thin, all platforms
 gh workflow run package.yml --ref main -f fat=true      # offline, all platforms
 gh workflow run package.yml --ref main -f only=mac      # just one platform
-gh workflow run package.yml --ref main -f fat=true -f release_tag=v0.3.1   # publish as well
+gh workflow run package.yml --ref main -f fat=true -f release_tag=v0.3.2   # publish as well
 ```
 
 `release_tag` makes each runner upload straight to that release, which is much faster than
-pulling several gigabytes down and pushing them back.
+pulling several gigabytes down and pushing them back. Create the release as a draft first if
+you want to read the smoke results before anything becomes downloadable.
+
+Two things to point out:
+
+- **A `fat=true` dispatch skips the thin matrix**, assuming thin is unchanged. If the app
+  itself changed you need both runs - and the Intel Mac build is thin-only, so a fat-only
+  release has no Intel Mac build at all.
+- **CI does not produce `SHA256SUMS.txt`.** Build it from GitHub's own digests rather than
+  downloading everything back:
+
+  ```
+  gh api repos/bprashanth/io/releases --paginate \
+    -q '.[] | select(.tag_name=="v0.3.2") | .assets[] | select(.name|endswith(".txt")|not) | "\(.digest)  \(.name)"' \
+    | sed 's/^sha256://' | sort -k2 > SHA256SUMS.txt
+  gh release upload v0.3.2 SHA256SUMS.txt --clobber
+  ```
 
 Then put the archives in `bin/` at the root of the repo:
 
 ```
-gh release download v0.3.1 --dir bin
+gh release download v0.3.2 -R bprashanth/io --dir bin
 ```
 
-(insert the latest release number if it's not `0.3.1` by checking this repo's releases page). 
+(insert the latest release number if it's not `0.3.2` by checking this repo's releases page).
 
 __What this contains__
 
@@ -58,11 +74,14 @@ insightout/MANIFEST.txt     every file and its size, for --verify
 ```
 
 **Budget 16 GB drives.**
-About 6.3 GB and 77,861 files per drive. 
+About 5.6 GB and roughly 45,000 files per drive, for all three platforms.
 
 Expect it to take a while and do not read that as a hang: the Windows offline pack alone is
-37,306 files, and a stick writes many small files far more slowly than its rated speed. The
+22,092 files, and a stick writes many small files far more slowly than its rated speed. The
 script prints a per-drive percentage counted in files.
+
+`--platform win|mac|linux` narrows what goes on a drive, for a stick you are handing to
+someone whose machine you already know. It defaults to all three.
 
 __Verifying, and repairing__
 
@@ -254,4 +273,5 @@ sudo mkfs.exfat -n IONAME /dev/sdXN   # reformat, then re-run usb_copy
 - [Windows](INSTALL-windows.md), [macOS](INSTALL-mac.md), [Linux](INSTALL-linux.md)
 - [Antigravity, per platform](ANTIGRAVITY-linux.md) and [what to pick on first run](ANTIGRAVITY-first-run.md)
 - [Running io from source](INSTALL-from-source.md)
+- [Preparing a USB drive from a release](RELEASES.md)
 - `app/io/README.md` for what each script in that folder does
