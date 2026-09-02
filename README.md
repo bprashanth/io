@@ -20,6 +20,12 @@ The main goal at the event is to answer the following questions:
 
 ## Quick start
 
+Start with the page for what you are doing:
+
+- **Organizing an event** - [installation/EVENTS.md](installation/EVENTS.md)
+- **Preparing a USB drive from a release** - [installation/RELEASES.md](installation/RELEASES.md)
+- **Just installing antigravity/io on your own machine** - the table below.
+
 Install Antigravity first, then the io app.
 
 **Antigravity install:**
@@ -35,7 +41,8 @@ First time you open Antigravity it asks a few setup questions. The important one
 
 **NOTE**: if you want to turn off permission requests for the term of this session, you can find the setting that say "Auto Execute" and "Review Policy" and set them to "Always Proceed". You can always turn this back to "Request Review" later. These settings are found in the bottom right corner of antigravity. 
 
-**Organizers:** [installation/DISTRIBUTION.md](installation/DISTRIBUTION.md) 
+**Organizers:** [running the event](installation/EVENTS.md), and
+[preparing USB drives](installation/RELEASES.md).
 
 Outside the event, there are two big pieces needed to run the setup. 
 A. The desktop app
@@ -90,12 +97,12 @@ Every question in io is answered by three models at once and the room server sho
 3. Everyone has to be on the same wifi as you. The first time you start it your firewall
    may ask to allow incoming connections: allow it.
 
-*What to tell each person, once:*
+*What to tell each person:*
 
 - the API key (or the server address, if you are running your own)
 - the board address, `http://<your address>:8890`
 
-*What each person does, in this order:*
+*What each person does:*
 
 1. Start io. The first screen asks for the API key. Paste it there.
 2. Then click the gear in the top right, paste the board address into **room server**, and
@@ -106,17 +113,17 @@ Doing it any time before their first vote is fine. Doing it right after the key 
 than remembering later, because a vote cast before the address is set never reaches the
 board and there is no way to send it again.
 
-*Then, for every question:*
+*For every question:*
 
 Three answers come back, in a random order, with no model names. The person picks one, or
 says no difference, or all bad, and optionally why. io will not take the next question
-until they pick. Each pick appears on the board within a few seconds.
+until they pick.
 
-*What leaves the laptop when they vote:* the question and answers exactly as the models saw
-them, which is to say with names and numbers already replaced by codes, plus how long each
-model took and the path of the folder they pointed io at. Real names are not in it. It goes
-to your laptop on the local wifi, not to the internet, and it lands in `room-votes.jsonl`
-next to where you started the board.
+*What leaves the laptop when they vote:* the question and answers with names
+and numbers already replaced by codes, plus how long each model took and the
+path of the folder they pointed io at. Real names are not in it. It goes to
+your laptop on the local wifi and it lands in `room-votes.jsonl` next to where
+you started the room server.
 
 
 **B. The privacy shield in Antigravity (optional, linux only)**
