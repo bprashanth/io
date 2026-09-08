@@ -17,7 +17,7 @@ being filled in one at a time; a heading with (to be written) is a stub.
 ## Where this started
 
 For the first two Insight Out events, and the 340-run frontier benchmark that
-followed them, see [remembrancer.netlify.com](remembrancer.netlify.com). 
+followed them, see [remembrancer.netlify.app](https://remembrancer.netlify.app/). 
 
 Those findings shaped everything below. In summary: 
 Frontier agents' best answers are excellent; the problem is
@@ -74,7 +74,7 @@ binary-search downward to close the gap. We assumed that anything larger than
 ~30B parameters was too big to run efficiently for, say, 20 concurrent users
 at the event. So our only choice was to go down. And even there, the question
 was practical - is there an alternative we can just hand users to run on
-their own laptops? Model swaps inside the same harness helped discern:
+their own laptops? Model swaps inside the same harness helped us discern:
 * Qwen 3.5 9B couldn't produce a working page
 * Qwen3 14B dropped half the districts and invented a citation. 
 
@@ -93,7 +93,7 @@ The findings of Gen 0 in a nutshell:
 > answer. What draws the page. What leaves the laptop. How many times it gets
 > called. What it remembers for next time.
 >
-> The next two weeks were spent in pulling these levers and documenting which
+> The next two weeks were spent pulling these levers and documenting which
 > ones moved the result.
 
 Scope: Antigravity CLI and IDE as the reference; Cline (CLI and extension) and
