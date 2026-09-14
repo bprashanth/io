@@ -1,4 +1,7 @@
-// Fetch the pinned Codex binary for this machine (or a named target) into codex-bin/.
+// Fetch the pinned Codex release package for this machine (or a named target) into codex-bin/.
+// The package tree is what the npm package installs: bin/codex, bin/codex-code-mode-host (the
+// process Codex runs commands through since 0.154 - without it every shell call fails closed),
+// codex-path/rg, codex-resources/{bwrap,zsh}.
 //
 //     node fetch-codex.js                 this platform and architecture
 //     node fetch-codex.js linux-x64       a specific target (for cross-packaging)
@@ -51,13 +54,13 @@ const sha = p => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('
   const got = sha(tgz);
   if (pin.sha256 && got !== pin.sha256) { console.error(`sha256 mismatch for ${pin.asset}: ${got}`); process.exit(1); }
   if (!pin.sha256) console.log(`first fetch of ${target}: sha256 ${got} - record it in codex-pins.json`);
-  // one file inside the tarball
-  const exe = process.platform === 'win32' && target.startsWith('win32') ? 'codex.exe' : 'codex';
-  const out = path.join(outDir, exe);
-  execFileSync('tar', ['xzf', tgz, '-O'], { stdio: ['ignore', fs.openSync(out, 'w'), 'inherit'], maxBuffer: 1 << 30 });
-  fs.chmodSync(out, 0o755);
-  const bsha = sha(out);
-  if (pin.binary_sha256 && bsha !== pin.binary_sha256) { console.error(`binary sha256 mismatch: ${bsha}`); process.exit(1); }
+  // the whole tree, replacing whatever an older fetch left there
+  for (const d of ['bin', 'codex-path', 'codex-resources', 'codex', 'VERSION.json', 'codex-package.json']) fs.rmSync(path.join(outDir, d), { recursive: true, force: true });
+  execFileSync('tar', ['xzf', tgz, '-C', outDir], { stdio: 'inherit' });
+  const exe = path.join(outDir, 'bin', target.startsWith('win32') ? 'codex.exe' : 'codex');
+  const host = path.join(outDir, 'bin', target.startsWith('win32') ? 'codex-code-mode-host.exe' : 'codex-code-mode-host');
+  for (const f of [exe, host]) { if (!fs.existsSync(f)) { console.error(`package is missing ${f}`); process.exit(1); } fs.chmodSync(f, 0o755); }
+  const bsha = sha(exe);
   fs.writeFileSync(path.join(outDir, 'VERSION.json'), JSON.stringify({ version: PINS.version, tag: PINS.tag, asset: pin.asset, sha256: got, binary_sha256: bsha, fetched: new Date().toISOString() }, null, 1));
-  console.log(`${out}  codex ${PINS.version}  sha256 ${bsha}`);
+  console.log(`${exe}  codex ${PINS.version}  package sha256 ${got}`);
 })().catch(e => { console.error(e.message || e); process.exit(1); });

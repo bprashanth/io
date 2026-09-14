@@ -119,9 +119,14 @@ other URL).
 
 ## Isolation from any other Codex on the machine
 
-- The binary is `app/io/codex-bin/<platform>-<arch>/codex` in a checkout and
-  `resources/codex/<platform>-<arch>/codex` in a packaged build, resolved in exactly one
+- The binary is `app/io/codex-bin/<platform>-<arch>/bin/codex` in a checkout and
+  `resources/codex/<platform>-<arch>/bin/codex` in a packaged build, resolved in exactly one
   function (`codex.js: bundledCodexPath`). A system `codex` on PATH is never consulted.
+  What ships is the release *package* tree, not the bare binary: `bin/codex-code-mode-host`
+  (the process Codex runs every command through since 0.154; without it every shell call
+  fails closed, which is exactly what the first laptop run showed), `codex-path/rg`,
+  `codex-resources/bwrap` and `codex-resources/zsh`. Codex finds them relative to its own
+  executable.
 - `CODEX_HOME` is `<data>/codex/home` (`~/.local/share/io/codex/home`, or `io-data/codex/home`
   on a portable stick). `~/.codex` is never read, written or listed; the drive script records
   the size and mtime of `~/.codex/auth.json` before and after and they are equal.

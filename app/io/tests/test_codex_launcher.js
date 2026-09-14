@@ -23,7 +23,7 @@ test('bundled path is inside the app, never a system codex', () => {
 
 test('packaged path resolves under resources/codex/<target>', () => {
   const b = codex.bundledCodexPath({ packaged: true, resourcesPath: '/opt/io/resources' });
-  assert.strictEqual(b.path, path.join('/opt/io/resources/codex', `${process.platform}-${process.arch}`, process.platform === 'win32' ? 'codex.exe' : 'codex'));
+  assert.strictEqual(b.path, path.join('/opt/io/resources/codex', `${process.platform}-${process.arch}`, 'bin', process.platform === 'win32' ? 'codex.exe' : 'codex'));
 });
 
 test('codex home is io-owned and distinct from ~/.codex', () => {
@@ -70,6 +70,7 @@ test('login status on an empty home is "not logged in" and never reads ~/.codex'
   const b = codex.bundledCodexPath();
   if (!fs.existsSync(b.path)) { console.log('   (skipped: bundled binary not fetched)'); return; }
   const home = path.join(tmp, 'empty-home');
+  assert.ok(codex.binaryInfo(b.path).host, 'codex-code-mode-host must ship beside codex');
   const st = codex.loginStatus(b.path, home);
   assert.strictEqual(st.loggedIn, false);
   assert.ok(/Not logged in/.test(st.line), st.line);

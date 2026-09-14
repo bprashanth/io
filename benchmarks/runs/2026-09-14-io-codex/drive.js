@@ -221,7 +221,7 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       ({ page } = await connect());
       await waitFor(page, () => page.locator('#s-provider.on').count(), 60000, 'provider after restart');
       await shot(page, 'after-restart-provider');
-      const codexBin = EXE ? path.join(path.dirname(EXE), 'resources', 'codex', `${process.platform}-${process.arch}`, 'codex') : path.join(APP, 'codex-bin', `${process.platform}-${process.arch}`, 'codex');
+      const codexBin = EXE ? path.join(path.dirname(EXE), 'resources', 'codex', `${process.platform}-${process.arch}`, 'bin', 'codex') : path.join(APP, 'codex-bin', `${process.platform}-${process.arch}`, 'bin', 'codex');
       results.afterRestart = { home_files: fs.readdirSync(codexHome), codexBin, login: spawnSync(codexBin, ['login', 'status'], { env: { ...env, CODEX_HOME: codexHome }, encoding: 'utf8' }).stderr.trim() };
     }
   } catch (e) {

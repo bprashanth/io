@@ -39,7 +39,7 @@ HOME.mkdir()
 WORK.mkdir()
 (WORK / "note.txt").write_text("Alice Example lives in SecretVillage.\n")
 
-codex = APP / "codex-bin" / ("linux-arm64" if os.uname().machine == "aarch64" else "linux-x64") / "codex"
+codex = APP / "codex-bin" / ("linux-arm64" if os.uname().machine == "aarch64" else "linux-x64") / "bin" / "codex"
 env = {k: v for k, v in os.environ.items() if not k.startswith("OPENAI")}
 env["CODEX_HOME"] = str(HOME)
 

@@ -19,15 +19,17 @@ try { pty = require('node-pty'); } catch (e) { pty = null; }
 
 const PINS = JSON.parse(fs.readFileSync(path.join(__dirname, 'codex-pins.json'), 'utf8'));
 
-// One place decides which binary runs. Dev checkout: codex-bin/<plat>-<arch>/codex, put
-// there by `node fetch-codex.js`. Packaged: resources/codex/<plat>-<arch>/codex.
+// One place decides which binary runs. Dev checkout: codex-bin/<plat>-<arch>/bin/codex, put
+// there by `node fetch-codex.js`. Packaged: resources/codex/<plat>-<arch>/bin/codex. The tree
+// around it (bin/codex-code-mode-host, codex-path/rg, codex-resources/) is the release package
+// and Codex finds those relative to its own executable, so the tree is copied whole.
 function bundledCodexPath(opts = {}) {
   const key = `${process.platform}-${process.arch}`;
   const exe = process.platform === 'win32' ? 'codex.exe' : 'codex';
   const dir = opts.packaged
     ? path.join(opts.resourcesPath || process.resourcesPath, 'codex', key)
     : path.join(__dirname, 'codex-bin', key);
-  return { key, path: path.join(dir, exe), pinned: PINS.targets[key] || null, version: PINS.version };
+  return { key, dir, path: path.join(dir, 'bin', exe), pinned: PINS.targets[key] || null, version: PINS.version };
 }
 
 function codexHome(dataDir) {
@@ -154,7 +156,9 @@ function spawnSession({ bin, home, cwd, cols, rows, noAltScreen }) {
 function binaryInfo(bin) {
   try {
     const st = fs.statSync(bin);
-    return { exists: true, size: st.size, executable: !!(st.mode & 0o111) };
+    // the command host lives beside codex; without it every shell call fails closed
+    const host = path.join(path.dirname(bin), process.platform === 'win32' ? 'codex-code-mode-host.exe' : 'codex-code-mode-host');
+    return { exists: true, size: st.size, executable: !!(st.mode & 0o111), host: fs.existsSync(host) };
   } catch { return { exists: false }; }
 }
 

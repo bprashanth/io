@@ -338,3 +338,25 @@ Note `unshare -U` is not a valid probe: on this DGX it succeeds despite the AppA
 setting because util-linux ships a profile, which Electron does not have. Also `run.sh`
 now runs `npm install` when a declared dependency is missing (node-pty was added after
 the laptop's last install).
+
+## 19:55 - The real login worked on the laptop; the shell did not, because of what I bundled
+
+Screenshot from the laptop (`/tmp/io_codex_fail.png` there): Connect ChatGPT signed io's
+Codex into a fresh account (`/status` in the TUI: provider openai, plan Free, model
+`gpt-5.6-terra`, monthly limit 100%), the bar said *Protected by io*, 14 requests went as
+codes. That is the brief's definition-of-done core, on a real account, on x64.
+
+Then every command failed: "Code Mode is unavailable because failed to spawn code-mode host
+.../codex-bin/linux-x64/codex-code-mode-host: host executable was not found. Code mode will
+fail closed." Since 0.154 Codex runs commands through a separate `codex-code-mode-host`
+process (`features.code_mode_host`, stable, on), and the release ships it in the *package*
+tarball (`codex-package-<triple>.tar.gz`: `bin/codex`, `bin/codex-code-mode-host`,
+`codex-path/rg`, `codex-resources/bwrap`, `codex-resources/zsh`), which is also what the
+npm package installs. I had pinned the bare `codex-<triple>.tar.gz`. It never showed on the
+DGX because the sandbox-bypass mode used there does not go through the host.
+
+Fix: pins, `fetch-codex.js`, `codex.js` and `run.sh` now use the package tree
+(`bin/codex`), `binaryInfo` checks the host is beside it, the launcher test asserts it.
+Hashes: x64 package `fc6e3e3b...`, arm64 `97d93e11...`. Spike 2 re-run on the tree passes.
+A side benefit: Codex now carries its own `bwrap`, so laptops without bubblewrap installed
+get the sandbox too.

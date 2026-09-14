@@ -69,7 +69,7 @@ supports_websockets = false
 enable_request_compression = false
 ''')
 
-codex = APP / "codex-bin" / ("linux-arm64" if os.uname().machine == "aarch64" else "linux-x64") / "codex"
+codex = APP / "codex-bin" / ("linux-arm64" if os.uname().machine == "aarch64" else "linux-x64") / "bin" / "codex"
 env = {k: v for k, v in os.environ.items() if not k.startswith("OPENAI")}
 env["CODEX_HOME"] = str(HOME)
 env["IO_DEV_KEY"] = key
