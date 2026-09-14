@@ -317,3 +317,24 @@ Not done here, and why:
 - **Re-approval after Codex edits a file** when the folder is re-opened (correct, but a
   speed bump).
 - **Paths.** Folder and file names reach the model as themselves; contents do not.
+
+## 19:45 - First run on the x64 laptop: the sandbox guard over-corrected
+
+The user fetched `io_codex` on the Pop!_OS laptop. `run.sh` fetched the x64 Codex
+(hash matched: `3188814c...`, first execution of that binary anywhere), then Electron died
+before `main.js` ran a line: `platform_shared_memory_region_posix.cc ... /dev/shm: No such
+process`. `main` died the same way, so it was not this branch. The laptop-side agent traced
+it: the 2026-08-30 guard adds `--no-sandbox` whenever `chrome-sandbox` is not root-owned
+setuid, and on that kernel an *unsandboxed* Chromium cannot set up shared memory (a
+five-line Electron app reproduced it with just those two switches). `/dev/shm` itself was
+fine; the message is a red herring.
+
+The guard existed for Ubuntu 24.04, whose AppArmor setting denies user namespaces to
+binaries without a profile, so Electron has neither sandbox route and aborts. The fix:
+stand the sandbox down only when the helper is unusable **and** the namespace route is
+closed (`apparmor_restrict_unprivileged_userns=1`, `unprivileged_userns_clone=0` or
+`max_user_namespaces=0`). Same logic in `main.js` (dev) and `launcher/io` (packaged).
+Note `unshare -U` is not a valid probe: on this DGX it succeeds despite the AppArmor
+setting because util-linux ships a profile, which Electron does not have. Also `run.sh`
+now runs `npm install` when a declared dependency is missing (node-pty was added after
+the laptop's last install).

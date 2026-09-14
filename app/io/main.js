@@ -102,20 +102,34 @@ ipcMain.handle('codex-stop', async () => { if (session) { try { session.kill(); 
 // This must run before app.whenReady(), because Electron fixes the path on first use.
 // Chromium's setuid sandbox helper has to be owned by root with mode 4755. Nothing we
 // ship can arrange that: the zip, tarball and dmg are all unpacked by an ordinary user,
-// and asking for sudo is the one thing this app promised never to do. When the helper is
-// not usable Electron aborts outright - "The SUID sandbox helper binary was found, but is
-// not configured correctly", core dumped, before any of our code runs. Seen on a
-// participant's Ubuntu laptop. Our own smoke passed --no-sandbox and so never saw it.
+// and asking for sudo is the one thing this app promised never to do. But the helper is
+// only Chromium's *second* choice: when the kernel lets an ordinary process create a user
+// namespace, Electron uses the namespace sandbox and never looks at the helper. It aborts
+// outright - "The SUID sandbox helper binary was found, but is not configured correctly",
+// core dumped, before any of our code runs - only when both are unavailable. Ubuntu 24.04
+// is the case that matters: its AppArmor setting denies user namespaces to any binary
+// without a profile, which is every Electron app that is not a snap. Seen on a
+// participant's laptop; our own smoke passed --no-sandbox and so never saw it.
 //
-// So: keep the sandbox when the helper is properly installed, and only stand it down when
-// it would otherwise be a crash. This must happen at module scope, before app is ready.
+// Standing the sandbox down unconditionally was the first fix, and it over-corrected: on a
+// Pop!_OS laptop where namespaces work, an unsandboxed Chromium failed to set up shared
+// memory and died with a misleading "/dev/shm" message (2026-09-14). So: keep the sandbox
+// whenever either route is open, and stand it down only when neither is. This must happen
+// at module scope, before app is ready.
+function namespaceSandboxUsable() {
+  const read = p => { try { return fs.readFileSync(p, 'utf8').trim(); } catch { return null; } };
+  if (read('/proc/sys/kernel/apparmor_restrict_unprivileged_userns') === '1') return false;  // Ubuntu 24.04+
+  if (read('/proc/sys/kernel/unprivileged_userns_clone') === '0') return false;              // Debian-style switch
+  if (read('/proc/sys/user/max_user_namespaces') === '0') return false;
+  return true;
+}
 if (process.platform === 'linux') {
-  let usable = false;
+  let helper = false;
   try {
     const st = fs.statSync(path.join(path.dirname(process.execPath), 'chrome-sandbox'));
-    usable = st.uid === 0 && (st.mode & 0o4000) !== 0;
+    helper = st.uid === 0 && (st.mode & 0o4000) !== 0;
   } catch { /* no helper at all */ }
-  if (!usable) {
+  if (!helper && !namespaceSandboxUsable()) {
     app.commandLine.appendSwitch('no-sandbox');
     app.commandLine.appendSwitch('disable-setuid-sandbox');
   }
