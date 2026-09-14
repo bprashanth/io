@@ -281,3 +281,39 @@ Packaging: `npm run pack` now builds one architecture per machine (the cross-bui
 node-pty from arm64 to x64 died on `g++ -m64`); `io-linux-arm64.tar.gz` carries
 `resources/codex/linux-arm64/codex`, `resources/io/codex_proxy.py`, `ui/vendor/xterm*`
 and the unpacked node-pty.
+
+## 19:25 - Packaged build, copied elsewhere, passes the same drive
+
+`npm run pack` (arm64, this machine) -> `dist/io-linux-arm64.tar.gz` (200 MB; the static
+Codex binary is 227 MB uncompressed). Unpacked into a scratch directory that stands in for
+"copied off a USB stick", launched from there (`drive.js --exe .../io-linux-arm64/io`,
+`drive-packaged/`), with the checkout's venv and model cache linked into the data dir in
+place of the thin build's first-run install. Same 17 screenshots, same outcome: answer
+restored, file edited with real values, fail-closed banner, PTY resize, restart with the
+login kept, `~/.codex` untouched, 12 upstream bodies with 14 codes and **zero** real values.
+`results.json` names the binary that answered `codex login status`:
+`.../io-linux-arm64/resources/codex/linux-arm64/codex` - the bundled one.
+
+## What is and is not done, against the brief's definition of done
+
+Done, with evidence: bundled pinned Codex; isolated `CODEX_HOME`; the proxy as the single
+enforcement point (outbound codes, inbound values, streamed deltas, fail closed); the
+embedded PTY terminal; approval -> launch gating; the status bar that only says protected
+when it is; the ChatGPT sign-in screen with browser and device-code flows running the real
+`codex login`; 25 proxy tests + 8 launcher tests; a real Electron run; a packaged run from
+a copied location; docs (`docs/io-codex.md`, READMEs) and this trail.
+
+Not done here, and why:
+
+- **Account B.** The one step that needs a person with a ChatGPT account and a browser.
+  Spike 1 shows ChatGPT-mode Codex reaching the proxy and the proxy reaching chatgpt.com
+  with the credential Codex holds; the drive shows the sign-in screen producing a real
+  device code. What remains is pressing Connect ChatGPT on a laptop and watching the first
+  turn come back. Expected wrinkle to watch for: `GET backend-api/codex/models` and the
+  `wham/*` calls pass through the proxy untouched - if chatgpt.com rejects a header the
+  proxy forwards (it forwards everything except hop-by-hop), the log will show it.
+- **x64 Linux.** Binary pinned and hashed; node-pty compiles on x64 the same way; not run.
+- **macOS / Windows.** Not built. Gaps listed in `docs/io-codex.md`.
+- **Re-approval after Codex edits a file** when the folder is re-opened (correct, but a
+  speed bump).
+- **Paths.** Folder and file names reach the model as themselves; contents do not.

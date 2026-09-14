@@ -160,6 +160,14 @@ overlaps, Unicode, JSON, split tokens across chunks, tool args and outputs, unkn
 cache, live-engine policy) and `node app/io/tests/test_codex_launcher.js` (8: paths, home,
 config, env).
 
+## Building
+
+`node fetch-codex.js` (this machine's target) or `node fetch-codex.js linux-x64` before
+`npm run pack`; the packer copies `codex-bin/<target>` into `resources/codex/<target>` and
+warns if it is missing. One architecture per build machine: node-pty is compiled for the
+target and the python payload has the same rule. The packaged arm64 build was driven end to
+end from a copied location on 2026-09-14 (`benchmarks/runs/2026-09-14-io-codex/drive-packaged/`).
+
 ## Platforms
 
 | | state |

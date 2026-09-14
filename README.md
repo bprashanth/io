@@ -66,7 +66,10 @@ These packs carry everything needed to run the app inside them.
 
 1. Start io.
 2. Give it an API key or a server address; it is kept in memory only. Ask the
-   organizers for this. 
+   organizers for this. Or press **Sign in with ChatGPT**: the real Codex CLI then runs
+   inside io on the sheltered folder, and everything it sends to the model crosses io's
+   privacy proxy as codes - no key needed. How that works and what exactly it protects:
+   [docs/io-codex.md](docs/io-codex.md). 
 3. Add a local dir, review the highlights, the "Preview" button shows
    the tokenized versions of data that leaves your laptop. 
 4. Cheat sheet; use `@` while you chat to address specific files, and `~name~` looks up a person (or any pii) in the vault and redacts it from your request. 
