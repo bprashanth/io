@@ -94,9 +94,24 @@ function writeConfig(home, proxyPort, extra = {}) {
   tables.push('[analytics]', 'enabled = false', '',
     '[features]', 'enable_request_compression = false', 'apps = false', 'plugins = false',
     'remote_plugin = false', 'plugin_sharing = false', 'recommended_plugins = false', 'image_generation = false', '');
-  if (extra.chat) {
-    // A conversation with no sheltered folder: Codex works in an empty io-owned folder, may
-    // download things there (network on), and is told not to read elsewhere. See AGENTS.md.
+  // The wall around the folder. A permissions profile: commands may write the working
+  // folder, read what the platform needs to run at all (":minimal": system libraries,
+  // shells) and nothing else - not the home directory, not other folders. Network is on
+  // only in a conversation with no data, so Codex can fetch what it is asked for.
+  // Codex 0.154 enforces read denial through bwrap (its Landlock backend cannot, and is
+  // deprecated). The DGX cannot run bwrap at all, so the dev bypass skips the profile.
+  // Codex reads its own AGENTS.md through the same wall (seen: "failed to load AGENTS.md
+  // instructions ... fs sandbox helper"), so that one file is granted; the rest of the
+  // home - auth.json above all - stays out of reach of commands. IO_CODEX_NO_WALL=1 is the
+  // escape hatch if a platform's sandbox cannot do read denial.
+  const esc = p => String(p).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  if (!extra.noSandbox && process.env.IO_CODEX_NO_WALL !== '1') {
+    top.push('default_permissions = "io"');
+    tables.push('[permissions.io]', 'description = "io: the sheltered folder and nothing else"', '',
+      '[permissions.io.filesystem]', '":minimal" = "read"', `"${esc(path.join(home, 'AGENTS.md'))}" = "read"`, '',
+      '[permissions.io.filesystem.":workspace_roots"]', '"." = "write"', '',
+      '[permissions.io.network]', `enabled = ${extra.chat ? 'true' : 'false'}`, '');
+  } else if (extra.chat) {
     tables.push('[sandbox_workspace_write]', 'network_access = true', '');
   }
   fs.writeFileSync(path.join(home, `${PROFILE}.config.toml`), top.concat(['']).concat(tables).join('\n'));

@@ -44,7 +44,8 @@ test('config points both base urls at the loopback proxy and keeps the codex suf
   assert.ok(!/api_key|OPENAI_API_KEY/i.test(toml));
   // no top-level key after the first table header
   const firstTable = toml.indexOf('\n[');
-  assert.ok(!/\n(openai_base_url|chatgpt_base_url|model|sandbox_mode) = /.test(toml.slice(firstTable)));
+  assert.ok(!/\n(openai_base_url|chatgpt_base_url|model|sandbox_mode|default_permissions) = /.test(toml.slice(firstTable)));
+  assert.ok(toml.includes('[permissions.io.network]\nenabled = false'), 'a sheltered folder has no network for commands');
 });
 
 test('config is rewritten with a new port, not appended', () => {
@@ -85,7 +86,7 @@ test('AGENTS.md for the audience is written beside the profile, chat variant dif
   codex.writeConfig(home, 7, { chat: true });
   const b = fs.readFileSync(path.join(home, 'AGENTS.md'), 'utf8');
   assert.ok(/attach a file/.test(b));
-  assert.ok(fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8').includes('network_access = true'));
+  const t = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8'); assert.ok(t.includes('default_permissions = "io"') && t.includes('[permissions.io.network]\nenabled = true') && t.includes('":minimal" = "read"'));
 });
 
 test('dev provider block only appears when asked for', () => {

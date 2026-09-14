@@ -89,6 +89,10 @@ class Policy:
     def leaks(self, text: str) -> list[str]:
         return []
 
+    def code_for(self, value: str) -> str:
+        """The code a private value maps to, for logs that must not carry the value."""
+        return "?"
+
     def ready(self) -> bool:
         return True
 
@@ -275,6 +279,19 @@ class Proxy:
                 return out, subs
         return out, subs
 
+    def content_leaks(self, body: Any) -> list[dict]:
+        """Known private values still present in the transformed content strings, reported
+        as the code they map to and where in the body they sit (never the value itself)."""
+        found: dict[str, set] = {}
+
+        def fn(text: str, _role: str | None, key: str | None) -> str:
+            for v in self.policy.leaks(text):
+                found.setdefault(v, set()).add(key or "?")
+            return text
+
+        walk_strings(body, fn)
+        return [{"code": self.policy.code_for(v), "keys": sorted(k)} for v, k in found.items()]
+
     def restore_value(self, body: Any) -> tuple[Any, int]:
         restored = 0
 
@@ -375,10 +392,15 @@ class Proxy:
             body, subs = self.transform_request(body)
             entry["subs"] = subs
             body_out = json.dumps(body, ensure_ascii=False).encode("utf-8")
-            leaks = self.policy.leaks(body_out.decode("utf-8"))
+            # The final check runs over what the transform produced: the content strings.
+            # Protocol constants ("auto", "text", tool names) are not content, and a vault
+            # that happens to hold the word "Auto" must not stop every request (seen live
+            # 2026-09-14 with a 1,473-code CRM export).
+            leaks = self.content_leaks(body)
             if leaks:
                 entry["note"] = f"stopped: {len(leaks)} private value(s) still present"
                 entry["leak_count"] = len(leaks)
+                entry["leaks"] = leaks[:5]     # tokens and key paths only, never the values
                 return self._reply(h, 403, {"error": {"message": f"io stopped this request: {len(leaks)} private value(s) were about to leave"}}, entry)
             self.dump(rid, "request", body_out)
         if method not in ("GET", "HEAD"):
@@ -604,3 +626,6 @@ class MapPolicy(Policy):
 
     def leaks(self, text: str) -> list[str]:
         return sorted({m.group(0) for m in self.fre.finditer(text)}) if self.fre else []
+
+    def code_for(self, value: str) -> str:
+        return self.cf.get(value.casefold(), "?")

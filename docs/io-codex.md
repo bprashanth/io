@@ -103,9 +103,13 @@ Passed through unchanged, logged: `GET backend-api/codex/models`, `backend-api/w
   are clickable; a local file Codex wrote under the folder opens with one click.
 - **A conversation without a folder**: type into the chat box on the shelf. Codex runs in an
   empty io-owned folder with network on; "attach a file" copies a file in, runs the same
-  review, and returns to the same conversation. Codex's sandbox does not stop commands
-  from *reading* elsewhere on disk; the instruction to stay in the folder is text, and a
-  `[permissions]` filesystem profile is the candidate wall.
+  review, and returns to the same conversation with a note; nothing is typed for the person.
+- **The wall**: a Codex permissions profile (`default_permissions = "io"`) lets commands
+  write the working folder, read only what the platform needs plus io's AGENTS.md, and
+  nothing else on disk; network only in a conversation. Enforced by Codex through bwrap on
+  Linux. `IO_CODEX_NO_WALL=1` switches it off. Untested on a machine that can run bwrap as
+  of 2026-09-14 evening.
+- **home** returns to the shelf and leaves Codex running; opening another folder replaces it.
 
 ## The privacy claim, precisely
 

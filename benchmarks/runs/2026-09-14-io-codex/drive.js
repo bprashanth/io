@@ -141,13 +141,20 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       // attach a file: the picker is native, so call the service the way the button does
       const attached = await api(page, '/api/attach', { path: path.join(TESTDATA, 'visits.csv') });
       results.attach = { attached: attached.attached, files: (attached.files || []).map(f => f.name), error: attached.error };
-      await page.evaluate(r => { files = r.files; skipped = r.skipped || []; tab = 0; accepted = false; pendingSay = 'I attached visits.csv in this folder. Tell me in one line what it contains.'; renderSheet(); }, attached);
+      await page.evaluate(r => { files = r.files; skipped = r.skipped || []; tab = 0; accepted = false; cxNote = `${r.attached} is in the folder now. Ask Codex about it in your own words.`; renderSheet(); }, attached);
       await waitFor(page, () => page.locator('#s-sheet.on').count(), 10000, 'review sheet for attached file');
       await sleep(800);
       await shot(page, 'attach-review-sheet');
       await page.click('#sheet-ok');
       await waitFor(page, () => page.locator('#s-codex.on').count(), 60000, 'back in the terminal');
-      const ok2 = await waitFor(page, async () => /9876543210|Alice Example|visits\.csv/.test((await termText(page)).slice(-2500)) && /I attached/.test(await termText(page)), 120000, 'attached file discussed');
+      await sleep(3000);
+      await shot(page, 'attach-back-with-note');
+      results.attachNote = await page.evaluate(() => [cxNote, $('#cx-err').style.display, $('#cx-err').textContent, attaching, cxRunning]);
+      await page.click('#term');
+      await page.keyboard.type('Which village does Alice Example live in, according to visits.csv? One line.', { delay: 6 });
+      await sleep(1200);
+      await page.keyboard.press('Enter');
+      const ok2 = await waitFor(page, async () => /SecretVillage/.test((await termText(page)).slice(-2500)), 120000, 'attached file discussed');
       await sleep(2500);
       await shot(page, 'attach-answer');
       results.attachAnswered = ok2;

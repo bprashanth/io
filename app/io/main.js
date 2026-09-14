@@ -37,7 +37,7 @@ async function codexStatus() {
   const { bin, home } = codexPaths();
   const info = codex.binaryInfo(bin.path);
   const out = { version: bin.version, target: bin.key, binary: info.exists && info.executable, home, pty: codex.hasPty(),
-                loginBusy: !!login, running: !!session };
+                loginBusy: !!login, running: !!session, folder: session ? session.ioFolder : null };
   if (out.binary) Object.assign(out, codex.loginStatus(bin.path, home));
   else out.line = `bundled Codex is missing (expected ${bin.path})`;
   try { out.service = await serviceGet('/api/codex'); } catch { out.service = null; }
@@ -88,7 +88,14 @@ ipcMain.handle('codex-login-cancel', async () => { if (login) { login.kill('SIGT
 ipcMain.handle('codex-logout', async () => { const { bin, home } = codexPaths(); return codex.logout(bin.path, home); });
 
 ipcMain.handle('codex-start', async (_e, opts) => {
-  if (session) return { error: 'a Codex session is already running' };
+  // A new start for a different folder replaces the running session; the same folder is
+  // refused so a double click cannot start two.
+  if (session) {
+    let info = null;
+    try { info = await serviceGet('/api/codex'); } catch {}
+    if (info && info.folder && session.ioFolder && info.folder !== session.ioFolder) { try { session.kill(); } catch {} session = null; }
+    else return { error: 'a Codex session is already running' };
+  }
   const { bin, home } = codexPaths();
   // The service is the authority: accepted policy, proxy listening, which folder.
   let info;
@@ -100,6 +107,7 @@ ipcMain.handle('codex-start', async (_e, opts) => {
   try {
     session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows });
   } catch (e) { return { error: e.message }; }
+  session.ioFolder = info.folder;
   session.onData(d => sendToWin('codex-data', d));
   session.onExit(({ exitCode, signal }) => { session = null; sendToWin('codex-exit', { exitCode, signal }); });
   return { ok: true, pid: session.pid, port: info.port, folder: info.folder };

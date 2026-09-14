@@ -170,6 +170,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
 #cx-bottom{display:flex;align-items:center;gap:14px;padding:10px 18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim)}
 #cx-bottom .grow{flex:1}
 #cx-err{display:none;margin:0 18px;padding:10px 14px;border:1px solid #e06c6c;border-radius:10px;color:#e8a0a0;font-size:13px;white-space:pre-wrap}
+#cx-err.note{border-color:var(--line);color:var(--dim)}
 .xterm .xterm-viewport{background:#15181c!important}
 
 /* modals */
@@ -285,9 +286,8 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <span id="cx-stats" class="dim"></span>
     <span class="grow"></span>
     <button id="cx-attach" style="display:none">attach a file</button>
-    <button id="cx-folders">folders</button>
     <button id="cx-restart" style="display:none">restart Codex</button>
-    <button id="cx-end">End session</button>
+    <button id="cx-folders">home</button>
   </div>
 </div>
 
@@ -886,7 +886,7 @@ function renderCompare(el, w, r){
 // keystrokes. Status comes from two places: the service (/api/codex: policy approved,
 // proxy port, counts) and the shell (bundled binary, login). "Protected" is shown only
 // when both say so.
-let term = null, fitAddon = null, cxTimer = null, cxRunning = false;
+let term = null, fitAddon = null, cxTimer = null, cxRunning = false, cxNote = null;
 function fitTerm(){ if (!term || !fitAddon) return; try { fitAddon.fit(); window.io.codex.resize(term.cols, term.rows); } catch (e) {} }
 function ensureTerm(){
   if (term) return;
@@ -915,14 +915,14 @@ function ensureTerm(){
     if (term.hasSelection()) { navigator.clipboard.writeText(term.getSelection()).catch(() => {}); term.clearSelection(); }
     else navigator.clipboard.readText().then(t => { if (t) term.paste(t); }).catch(() => {});
   });
-  term.onData(d => window.io.codex.input(d));
+  term.onData(d => { if (cxNote) { cxNote = null; cxErr(''); } window.io.codex.input(d); });
   term.onResize(({cols, rows}) => window.io.codex.resize(cols, rows));
   window.io.codex.onData(d => term.write(d));
   window.io.codex.onExit(({exitCode}) => { cxRunning = false; term.write(`\r\n\x1b[90m[Codex ended (exit ${exitCode})]\x1b[0m\r\n`); $('#cx-restart').style.display = ''; paintCodexStatus(); });
   new ResizeObserver(() => fitTerm()).observe($('#cx-wrap'));
   window.addEventListener('resize', fitTerm);
 }
-function cxErr(msg){ const e = $('#cx-err'); if (!msg) { e.style.display = 'none'; e.textContent = ''; return; } e.style.display = 'block'; e.textContent = msg; }
+function cxErr(msg){ const e = $('#cx-err'); if (!msg) { e.style.display = 'none'; e.textContent = ''; return; } e.style.display = 'block'; e.textContent = msg; e.classList.toggle('note', msg === cxNote); }
 async function enterCodex(){
   ensureTerm();
   show('#s-codex');
@@ -930,9 +930,11 @@ async function enterCodex(){
   $('#cx-attach').style.display = chatWorkspace ? '' : 'none';
   await new Promise(r => setTimeout(r, 60));
   fitTerm();
+  const st = await window.io.codex.status();
+  const sv = st.service || {};
+  if (st.running && st.folder && sv.folder && st.folder !== sv.folder) { await window.io.codex.stop(); cxRunning = false; }   // a different folder now: fresh Codex
   if (!cxRunning) {
-    const st = await window.io.codex.status();
-    if (st.running) { cxRunning = true; $('#cx-restart').style.display = 'none'; term.write('\x1b[90m[reattached to the running Codex]\x1b[0m\r\n'); fitTerm(); }
+    if (st.running && (!st.folder || st.folder === sv.folder)) { cxRunning = true; $('#cx-restart').style.display = 'none'; term.write('\x1b[90m[reattached to the running Codex]\x1b[0m\r\n'); fitTerm(); }
     else await startCodex();
   }
   paintCodexStatus();
@@ -961,11 +963,11 @@ async function paintCodexStatus(){
   $('#cx-shield').textContent = protectedNow ? 'Protected by io' : 'NOT protected';
   $('#cx-shield').style.color = protectedNow ? 'var(--grn)' : '#e06c6c';
   if (sv && sv.stats) { const t = sv.stats; $('#cx-stats').textContent = `${t.forwarded} request${t.forwarded === 1 ? '' : 's'} sent as codes, ${t.substitutions} coded, ${t.restorations} restored${t.refused ? ', ' + t.refused + ' refused' : ''}`; }
+  if (attaching) return;                       // the rescan withdraws approval for a moment; not an error
   if (!sv) cxErr('io\'s privacy proxy is not answering. Codex cannot reach the model until it is back: press reload.');
   else if (!sv.ready && cxRunning) cxErr('The privacy policy is no longer approved; Codex requests are being refused.');
-  else if (sv && sv.ready) cxErr('');
+  else if (sv && sv.ready) cxErr(cxNote || '');
 }
-$('#cx-end').onclick = async () => { await window.io.codex.stop(); cxRunning = false; $('#cx-restart').style.display = ''; };
 
 // A conversation with no data: an empty io-owned folder, approved trivially, network on for
 // Codex's own downloads. The first message typed in the chat box is typed into Codex once
@@ -983,14 +985,20 @@ async function sayWhenReady(text){
   await new Promise(r => setTimeout(r, 1500));
   await window.io.codex.say(text);
 }
+let attaching = false;
 $('#cx-attach').onclick = async () => {
   const p = await window.io.pickFile();
   if (!p) return;
+  attaching = true; cxErr('');
+  $('#cx-attach').disabled = true; $('#cx-attach').textContent = 'checking the file';
   const r = await api('/api/attach', {path: p});
+  $('#cx-attach').disabled = false; $('#cx-attach').textContent = 'attach a file';
+  attaching = false;
   if (r.error) { cxErr(r.error); return; }
-  // the review sheet for the attached file; Looks right brings them back here
+  // the review sheet for the attached file; Looks right brings them back here. Nothing is
+  // typed into Codex on their behalf: the file is in the folder, they say what they want.
   files = r.files; skipped = r.skipped || []; tab = 0; accepted = false;
-  pendingSay = `I attached ${r.attached} in this folder. Have a look at it and tell me in one line what it contains.`;
+  cxNote = `${r.attached} is in the folder now. Ask Codex about it in your own words.`;
   renderSheet();
 };
 $('#cx-restart').onclick = () => startCodex();

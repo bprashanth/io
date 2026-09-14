@@ -484,6 +484,9 @@ class IoPolicy(codex_proxy.Policy):
     def leaks(self, text: str) -> list[str]:
         return S.leak_check(text)
 
+    def code_for(self, value: str) -> str:
+        return S.pmap.forward.get(re.sub(r"\s+", " ", value.strip()).casefold(), "?") if S.pmap else "?"
+
     def version(self) -> int:
         # the vault object changes per folder, its size changes as codes are minted
         return (id(S.pmap), len(S.pmap.display)) if S.pmap else 0

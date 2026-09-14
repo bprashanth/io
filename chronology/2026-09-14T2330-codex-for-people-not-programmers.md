@@ -89,3 +89,37 @@ walk - the scanner minted a code from the user message after the instructions st
 already been transformed, and the final check stopped the turn once before the retry
 went through. Regression test added. WebSocket 426s no longer count as "refused" in the
 footer.
+
+## 23:45 - Second laptop run: the wall, the 403, and what the page should not do
+
+The user's screenshot (`/tmp/io_codex_fail_2.png` on the laptop): a conversation, two CRM
+exports attached (1,473 codes), both summarised correctly through the proxy; then every
+question refused with "io stopped this request: 1 private value(s) were about to leave".
+Diagnosis by construction: the final leak check ran over the whole serialised body, and a
+1,473-value vault from a CRM (tags, notes) can contain a word that is also a protocol
+constant - "auto", "text", "low" - which then matches inside `"tool_choice": "auto"` on
+every request. The check now runs over the transformed content strings only (the walk the
+transform itself did), and the log line names the *code* and the JSON keys where a leak
+sat, never the value (`leaks: [{"code": "NAME_017", "keys": ["text"]}]`). Test added.
+
+Attaching a file no longer types a line into Codex: the file is copied in, the review runs,
+and a grey note says "x.csv is in the folder now. Ask Codex about it in your own words."
+The red "policy no longer approved" banner that flashed during the rescan was the status
+poll seeing approval withdrawn for a moment; suppressed while an attach is in progress.
+"folders" is "home"; "End session" is gone. Opening a different folder now replaces the
+running Codex instead of refusing with "a session is already running"; the same folder
+reattaches. Home leaves Codex running in the background so coming back resumes.
+
+**The wall.** Codex 0.154 permission profiles: `default_permissions = "io"` with
+`[permissions.io.filesystem] ":minimal" = "read"` (what the platform needs to run
+anything) and `[permissions.io.filesystem.":workspace_roots"] "." = "write"` (the cwd is
+a workspace root by default) - everything else unreadable, enforced through bwrap
+(`linux-sandbox/src/landlock.rs`: "Restricted read-only access is not supported by the
+legacy Linux Landlock backend", which is the deprecated one). Network in the profile:
+`enabled = true` for a conversation, `false` for a sheltered folder. Two facts learned
+running it here: the profile is applied even to Codex's own read of `<home>/AGENTS.md`
+("failed to load AGENTS.md instructions ... fs sandbox helper failed"), so that one file is
+granted read; and this DGX cannot run bwrap, so the dev bypass skips the profile and the
+wall itself is **untested until the laptop runs it**. Escape hatch: `IO_CODEX_NO_WALL=1`.
+Check on the laptop: in a conversation ask "list the files in my home folder" - the
+sandbox must refuse, and the AGENTS.md register must still be in the answers.

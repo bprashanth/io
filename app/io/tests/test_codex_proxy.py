@@ -271,6 +271,22 @@ class ProxyTests(unittest.TestCase):
         finally:
             p.stop()
 
+    def test_protocol_constants_are_not_leaks(self):
+        # a vault value that equals a protocol word must not stop requests
+        p = Proxy(MapPolicy({"Auto": "NAME_009", "Alice Example": "NAME_001"}), upstream=f"http://127.0.0.1:{self.up.port}", log=lambda s: None)
+        port = p.start()
+        try:
+            self.up.script.append(("application/json", 200, [b"{}"]))
+            body = {"tool_choice": "auto", "reasoning": {"summary": "auto"}, "text": {"format": {"type": "text"}},
+                    "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hello Alice Example"}]}]}
+            status, _h, _d = post(port, "/backend-api/codex/responses/compact", body)
+            self.assertEqual(status, 200)
+            sent = json.loads(self.up.received[0]["body"])
+            self.assertEqual(sent["tool_choice"], "auto")
+            self.assertEqual(sent["input"][0]["content"][0]["text"], "hello NAME_001")
+        finally:
+            p.stop()
+
     def test_leak_check_stops_a_request(self):
         class Leaky(MapPolicy):
             def outbound(self, text, role):
@@ -278,10 +294,15 @@ class ProxyTests(unittest.TestCase):
         p = Proxy(Leaky(MAPPING), upstream=f"http://127.0.0.1:{self.up.port}", log=lambda s: None)
         port = p.start()
         try:
+            lines = []
+            p.log = lines.append
             status, _h, data = post(port, "/backend-api/codex/responses", {"input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "Alice Example"}]}]})
             self.assertEqual(status, 403)
             self.assertIn("about to leave", data.decode())
             self.assertEqual(len(self.up.received), 0)
+            entry = json.loads(lines[-1])
+            self.assertEqual(entry["leaks"], [{"code": "NAME_001", "keys": ["text"]}])
+            self.assertNotIn("Alice", lines[-1])
         finally:
             p.stop()
 
