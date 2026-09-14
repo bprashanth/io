@@ -40,7 +40,7 @@ if (HF_HOME / "hub").is_dir() and any((HF_HOME / "hub").glob("models--knowledgat
 sys.path.insert(0, str(HERE / "engine"))                    # the shield's tested modules, vendored unchanged
 
 from columns import classify_columns  # noqa: E402
-from detect import build_engine, regex_engine  # noqa: E402
+from detect import build_engine, regex_engine, make_server  # noqa: E402
 from detect import make_text_v2  # noqa: E402
 from pseudonymize import PseudonymMap, pseudonymise_frame, redact_question, redact_text  # noqa: E402
 
@@ -64,6 +64,15 @@ REASON = {
 }
 
 GLINER_MODEL = "knowledgator/gliner-pii-edge-v1.0"
+
+# Where the scanning happens. Default: the privacy server on the office DGX (GPU: ten times
+# faster per chunk, fifty times batched, and the laptop never loads torch). IO_PRIVACY_SERVER
+# overrides the address, the settings gear overrides it per session. IO_SCANNER picks the
+# order: "auto" (server, then the on-device model, then patterns), "local" (never the
+# server), "server" (never the local model), "regex". The on-device install is unchanged;
+# it is simply not the first choice any more.
+DEFAULT_PRIVACY_SERVER = os.environ.get("IO_PRIVACY_SERVER", "http://100.82.28.38:8899")
+SCANNER_ORDER = (os.environ.get("IO_SCANNER") or "auto").strip().lower()
 
 RULE = {
     "validator": "the format checks out",
@@ -110,7 +119,7 @@ class State:
         if getattr(self, "text_detector", None) is None:
             self.get_detector()
             try:
-                self.text_detector = make_text_v2(f"gliner:{GLINER_MODEL}")
+                self.text_detector = make_text_v2(getattr(self, "scanner_base", None) or "regex")
             except Exception:  # noqa: BLE001
                 traceback.print_exc()
                 self.text_detector = regex_engine
@@ -121,41 +130,53 @@ class State:
         self.get_detector()
         return getattr(self, "_scanner_mode", "regex")
 
+    def scanner_server(self) -> str:
+        return (self.provider.get("scanner_server") or DEFAULT_PRIVACY_SERVER).strip()
+
     def get_detector(self):
         with self.det_lock:
-            if self.detector is None:
-                self.step("loading the on-device scanner")
+            if self.detector is not None:
+                return self.detector
+            order = SCANNER_ORDER
+            remote = self.scanner_server()
+            declined = bool((self.provider.get("scanner_declined") or "").strip())
+            # 1. the privacy server. The text goes there unredacted - it has to, the server is
+            #    being asked to find the private values in it - so this is the office DGX or a
+            #    server the organizers gave out, never something on the public internet.
+            if order in ("auto", "server") and remote and not declined:
                 try:
+                    self.step("reaching the privacy server")
+                    make_server(remote, timeout=4.0)("warm up")     # fail fast, not mid-scan
+                    rs = make_server(remote)
+                    self.detector = lambda t: regex_engine(t) + rs(t)
+                    self._scanner_mode = "server"
+                    self.scanner_base = f"server:{remote}"
+                    self.step("privacy server ready")
+                    return self.detector
+                except Exception as exc:  # noqa: BLE001
+                    self.server_error = f"{type(exc).__name__}: {exc}".strip()[:200]
+                    self.step("privacy server not reachable" + (", using the on-device scanner" if order == "auto" else ""))
+            # 2. the on-device model, when installed
+            if order in ("auto", "local"):
+                try:
+                    self.step("loading the on-device scanner")
                     gl = build_engine(f"gliner:{GLINER_MODEL}")
                     self.detector = lambda t: regex_engine(t) + gl(t)
                     self._scanner_mode = "local"
+                    self.scanner_base = f"gliner:{GLINER_MODEL}"
                     self.step("scanner ready")   # never leave "loading..." as the last visible word
+                    return self.detector
                 except Exception as exc:  # noqa: BLE001
                     traceback.print_exc()
-                    # Remember why, so the app can offer the same choice it offers when the
-                    # install already knew this machine could not run it. A model that
-                    # installs and then fails to load - out of memory, a broken cache, a
-                    # library the machine will not load - looks identical to the person.
+                    # Remember why, so the app can offer the privacy-server choice. A model that
+                    # installs and then fails to load - out of memory, a broken cache, a library
+                    # the machine will not load - looks identical to the person.
                     self.scanner_error = f"{type(exc).__name__}: {exc}".strip()[:400]
-                    # No local model. If the person has explicitly agreed to a privacy
-                    # server, use it: the text goes there unredacted, so this only ever
-                    # happens on an answer they gave. Otherwise fall back to regex, which
-                    # finds numbers and ids but not people's names.
-                    remote = (self.provider.get("scanner_server") or "").strip()
-                    if remote:
-                        try:
-                            self.step("using the privacy server")
-                            rs = build_engine(f"server:{remote}")
-                            rs("warm up")            # fail here rather than mid-scan
-                            self.detector = lambda t: regex_engine(t) + rs(t)
-                            self._scanner_mode = "server"
-                            self.step("privacy server ready")
-                            return self.detector
-                        except Exception:  # noqa: BLE001
-                            traceback.print_exc()
-                            self.step("the privacy server did not answer, using patterns only")
-                    self.detector = regex_engine
-                    self._scanner_mode = "regex"
+            # 3. patterns only: numbers and ids, not people's names
+            self.step("using patterns only")
+            self.detector = regex_engine
+            self._scanner_mode = "regex"
+            self.scanner_base = "regex"
         return self.detector
 
     @staticmethod
@@ -781,7 +802,10 @@ class H(BaseHTTPRequestHandler):
             return self._json({
                 "unavailable": why or None,
                 "mode": getattr(S, "_scanner_mode", None) if S.detector is not None else None,
-                "server": bool((S.provider.get("scanner_server") or "").strip()),
+                "server": bool(S.scanner_server()),
+                "server_url": S.scanner_server(),
+                "server_error": getattr(S, "server_error", None),
+                "order": SCANNER_ORDER,
                 "declined": bool((S.provider.get("scanner_declined") or "").strip()),
             })
         if p == "/api/state":

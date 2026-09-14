@@ -12,6 +12,12 @@ Point io at a folder. It shows what will leave as codes; you correct it by click
   `installation/` for how they are built and what is verified.
 - Provider: an OpenRouter API key, or any OpenAI-compatible server address. Kept in memory;
   asked again on restart. Model defaults to `google/gemini-3.7-flash`; change it in settings (⚙).
+- Scanning happens on the privacy server by default (`DEFAULT_PRIVACY_SERVER` in
+  `service.py`, the office DGX on the tailnet; `IO_PRIVACY_SERVER` or the gear overrides it).
+  The text goes there as it is, so it is a machine the same people already trust. If the
+  server is not reachable io falls back to the on-device scanner, then to patterns;
+  `IO_SCANNER=local` forces the on-device model. Chronology 2026-09-14T2220 has the numbers
+  (a folder scan 0.6 s via the DGX GPU against 10 s on a CPU).
 - Or **Sign in with ChatGPT**: io runs the real Codex CLI inside the window, in the
   sheltered folder, with its own bundled binary and its own `CODEX_HOME`, and every model
   request crosses io's privacy proxy (`codex_proxy.py`) where codes replace values on the
@@ -62,9 +68,9 @@ privacy-shield modules, unchanged.
   per drive in `usb_copy-logs/`. Expect it to take a while and do not read that as a hang:
   the offline Windows pack alone is about 41,000 files, and a USB stick writes many small
   files far more slowly than its rated speed.
-- `privacy_server.py` - runs the scanner for machines that cannot run it themselves. Read
-  the notes at the top of that file before starting one: the text sent to it is not
-  redacted.
+- `privacy_server.py` - runs the scanner for other machines; the default target of every io
+  since 2026-09-14. Read the notes at the top of that file before starting one: the text
+  sent to it is not redacted. `IO_SCANNER_DEVICE=cuda` puts the model on a GPU.
 - `room_server.py` - the projector board that collects the blind-comparison votes.
 
 The whole distribution and event-day process is one page:

@@ -128,12 +128,18 @@ def make_gliner(model_id: str, threshold: float = 0.4, chunk_chars: int = 1500) 
     import torch
     from gliner import GLiNER
     torch.set_num_threads(int(os.environ.get("PII_THREADS", "4")))
+    # IO_SCANNER_DEVICE=cuda puts the model on a GPU where there is one (the privacy server
+    # on the DGX: 34 ms per chunk against 370 ms on its CPU, 2026-09-14). Laptops stay on cpu.
+    device = os.environ.get("IO_SCANNER_DEVICE", "cpu")
     model = GLiNER.from_pretrained(model_id, map_location="cpu")
+    if device != "cpu":
+        model = model.to(device)
     model.eval()
 
     def run(text: str) -> list[Span]:
-        spans: list[Span] = []
-        # chunk on line boundaries so offsets stay exact
+        # chunk on line boundaries so offsets stay exact, then one batched call: on a GPU
+        # the batch costs about what a single chunk does
+        pieces: list[tuple[int, str]] = []
         start = 0
         while start < len(text):
             end = min(len(text), start + chunk_chars)
@@ -141,11 +147,19 @@ def make_gliner(model_id: str, threshold: float = 0.4, chunk_chars: int = 1500) 
                 cut = text.rfind("\n", start, end)
                 if cut > start:
                     end = cut + 1
-            piece = text[start:end]
-            for ent in model.predict_entities(piece, GLINER_LABELS, threshold=threshold):
+            pieces.append((start, text[start:end]))
+            start = end
+        if not pieces:
+            return []
+        if len(pieces) == 1:
+            results = [model.predict_entities(pieces[0][1], GLINER_LABELS, threshold=threshold)]
+        else:
+            results = model.batch_predict_entities([p for _, p in pieces], GLINER_LABELS, threshold=threshold, batch_size=16)
+        spans: list[Span] = []
+        for (start, _piece), ents in zip(pieces, results):
+            for ent in ents:
                 spans.append((start + ent["start"], start + ent["end"],
                               GLINER_TO_CLASS.get(ent["label"], ent["label"]), float(ent["score"])))
-            start = end
         return spans
     return run
 
@@ -358,28 +372,43 @@ def main() -> int:
 
 
 # ------------------------------------------------- composed text engine (v2)
+DOB_CONTEXT = re.compile(r"\b(?:dob|d\.o\.b|date of birth|born|birth|birthday|age[d]?|janm|जन्म)\b", re.I)
 CHAT_LINE = re.compile(r"^(\d{1,2}/\d{1,2}/\d{2,4},? \d{1,2}:\d{2}(?::\d{2})?(?: [AP]M)?\]? ?- )([^:\n]{2,60}):", re.M)
 
 
 def make_text_v2(base_spec: str) -> Callable[[str], list[Span]]:
-    """Structural chat-sender rule + regex validators + span model on original AND
-    title-cased text (same offsets) + propagation of every detected name/place to all
-    of its case-insensitive occurrences in the document."""
+    """Structural chat-sender rule + regex validators + span model, with every person name
+    the model found propagated to its other case-insensitive occurrences in the document
+    (a chat log says "ramesh said" as often as "Ramesh said").
+
+    Two things this deliberately no longer does (2026-09-14, over-marking in chat logs):
+    a second model pass over the title-cased text, which made ordinary words and Hindi
+    phrases look like entities ("Bhej Sakta Hai"); and propagating village/address spans
+    as if they were names, which turned a single "borewell" into a code everywhere. The
+    planted-PII fixtures measure the trade: see benchmarks/runs/2026-09-14-io-codex/overcatch.
+    """
     base = build_engine(base_spec)
 
     def run(text: str) -> list[Span]:
+        # Dates in documents: the validator sees every dd/mm/yyyy as a birth date, so a chat
+        # export (a timestamp per line) or a helpline log (a call date per entry) came out
+        # coded as DOB_001... on every line (876 spans on a 260-line chat, 2026-09-14). In
+        # free text a date is private when it is someone's birth date; keep those, which
+        # sit next to a word that says so, and leave operational dates alone.
         spans: list[Span] = list(regex_engine(text))
         for m in CHAT_LINE.finditer(text):
             spans.append((m.start(2), m.end(2), "person_name", 1.0))
-        spans += base(text)
-        spans += base(text.title())
-        found = {text[s:e] for s, e, lab, _ in spans if lab in {"person_name", "village", "address"} and e - s >= 4}
+        spans += base(text)          # the model, local or on the privacy server (which adds its own regex pass)
+        spans = [sp for sp in spans if sp[2] != "dob" or DOB_CONTEXT.search(text[max(0, sp[0] - 40):sp[1] + 40])]
+        # Propagate a name to its other occurrences only when it is a full name or the model
+        # was sure: one low-confidence hit on a Hindi word ("sabko") otherwise becomes 27 codes.
+        found = {text[s:e] for s, e, lab, sc in spans
+                 if lab == "person_name" and e - s >= 4 and (" " in text[s:e].strip() or sc >= 0.8)}
         for value in found:
-            for m in re.finditer(re.escape(value), text, flags=re.I):
+            for m in re.finditer(r"(?<!\w)" + re.escape(value) + r"(?!\w)", text, flags=re.I):
                 spans.append((m.start(), m.end(), "person_name", 0.9))
         return spans
     return run
-
 
 
 if __name__ == "__main__":
