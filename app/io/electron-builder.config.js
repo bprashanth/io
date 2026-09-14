@@ -27,7 +27,21 @@ const extraResources = [
   { from: 'privacy_server.py', to: 'io/privacy_server.py' },
   { from: 'engine', to: 'io/engine', filter: ['**/*.py'] },
   { from: 'ui', to: 'io/ui' },
+  // The privacy proxy that sits between the bundled Codex and the model provider.
+  { from: 'codex_proxy.py', to: 'io/codex_proxy.py' },
 ];
+
+// The bundled Codex CLI: one static binary for the target, fetched by `node fetch-codex.js`
+// and checked against codex-pins.json. It lives outside the asar because it has to be
+// executable. A build without it still packs; the app then says "bundled Codex is missing"
+// on the sign-in screen rather than falling back to a system codex.
+const codexTarget = process.env.IO_CODEX_TARGET || `${process.platform}-${process.arch}`;
+const codexDir = path.join(__dirname, 'codex-bin', codexTarget);
+if (fs.existsSync(codexDir)) {
+  extraResources.push({ from: codexDir, to: `codex/${codexTarget}` });
+} else {
+  console.warn(`no bundled Codex at ${codexDir}; run: node fetch-codex.js ${codexTarget}`);
+}
 
 // A participant copies this whole folder off a USB stick, and on Windows that is a slow,
 // per-file operation - so the file COUNT is what hurts, not the megabytes. Roughly 40% of
@@ -106,9 +120,13 @@ module.exports = {
   directories: { output: 'dist', buildResources: 'icons' },
   asar: true,
   files: [
-    'main.js', 'preload.js', 'runtime.js', 'bootstrap.js', 'pins.json', 'splash.html',
+    'main.js', 'preload.js', 'runtime.js', 'bootstrap.js', 'codex.js', 'pins.json', 'codex-pins.json', 'splash.html',
     'icons/icon.png',
+    // node-pty (dependencies are included by electron-builder; listed so a prune never drops it)
+    'node_modules/node-pty/**',
   ],
+  // A native module has to be a real file on disk to dlopen; the asar cannot hold it.
+  asarUnpack: ['node_modules/node-pty/**'],
   extraResources,
 
   win: {
@@ -138,7 +156,10 @@ module.exports = {
     // nobody uses when launching the file itself); it doubled the offline payload at about
     // a gigabyte; and the install docs already told people to use the tarball. Extract the
     // tarball anywhere and run ./io.
-    target: [{ target: 'tar.gz', arch: ['x64', 'arm64'] }],
+    // One architecture per build machine. node-pty is compiled for the target, and a
+    // cross-compile from an arm64 host to x64 dies on `g++ -m64`; the python payload has
+    // the same rule already (built on the target). IO_ARCH overrides for a deliberate cross.
+    target: [{ target: 'tar.gz', arch: [process.env.IO_ARCH || process.arch] }],
     icon: 'icons/icon.png',
     category: 'Office',
     synopsis: 'Ask questions about a folder of files, without the files leaving.',

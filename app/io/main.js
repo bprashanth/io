@@ -1,5 +1,5 @@
 // io — minimal desktop shell.
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -8,11 +8,92 @@ const net = require('net');
 
 const runtime = require('./runtime');
 const bootstrap = require('./bootstrap');
+const codex = require('./codex');
 
 const PORT_BASE = Number(process.env.IO_PORT_BASE || 8801);
 let proc = null;
 let env = null;
 let splash = null;
+let servicePort = null;
+let win = null;
+
+// ---- the bundled Codex -------------------------------------------------------------
+// One PTY session at a time, one login at a time. Everything privileged - the binary path,
+// CODEX_HOME, the proxy port, the spawn - stays here in main; the renderer sees terminal
+// bytes and status strings, never a token or a path it chose itself.
+let session = null;      // node-pty process
+let login = null;        // child process of `codex login`
+
+const serviceGet = p => new Promise((res, rej) => http.get(`http://127.0.0.1:${servicePort}${p}`, r => {
+  let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } });
+}).on('error', rej));
+
+function codexPaths() {
+  const bin = codex.bundledCodexPath({ packaged: app.isPackaged });
+  return { bin, home: codex.codexHome(env.dataDir) };
+}
+
+async function codexStatus() {
+  const { bin, home } = codexPaths();
+  const info = codex.binaryInfo(bin.path);
+  const out = { version: bin.version, target: bin.key, binary: info.exists && info.executable, home, pty: codex.hasPty(),
+                loginBusy: !!login, running: !!session };
+  if (out.binary) Object.assign(out, codex.loginStatus(bin.path, home));
+  else out.line = `bundled Codex is missing (expected ${bin.path})`;
+  try { out.service = await serviceGet('/api/codex'); } catch { out.service = null; }
+  return out;
+}
+
+function sendToWin(channel, payload) {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+}
+
+ipcMain.handle('codex-status', codexStatus);
+// The login link Codex printed. Only OpenAI's sign-in hosts are ever opened from the page.
+ipcMain.handle('open-external', async (_e, url) => {
+  if (!/^https:\/\/(auth\.openai\.com|chatgpt\.com|platform\.openai\.com)\//.test(String(url))) return { error: 'not a sign-in link' };
+  await shell.openExternal(String(url));
+  return { ok: true };
+});
+
+ipcMain.handle('codex-login', async (_e, mode) => {
+  const { bin, home } = codexPaths();
+  if (login) return { error: 'a login is already in progress' };
+  if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
+  fs.mkdirSync(home, { recursive: true });
+  login = codex.startLogin(bin.path, home, mode === 'device' ? 'device' : 'browser',
+    line => {
+      // The URL and the one-time code are meant for the person; the tokens never come this way.
+      const url = (line.match(/https?:\/\/\S+/) || [])[0] || null;
+      sendToWin('codex-login-event', { line, url });
+    },
+    (code) => { login = null; sendToWin('codex-login-event', { done: true, ok: code === 0 }); });
+  return { ok: true };
+});
+
+ipcMain.handle('codex-login-cancel', async () => { if (login) { login.kill('SIGTERM'); login = null; } return { ok: true }; });
+ipcMain.handle('codex-logout', async () => { const { bin, home } = codexPaths(); return codex.logout(bin.path, home); });
+
+ipcMain.handle('codex-start', async (_e, opts) => {
+  if (session) return { error: 'a Codex session is already running' };
+  const { bin, home } = codexPaths();
+  // The service is the authority: accepted policy, proxy listening, which folder.
+  let info;
+  try { info = await serviceGet('/api/codex'); } catch (e) { return { error: 'io service is not answering' }; }
+  if (!info.ready || !info.port) return { error: `not protected: ${info.reason || 'proxy not ready'}` };
+  if (!info.folder) return { error: 'no sheltered folder' };
+  if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
+  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
+  try {
+    session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows });
+  } catch (e) { return { error: e.message }; }
+  session.onData(d => sendToWin('codex-data', d));
+  session.onExit(({ exitCode, signal }) => { session = null; sendToWin('codex-exit', { exitCode, signal }); });
+  return { ok: true, pid: session.pid, port: info.port, folder: info.folder };
+});
+ipcMain.on('codex-input', (_e, data) => { if (session) session.write(data); });
+ipcMain.on('codex-resize', (_e, { cols, rows }) => { if (session && cols > 0 && rows > 0) { try { session.resize(cols, rows); } catch {} } });
+ipcMain.handle('codex-stop', async () => { if (session) { try { session.kill(); } catch {} session = null; } return { ok: true }; });
 
 // Electron keeps its own state - Chromium's cache, cookies, GPU cache, preferences - under
 // userData, which is ~/.config/io, %APPDATA%\io or ~/Library/Application Support/io. That
@@ -178,6 +259,7 @@ async function start() {
   if (PORTABLE && !process.env.IO_HOME) senv.IO_HOME = path.join(PORTABLE, 'config');
 
   const port = await freePort(PORT_BASE);
+  servicePort = port;
   // Both logs live in the data dir. io.log used to go to Electron's userData, which is a
   // different directory on every platform and is not where anyone - or CI - thinks to look
   // when the service fails to come up.
@@ -198,7 +280,7 @@ async function start() {
   await openSplash();
   tellSplash('starting the on-device privacy model', 'teaching it to keep a secret. only slow the first time.');
 
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1200, height: 820, title: 'io', backgroundColor: '#1a1d21', show: false,
     icon: path.join(__dirname, 'icons', 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
@@ -222,4 +304,4 @@ async function start() {
 
 ipcMain.handle('pick-folder', async () => { const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); return r.canceled ? null : r.filePaths[0]; });
 app.whenReady().then(start);
-app.on('window-all-closed', () => { if (proc) proc.kill(); app.quit(); });
+app.on('window-all-closed', () => { if (session) { try { session.kill(); } catch {} } if (login) { try { login.kill(); } catch {} } if (proc) proc.kill(); app.quit(); });

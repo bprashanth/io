@@ -12,6 +12,12 @@ Point io at a folder. It shows what will leave as codes; you correct it by click
   `installation/` for how they are built and what is verified.
 - Provider: an OpenRouter API key, or any OpenAI-compatible server address. Kept in memory;
   asked again on restart. Model defaults to `google/gemini-3.7-flash`; change it in settings (⚙).
+- Or **Sign in with ChatGPT**: io runs the real Codex CLI inside the window, in the
+  sheltered folder, with its own bundled binary and its own `CODEX_HOME`, and every model
+  request crosses io's privacy proxy (`codex_proxy.py`) where codes replace values on the
+  way out and values replace codes on the way back. No API key. The whole design, the
+  exact privacy claim and the evidence: [docs/io-codex.md](../../docs/io-codex.md).
+  `run.sh` fetches the pinned Codex (`node fetch-codex.js`, hashes in `codex-pins.json`).
 - The sheet view highlights what the scanner flagged, with the reason under each header.
   Click a column to change it. Decisions are remembered by header signature
   (`~/.config/io/decisions.json`), the vault per folder (`vault-…-local-only.json`), exactly
@@ -33,7 +39,12 @@ privacy-shield modules, unchanged.
 
 - `install.sh` - one-time setup for running from a git checkout. Builds `.venv` and caches
   the scanner using the versions pinned in `pins.json`. Not needed for a downloaded build.
-- `run.sh` - start io from a checkout. Runs `install.sh` first if it has not been run.
+- `run.sh` - start io from a checkout. Runs `install.sh` first if it has not been run,
+  and `fetch-codex.js` if the bundled Codex is not there yet.
+- `fetch-codex.js` - download the pinned Codex release binary for this machine (or a named
+  target) into `codex-bin/`, checked against `codex-pins.json`. Build-time only.
+- `codex.js` / `codex_proxy.py` - the bundled Codex's launcher (binary, home, config, login,
+  PTY) and the privacy proxy it talks through. Tests: `tests/`.
 - `usb_copy.sh` - put the builds and the event data onto every plugged-in USB stick at once.
   Run it from the root of the repo:
 

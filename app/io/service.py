@@ -42,7 +42,9 @@ sys.path.insert(0, str(HERE / "engine"))                    # the shield's teste
 from columns import classify_columns  # noqa: E402
 from detect import build_engine, regex_engine  # noqa: E402
 from detect import make_text_v2  # noqa: E402
-from pseudonymize import PseudonymMap, pseudonymise_frame, redact_question  # noqa: E402
+from pseudonymize import PseudonymMap, pseudonymise_frame, redact_question, redact_text  # noqa: E402
+
+import codex_proxy  # noqa: E402
 
 UI = Path(__file__).resolve().parent / "ui"
 CONF = Path(os.environ.get("IO_HOME") or (Path.home() / ".config" / "io"))
@@ -95,6 +97,8 @@ class State:
         self.detector = None
         self.det_lock = threading.Lock()
         self.lock = threading.Lock()
+        self.vault_lock = threading.RLock()   # the proxy mints tokens from several threads at once
+        self.vault_saved_at = 0.0
         self.progress: list[str] = []
 
     def step(self, text: str) -> None:
@@ -393,6 +397,69 @@ class State:
 
 
 S = State()
+
+
+class IoPolicy(codex_proxy.Policy):
+    """The live vault, applied to Codex traffic the way chat applies it to a typed question:
+    exact known values first (longest wins), then the detector for values never seen before.
+    The detector is the regex validators (phones, Aadhaar, emails, accounts...) on every
+    string, and the on-device scanner additionally on what the user typed (role=user), the
+    same as /api/chat does today. Kept values stay clear, as everywhere else in io."""
+
+    DIRECT = {"person_name", "phone", "email", "aadhaar", "pan", "bank_account", "ifsc", "upi_id",
+              "ration_card", "voter_id", "vehicle_number", "address", "village"}
+
+    def ready(self) -> bool:
+        return bool(getattr(S, "accepted", False) and S.pmap is not None)
+
+    def not_ready_reason(self) -> str:
+        if S.folder is None:
+            return "no folder is sheltered"
+        return "the privacy policy for this folder has not been approved (press Looks right first)"
+
+    # Codex wraps the context it injects as role=user messages in tags: <environment_context>
+    # (cwd, timezone), <user_instructions>, <permissions instructions>, <turn_aborted>...
+    # Those are not the person's words; the scanner on them minted PLACE codes for
+    # "Asia/Kolkata" and a NAME for the home directory (seen live 2026-09-14). The
+    # validators still run on them; the scanner runs on what the person typed.
+    WRAPPED = re.compile(r"\s*<[a-z_]+( [a-z_]+)?>")
+
+    def outbound(self, text: str, role: str | None) -> str:
+        det = S.get_detector() if (role == "user" and not self.WRAPPED.match(text)) else regex_engine
+        kept = S.kept_all()
+
+        def filt(t, _d=det, _k=kept):
+            return [sp for sp in _d(t) if t[sp[0]:sp[1]].casefold() not in _k]
+
+        with S.vault_lock:
+            before = len(S.pmap.display)
+            out, _events = redact_text(text, S.pmap, filt, classes=self.DIRECT)
+            if len(S.pmap.display) != before and time.monotonic() - S.vault_saved_at > 1.0:
+                S.pmap.save()               # new codes were minted: keep the vault on disk current
+                S.vault_saved_at = time.monotonic()
+        return out
+
+    def inbound(self, text: str) -> str:
+        return S.pmap.rehydrate(text) if S.pmap else text
+
+    def leaks(self, text: str) -> list[str]:
+        return S.leak_check(text)
+
+    def version(self) -> int:
+        # the vault object changes per folder, its size changes as codes are minted
+        return (id(S.pmap), len(S.pmap.display)) if S.pmap else 0
+
+
+# Development only: IO_PROXY_DEV_UPSTREAM="/dev/v1=https://openrouter.ai/api/v1" routes that
+# prefix to an OpenAI-compatible Responses server, through the same transform code, so the
+# interactive session can be exercised on a machine with no ChatGPT login. Never set for a user.
+_dev = dict(x.split("=", 1) for x in os.environ.get("IO_PROXY_DEV_UPSTREAM", "").split(";") if "=" in x)
+PROXY = codex_proxy.Proxy(
+    IoPolicy(),
+    log=lambda line: print("proxy " + line, flush=True),
+    dump_dir=Path(os.environ["IO_PROXY_DUMP"]) if os.environ.get("IO_PROXY_DUMP") else None,
+    dev_upstreams=_dev,
+)
 
 PROMPT = """You are helping someone understand their files. The files are below as CSV. Values like NAME_001,
 PHONE_002, PLACE_003 are stand-ins; treat them as ordinary labels and never mention that they are stand-ins.
@@ -699,6 +766,13 @@ class H(BaseHTTPRequestHandler):
         p = self.path.split("?")[0]
         if p in ("/", "/index.html"):
             return self._send(200, (UI / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if p.startswith("/vendor/"):
+            # xterm.js and its css, shipped with io: the terminal must work with no network.
+            f = (UI / "vendor" / p[len("/vendor/"):]).resolve()
+            if f.parent != (UI / "vendor").resolve() or not f.is_file():
+                return self._send(404, b"")
+            ctype = {"js": "application/javascript", "css": "text/css"}.get(f.suffix.lstrip("."), "application/octet-stream")
+            return self._send(200, f.read_bytes(), ctype + "; charset=utf-8")
         if p == "/api/scanner":
             # Two ways to end up without a scanner: the install already knew this machine
             # could not run one, or it loaded and then failed here. Report either, so the
@@ -711,7 +785,7 @@ class H(BaseHTTPRequestHandler):
                 "declined": bool((S.provider.get("scanner_declined") or "").strip()),
             })
         if p == "/api/state":
-            return self._json({"provider": {"set": bool(S.provider), "model": S.provider.get("model"), "server": bool(S.provider.get("server"))},
+            return self._json({"provider": {"set": bool(S.provider), "model": S.provider.get("model"), "server": bool(S.provider.get("server")), "codex": bool(S.provider.get("codex"))},
                                "folder": str(S.folder) if S.folder else None,
                                "accepted": bool(getattr(S, "accepted", False)),
                                "files": [{"name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns)} for t in S.tables],
@@ -766,6 +840,16 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/folders":
             folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
             return self._json({"folders": folders})
+        if p == "/api/codex":
+            # Everything the shell needs to launch Codex, and everything the status bar shows.
+            # The service is the authority on readiness; the shell never launches on the
+            # renderer's word alone.
+            pol = PROXY.policy
+            return self._json({"port": PROXY.port, "ready": pol.ready(),
+                               "reason": None if pol.ready() else pol.not_ready_reason(),
+                               "folder": str(S.folder) if S.folder else None,
+                               "vault": len(S.pmap.display) if S.pmap else 0,
+                               "stats": PROXY.stats.snapshot(), "dump": bool(PROXY.dump_dir)})
         if p == "/api/preview":
             with S.lock:
                 if not S.redacted:
@@ -808,7 +892,7 @@ class H(BaseHTTPRequestHandler):
                         S.detector = None
                         S.text_detector = None
                         S._scanner_mode = None
-                for k in ("api_key", "server", "model", "room", "org", "scanner_server", "scanner_declined"):
+                for k in ("api_key", "server", "model", "room", "org", "scanner_server", "scanner_declined", "codex"):
                     if k in body:
                         S.provider[k] = body[k].strip()
                 S.provider = {k: v for k, v in S.provider.items() if v}
@@ -984,6 +1068,9 @@ class H(BaseHTTPRequestHandler):
 def main():
     threading.Thread(target=S.get_detector, daemon=True).start()  # warm the scanner
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8801
+    # The privacy proxy listens from the start, on a port the OS picks, and refuses every
+    # request until a folder's policy has been approved. Codex is never pointed anywhere else.
+    PROXY.start()
     print(f"io on http://127.0.0.1:{port}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
 

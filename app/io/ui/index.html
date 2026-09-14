@@ -20,9 +20,9 @@ input:focus,textarea:focus{border-color:var(--hi)}
 /* screens */
 .screen{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px}
 .screen.on{display:flex}
-#s-provider .card, #s-consent .card, #s-scanner .card{width:400px;display:flex;flex-direction:column;gap:10px}
-#s-provider h1, #s-consent h1, #s-scanner h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
-#s-provider p, #s-consent p, #s-scanner p{margin:0 0 6px;text-align:center}
+#s-provider .card, #s-consent .card, #s-scanner .card, #s-login .card{width:400px;display:flex;flex-direction:column;gap:10px}
+#s-provider h1, #s-consent h1, #s-scanner h1, #s-login h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
+#s-provider p, #s-consent p, #s-scanner p, #s-login p{margin:0 0 6px;text-align:center}
 #shelf{width:460px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .fol{display:flex;align-items:baseline;gap:10px;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--line)}
 .fol:last-child{border-bottom:none}
@@ -146,6 +146,32 @@ td.tok{background:var(--hibg);color:var(--hi)}
 #chev{position:absolute;left:14px;top:14px;color:var(--dim)}
 #note{max-width:860px;margin:6px auto 0;font-size:12px;color:var(--dim);padding:0 6px;min-height:16px}
 
+/* sign in with ChatGPT */
+.orline{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:12.5px;margin:4px 0}
+.orline:before,.orline:after{content:"";flex:1;border-top:1px solid var(--line)}
+#s-login .card{width:440px}
+#lg-status{font-size:14px;color:var(--dim);min-height:22px;text-align:center}
+#lg-code{font:600 30px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:4px;text-align:center;color:var(--hi);user-select:all;display:none;padding:10px 0 4px}
+#lg-url{font-size:12.5px;color:var(--dim);word-break:break-all;text-align:center;display:none}
+#lg-url a{color:var(--hi);cursor:pointer}
+.plainbtn{background:none;border:none;color:var(--dim);font-size:13px;cursor:pointer;padding:4px}
+.plainbtn:hover{color:var(--ink)}
+
+/* codex terminal */
+#s-codex{justify-content:flex-start;align-items:stretch;padding:0;overflow:hidden;gap:0}
+#cx-top{display:flex;align-items:center;gap:18px;padding:12px 18px;border-bottom:1px solid var(--line);font-size:13px;color:var(--dim);flex-wrap:wrap}
+#cx-top b{color:var(--ink);font-weight:500}
+#cx-top .pill{display:inline-flex;align-items:center;gap:6px}
+#cx-top .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block}
+#cx-top .dot.ok{background:var(--grn)}
+#cx-top .dot.bad{background:#e06c6c}
+#cx-wrap{flex:1;min-height:0;padding:10px 14px 6px;background:#15181c}
+#term{width:100%;height:100%}
+#cx-bottom{display:flex;align-items:center;gap:14px;padding:10px 18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim)}
+#cx-bottom .grow{flex:1}
+#cx-err{display:none;margin:0 18px;padding:10px 14px;border:1px solid #e06c6c;border-radius:10px;color:#e8a0a0;font-size:13px;white-space:pre-wrap}
+.xterm .xterm-viewport{background:#15181c!important}
+
 /* modals */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
 .modal.on{display:flex}
@@ -164,6 +190,9 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <p class="dim">io needs an AI provider.</p>
     <input id="p-key" type="password" placeholder="API key" autocomplete="off">
     <input id="p-server" placeholder="or server address" autocomplete="off">
+    <div class="orline">or</div>
+    <button class="go" id="p-chatgpt">Sign in with ChatGPT</button>
+    <p class="dim" style="font-size:12.5px;margin:0">Codex runs inside io with your own ChatGPT account. No API key needed.</p>
     <div class="eventbits">
       <input id="p-room" placeholder="room server (optional, from the organizers)" autocomplete="off">
       <input id="p-org" placeholder="your organisation (optional)" autocomplete="off">
@@ -201,6 +230,24 @@ td.tok{background:var(--hibg);color:var(--hi)}
   </div>
 </div>
 
+<div class="screen" id="s-login">
+  <div class="card">
+    <h1>io</h1>
+    <p class="dim">Connect the ChatGPT account io's Codex should use.<br>Your files never go to it: only coded versions do.</p>
+    <div id="lg-status">checking…</div>
+    <div id="lg-code"></div>
+    <div id="lg-url"></div>
+    <button class="go" id="lg-go">Connect ChatGPT</button>
+    <button class="go" id="lg-continue" style="display:none">Continue</button>
+    <div style="display:flex;justify-content:center;gap:16px">
+      <button class="plainbtn" id="lg-device">use a code instead</button>
+      <button class="plainbtn" id="lg-cancel" style="display:none">cancel</button>
+      <button class="plainbtn" id="lg-out" style="display:none">sign out</button>
+      <button class="plainbtn" id="lg-back">back</button>
+    </div>
+  </div>
+</div>
+
 <div class="screen" id="s-home">
   <div id="shelf"></div>
 </div>
@@ -222,6 +269,25 @@ td.tok{background:var(--hibg);color:var(--hi)}
 
 <div class="screen" id="s-chat">
   <div id="thread"></div>
+</div>
+
+<div class="screen" id="s-codex">
+  <div id="cx-top">
+    <span class="pill"><span>Workspace</span> <b id="cx-folder"></b></span>
+    <span class="pill"><span class="dot" id="cx-dot-priv"></span><span>Privacy</span> <b id="cx-priv">…</b></span>
+    <span class="pill"><span class="dot" id="cx-dot-proxy"></span><span>Proxy</span> <b id="cx-proxy">…</b></span>
+    <span class="pill"><span class="dot" id="cx-dot-gpt"></span><span>ChatGPT</span> <b id="cx-gpt">…</b></span>
+  </div>
+  <div id="cx-err"></div>
+  <div id="cx-wrap"><div id="term"></div></div>
+  <div id="cx-bottom">
+    <span id="cx-shield">Protected by io</span>
+    <span id="cx-stats" class="dim"></span>
+    <span class="grow"></span>
+    <button id="cx-folders">folders</button>
+    <button id="cx-restart" style="display:none">restart Codex</button>
+    <button id="cx-end">End session</button>
+  </div>
 </div>
 
 <div id="bar" style="display:none">
@@ -260,6 +326,9 @@ td.tok{background:var(--hibg);color:var(--hi)}
   <div style="display:flex;justify-content:flex-end;gap:8px"><button id="st-x">Close</button><button class="go" id="st-ok">Save</button></div>
 </div></div>
 
+<link rel="stylesheet" href="/vendor/xterm.css">
+<script src="/vendor/xterm.js"></script>
+<script src="/vendor/addon-fit.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 let files = [], skipped = [], tab = 0, terms = [], accepted = false;
@@ -292,6 +361,7 @@ function appendTurn(t){
 }
 function resumeChat(st){
   accepted = true;
+  if (codexMode) { files = (st.files || []).concat(st.docs || []); enterCodex(); return; }
   files = (st.files || []).concat(st.docs || []);
   api('/api/terms').then(t => { terms = t.terms || []; paintMirror(); });
   $('#thread').innerHTML = '';
@@ -299,8 +369,72 @@ function resumeChat(st){
   show('#s-chat');
   $('#thread').scrollTop = 1e9;
 }
-(async () => { const st = await api('/api/state'); if (st.provider.set) { await afterConsent(); } })();
-function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent' || id === '#s-scanner') ? 'none' : ''; $('#acts').style.display = (id === '#s-chat') ? 'flex' : 'none'; }
+let codexMode = false;
+(async () => {
+  const st = await api('/api/state');
+  codexMode = !!(st.provider && st.provider.codex);
+  if (codexMode) { const ok = await loginGate(); if (!ok) return; }
+  if (st.provider.set) { await afterConsent(); }
+})();
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent' || id === '#s-scanner' || id === '#s-login' || id === '#s-codex') ? 'none' : ''; $('#acts').style.display = (id === '#s-chat') ? 'flex' : 'none'; if (id === '#s-codex') setTimeout(fitTerm, 30); }
+
+// provider: sign in with ChatGPT (Codex inside io, no key)
+$('#p-chatgpt').onclick = async () => {
+  if (!(window.io && window.io.codex)) { alert('Codex runs only inside the io app, not in a plain browser.'); return; }
+  await api('/api/provider', {codex: '1', room: $('#p-room').value.trim(), org: $('#p-org').value.trim()});
+  codexMode = true;
+  const ok = await loginGate();
+  if (ok) show('#s-consent');
+};
+// The login screen. Resolves true once io's own Codex is signed in (this CODEX_HOME only,
+// never ~/.codex). Codex does the OAuth itself; the page only ever sees the link/code.
+let loginResolve = null;
+async function loginGate(){
+  const st = await window.io.codex.status();
+  if (st.loggedIn) return true;
+  show('#s-login');
+  paintLogin(st);
+  return new Promise(res => { loginResolve = res; });
+}
+function paintLogin(st){
+  const s = $('#lg-status');
+  if (!st.binary) { s.textContent = st.line || 'bundled Codex is missing'; $('#lg-go').disabled = true; return; }
+  if (st.loggedIn) { s.textContent = 'Connected: ' + (st.line || 'signed in'); $('#lg-go').style.display = 'none'; $('#lg-continue').style.display = ''; $('#lg-out').style.display = ''; $('#lg-device').style.display = 'none'; }
+  else { s.textContent = 'Not connected yet'; $('#lg-go').style.display = ''; $('#lg-continue').style.display = 'none'; $('#lg-out').style.display = 'none'; $('#lg-device').style.display = ''; }
+}
+async function beginLogin(mode){
+  $('#lg-code').style.display = 'none'; $('#lg-url').style.display = 'none'; $('#lg-code').textContent = '';   // (display is 'block' when shown: the stylesheet default is none)
+  $('#lg-status').textContent = mode === 'device' ? 'getting a code…' : 'opening your browser…';
+  $('#lg-go').disabled = true; $('#lg-device').disabled = true; $('#lg-cancel').style.display = '';
+  window.io.codex.onLoginEvent(async ev => {
+    if (ev.done) {
+      $('#lg-go').disabled = false; $('#lg-device').disabled = false; $('#lg-cancel').style.display = 'none';
+      $('#lg-code').style.display = 'none';
+      const st = await window.io.codex.status();
+      if (ev.ok && st.loggedIn) { paintLogin(st); $('#lg-status').textContent = 'Connected: ' + (st.line || 'signed in'); }
+      else { paintLogin(st); $('#lg-status').textContent = 'Sign-in did not complete. Try again.'; }
+      return;
+    }
+    if (ev.url && /auth\.openai\.com|chatgpt\.com/.test(ev.url)) {
+      const u = $('#lg-url'); u.style.display = 'block'; u.innerHTML = '';
+      const a = document.createElement('a'); a.textContent = mode === 'device' ? 'open the sign-in page' : 'browser did not open? click here';
+      a.onclick = () => window.io.openExternal(ev.url);
+      u.appendChild(a); u.appendChild(document.createTextNode('  ' + ev.url));
+      if (mode === 'device') window.io.openExternal(ev.url);
+      $('#lg-status').textContent = mode === 'device' ? 'Sign in on the page and enter this code:' : 'Finish signing in in your browser…';
+    }
+    const code = ev.line && ev.line.match(/^\s*([A-Z0-9]{4,}-[A-Z0-9]{4,}|[A-Z0-9]{8,})\s*$/);
+    if (code) { $('#lg-code').textContent = code[1]; $('#lg-code').style.display = 'block'; }
+  });
+  const r = await window.io.codex.login(mode);
+  if (r && r.error) { $('#lg-status').textContent = r.error; $('#lg-go').disabled = false; $('#lg-device').disabled = false; $('#lg-cancel').style.display = 'none'; }
+}
+$('#lg-go').onclick = () => beginLogin('browser');
+$('#lg-device').onclick = () => beginLogin('device');
+$('#lg-cancel').onclick = async () => { await window.io.codex.cancelLogin(); paintLogin(await window.io.codex.status()); $('#lg-cancel').style.display = 'none'; $('#lg-go').disabled = false; $('#lg-device').disabled = false; $('#lg-code').style.display = 'none'; $('#lg-url').style.display = 'none'; };
+$('#lg-out').onclick = async () => { await window.io.codex.logout(); paintLogin(await window.io.codex.status()); };
+$('#lg-continue').onclick = () => { const r = loginResolve; loginResolve = null; if (r) r(true); };
+$('#lg-back').onclick = async () => { await api('/api/provider', {codex: ''}); codexMode = false; const r = loginResolve; loginResolve = null; if (r) r(false); show('#s-provider'); };
 
 // provider
 $('#p-go').onclick = async () => {
@@ -512,6 +646,7 @@ function renderPreview(){
 }
 $('#sheet-ok').onclick = async () => {
   accepted = true;
+  if (codexMode) { $('#sheet-ok').disabled = true; $('#sheet-ok').textContent = 'coding'; await api('/api/accept', {}); $('#sheet-ok').disabled = false; $('#sheet-ok').textContent = 'Looks right'; enterCodex(); return; }
   show('#s-chat'); $('#q').focus();
   $('#note').textContent = 'coding the files…';
   await api('/api/accept', {});
@@ -738,6 +873,73 @@ function renderCompare(el, w, r){
   w.querySelectorAll('.voterow .plain[data-p]').forEach(b => b.onclick = () => vote(b.dataset.p));
   $('#thread').scrollTop = 1e9;
 }
+
+// ---- Codex inside io ---------------------------------------------------------------
+// The terminal is a real PTY on the other side of the bridge; here it is only pixels and
+// keystrokes. Status comes from two places: the service (/api/codex: policy approved,
+// proxy port, counts) and the shell (bundled binary, login). "Protected" is shown only
+// when both say so.
+let term = null, fitAddon = null, cxTimer = null, cxRunning = false;
+function fitTerm(){ if (!term || !fitAddon) return; try { fitAddon.fit(); window.io.codex.resize(term.cols, term.rows); } catch (e) {} }
+function ensureTerm(){
+  if (term) return;
+  term = new Terminal({ cursorBlink: true, fontSize: 14, fontFamily: 'ui-monospace, Menlo, Consolas, "DejaVu Sans Mono", monospace', scrollback: 5000, allowProposedApi: true,
+    theme: { background: '#15181c', foreground: '#e8e6e1', cursor: '#e8b26a', selectionBackground: 'rgba(232,178,106,.25)', black: '#1a1d21', brightBlack: '#5c636b' } });
+  window.term = term;   // for the driver/QA scripts; nothing in the page relies on it
+  fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open($('#term'));
+  term.onData(d => window.io.codex.input(d));
+  term.onResize(({cols, rows}) => window.io.codex.resize(cols, rows));
+  window.io.codex.onData(d => term.write(d));
+  window.io.codex.onExit(({exitCode}) => { cxRunning = false; term.write(`\r\n\x1b[90m[Codex ended (exit ${exitCode})]\x1b[0m\r\n`); $('#cx-restart').style.display = ''; paintCodexStatus(); });
+  new ResizeObserver(() => fitTerm()).observe($('#cx-wrap'));
+  window.addEventListener('resize', fitTerm);
+}
+function cxErr(msg){ const e = $('#cx-err'); if (!msg) { e.style.display = 'none'; e.textContent = ''; return; } e.style.display = 'block'; e.textContent = msg; }
+async function enterCodex(){
+  ensureTerm();
+  show('#s-codex');
+  cxErr('');
+  await new Promise(r => setTimeout(r, 60));
+  fitTerm();
+  if (!cxRunning) {
+    const st = await window.io.codex.status();
+    if (st.running) { cxRunning = true; $('#cx-restart').style.display = 'none'; term.write('\x1b[90m[reattached to the running Codex]\x1b[0m\r\n'); fitTerm(); }
+    else await startCodex();
+  }
+  paintCodexStatus();
+  if (!cxTimer) cxTimer = setInterval(paintCodexStatus, 2000);
+  term.focus();
+}
+async function startCodex(){
+  term.reset();
+  const r = await window.io.codex.start({cols: term.cols, rows: term.rows});
+  if (r && r.error) { cxRunning = false; cxErr('Codex was not started: ' + r.error); $('#cx-restart').style.display = ''; return; }
+  cxRunning = true; $('#cx-restart').style.display = 'none';
+  term.focus();
+}
+async function paintCodexStatus(){
+  if (!$('#s-codex').classList.contains('on')) return;
+  let sv = null, sh = null;
+  try { sv = await api('/api/codex'); } catch (e) {}
+  try { sh = await window.io.codex.status(); } catch (e) {}
+  const set = (id, dot, text, ok) => { $(id).textContent = text; $(dot).className = 'dot ' + (ok === true ? 'ok' : ok === false ? 'bad' : ''); };
+  $('#cx-folder').textContent = sv && sv.folder ? sv.folder.split('/').pop() : '';
+  set('#cx-priv', '#cx-dot-priv', sv ? (sv.ready ? `${sv.vault} codes approved` : (sv.reason || 'not approved')) : 'service not answering', sv ? sv.ready : false);
+  set('#cx-proxy', '#cx-dot-proxy', sv && sv.port ? `active on 127.0.0.1:${sv.port}` : 'not running', !!(sv && sv.port && sv.ready));
+  set('#cx-gpt', '#cx-dot-gpt', sh ? (sh.loggedIn ? 'connected' : 'not signed in') : 'unknown', sh ? sh.loggedIn : null);
+  const protectedNow = !!(sv && sv.ready && sv.port && sh && sh.loggedIn);
+  $('#cx-shield').textContent = protectedNow ? 'Protected by io' : 'NOT protected';
+  $('#cx-shield').style.color = protectedNow ? 'var(--grn)' : '#e06c6c';
+  if (sv && sv.stats) { const t = sv.stats; $('#cx-stats').textContent = `${t.forwarded} request${t.forwarded === 1 ? '' : 's'} sent as codes, ${t.substitutions} coded, ${t.restorations} restored${t.refused ? ', ' + t.refused + ' refused' : ''}`; }
+  if (!sv) cxErr('io\'s privacy proxy is not answering. Codex cannot reach the model until it is back: press reload.');
+  else if (!sv.ready && cxRunning) cxErr('The privacy policy is no longer approved; Codex requests are being refused.');
+  else if (sv && sv.ready) cxErr('');
+}
+$('#cx-end').onclick = async () => { await window.io.codex.stop(); cxRunning = false; $('#cx-restart').style.display = ''; };
+$('#cx-restart').onclick = () => startCodex();
+$('#cx-folders').onclick = () => { show('#s-home'); renderShelf(); };
 
 paintMirror();
 </script>

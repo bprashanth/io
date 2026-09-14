@@ -20,6 +20,11 @@ cd io/app/io
 ./run.sh
 ```
 
+`run.sh` also fetches the Codex CLI that io bundles for "Sign in with ChatGPT" (about
+100 MB, pinned and hashed in `app/io/codex-pins.json`; `node fetch-codex.js` by hand).
+`node-pty`, the terminal's native module, builds from source on Linux, so `npm install`
+needs `python3`, `make` and a C++ compiler there (macOS and Windows have prebuilds).
+
 ## Windows
 
 Open PowerShell in the same folder and run the steps by hand. `install.ps1` is not
