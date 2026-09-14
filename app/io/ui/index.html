@@ -284,6 +284,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <span id="cx-shield">Protected by io</span>
     <span id="cx-stats" class="dim"></span>
     <span class="grow"></span>
+    <button id="cx-attach" style="display:none">attach a file</button>
     <button id="cx-folders">folders</button>
     <button id="cx-restart" style="display:none">restart Codex</button>
     <button id="cx-end">End session</button>
@@ -329,6 +330,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
 <link rel="stylesheet" href="/vendor/xterm.css">
 <script src="/vendor/xterm.js"></script>
 <script src="/vendor/addon-fit.js"></script>
+<script src="/vendor/addon-web-links.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 let files = [], skipped = [], tab = 0, terms = [], accepted = false;
@@ -505,6 +507,7 @@ async function confirmScan(path){
   $('#cs-ok').onclick = () => { if (!total) return; $('#confirmscan').classList.remove('on'); openFolder(path); };
 }
 async function openFolder(path){
+  chatWorkspace = null;
   show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';
   $('#sheet-top').style.display = 'none'; $('#sheet-bar').style.display = 'none';
   let scanning = true;
@@ -728,6 +731,7 @@ q.addEventListener('keydown', async e => {
   if (e.key !== 'Enter' || e.shiftKey) return;
   e.preventDefault();
   const text = q.value.trim(); if (!text) return;
+  if (codexMode && !files.length) { q.value = ''; paintMirror(); await startChatWorkspace(text); return; }
   if (!files.length) { pickFolder(); return; }
   if (!accepted) { renderSheet(); return; }
   q.value = ''; paintMirror(); q.disabled = true;
@@ -891,7 +895,26 @@ function ensureTerm(){
   window.term = term;   // for the driver/QA scripts; nothing in the page relies on it
   fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
+  // Links open in the person's browser; the shell decides what may open (http/https, and
+  // files under the workspace or io's own data).
+  term.loadAddon(new WebLinksAddon.WebLinksAddon((_ev, uri) => window.io.openExternal(uri)));
   term.open($('#term'));
+  // Copy and paste the way people expect: Ctrl+C with text selected copies (without a
+  // selection it still interrupts Codex), Ctrl+V and Ctrl+Shift+V paste, right-click pastes
+  // when nothing is selected and copies when something is. Codex sees a paste as a paste.
+  term.attachCustomKeyEventHandler(ev => {
+    if (ev.type !== 'keydown') return true;
+    const ctrl = ev.ctrlKey || ev.metaKey;
+    if (ctrl && ev.key.toLowerCase() === 'c' && term.hasSelection()) { navigator.clipboard.writeText(term.getSelection()).catch(() => {}); term.clearSelection(); return false; }
+    if (ctrl && ev.key.toLowerCase() === 'v') { navigator.clipboard.readText().then(t => { if (t) term.paste(t); }).catch(() => {}); return false; }
+    if (ctrl && ev.shiftKey && ev.key.toLowerCase() === 'c' && term.hasSelection()) { navigator.clipboard.writeText(term.getSelection()).catch(() => {}); return false; }
+    return true;
+  });
+  $('#term').addEventListener('contextmenu', ev => {
+    ev.preventDefault();
+    if (term.hasSelection()) { navigator.clipboard.writeText(term.getSelection()).catch(() => {}); term.clearSelection(); }
+    else navigator.clipboard.readText().then(t => { if (t) term.paste(t); }).catch(() => {});
+  });
   term.onData(d => window.io.codex.input(d));
   term.onResize(({cols, rows}) => window.io.codex.resize(cols, rows));
   window.io.codex.onData(d => term.write(d));
@@ -904,6 +927,7 @@ async function enterCodex(){
   ensureTerm();
   show('#s-codex');
   cxErr('');
+  $('#cx-attach').style.display = chatWorkspace ? '' : 'none';
   await new Promise(r => setTimeout(r, 60));
   fitTerm();
   if (!cxRunning) {
@@ -914,10 +938,11 @@ async function enterCodex(){
   paintCodexStatus();
   if (!cxTimer) cxTimer = setInterval(paintCodexStatus, 2000);
   term.focus();
+  if (pendingSay && cxRunning) { const t = pendingSay; pendingSay = null; sayWhenReady(t); }
 }
 async function startCodex(){
   term.reset();
-  const r = await window.io.codex.start({cols: term.cols, rows: term.rows});
+  const r = await window.io.codex.start({cols: term.cols, rows: term.rows, chat: !!chatWorkspace});
   if (r && r.error) { cxRunning = false; cxErr('Codex was not started: ' + r.error); $('#cx-restart').style.display = ''; return; }
   cxRunning = true; $('#cx-restart').style.display = 'none';
   term.focus();
@@ -928,7 +953,7 @@ async function paintCodexStatus(){
   try { sv = await api('/api/codex'); } catch (e) {}
   try { sh = await window.io.codex.status(); } catch (e) {}
   const set = (id, dot, text, ok) => { $(id).textContent = text; $(dot).className = 'dot ' + (ok === true ? 'ok' : ok === false ? 'bad' : ''); };
-  $('#cx-folder').textContent = sv && sv.folder ? sv.folder.split('/').pop() : '';
+  $('#cx-folder').textContent = sv && sv.folder ? (chatWorkspace && sv.folder === chatWorkspace ? 'conversation (no data)' : sv.folder.split('/').pop()) : '';
   set('#cx-priv', '#cx-dot-priv', sv ? (sv.ready ? `${sv.vault} codes approved` : (sv.reason || 'not approved')) : 'service not answering', sv ? sv.ready : false);
   set('#cx-proxy', '#cx-dot-proxy', sv && sv.port ? `active on 127.0.0.1:${sv.port}` : 'not running', !!(sv && sv.port && sv.ready));
   set('#cx-gpt', '#cx-dot-gpt', sh ? (sh.loggedIn ? 'connected' : 'not signed in') : 'unknown', sh ? sh.loggedIn : null);
@@ -941,8 +966,35 @@ async function paintCodexStatus(){
   else if (sv && sv.ready) cxErr('');
 }
 $('#cx-end').onclick = async () => { await window.io.codex.stop(); cxRunning = false; $('#cx-restart').style.display = ''; };
+
+// A conversation with no data: an empty io-owned folder, approved trivially, network on for
+// Codex's own downloads. The first message typed in the chat box is typed into Codex once
+// its screen is up. Files come in through "attach a file", which runs the same review.
+let chatWorkspace = null, pendingSay = null;
+async function startChatWorkspace(firstMessage){
+  const r = await api('/api/chat-workspace', {});
+  if (r.error) { oops(r.error); return; }
+  chatWorkspace = r.folder; files = []; accepted = true; pendingSay = firstMessage || null;
+  await enterCodex();
+}
+async function sayWhenReady(text){
+  // wait for the TUI's first paint, then type the line as the person
+  for (let i = 0; i < 60; i++) { const t = window.term; if (t && t.buffer.active.length > 3) break; await new Promise(r => setTimeout(r, 250)); }
+  await new Promise(r => setTimeout(r, 1500));
+  await window.io.codex.say(text);
+}
+$('#cx-attach').onclick = async () => {
+  const p = await window.io.pickFile();
+  if (!p) return;
+  const r = await api('/api/attach', {path: p});
+  if (r.error) { cxErr(r.error); return; }
+  // the review sheet for the attached file; Looks right brings them back here
+  files = r.files; skipped = r.skipped || []; tab = 0; accepted = false;
+  pendingSay = `I attached ${r.attached} in this folder. Have a look at it and tell me in one line what it contains.`;
+  renderSheet();
+};
 $('#cx-restart').onclick = () => startCodex();
-$('#cx-folders').onclick = () => { show('#s-home'); renderShelf(); };
+$('#cx-folders').onclick = () => { chatWorkspace = null; show('#s-home'); renderShelf(); };
 
 paintMirror();
 </script>

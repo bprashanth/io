@@ -22,6 +22,7 @@ const CDP = Number(arg('cdp', 9801));
 // build would spend minutes installing python; the checkout's venv and model cache are
 // linked into the data dir instead, which is exactly what a finished first run leaves there.
 const EXE = arg('exe', null);
+const CHAT = process.argv.includes('--chat');
 const PORT_BASE = Number(arg('port-base', 8841));
 const APP = path.resolve(__dirname, '../../../app/io');
 const DATA = path.join(OUT, 'data');
@@ -119,7 +120,41 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await shot(page, 'login-cancelled');
     }
 
-    if (FIXTURE) {
+    if (FIXTURE && CHAT) {
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await shot(page, 'home-with-chat-box');
+      await page.click('#q');
+      await page.keyboard.type('What is a good way to name columns in a spreadsheet? Answer in two lines.', { delay: 5 });
+      await page.keyboard.press('Enter');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 30000, 'codex screen from chat box');
+      await waitFor(page, async () => /columns/i.test((await termText(page)).slice(-4000)) && (await termText(page)).length > 400, 90000, 'first message typed for the person');
+      await sleep(1500);
+      await shot(page, 'chat-first-message');
+      results.chatHeader = await page.locator('#cx-folder').textContent();
+      const ok = await waitFor(page, async () => /›\s*Ask Codex to do anything/.test((await termText(page)).slice(-3000)) && /\n\s*•/.test((await termText(page)).slice(-3000)), 120000, 'answer to first message');
+      await sleep(1000);
+      await shot(page, 'chat-answer');
+      results.chatAnswered = ok;
+      results.chatTail = (await termText(page)).slice(-900);
+      // attach a file: the picker is native, so call the service the way the button does
+      const attached = await api(page, '/api/attach', { path: path.join(TESTDATA, 'visits.csv') });
+      results.attach = { attached: attached.attached, files: (attached.files || []).map(f => f.name), error: attached.error };
+      await page.evaluate(r => { files = r.files; skipped = r.skipped || []; tab = 0; accepted = false; pendingSay = 'I attached visits.csv in this folder. Tell me in one line what it contains.'; renderSheet(); }, attached);
+      await waitFor(page, () => page.locator('#s-sheet.on').count(), 10000, 'review sheet for attached file');
+      await sleep(800);
+      await shot(page, 'attach-review-sheet');
+      await page.click('#sheet-ok');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 60000, 'back in the terminal');
+      const ok2 = await waitFor(page, async () => /9876543210|Alice Example|visits\.csv/.test((await termText(page)).slice(-2500)) && /I attached/.test(await termText(page)), 120000, 'attached file discussed');
+      await sleep(2500);
+      await shot(page, 'attach-answer');
+      results.attachAnswered = ok2;
+      results.attachTail = (await termText(page)).slice(-1200);
+      results.proxy = await api(page, '/api/codex');
+      results.copyPaste = await page.evaluate(async () => { const t = window.term; t.selectAll(); const sel = t.getSelection(); t.clearSelection(); return { selectable: sel.length > 100 }; });
+    } else if (FIXTURE) {
       // The fixture credential stands in for the account-B login this machine cannot do:
       // `codex login status` in io's home says signed in, so the gate lets us through.
       await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent after fixture login');

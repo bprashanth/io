@@ -275,20 +275,38 @@ class State:
         return out
 
     def cell_spans(self, frame: pd.DataFrame, classes: dict, decided: dict, det) -> dict[str, dict[int, dict]]:
-        """Free-text columns: per cell (first 200 rows), what exactly the scanner found."""
+        """Free-text columns: per cell (first 200 rows), what exactly the scanner found.
+
+        The cells go to the scanner in joined chunks of about 1500 characters (the same
+        separator trick redact_cells uses), so a 200-row column is a handful of calls rather
+        than 200. Through the privacy server that is the difference between round trips
+        and one (2026-09-14: the pii corpus review went from 17 s to a few)."""
+        from pseudonymize import SEP  # noqa: PLC0415
         spans: dict[str, dict[int, dict]] = {}
         for col, info in classes.items():
             cls = decided.get(col, info["class"] if isinstance(info, dict) else info)
             if cls != "free_text_with_pii":
                 continue
             hits: dict[int, dict] = {}
-            for i, v in enumerate(frame[col].head(200)):
-                if not (isinstance(v, str) and v.strip()):
-                    continue
-                found = det(v)
-                if found:
+            cells = [(i, v) for i, v in enumerate(frame[col].head(200)) if isinstance(v, str) and v.strip()]
+            k = 0
+            while k < len(cells):
+                chunk, size = [], 0
+                while k < len(cells) and (size + len(cells[k][1]) < 1500 or not chunk):
+                    chunk.append(cells[k])
+                    size += len(cells[k][1]) + len(SEP)
+                    k += 1
+                text = SEP.join(v for _, v in chunk)
+                found = det(text)
+                cursor = 0
+                for i, v in chunk:
+                    vs, ve = cursor, cursor + len(v)
+                    local = [(st - vs, en - vs, label, c) for (st, en, label, c) in found if st >= vs and en <= ve]
+                    cursor = ve + len(SEP)
+                    if not local:
+                        continue
                     parts, vals = [], []
-                    for st, en, label, _c in found[:3]:
+                    for st, en, label, _c in local[:3]:
                         word = REASON.get(label, label).rstrip("s")
                         parts.append(f"{word}: {v[st:en][:24]}")
                         vals.append(v[st:en])
@@ -928,6 +946,35 @@ class H(BaseHTTPRequestHandler):
                 with S.lock:
                     S.load_folder(folder)
                 return self._json(self.review())
+            if self.path == "/api/chat-workspace":
+                # A conversation with no data: Codex gets an empty io-owned folder, the
+                # policy is approved trivially (nothing to review), the vault starts empty
+                # and grows only from what the person types (validators + scanner, the
+                # same as a typed question). Files come in through /api/attach.
+                ws = CONF / "chats" / time.strftime("%Y%m%d-%H%M%S")
+                ws.mkdir(parents=True, exist_ok=True)
+                with S.lock:
+                    S.load_folder(ws)
+                    S.build_vault()
+                    S.accepted = True
+                return self._json({"folder": str(ws)})
+            if self.path == "/api/attach":
+                # Bring one file into the current chat workspace: copy it in (Codex works on
+                # real files), rescan the folder so the review sheet shows what will leave.
+                # Approval is withdrawn until the person presses Looks right again; the proxy
+                # refuses in between.
+                src = Path(body["path"]).expanduser()
+                if not src.is_file():
+                    return self._json({"error": "not a file"}, 400)
+                if not S.folder or not str(S.folder).startswith(str(CONF / "chats")):
+                    return self._json({"error": "attach works in a conversation without a sheltered folder; shelter the folder instead"}, 400)
+                import shutil  # noqa: PLC0415
+                dest = S.folder / src.name
+                shutil.copy2(src, dest)
+                with S.lock:
+                    S.sessions.pop(str(S.folder), None)
+                    S.load_folder(S.folder)
+                return self._json({"attached": src.name, **self.review()})
             if self.path == "/api/toggle":
                 with S.lock:
                     t = next(x for x in S.tables if x["name"] == body["name"])

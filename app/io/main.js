@@ -49,11 +49,24 @@ function sendToWin(channel, payload) {
 }
 
 ipcMain.handle('codex-status', codexStatus);
-// The login link Codex printed. Only OpenAI's sign-in hosts are ever opened from the page.
+// Links from the page: the sign-in link Codex printed, anything http(s) a person clicked in
+// the terminal, and local files (a dashboard Codex wrote) as long as they sit under the
+// sheltered folder or io's own data. Nothing else opens.
 ipcMain.handle('open-external', async (_e, url) => {
-  if (!/^https:\/\/(auth\.openai\.com|chatgpt\.com|platform\.openai\.com)\//.test(String(url))) return { error: 'not a sign-in link' };
-  await shell.openExternal(String(url));
-  return { ok: true };
+  const u = String(url || '');
+  if (/^https?:\/\//.test(u)) { await shell.openExternal(u); return { ok: true }; }
+  let file = null;
+  if (/^file:\/\//.test(u)) { try { file = decodeURIComponent(new URL(u).pathname); } catch { file = null; } }
+  else if (path.isAbsolute(u)) file = u;
+  if (file) {
+    let roots = [env.dataDir];
+    try { const info = await serviceGet('/api/codex'); if (info.folder) roots.push(info.folder); } catch {}
+    const real = fs.existsSync(file) ? fs.realpathSync(file) : file;
+    if (!roots.some(r => real.startsWith(path.resolve(r) + path.sep))) return { error: 'not a file io may open' };
+    const err = await shell.openPath(real);
+    return err ? { error: err } : { ok: true };
+  }
+  return { error: 'not a link io may open' };
 });
 
 ipcMain.handle('codex-login', async (_e, mode) => {
@@ -83,7 +96,7 @@ ipcMain.handle('codex-start', async (_e, opts) => {
   if (!info.ready || !info.port) return { error: `not protected: ${info.reason || 'proxy not ready'}` };
   if (!info.folder) return { error: 'no sheltered folder' };
   if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
-  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
+  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
   try {
     session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows });
   } catch (e) { return { error: e.message }; }
@@ -316,6 +329,19 @@ async function start() {
   }
 }
 
+ipcMain.handle('pick-file', async () => { const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'data and documents', extensions: ['csv', 'xlsx', 'xls', 'txt', 'md', 'log', 'pdf'] }] }); return r.canceled ? null : r.filePaths[0]; });
+// A line typed into the terminal on the person's behalf (the first message of a
+// conversation started from the chat box, or "I attached x.csv"). Visible in the terminal.
+ipcMain.handle('codex-say', async (_e, text) => {
+  if (!session) return { error: 'no session' };
+  // As a bracketed paste, so the composer takes every character literally ("?" is a
+  // shortcut key otherwise), then Enter after the pause the composer needs to see the
+  // paste as finished; an Enter inside that window is folded into the paste as a newline.
+  const line = String(text).replace(/[\r\n]+/g, ' ').trim();
+  session.write('\x1b[200~' + line + '\x1b[201~');
+  setTimeout(() => { if (session) session.write('\r'); }, 1500);
+  return { ok: true };
+});
 ipcMain.handle('pick-folder', async () => { const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); return r.canceled ? null : r.filePaths[0]; });
 app.whenReady().then(start);
 app.on('window-all-closed', () => { if (session) { try { session.kill(); } catch {} } if (login) { try { login.kill(); } catch {} } if (proc) proc.kill(); app.quit(); });

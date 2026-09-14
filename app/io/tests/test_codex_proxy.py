@@ -318,6 +318,36 @@ class ProxyTests(unittest.TestCase):
         finally:
             p.stop()
 
+    def test_vault_growing_during_one_request_is_applied_to_the_whole_body(self):
+        # instructions (transformed first) mention a word that the "scanner" only mints a
+        # code for when it reaches the user message; the walk must run again
+        class Minting(MapPolicy):
+            def __init__(self):
+                super().__init__({})
+                self.v = 0
+
+            def outbound(self, text, role):
+                if role == "user" and "Kiran Demo" in text and "Kiran Demo" not in self.forward:
+                    MapPolicy.__init__(self, {"Kiran Demo": "NAME_001"})
+                    self.v += 1
+                return MapPolicy.outbound(self, text, role)
+
+            def version(self):
+                return self.v
+
+        p = Proxy(Minting(), upstream=f"http://127.0.0.1:{self.up.port}", log=lambda s: None)
+        port = p.start()
+        try:
+            self.up.script.append(("application/json", 200, [b"{}"]))
+            body = {"instructions": "notes about Kiran Demo", "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "who is Kiran Demo"}]}]}
+            status, _h, _d = post(port, "/backend-api/codex/responses/compact", body)
+            self.assertEqual(status, 200)
+            sent = json.loads(self.up.received[0]["body"])
+            self.assertEqual(sent["instructions"], "notes about NAME_001")
+            self.assertEqual(sent["input"][0]["content"][0]["text"], "who is NAME_001")
+        finally:
+            p.stop()
+
     def test_multi_turn_history_is_cached_and_consistent(self):
         self.up.script.append(("application/json", 200, [b"{}"]))
         self.up.script.append(("application/json", 200, [b"{}"]))

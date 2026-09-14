@@ -35,7 +35,7 @@ test('codex home is io-owned and distinct from ~/.codex', () => {
 test('config points both base urls at the loopback proxy and keeps the codex suffix', () => {
   const home = path.join(tmp, 'home');
   codex.writeConfig(home, 43210, { trust: '/some/folder' });
-  const toml = fs.readFileSync(path.join(home, 'config.toml'), 'utf8');
+  const toml = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
   assert.ok(toml.includes('openai_base_url = "http://127.0.0.1:43210/backend-api/codex"'));
   assert.ok(toml.includes('chatgpt_base_url = "http://127.0.0.1:43210/backend-api/"'));
   assert.ok(toml.includes('enable_request_compression = false'));
@@ -51,7 +51,7 @@ test('config is rewritten with a new port, not appended', () => {
   const home = path.join(tmp, 'home2');
   codex.writeConfig(home, 1111);
   codex.writeConfig(home, 2222);
-  const toml = fs.readFileSync(path.join(home, 'config.toml'), 'utf8');
+  const toml = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
   assert.ok(toml.includes(':2222/'));
   assert.ok(!toml.includes(':1111/'));
 });
@@ -77,10 +77,21 @@ test('login status on an empty home is "not logged in" and never reads ~/.codex'
   assert.ok(!fs.existsSync(path.join(home, 'auth.json')));
 });
 
+test('AGENTS.md for the audience is written beside the profile, chat variant differs', () => {
+  const home = path.join(tmp, 'home4');
+  codex.writeConfig(home, 7, {});
+  const a = fs.readFileSync(path.join(home, 'AGENTS.md'), 'utf8');
+  assert.ok(/not programmers/.test(a) && /NAME_001/.test(a) && !/attach a file/.test(a));
+  codex.writeConfig(home, 7, { chat: true });
+  const b = fs.readFileSync(path.join(home, 'AGENTS.md'), 'utf8');
+  assert.ok(/attach a file/.test(b));
+  assert.ok(fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8').includes('network_access = true'));
+});
+
 test('dev provider block only appears when asked for', () => {
   const home = path.join(tmp, 'home3');
   codex.writeConfig(home, 5, { devProvider: true });
-  const toml = fs.readFileSync(path.join(home, 'config.toml'), 'utf8');
+  const toml = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
   assert.ok(toml.includes('model_provider = "io-dev"') && toml.includes('/dev/v1"'));
   assert.ok(toml.indexOf('model_provider = "io-dev"') < toml.indexOf('\n['), 'top-level key before any table');
 });

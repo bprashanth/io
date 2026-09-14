@@ -93,6 +93,20 @@ comes back as the real value. Codes the vault does not know pass through untouch
 Passed through unchanged, logged: `GET backend-api/codex/models`, `backend-api/wham/*`
 (rate limits, account check, settings; no workspace content).
 
+### The session, from the person's side
+
+- `<home>/io.config.toml` (launched with `-p io`) carries io's settings; Codex's own
+  `config.toml` keeps what the person picks with `/model`. Effort is low by default.
+- `<home>/AGENTS.md`, rewritten each launch, tells Codex who it is talking to: plain words,
+  no technical questions, pages opened in the browser, codes are labels, stay in the folder.
+- Copy and paste work the usual way (Ctrl+C with a selection, Ctrl+V, right-click); links
+  are clickable; a local file Codex wrote under the folder opens with one click.
+- **A conversation without a folder**: type into the chat box on the shelf. Codex runs in an
+  empty io-owned folder with network on; "attach a file" copies a file in, runs the same
+  review, and returns to the same conversation. Codex's sandbox does not stop commands
+  from *reading* elsewhere on disk; the instruction to stay in the folder is text, and a
+  `[permissions]` filesystem profile is the candidate wall.
+
 ## The privacy claim, precisely
 
 **io tokenises what Codex sends to the model provider.** That is the claim, and it is

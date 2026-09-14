@@ -108,6 +108,7 @@ class Stats:
         self.requests = 0
         self.forwarded = 0
         self.refused = 0
+        self.ws_fallbacks = 0
         self.substitutions = 0
         self.restorations = 0
         self.last: dict | None = None
@@ -119,6 +120,8 @@ class Stats:
             self.requests += 1
             if entry.get("forwarded"):
                 self.forwarded += 1
+            elif entry.get("status") == 426:
+                self.ws_fallbacks += 1       # protocol negotiation, not a refusal worth showing
             else:
                 self.refused += 1
             self.substitutions += entry.get("subs", 0)
@@ -253,6 +256,10 @@ class Proxy:
         return out, (1 if out != text else 0)
 
     def transform_request(self, body: Any) -> tuple[Any, int]:
+        """Every string through the policy. If the vault grew while walking (the scanner
+        minted a code from one string that also occurs in a string already transformed),
+        walk again under the new vault; the first run of a conversation refused its own
+        first turn this way (2026-09-14) until the walk repeated."""
         subs = 0
 
         def fn(text: str, role: str | None, _key: str | None) -> str:
@@ -261,7 +268,12 @@ class Proxy:
             subs += n
             return out
 
-        return walk_strings(body, fn), subs
+        for _ in range(3):
+            v0 = self.policy.version()
+            out = walk_strings(body, fn)
+            if self.policy.version() == v0:
+                return out, subs
+        return out, subs
 
     def restore_value(self, body: Any) -> tuple[Any, int]:
         restored = 0

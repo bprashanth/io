@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('io', {
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   openExternal: url => ipcRenderer.invoke('open-external', url),
+  pickFile: () => ipcRenderer.invoke('pick-file'),
   codex: {
     status: () => ipcRenderer.invoke('codex-status'),
     login: mode => ipcRenderer.invoke('codex-login', mode),
@@ -11,6 +12,7 @@ contextBridge.exposeInMainWorld('io', {
     logout: () => ipcRenderer.invoke('codex-logout'),
     start: opts => ipcRenderer.invoke('codex-start', opts),
     stop: () => ipcRenderer.invoke('codex-stop'),
+    say: text => ipcRenderer.invoke('codex-say', text),
     input: data => ipcRenderer.send('codex-input', data),
     resize: (cols, rows) => ipcRenderer.send('codex-resize', { cols, rows }),
     onData: fn => { ipcRenderer.removeAllListeners('codex-data'); ipcRenderer.on('codex-data', (_e, d) => fn(d)); },

@@ -47,16 +47,24 @@ function codexHome(dataDir) {
 //   enable_request_compression = false   Codex would otherwise zstd the body, which the
 //                     proxy cannot read and therefore refuses.
 //   check_for_update_on_startup = false  io pins its own Codex.
+// io's settings go into a profile, `<home>/io.config.toml`, and every session is launched
+// with `-p io`. Codex layers the profile on top of its own config.toml, so what Codex
+// writes there itself - the model a person picks with /model - survives the next launch
+// instead of being wiped by io. Effort is "low" by default: the audience is on the free
+// plan and a chat about a spreadsheet does not need long thinking.
+const PROFILE = 'io';
+
 function writeConfig(home, proxyPort, extra = {}) {
   fs.mkdirSync(home, { recursive: true });
   // TOML: every top-level key must come before the first table header, or it silently
   // becomes a key of that table.
   const top = [
     '# Written by io on every launch. Edits here do not survive; io owns this file.',
+    '# Codex keeps its own choices (the /model pick) in config.toml next to this one.',
     `openai_base_url = "http://127.0.0.1:${proxyPort}/backend-api/codex"`,
     `chatgpt_base_url = "http://127.0.0.1:${proxyPort}/backend-api/"`,
     'check_for_update_on_startup = false',
-    'model_reasoning_effort = "medium"',
+    `model_reasoning_effort = "${extra.effort || 'low'}"`,
   ];
   const tables = [];
   if (extra.model) top.push(`model = "${extra.model}"`);
@@ -86,7 +94,76 @@ function writeConfig(home, proxyPort, extra = {}) {
   tables.push('[analytics]', 'enabled = false', '',
     '[features]', 'enable_request_compression = false', 'apps = false', 'plugins = false',
     'remote_plugin = false', 'plugin_sharing = false', 'recommended_plugins = false', 'image_generation = false', '');
-  fs.writeFileSync(path.join(home, 'config.toml'), top.concat(['']).concat(tables).join('\n'));
+  if (extra.chat) {
+    // A conversation with no sheltered folder: Codex works in an empty io-owned folder, may
+    // download things there (network on), and is told not to read elsewhere. See AGENTS.md.
+    tables.push('[sandbox_workspace_write]', 'network_access = true', '');
+  }
+  fs.writeFileSync(path.join(home, `${PROFILE}.config.toml`), top.concat(['']).concat(tables).join('\n'));
+  fs.writeFileSync(path.join(home, 'AGENTS.md'), agentsMd(extra));
+  // an older io wrote its settings into config.toml itself; take those lines out once
+  const cfg = path.join(home, 'config.toml');
+  if (fs.existsSync(cfg)) {
+    const t = fs.readFileSync(cfg, 'utf8');
+    if (t.includes('Written by io on every launch')) fs.writeFileSync(cfg, '');
+  }
+}
+
+// What Codex is told about who it is talking to. Written to <home>/AGENTS.md, which Codex
+// reads as the person's own instructions in every session (a project AGENTS.md in the
+// folder is added after it, not instead of it).
+function agentsMd(extra = {}) {
+  const lines = [
+    '# Who you are talking to',
+    '',
+    'You are running inside io, a small desktop app, for people who work at non-profit',
+    'organisations in India. They are not programmers. Most will never have used a terminal.',
+    '',
+    '## How to talk',
+    '',
+    '- Plain words. No jargon, no acronyms without saying what they mean, no code unless asked.',
+    '- Never ask a technical question back (nothing about paths, formats, encodings, shells,',
+    '  branches, permissions). If you need to choose, choose the sensible thing and say what',
+    '  you chose in one line.',
+    '- Short answers. One idea per sentence. Numbers in a small table when there are several.',
+    '- When you have done something, say what changed in their words: "I added a column with',
+    '  the total per village", not "I appended a Series".',
+    '',
+    '## Show, do not describe',
+    '',
+    '- When asked for a chart, dashboard, report or anything visual, write one self-contained',
+    '  HTML file (inline CSS and JS, no internet needed to view it) in the working folder,',
+    '  then open it for them: run `xdg-open <file>` on Linux, `open <file>` on macOS,',
+    '  `start "" <file>` on Windows. If opening fails, print the full path on its own line so',
+    '  they can click it.',
+    '- Prefer a page in the browser over long text in this window.',
+    '- When you refer to a file or a web page, give the full path or link on its own line.',
+    '',
+    '## Their data',
+    '',
+    '- Names, phone numbers and places in what you see may appear as codes like NAME_001 or',
+    '  PLACE_003. That is expected. Use them as ordinary labels, never mention that they are',
+    '  codes, and never try to guess what they stand for.',
+    '- Do not send their data anywhere, do not upload files, do not paste their data into',
+    '  web forms or search boxes.',
+  ];
+  if (extra.chat) {
+    lines.push(
+      '- This conversation has no sheltered folder. Work only inside the current working',
+      '  folder. Do not read, list or open files anywhere else on this computer. If they want',
+      '  help with their own files, tell them to press "attach a file" in io, which checks the',
+      '  file for private details first.',
+    );
+  } else {
+    lines.push(
+      '- Work inside the current working folder. It has been checked for private details;',
+      '  other folders on this computer have not, so do not read files outside it.',
+    );
+  }
+  lines.push('', '## Be careful with their time and their plan', '',
+    '- Keep steps few. Do not run long explorations. Ask nothing you can find out yourself.',
+    '');
+  return lines.join('\n');
 }
 
 function baseEnv(home) {
@@ -142,7 +219,7 @@ function logout(bin, home) {
 // raw keys, none of which survive a pipe.
 function spawnSession({ bin, home, cwd, cols, rows, noAltScreen }) {
   if (!pty) throw new Error('node-pty is not available in this build');
-  const args = [];
+  const args = ['-p', PROFILE];
   if (noAltScreen) args.push('--no-alt-screen');
   return pty.spawn(bin, args, {
     name: 'xterm-256color',
@@ -162,4 +239,4 @@ function binaryInfo(bin) {
   } catch { return { exists: false }; }
 }
 
-module.exports = { bundledCodexPath, codexHome, writeConfig, baseEnv, loginStatus, startLogin, logout, spawnSession, binaryInfo, hasPty: () => !!pty, PINS };
+module.exports = { bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };
