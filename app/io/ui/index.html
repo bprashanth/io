@@ -735,7 +735,10 @@ q.addEventListener('keydown', async e => {
   if (e.key !== 'Enter' || e.shiftKey) return;
   e.preventDefault();
   const text = q.value.trim(); if (!text) return;
-  if (codexMode && !files.length) { q.value = ''; paintMirror(); await startChatWorkspace(text); return; }
+  // In Codex mode the chat box on the landing page always starts a conversation; the old
+  // three-model chat is never the destination (it answered "no model could be reached"
+  // when a previous folder's file list was still in memory after pressing home).
+  if (codexMode) { q.value = ''; paintMirror(); await startChatWorkspace(text); return; }
   if (!files.length) { pickFolder(); return; }
   if (!accepted) { renderSheet(); return; }
   q.value = ''; paintMirror(); q.disabled = true;
@@ -1025,7 +1028,7 @@ $('#cx-attach').onclick = async () => {
   renderSheet();
 };
 $('#cx-restart').onclick = () => startCodex();
-$('#cx-folders').onclick = () => { chatWorkspace = null; show('#s-home'); renderShelf(); };
+$('#cx-folders').onclick = () => { chatWorkspace = null; files = []; accepted = false; show('#s-home'); renderShelf(); };
 
 paintMirror();
 </script>
