@@ -165,6 +165,8 @@ td.tok{background:var(--hibg);color:var(--hi)}
 #cx-top .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block}
 #cx-top .dot.ok{background:var(--grn)}
 #cx-top .dot.bad{background:#e06c6c}
+#cx-top .brand{color:var(--hi);font-weight:600;letter-spacing:.5px;padding-right:6px;border-right:1px solid var(--line);margin-right:2px}
+#cx-hint{font-size:12px}
 #cx-wrap{flex:1;min-height:0;padding:10px 14px 6px;background:#15181c}
 #term{width:100%;height:100%}
 #cx-bottom{display:flex;align-items:center;gap:14px;padding:10px 18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim)}
@@ -274,6 +276,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
 
 <div class="screen" id="s-codex">
   <div id="cx-top">
+    <span class="pill brand" id="cx-brand"></span>
     <span class="pill"><span>Workspace</span> <b id="cx-folder"></b></span>
     <span class="pill"><span class="dot" id="cx-dot-priv"></span><span>Privacy</span> <b id="cx-priv">…</b></span>
     <span class="pill"><span class="dot" id="cx-dot-proxy"></span><span>Proxy</span> <b id="cx-proxy">…</b></span>
@@ -285,6 +288,8 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <span id="cx-shield">Protected by io</span>
     <span id="cx-stats" class="dim"></span>
     <span class="grow"></span>
+    <span class="dim" id="cx-hint">select text with Shift + drag</span>
+    <button id="cx-copy">copy text</button>
     <button id="cx-attach" style="display:none">attach a file</button>
     <button id="cx-restart" style="display:none">restart Codex</button>
     <button id="cx-folders">home</button>
@@ -887,6 +892,23 @@ function renderCompare(el, w, r){
 // proxy port, counts) and the shell (bundled binary, login). "Protected" is shown only
 // when both say so.
 let term = null, fitAddon = null, cxTimer = null, cxRunning = false, cxNote = null;
+// The organisation's mark, on io's own bar. The box inside the terminal that says
+// "OpenAI Codex" is drawn by Codex itself (tui/src/history_cell/session.rs) and cannot
+// be changed from outside; ours sits above it.
+const BRAND = 'T4GC';
+$('#cx-brand').textContent = BRAND + ' · io';
+// The Codex TUI takes the mouse (for its own scrolling), so plain drag does not select.
+// Shift + drag (Alt + drag on a Mac) selects, and "copy text" takes the whole screen
+// and scrollback to the clipboard for pasting elsewhere.
+$('#cx-hint').textContent = /Mac/.test(navigator.platform) ? 'select text with Alt + drag' : 'select text with Shift + drag';
+$('#cx-copy').onclick = async () => {
+  if (!term) return;
+  const b = term.buffer.active, lines = [];
+  for (let i = 0; i < b.length; i++) { const ln = b.getLine(i); if (ln) lines.push(ln.translateToString(true)); }
+  const text = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  try { await navigator.clipboard.writeText(text); $('#cx-copy').textContent = 'copied'; } catch (e) { $('#cx-copy').textContent = 'could not copy'; }
+  setTimeout(() => { $('#cx-copy').textContent = 'copy text'; }, 1500);
+};
 function fitTerm(){ if (!term || !fitAddon) return; try { fitAddon.fit(); window.io.codex.resize(term.cols, term.rows); } catch (e) {} }
 function ensureTerm(){
   if (term) return;
