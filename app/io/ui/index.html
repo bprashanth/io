@@ -915,7 +915,9 @@ function ensureTerm(){
     if (term.hasSelection()) { navigator.clipboard.writeText(term.getSelection()).catch(() => {}); term.clearSelection(); }
     else navigator.clipboard.readText().then(t => { if (t) term.paste(t); }).catch(() => {});
   });
-  term.onData(d => { if (cxNote) { cxNote = null; cxErr(''); } window.io.codex.input(d); });
+  // the note goes away when the person types; focus reports and other escape sequences
+  // the TUI asked for are not typing
+  term.onData(d => { if (cxNote && !d.startsWith('\x1b')) { cxNote = null; cxErr(''); } window.io.codex.input(d); });
   term.onResize(({cols, rows}) => window.io.codex.resize(cols, rows));
   window.io.codex.onData(d => term.write(d));
   window.io.codex.onExit(({exitCode}) => { cxRunning = false; term.write(`\r\n\x1b[90m[Codex ended (exit ${exitCode})]\x1b[0m\r\n`); $('#cx-restart').style.display = ''; paintCodexStatus(); });
