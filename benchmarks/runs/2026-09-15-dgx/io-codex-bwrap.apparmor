@@ -1,0 +1,12 @@
+# Temporary, loaded with apparmor_parser -r; not in /etc/apparmor.d, gone at reboot.
+# Ubuntu 24.04 denies user namespaces to unconfined binaries (kernel.apparmor_restrict_unprivileged_userns=1);
+# this grants them to io's bundled bubblewrap only, the same way Ubuntu does for its own packages.
+abi <abi/4.0>,
+include <tunables/global>
+profile io-codex-bwrap <checkout>/app/io/codex-bin/<target>/codex-resources/bwrap flags=(unconfined) {
+  userns,
+}
+# Codex prefers the system bubblewrap when one is installed (audit: execpath=/usr/bin/bwrap), so it needs the grant too.
+profile io-system-bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}

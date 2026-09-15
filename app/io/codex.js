@@ -152,6 +152,13 @@ function writeConfig(home, proxyPort, extra = {}) {
     if (extra.libsDir) fsEntries.push(`"${esc(extra.libsDir)}" = "read"`);
     for (const t of new Set([os.tmpdir(), '/tmp'].filter(Boolean))) fsEntries.push(`"${esc(t)}" = "write"`);
     const wall = wallOf(extra.wall);
+    // "Open" had the network but no name resolution (DGX, 2026-09-15): ":minimal" does not
+    // include /run, and on systemd-resolved machines /etc/resolv.conf is a symlink into
+    // /run/systemd/resolve, so every curl inside the wall failed with "could not resolve
+    // host" while loopback worked. Grant the resolver's directory when commands may go online.
+    if ((extra.chat || wall.network) && process.platform === 'linux' && fs.existsSync('/run/systemd/resolve')) {
+      fsEntries.push('"/run/systemd/resolve" = "read"');
+    }
     tables.push('[permissions.io]', 'description = "io: the sheltered folder and nothing else"', '',
       '[permissions.io.filesystem]', ...fsEntries, '',
       '[permissions.io.filesystem.":workspace_roots"]', '"." = "write"', '',
