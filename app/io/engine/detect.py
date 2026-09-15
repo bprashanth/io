@@ -108,15 +108,26 @@ def make_server(url: str, timeout: float = 30.0) -> Callable[[str], list[Span]]:
     asked to find the private values in it. io asks the person before ever using this.
     """
     import urllib.request
+    from urllib.parse import urlsplit, urlunsplit
 
-    endpoint = url.rstrip("/")
+    # https://TOKEN@privacy.example.org -> the token goes as a bearer header, never in the
+    # URL that gets logged. A server without a token is a plain address.
+    parts = urlsplit(url.strip())
+    token = parts.username or ""
+    host = parts.hostname or ""
+    if parts.port:
+        host += f":{parts.port}"
+    endpoint = urlunsplit((parts.scheme, host, parts.path, "", "")).rstrip("/")
     if not endpoint.endswith("/scan"):
         endpoint += "/scan"
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
 
     def run(text: str) -> list[Span]:
         req = urllib.request.Request(
             endpoint, data=json.dumps({"text": text}).encode(),
-            headers={"Content-Type": "application/json"})
+            headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as r:
             payload = json.loads(r.read())
         return [(int(a), int(b), str(c), float(d)) for a, b, c, d in payload.get("spans", [])]

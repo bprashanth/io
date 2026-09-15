@@ -1,0 +1,29 @@
+# The io privacy server as a systemd *user* service on the DGX.
+#
+#   mkdir -p ~/.config/systemd/user ~/.config/io-privacy-server
+#   cp installation/privacy-server/io-privacy-server.service ~/.config/systemd/user/
+#   echo "IO_PRIVACY_TOKEN=$(openssl rand -hex 24)" > ~/.config/io-privacy-server/env
+#   chmod 600 ~/.config/io-privacy-server/env
+#   systemctl --user daemon-reload && systemctl --user enable --now io-privacy-server
+#   loginctl enable-linger $USER          # keep it running when nobody is logged in
+#   journalctl --user -u io-privacy-server -f
+#
+# The token is the only thing between the internet and a scanner that sees text as it is.
+# io is given it inside the server address: https://<token>@privacy.idli.cc
+[Unit]
+Description=io privacy server (GLiNER on the GPU, port 8899)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/src/github.com/bprashanth/io/app/io
+EnvironmentFile=%h/.config/io-privacy-server/env
+Environment=IO_SCANNER_DEVICE=cuda
+Environment=HF_HUB_OFFLINE=1
+Environment=HF_HOME=%h/src/github.com/bprashanth/io/app/io/hf-cache
+Environment=CPATH=%h/.local/share/io/runtime/include/python3.12
+ExecStart=%h/src/github.com/bprashanth/io/.venv-pii/bin/python privacy_server.py 8899
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
