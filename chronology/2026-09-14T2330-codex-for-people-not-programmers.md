@@ -158,3 +158,23 @@ moment a real network sat between io and the scanner, and both are fixed:
 Same hidden columns and cell marks per table as the per-question run (one cell count moved
 by one on a batch-padding difference); vault 1,108 codes both ways; zero vault values left
 in the coded output.
+
+## 2026-09-15 10:40 - Column names were being coded
+
+Laptop transcript ("plot on a map the main locations"): the model's script asked for
+`row.get("PLACE_052")` and `row.get("GPS_004")`; the columns are `village`, `gps_lat`,
+`gps_lon`. Reproduced here on the same corpus: the vault (4,685 codes) held
+`PLACE_052 = "village"`, `GPS_002 = "gps_lat"`, `GPS_003 = "gps_lon"`,
+`NAME_1440 = "enumerator_name"` - minted from the corpus README, where the scanner tagged
+the words describing the columns as places and names. From then on every command that
+printed the CSV header showed the model codes where the column names should be. Column
+names are structure, not data. `kept_all()` now includes the column names of every
+sheltered table (3+ characters), and the known-values pass in `redact_text` honours the
+kept set (it did not before: only the detector spans were filtered). Probe: the header
+line leaves intact, the data row beside it still codes. `IO_KEEP_HEADERS=0` reproduces
+the old behaviour.
+
+Open: on the laptop the codes also survived *into the file on disk*, which means the
+inbound restoration did not apply there. Here, the same request (fix off) restored fine
+and produced a working map page; the apply_patch custom-tool stream restores in a unit
+test added today. Needs the laptop's proxy dump (`IO_PROXY_DUMP`) to explain.

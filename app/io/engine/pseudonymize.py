@@ -101,8 +101,10 @@ class PseudonymMap:
 
 
 def redact_text(text: str, pmap: PseudonymMap, detector: Callable[[str], list[tuple[int, int, str, float]]] | None,
-                classes: set[str] | None = None) -> tuple[str, list[dict[str, Any]]]:
-    """Replace known values (longest first) and detector spans with tokens."""
+                classes: set[str] | None = None, kept: set[str] | None = None) -> tuple[str, list[dict[str, Any]]]:
+    """Replace known values (longest first) and detector spans with tokens.
+    kept: casefolded values that stay clear even though the vault knows them (what the
+    person chose to keep, and the column names of the sheltered tables)."""
     events: list[dict[str, Any]] = []
     spans: list[tuple[int, int, str]] = []
     existing = [(m.start(), m.end()) for m in TOKEN_RE.finditer(text)]
@@ -116,6 +118,8 @@ def redact_text(text: str, pmap: PseudonymMap, detector: Callable[[str], list[tu
     known = pmap.known_regex()
     if known:
         for m in known.finditer(text):
+            if kept and m.group(0).casefold() in kept:
+                continue
             token = pmap.forward.get(normalise(m.group(0)))
             if token:
                 spans.append((m.start(), m.end(), f"known:{token}"))

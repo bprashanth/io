@@ -203,6 +203,28 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(events[2]["item"]["arguments"], "{\"cmd\":\"grep Alice Example data.csv\"}")
         self.assertEqual(events[2]["item"]["name"], "shell")   # structural, untouched
 
+    def test_apply_patch_custom_tool_stream_is_restored(self):
+        # the model adds a file through the apply_patch custom tool: the streamed input, the
+        # input.done and the item all come back with real column names
+        p = Proxy(MapPolicy({"village": "PLACE_052", "gps_lat": "GPS_004"}), upstream=f"http://127.0.0.1:{self.up.port}", log=lambda s: None)
+        port = p.start()
+        try:
+            patch = '*** Begin Patch\n*** Add File: build.py\n+place = row.get("PLACE_052", "")\n+lat = float(row.get("GPS_004"))\n*** End Patch'
+            self.up.script.append(("text/event-stream", 200, [sse([
+                {"type": "response.custom_tool_call_input.delta", "item_id": "i1", "output_index": 0, "delta": '+place = row.get("PLACE_0'},
+                {"type": "response.custom_tool_call_input.delta", "item_id": "i1", "output_index": 0, "delta": '52", "")\n'},
+                {"type": "response.custom_tool_call_input.done", "item_id": "i1", "output_index": 0, "input": patch},
+                {"type": "response.output_item.done", "item": {"type": "custom_tool_call", "name": "apply_patch", "call_id": "c1", "input": patch}},
+                {"type": "response.completed", "response": {"id": "r"}},
+            ])]))
+            _s, _h, data = post(port, "/backend-api/codex/responses", {"input": []})
+            events = [json.loads(l[5:]) for l in data.decode().split("\n") if l.startswith("data:")]
+            self.assertEqual("".join(e["delta"] for e in events if "delta" in e), '+place = row.get("village", "")\n')
+            self.assertIn('row.get("gps_lat")', events[-2]["item"]["input"])
+            self.assertNotIn("PLACE_052", data.decode())
+        finally:
+            p.stop()
+
     def test_overlapping_values_longest_first_and_unicode(self):
         self.up.script.append(("application/json", 200, [b"{\"ok\":true}"]))
         body = {"input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "Ramesh Kumar and Ramesh and Zoë Müller went"}]}]}

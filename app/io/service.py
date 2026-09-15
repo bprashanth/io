@@ -437,7 +437,15 @@ class State:
         return {v.casefold() for v in self.kept.get(key, [])}
 
     def kept_all(self) -> set:
-        return {v.casefold() for vals in self.kept.values() for v in vals}
+        # Column names are structure, not data: a README that says "the village column" had
+        # the scanner mint PLACE_052 for the word "village", and every command that printed
+        # the CSV header then showed the model codes where the column names should be, so
+        # its scripts asked for row["PLACE_052"] and found nothing (laptop, 2026-09-15).
+        # Headers stay clear everywhere: outbound, coding, leak check.
+        kept = {v.casefold() for vals in self.kept.values() for v in vals}
+        if os.environ.get("IO_KEEP_HEADERS", "1") != "0":
+            kept |= {str(c).strip().casefold() for t in self.tables for c in t["frame"].columns if len(str(c).strip()) >= 3}
+        return kept
 
     def save_decisions(self) -> None:
         DECISIONS_PATH.write_text(json.dumps({**self.decisions, "_kept": self.kept}, indent=1))
@@ -519,7 +527,7 @@ class IoPolicy(codex_proxy.Policy):
 
         with S.vault_lock:
             before = len(S.pmap.display)
-            out, _events = redact_text(text, S.pmap, filt, classes=self.DIRECT)
+            out, _events = redact_text(text, S.pmap, filt, classes=self.DIRECT, kept=kept)
             if len(S.pmap.display) != before and time.monotonic() - S.vault_saved_at > 1.0:
                 S.pmap.save()               # new codes were minted: keep the vault on disk current
                 S.vault_saved_at = time.monotonic()

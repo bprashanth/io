@@ -23,6 +23,11 @@ const CDP = Number(arg('cdp', 9801));
 // linked into the data dir instead, which is exactly what a finished first run leaves there.
 const EXE = arg('exe', null);
 const CHAT = process.argv.includes('--chat');
+// --map: shelter the pii corpus and ask for a map; the point is what the written script
+// contains (column names or codes) and what the proxy saw. Run with the header fix off
+// (IO_KEEP_HEADERS=0) to reproduce the laptop, on to verify the fix.
+const MAP = process.argv.includes('--map');
+const TESTDATA_SRC = MAP ? path.resolve(__dirname, '../../pii/corpus') : path.join(__dirname, 'testdata');
 const PORT_BASE = Number(arg('port-base', 8841));
 const APP = path.resolve(__dirname, '../../../app/io');
 const DATA = path.join(OUT, 'data');
@@ -30,7 +35,7 @@ const IOHOME = path.join(OUT, 'io-home');
 const TESTDATA = path.join(OUT, 'workspace');
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(DATA, { recursive: true }); fs.mkdirSync(IOHOME, { recursive: true });
-fs.cpSync(path.join(__dirname, 'testdata'), TESTDATA, { recursive: true });
+fs.cpSync(TESTDATA_SRC, TESTDATA, { recursive: true });
 if (EXE) {
   fs.symlinkSync(path.join(APP, '.venv'), path.join(DATA, 'runtime'));
   fs.symlinkSync(path.join(APP, 'hf-cache'), path.join(DATA, 'hf-cache'));
@@ -120,7 +125,30 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await shot(page, 'login-cancelled');
     }
 
-    if (FIXTURE && CHAT) {
+    if (FIXTURE && MAP) {
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#sheet-top').isVisible(), 300000, 'scan finished');
+      await page.click('#sheet-ok');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 120000, 'codex screen');
+      await waitFor(page, async () => (await termText(page)).length > 200, 40000, 'codex TUI first paint');
+      await sleep(2500);
+      await page.click('#term');
+      await page.keyboard.type('Plot on a map the main locations we have in household_survey.csv. One self-contained html page in this folder.', { delay: 6 });
+      await sleep(1200);
+      await page.keyboard.press('Enter');
+      const ok = await waitFor(page, () => fs.readdirSync(TESTDATA).some(f => /\.html$/.test(f) && !/dashboard|frequency/.test(f)), 300000, 'a new html page written');
+      await sleep(4000);
+      await shot(page, 'map-request');
+      const written = fs.readdirSync(TESTDATA).filter(f => (/\.(html|py)$/.test(f)) && !/dashboard|frequency|build_(household_)?dashboard/.test(f));
+      results.map = { pageWritten: ok, files: written, codesInWrittenFiles: {}, tail: (await termText(page)).slice(-1500) };
+      for (const f of written) { const t = fs.readFileSync(path.join(TESTDATA, f), 'utf8'); results.map.codesInWrittenFiles[f] = (t.match(/\b(?:NAME|PLACE|GPS|PHONE)_\d{3,}\b/g) || []).slice(0, 8); }
+      results.proxy = await api(page, '/api/codex');
+    } else if (FIXTURE && CHAT) {
       await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
       await page.click('#c-ok');
       await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
