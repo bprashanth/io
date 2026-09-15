@@ -156,3 +156,25 @@ model (gpt-5.2 at low effort through the dev provider) emitted the tool call as 
 `{"cmd":"printf ..."}` printed inside its message instead of a function call, so nothing
 ran. Yesterday's runs made the call properly. A model quirk on this path, not the wall:
 the probe run above already showed the wall lets the folder be written.
+
+## 22:25 - Checkpoint: the grants are permanent on the DGX
+
+Decision (user): keep the wall runnable on this box. Installed exactly the file io itself
+generated for the halt (`<data>/io-bwrap`, two profiles: `/usr/bin/bwrap` and the bundled
+`codex-resources/bwrap`) with io's own printed command:
+`sudo install -m 644 io-bwrap /etc/apparmor.d/io-bwrap && sudo apparmor_parser -r
+/etc/apparmor.d/io-bwrap`. The transient scratchpad profiles were removed first so no
+path is attached twice. `aa-status` lists `io-bwrap-0` and `io-bwrap-1`; `sandboxCheck`
+answers ok with `/usr/bin/bwrap`; survives reboot. Undo: `sudo apparmor_parser -R
+/etc/apparmor.d/io-bwrap && sudo rm /etc/apparmor.d/io-bwrap`.
+
+One correction to an assumption raised while deciding this: **Open is a wall setting
+too**. It differs from the others only in letting commands reach the network; it still
+runs every command inside bubblewrap. On a machine that cannot run the sandbox, Open is
+halted with the other two. The only thing that would let Codex work there is a fourth
+"no wall" setting (`danger-full-access`, what the dev bypass does), which was decided
+against today: tokenisation would still hold for the model traffic, but the folder next
+door would be readable and "Protected by io" would be a claim about the wire only.
+
+State of this box for the next agent: the wall runs; `IO_CODEX_NO_SANDBOX=1` is no
+longer needed for drives here and the driver no longer sets it.
