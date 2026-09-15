@@ -55,12 +55,18 @@ ipcMain.handle('codex-status', codexStatus);
 ipcMain.handle('open-external', async (_e, url) => {
   const u = String(url || '');
   if (/^https?:\/\//.test(u)) { await shell.openExternal(u); return { ok: true }; }
+  let folder = null;
+  try { const info = await serviceGet('/api/codex'); if (info.folder) folder = info.folder; } catch {}
   let file = null;
   if (/^file:\/\//.test(u)) { try { file = decodeURIComponent(new URL(u).pathname); } catch { file = null; } }
   else if (path.isAbsolute(u)) file = u;
+  // Codex names a page it wrote the way it told the person about it - a bare
+  // "main_locations_map.html" - so a relative name resolves against the sheltered folder.
+  // The containment check below is still what decides; this only says where to look.
+  else if (u && !u.split(/[\\/]/).includes('..') && folder) file = path.join(folder, u);
   if (file) {
     let roots = [env.dataDir];
-    try { const info = await serviceGet('/api/codex'); if (info.folder) roots.push(info.folder); } catch {}
+    if (folder) roots.push(folder);
     const real = fs.existsSync(file) ? fs.realpathSync(file) : file;
     if (!roots.some(r => real.startsWith(path.resolve(r) + path.sep))) return { error: 'not a file io may open' };
     const err = await shell.openPath(real);
@@ -104,13 +110,23 @@ ipcMain.handle('codex-start', async (_e, opts) => {
   if (!info.folder) return { error: 'no sheltered folder' };
   if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
   codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
+  let mine;
   try {
-    session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows });
+    mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows });
   } catch (e) { return { error: e.message }; }
-  session.ioFolder = info.folder;
-  session.onData(d => sendToWin('codex-data', d));
-  session.onExit(({ exitCode, signal }) => { session = null; sendToWin('codex-exit', { exitCode, signal }); });
-  return { ok: true, pid: session.pid, port: info.port, folder: info.folder };
+  mine.ioFolder = info.folder;
+  mine.onData(d => sendToWin('codex-data', d));
+  // Only the *current* session may clear the handle. A killed Codex takes a moment to die,
+  // and its exit arrives after the next one has already started: closing over `session`
+  // meant that late event nulled the live session instead of the dead one. Output kept
+  // flowing (onData is bound to the pty itself) while every keystroke was dropped by
+  // codex-input below, so a conversation opened from the shelf could not be typed into at
+  // all until the person pressed "restart Codex". Seen on the laptop, 2026-09-15.
+  mine.onExit(({ exitCode, signal }) => {
+    if (session === mine) session = null;
+    sendToWin('codex-exit', { exitCode, signal, stale: session !== null });
+  });
+  return { ok: true, pid: mine.pid, port: info.port, folder: info.folder };
 });
 ipcMain.on('codex-input', (_e, data) => { if (session) session.write(data); });
 ipcMain.on('codex-resize', (_e, { cols, rows }) => { if (session && cols > 0 && rows > 0) { try { session.resize(cols, rows); } catch {} } });

@@ -930,6 +930,32 @@ function ensureTerm(){
   // Links open in the person's browser; the shell decides what may open (http/https, and
   // files under the workspace or io's own data).
   term.loadAddon(new WebLinksAddon.WebLinksAddon((_ev, uri) => window.io.openExternal(uri)));
+  // WebLinksAddon only ever sees http(s). Codex finishes a piece of work by naming the page
+  // it wrote - "Open the map (main_locations_map.html)" - and that was dead text: the person
+  // was told to click something that could not be clicked, and xdg-open inside the wall
+  // cannot reach the browser either, so the page had no way of being opened at all. Make a
+  // file Codex named clickable; the shell still decides whether it may open (it must sit
+  // under the sheltered folder or io's own data).
+  const OPENABLE = /(?:\/[\w@%+.-]+)+\.(?:html?|pdf|csv|xlsx?|png|jpe?g|svg|md|txt)\b|[\w@%+-]+(?:[._-][\w@%+-]+)*\.(?:html?|pdf|csv|xlsx?|png|jpe?g|svg|md|txt)\b/g;
+  term.registerLinkProvider({
+    provideLinks(y, done) {
+      const line = term.buffer.active.getLine(y - 1);
+      if (!line) return done(undefined);
+      const text = line.translateToString(true);
+      const out = [];
+      OPENABLE.lastIndex = 0;
+      let m;
+      while ((m = OPENABLE.exec(text)) !== null) {
+        const hit = m[0];
+        out.push({
+          range: { start: { x: m.index + 1, y }, end: { x: m.index + hit.length, y } },
+          text: hit,
+          activate: () => window.io.openExternal(hit),
+        });
+      }
+      done(out.length ? out : undefined);
+    },
+  });
   term.open($('#term'));
   // Copy and paste the way people expect: Ctrl+C with text selected copies (without a
   // selection it still interrupts Codex), Ctrl+V and Ctrl+Shift+V paste, right-click pastes
@@ -952,7 +978,10 @@ function ensureTerm(){
   term.onData(d => { if (cxNote && !d.startsWith('\x1b')) { cxNote = null; cxErr(''); } window.io.codex.input(d); });
   term.onResize(({cols, rows}) => window.io.codex.resize(cols, rows));
   window.io.codex.onData(d => term.write(d));
-  window.io.codex.onExit(({exitCode}) => { cxRunning = false; term.write(`\r\n\x1b[90m[Codex ended (exit ${exitCode})]\x1b[0m\r\n`); $('#cx-restart').style.display = ''; paintCodexStatus(); });
+  // A superseded Codex exits after its replacement is already up; the shell marks that
+  // event stale. Acting on it told the person Codex had ended and offered them a restart
+  // while the new session was running perfectly well.
+  window.io.codex.onExit(({exitCode, stale}) => { if (stale) return; cxRunning = false; term.write(`\r\n\x1b[90m[Codex ended (exit ${exitCode})]\x1b[0m\r\n`); $('#cx-restart').style.display = ''; paintCodexStatus(); });
   new ResizeObserver(() => fitTerm()).observe($('#cx-wrap'));
   window.addEventListener('resize', fitTerm);
 }

@@ -47,7 +47,8 @@ class FakeUpstream:
                 srv.received.append({"path": self.path, "headers": dict(self.headers), "body": raw})
                 ctype, status, chunks = srv.script.pop(0) if srv.script else ("application/json", 200, [b"{}"])
                 self.send_response(status)
-                self.send_header("Content-Type", ctype)
+                if ctype:                       # None/"" reproduces an upstream that sends none
+                    self.send_header("Content-Type", ctype)
                 self.send_header("Connection", "close")
                 self.end_headers()
                 for c in chunks:
@@ -177,6 +178,24 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(status, 200)
         deltas = "".join(json.loads(ln[5:])["delta"] for ln in data.decode().split("\n") if ln.startswith("data:") and "delta" in ln)
         self.assertEqual(deltas, "It is Alice Example again")
+
+    def test_sse_without_a_content_type_is_still_restored(self):
+        """chatgpt.com streams the Codex responses endpoint with no Content-Type header.
+
+        Deciding on the header alone dropped the whole answer down the raw pass-through
+        path, so codes reached the person unrestored ("PLACE_003" where a village name
+        belonged). Seen live on 2026-09-15; every other test here sets a Content-Type, so
+        nothing caught it.
+        """
+        ev = {"type": "response.output_text.delta", "item_id": "m1", "output_index": 0,
+              "content_index": 0, "delta": "the name is NAME_001 today"}
+        done = {"type": "response.completed", "response": {"id": "r"}}
+        self.up.script.append((None, 200, [sse([ev]), sse([done])]))
+        status, _h, data = post(self.port, "/backend-api/codex/responses", {"input": []})
+        self.assertEqual(status, 200)
+        deltas = "".join(json.loads(ln[5:])["delta"] for ln in data.decode().split("\n")
+                         if ln.startswith("data:") and "delta" in ln)
+        self.assertEqual(deltas, "the name is Alice Example today")
 
     def test_held_tail_is_flushed_before_a_done_event(self):
         ev1 = {"type": "response.output_text.delta", "item_id": "m1", "output_index": 0, "content_index": 0, "delta": "ask NAME"}

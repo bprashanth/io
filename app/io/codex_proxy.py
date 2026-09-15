@@ -443,12 +443,26 @@ class Proxy:
             h.wfile.write(data)
             return
 
+        # chatgpt.com streams the Codex responses endpoint back with no Content-Type header
+        # at all (seen live on an x64 laptop, 2026-09-15). Deciding on the header alone sent
+        # every answer down the raw path below: nothing was restored, and the person read
+        # "PLACE_003" where a village name belonged. Every proxy test set a Content-Type, so
+        # the suite stayed green. When the header is missing or unhelpful on a content route,
+        # look at the first bytes instead - an SSE body starts with an "event:" or "data:"
+        # line - and hand what we peeked to the streamer so nothing is lost.
+        prefix = b""
+        if kind == "content" and "event-stream" not in ctype and "json" not in ctype:
+            prefix = resp.read1(8192) if hasattr(resp, "read1") else resp.read(8192)
+            head = prefix.lstrip()[:16]
+            if head.startswith(b"event:") or head.startswith(b"data:"):
+                ctype = "text/event-stream"
+
         if "event-stream" in ctype:
             h.end_headers()
-            self.stream_sse(resp, h.wfile, rid, entry)
+            self.stream_sse(resp, h.wfile, rid, entry, prefix)
             return
 
-        data = resp.read()
+        data = prefix + resp.read()
         if "json" in ctype:
             try:
                 obj, n = self.restore_value(json.loads(data.decode("utf-8")))
@@ -494,14 +508,17 @@ class Proxy:
         return bytes(out)
 
     # ------------------------------------------------------------------ SSE
-    def stream_sse(self, resp, wfile, rid: str, entry: dict) -> None:
-        """Parse events, restore strings, forward each event as soon as it is complete."""
+    def stream_sse(self, resp, wfile, rid: str, entry: dict, prefix: bytes = b"") -> None:
+        """Parse events, restore strings, forward each event as soon as it is complete.
+
+        `prefix` is any part of the body already read off the socket while sniffing.
+        """
         restorers: dict[str, StreamRestorer] = {}
         last_delta: dict[str, dict] = {}
         events = 0
         restored = 0
         dump_parts: list[bytes] = []
-        buf = b""
+        buf = prefix
 
         def stream_key(ev: dict) -> str:
             return "|".join(str(ev.get(k, "")) for k in ("type", "item_id", "output_index", "content_index", "summary_index"))
