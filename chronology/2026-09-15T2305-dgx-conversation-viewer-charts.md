@@ -1,4 +1,4 @@
-# 2026-09-15, 23:20 IST — DGX: conversations stop coding words, pages open inside io, charts without a network
+# 2026-09-15, 23:05 IST — DGX: conversations stop coding words, pages open inside io, charts without a network
 
 Follows `2026-09-15T1856-dgx-sandbox-boundary.md`. The wall runs on this box now, so every
 drive below ran with the real sandbox (`IO_DRIVE_BYPASS` unset). Evidence under
