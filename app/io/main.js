@@ -1,5 +1,5 @@
 // io — minimal desktop shell.
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -8,11 +8,137 @@ const net = require('net');
 
 const runtime = require('./runtime');
 const bootstrap = require('./bootstrap');
+const codex = require('./codex');
 
 const PORT_BASE = Number(process.env.IO_PORT_BASE || 8801);
 let proc = null;
 let env = null;
 let splash = null;
+let servicePort = null;
+let win = null;
+
+// ---- the bundled Codex -------------------------------------------------------------
+// One PTY session at a time, one login at a time. Everything privileged - the binary path,
+// CODEX_HOME, the proxy port, the spawn - stays here in main; the renderer sees terminal
+// bytes and status strings, never a token or a path it chose itself.
+let session = null;      // node-pty process
+let wall = null;         // the setting the person picked for this folder (see codex.js WALLS)
+let login = null;        // child process of `codex login`
+
+const serviceGet = p => new Promise((res, rej) => http.get(`http://127.0.0.1:${servicePort}${p}`, r => {
+  let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } });
+}).on('error', rej));
+
+function codexPaths() {
+  const bin = codex.bundledCodexPath({ packaged: app.isPackaged });
+  return { bin, home: codex.codexHome(env.dataDir) };
+}
+
+async function codexStatus() {
+  const { bin, home } = codexPaths();
+  const info = codex.binaryInfo(bin.path);
+  const out = { version: bin.version, target: bin.key, binary: info.exists && info.executable, home, pty: codex.hasPty(),
+                loginBusy: !!login, running: !!session, folder: session ? session.ioFolder : null, wall };
+  if (out.binary) Object.assign(out, codex.loginStatus(bin.path, home));
+  else out.line = `bundled Codex is missing (expected ${bin.path})`;
+  try { out.service = await serviceGet('/api/codex'); } catch { out.service = null; }
+  return out;
+}
+
+function sendToWin(channel, payload) {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+}
+
+ipcMain.handle('codex-status', codexStatus);
+// Links from the page: the sign-in link Codex printed, anything http(s) a person clicked in
+// the terminal, and local files (a dashboard Codex wrote) as long as they sit under the
+// sheltered folder or io's own data. Nothing else opens.
+ipcMain.handle('open-external', async (_e, url) => {
+  const u = String(url || '');
+  if (/^https?:\/\//.test(u)) { await shell.openExternal(u); return { ok: true }; }
+  let folder = null;
+  try { const info = await serviceGet('/api/codex'); if (info.folder) folder = info.folder; } catch {}
+  let file = null;
+  if (/^file:\/\//.test(u)) { try { file = decodeURIComponent(new URL(u).pathname); } catch { file = null; } }
+  else if (path.isAbsolute(u)) file = u;
+  // Codex names a page it wrote the way it told the person about it - a bare
+  // "main_locations_map.html" - so a relative name resolves against the sheltered folder.
+  // The containment check below is still what decides; this only says where to look.
+  else if (u && !u.split(/[\\/]/).includes('..') && folder) file = path.join(folder, u);
+  if (file) {
+    // "Nothing leaves" has to mean the browser too. A page is the one route out of the
+    // wall that io itself operates, and an HTML file carries whatever data Codex chose to
+    // put in it, with full network once it is open. So the strictest setting declines.
+    if (wall && !codex.wallOf(wall).openPages) {
+      return { error: 'this folder is set to stay offline, so io will not open a page for it' };
+    }
+    let roots = [env.dataDir];
+    if (folder) roots.push(folder);
+    const real = fs.existsSync(file) ? fs.realpathSync(file) : file;
+    if (!roots.some(r => real.startsWith(path.resolve(r) + path.sep))) return { error: 'not a file io may open' };
+    const err = await shell.openPath(real);
+    return err ? { error: err } : { ok: true };
+  }
+  return { error: 'not a link io may open' };
+});
+
+ipcMain.handle('codex-login', async (_e, mode) => {
+  const { bin, home } = codexPaths();
+  if (login) return { error: 'a login is already in progress' };
+  if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
+  fs.mkdirSync(home, { recursive: true });
+  login = codex.startLogin(bin.path, home, mode === 'device' ? 'device' : 'browser',
+    line => {
+      // The URL and the one-time code are meant for the person; the tokens never come this way.
+      const url = (line.match(/https?:\/\/\S+/) || [])[0] || null;
+      sendToWin('codex-login-event', { line, url });
+    },
+    (code) => { login = null; sendToWin('codex-login-event', { done: true, ok: code === 0 }); });
+  return { ok: true };
+});
+
+ipcMain.handle('codex-login-cancel', async () => { if (login) { login.kill('SIGTERM'); login = null; } return { ok: true }; });
+ipcMain.handle('codex-logout', async () => { const { bin, home } = codexPaths(); return codex.logout(bin.path, home); });
+
+ipcMain.handle('codex-start', async (_e, opts) => {
+  // A new start for a different folder replaces the running session; the same folder is
+  // refused so a double click cannot start two.
+  if (session) {
+    let info = null;
+    try { info = await serviceGet('/api/codex'); } catch {}
+    if (info && info.folder && session.ioFolder && info.folder !== session.ioFolder) { try { session.kill(); } catch {} session = null; }
+    else return { error: 'a Codex session is already running' };
+  }
+  const { bin, home } = codexPaths();
+  // The service is the authority: accepted policy, proxy listening, which folder.
+  let info;
+  try { info = await serviceGet('/api/codex'); } catch (e) { return { error: 'io service is not answering' }; }
+  if (!info.ready || !info.port) return { error: `not protected: ${info.reason || 'proxy not ready'}` };
+  if (!info.folder) return { error: 'no sheltered folder' };
+  if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
+  wall = (opts && opts.wall) || codex.DEFAULT_WALL;
+  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
+  let mine;
+  try {
+    mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows, libsDir: env.runtimeDir, wall, resume: opts && opts.resume });
+  } catch (e) { return { error: e.message }; }
+  mine.ioFolder = info.folder;
+  mine.onData(d => sendToWin('codex-data', d));
+  // Only the *current* session may clear the handle. A killed Codex takes a moment to die,
+  // and its exit arrives after the next one has already started: closing over `session`
+  // meant that late event nulled the live session instead of the dead one. Output kept
+  // flowing (onData is bound to the pty itself) while every keystroke was dropped by
+  // codex-input below, so a conversation opened from the shelf could not be typed into at
+  // all until the person pressed "restart Codex". Seen on the laptop, 2026-09-15.
+  mine.onExit(({ exitCode, signal }) => {
+    if (session === mine) session = null;
+    sendToWin('codex-exit', { exitCode, signal, stale: session !== null });
+  });
+  return { ok: true, pid: mine.pid, port: info.port, folder: info.folder };
+});
+ipcMain.on('codex-input', (_e, data) => { if (session) session.write(data); });
+ipcMain.on('codex-resize', (_e, { cols, rows }) => { if (session && cols > 0 && rows > 0) { try { session.resize(cols, rows); } catch {} } });
+ipcMain.handle('codex-stop', async () => { if (session) { try { session.kill(); } catch {} session = null; } return { ok: true }; });
 
 // Electron keeps its own state - Chromium's cache, cookies, GPU cache, preferences - under
 // userData, which is ~/.config/io, %APPDATA%\io or ~/Library/Application Support/io. That
@@ -21,20 +147,34 @@ let splash = null;
 // This must run before app.whenReady(), because Electron fixes the path on first use.
 // Chromium's setuid sandbox helper has to be owned by root with mode 4755. Nothing we
 // ship can arrange that: the zip, tarball and dmg are all unpacked by an ordinary user,
-// and asking for sudo is the one thing this app promised never to do. When the helper is
-// not usable Electron aborts outright - "The SUID sandbox helper binary was found, but is
-// not configured correctly", core dumped, before any of our code runs. Seen on a
-// participant's Ubuntu laptop. Our own smoke passed --no-sandbox and so never saw it.
+// and asking for sudo is the one thing this app promised never to do. But the helper is
+// only Chromium's *second* choice: when the kernel lets an ordinary process create a user
+// namespace, Electron uses the namespace sandbox and never looks at the helper. It aborts
+// outright - "The SUID sandbox helper binary was found, but is not configured correctly",
+// core dumped, before any of our code runs - only when both are unavailable. Ubuntu 24.04
+// is the case that matters: its AppArmor setting denies user namespaces to any binary
+// without a profile, which is every Electron app that is not a snap. Seen on a
+// participant's laptop; our own smoke passed --no-sandbox and so never saw it.
 //
-// So: keep the sandbox when the helper is properly installed, and only stand it down when
-// it would otherwise be a crash. This must happen at module scope, before app is ready.
+// Standing the sandbox down unconditionally was the first fix, and it over-corrected: on a
+// Pop!_OS laptop where namespaces work, an unsandboxed Chromium failed to set up shared
+// memory and died with a misleading "/dev/shm" message (2026-09-14). So: keep the sandbox
+// whenever either route is open, and stand it down only when neither is. This must happen
+// at module scope, before app is ready.
+function namespaceSandboxUsable() {
+  const read = p => { try { return fs.readFileSync(p, 'utf8').trim(); } catch { return null; } };
+  if (read('/proc/sys/kernel/apparmor_restrict_unprivileged_userns') === '1') return false;  // Ubuntu 24.04+
+  if (read('/proc/sys/kernel/unprivileged_userns_clone') === '0') return false;              // Debian-style switch
+  if (read('/proc/sys/user/max_user_namespaces') === '0') return false;
+  return true;
+}
 if (process.platform === 'linux') {
-  let usable = false;
+  let helper = false;
   try {
     const st = fs.statSync(path.join(path.dirname(process.execPath), 'chrome-sandbox'));
-    usable = st.uid === 0 && (st.mode & 0o4000) !== 0;
+    helper = st.uid === 0 && (st.mode & 0o4000) !== 0;
   } catch { /* no helper at all */ }
-  if (!usable) {
+  if (!helper && !namespaceSandboxUsable()) {
     app.commandLine.appendSwitch('no-sandbox');
     app.commandLine.appendSwitch('disable-setuid-sandbox');
   }
@@ -178,6 +318,7 @@ async function start() {
   if (PORTABLE && !process.env.IO_HOME) senv.IO_HOME = path.join(PORTABLE, 'config');
 
   const port = await freePort(PORT_BASE);
+  servicePort = port;
   // Both logs live in the data dir. io.log used to go to Electron's userData, which is a
   // different directory on every platform and is not where anyone - or CI - thinks to look
   // when the service fails to come up.
@@ -198,7 +339,7 @@ async function start() {
   await openSplash();
   tellSplash('starting the on-device privacy model', 'teaching it to keep a secret. only slow the first time.');
 
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1200, height: 820, title: 'io', backgroundColor: '#1a1d21', show: false,
     icon: path.join(__dirname, 'icons', 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
@@ -220,6 +361,19 @@ async function start() {
   }
 }
 
+ipcMain.handle('pick-file', async () => { const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'spreadsheets', extensions: ['csv', 'xlsx', 'xls'] }] }); return r.canceled ? null : r.filePaths[0]; });
+// A line typed into the terminal on the person's behalf (the first message of a
+// conversation started from the chat box, or "I attached x.csv"). Visible in the terminal.
+ipcMain.handle('codex-say', async (_e, text) => {
+  if (!session) return { error: 'no session' };
+  // As a bracketed paste, so the composer takes every character literally ("?" is a
+  // shortcut key otherwise), then Enter after the pause the composer needs to see the
+  // paste as finished; an Enter inside that window is folded into the paste as a newline.
+  const line = String(text).replace(/[\r\n]+/g, ' ').trim();
+  session.write('\x1b[200~' + line + '\x1b[201~');
+  setTimeout(() => { if (session) session.write('\r'); }, 1500);
+  return { ok: true };
+});
 ipcMain.handle('pick-folder', async () => { const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); return r.canceled ? null : r.filePaths[0]; });
 app.whenReady().then(start);
-app.on('window-all-closed', () => { if (proc) proc.kill(); app.quit(); });
+app.on('window-all-closed', () => { if (session) { try { session.kill(); } catch {} } if (login) { try { login.kill(); } catch {} } if (proc) proc.kill(); app.quit(); });

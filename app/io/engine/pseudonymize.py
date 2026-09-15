@@ -69,15 +69,27 @@ class PseudonymMap:
                 indent=1, ensure_ascii=False))
 
     def known_regex(self) -> re.Pattern[str] | None:
-        """One compiled alternation over all display values (longest first), rebuilt on growth."""
+        """One compiled alternation over all display values (longest first), rebuilt on growth.
+
+        Rebuilding costs ~30 ms for a thousand values, and a coding pass mints a value per
+        row: 107 rebuilds were 4.0 s of a 4.1 s pass (2026-09-15). In bulk mode (set by
+        pseudonymise_frame) the regex is rebuilt every 64 new values and on refresh(); the
+        detector still sees every cell, so the only thing a stale regex can miss during
+        the pass is a value minted moments earlier, and the free-text columns are coded
+        last, after a refresh, precisely so that all column values are known by then."""
         n = len(self.display)
         if n == 0:
             return None
-        if getattr(self, "_known_n", -1) != n:
+        last = getattr(self, "_known_n", -1)
+        if last != n and (not getattr(self, "bulk", False) or last <= 0 or n - last >= 64):
             values = sorted((v for v in self.display.values() if len(v) >= 3), key=len, reverse=True)
             self._known_re = re.compile(r"(?<![\w@.])(?:" + "|".join(re.escape(v) for v in values) + r")(?!(?:[\w@]|\.[\w@]))", re.I)  # a trailing dot only blocks when it starts a domain-like tail; plain sentence periods must not hide a name
             self._known_n = n
         return self._known_re
+
+    def refresh(self) -> None:
+        """Force the next known_regex() to rebuild."""
+        self._known_n = -1
 
     def rehydrate(self, text: str) -> str:
         return TOKEN_RE.sub(lambda m: self.display.get(m.group(0).replace("\\_", "_"), m.group(0)), text)
@@ -89,8 +101,10 @@ class PseudonymMap:
 
 
 def redact_text(text: str, pmap: PseudonymMap, detector: Callable[[str], list[tuple[int, int, str, float]]] | None,
-                classes: set[str] | None = None) -> tuple[str, list[dict[str, Any]]]:
-    """Replace known values (longest first) and detector spans with tokens."""
+                classes: set[str] | None = None, kept: set[str] | None = None) -> tuple[str, list[dict[str, Any]]]:
+    """Replace known values (longest first) and detector spans with tokens.
+    kept: casefolded values that stay clear even though the vault knows them (what the
+    person chose to keep, and the column names of the sheltered tables)."""
     events: list[dict[str, Any]] = []
     spans: list[tuple[int, int, str]] = []
     existing = [(m.start(), m.end()) for m in TOKEN_RE.finditer(text)]
@@ -104,6 +118,8 @@ def redact_text(text: str, pmap: PseudonymMap, detector: Callable[[str], list[tu
     known = pmap.known_regex()
     if known:
         for m in known.finditer(text):
+            if kept and m.group(0).casefold() in kept:
+                continue
             token = pmap.forward.get(normalise(m.group(0)))
             if token:
                 spans.append((m.start(), m.end(), f"known:{token}"))
@@ -164,7 +180,19 @@ def pseudonymise_frame(frame: pd.DataFrame, column_classes: dict[str, Any], pmap
     kept_validator: hard validators (email/PAN/aadhaar/...) still applied to cells of
     kept columns — a mangled header must never let a checksummed identifier through."""
     result = frame.copy()
-    for column, cls in column_classes.items():
+    # Direct identifier columns first, free text last: by the time remarks are coded every
+    # name and place from the other columns is in the vault and one rebuilt regex catches
+    # them all. Bulk mode throttles the regex rebuilds in between.
+    def is_free(c):
+        return "free_text_with_pii" in (c if isinstance(c, list) else [c])
+    ordered = sorted(column_classes.items(), key=lambda kv: is_free(kv[1]))
+    was_bulk = getattr(pmap, "bulk", False)
+    pmap.bulk = True
+    refreshed = False
+    for column, cls in ordered:
+        if is_free(cls) and not refreshed:
+            pmap.refresh()
+            refreshed = True
         if column not in result.columns or cls in (None, "none", "record_id_non_pii", "age"):
             if kept_validator is not None and column in result.columns:
                 series = result[column].astype("string")
@@ -198,6 +226,8 @@ def pseudonymise_frame(frame: pd.DataFrame, column_classes: dict[str, Any], pmap
                     c = "email" if "@" in str(v) else ("phone" if re.search(r"\d{6,}", str(v)) else primary)
                 return pmap.token(str(v), c)
             result[column] = series.map(tok)
+    pmap.bulk = was_bulk
+    pmap.refresh()
     return result
 
 

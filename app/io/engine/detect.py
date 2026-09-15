@@ -101,6 +101,46 @@ GLINER_TO_CLASS = {
 }
 
 
+def scan_many(det: Callable[[str], list[Span]], texts: list[str]) -> list[list[Span]]:
+    """Spans for each text. One call when the detector has a batch path (the GLiNER
+    engine and the privacy-server client both do), a loop otherwise. The whole point of
+    batching: through a tunnel a call is a round trip, and a review used to make 334 of
+    them for nine files (2026-09-15)."""
+    if not texts:
+        return []
+    many = getattr(det, "many", None)
+    if many is not None:
+        return many(texts)
+    return [det(t) for t in texts]
+
+
+def batched_calls(det: Callable[[str], list[Span]], fn: Callable[[Callable[[str], list[Span]]], Any]) -> Any:
+    """Run fn(detector) so that every text it asks about goes to the scanner in ONE call.
+
+    Two passes: the first runs fn with a detector that records each text and answers
+    "nothing found"; the recorded texts go out as a single batch; the second pass runs fn
+    again with the answers. fn must ask the same or fewer questions on the second pass -
+    true of classify_columns (it asks before it branches) and pseudonymise_frame (chunking
+    depends only on the values). Anything not recorded is asked directly."""
+    asked: list[str] = []
+    seen: set[str] = set()
+
+    def record(text: str) -> list[Span]:
+        if text not in seen:
+            seen.add(text)
+            asked.append(text)
+        return []
+
+    fn(record)
+    answers = dict(zip(asked, scan_many(det, asked)))
+
+    def replay(text: str) -> list[Span]:
+        hit = answers.get(text)
+        return hit if hit is not None else det(text)
+
+    return fn(replay)
+
+
 def make_server(url: str, timeout: float = 30.0) -> Callable[[str], list[Span]]:
     """Ask a privacy server to scan, for machines that cannot run the model themselves.
 
@@ -108,19 +148,44 @@ def make_server(url: str, timeout: float = 30.0) -> Callable[[str], list[Span]]:
     asked to find the private values in it. io asks the person before ever using this.
     """
     import urllib.request
+    from urllib.parse import urlsplit, urlunsplit
 
-    endpoint = url.rstrip("/")
+    # https://TOKEN@privacy.example.org -> the token goes as a bearer header, never in the
+    # URL that gets logged. A server without a token is a plain address.
+    parts = urlsplit(url.strip())
+    token = parts.username or ""
+    host = parts.hostname or ""
+    if parts.port:
+        host += f":{parts.port}"
+    endpoint = urlunsplit((parts.scheme, host, parts.path, "", "")).rstrip("/")
     if not endpoint.endswith("/scan"):
         endpoint += "/scan"
+    # Cloudflare's bot rules answer python's default user agent with 403; say who we are.
+    headers = {"Content-Type": "application/json", "User-Agent": "io-privacy-client/1"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    def post(body: dict) -> dict:
+        req = urllib.request.Request(endpoint, data=json.dumps(body).encode(), headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read())
 
     def run(text: str) -> list[Span]:
-        req = urllib.request.Request(
-            endpoint, data=json.dumps({"text": text}).encode(),
-            headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            payload = json.loads(r.read())
+        payload = post({"text": text})
         return [(int(a), int(b), str(c), float(d)) for a, b, c, d in payload.get("spans", [])]
 
+    def many(texts: list[str]) -> list[list[Span]]:
+        # one request for all of them; an older server without "texts" answers only the
+        # single form, so fall back to a loop rather than fail
+        if not texts:
+            return []
+        payload = post({"texts": texts})
+        results = payload.get("results")
+        if results is None:
+            return [run(t) for t in texts]
+        return [[(int(a), int(b), str(c), float(d)) for a, b, c, d in spans] for spans in results]
+
+    run.many = many  # type: ignore[attr-defined]
     return run
 
 
@@ -128,12 +193,18 @@ def make_gliner(model_id: str, threshold: float = 0.4, chunk_chars: int = 1500) 
     import torch
     from gliner import GLiNER
     torch.set_num_threads(int(os.environ.get("PII_THREADS", "4")))
+    # IO_SCANNER_DEVICE=cuda puts the model on a GPU where there is one (the privacy server
+    # on the DGX: 34 ms per chunk against 370 ms on its CPU, 2026-09-14). Laptops stay on cpu.
+    device = os.environ.get("IO_SCANNER_DEVICE", "cpu")
     model = GLiNER.from_pretrained(model_id, map_location="cpu")
+    if device != "cpu":
+        model = model.to(device)
     model.eval()
 
     def run(text: str) -> list[Span]:
-        spans: list[Span] = []
-        # chunk on line boundaries so offsets stay exact
+        # chunk on line boundaries so offsets stay exact, then one batched call: on a GPU
+        # the batch costs about what a single chunk does
+        pieces: list[tuple[int, str]] = []
         start = 0
         while start < len(text):
             end = min(len(text), start + chunk_chars)
@@ -141,12 +212,53 @@ def make_gliner(model_id: str, threshold: float = 0.4, chunk_chars: int = 1500) 
                 cut = text.rfind("\n", start, end)
                 if cut > start:
                     end = cut + 1
-            piece = text[start:end]
-            for ent in model.predict_entities(piece, GLINER_LABELS, threshold=threshold):
+            pieces.append((start, text[start:end]))
+            start = end
+        if not pieces:
+            return []
+        if len(pieces) == 1:
+            results = [model.predict_entities(pieces[0][1], GLINER_LABELS, threshold=threshold)]
+        else:
+            results = model.batch_predict_entities([p for _, p in pieces], GLINER_LABELS, threshold=threshold, batch_size=16)
+        spans: list[Span] = []
+        for (start, _piece), ents in zip(pieces, results):
+            for ent in ents:
                 spans.append((start + ent["start"], start + ent["end"],
                               GLINER_TO_CLASS.get(ent["label"], ent["label"]), float(ent["score"])))
-            start = end
         return spans
+
+    def chunks_of(text: str) -> list[tuple[int, str]]:
+        out, start = [], 0
+        while start < len(text):
+            end = min(len(text), start + chunk_chars)
+            if end < len(text):
+                cut = text.rfind("\n", start, end)
+                if cut > start:
+                    end = cut + 1
+            out.append((start, text[start:end]))
+            start = end
+        return out
+
+    def many(texts: list[str]) -> list[list[Span]]:
+        """All the chunks of all the texts in one model call."""
+        plan = [chunks_of(t) for t in texts]
+        flat = [piece for chunks in plan for _s, piece in chunks]
+        if not flat:
+            return [[] for _ in texts]
+        results = model.batch_predict_entities(flat, GLINER_LABELS, threshold=threshold, batch_size=32)
+        out: list[list[Span]] = []
+        k = 0
+        for chunks in plan:
+            spans: list[Span] = []
+            for start, _piece in chunks:
+                for ent in results[k]:
+                    spans.append((start + ent["start"], start + ent["end"],
+                                  GLINER_TO_CLASS.get(ent["label"], ent["label"]), float(ent["score"])))
+                k += 1
+            out.append(spans)
+        return out
+
+    run.many = many  # type: ignore[attr-defined]
     return run
 
 
@@ -358,28 +470,43 @@ def main() -> int:
 
 
 # ------------------------------------------------- composed text engine (v2)
+DOB_CONTEXT = re.compile(r"\b(?:dob|d\.o\.b|date of birth|born|birth|birthday|age[d]?|janm|जन्म)\b", re.I)
 CHAT_LINE = re.compile(r"^(\d{1,2}/\d{1,2}/\d{2,4},? \d{1,2}:\d{2}(?::\d{2})?(?: [AP]M)?\]? ?- )([^:\n]{2,60}):", re.M)
 
 
 def make_text_v2(base_spec: str) -> Callable[[str], list[Span]]:
-    """Structural chat-sender rule + regex validators + span model on original AND
-    title-cased text (same offsets) + propagation of every detected name/place to all
-    of its case-insensitive occurrences in the document."""
+    """Structural chat-sender rule + regex validators + span model, with every person name
+    the model found propagated to its other case-insensitive occurrences in the document
+    (a chat log says "ramesh said" as often as "Ramesh said").
+
+    Two things this deliberately no longer does (2026-09-14, over-marking in chat logs):
+    a second model pass over the title-cased text, which made ordinary words and Hindi
+    phrases look like entities ("Bhej Sakta Hai"); and propagating village/address spans
+    as if they were names, which turned a single "borewell" into a code everywhere. The
+    planted-PII fixtures measure the trade: see benchmarks/runs/2026-09-14-io-codex/overcatch.
+    """
     base = build_engine(base_spec)
 
     def run(text: str) -> list[Span]:
+        # Dates in documents: the validator sees every dd/mm/yyyy as a birth date, so a chat
+        # export (a timestamp per line) or a helpline log (a call date per entry) came out
+        # coded as DOB_001... on every line (876 spans on a 260-line chat, 2026-09-14). In
+        # free text a date is private when it is someone's birth date; keep those, which
+        # sit next to a word that says so, and leave operational dates alone.
         spans: list[Span] = list(regex_engine(text))
         for m in CHAT_LINE.finditer(text):
             spans.append((m.start(2), m.end(2), "person_name", 1.0))
-        spans += base(text)
-        spans += base(text.title())
-        found = {text[s:e] for s, e, lab, _ in spans if lab in {"person_name", "village", "address"} and e - s >= 4}
+        spans += base(text)          # the model, local or on the privacy server (which adds its own regex pass)
+        spans = [sp for sp in spans if sp[2] != "dob" or DOB_CONTEXT.search(text[max(0, sp[0] - 40):sp[1] + 40])]
+        # Propagate a name to its other occurrences only when it is a full name or the model
+        # was sure: one low-confidence hit on a Hindi word ("sabko") otherwise becomes 27 codes.
+        found = {text[s:e] for s, e, lab, sc in spans
+                 if lab == "person_name" and e - s >= 4 and (" " in text[s:e].strip() or sc >= 0.8)}
         for value in found:
-            for m in re.finditer(re.escape(value), text, flags=re.I):
+            for m in re.finditer(r"(?<!\w)" + re.escape(value) + r"(?!\w)", text, flags=re.I):
                 spans.append((m.start(), m.end(), "person_name", 0.9))
         return spans
     return run
-
 
 
 if __name__ == "__main__":

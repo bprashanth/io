@@ -40,9 +40,11 @@ if (HF_HOME / "hub").is_dir() and any((HF_HOME / "hub").glob("models--knowledgat
 sys.path.insert(0, str(HERE / "engine"))                    # the shield's tested modules, vendored unchanged
 
 from columns import classify_columns  # noqa: E402
-from detect import build_engine, regex_engine  # noqa: E402
+from detect import build_engine, regex_engine, make_server, batched_calls  # noqa: E402
 from detect import make_text_v2  # noqa: E402
-from pseudonymize import PseudonymMap, pseudonymise_frame, redact_question  # noqa: E402
+from pseudonymize import PseudonymMap, pseudonymise_frame, redact_question, redact_text  # noqa: E402
+
+import codex_proxy  # noqa: E402
 
 UI = Path(__file__).resolve().parent / "ui"
 CONF = Path(os.environ.get("IO_HOME") or (Path.home() / ".config" / "io"))
@@ -62,6 +64,21 @@ REASON = {
 }
 
 GLINER_MODEL = "knowledgator/gliner-pii-edge-v1.0"
+
+# Where the scanning happens. Default: the privacy server on the office DGX (GPU: ten times
+# faster per chunk, fifty times batched, and the laptop never loads torch). IO_PRIVACY_SERVER
+# overrides the address, the settings gear overrides it per session. IO_SCANNER picks the
+# order: "auto" (server, then the on-device model, then patterns), "local" (never the
+# server), "server" (never the local model), "regex". The on-device install is unchanged;
+# it is simply not the first choice any more.
+# Baked in: the public name (a Cloudflare Tunnel to the DGX). Only that one: users in the
+# office have no tailnet either, so a tailnet shortcut would hide the delay everyone else
+# pays. No token for the limited preview: anyone with the app may use the scanner; it
+# stores nothing. A token, when wanted, rides inside the address (https://TOKEN@host).
+DEFAULT_PRIVACY_SERVERS = [x.strip() for x in os.environ.get(
+    "IO_PRIVACY_SERVER", "https://privacy.idli.cc").split(",") if x.strip()]
+DEFAULT_PRIVACY_SERVER = DEFAULT_PRIVACY_SERVERS[0] if DEFAULT_PRIVACY_SERVERS else ""
+SCANNER_ORDER = (os.environ.get("IO_SCANNER") or "auto").strip().lower()
 
 RULE = {
     "validator": "the format checks out",
@@ -95,6 +112,8 @@ class State:
         self.detector = None
         self.det_lock = threading.Lock()
         self.lock = threading.Lock()
+        self.vault_lock = threading.RLock()   # the proxy mints tokens from several threads at once
+        self.vault_saved_at = 0.0
         self.progress: list[str] = []
 
     def step(self, text: str) -> None:
@@ -106,7 +125,7 @@ class State:
         if getattr(self, "text_detector", None) is None:
             self.get_detector()
             try:
-                self.text_detector = make_text_v2(f"gliner:{GLINER_MODEL}")
+                self.text_detector = make_text_v2(getattr(self, "scanner_base", None) or "regex")
             except Exception:  # noqa: BLE001
                 traceback.print_exc()
                 self.text_detector = regex_engine
@@ -117,41 +136,88 @@ class State:
         self.get_detector()
         return getattr(self, "_scanner_mode", "regex")
 
+    @staticmethod
+    def with_regex(model):
+        """Validators + the model, as one detector that keeps the model's batch path: a
+        plain lambda here silently turned every batched review back into one call per
+        text (220 calls instead of 15 for the pii corpus, 2026-09-15)."""
+        def one(t):
+            return regex_engine(t) + model(t)
+
+        many = getattr(model, "many", None)
+        if many is not None:
+            one.many = lambda texts: [regex_engine(t) + sp for t, sp in zip(texts, many(texts))]
+        return one
+
+    def scanner_server(self) -> str:
+        return (getattr(self, "_scanner_url", None) or self.provider.get("scanner_server") or DEFAULT_PRIVACY_SERVER).strip()
+
+    def scanner_candidates(self) -> list[str]:
+        chosen = (self.provider.get("scanner_server") or "").strip()
+        return [chosen] if chosen else list(DEFAULT_PRIVACY_SERVERS)
+
     def get_detector(self):
         with self.det_lock:
-            if self.detector is None:
-                self.step("loading the on-device scanner")
+            if self.detector is not None:
+                return self.detector
+            order = SCANNER_ORDER
+            declined = bool((self.provider.get("scanner_declined") or "").strip())
+            # 1. a privacy server, the first that answers. The text goes there unredacted -
+            #    it has to, the server is being asked to find the private values in it.
+            if order in ("auto", "server") and not declined:
+                # Try them all at once and take the fastest that answers: on the office
+                # network the tailnet address beats the public name (5 s against 35 s for
+                # a corpus scan of 334 calls, 2026-09-15), elsewhere only the name works.
+                results: dict[str, float | Exception] = {}
+
+                def probe(remote: str) -> None:
+                    t0 = time.monotonic()
+                    try:
+                        make_server(remote, timeout=4.0)("warm up")
+                        results[remote] = time.monotonic() - t0
+                    except Exception as exc:  # noqa: BLE001
+                        results[remote] = exc
+
+                self.step("reaching the privacy server")
+                threads = [threading.Thread(target=probe, args=(r,), daemon=True) for r in self.scanner_candidates()]
+                for th in threads:
+                    th.start()
+                for th in threads:
+                    th.join(6.0)
+                answered = sorted((v, r) for r, v in results.items() if isinstance(v, float))
+                if answered:
+                    remote = answered[0][1]
+                    rs = make_server(remote)
+                    self.detector = self.with_regex(rs)
+                    self._scanner_mode = "server"
+                    self._scanner_url = remote
+                    self.scanner_base = f"server:{remote}"
+                    self.step("privacy server ready")
+                    return self.detector
+                errs = [f"{type(v).__name__}: {v}" for v in results.values() if isinstance(v, Exception)]
+                self.server_error = (errs[0] if errs else "no answer").strip()[:200]
+                self.step("privacy server not reachable" + (", using the on-device scanner" if order == "auto" else ""))
+            # 2. the on-device model, when installed
+            if order in ("auto", "local"):
                 try:
+                    self.step("loading the on-device scanner")
                     gl = build_engine(f"gliner:{GLINER_MODEL}")
-                    self.detector = lambda t: regex_engine(t) + gl(t)
+                    self.detector = self.with_regex(gl)
                     self._scanner_mode = "local"
+                    self.scanner_base = f"gliner:{GLINER_MODEL}"
                     self.step("scanner ready")   # never leave "loading..." as the last visible word
+                    return self.detector
                 except Exception as exc:  # noqa: BLE001
                     traceback.print_exc()
-                    # Remember why, so the app can offer the same choice it offers when the
-                    # install already knew this machine could not run it. A model that
-                    # installs and then fails to load - out of memory, a broken cache, a
-                    # library the machine will not load - looks identical to the person.
+                    # Remember why, so the app can offer the privacy-server choice. A model that
+                    # installs and then fails to load - out of memory, a broken cache, a library
+                    # the machine will not load - looks identical to the person.
                     self.scanner_error = f"{type(exc).__name__}: {exc}".strip()[:400]
-                    # No local model. If the person has explicitly agreed to a privacy
-                    # server, use it: the text goes there unredacted, so this only ever
-                    # happens on an answer they gave. Otherwise fall back to regex, which
-                    # finds numbers and ids but not people's names.
-                    remote = (self.provider.get("scanner_server") or "").strip()
-                    if remote:
-                        try:
-                            self.step("using the privacy server")
-                            rs = build_engine(f"server:{remote}")
-                            rs("warm up")            # fail here rather than mid-scan
-                            self.detector = lambda t: regex_engine(t) + rs(t)
-                            self._scanner_mode = "server"
-                            self.step("privacy server ready")
-                            return self.detector
-                        except Exception:  # noqa: BLE001
-                            traceback.print_exc()
-                            self.step("the privacy server did not answer, using patterns only")
-                    self.detector = regex_engine
-                    self._scanner_mode = "regex"
+            # 3. patterns only: numbers and ids, not people's names
+            self.step("using patterns only")
+            self.detector = regex_engine
+            self._scanner_mode = "regex"
+            self.scanner_base = "regex"
         return self.detector
 
     @staticmethod
@@ -194,17 +260,25 @@ class State:
         self.pmap = PseudonymMap(CONF / f"vault-{hashlib.sha256(str(folder).encode()).hexdigest()[:12]}-local-only.json")
         det = self.get_detector()
         self.skipped = []
+        self.deferred = []          # documents: shown, not scanned, for now
         for f in sorted(folder.iterdir()):
             if f.name.startswith("~$") or f.name.startswith("."):
                 continue
             if not f.is_file():
                 continue
             if f.suffix.lower() in (".txt", ".md", ".log", ".pdf"):
-                try:
-                    self.load_doc(f)
-                except Exception:  # noqa: BLE001
-                    traceback.print_exc()
-                    self.skipped.append(f.name)
+                # Documents are deferred for now (2026-09-15): a README describing the
+                # columns minted codes for the column names themselves, and chat logs
+                # over-mark. Spreadsheets only, until the document path earns its place.
+                # IO_DOCS=1 brings it back for testing.
+                if os.environ.get("IO_DOCS") == "1":
+                    try:
+                        self.load_doc(f)
+                    except Exception:  # noqa: BLE001
+                        traceback.print_exc()
+                        self.skipped.append(f.name)
+                else:
+                    self.deferred.append(f.name)
                 continue
             if f.suffix.lower() not in (".csv", ".xlsx", ".xls"):
                 self.skipped.append(f.name)
@@ -224,10 +298,11 @@ class State:
                 if any(t["name"] == name for t in self.tables):
                     name = f"{f.stem} ({f.suffix.lstrip('.')})" + (f" - {sheet}" if sheet and len(frames) > 1 else "")
                 self.step(f"scanning {name}")
-                classes = classify_columns(frame, det)
+                # one scanner call for the whole table's classification, one for its cells
+                classes = batched_calls(det, lambda d, _f=frame: classify_columns(_f, d))
                 key = self.header_key(list(frame.columns))
                 decided = dict(self.decisions.get(key, {}))
-                spans = self.cell_spans(frame, classes, decided, det)
+                spans = batched_calls(det, lambda d, _f=frame, _c=classes, _d=decided: self.cell_spans(_f, _c, _d, d))
                 self.tables.append({"file": f.name, "sheet": sheet, "name": name, "key": key,
                                     "frame": frame, "classes": classes, "decided": decided, "spans": spans})
         self.step("done")
@@ -250,20 +325,38 @@ class State:
         return out
 
     def cell_spans(self, frame: pd.DataFrame, classes: dict, decided: dict, det) -> dict[str, dict[int, dict]]:
-        """Free-text columns: per cell (first 200 rows), what exactly the scanner found."""
+        """Free-text columns: per cell (first 200 rows), what exactly the scanner found.
+
+        The cells go to the scanner in joined chunks of about 1500 characters (the same
+        separator trick redact_cells uses), so a 200-row column is a handful of calls rather
+        than 200. Through the privacy server that is the difference between round trips
+        and one (2026-09-14: the pii corpus review went from 17 s to a few)."""
+        from pseudonymize import SEP  # noqa: PLC0415
         spans: dict[str, dict[int, dict]] = {}
         for col, info in classes.items():
             cls = decided.get(col, info["class"] if isinstance(info, dict) else info)
             if cls != "free_text_with_pii":
                 continue
             hits: dict[int, dict] = {}
-            for i, v in enumerate(frame[col].head(200)):
-                if not (isinstance(v, str) and v.strip()):
-                    continue
-                found = det(v)
-                if found:
+            cells = [(i, v) for i, v in enumerate(frame[col].head(200)) if isinstance(v, str) and v.strip()]
+            k = 0
+            while k < len(cells):
+                chunk, size = [], 0
+                while k < len(cells) and (size + len(cells[k][1]) < 1500 or not chunk):
+                    chunk.append(cells[k])
+                    size += len(cells[k][1]) + len(SEP)
+                    k += 1
+                text = SEP.join(v for _, v in chunk)
+                found = det(text)
+                cursor = 0
+                for i, v in chunk:
+                    vs, ve = cursor, cursor + len(v)
+                    local = [(st - vs, en - vs, label, c) for (st, en, label, c) in found if st >= vs and en <= ve]
+                    cursor = ve + len(SEP)
+                    if not local:
+                        continue
                     parts, vals = [], []
-                    for st, en, label, _c in found[:3]:
+                    for st, en, label, _c in local[:3]:
                         word = REASON.get(label, label).rstrip("s")
                         parts.append(f"{word}: {v[st:en][:24]}")
                         vals.append(v[st:en])
@@ -352,7 +445,15 @@ class State:
         return {v.casefold() for v in self.kept.get(key, [])}
 
     def kept_all(self) -> set:
-        return {v.casefold() for vals in self.kept.values() for v in vals}
+        # Column names are structure, not data: a README that says "the village column" had
+        # the scanner mint PLACE_052 for the word "village", and every command that printed
+        # the CSV header then showed the model codes where the column names should be, so
+        # its scripts asked for row["PLACE_052"] and found nothing (laptop, 2026-09-15).
+        # Headers stay clear everywhere: outbound, coding, leak check.
+        kept = {v.casefold() for vals in self.kept.values() for v in vals}
+        if os.environ.get("IO_KEEP_HEADERS", "1") != "0":
+            kept |= {str(c).strip().casefold() for t in self.tables for c in t["frame"].columns if len(str(c).strip()) >= 3}
+        return kept
 
     def save_decisions(self) -> None:
         DECISIONS_PATH.write_text(json.dumps({**self.decisions, "_kept": self.kept}, indent=1))
@@ -362,12 +463,17 @@ class State:
         for t in self.tables:
             self.step(f"coding {t['name']}")
             kept = self.kept_for(t["key"])
-            def filt(text, _d=det, _k=kept):
-                return [sp for sp in _d(text) if text[sp[0]:sp[1]].casefold() not in _k]
             kv = (lambda text, _k=kept: [sp for sp in regex_engine(text) if text[sp[0]:sp[1]].casefold() not in _k]) if kept else regex_engine
             classes = {c: v for c, v in self.effective(t).items()}
             full = {c: classes.get(c, "none") for c in t["frame"].columns}
-            self.redacted[t["name"]] = pseudonymise_frame(t["frame"], full, self.pmap, detector=filt, kept_validator=kv)
+
+            def code_table(d, _t=t, _full=full, _kv=kv, _k=kept):
+                def filt(text):
+                    return [sp for sp in d(text) if text[sp[0]:sp[1]].casefold() not in _k]
+                return pseudonymise_frame(_t["frame"], _full, self.pmap, detector=filt, kept_validator=_kv)
+
+            # one scanner call for the whole table's free-text cells
+            self.redacted[t["name"]] = batched_calls(det, code_table)
         for d in self.docs:
             self.step(f"coding {d['name']}")
             self.redacted[d["name"]] = self.redact_doc(d)
@@ -393,6 +499,72 @@ class State:
 
 
 S = State()
+
+
+class IoPolicy(codex_proxy.Policy):
+    """The live vault, applied to Codex traffic the way chat applies it to a typed question:
+    exact known values first (longest wins), then the detector for values never seen before.
+    The detector is the regex validators (phones, Aadhaar, emails, accounts...) on every
+    string, and the on-device scanner additionally on what the user typed (role=user), the
+    same as /api/chat does today. Kept values stay clear, as everywhere else in io."""
+
+    DIRECT = {"person_name", "phone", "email", "aadhaar", "pan", "bank_account", "ifsc", "upi_id",
+              "ration_card", "voter_id", "vehicle_number", "address", "village"}
+
+    def ready(self) -> bool:
+        return bool(getattr(S, "accepted", False) and S.pmap is not None)
+
+    def not_ready_reason(self) -> str:
+        if S.folder is None:
+            return "no folder is sheltered"
+        return "the privacy policy for this folder has not been approved (press Looks right first)"
+
+    # Codex wraps the context it injects as role=user messages in tags: <environment_context>
+    # (cwd, timezone), <user_instructions>, <permissions instructions>, <turn_aborted>...
+    # Those are not the person's words; the scanner on them minted PLACE codes for
+    # "Asia/Kolkata" and a NAME for the home directory (seen live 2026-09-14). The
+    # validators still run on them; the scanner runs on what the person typed.
+    WRAPPED = re.compile(r"\s*<[a-z_]+( [a-z_]+)?>")
+
+    def outbound(self, text: str, role: str | None) -> str:
+        det = S.get_detector() if (role == "user" and not self.WRAPPED.match(text)) else regex_engine
+        kept = S.kept_all()
+
+        def filt(t, _d=det, _k=kept):
+            return [sp for sp in _d(t) if t[sp[0]:sp[1]].casefold() not in _k]
+
+        with S.vault_lock:
+            before = len(S.pmap.display)
+            out, _events = redact_text(text, S.pmap, filt, classes=self.DIRECT, kept=kept)
+            if len(S.pmap.display) != before and time.monotonic() - S.vault_saved_at > 1.0:
+                S.pmap.save()               # new codes were minted: keep the vault on disk current
+                S.vault_saved_at = time.monotonic()
+        return out
+
+    def inbound(self, text: str) -> str:
+        return S.pmap.rehydrate(text) if S.pmap else text
+
+    def leaks(self, text: str) -> list[str]:
+        return S.leak_check(text)
+
+    def code_for(self, value: str) -> str:
+        return S.pmap.forward.get(re.sub(r"\s+", " ", value.strip()).casefold(), "?") if S.pmap else "?"
+
+    def version(self) -> int:
+        # the vault object changes per folder, its size changes as codes are minted
+        return (id(S.pmap), len(S.pmap.display)) if S.pmap else 0
+
+
+# Development only: IO_PROXY_DEV_UPSTREAM="/dev/v1=https://openrouter.ai/api/v1" routes that
+# prefix to an OpenAI-compatible Responses server, through the same transform code, so the
+# interactive session can be exercised on a machine with no ChatGPT login. Never set for a user.
+_dev = dict(x.split("=", 1) for x in os.environ.get("IO_PROXY_DEV_UPSTREAM", "").split(";") if "=" in x)
+PROXY = codex_proxy.Proxy(
+    IoPolicy(),
+    log=lambda line: print("proxy " + line, flush=True),
+    dump_dir=Path(os.environ["IO_PROXY_DUMP"]) if os.environ.get("IO_PROXY_DUMP") else None,
+    dev_upstreams=_dev,
+)
 
 PROMPT = """You are helping someone understand their files. The files are below as CSV. Values like NAME_001,
 PHONE_002, PLACE_003 are stand-ins; treat them as ordinary labels and never mention that they are stand-ins.
@@ -699,6 +871,13 @@ class H(BaseHTTPRequestHandler):
         p = self.path.split("?")[0]
         if p in ("/", "/index.html"):
             return self._send(200, (UI / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if p.startswith("/vendor/"):
+            # xterm.js and its css, shipped with io: the terminal must work with no network.
+            f = (UI / "vendor" / p[len("/vendor/"):]).resolve()
+            if f.parent != (UI / "vendor").resolve() or not f.is_file():
+                return self._send(404, b"")
+            ctype = {"js": "application/javascript", "css": "text/css"}.get(f.suffix.lstrip("."), "application/octet-stream")
+            return self._send(200, f.read_bytes(), ctype + "; charset=utf-8")
         if p == "/api/scanner":
             # Two ways to end up without a scanner: the install already knew this machine
             # could not run one, or it loaded and then failed here. Report either, so the
@@ -707,11 +886,14 @@ class H(BaseHTTPRequestHandler):
             return self._json({
                 "unavailable": why or None,
                 "mode": getattr(S, "_scanner_mode", None) if S.detector is not None else None,
-                "server": bool((S.provider.get("scanner_server") or "").strip()),
+                "server": bool(S.scanner_server()),
+                "server_url": S.scanner_server(),
+                "server_error": getattr(S, "server_error", None),
+                "order": SCANNER_ORDER,
                 "declined": bool((S.provider.get("scanner_declined") or "").strip()),
             })
         if p == "/api/state":
-            return self._json({"provider": {"set": bool(S.provider), "model": S.provider.get("model"), "server": bool(S.provider.get("server"))},
+            return self._json({"provider": {"set": bool(S.provider), "model": S.provider.get("model"), "server": bool(S.provider.get("server")), "codex": bool(S.provider.get("codex"))},
                                "folder": str(S.folder) if S.folder else None,
                                "accepted": bool(getattr(S, "accepted", False)),
                                "files": [{"name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns)} for t in S.tables],
@@ -736,7 +918,7 @@ class H(BaseHTTPRequestHandler):
             cur = Path(q.get("path", [str(Path.home())])[0]).expanduser().resolve()
             if not cur.is_dir():
                 cur = Path.home()
-            dirs, count, chats, pdfs = [], 0, 0, 0
+            dirs, count, chats, pdfs, other = [], 0, 0, 0, 0
             try:
                 for e in sorted(cur.iterdir()):
                     if e.name.startswith("."):
@@ -749,9 +931,13 @@ class H(BaseHTTPRequestHandler):
                         chats += 1
                     elif e.suffix.lower() == ".pdf":
                         pdfs += 1
+                    elif e.is_file():
+                        other += 1
             except PermissionError:
                 pass
-            return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200], "data_files": count, "chat_files": chats, "pdf_files": pdfs})
+            return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200],
+                               "data_files": count, "chat_files": chats, "pdf_files": pdfs, "other_files": other,
+                               "docs": os.environ.get("IO_DOCS") == "1"})
         if p.startswith("/api/vault/find"):
             from urllib.parse import parse_qs, urlparse
             qq = parse_qs(urlparse(self.path).query).get("q", [""])[0].strip()
@@ -766,6 +952,16 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/folders":
             folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
             return self._json({"folders": folders})
+        if p == "/api/codex":
+            # Everything the shell needs to launch Codex, and everything the status bar shows.
+            # The service is the authority on readiness; the shell never launches on the
+            # renderer's word alone.
+            pol = PROXY.policy
+            return self._json({"port": PROXY.port, "ready": pol.ready(),
+                               "reason": None if pol.ready() else pol.not_ready_reason(),
+                               "folder": str(S.folder) if S.folder else None,
+                               "vault": len(S.pmap.display) if S.pmap else 0,
+                               "stats": PROXY.stats.snapshot(), "dump": bool(PROXY.dump_dir)})
         if p == "/api/preview":
             with S.lock:
                 if not S.redacted:
@@ -808,7 +1004,7 @@ class H(BaseHTTPRequestHandler):
                         S.detector = None
                         S.text_detector = None
                         S._scanner_mode = None
-                for k in ("api_key", "server", "model", "room", "org", "scanner_server", "scanner_declined"):
+                for k in ("api_key", "server", "model", "room", "org", "scanner_server", "scanner_declined", "codex"):
                     if k in body:
                         S.provider[k] = body[k].strip()
                 S.provider = {k: v for k, v in S.provider.items() if v}
@@ -820,6 +1016,35 @@ class H(BaseHTTPRequestHandler):
                 with S.lock:
                     S.load_folder(folder)
                 return self._json(self.review())
+            if self.path == "/api/chat-workspace":
+                # A conversation with no data: Codex gets an empty io-owned folder, the
+                # policy is approved trivially (nothing to review), the vault starts empty
+                # and grows only from what the person types (validators + scanner, the
+                # same as a typed question). Files come in through /api/attach.
+                ws = CONF / "chats" / time.strftime("%Y%m%d-%H%M%S")
+                ws.mkdir(parents=True, exist_ok=True)
+                with S.lock:
+                    S.load_folder(ws)
+                    S.build_vault()
+                    S.accepted = True
+                return self._json({"folder": str(ws)})
+            if self.path == "/api/attach":
+                # Bring one file into the current chat workspace: copy it in (Codex works on
+                # real files), rescan the folder so the review sheet shows what will leave.
+                # Approval is withdrawn until the person presses Looks right again; the proxy
+                # refuses in between.
+                src = Path(body["path"]).expanduser()
+                if not src.is_file():
+                    return self._json({"error": "not a file"}, 400)
+                if not S.folder or not str(S.folder).startswith(str(CONF / "chats")):
+                    return self._json({"error": "attach works in a conversation without a sheltered folder; shelter the folder instead"}, 400)
+                import shutil  # noqa: PLC0415
+                dest = S.folder / src.name
+                shutil.copy2(src, dest)
+                with S.lock:
+                    S.sessions.pop(str(S.folder), None)
+                    S.load_folder(S.folder)
+                return self._json({"attached": src.name, **self.review()})
             if self.path == "/api/toggle":
                 with S.lock:
                     t = next(x for x in S.tables if x["name"] == body["name"])
@@ -978,12 +1203,15 @@ class H(BaseHTTPRequestHandler):
             out.append({"kind": "doc", "name": d["name"], "chars": len(d["text"]), "text": d["text"][:200_000],
                         "labels": d.get("labels", []),
                         "spans": [{**sp, "kept": sp["text"].casefold() in kept} for sp in d["spans"]]})
-        return {"files": out, "skipped": getattr(S, "skipped", [])}
+        return {"files": out, "skipped": getattr(S, "skipped", []), "deferred": getattr(S, "deferred", [])}
 
 
 def main():
     threading.Thread(target=S.get_detector, daemon=True).start()  # warm the scanner
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8801
+    # The privacy proxy listens from the start, on a port the OS picks, and refuses every
+    # request until a folder's policy has been approved. Codex is never pointed anywhere else.
+    PROXY.start()
     print(f"io on http://127.0.0.1:{port}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
 
