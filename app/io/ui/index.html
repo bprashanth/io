@@ -42,6 +42,7 @@ input:focus,textarea:focus{border-color:var(--hi)}
            color:var(--hi);background:var(--bg);border:1px solid var(--hi);border-radius:999px;padding:1px 8px}
 .wall .wnote{font-size:11.5px;color:#7a8189;line-height:1.5;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
 .wallfoot{display:flex;justify-content:flex-end;gap:10px;align-items:center}
+.wallfoot .go[disabled]{opacity:.35;cursor:default}
 @media (max-width:880px){.walls{grid-template-columns:1fr}.wall .wone{min-height:0}}
 #s-provider .card, #s-consent .card, #s-scanner .card, #s-login .card{width:400px;display:flex;flex-direction:column;gap:10px}
 #s-provider h1, #s-consent h1, #s-scanner h1, #s-login h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
@@ -280,6 +281,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
     about the <b>tools</b> it uses to get the job done. It is not about the conversation
     itself: what you ask, and anything it reads from your files, is turned into codes before
     it leaves this computer and travels encrypted, in all three of these.</p>
+    <div id="wall-halt" style="display:none;border:1px solid #e06c6c;border-radius:12px;padding:14px 16px;color:#e8a0a0;font-size:13.5px;line-height:1.6;white-space:pre-wrap"></div>
     <div class="walls" id="walls"></div>
     <div class="wallfoot">
       <button class="plain" id="wall-cancel">Cancel</button>
@@ -596,8 +598,23 @@ function renderWalls(){
 
 // Between picking the folder and reading a single file: the choice shapes the profile that
 // Codex is launched with, so it has to be made before anything is scanned or coded.
-function chooseWall(path){
+// The wall needs the computer's cooperation. When it cannot run, every setting that relies
+// on it is switched off and the person is told plainly what an administrator has to do
+// once; nothing starts without it.
+async function sandboxHalt(){
+  let st = null;
+  try { st = await window.io.codex.status(); } catch (e) { return 'io could not check this computer.'; }
+  if (!st.sandbox || st.sandbox.ok) return null;
+  let msg = `io cannot protect this folder on this computer: ${st.sandbox.why}. All three settings need that protection, so Codex is switched off here for now.`;
+  if (st.sandbox.install) msg += `\n\nAn administrator can allow it once, in a terminal:\n  cd ${(st.sandbox.profilePath || '').replace(/\/[^/]*$/, '')}\n  ${st.sandbox.install}\n\nThen start io again.`;
+  return msg;
+}
+async function chooseWall(path){
   wallPath = path;
+  const halt = await sandboxHalt();
+  $('#wall-halt').style.display = halt ? 'block' : 'none';
+  $('#wall-halt').textContent = halt || '';
+  $('#wall-go').disabled = !!halt;
   let last = null;
   try { last = localStorage.getItem('io.wall.' + path); } catch (e) {}
   wallChoice = WALL_CHOICES.some(w => w.id === last) ? last : 'tools';
@@ -838,7 +855,7 @@ q.addEventListener('keydown', async e => {
   // In Codex mode the chat box on the landing page always starts a conversation; the old
   // three-model chat is never the destination (it answered "no model could be reached"
   // when a previous folder's file list was still in memory after pressing home).
-  if (codexMode) { q.value = ''; paintMirror(); await startChatWorkspace(text); return; }
+  if (codexMode) { const halt = await sandboxHalt(); if (halt) { alert(halt); return; } q.value = ''; paintMirror(); await startChatWorkspace(text); return; }
   if (!files.length) { pickFolder(); return; }
   if (!accepted) { renderSheet(); return; }
   q.value = ''; paintMirror(); q.disabled = true;

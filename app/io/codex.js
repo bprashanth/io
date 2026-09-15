@@ -115,6 +115,11 @@ function writeConfig(home, proxyPort, extra = {}) {
     // trust this folder" question would be the same question asked twice.
     tables.push(`[projects."${String(extra.trust).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`, 'trust_level = "trusted"', '');
   }
+  // Windows: Codex's sandbox is off unless asked for (WindowsSandboxLevel defaults to
+  // Disabled; `[windows] sandbox` selects it). "unelevated" is the restricted-token sandbox
+  // that needs no administrator; "elevated" is stronger and needs one. Untested by io as of
+  // 2026-09-15; written so the first Windows run starts from the right place.
+  if (process.platform === 'win32') tables.push('[windows]', 'sandbox = "unelevated"', '');
   // Traffic that is not the model: switched off, and refused by the proxy anyway.
   //   apps / plugins   OpenAI-hosted MCP and plugin catalogues (POST backend-api/ps/mcp,
   //                    GET backend-api/ps/plugins/...) - tool arguments could flow there.
@@ -310,6 +315,47 @@ function spawnSession({ bin, home, cwd, cols, rows, noAltScreen, libsDir, wall, 
   });
 }
 
+// Can this machine run the wall at all? On Linux the wall is bubblewrap, and Ubuntu 24.04
+// confines any unconfined binary that creates a user namespace into a capability-less
+// AppArmor profile, so bwrap dies with "loopback: Failed RTM_NEWADDR" or "setting up uid
+// map: Permission denied" (measured on the DGX, chronology 2026-09-15T1856-dgx). Codex
+// prefers a system bwrap on PATH and falls back to its bundled one, so the same binary
+// Codex would use is the one tried here, with the same three namespaces. There is no
+// user-side fix: an administrator has to grant `userns` to that binary once (the profile
+// text this returns), or io runs without a wall, which it refuses to do silently.
+// macOS uses Seatbelt (built in, no setup); Windows uses Codex's own sandbox: both
+// report "not checked here" rather than a guess.
+let sandboxCache = null;
+function sandboxCheck(codexDir) {
+  if (sandboxCache) return sandboxCache;
+  if (process.platform !== 'linux') return (sandboxCache = { ok: true, checked: false, why: `${process.platform}: Codex's own sandbox, not checked by io` });
+  const bundled = path.join(codexDir || '', 'codex-resources', 'bwrap');
+  let system = null;
+  try { system = execFileSyncQuiet('sh', ['-c', 'command -v bwrap']).trim() || null; } catch { system = null; }
+  const bwrap = system || (fs.existsSync(bundled) ? bundled : null);
+  if (!bwrap) return (sandboxCache = { ok: false, checked: true, why: 'no bubblewrap found, neither on PATH nor bundled with Codex', fix: null });
+  const r = spawnSync(bwrap, ['--unshare-user', '--unshare-net', '--unshare-pid', '--ro-bind', '/', '/', '/bin/true'], { encoding: 'utf8', timeout: 10000 });
+  if (r.status === 0) return (sandboxCache = { ok: true, checked: true, bwrap });
+  const err = ((r.stderr || '') + (r.error ? String(r.error.message) : '')).trim().split('\n')[0].slice(0, 200);
+  let restricted = false;
+  try { restricted = fs.readFileSync('/proc/sys/kernel/apparmor_restrict_unprivileged_userns', 'utf8').trim() === '1'; } catch {}
+  const paths = [...new Set([system, fs.existsSync(bundled) ? bundled : null].filter(Boolean))];
+  const profile = ['abi <abi/4.0>,', 'include <tunables/global>']
+    .concat(paths.map((p, i) => `profile io-bwrap-${i} ${p} flags=(unconfined) {\n  userns,\n}`)).join('\n') + '\n';
+  return (sandboxCache = {
+    ok: false, checked: true, bwrap, error: err,
+    why: restricted
+      ? "this computer's settings (Ubuntu's AppArmor rule for user namespaces) do not let the wall start"
+      : `the wall could not start: ${err}`,
+    fix: restricted ? { profile, install: 'sudo install -m 644 io-bwrap /etc/apparmor.d/io-bwrap && sudo apparmor_parser -r /etc/apparmor.d/io-bwrap' } : null,
+  });
+}
+
+function execFileSyncQuiet(cmd, args) {
+  const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 5000 });
+  return r.status === 0 ? (r.stdout || '') : '';
+}
+
 function binaryInfo(bin) {
   try {
     const st = fs.statSync(bin);
@@ -320,4 +366,4 @@ function binaryInfo(bin) {
 }
 
 module.exports = {
-  WALLS, DEFAULT_WALL, wallOf, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };
+  WALLS, DEFAULT_WALL, wallOf, sandboxCheck, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };

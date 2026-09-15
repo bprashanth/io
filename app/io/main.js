@@ -41,6 +41,13 @@ async function codexStatus() {
                 loginBusy: !!login, running: !!session, folder: session ? session.ioFolder : null, wall };
   if (out.binary) Object.assign(out, codex.loginStatus(bin.path, home));
   else out.line = `bundled Codex is missing (expected ${bin.path})`;
+  // Whether the wall can run here. Written out once so an administrator has the exact file
+  // to install; the page only ever shows the sentence and the path.
+  const sb = process.env.IO_CODEX_NO_SANDBOX === '1' ? { ok: true, checked: false, why: 'dev bypass: no sandbox' } : codex.sandboxCheck(bin.dir);
+  out.sandbox = { ok: sb.ok, checked: sb.checked, why: sb.why || null, profilePath: null, install: sb.fix ? sb.fix.install : null };
+  if (sb.fix) {
+    try { const p = path.join(env.dataDir, 'io-bwrap'); fs.writeFileSync(p, sb.fix.profile); out.sandbox.profilePath = p; } catch {}
+  }
   try { out.service = await serviceGet('/api/codex'); } catch { out.service = null; }
   return out;
 }

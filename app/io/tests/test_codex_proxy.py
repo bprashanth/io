@@ -104,6 +104,13 @@ class RestorerTests(unittest.TestCase):
         out = r.feed("xNAME_0") + r.feed("01")
         self.assertEqual(out, "xNAME_001")
 
+    def test_code_glued_to_a_backslash_escape_is_still_restored(self):
+        # printf '\nNAME_001,...' : the code follows the n of a literal \n, no word boundary
+        r = StreamRestorer(self.p.inbound)
+        out = r.feed("printf '\\nNAME_001,PLACE_001' >> f.csv") + r.flush()
+        self.assertEqual(out, "printf '\\nAlice Example,SecretVillage' >> f.csv")
+        self.assertEqual(self.p.outbound("data: '\\nAlice Example' and '\\tSecretVillage'", None), "data: '\\nNAME_001' and '\\tPLACE_001'")
+
     def test_unknown_placeholder_passes_through(self):
         r = StreamRestorer(self.p.inbound)
         out = r.feed("WHATEVER_999 and NAME_001") + r.flush()

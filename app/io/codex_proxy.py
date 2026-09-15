@@ -58,7 +58,7 @@ STRUCTURAL_KEYS = frozenset({
 
 # A delta that ends like this might be the first half of a token (NAME_001 split as
 # "NAME_0" + "01"), so that tail waits for the next chunk. Longest thing worth holding.
-HOLD_RE = re.compile(r"(?<![\w])[A-Z][A-Z_]{0,24}\d{0,2}$")
+HOLD_RE = re.compile(r"(?:(?<![\w])|(?<=\\[ntr]))[A-Z][A-Z_]{0,24}\d{0,2}$")
 HOLD_MAX = 32
 
 # The paths Codex 0.154.0 uses under its two base URLs, and how each is treated.
@@ -631,8 +631,8 @@ class MapPolicy(Policy):
         self.forward = dict(mapping)
         self.back = {t: v for v, t in mapping.items()}
         vals = sorted(self.forward, key=len, reverse=True)
-        self.fre = re.compile(r"(?<![\w@.])(?:" + "|".join(re.escape(v) for v in vals) + r")(?![\w@])", re.I) if vals else None
-        self.tre = re.compile(r"\b(?:" + "|".join(re.escape(t) for t in self.back) + r")\b") if self.back else None
+        self.fre = re.compile(r"(?:(?<![\w@.])|(?<=\\[ntr]))(?:" + "|".join(re.escape(v) for v in vals) + r")(?![\w@])", re.I) if vals else None
+        self.tre = re.compile(r"(?:(?<!\w)|(?<=\\[ntr]))(?:" + "|".join(re.escape(t) for t in self.back) + r")\b") if self.back else None
         self.cf = {v.casefold(): t for v, t in self.forward.items()}
 
     def outbound(self, text: str, role: str | None) -> str:

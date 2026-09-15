@@ -141,5 +141,17 @@ test('io ships the analysis packages into the wall, and only io-owned paths', ()
   assert.ok(!fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8').includes('runtime'), 'nothing granted when io has no runtime to grant');
 });
 
+test('the sandbox check answers with a verdict, and with the admin fix when it fails', () => {
+  const r = codex.sandboxCheck(codex.bundledCodexPath().dir);
+  assert.strictEqual(typeof r.ok, 'boolean');
+  if (process.platform === 'linux') {
+    assert.strictEqual(r.checked, true);
+    if (!r.ok) { assert.ok(r.why); if (r.fix) { assert.ok(/userns/.test(r.fix.profile)); assert.ok(/apparmor_parser/.test(r.fix.install)); } }
+  } else {
+    assert.strictEqual(r.checked, false);
+  }
+  console.log(`   (this machine: ${r.ok ? 'wall can run' : 'wall cannot run - ' + r.why})`);
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${passed} launcher tests passed`);

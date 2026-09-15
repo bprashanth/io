@@ -59,11 +59,16 @@ if (FIXTURE) { fs.mkdirSync(codexHome, { recursive: true }); fs.copyFileSync(FIX
 const env = {
   ...process.env,
   IO_DATA_DIR: DATA, IO_HOME: IOHOME, IO_PORT_BASE: String(PORT_BASE), IO_SMOKE: '1',
-  IO_CODEX_NO_SANDBOX: '1', IO_CODEX_DEV_PROVIDER: '1', IO_DEV_KEY: key,
+  IO_CODEX_DEV_PROVIDER: '1', IO_DEV_KEY: key,
   IO_PROXY_DEV_UPSTREAM: '/dev/v1=https://openrouter.ai/api/v1', IO_CODEX_MODEL: process.env.IO_CODEX_MODEL || 'openai/gpt-5.2',
   IO_PROXY_DUMP: path.join(OUT, 'proxy-dump'),
 };
 delete env.OPENAI_API_KEY; delete env.CODEX_HOME;
+// The wall runs here now (chronology 2026-09-15T1856-dgx); IO_DRIVE_BYPASS=1 restores the old
+// no-sandbox drive for a machine that cannot.
+if (process.env.IO_DRIVE_BYPASS === '1') env.IO_CODEX_NO_SANDBOX = '1';
+// --halt: stop at the wall screen and photograph it (used with the AppArmor grants unloaded)
+const HALT = process.argv.includes('--halt');
 
 let child = null;
 function launch() {
@@ -125,7 +130,18 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await shot(page, 'login-cancelled');
     }
 
-    if (FIXTURE && MAP) {
+    if (FIXTURE && HALT) {
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await sleep(1500);
+      await shot(page, 'wall-screen');
+      results.halt = { text: await page.locator('#wall-halt').textContent(), continueDisabled: await page.locator('#wall-go').isDisabled() };
+    } else if (FIXTURE && MAP) {
       await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
       await page.click('#c-ok');
       await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
@@ -134,6 +150,8 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await sleep(600);
       await shot(page, 'confirm-scan-spreadsheets-only');
       await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await page.click('#wall-go');
       await waitFor(page, () => page.locator('#sheet-top').isVisible(), 300000, 'scan finished');
       await sleep(600);
       await shot(page, 'review-sheet-corpus');
@@ -205,6 +223,11 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
       await shot(page, 'confirm-scan');
       await page.click('#cs-ok');
+      // the settings screen the laptop added between the dialog and the scan
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await sleep(600);
+      await shot(page, 'wall-settings');
+      await page.click('#wall-go');
       await waitFor(page, () => page.locator('#sheet-top').isVisible(), 180000, 'scan finished');
       await sleep(800);
       await shot(page, 'review-sheet');

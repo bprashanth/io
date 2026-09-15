@@ -122,3 +122,37 @@ T4GC tools opens it, and the link provider makes a bare filename clickable.
    that this computer needs a one-time step from an admin; offer to do it through `pkexec`
    with an explanation; or accept "no wall" mode on those machines with the footer saying
    so. This is a product decision, not a code one.
+
+## 21:40 - Detect and halt; the wall in Electron on the DGX; a code glued to a backslash
+
+Decision (user): where the wall cannot run, detect it and say so, and switch off every
+setting that needs it. Built: `sandboxCheck` in `codex.js` runs the same bubblewrap Codex
+would use (system `bwrap` on PATH first, else the bundled one) with the three namespaces
+the wall needs; on failure it reads the AppArmor setting and returns the sentence for the
+person plus the two-profile text and the one-time admin command. `main.js` writes the
+profile to `<data>/io-bwrap`, reports it in `codex-status`, and refuses `codex-start`
+without a wall. The settings screen shows the halt in red with Continue disabled, and the
+landing-page chat box says the same (`drive-halt/01-wall-screen.png`, taken with the
+grants unloaded, i.e. as stock Ubuntu 24.04 would show it). `IO_CODEX_NO_SANDBOX=1` is
+still the dev bypass. Windows: `[windows] sandbox = "unelevated"` is now written into the
+profile, because Codex's Windows sandbox is *off* unless asked for (`WindowsSandboxLevel`
+defaults to Disabled); untested.
+
+The full app drive then ran on the DGX **with the real wall** for the first time
+(`drive-walled/`, `IO_DRIVE_BYPASS` unset): the answer came back through a sandboxed
+`cat`, fail-closed, resize and restart all as before - and the edit step failed in a new
+way. Codex ran `printf '\nNAME_005,SecretVillage,9222222222,3,\n' >> visits.csv` and the
+file on disk got `NAME_005`, not `Kiran Demo`. The code follows the `n` of a literal `\n`
+in the shell command; `\b` sees two word characters and no boundary, so neither the
+restorer nor, symmetrically, the known-values pass and the leak check treat it as a code
+or a value. Yesterday's run wrote the same row with `printf '%s\n' '...'`, where a quote
+preceded the name, and passed. Fix in `TOKEN_RE`, `known_regex`, `HOLD_RE` and the test
+policy: a boundary is "not a word character, or a literal `\n`/`\t`/`\r` escape". Tests
+added for both directions.
+
+Re-run after the fix: the command text now came back as `printf '\nKiran Demo,...'` - the
+code restored - but the file still did not change, for a different and older reason: the
+model (gpt-5.2 at low effort through the dev provider) emitted the tool call as prose,
+`{"cmd":"printf ..."}` printed inside its message instead of a function call, so nothing
+ran. Yesterday's runs made the call properly. A model quirk on this path, not the wall:
+the probe run above already showed the wall lets the folder be written.
