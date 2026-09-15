@@ -172,7 +172,7 @@ ipcMain.handle('codex-login', async (_e, mode) => {
 ipcMain.handle('codex-login-cancel', async () => { if (login) { login.kill('SIGTERM'); login = null; } return { ok: true }; });
 ipcMain.handle('codex-logout', async () => { const { bin, home } = codexPaths(); return codex.logout(bin.path, home); });
 
-ipcMain.handle('codex-start', async (_e, opts) => {
+async function startSession(opts) {
   // A new start for a different folder replaces the running session; the same folder is
   // refused so a double click cannot start two.
   if (session) {
@@ -208,6 +208,20 @@ ipcMain.handle('codex-start', async (_e, opts) => {
     sendToWin('codex-exit', { exitCode, signal, stale: session !== null });
   });
   return { ok: true, pid: mine.pid, port: info.port, folder: info.folder };
+}
+
+ipcMain.handle('codex-start', async (_e, opts) => startSession(opts));
+
+// Change the setting mid-session: Codex is relaunched under the new profile with the same
+// thread resumed (`codex resume --last`), so the conversation continues and the service,
+// proxy and vault are untouched. The old process is killed first and waited for, because
+// its late exit would otherwise be taken for the new one's (see the stale guard above).
+ipcMain.handle('codex-switch', async (_e, opts) => {
+  if (!session) return { error: 'no session to switch' };
+  const old = session;
+  session = null;
+  await new Promise(res => { let done = false; old.onExit(() => { if (!done) { done = true; res(); } }); try { old.kill(); } catch {} setTimeout(() => { if (!done) { done = true; res(); } }, 4000); });
+  return startSession({ ...(opts || {}), resume: '--last' });
 });
 ipcMain.on('codex-input', (_e, data) => { if (session) session.write(data); });
 ipcMain.on('codex-resize', (_e, { cols, rows }) => { if (session && cols > 0 && rows > 0) { try { session.resize(cols, rows); } catch {} } });

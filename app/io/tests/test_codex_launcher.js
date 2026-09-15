@@ -154,4 +154,15 @@ test('the sandbox check answers with a verdict, and with the admin fix when it f
 });
 
 fs.rmSync(tmp, { recursive: true, force: true });
+
+test('a switch resumes the thread under the profile, and Offline still cannot escalate', () => {
+  const fresh = codex.sessionArgs({ wall: 'tools' });
+  assert.deepStrictEqual(fresh, ['-p', 'io']);
+  const sw = codex.sessionArgs({ wall: 'open', resume: '--last' });
+  assert.deepStrictEqual(sw, ['resume', '--last', '-p', 'io']);
+  const off = codex.sessionArgs({ wall: 'offline', resume: '--last' });
+  assert.deepStrictEqual(off, ['resume', '--last', '-p', 'io', '-a', 'never']);
+  assert.ok(!codex.sessionArgs({ wall: 'open', resume: '--last' }).includes('never'));
+});
+
 console.log(`\n${passed} launcher tests passed`);

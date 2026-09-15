@@ -190,6 +190,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
 #cx-top .dot.ok{background:var(--grn)}
 #cx-top .dot.bad{background:#e06c6c}
 #cx-top .brand{color:var(--hi);font-weight:600;letter-spacing:.5px;padding-right:6px;border-right:1px solid var(--line);margin-right:2px}
+#cx-wall{font:inherit;font-size:12.5px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:3px 8px}
 #cx-hint{font-size:12px}
 #cx-wrap{flex:1;min-height:0;padding:10px 14px 6px;background:#15181c}
 #term{width:100%;height:100%}
@@ -320,6 +321,10 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <span class="pill"><span class="dot" id="cx-dot-priv"></span><span>Privacy</span> <b id="cx-priv">…</b></span>
     <span class="pill"><span class="dot" id="cx-dot-proxy"></span><span>Proxy</span> <b id="cx-proxy">…</b></span>
     <span class="pill"><span class="dot" id="cx-dot-gpt"></span><span>ChatGPT</span> <b id="cx-gpt">…</b></span>
+    <span class="pill" id="cx-wallpill"><span>Setting</span>
+      <select id="cx-wall" title="change what the assistant may reach; the conversation continues">
+        <option value="offline">Offline</option><option value="tools">T4GC tools</option><option value="open">Open</option>
+      </select></span>
   </div>
   <div id="cx-err"></div>
   <div id="cx-wrap"><div id="term"></div></div>
@@ -1100,6 +1105,8 @@ async function enterCodex(){
   ensureTerm();
   show('#s-codex');
   cxErr('');
+  $('#cx-wall').value = wallChoice;
+  $('#cx-wallpill').style.display = chatWorkspace ? 'none' : '';
   $('#cx-attach').style.display = chatWorkspace ? '' : 'none';
   await new Promise(r => setTimeout(r, 60));
   fitTerm();
@@ -1179,6 +1186,19 @@ $('#cx-attach').onclick = async () => {
   renderSheet();
 };
 $('#cx-restart').onclick = () => startCodex();
+// The setting control: relaunches Codex under the new profile with the thread resumed.
+$('#cx-wall').onchange = async () => {
+  const next = $('#cx-wall').value;
+  if (next === wallChoice) return;
+  const prev = wallChoice;
+  wallChoice = next;
+  try { if (wallPath) localStorage.setItem('io.wall.' + wallPath, next); } catch (e) {}
+  const names = { offline: 'Offline', tools: 'T4GC tools', open: 'Open' };
+  term.write(`\r\n\x1b[90m[io: switching to ${names[next]}; Codex continues where it was]\x1b[0m\r\n`);
+  const r = await window.io.codex.switch({cols: term.cols, rows: term.rows, chat: !!chatWorkspace, wall: next});
+  if (r && r.error) { cxErr('could not switch: ' + r.error); wallChoice = prev; $('#cx-wall').value = prev; return; }
+  cxRunning = true; $('#cx-restart').style.display = 'none'; term.focus();
+};
 $('#cx-folders').onclick = () => { chatWorkspace = null; files = []; accepted = false; show('#s-home'); renderShelf(); };
 
 paintMirror();

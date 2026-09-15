@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('io', {
     cancelLogin: () => ipcRenderer.invoke('codex-login-cancel'),
     logout: () => ipcRenderer.invoke('codex-logout'),
     start: opts => ipcRenderer.invoke('codex-start', opts),
+    switch: opts => ipcRenderer.invoke('codex-switch', opts),
     stop: () => ipcRenderer.invoke('codex-stop'),
     say: text => ipcRenderer.invoke('codex-say', text),
     input: data => ipcRenderer.send('codex-input', data),

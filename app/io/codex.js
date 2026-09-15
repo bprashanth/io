@@ -306,11 +306,20 @@ function logout(bin, home) {
 
 // The interactive session. A real PTY: Codex's TUI needs cursor movement, resize and
 // raw keys, none of which survive a pipe.
-function spawnSession({ bin, home, cwd, cols, rows, noAltScreen, libsDir, wall, resume }) {
-  if (!pty) throw new Error('node-pty is not available in this build');
+// The command line for a session. A switch of setting is a relaunch with the thread
+// resumed (`codex resume --last`), and the profile flag has to be repeated: a resumed
+// session takes its wall from the profile file as it is now, not from the session it
+// resumes (measured, chronology 2026-09-15T2330-dgx).
+function sessionArgs({ wall, resume, noAltScreen } = {}) {
   const args = resume ? ['resume', resume, '-p', PROFILE] : ['-p', PROFILE];
   if (!wallOf(wall).escalate) args.push('-a', 'never');
   if (noAltScreen) args.push('--no-alt-screen');
+  return args;
+}
+
+function spawnSession({ bin, home, cwd, cols, rows, noAltScreen, libsDir, wall, resume }) {
+  if (!pty) throw new Error('node-pty is not available in this build');
+  const args = sessionArgs({ wall, resume, noAltScreen });
   return pty.spawn(bin, args, {
     name: 'xterm-256color',
     cols: cols || 100,
@@ -371,4 +380,4 @@ function binaryInfo(bin) {
 }
 
 module.exports = {
-  WALLS, DEFAULT_WALL, wallOf, sandboxCheck, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };
+  WALLS, DEFAULT_WALL, wallOf, sandboxCheck, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, sessionArgs, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };

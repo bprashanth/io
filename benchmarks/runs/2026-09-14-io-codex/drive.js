@@ -28,6 +28,7 @@ const CHAT = process.argv.includes('--chat');
 // (IO_KEEP_HEADERS=0) to reproduce the laptop, on to verify the fix.
 const MAP = process.argv.includes('--map');
 const CHART = process.argv.includes('--chart');
+const SWITCH = process.argv.includes('--switch');
 const TESTDATA_SRC = MAP ? path.resolve(__dirname, '../../pii/corpus') : path.join(__dirname, 'testdata');
 const PORT_BASE = Number(arg('port-base', 8841));
 const APP = path.resolve(__dirname, '../../../app/io');
@@ -131,7 +132,53 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await shot(page, 'login-cancelled');
     }
 
-    if (FIXTURE && CHART) {
+    if (FIXTURE && SWITCH) {
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await page.click('#wall-go');      // T4GC tools, the suggested one
+      await waitFor(page, () => page.locator('#sheet-top').isVisible(), 180000, 'scan finished');
+      await page.click('#sheet-ok');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 60000, 'codex screen');
+      await waitFor(page, async () => (await termText(page)).length > 200, 40000, 'codex TUI first paint');
+      await sleep(2500);
+      const ask = async (q, done, ms) => { await page.click('#term'); await page.keyboard.type(q, { delay: 6 }); await sleep(1200); await page.keyboard.press('Enter'); return waitFor(page, async () => done((await termText(page))), ms); };
+      await ask('Say the word banana and nothing else.', t => /›\s*Ask Codex to do anything/.test(t.slice(-1500)) && /banana/i.test(t.slice(-1500).replace(/Say the word banana.*/, '')), 90000);
+      await shot(page, 'switch-before');
+      results.switch = { setting0: await page.locator('#cx-wall').inputValue() };
+      const probe = 'Run this exact command and tell me only its output: curl -s -m 8 -o /dev/null -w "%{http_code}" https://example.com; echo " exit=$?"';
+      // A result line is "<3 digits> exit=<n>"; the echoed prompt says "exit=$?" and never
+      // matches. Each probe waits for one more result line than the screen already had,
+      // otherwise the previous setting's answer is read as this one's.
+      const nResults = t => (t.match(/\b\d{3} exit=\d+/g) || []).length;
+      const lastResult = t => { const m = t.match(/\b\d{3} exit=\d+/g); return m ? m[m.length - 1] : null; };
+      const probeNet = async () => { const n0 = nResults(await termText(page)); await ask(probe, t => nResults(t) > n0, 150000); await sleep(800); return lastResult(await termText(page)); };
+      results.switch.toolsNet = await probeNet();
+      await shot(page, 'switch-tools-net');
+      // switch to Open: Codex relaunches with the thread resumed
+      await page.selectOption('#cx-wall', 'open');
+      await waitFor(page, async () => /switching to Open/.test(await termText(page)), 10000, 'switch note');
+      await waitFor(page, async () => /›\s*Ask Codex to do anything/.test((await termText(page)).slice(-1500)), 60000, 'resumed TUI ready');
+      await sleep(2500);
+      await shot(page, 'switch-open-resumed');
+      results.switch.resumedShowsBanana = /banana/i.test(await termText(page));
+      results.switch.status = await page.evaluate(() => window.io.codex.status());
+      results.switch.openConfig = await page.evaluate(() => window.io.codex.status()).then(st => require('fs').readFileSync(require('path').join(st.home, 'io.config.toml'), 'utf8').match(/\[permissions\.io\.network\]\s*\n\s*enabled = (\w+)/)?.[1]);
+      results.switch.openNet = await probeNet();
+      await shot(page, 'switch-open-net');
+      // and to Offline
+      await page.selectOption('#cx-wall', 'offline');
+      await waitFor(page, async () => /›\s*Ask Codex to do anything/.test((await termText(page)).slice(-1500)) && /switching to Offline/.test(await termText(page)), 60000, 'offline resumed');
+      await sleep(2500);
+      results.switch.offlineConfig = await page.evaluate(() => window.io.codex.status()).then(st => require('fs').readFileSync(require('path').join(st.home, 'io.config.toml'), 'utf8').match(/\[permissions\.io\.network\]\s*\n\s*enabled = (\w+)/)?.[1]);
+      results.switch.offlineNet = await probeNet();
+      await shot(page, 'switch-offline-net');
+      results.switch.tail = (await termText(page)).slice(-1500);
+    } else if (FIXTURE && CHART) {
       await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
       await page.click('#c-ok');
       await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
