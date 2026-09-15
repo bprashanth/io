@@ -131,8 +131,12 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
       await page.evaluate(p => confirmScan(p), TESTDATA);
       await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await sleep(600);
+      await shot(page, 'confirm-scan-spreadsheets-only');
       await page.click('#cs-ok');
       await waitFor(page, () => page.locator('#sheet-top').isVisible(), 300000, 'scan finished');
+      await sleep(600);
+      await shot(page, 'review-sheet-corpus');
       await page.click('#sheet-ok');
       await waitFor(page, () => page.locator('#s-codex.on').count(), 120000, 'codex screen');
       await waitFor(page, async () => (await termText(page)).length > 200, 40000, 'codex TUI first paint');
