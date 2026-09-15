@@ -152,19 +152,37 @@ class State:
             # 1. a privacy server, the first that answers. The text goes there unredacted -
             #    it has to, the server is being asked to find the private values in it.
             if order in ("auto", "server") and not declined:
-                for remote in self.scanner_candidates():
+                # Try them all at once and take the fastest that answers: on the office
+                # network the tailnet address beats the public name (5 s against 35 s for
+                # a corpus scan of 334 calls, 2026-09-15), elsewhere only the name works.
+                results: dict[str, float | Exception] = {}
+
+                def probe(remote: str) -> None:
+                    t0 = time.monotonic()
                     try:
-                        self.step("reaching the privacy server")
-                        make_server(remote, timeout=4.0)("warm up")     # fail fast, not mid-scan
-                        rs = make_server(remote)
-                        self.detector = lambda t, _rs=rs: regex_engine(t) + _rs(t)
-                        self._scanner_mode = "server"
-                        self._scanner_url = remote
-                        self.scanner_base = f"server:{remote}"
-                        self.step("privacy server ready")
-                        return self.detector
+                        make_server(remote, timeout=4.0)("warm up")
+                        results[remote] = time.monotonic() - t0
                     except Exception as exc:  # noqa: BLE001
-                        self.server_error = f"{type(exc).__name__}: {exc}".strip()[:200]
+                        results[remote] = exc
+
+                self.step("reaching the privacy server")
+                threads = [threading.Thread(target=probe, args=(r,), daemon=True) for r in self.scanner_candidates()]
+                for th in threads:
+                    th.start()
+                for th in threads:
+                    th.join(6.0)
+                answered = sorted((v, r) for r, v in results.items() if isinstance(v, float))
+                if answered:
+                    remote = answered[0][1]
+                    rs = make_server(remote)
+                    self.detector = lambda t, _rs=rs: regex_engine(t) + _rs(t)
+                    self._scanner_mode = "server"
+                    self._scanner_url = remote
+                    self.scanner_base = f"server:{remote}"
+                    self.step("privacy server ready")
+                    return self.detector
+                errs = [f"{type(v).__name__}: {v}" for v in results.values() if isinstance(v, Exception)]
+                self.server_error = (errs[0] if errs else "no answer").strip()[:200]
                 self.step("privacy server not reachable" + (", using the on-device scanner" if order == "auto" else ""))
             # 2. the on-device model, when installed
             if order in ("auto", "local"):

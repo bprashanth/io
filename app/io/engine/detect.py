@@ -120,7 +120,8 @@ def make_server(url: str, timeout: float = 30.0) -> Callable[[str], list[Span]]:
     endpoint = urlunsplit((parts.scheme, host, parts.path, "", "")).rstrip("/")
     if not endpoint.endswith("/scan"):
         endpoint += "/scan"
-    headers = {"Content-Type": "application/json"}
+    # Cloudflare's bot rules answer python's default user agent with 403; say who we are.
+    headers = {"Content-Type": "application/json", "User-Agent": "io-privacy-client/1"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
