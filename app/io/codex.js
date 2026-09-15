@@ -68,10 +68,17 @@ const PROFILE = 'io';
 //
 // The folder boundary does not move between them. Commands may write the sheltered folder
 // and temp, read what the platform needs, and nothing else, in every setting.
+// `escalate` is the third lever and the one that makes the first two mean anything.
+// Codex's default approval policy lets the model ask the person to run a command outside
+// the sandbox - the "Environment: local" prompt seen on 2026-09-15 when it wanted xdg-open.
+// A person who says yes to that gets a command with the whole machine and the whole
+// network, whichever setting they picked, so "Offline" would have been a label and not a
+// fact. `-a never` returns the failure to the model instead of asking. Escalation stays
+// available only where the person has already said the tools may reach out.
 const WALLS = {
-  offline: { network: false, openPages: false },
-  tools:   { network: false, openPages: true  },
-  open:    { network: true,  openPages: true  },
+  offline: { network: false, openPages: false, escalate: false },
+  tools:   { network: false, openPages: true,  escalate: true  },
+  open:    { network: true,  openPages: true,  escalate: true  },
 };
 const DEFAULT_WALL = 'tools';
 const wallOf = name => WALLS[name] || WALLS[DEFAULT_WALL];
@@ -282,9 +289,10 @@ function logout(bin, home) {
 
 // The interactive session. A real PTY: Codex's TUI needs cursor movement, resize and
 // raw keys, none of which survive a pipe.
-function spawnSession({ bin, home, cwd, cols, rows, noAltScreen, libsDir }) {
+function spawnSession({ bin, home, cwd, cols, rows, noAltScreen, libsDir, wall, resume }) {
   if (!pty) throw new Error('node-pty is not available in this build');
-  const args = ['-p', PROFILE];
+  const args = resume ? ['resume', resume, '-p', PROFILE] : ['-p', PROFILE];
+  if (!wallOf(wall).escalate) args.push('-a', 'never');
   if (noAltScreen) args.push('--no-alt-screen');
   return pty.spawn(bin, args, {
     name: 'xterm-256color',

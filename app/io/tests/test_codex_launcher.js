@@ -116,6 +116,13 @@ test('the three walls differ only in network, and never in the folder boundary',
     assert.ok(t.includes('":minimal" = "read"'));
     assert.ok(!t.includes('[sandbox_workspace_write]'), 'never the unwalled fallback');
   }
+  // Escalation: Codex's default policy lets the model ask the person to run a command
+  // outside the sandbox, which would hand it the whole machine and the whole network
+  // whatever setting they chose. Offline must not be able to ask. The other two may,
+  // because that is also how an MCP tool call is approved.
+  assert.strictEqual(codex.wallOf('offline').escalate, false, 'offline may never escalate');
+  assert.strictEqual(codex.wallOf('open').escalate, true);
+  assert.strictEqual(codex.wallOf('nonsense').escalate, codex.wallOf(codex.DEFAULT_WALL).escalate);
   // an unknown or missing name falls back to the suggested one, never to the open one
   const fallback = read('nonsense-value');
   assert.strictEqual(codex.DEFAULT_WALL, 'tools');

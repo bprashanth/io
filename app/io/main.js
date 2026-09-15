@@ -120,7 +120,7 @@ ipcMain.handle('codex-start', async (_e, opts) => {
   codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
   let mine;
   try {
-    mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows, libsDir: env.runtimeDir });
+    mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows, libsDir: env.runtimeDir, wall, resume: opts && opts.resume });
   } catch (e) { return { error: e.message }; }
   mine.ioFolder = info.folder;
   mine.onData(d => sendToWin('codex-data', d));
