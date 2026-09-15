@@ -178,3 +178,17 @@ Open: on the laptop the codes also survived *into the file on disk*, which means
 inbound restoration did not apply there. Here, the same request (fix off) restored fine
 and produced a working map page; the apply_patch custom-tool stream restores in a unit
 test added today. Needs the laptop's proxy dump (`IO_PROXY_DUMP`) to explain.
+
+## 2026-09-15 11:10 - Spreadsheets only, for now
+
+Decision (user): sheltered mode is csv/xlsx until the document path earns its place - a
+README minted codes for column names, chat logs over-mark. Documents (.txt/.md/.log/.pdf)
+are listed in the confirm dialog as "coming soon" and not scanned (`IO_DOCS=1` brings
+them back for testing; the review shows them as `deferred`); everything else in the folder
+is counted as "N other files ignored" so nobody wonders about the html and json sitting
+there. The attach picker offers spreadsheets only. On the pii corpus: 4 spreadsheets
+scanned (5 tables), 4 documents deferred, 15 other files ignored.
+
+Branch `io_codex` is on GitHub now (`origin/io_codex`), so the laptop can push its fixes
+there and the DGX pulls them: `git pull --ff-only origin io_codex` on either side. The
+prompt for the laptop agent is `installation/AGENT_PROMPT-laptop-codex.md`.

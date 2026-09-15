@@ -260,17 +260,25 @@ class State:
         self.pmap = PseudonymMap(CONF / f"vault-{hashlib.sha256(str(folder).encode()).hexdigest()[:12]}-local-only.json")
         det = self.get_detector()
         self.skipped = []
+        self.deferred = []          # documents: shown, not scanned, for now
         for f in sorted(folder.iterdir()):
             if f.name.startswith("~$") or f.name.startswith("."):
                 continue
             if not f.is_file():
                 continue
             if f.suffix.lower() in (".txt", ".md", ".log", ".pdf"):
-                try:
-                    self.load_doc(f)
-                except Exception:  # noqa: BLE001
-                    traceback.print_exc()
-                    self.skipped.append(f.name)
+                # Documents are deferred for now (2026-09-15): a README describing the
+                # columns minted codes for the column names themselves, and chat logs
+                # over-mark. Spreadsheets only, until the document path earns its place.
+                # IO_DOCS=1 brings it back for testing.
+                if os.environ.get("IO_DOCS") == "1":
+                    try:
+                        self.load_doc(f)
+                    except Exception:  # noqa: BLE001
+                        traceback.print_exc()
+                        self.skipped.append(f.name)
+                else:
+                    self.deferred.append(f.name)
                 continue
             if f.suffix.lower() not in (".csv", ".xlsx", ".xls"):
                 self.skipped.append(f.name)
@@ -910,7 +918,7 @@ class H(BaseHTTPRequestHandler):
             cur = Path(q.get("path", [str(Path.home())])[0]).expanduser().resolve()
             if not cur.is_dir():
                 cur = Path.home()
-            dirs, count, chats, pdfs = [], 0, 0, 0
+            dirs, count, chats, pdfs, other = [], 0, 0, 0, 0
             try:
                 for e in sorted(cur.iterdir()):
                     if e.name.startswith("."):
@@ -923,9 +931,13 @@ class H(BaseHTTPRequestHandler):
                         chats += 1
                     elif e.suffix.lower() == ".pdf":
                         pdfs += 1
+                    elif e.is_file():
+                        other += 1
             except PermissionError:
                 pass
-            return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200], "data_files": count, "chat_files": chats, "pdf_files": pdfs})
+            return self._json({"path": str(cur), "parent": str(cur.parent) if cur != cur.parent else None, "dirs": dirs[:200],
+                               "data_files": count, "chat_files": chats, "pdf_files": pdfs, "other_files": other,
+                               "docs": os.environ.get("IO_DOCS") == "1"})
         if p.startswith("/api/vault/find"):
             from urllib.parse import parse_qs, urlparse
             qq = parse_qs(urlparse(self.path).query).get("q", [""])[0].strip()
@@ -1191,7 +1203,7 @@ class H(BaseHTTPRequestHandler):
             out.append({"kind": "doc", "name": d["name"], "chars": len(d["text"]), "text": d["text"][:200_000],
                         "labels": d.get("labels", []),
                         "spans": [{**sp, "kept": sp["text"].casefold() in kept} for sp in d["spans"]]})
-        return {"files": out, "skipped": getattr(S, "skipped", [])}
+        return {"files": out, "skipped": getattr(S, "skipped", []), "deferred": getattr(S, "deferred", [])}
 
 
 def main():

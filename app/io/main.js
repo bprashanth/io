@@ -337,7 +337,7 @@ async function start() {
   }
 }
 
-ipcMain.handle('pick-file', async () => { const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'data and documents', extensions: ['csv', 'xlsx', 'xls', 'txt', 'md', 'log', 'pdf'] }] }); return r.canceled ? null : r.filePaths[0]; });
+ipcMain.handle('pick-file', async () => { const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'spreadsheets', extensions: ['csv', 'xlsx', 'xls'] }] }); return r.canceled ? null : r.filePaths[0]; });
 // A line typed into the terminal on the person's behalf (the first message of a
 // conversation started from the chat box, or "I attached x.csv"). Visible in the terminal.
 ipcMain.handle('codex-say', async (_e, text) => {
