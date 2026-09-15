@@ -25,7 +25,7 @@ instead of one; either is fine, ours has no dependency.
 
 Where io looks, baked in (`DEFAULT_PRIVACY_SERVERS` in `app/io/service.py`, in order;
 `IO_PRIVACY_SERVER=a,b` overrides; the settings gear per session): `https://privacy.idli.cc`
-first, then `http://100.82.28.38:8899` on the tailnet for the office. Each gets a 4-second
+only - users in the office have no tailnet either, so a shortcut would hide the delay everyone else pays. Each candidate gets a 4-second
 warm-up; the first that answers is used, otherwise the on-device scanner. A quick check
 from any laptop:
 

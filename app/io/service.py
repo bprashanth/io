@@ -71,12 +71,12 @@ GLINER_MODEL = "knowledgator/gliner-pii-edge-v1.0"
 # order: "auto" (server, then the on-device model, then patterns), "local" (never the
 # server), "server" (never the local model), "regex". The on-device install is unchanged;
 # it is simply not the first choice any more.
-# Baked in, in order: the public name (Cloudflare Tunnel to the DGX), then the DGX on the
-# tailnet for the office. No token for the limited preview: anyone with the app may use
-# the scanner; it stores nothing. A token, when wanted, rides inside the address
-# (https://TOKEN@host) and the server refuses without it.
+# Baked in: the public name (a Cloudflare Tunnel to the DGX). Only that one: users in the
+# office have no tailnet either, so a tailnet shortcut would hide the delay everyone else
+# pays. No token for the limited preview: anyone with the app may use the scanner; it
+# stores nothing. A token, when wanted, rides inside the address (https://TOKEN@host).
 DEFAULT_PRIVACY_SERVERS = [x.strip() for x in os.environ.get(
-    "IO_PRIVACY_SERVER", "https://privacy.idli.cc,http://100.82.28.38:8899").split(",") if x.strip()]
+    "IO_PRIVACY_SERVER", "https://privacy.idli.cc").split(",") if x.strip()]
 DEFAULT_PRIVACY_SERVER = DEFAULT_PRIVACY_SERVERS[0] if DEFAULT_PRIVACY_SERVERS else ""
 SCANNER_ORDER = (os.environ.get("IO_SCANNER") or "auto").strip().lower()
 
