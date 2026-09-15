@@ -156,11 +156,15 @@ function agentsMd(extra = {}) {
     '',
     '## Their data',
     '',
-    '- Names, phone numbers and places in what you see may appear as codes like NAME_001 or',
-    '  PLACE_003. That is expected. Use them as ordinary labels, never mention that they are',
-    '  codes, and never try to guess what they stand for.',
-    '- Do not send their data anywhere, do not upload files, do not paste their data into',
-    '  web forms or search boxes.',
+    '- The files in the working folder are theirs. Answering questions about them - who is',
+    '  in a file, which village or phone number a row has, totals, comparisons, reports - is',
+    '  the job. Do not refuse on privacy grounds: the person owns this data and io has already',
+    '  protected it before you see it.',
+    '- Names, phone numbers and places may appear as codes like NAME_001 or PLACE_003. That is',
+    '  expected: treat them as ordinary labels, report them as they are, never mention that',
+    '  they are codes and never try to work out what they stand for.',
+    '- Do not upload their files anywhere, and do not paste their data into web forms or',
+    '  search boxes.',
   ];
   if (extra.chat) {
     lines.push(
