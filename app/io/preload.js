@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('io', {
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   openExternal: url => ipcRenderer.invoke('open-external', url),
   pickFile: () => ipcRenderer.invoke('pick-file'),
+  openViewer: file => ipcRenderer.invoke('open-viewer', file),
+  onPageReady: fn => { ipcRenderer.removeAllListeners('page-ready'); ipcRenderer.on('page-ready', (_e, d) => fn(d)); },
   codex: {
     status: () => ipcRenderer.invoke('codex-status'),
     login: mode => ipcRenderer.invoke('codex-login', mode),

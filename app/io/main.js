@@ -1,5 +1,5 @@
 // io — minimal desktop shell.
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, session: esession } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -57,6 +57,71 @@ function sendToWin(channel, payload) {
 }
 
 ipcMain.handle('codex-status', codexStatus);
+// ---- the contained viewer -------------------------------------------------------------
+// A page Codex writes is arbitrary JavaScript with full network once it opens in a real
+// browser, carrying whatever data was inlined (demonstrated on the laptop 2026-09-15). So
+// pages open here first: an io-owned window whose session may load nothing but files, so
+// nothing on the page can send anything anywhere. "open in your browser" is one click away
+// unless the folder is set to Offline, so nobody is locked in.
+let viewer = null;
+let viewerFile = null;
+function viewerSession() {
+  const s = esession.fromPartition('io-viewer');
+  if (!s.__ioBlocked) {
+    s.__ioBlocked = true;
+    s.webRequest.onBeforeRequest({ urls: ['*://*/*', 'ws://*/*', 'wss://*/*'] }, (details, cb) => cb({ cancel: !/^(file|data|blob):/.test(details.url) }));
+    s.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  }
+  return s;
+}
+function openViewer(file) {
+  const canBrowser = !(wall && !codex.wallOf(wall).openPages);
+  const url = `file://${path.join(__dirname, 'ui', 'viewer.html')}?file=${encodeURIComponent(file)}&browser=${canBrowser ? 1 : 0}`;
+  if (viewer && !viewer.isDestroyed()) {
+    if (viewerFile === file) { viewer.webContents.send('io-reload'); viewer.webContents.executeJavaScript('window.postMessage("io-reload","*")').catch(() => {}); viewer.focus(); return; }
+    viewer.loadURL(url); viewerFile = file; viewer.focus(); return;
+  }
+  viewer = new BrowserWindow({
+    width: 1000, height: 760, title: 'io', backgroundColor: '#1a1d21',
+    webPreferences: { preload: path.join(__dirname, 'viewer-preload.js'), contextIsolation: true, partition: 'io-viewer', sandbox: true },
+  });
+  viewerSession();
+  viewer.setMenuBarVisibility(false);
+  viewer.on('closed', () => { viewer = null; viewerFile = null; });
+  viewerFile = file;
+  viewer.loadURL(url);
+}
+ipcMain.handle('viewer-open-in-browser', async (_e, file) => {
+  if (wall && !codex.wallOf(wall).openPages) return { error: 'offline' };
+  const err = await shell.openPath(String(file));
+  return err ? { error: err } : { ok: true };
+});
+
+// Codex cannot open a page from inside the wall (no D-Bus, and xdg-open exits 0 anyway),
+// so io watches the folder instead: a page or chart that appears or changes is shown in the
+// viewer, which is what "open it for them" means now.
+let folderWatch = null;
+const watchTimers = new Map();
+function watchFolder(folder) {
+  if (folderWatch) { try { folderWatch.close(); } catch {} folderWatch = null; }
+  if (!folder) return;
+  try {
+    folderWatch = fs.watch(folder, (_ev, name) => {
+      if (!name || !/\.(html?|png|svg|jpe?g)$/i.test(name) || name.startsWith('.')) return;
+      const full = path.join(folder, name);
+      clearTimeout(watchTimers.get(full));
+      watchTimers.set(full, setTimeout(() => {
+        watchTimers.delete(full);
+        let size = 0; try { size = fs.statSync(full).size; } catch { return; }
+        if (!size) return;
+        sendToWin('page-ready', { file: full, name });
+        openViewer(full);
+      }, 1500));
+    });
+  } catch (e) { log && log.write && log.write(`watch failed: ${e.message}\n`); }
+}
+ipcMain.handle('open-viewer', async (_e, file) => { openViewer(String(file)); return { ok: true }; });
+
 // Links from the page: the sign-in link Codex printed, anything http(s) a person clicked in
 // the terminal, and local files (a dashboard Codex wrote) as long as they sit under the
 // sheltered folder or io's own data. Nothing else opens.
@@ -83,8 +148,8 @@ ipcMain.handle('open-external', async (_e, url) => {
     if (folder) roots.push(folder);
     const real = fs.existsSync(file) ? fs.realpathSync(file) : file;
     if (!roots.some(r => real.startsWith(path.resolve(r) + path.sep))) return { error: 'not a file io may open' };
-    const err = await shell.openPath(real);
-    return err ? { error: err } : { ok: true };
+    openViewer(real);
+    return { ok: true, viewer: true };
   }
   return { error: 'not a link io may open' };
 });
@@ -130,6 +195,7 @@ ipcMain.handle('codex-start', async (_e, opts) => {
     mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows, libsDir: env.runtimeDir, wall, resume: opts && opts.resume });
   } catch (e) { return { error: e.message }; }
   mine.ioFolder = info.folder;
+  watchFolder(info.folder);
   mine.onData(d => sendToWin('codex-data', d));
   // Only the *current* session may clear the handle. A killed Codex takes a moment to die,
   // and its exit arrives after the next one has already started: closing over `session`

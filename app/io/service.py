@@ -527,7 +527,14 @@ class IoPolicy(codex_proxy.Policy):
     WRAPPED = re.compile(r"\s*<[a-z_]+( [a-z_]+)?>")
 
     def outbound(self, text: str, role: str | None) -> str:
-        det = S.get_detector() if (role == "user" and not self.WRAPPED.match(text)) else regex_engine
+        # The scanner (names, places) runs on what the person typed only when a sheltered
+        # folder is open: there it catches a name typed that the files did not contain. In a
+        # conversation with no folder the vault holds nothing and the person typed the word
+        # themselves; "what is the capital of france" left as "PLACE_003" (laptop,
+        # 2026-09-15). Known values (an attached file's) and the validators (phones,
+        # Aadhaar, account numbers) still apply everywhere.
+        in_chat = S.folder is not None and str(S.folder).startswith(str(CONF / "chats"))
+        det = S.get_detector() if (role == "user" and not in_chat and not self.WRAPPED.match(text)) else regex_engine
         kept = S.kept_all()
 
         def filt(t, _d=det, _k=kept):

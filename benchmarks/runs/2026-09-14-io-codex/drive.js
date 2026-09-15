@@ -27,6 +27,7 @@ const CHAT = process.argv.includes('--chat');
 // contains (column names or codes) and what the proxy saw. Run with the header fix off
 // (IO_KEEP_HEADERS=0) to reproduce the laptop, on to verify the fix.
 const MAP = process.argv.includes('--map');
+const CHART = process.argv.includes('--chart');
 const TESTDATA_SRC = MAP ? path.resolve(__dirname, '../../pii/corpus') : path.join(__dirname, 'testdata');
 const PORT_BASE = Number(arg('port-base', 8841));
 const APP = path.resolve(__dirname, '../../../app/io');
@@ -108,7 +109,7 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
   try {
     launch();
     mark('launch');
-    let { page } = await connect();
+    let { browser, page } = await connect();
     await page.setViewportSize({ width: 1280, height: 820 }).catch(() => {});
     await waitFor(page, () => page.locator('#s-provider.on').count(), 60000, 'provider screen');
     await shot(page, 'provider-screen-with-chatgpt');
@@ -130,7 +131,41 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await shot(page, 'login-cancelled');
     }
 
-    if (FIXTURE && HALT) {
+    if (FIXTURE && CHART) {
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await page.click('#walls .wall[data-w="offline"]');
+      await sleep(400);
+      await shot(page, 'wall-offline-chosen');
+      await page.click('#wall-go');
+      await waitFor(page, () => page.locator('#sheet-top').isVisible(), 180000, 'scan finished');
+      await page.click('#sheet-ok');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 60000, 'codex screen');
+      await waitFor(page, async () => (await termText(page)).length > 200, 40000, 'codex TUI first paint');
+      await sleep(2500);
+      await page.click('#term');
+      await page.keyboard.type('Draw a bar chart of visits per village from visits.csv.', { delay: 6 });
+      await sleep(1200);
+      await page.keyboard.press('Enter');
+      const ok = await waitFor(page, () => fs.readdirSync(TESTDATA).some(f => /\.png$/i.test(f)), 240000, 'a png chart written');
+      await sleep(4000);
+      await shot(page, 'chart-request');
+      const pngs = fs.readdirSync(TESTDATA).filter(f => /\.png$/i.test(f));
+      // the viewer is its own window; playwright sees it as another page
+      const pages = browser.contexts().flatMap(c => c.pages());
+      const vpage = pages.find(p => /viewer\.html/.test(p.url()));
+      if (vpage) { await sleep(1500); await vpage.screenshot({ path: path.join(OUT, `${String(shotN++).padStart(2, '0')}-viewer-window.png`) }); mark('shot viewer window'); }
+      results.chart = { pngWritten: ok, pngs, viewerOpened: !!vpage, viewerUrl: vpage ? vpage.url().slice(0, 160) : null,
+        chip: await page.locator('#cx-page-link').textContent().catch(() => null),
+        browserButtonDisabled: vpage ? await vpage.locator('#browser').isDisabled() : null,
+        tail: (await termText(page)).slice(-900) };
+      results.proxy = await api(page, '/api/codex');
+    } else if (FIXTURE && HALT) {
       await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
       await page.click('#c-ok');
       await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
@@ -176,10 +211,10 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
       await shot(page, 'home-with-chat-box');
       await page.click('#q');
-      await page.keyboard.type('What is a good way to name columns in a spreadsheet? Answer in two lines.', { delay: 5 });
+      await page.keyboard.type('What is the capital of france? Answer in one line.', { delay: 5 });
       await page.keyboard.press('Enter');
       await waitFor(page, () => page.locator('#s-codex.on').count(), 30000, 'codex screen from chat box');
-      await waitFor(page, async () => /columns/i.test((await termText(page)).slice(-4000)) && (await termText(page)).length > 400, 90000, 'first message typed for the person');
+      await waitFor(page, async () => /france/i.test((await termText(page)).slice(-4000)) && (await termText(page)).length > 400, 90000, 'first message typed for the person');
       await sleep(1500);
       await shot(page, 'chat-first-message');
       results.chatHeader = await page.locator('#cx-folder').textContent();
@@ -188,6 +223,9 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await shot(page, 'chat-answer');
       results.chatAnswered = ok;
       results.chatTail = (await termText(page)).slice(-900);
+      results.chatParis = /Paris/.test(await termText(page));
+      const dumps = fs.readdirSync(path.join(OUT, 'proxy-dump')).filter(f => /request/.test(f)).map(f => fs.readFileSync(path.join(OUT, 'proxy-dump', f), 'utf8'));
+      results.chatFranceLeftAsItself = dumps.some(t => /capital of france/i.test(t)) && !dumps.some(t => /capital of PLACE_/i.test(t));
       // attach a file: the picker is native, so call the service the way the button does
       const attached = await api(page, '/api/attach', { path: path.join(TESTDATA, 'visits.csv') });
       results.attach = { attached: attached.attached, files: (attached.files || []).map(f => f.name), error: attached.error };

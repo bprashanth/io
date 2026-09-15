@@ -326,6 +326,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
   <div id="cx-bottom">
     <span id="cx-shield">Protected by io</span>
     <span id="cx-stats" class="dim"></span>
+    <span id="cx-page" style="display:none"><a id="cx-page-link" style="color:var(--hi);cursor:pointer"></a></span>
     <span class="grow"></span>
     <span class="dim" id="cx-hint">select text with Shift + drag</span>
     <button id="cx-copy">copy text</button>
@@ -1113,6 +1114,10 @@ async function enterCodex(){
   if (!cxTimer) cxTimer = setInterval(paintCodexStatus, 2000);
   term.focus();
   if (pendingSay && cxRunning) { const t = pendingSay; pendingSay = null; sayWhenReady(t); }
+  // a page or chart Codex saved: io has opened it in its viewer; the chip reopens it
+  window.io.onPageReady(({file, name}) => {
+    const c = $('#cx-page'); c.style.display = ''; const a = $('#cx-page-link'); a.textContent = `${name} - show again`; a.onclick = () => window.io.openViewer(file);
+  });
 }
 async function startCodex(){
   term.reset();
