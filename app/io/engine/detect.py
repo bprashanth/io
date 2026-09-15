@@ -101,6 +101,46 @@ GLINER_TO_CLASS = {
 }
 
 
+def scan_many(det: Callable[[str], list[Span]], texts: list[str]) -> list[list[Span]]:
+    """Spans for each text. One call when the detector has a batch path (the GLiNER
+    engine and the privacy-server client both do), a loop otherwise. The whole point of
+    batching: through a tunnel a call is a round trip, and a review used to make 334 of
+    them for nine files (2026-09-15)."""
+    if not texts:
+        return []
+    many = getattr(det, "many", None)
+    if many is not None:
+        return many(texts)
+    return [det(t) for t in texts]
+
+
+def batched_calls(det: Callable[[str], list[Span]], fn: Callable[[Callable[[str], list[Span]]], Any]) -> Any:
+    """Run fn(detector) so that every text it asks about goes to the scanner in ONE call.
+
+    Two passes: the first runs fn with a detector that records each text and answers
+    "nothing found"; the recorded texts go out as a single batch; the second pass runs fn
+    again with the answers. fn must ask the same or fewer questions on the second pass -
+    true of classify_columns (it asks before it branches) and pseudonymise_frame (chunking
+    depends only on the values). Anything not recorded is asked directly."""
+    asked: list[str] = []
+    seen: set[str] = set()
+
+    def record(text: str) -> list[Span]:
+        if text not in seen:
+            seen.add(text)
+            asked.append(text)
+        return []
+
+    fn(record)
+    answers = dict(zip(asked, scan_many(det, asked)))
+
+    def replay(text: str) -> list[Span]:
+        hit = answers.get(text)
+        return hit if hit is not None else det(text)
+
+    return fn(replay)
+
+
 def make_server(url: str, timeout: float = 30.0) -> Callable[[str], list[Span]]:
     """Ask a privacy server to scan, for machines that cannot run the model themselves.
 
@@ -125,14 +165,27 @@ def make_server(url: str, timeout: float = 30.0) -> Callable[[str], list[Span]]:
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    def run(text: str) -> list[Span]:
-        req = urllib.request.Request(
-            endpoint, data=json.dumps({"text": text}).encode(),
-            headers=headers)
+    def post(body: dict) -> dict:
+        req = urllib.request.Request(endpoint, data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            payload = json.loads(r.read())
+            return json.loads(r.read())
+
+    def run(text: str) -> list[Span]:
+        payload = post({"text": text})
         return [(int(a), int(b), str(c), float(d)) for a, b, c, d in payload.get("spans", [])]
 
+    def many(texts: list[str]) -> list[list[Span]]:
+        # one request for all of them; an older server without "texts" answers only the
+        # single form, so fall back to a loop rather than fail
+        if not texts:
+            return []
+        payload = post({"texts": texts})
+        results = payload.get("results")
+        if results is None:
+            return [run(t) for t in texts]
+        return [[(int(a), int(b), str(c), float(d)) for a, b, c, d in spans] for spans in results]
+
+    run.many = many  # type: ignore[attr-defined]
     return run
 
 
@@ -173,6 +226,39 @@ def make_gliner(model_id: str, threshold: float = 0.4, chunk_chars: int = 1500) 
                 spans.append((start + ent["start"], start + ent["end"],
                               GLINER_TO_CLASS.get(ent["label"], ent["label"]), float(ent["score"])))
         return spans
+
+    def chunks_of(text: str) -> list[tuple[int, str]]:
+        out, start = [], 0
+        while start < len(text):
+            end = min(len(text), start + chunk_chars)
+            if end < len(text):
+                cut = text.rfind("\n", start, end)
+                if cut > start:
+                    end = cut + 1
+            out.append((start, text[start:end]))
+            start = end
+        return out
+
+    def many(texts: list[str]) -> list[list[Span]]:
+        """All the chunks of all the texts in one model call."""
+        plan = [chunks_of(t) for t in texts]
+        flat = [piece for chunks in plan for _s, piece in chunks]
+        if not flat:
+            return [[] for _ in texts]
+        results = model.batch_predict_entities(flat, GLINER_LABELS, threshold=threshold, batch_size=32)
+        out: list[list[Span]] = []
+        k = 0
+        for chunks in plan:
+            spans: list[Span] = []
+            for start, _piece in chunks:
+                for ent in results[k]:
+                    spans.append((start + ent["start"], start + ent["end"],
+                                  GLINER_TO_CLASS.get(ent["label"], ent["label"]), float(ent["score"])))
+                k += 1
+            out.append(spans)
+        return out
+
+    run.many = many  # type: ignore[attr-defined]
     return run
 
 

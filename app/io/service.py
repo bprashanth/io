@@ -40,7 +40,7 @@ if (HF_HOME / "hub").is_dir() and any((HF_HOME / "hub").glob("models--knowledgat
 sys.path.insert(0, str(HERE / "engine"))                    # the shield's tested modules, vendored unchanged
 
 from columns import classify_columns  # noqa: E402
-from detect import build_engine, regex_engine, make_server  # noqa: E402
+from detect import build_engine, regex_engine, make_server, batched_calls  # noqa: E402
 from detect import make_text_v2  # noqa: E402
 from pseudonymize import PseudonymMap, pseudonymise_frame, redact_question, redact_text  # noqa: E402
 
@@ -136,6 +136,19 @@ class State:
         self.get_detector()
         return getattr(self, "_scanner_mode", "regex")
 
+    @staticmethod
+    def with_regex(model):
+        """Validators + the model, as one detector that keeps the model's batch path: a
+        plain lambda here silently turned every batched review back into one call per
+        text (220 calls instead of 15 for the pii corpus, 2026-09-15)."""
+        def one(t):
+            return regex_engine(t) + model(t)
+
+        many = getattr(model, "many", None)
+        if many is not None:
+            one.many = lambda texts: [regex_engine(t) + sp for t, sp in zip(texts, many(texts))]
+        return one
+
     def scanner_server(self) -> str:
         return (getattr(self, "_scanner_url", None) or self.provider.get("scanner_server") or DEFAULT_PRIVACY_SERVER).strip()
 
@@ -175,7 +188,7 @@ class State:
                 if answered:
                     remote = answered[0][1]
                     rs = make_server(remote)
-                    self.detector = lambda t, _rs=rs: regex_engine(t) + _rs(t)
+                    self.detector = self.with_regex(rs)
                     self._scanner_mode = "server"
                     self._scanner_url = remote
                     self.scanner_base = f"server:{remote}"
@@ -189,7 +202,7 @@ class State:
                 try:
                     self.step("loading the on-device scanner")
                     gl = build_engine(f"gliner:{GLINER_MODEL}")
-                    self.detector = lambda t: regex_engine(t) + gl(t)
+                    self.detector = self.with_regex(gl)
                     self._scanner_mode = "local"
                     self.scanner_base = f"gliner:{GLINER_MODEL}"
                     self.step("scanner ready")   # never leave "loading..." as the last visible word
@@ -277,10 +290,11 @@ class State:
                 if any(t["name"] == name for t in self.tables):
                     name = f"{f.stem} ({f.suffix.lstrip('.')})" + (f" - {sheet}" if sheet and len(frames) > 1 else "")
                 self.step(f"scanning {name}")
-                classes = classify_columns(frame, det)
+                # one scanner call for the whole table's classification, one for its cells
+                classes = batched_calls(det, lambda d, _f=frame: classify_columns(_f, d))
                 key = self.header_key(list(frame.columns))
                 decided = dict(self.decisions.get(key, {}))
-                spans = self.cell_spans(frame, classes, decided, det)
+                spans = batched_calls(det, lambda d, _f=frame, _c=classes, _d=decided: self.cell_spans(_f, _c, _d, d))
                 self.tables.append({"file": f.name, "sheet": sheet, "name": name, "key": key,
                                     "frame": frame, "classes": classes, "decided": decided, "spans": spans})
         self.step("done")
@@ -433,12 +447,17 @@ class State:
         for t in self.tables:
             self.step(f"coding {t['name']}")
             kept = self.kept_for(t["key"])
-            def filt(text, _d=det, _k=kept):
-                return [sp for sp in _d(text) if text[sp[0]:sp[1]].casefold() not in _k]
             kv = (lambda text, _k=kept: [sp for sp in regex_engine(text) if text[sp[0]:sp[1]].casefold() not in _k]) if kept else regex_engine
             classes = {c: v for c, v in self.effective(t).items()}
             full = {c: classes.get(c, "none") for c in t["frame"].columns}
-            self.redacted[t["name"]] = pseudonymise_frame(t["frame"], full, self.pmap, detector=filt, kept_validator=kv)
+
+            def code_table(d, _t=t, _full=full, _kv=kv, _k=kept):
+                def filt(text):
+                    return [sp for sp in d(text) if text[sp[0]:sp[1]].casefold() not in _k]
+                return pseudonymise_frame(_t["frame"], _full, self.pmap, detector=filt, kept_validator=_kv)
+
+            # one scanner call for the whole table's free-text cells
+            self.redacted[t["name"]] = batched_calls(det, code_table)
         for d in self.docs:
             self.step(f"coding {d['name']}")
             self.redacted[d["name"]] = self.redact_doc(d)

@@ -123,3 +123,38 @@ granted read; and this DGX cannot run bwrap, so the dev bypass skips the profile
 wall itself is **untested until the laptop runs it**. Escape hatch: `IO_CODEX_NO_WALL=1`.
 Check on the laptop: in a conversation ask "list the files in my home folder" - the
 sandbox must refuse, and the AGENTS.md register must still be in the answers.
+
+## 2026-09-15 09:30 - privacy.idli.cc live; the scan rewritten for a network instead of a loopback
+
+The Cloudflare Tunnel answers (`/health` 200, `/scan` 200 in 0.13 s). Two things broke the
+moment a real network sat between io and the scanner, and both are fixed:
+
+1. Cloudflare's bot rules answer python's default user agent with 403 (`curl` got 200,
+   io got 403). The client now sends `User-Agent: io-privacy-client/1`.
+2. The review was written for a loopback: one HTTP call per question, 334 for the nine-file
+   pii corpus. On the tailnet that was 5 s; through the tunnel from this box, 35 s. The
+   tailnet shortcut is gone from the defaults (users in the office have no tailnet either;
+   it would have hidden the delay everyone else pays) and the scan now batches:
+   the server accepts `{"texts": [...]}` and answers in one GPU batch; the client and the
+   GLiNER engine expose a `.many` path; `batched_calls` runs the classifier, the cell
+   marks and the coding pass twice - once recording every text they ask about, once
+   answering from a single batch - so each phase is one call per table. First attempt
+   still made 220 calls: the validators+model wrapper was a plain lambda that lost the
+   batch path; `State.with_regex` keeps it.
+
+   Then the coding pass was 8 s with five calls in it: `known_regex` recompiled a
+   1,100-value alternation every time a row minted a code, 107 rebuilds = 4.0 of 4.1 s
+   (profiled). Bulk mode rebuilds every 64 values; free-text columns are coded last, after
+   one refresh, so every name and place from the other columns is known by then - faster
+   and better recall in the same change.
+
+| corpus, via privacy.idli.cc from this box | calls | review scan | coding |
+|---|---|---|---|
+| per-question calls | 334 | 35.5 s | 9.8 s |
+| batched, wrapper losing the batch path | 220 | 23.3 s | 10.8 s |
+| batched | 20 | 3.4 s | 7.9 s |
+| + regex rebuild throttle, free text last | 20 | **3.5 s** | **1.7 s** |
+
+Same hidden columns and cell marks per table as the per-question run (one cell count moved
+by one on a batch-padding difference); vault 1,108 codes both ways; zero vault values left
+in the coded output.

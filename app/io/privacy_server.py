@@ -51,7 +51,16 @@ def engine():
     if ENGINE is None:
         try:
             gl = build_engine(f"gliner:{MODEL}")
-            ENGINE = lambda t: regex_engine(t) + gl(t)   # noqa: E731
+
+            def one(t):
+                return regex_engine(t) + gl(t)
+
+            def many(texts):
+                # one GPU batch for every text in the request
+                return [regex_engine(t) + spans for t, spans in zip(texts, gl.many(texts))]
+
+            one.many = many
+            ENGINE = one
             print("scanner ready", flush=True)
         except Exception as exc:  # noqa: BLE001
             print(f"could not load the scanner, serving regex only: {exc}", flush=True)
@@ -94,15 +103,26 @@ class H(BaseHTTPRequestHandler):
             return self._send(401, b'{"error":"this privacy server needs its token"}')
         try:
             n = int(self.headers.get("Content-Length") or 0)
-            if n > 4_000_000:
+            if n > 16_000_000:
                 return self._send(413, b'{"error":"too much text in one request"}')
             body = json.loads(self.rfile.read(n) or b"{}")
+            texts = body.get("texts")
             text = body.get("text") or ""
         except Exception:  # noqa: BLE001
             return self._send(400, b'{"error":"bad json"}')
 
-        spans = engine()(text)
         STATS["requests"] += 1
+        if isinstance(texts, list):
+            # many texts, one answer: {"results": [[spans], ...]} in the same order
+            texts = [str(t) for t in texts][:5000]
+            det = engine()
+            many = getattr(det, "many", None)
+            results = many(texts) if many else [det(t) for t in texts]
+            STATS["chars"] += sum(len(t) for t in texts)
+            STATS["spans"] += sum(len(r) for r in results)
+            out = json.dumps({"results": [[[int(a), int(b), str(c), float(d)] for a, b, c, d in r] for r in results]})
+            return self._send(200, out.encode())
+        spans = engine()(text)
         STATS["chars"] += len(text)
         STATS["spans"] += len(spans)
         out = json.dumps({"spans": [[int(a), int(b), str(c), float(d)] for a, b, c, d in spans]})
