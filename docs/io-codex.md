@@ -118,17 +118,29 @@ enforced at one point with tests around it.
 
 What it does *not* claim:
 
-- **Commands Codex runs** are not proxied. Under Codex's default `workspace-write` sandbox
-  they have no network (`NetworkSandboxPolicy::Restricted`), so `curl` and Python sockets
-  fail unless the user approves a command outside the sandbox. If a user says yes to
-  "run this without the sandbox", that command can do anything, including send a file
-  somewhere. The io footer cannot see that.
+- **Commands Codex runs** are not proxied. They run inside the wall (`docs`: the "io"
+  permissions profile), where network is off unless the folder's setting is Open. Codex
+  can no longer ask the person to run a command *outside* the wall: every setting launches
+  with `-a never` and writes `approval_policy = "never"`, so a blocked command comes back
+  to the model as a failure rather than as a question (since 2026-09-15; before that a
+  "yes" to "run this without the sandbox" handed a command the whole machine).
 - **Codex's `web_search` tool** runs at the provider, from the tokenised context: the
   model never holds a real value to search for, but the search is provider-side traffic.
+  Off (`web_search = "disabled"`) unless the setting is Open.
 - **Token refresh** goes from Codex to `auth.openai.com` directly (the OAuth endpoint; no
   workspace content).
-- **MCP servers / plugins / apps** are switched off in io's config and refused by the
-  proxy. A user who edits io's config.toml by hand gets it rewritten on the next launch.
+- **OpenAI-hosted MCP / plugins / apps** are switched off in io's config and refused by
+  the proxy. A user who edits io's config.toml by hand gets it rewritten on the next launch.
+- **io's own toolbox** is the one MCP server Codex may call (`tools/mcp.js`, registered in
+  the profile with `default_tools_approval_mode = "approve"`, so no prompt; absent under
+  Offline). It runs on io's side of the wall and talks to io's main process over loopback
+  with a token only the profile carries. One tool: `render_page`, which returns a picture
+  of a page Codex wrote, rendered from a copy of the page coded the way a request is coded
+  and shown in a window that can load nothing but that copy. The real page is never
+  screenshotted; a PNG chart is refused. **The proxy is blind to pictures**: a `data:`
+  URL passes the walk untouched (a validator would otherwise read digit runs in base64 as
+  phone numbers and corrupt the image), so what a picture shows is decided where it is
+  made, not at the proxy.
 
 Two verified facts worth restating: the proxy binds `127.0.0.1` on an OS-chosen port and
 refuses everything until a policy is approved; and a proxy that is down means Codex

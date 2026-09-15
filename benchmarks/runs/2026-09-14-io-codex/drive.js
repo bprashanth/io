@@ -28,6 +28,7 @@ const CHAT = process.argv.includes('--chat');
 // (IO_KEEP_HEADERS=0) to reproduce the laptop, on to verify the fix.
 const MAP = process.argv.includes('--map');
 const CHART = process.argv.includes('--chart');
+const RENDER = process.argv.includes('--render');
 const SWITCH = process.argv.includes('--switch');
 const TESTDATA_SRC = MAP ? path.resolve(__dirname, '../../pii/corpus') : path.join(__dirname, 'testdata');
 const PORT_BASE = Number(arg('port-base', 8841));
@@ -178,6 +179,60 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       results.switch.offlineNet = await probeNet();
       await shot(page, 'switch-offline-net');
       results.switch.tail = (await termText(page)).slice(-1500);
+    } else if (FIXTURE && RENDER) {
+      // the toolbox: Codex writes a page, asks io for a picture of it, io renders a coded
+      // copy; the person sees the real page and what the assistant saw
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await sleep(400);
+      await shot(page, 'wall-screen-with-toolbox-link');
+      await page.click('#walls .tblink');
+      await sleep(500);
+      await shot(page, 'toolbox-from-the-card');
+      await page.click('#tb-close');
+      await page.click('#wall-go');      // T4GC tools
+      await waitFor(page, () => page.locator('#sheet-top').isVisible(), 180000, 'scan finished');
+      await page.click('#sheet-ok');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 60000, 'codex screen');
+      await waitFor(page, async () => (await termText(page)).length > 200, 40000, 'codex TUI first paint');
+      await sleep(2500);
+      await page.click('#term');
+      await page.keyboard.type('Make a page called visits.html with a table of name, village and visits from visits.csv, then use the render_page tool to check how it looks and tell me what you saw.', { delay: 4 });
+      await sleep(1500);
+      await page.keyboard.press('Enter');
+      const rendersDir = path.join(OUT, 'data', 'renders');
+      const rendered = await waitFor(page, () => fs.existsSync(rendersDir) && fs.readdirSync(rendersDir).some(f => /\.png$/i.test(f)), 300000, 'io rendered a coded copy');
+      await sleep(5000);
+      await shot(page, 'render-request');
+      await waitFor(page, async () => /›\s*Ask Codex to do anything/.test((await termText(page)).slice(-1500)), 180000, 'turn finished');
+      await sleep(800);
+      await shot(page, 'render-answer');
+      const term = await termText(page);
+      const footerNote = await page.locator('#cx-err').textContent().catch(() => '');
+      await page.click('#cx-toolbox');
+      await sleep(1200);
+      await shot(page, 'toolbox-after-render');
+      const pages0 = browser.contexts().flatMap(c => c.pages());
+      await page.click('#tb-page');
+      await sleep(2500);
+      const pages = browser.contexts().flatMap(c => c.pages());
+      const vpage = pages.find(p => /viewer\.html/.test(p.url()));
+      if (vpage) { await sleep(1500); await vpage.screenshot({ path: path.join(OUT, `${String(shotN++).padStart(2, '0')}-viewer-real-page.png`) }); mark('shot viewer real page'); }
+      // what crossed the proxy: requests carrying a picture, and whether the picture was left alone
+      const dumpDir = path.join(OUT, 'proxy-dump');
+      let imageRequests = 0, imageBytesUntouched = null;
+      for (const f of (fs.existsSync(dumpDir) ? fs.readdirSync(dumpDir) : []).filter(f => /request/.test(f))) {
+        const txt = fs.readFileSync(path.join(dumpDir, f), 'utf8');
+        if (txt.includes('data:image/png;base64,')) imageRequests++;
+      }
+      results.render = { rendered, renders: fs.existsSync(rendersDir) ? fs.readdirSync(rendersDir) : [], pageWritten: fs.existsSync(path.join(TESTDATA, 'visits.html')),
+        noteShown: /showed Codex a picture of/.test(footerNote || ''), approvalPromptSeen: /Would you like|Allow the .* MCP server/.test(term), toolCalled: /render_page/.test(term),
+        viewerOpened: !!vpage, viewerUrl: vpage ? vpage.url().slice(0, 160) : null, imageRequests, tail: term.slice(-1200) };
     } else if (FIXTURE && CHART) {
       await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
       await page.click('#c-ok');

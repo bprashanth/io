@@ -118,6 +118,18 @@ class RestorerTests(unittest.TestCase):
 
 
 class WalkTests(unittest.TestCase):
+    def test_a_data_url_is_passed_through_untouched(self):
+        # a picture a tool returned: base64 with a digit run a validator would read as a phone
+        png = "data:image/png;base64,iVBORw0KGgo9876543210AAAA/Alice+Example=="
+        body = {"input": [{"type": "message", "role": "user", "content": [
+            {"type": "input_text", "text": "Alice Example 9876543210"},
+            {"type": "input_image", "image_url": png}]}]}
+        seen = []
+        out = walk_strings(body, lambda t, _r, _k: (seen.append(t), t.upper())[1])
+        self.assertEqual(out["input"][0]["content"][1]["image_url"], png)
+        self.assertEqual(out["input"][0]["content"][0]["text"], "ALICE EXAMPLE 9876543210")
+        self.assertNotIn(png, seen)
+
     def test_structural_keys_untouched_and_role_propagates(self):
         seen = []
         body = {"model": "NAME_001", "input": [{"type": "message", "role": "user",

@@ -68,19 +68,37 @@ const PROFILE = 'io';
 //
 // The folder boundary does not move between them. Commands may write the sheltered folder
 // and temp, read what the platform needs, and nothing else, in every setting.
-// `escalate` is the third lever and the one that makes the first two mean anything.
-// Codex's default approval policy lets the model ask the person to run a command outside
-// the sandbox - the "Environment: local" prompt seen on 2026-09-15 when it wanted xdg-open.
-// A person who says yes to that gets a command with the whole machine and the whole
-// network, whichever setting they picked, so "Offline" would have been a label and not a
-// fact. `-a never` returns the failure to the model instead of asking. Escalation stays
-// available only where the person has already said the tools may reach out.
+//
+// Escalation is closed in all three. Codex's default approval policy lets the model ask
+// the person to run a command outside the sandbox - the "Environment: local" prompt seen
+// on 2026-09-15 when it wanted xdg-open. A person who says yes to that gets a command with
+// the whole machine and the whole network, whichever setting they picked, so "Offline"
+// would have been a label and not a fact. `-a never` (and `approval_policy = "never"` in
+// the profile, so `codex exec` is covered too) returns the failure to the model instead.
+//
+// `tools` is the third lever: whether io's toolbox is registered. Until 2026-09-15 the
+// escalation lock and the tool channel were the same switch (an MCP tool call under
+// `-a never` failed with "requires approval, but approval policy is never"), so the middle
+// setting had to keep escalation open to have tools at all. Codex 0.154 has a per-server
+// `default_tools_approval_mode`; "approve" is checked before the approval policy
+// (codex-mcp: mcp_permission_prompt_is_auto_approved), so a server io registers that way
+// runs without a prompt while every shell escalation is still refused. Measured on the
+// DGX, chronology 2026-09-15T2330-dgx. Offline has no toolbox: nothing io operates on
+// its behalf, by construction.
 const WALLS = {
-  offline: { network: false, openPages: false, escalate: false },
-  tools:   { network: false, openPages: true,  escalate: true  },
-  open:    { network: true,  openPages: true,  escalate: true  },
+  offline: { network: false, openPages: false, tools: false },
+  tools:   { network: false, openPages: true,  tools: true  },
+  open:    { network: true,  openPages: true,  tools: true  },
 };
 const DEFAULT_WALL = 'tools';
+// What is in the toolbox, in the person's words. Shown on the setting card and in the
+// toolbox window; the MCP server in tools/mcp.js is the machine-readable side.
+const TOOLBOX = [
+  { id: 'render_page', name: 'Renderer',
+    does: 'shows the assistant a picture of a page it wrote, so it can check its own work',
+    sees: 'a copy of the page with names, places, phone numbers and the like replaced by codes - never the real page, never a chart image',
+    reaches: 'nothing' },
+];
 const wallOf = name => WALLS[name] || WALLS[DEFAULT_WALL];
 
 function writeConfig(home, proxyPort, extra = {}) {
@@ -94,8 +112,15 @@ function writeConfig(home, proxyPort, extra = {}) {
     `chatgpt_base_url = "http://127.0.0.1:${proxyPort}/backend-api/"`,
     'check_for_update_on_startup = false',
     `model_reasoning_effort = "${extra.effort || 'low'}"`,
+    // never ask the person to run something outside the wall (see WALLS)
+    'approval_policy = "never"',
   ];
+  // The provider's hosted web search is a tool too: the query leaves coded, but it goes
+  // to the web from the provider's side, and the middle setting says "does not go to a
+  // website by itself". Off unless the setting is Open.
+  if (!(extra.chat || wallOf(extra.wall).network)) top.push('web_search = "disabled"');
   const tables = [];
+  const esc = p => String(p).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   if (extra.model) top.push(`model = "${extra.model}"`);
   if (extra.noSandbox) {
     // Development machines whose kernel refuses bwrap (the DGX). Never set for a user.
@@ -128,6 +153,26 @@ function writeConfig(home, proxyPort, extra = {}) {
   tables.push('[analytics]', 'enabled = false', '',
     '[features]', 'enable_request_compression = false', 'apps = false', 'plugins = false',
     'remote_plugin = false', 'plugin_sharing = false', 'recommended_plugins = false', 'image_generation = false', '');
+  // io's toolbox: one local MCP server that io launches and Codex calls. It runs on io's
+  // side of the wall (an MCP server is Codex's child, not a sandboxed command), so this is
+  // the one channel through which a folder session can ask io for anything. "approve"
+  // means Codex never asks the person about a call to it; what a tool may do is decided
+  // when T4GC puts it in the box, not per call. Registered only where the setting has
+  // tools; Offline gets no server at all.
+  if (extra.toolbox && wallOf(extra.wall).tools) {
+    const tb = extra.toolbox;
+    tables.push('[mcp_servers.io]', `command = "${esc(tb.command)}"`,
+      `args = [${(tb.args || []).map(a => `"${esc(a)}"`).join(', ')}]`,
+      'default_tools_approval_mode = "approve"', 'startup_timeout_sec = 30', 'tool_timeout_sec = 120', '',
+      '[mcp_servers.io.env]', ...Object.entries(tb.env || {}).map(([k, v]) => `${k} = "${esc(v)}"`), '');
+    // Codex 0.154 hides MCP tools behind a `tool_search` step ("deferred" exposure) when
+    // the model supports it; a low-effort model then answers "that tool is not available"
+    // without ever searching (seen on the DGX). This names io's namespace as direct-only,
+    // so render_page is in the tool list like exec_command is.
+    // (the table is a sub-table of [features]; the namespace is the server name, with
+    // Codex's "mcp__" prefix when prefixing is on, so both spellings are listed)
+    tables.push('[features.code_mode]', 'direct_only_tool_namespaces = ["mcp__io", "io"]', '');
+  }
   // The wall around the folder. A permissions profile: commands may write the working
   // folder, read what the platform needs to run at all (":minimal": system libraries,
   // shells) and nothing else - not the home directory, not other folders. Network is on
@@ -138,7 +183,6 @@ function writeConfig(home, proxyPort, extra = {}) {
   // instructions ... fs sandbox helper"), so that one file is granted; the rest of the
   // home - auth.json above all - stays out of reach of commands. IO_CODEX_NO_WALL=1 is the
   // escape hatch if a platform's sandbox cannot do read denial.
-  const esc = p => String(p).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   if (!extra.noSandbox && process.env.IO_CODEX_NO_WALL !== '1') {
     top.push('default_permissions = "io"');
     // Codex's own runner (bin/codex-code-mode-host, codex-resources/bwrap, zsh, codex-path/rg)
@@ -216,6 +260,11 @@ function agentsMd(extra = {}) {
     '- `python3` here already has pandas, numpy, openpyxl and matplotlib. Use them; never',
     '  take a spreadsheet apart by unzipping it and reading the XML inside.',
     '- Prefer a page in the browser over long text in this window.',
+    ...(extra.toolbox && wallOf(extra.wall).tools ? [
+    '- After you save a page, you may call the io tool `render_page` with the file name once',
+    '  to see a picture of it and check it looks right. In that picture names and places',
+    '  appear as codes; that is expected, do not try to fix it. Charts (PNG) cannot be',
+    '  rendered this way; trust matplotlib.'] : []),
     '- When you refer to a file or a web page, give the full path or link on its own line.',
     '',
     '## Their data',
@@ -310,16 +359,16 @@ function logout(bin, home) {
 // resumed (`codex resume --last`), and the profile flag has to be repeated: a resumed
 // session takes its wall from the profile file as it is now, not from the session it
 // resumes (measured, chronology 2026-09-15T2330-dgx).
-function sessionArgs({ wall, resume, noAltScreen } = {}) {
+function sessionArgs({ resume, noAltScreen } = {}) {
   const args = resume ? ['resume', resume, '-p', PROFILE] : ['-p', PROFILE];
-  if (!wallOf(wall).escalate) args.push('-a', 'never');
+  args.push('-a', 'never');
   if (noAltScreen) args.push('--no-alt-screen');
   return args;
 }
 
 function spawnSession({ bin, home, cwd, cols, rows, noAltScreen, libsDir, wall, resume }) {
   if (!pty) throw new Error('node-pty is not available in this build');
-  const args = sessionArgs({ wall, resume, noAltScreen });
+  const args = sessionArgs({ resume, noAltScreen });
   return pty.spawn(bin, args, {
     name: 'xterm-256color',
     cols: cols || 100,
@@ -380,4 +429,4 @@ function binaryInfo(bin) {
 }
 
 module.exports = {
-  WALLS, DEFAULT_WALL, wallOf, sandboxCheck, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, sessionArgs, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };
+  WALLS, DEFAULT_WALL, TOOLBOX, wallOf, sandboxCheck, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, sessionArgs, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('io', {
   pickFile: () => ipcRenderer.invoke('pick-file'),
   openViewer: file => ipcRenderer.invoke('open-viewer', file),
   onPageReady: fn => { ipcRenderer.removeAllListeners('page-ready'); ipcRenderer.on('page-ready', (_e, d) => fn(d)); },
+  onRender: fn => { ipcRenderer.removeAllListeners('render-done'); ipcRenderer.on('render-done', (_e, d) => fn(d)); },
   codex: {
     status: () => ipcRenderer.invoke('codex-status'),
     login: mode => ipcRenderer.invoke('codex-login', mode),
@@ -14,6 +15,8 @@ contextBridge.exposeInMainWorld('io', {
     logout: () => ipcRenderer.invoke('codex-logout'),
     start: opts => ipcRenderer.invoke('codex-start', opts),
     switch: opts => ipcRenderer.invoke('codex-switch', opts),
+    toolbox: () => ipcRenderer.invoke('toolbox-list'),
+    toolboxImage: () => ipcRenderer.invoke('toolbox-last-image'),
     stop: () => ipcRenderer.invoke('codex-stop'),
     say: text => ipcRenderer.invoke('codex-say', text),
     input: data => ipcRenderer.send('codex-input', data),

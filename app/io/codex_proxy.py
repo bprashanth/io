@@ -169,10 +169,22 @@ class StreamRestorer:
         return self.inbound(out) if out else ""
 
 
+def is_data_url(text: str) -> bool:
+    return text.startswith("data:") and ";base64," in text[:80]
+
+
 def walk_strings(node: Any, fn: Callable[[str, str | None, str | None], str], role: str | None = None,
                  key: str | None = None) -> Any:
-    """Apply fn(text, role, key) to every content string in a JSON value. Structural keys skipped."""
+    """Apply fn(text, role, key) to every content string in a JSON value. Structural keys skipped.
+
+    A data URL (an image a tool returned, sent back as `input_image`) is passed through
+    untouched: it is base64, not words, and a validator would otherwise read a run of
+    digits in it as a phone number and rewrite the picture into garbage. What such an
+    image shows is decided where it is made (io renders from coded text, never the real
+    page), not here."""
     if isinstance(node, str):
+        if is_data_url(node):
+            return node
         return fn(node, role, key)
     if isinstance(node, list):
         return [walk_strings(x, fn, role, key) for x in node]

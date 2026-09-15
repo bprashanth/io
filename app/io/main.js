@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const net = require('net');
+const crypto = require('crypto');
 
 const runtime = require('./runtime');
 const bootstrap = require('./bootstrap');
@@ -25,6 +26,13 @@ let session = null;      // node-pty process
 let wall = null;         // the setting the person picked for this folder (see codex.js WALLS)
 let login = null;        // child process of `codex login`
 
+const servicePost = (p, body) => new Promise((res, rej) => {
+  const data = JSON.stringify(body || {});
+  const req = http.request({ host: '127.0.0.1', port: servicePort, path: p, method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } }, r => {
+    let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } });
+  });
+  req.on('error', rej); req.end(data);
+});
 const serviceGet = p => new Promise((res, rej) => http.get(`http://127.0.0.1:${servicePort}${p}`, r => {
   let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } });
 }).on('error', rej));
@@ -122,6 +130,103 @@ function watchFolder(folder) {
 }
 ipcMain.handle('open-viewer', async (_e, file) => { openViewer(String(file)); return { ok: true }; });
 
+// ---- the toolbox --------------------------------------------------------------------
+// io's tools are one local MCP server (tools/mcp.js) that Codex launches as its own child,
+// outside the wall, and that talks back to this process over a loopback port with a token
+// that only the profile file carries (which commands inside the wall cannot read). What a
+// tool may do is decided here. One tool so far: render_page.
+//
+// The proxy is blind to images: a picture crosses it as base64 and the leak check cannot
+// see inside it. So the renderer never screenshots the real page. It asks the service for
+// the page's text coded the way a request is coded, renders that copy in a window that can
+// load nothing but the copy itself, and returns that picture. Values the vault does not
+// hold (free text, amounts) appear as themselves, the same as in every request; a PNG
+// chart is refused, because its labels are pixels and cannot be coded.
+let toolbox = null;       // { port, token }
+let lastRender = null;    // { file, name, png, at, coded }
+function renderSession() {
+  const s = esession.fromPartition('io-render');
+  if (!s.__ioBlocked) {
+    s.__ioBlocked = true;
+    const dir = path.join(env.dataDir, 'renders') + path.sep;
+    s.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, cb) => {
+      let ok = false;
+      if (details.url.startsWith('file://')) { try { ok = decodeURIComponent(details.url.slice(7)).startsWith(dir); } catch { ok = false; } }
+      cb({ cancel: !ok });
+    });
+    s.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  }
+  return s;
+}
+async function renderCoded(fileArg) {
+  const folder = session && session.ioFolder;
+  if (!folder) return { error: 'no session is running' };
+  const full = path.resolve(folder, String(fileArg || ''));
+  if (!(full + path.sep).startsWith(path.resolve(folder) + path.sep)) return { error: 'only a page in the working folder can be rendered' };
+  if (!/\.html?$/i.test(full)) return { error: 'only an .html page can be rendered; a chart image cannot' };
+  let text;
+  try { text = fs.readFileSync(full, 'utf8'); } catch { return { error: 'that file is not in the working folder' }; }
+  if (text.length > 4_000_000) return { error: 'that page is too large to render' };
+  let coded;
+  try { coded = await servicePost('/api/code-text', { text }); } catch { return { error: 'io is not answering' }; }
+  if (!coded || coded.error) return { error: (coded && coded.error) || 'could not code the page' };
+  const dir = path.join(env.dataDir, 'renders');
+  fs.mkdirSync(dir, { recursive: true });
+  const id = `${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
+  const copy = path.join(dir, `${id}.html`);
+  // no relative resources resolve from here (the copy sits alone), and the session refuses
+  // everything but files in this directory, so an <img> of a real chart shows as broken
+  fs.writeFileSync(copy, coded.text);
+  const w = new BrowserWindow({ show: false, width: 1100, height: 800, backgroundColor: '#ffffff',
+    webPreferences: { partition: 'io-render', sandbox: true, contextIsolation: true, javascript: true, images: true } });
+  renderSession();
+  try {
+    await new Promise((res, rej) => {
+      const t = setTimeout(() => res(), 15000);
+      w.webContents.once('did-finish-load', () => { clearTimeout(t); res(); });
+      w.webContents.once('did-fail-load', (_e, code, desc) => { clearTimeout(t); rej(new Error(`${desc || code}`)); });
+      w.loadFile(copy).catch(rej);
+    });
+    await new Promise(r => setTimeout(r, 900));
+    const img = await w.webContents.capturePage();
+    const png = path.join(dir, `${id}.png`);
+    fs.writeFileSync(png, img.toPNG());
+    const size = img.getSize();
+    lastRender = { file: full, name: path.basename(full), png, at: Date.now(), coded: !!coded.changed, leaks: coded.leaks || 0 };
+    sendToWin('render-done', { file: full, name: lastRender.name, coded: lastRender.coded });
+    return { ok: true, file: path.basename(full), width: size.width, height: size.height, png: img.toPNG().toString('base64'), coded: coded.changed ? 1 : 0 };
+  } catch (e) {
+    return { error: `could not render: ${e.message}` };
+  } finally {
+    try { w.destroy(); } catch {}
+    try { fs.unlinkSync(copy); } catch {}
+  }
+}
+function startToolbox() {
+  if (toolbox) return Promise.resolve(toolbox);
+  const token = crypto.randomBytes(16).toString('hex');
+  return new Promise((res, rej) => {
+    const srv = http.createServer((req, resp) => {
+      const deny = (code, msg) => { resp.writeHead(code, { 'content-type': 'application/json' }); resp.end(JSON.stringify({ error: msg })); };
+      if (req.headers['x-io-token'] !== token) return deny(403, 'not io');
+      if (req.method !== 'POST' || req.url !== '/render') return deny(404, 'no such tool');
+      let b = ''; req.on('data', d => { b += d; if (b.length > 1e6) req.destroy(); });
+      req.on('end', async () => {
+        let body = {}; try { body = JSON.parse(b || '{}'); } catch {}
+        const r = await renderCoded(body.file);
+        resp.writeHead(200, { 'content-type': 'application/json' }); resp.end(JSON.stringify(r.error ? { ok: false, error: r.error } : r));
+      });
+    });
+    srv.on('error', rej);
+    srv.listen(0, '127.0.0.1', () => { toolbox = { port: srv.address().port, token, server: srv }; res(toolbox); });
+  });
+}
+ipcMain.handle('toolbox-list', async () => ({ tools: codex.TOOLBOX, last: lastRender ? { name: lastRender.name, file: lastRender.file, at: lastRender.at, coded: lastRender.coded } : null }));
+ipcMain.handle('toolbox-last-image', async () => {
+  if (!lastRender) return { error: 'nothing rendered yet' };
+  try { return { ok: true, name: lastRender.name, dataUrl: 'data:image/png;base64,' + fs.readFileSync(lastRender.png).toString('base64') }; } catch { return { error: 'the last picture is gone' }; }
+});
+
 // Links from the page: the sign-in link Codex printed, anything http(s) a person clicked in
 // the terminal, and local files (a dashboard Codex wrote) as long as they sit under the
 // sheltered folder or io's own data. Nothing else opens.
@@ -189,7 +294,12 @@ async function startSession(opts) {
   if (!info.folder) return { error: 'no sheltered folder' };
   if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
   wall = (opts && opts.wall) || codex.DEFAULT_WALL;
-  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
+  let tb = null;
+  try { tb = await startToolbox(); } catch (e) { console.error(`toolbox failed to start: ${e.message}`); }
+  // the toolbox server is this process run as plain node (ELECTRON_RUN_AS_NODE); Codex
+  // gives it only the environment written here, nothing inherited
+  const toolboxCfg = tb ? { command: process.execPath, args: [path.join(__dirname, 'tools', 'mcp.js')], env: { ELECTRON_RUN_AS_NODE: '1', IO_TOOLS_PORT: String(tb.port), IO_TOOLS_TOKEN: tb.token } } : null;
+  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1', toolbox: toolboxCfg });
   let mine;
   try {
     mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows, libsDir: env.runtimeDir, wall, resume: opts && opts.resume });

@@ -1023,6 +1023,17 @@ class H(BaseHTTPRequestHandler):
                 with S.lock:
                     S.load_folder(folder)
                 return self._json(self.review())
+            if self.path == "/api/code-text":
+                # The toolbox's renderer: the text of a page Codex wrote, coded the way a
+                # request to the model is coded (known values, then the validators), so the
+                # picture io renders shows NAME_001 where the page says the name. The
+                # scanner is not run (role None): the page's text came from files already
+                # in the vault, and free text stays free text, as it does in every request.
+                text = str(body.get("text") or "")
+                if not PROXY.policy.ready():
+                    return self._json({"error": PROXY.policy.not_ready_reason()}, 409)
+                out, _n = PROXY.transform_request(text)
+                return self._json({"text": out, "changed": out != text, "leaks": len(PROXY.policy.leaks(out))})
             if self.path == "/api/chat-workspace":
                 # A conversation with no data: Codex gets an empty io-owned folder, the
                 # policy is approved trivially (nothing to review), the vault starts empty
