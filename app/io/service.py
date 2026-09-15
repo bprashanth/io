@@ -71,7 +71,13 @@ GLINER_MODEL = "knowledgator/gliner-pii-edge-v1.0"
 # order: "auto" (server, then the on-device model, then patterns), "local" (never the
 # server), "server" (never the local model), "regex". The on-device install is unchanged;
 # it is simply not the first choice any more.
-DEFAULT_PRIVACY_SERVER = os.environ.get("IO_PRIVACY_SERVER", "http://100.82.28.38:8899")
+# Baked in, in order: the public name (Cloudflare Tunnel to the DGX), then the DGX on the
+# tailnet for the office. No token for the limited preview: anyone with the app may use
+# the scanner; it stores nothing. A token, when wanted, rides inside the address
+# (https://TOKEN@host) and the server refuses without it.
+DEFAULT_PRIVACY_SERVERS = [x.strip() for x in os.environ.get(
+    "IO_PRIVACY_SERVER", "https://privacy.idli.cc,http://100.82.28.38:8899").split(",") if x.strip()]
+DEFAULT_PRIVACY_SERVER = DEFAULT_PRIVACY_SERVERS[0] if DEFAULT_PRIVACY_SERVERS else ""
 SCANNER_ORDER = (os.environ.get("IO_SCANNER") or "auto").strip().lower()
 
 RULE = {
@@ -131,31 +137,35 @@ class State:
         return getattr(self, "_scanner_mode", "regex")
 
     def scanner_server(self) -> str:
-        return (self.provider.get("scanner_server") or DEFAULT_PRIVACY_SERVER).strip()
+        return (getattr(self, "_scanner_url", None) or self.provider.get("scanner_server") or DEFAULT_PRIVACY_SERVER).strip()
+
+    def scanner_candidates(self) -> list[str]:
+        chosen = (self.provider.get("scanner_server") or "").strip()
+        return [chosen] if chosen else list(DEFAULT_PRIVACY_SERVERS)
 
     def get_detector(self):
         with self.det_lock:
             if self.detector is not None:
                 return self.detector
             order = SCANNER_ORDER
-            remote = self.scanner_server()
             declined = bool((self.provider.get("scanner_declined") or "").strip())
-            # 1. the privacy server. The text goes there unredacted - it has to, the server is
-            #    being asked to find the private values in it - so this is the office DGX or a
-            #    server the organizers gave out, never something on the public internet.
-            if order in ("auto", "server") and remote and not declined:
-                try:
-                    self.step("reaching the privacy server")
-                    make_server(remote, timeout=4.0)("warm up")     # fail fast, not mid-scan
-                    rs = make_server(remote)
-                    self.detector = lambda t: regex_engine(t) + rs(t)
-                    self._scanner_mode = "server"
-                    self.scanner_base = f"server:{remote}"
-                    self.step("privacy server ready")
-                    return self.detector
-                except Exception as exc:  # noqa: BLE001
-                    self.server_error = f"{type(exc).__name__}: {exc}".strip()[:200]
-                    self.step("privacy server not reachable" + (", using the on-device scanner" if order == "auto" else ""))
+            # 1. a privacy server, the first that answers. The text goes there unredacted -
+            #    it has to, the server is being asked to find the private values in it.
+            if order in ("auto", "server") and not declined:
+                for remote in self.scanner_candidates():
+                    try:
+                        self.step("reaching the privacy server")
+                        make_server(remote, timeout=4.0)("warm up")     # fail fast, not mid-scan
+                        rs = make_server(remote)
+                        self.detector = lambda t, _rs=rs: regex_engine(t) + _rs(t)
+                        self._scanner_mode = "server"
+                        self._scanner_url = remote
+                        self.scanner_base = f"server:{remote}"
+                        self.step("privacy server ready")
+                        return self.detector
+                    except Exception as exc:  # noqa: BLE001
+                        self.server_error = f"{type(exc).__name__}: {exc}".strip()[:200]
+                self.step("privacy server not reachable" + (", using the on-device scanner" if order == "auto" else ""))
             # 2. the on-device model, when installed
             if order in ("auto", "local"):
                 try:

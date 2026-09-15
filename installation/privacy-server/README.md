@@ -10,23 +10,25 @@ before it is on a public name: TLS, a way in that opens no port on the box, and 
    Nothing on the DGX listens to the internet.
 2. **The service** (`io-privacy-server.service`, instructions inside): a systemd user unit
    so it survives reboots and restarts on failure, with the token in a 600-mode env file.
-3. **The token.** `IO_PRIVACY_TOKEN` on the server; io gets it inside the server address,
-   `https://<token>@privacy.idli.cc`, and sends it as a bearer header (the address that
-   is logged is the one without it). No token, no scan: 401. There is no second sign-in
-   for the person; the app carries the credential. It is a shared secret, so anyone with
-   it can use the scanner (never see anyone else's text - nothing is stored); rotate it by
-   changing the env file and the address io is given.
+3. **The token - none for the limited preview.** The app is public on GitHub, so a
+   token in the app would be no token; and the decision for now is that anyone with the
+   app may use the scanner (it stores nothing, so the exposure is GPU time; put a
+   Cloudflare rate limit on the hostname). The machinery is there for later:
+   `IO_PRIVACY_TOKEN` in `~/.config/io-privacy-server/env` makes the server refuse
+   without it (401), and io sends it when it is given the address as
+   `https://<token>@privacy.idli.cc`. No second sign-in either way.
 
 Why not Cloudflare Access with a login: it would be a second sign-in in the browser, and
 there is no exchange between OpenAI's identity (the ChatGPT login inside io) and
 Cloudflare's. Access with a *service token* is the same idea as ours with two headers
 instead of one; either is fine, ours has no dependency.
 
-Where io looks by default: `DEFAULT_PRIVACY_SERVER` in `app/io/service.py`
-(`IO_PRIVACY_SERVER` overrides; the settings gear per session). Switch it to
-`https://<token>@privacy.idli.cc` once the tunnel answers `/health`, and keep the
-tailnet address as the fallback for the office. A quick check from any laptop:
+Where io looks, baked in (`DEFAULT_PRIVACY_SERVERS` in `app/io/service.py`, in order;
+`IO_PRIVACY_SERVER=a,b` overrides; the settings gear per session): `https://privacy.idli.cc`
+first, then `http://100.82.28.38:8899` on the tailnet for the office. Each gets a 4-second
+warm-up; the first that answers is used, otherwise the on-device scanner. A quick check
+from any laptop:
 
     curl -s https://privacy.idli.cc/health | head -c 200
-    curl -s -X POST https://privacy.idli.cc/scan -H 'Authorization: Bearer <token>' \
+    curl -s -X POST https://privacy.idli.cc/scan \
       -H 'Content-Type: application/json' -d '{"text":"call 9876543210"}'
