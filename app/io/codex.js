@@ -107,8 +107,16 @@ function writeConfig(home, proxyPort, extra = {}) {
   const esc = p => String(p).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   if (!extra.noSandbox && process.env.IO_CODEX_NO_WALL !== '1') {
     top.push('default_permissions = "io"');
+    // Codex's own runner (bin/codex-code-mode-host, codex-resources/bwrap, zsh, codex-path/rg)
+    // lives in the package directory, outside ":minimal" and the folder; without it the
+    // sandbox cannot start the runner and Codex asks to run outside it ("the sandbox
+    // runner itself is missing", laptop 2026-09-15). Temp is writable, as in Codex's own
+    // workspace-write profile, or python and friends fail on their scratch files.
+    const fsEntries = ['":minimal" = "read"', `"${esc(path.join(home, 'AGENTS.md'))}" = "read"`];
+    if (extra.codexDir) fsEntries.push(`"${esc(extra.codexDir)}" = "read"`);
+    for (const t of new Set([os.tmpdir(), '/tmp'].filter(Boolean))) fsEntries.push(`"${esc(t)}" = "write"`);
     tables.push('[permissions.io]', 'description = "io: the sheltered folder and nothing else"', '',
-      '[permissions.io.filesystem]', '":minimal" = "read"', `"${esc(path.join(home, 'AGENTS.md'))}" = "read"`, '',
+      '[permissions.io.filesystem]', ...fsEntries, '',
       '[permissions.io.filesystem.":workspace_roots"]', '"." = "write"', '',
       '[permissions.io.network]', `enabled = ${extra.chat ? 'true' : 'false'}`, '');
   } else if (extra.chat) {

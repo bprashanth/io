@@ -34,8 +34,10 @@ test('codex home is io-owned and distinct from ~/.codex', () => {
 
 test('config points both base urls at the loopback proxy and keeps the codex suffix', () => {
   const home = path.join(tmp, 'home');
-  codex.writeConfig(home, 43210, { trust: '/some/folder' });
+  codex.writeConfig(home, 43210, { trust: '/some/folder', codexDir: '/opt/io/codex-bin/linux-x64' });
   const toml = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
+  assert.ok(toml.includes('"/opt/io/codex-bin/linux-x64" = "read"'), 'the Codex package dir must be readable inside the wall');
+  assert.ok(toml.includes('"/tmp" = "write"'));
   assert.ok(toml.includes('openai_base_url = "http://127.0.0.1:43210/backend-api/codex"'));
   assert.ok(toml.includes('chatgpt_base_url = "http://127.0.0.1:43210/backend-api/"'));
   assert.ok(toml.includes('enable_request_compression = false'));

@@ -103,7 +103,7 @@ ipcMain.handle('codex-start', async (_e, opts) => {
   if (!info.ready || !info.port) return { error: `not protected: ${info.reason || 'proxy not ready'}` };
   if (!info.folder) return { error: 'no sheltered folder' };
   if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
-  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
+  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
   try {
     session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows });
   } catch (e) { return { error: e.message }; }
