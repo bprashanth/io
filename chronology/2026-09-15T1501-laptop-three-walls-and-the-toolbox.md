@@ -1,7 +1,7 @@
 # 2026-09-15, 15:10 IST — three settings for the folder, and giving the wall a toolbox
 
 Follows `2026-09-15T1159-laptop-restoration-and-session-handle.md`. Screenshots in
-`benchmarks/runs/2026-09-15-laptop/` (59 onwards). Synthetic corpus only.
+`benchmarks/runs/2026-09-15-laptop/` (75 and 76). Synthetic corpus only.
 
 ## Why
 

@@ -24,7 +24,7 @@ Two things blocked the first launch, both already understood by the time of this
 Every answer reached the person as codes. Asked for the village in the first row of
 `household_survey.csv`, Codex printed `PLACE_003`. Asked who `CFS0001` is, it printed
 `NAME_001` and `NAME_200`. The footer read "0 restored" for the whole session, and no
-response log line carried a `restored` or `events` field at all (screenshots 16, 22).
+response log line carried a `restored` or `events` field at all (screenshot 22).
 
 Cause: `Proxy._handle` decided how to treat the upstream response from its `Content-Type`
 header, and chatgpt.com streams `/backend-api/codex/responses` back **with no Content-Type
@@ -51,7 +51,7 @@ Repro: open a sheltered folder, press **home**, type into the chat box on the sh
 conversation screen comes up, Codex's banner renders with the right chat folder, a real
 codex process is running there — and the keyboard is dead. Nothing appears, and no request
 reaches the proxy. The first message typed into the chat box is lost too. Pressing
-**restart Codex** makes everything work (screenshots 32-38).
+**restart Codex** makes everything work (screenshots 33 and 38).
 
 Cause: `main.js` keeps one module-level `session`, and the `onExit` callback closed over
 that variable. Leaving the folder kills the old Codex; it takes a moment to die, and its
@@ -133,10 +133,10 @@ honest answer. Both are product choices.
 - attach a file: the CSV was copied in, ran the same review (names, emails, PAN, UPI all
   flagged), returned to the same conversation with a note and nothing typed for the person,
   and the follow-up question answered correctly with a restored name and a rupee amount
-  (45, 46, 47).
+  (45, 47).
 - Terminal: Ctrl+V pastes, Ctrl+C copies a selection, Ctrl+C with no selection interrupts,
   the "copy text" button copies the screen, a file Codex named opens on click, and the
-  terminal reflows when the window is resized (50-55).
+  terminal reflows when the window is resized (53, 55).
 - Proxy over the whole session: 153×200, 11×403, 15×426, **zero leak lines**. Refusals were
   15 websocket 426 (by design, Codex falls back to SSE), 2 `not ready` during a rescan
   (fail-closed, expected), and 9 `path not allowed` on

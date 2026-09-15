@@ -2,7 +2,7 @@
 
 Third laptop entry today. Follows `2026-09-15T1501-laptop-three-walls-and-the-toolbox.md`.
 Everything here needed bwrap actually working, which is why it was done on the laptop and
-not the DGX. Screenshots 76-82 in `benchmarks/runs/2026-09-15-laptop/`.
+not the DGX. Screenshots 76, 78 and 82 in `benchmarks/runs/2026-09-15-laptop/`.
 
 ## Renames
 
