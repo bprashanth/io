@@ -22,6 +22,7 @@ let win = null;
 // CODEX_HOME, the proxy port, the spawn - stays here in main; the renderer sees terminal
 // bytes and status strings, never a token or a path it chose itself.
 let session = null;      // node-pty process
+let wall = null;         // the setting the person picked for this folder (see codex.js WALLS)
 let login = null;        // child process of `codex login`
 
 const serviceGet = p => new Promise((res, rej) => http.get(`http://127.0.0.1:${servicePort}${p}`, r => {
@@ -37,7 +38,7 @@ async function codexStatus() {
   const { bin, home } = codexPaths();
   const info = codex.binaryInfo(bin.path);
   const out = { version: bin.version, target: bin.key, binary: info.exists && info.executable, home, pty: codex.hasPty(),
-                loginBusy: !!login, running: !!session, folder: session ? session.ioFolder : null };
+                loginBusy: !!login, running: !!session, folder: session ? session.ioFolder : null, wall };
   if (out.binary) Object.assign(out, codex.loginStatus(bin.path, home));
   else out.line = `bundled Codex is missing (expected ${bin.path})`;
   try { out.service = await serviceGet('/api/codex'); } catch { out.service = null; }
@@ -65,6 +66,12 @@ ipcMain.handle('open-external', async (_e, url) => {
   // The containment check below is still what decides; this only says where to look.
   else if (u && !u.split(/[\\/]/).includes('..') && folder) file = path.join(folder, u);
   if (file) {
+    // "Nothing leaves" has to mean the browser too. A page is the one route out of the
+    // wall that io itself operates, and an HTML file carries whatever data Codex chose to
+    // put in it, with full network once it is open. So the strictest setting declines.
+    if (wall && !codex.wallOf(wall).openPages) {
+      return { error: 'this folder is set to stay offline, so io will not open a page for it' };
+    }
     let roots = [env.dataDir];
     if (folder) roots.push(folder);
     const real = fs.existsSync(file) ? fs.realpathSync(file) : file;
@@ -109,10 +116,11 @@ ipcMain.handle('codex-start', async (_e, opts) => {
   if (!info.ready || !info.port) return { error: `not protected: ${info.reason || 'proxy not ready'}` };
   if (!info.folder) return { error: 'no sheltered folder' };
   if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
-  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
+  wall = (opts && opts.wall) || codex.DEFAULT_WALL;
+  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
   let mine;
   try {
-    mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows });
+    mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows, libsDir: env.runtimeDir });
   } catch (e) { return { error: e.message }; }
   mine.ioFolder = info.folder;
   mine.onData(d => sendToWin('codex-data', d));

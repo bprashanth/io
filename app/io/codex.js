@@ -54,6 +54,28 @@ function codexHome(dataDir) {
 // plan and a chat about a spreadsheet does not need long thinking.
 const PROFILE = 'io';
 
+// The three settings a person picks after choosing a folder, before anything is scanned.
+// They differ in what the *tools* Codex runs may reach. None of them changes what goes to
+// the model: that is replaced with codes by the proxy and sent over TLS in all three.
+//
+//   offline  commands have no internet, and io will not open a page in the browser either.
+//            Nothing this folder's work produces can leave by any route io controls.
+//   tools    commands still have no internet; io will open a page it wrote for the person.
+//            The name is forward-looking: when io ships tools that need the internet, they
+//            run on io's side of the wall and only they go online. Nothing Codex runs does.
+//   open     commands get the internet, may install what they judge useful, and a page
+//            opens in the person's own browser.
+//
+// The folder boundary does not move between them. Commands may write the sheltered folder
+// and temp, read what the platform needs, and nothing else, in every setting.
+const WALLS = {
+  offline: { network: false, openPages: false },
+  tools:   { network: false, openPages: true  },
+  open:    { network: true,  openPages: true  },
+};
+const DEFAULT_WALL = 'tools';
+const wallOf = name => WALLS[name] || WALLS[DEFAULT_WALL];
+
 function writeConfig(home, proxyPort, extra = {}) {
   fs.mkdirSync(home, { recursive: true });
   // TOML: every top-level key must come before the first table header, or it silently
@@ -114,11 +136,19 @@ function writeConfig(home, proxyPort, extra = {}) {
     // workspace-write profile, or python and friends fail on their scratch files.
     const fsEntries = ['":minimal" = "read"', `"${esc(path.join(home, 'AGENTS.md'))}" = "read"`];
     if (extra.codexDir) fsEntries.push(`"${esc(extra.codexDir)}" = "read"`);
+    // io's own python and its packages. ":minimal" is the platform's bare interpreter and
+    // stdlib; pandas, numpy and openpyxl are not in it. On the laptop the only copies on
+    // the machine were a per-user install under $HOME, which the wall correctly refuses,
+    // so `import pandas` failed and Codex fell back to unzipping xlsx files and walking
+    // the XML by hand - badly (2026-09-15). io ships a runtime that has them, io owns it,
+    // and it holds nobody's data, so every setting may read it.
+    if (extra.libsDir) fsEntries.push(`"${esc(extra.libsDir)}" = "read"`);
     for (const t of new Set([os.tmpdir(), '/tmp'].filter(Boolean))) fsEntries.push(`"${esc(t)}" = "write"`);
+    const wall = wallOf(extra.wall);
     tables.push('[permissions.io]', 'description = "io: the sheltered folder and nothing else"', '',
       '[permissions.io.filesystem]', ...fsEntries, '',
       '[permissions.io.filesystem.":workspace_roots"]', '"." = "write"', '',
-      '[permissions.io.network]', `enabled = ${extra.chat ? 'true' : 'false'}`, '');
+      '[permissions.io.network]', `enabled = ${extra.chat || wall.network ? 'true' : 'false'}`, '');
   } else if (extra.chat) {
     tables.push('[sandbox_workspace_write]', 'network_access = true', '');
   }
@@ -159,6 +189,8 @@ function agentsMd(extra = {}) {
     '  then open it for them: run `xdg-open <file>` on Linux, `open <file>` on macOS,',
     '  `start "" <file>` on Windows. If opening fails, print the full path on its own line so',
     '  they can click it.',
+    '- `python3` here already has pandas, numpy and openpyxl. Use them; never take a',
+    '  spreadsheet apart by unzipping it and reading the XML inside.',
     '- Prefer a page in the browser over long text in this window.',
     '- When you refer to a file or a web page, give the full path or link on its own line.',
     '',
@@ -193,8 +225,14 @@ function agentsMd(extra = {}) {
   return lines.join('\n');
 }
 
-function baseEnv(home) {
+function baseEnv(home, libsDir) {
   const env = { ...process.env, CODEX_HOME: home };
+  // Granting the wall read access to io's runtime is only half of it: commands still run
+  // the platform's own python3, which has no pandas or openpyxl (the only copies on the
+  // laptop were a per-user install under $HOME, which the wall rightly refuses). Putting
+  // io's runtime first on PATH makes `python3` mean io's python, the one that has them.
+  const bin = libsDir && path.join(libsDir, process.platform === 'win32' ? 'Scripts' : 'bin');
+  if (bin && fs.existsSync(bin)) env.PATH = bin + path.delimiter + (env.PATH || '');
   // Codex would treat an OPENAI_API_KEY in the environment as a login. io's Codex logs
   // in with ChatGPT, or not at all.
   for (const k of Object.keys(env)) {
@@ -244,7 +282,7 @@ function logout(bin, home) {
 
 // The interactive session. A real PTY: Codex's TUI needs cursor movement, resize and
 // raw keys, none of which survive a pipe.
-function spawnSession({ bin, home, cwd, cols, rows, noAltScreen }) {
+function spawnSession({ bin, home, cwd, cols, rows, noAltScreen, libsDir }) {
   if (!pty) throw new Error('node-pty is not available in this build');
   const args = ['-p', PROFILE];
   if (noAltScreen) args.push('--no-alt-screen');
@@ -253,7 +291,7 @@ function spawnSession({ bin, home, cwd, cols, rows, noAltScreen }) {
     cols: cols || 100,
     rows: rows || 30,
     cwd,
-    env: { ...baseEnv(home), TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: process.env.LANG || 'C.UTF-8' },
+    env: { ...baseEnv(home, libsDir), TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: process.env.LANG || 'C.UTF-8' },
   });
 }
 
@@ -266,4 +304,5 @@ function binaryInfo(bin) {
   } catch { return { exists: false }; }
 }
 
-module.exports = { bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };
+module.exports = {
+  WALLS, DEFAULT_WALL, wallOf, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };

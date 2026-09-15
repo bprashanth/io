@@ -20,6 +20,29 @@ input:focus,textarea:focus{border-color:var(--hi)}
 /* screens */
 .screen{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px}
 .screen.on{display:flex}
+/* the setting picked after choosing a folder, before anything is scanned */
+#s-wall{justify-content:center}
+.wallwrap{width:100%;max-width:940px;display:flex;flex-direction:column;gap:18px}
+.wallwrap h2{font-size:22px;font-weight:600;margin:0}
+.wall-lede{margin:0;max-width:640px;color:var(--dim);line-height:1.65;font-size:13.5px}
+.wall-lede b{color:var(--ink);font-weight:600}
+.walls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.wall{position:relative;display:flex;flex-direction:column;gap:9px;text-align:left;align-items:stretch;
+      border:1px solid var(--line);border-radius:12px;padding:15px 15px 16px;background:transparent}
+.wall:hover{border-color:#454b53}
+.wall.on{border-color:var(--hi);background:var(--hibg)}
+.wall .wname{font-size:14.5px;font-weight:600;color:var(--ink)}
+.wall.on .wname{color:var(--hi)}
+.wall .wone{font-size:12.5px;color:var(--dim);line-height:1.55;min-height:56px}
+.wall ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.wall li{font-size:12px;color:var(--dim);line-height:1.45;display:flex;gap:7px;align-items:flex-start}
+.wall li i{font-style:normal;flex:none;width:9px;color:#6d757d}
+.wall li.yes i{color:var(--grn)}
+.wall .sug{position:absolute;top:-8px;right:12px;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;
+           color:var(--hi);background:var(--bg);border:1px solid var(--hi);border-radius:999px;padding:1px 8px}
+.wall .wnote{font-size:11.5px;color:#7a8189;line-height:1.5;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.wallfoot{display:flex;justify-content:flex-end;gap:10px;align-items:center}
+@media (max-width:880px){.walls{grid-template-columns:1fr}.wall .wone{min-height:0}}
 #s-provider .card, #s-consent .card, #s-scanner .card, #s-login .card{width:400px;display:flex;flex-direction:column;gap:10px}
 #s-provider h1, #s-consent h1, #s-scanner h1, #s-login h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
 #s-provider p, #s-consent p, #s-scanner p, #s-login p{margin:0 0 6px;text-align:center}
@@ -250,6 +273,21 @@ td.tok{background:var(--hibg);color:var(--hi)}
   </div>
 </div>
 
+<div class="screen" id="s-wall">
+  <div class="wallwrap">
+    <h2>Before io opens this folder</h2>
+    <p class="wall-lede">Choose what the assistant may reach while it works for you. This is
+    about the <b>tools</b> it uses to get the job done. It is not about the conversation
+    itself: what you ask, and anything it reads from your files, is turned into codes before
+    it leaves this computer and travels encrypted, in all three of these.</p>
+    <div class="walls" id="walls"></div>
+    <div class="wallfoot">
+      <button class="plain" id="wall-cancel">Cancel</button>
+      <button class="go" id="wall-go">Continue</button>
+    </div>
+  </div>
+</div>
+
 <div class="screen" id="s-home">
   <div id="shelf"></div>
 </div>
@@ -383,7 +421,7 @@ let codexMode = false;
   if (codexMode) { const ok = await loginGate(); if (!ok) return; }
   if (st.provider.set) { await afterConsent(); }
 })();
-function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent' || id === '#s-scanner' || id === '#s-login' || id === '#s-codex') ? 'none' : ''; $('#acts').style.display = (id === '#s-chat') ? 'flex' : 'none'; if (id === '#s-codex') setTimeout(fitTerm, 30); }
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); $('#bar').style.display = (id === '#s-home' || id === '#s-chat') ? '' : 'none'; $('#gear').style.display = (id === '#s-provider' || id === '#s-consent' || id === '#s-scanner' || id === '#s-login' || id === '#s-codex' || id === '#s-wall') ? 'none' : ''; $('#acts').style.display = (id === '#s-chat') ? 'flex' : 'none'; if (id === '#s-codex') setTimeout(fitTerm, 30); }
 
 // provider: sign in with ChatGPT (Codex inside io, no key)
 $('#p-chatgpt').onclick = async () => {
@@ -516,8 +554,62 @@ async function confirmScan(path){
   const total = (r.data_files || 0) + (r.docs ? (r.chat_files || 0) + (r.pdf_files || 0) : 0);
   $('#confirmscan').classList.add('on');
   $('#cs-x').onclick = () => $('#confirmscan').classList.remove('on');
-  $('#cs-ok').onclick = () => { if (!total) return; $('#confirmscan').classList.remove('on'); openFolder(path); };
+  $('#cs-ok').onclick = () => { if (!total) return; $('#confirmscan').classList.remove('on'); chooseWall(path); };
 }
+// What the assistant may reach while it works. The wording is for someone who has never
+// used a terminal: what it can do, what it cannot, and no mention of sandboxes or networks
+// as such. The order is strict -> open, left to right.
+const WALL_CHOICES = [
+  { id: 'offline', name: 'Stays offline',
+    one: 'Nothing it runs can reach the internet, and io will not open a page in your browser.',
+    yes: ['Read and change the files in this folder',
+          'Draw charts and read spreadsheets with the tools io brings'],
+    no:  ['Reach any website', 'Install anything', 'Open a page for you'] },
+  { id: 'tools', name: "io's tools only", suggested: true,
+    one: 'Nothing it runs reaches the internet on its own. io opens the charts and reports it writes, so you can see the work.',
+    yes: ['Everything on the left', 'Show you a page it wrote, in your browser'],
+    no:  ['Go to a website by itself', 'Install anything'],
+    note: 'Only tools that io itself ships will ever go online, and they run on io\u2019s side. None are shipped yet, so today nothing it runs reaches the internet.' },
+  { id: 'open', name: 'Open',
+    one: 'It may go online and fetch or install whatever it judges useful, the way it would on a programmer\u2019s computer.',
+    yes: ['Look things up online', 'Install extra software it needs', 'Open pages in your browser'],
+    no:  ['Read your other folders \u2014 that never changes'],
+    note: 'The most capable, and the least predictable. It may take steps you did not ask for, and a page it writes can carry your data anywhere once you open it.' },
+];
+let wallChoice = 'tools';
+let wallPath = null;
+
+function renderWalls(){
+  $('#walls').innerHTML = WALL_CHOICES.map(w => `
+    <button class="wall${w.id === wallChoice ? ' on' : ''}" data-w="${w.id}">
+      ${w.suggested ? '<span class="sug">Suggested</span>' : ''}
+      <span class="wname">${w.name}</span>
+      <span class="wone">${w.one}</span>
+      <ul>
+        ${w.yes.map(t => `<li class="yes"><i>&#10003;</i><span>${t}</span></li>`).join('')}
+        ${w.no.map(t => `<li><i>&#215;</i><span>${t}</span></li>`).join('')}
+      </ul>
+      ${w.note ? `<span class="wnote">${w.note}</span>` : ''}
+    </button>`).join('');
+  document.querySelectorAll('#walls .wall').forEach(b => b.onclick = () => { wallChoice = b.dataset.w; renderWalls(); });
+}
+
+// Between picking the folder and reading a single file: the choice shapes the profile that
+// Codex is launched with, so it has to be made before anything is scanned or coded.
+function chooseWall(path){
+  wallPath = path;
+  let last = null;
+  try { last = localStorage.getItem('io.wall.' + path); } catch (e) {}
+  wallChoice = WALL_CHOICES.some(w => w.id === last) ? last : 'tools';
+  renderWalls();
+  show('#s-wall');
+  $('#wall-cancel').onclick = () => { show('#s-home'); renderShelf(); };
+  $('#wall-go').onclick = () => {
+    try { localStorage.setItem('io.wall.' + path, wallChoice); } catch (e) {}
+    openFolder(path);
+  };
+}
+
 async function openFolder(path){
   chatWorkspace = null;
   show('#s-sheet'); $('#tabs').innerHTML = ''; $('#gridwrap').innerHTML = '<p class="dim" style="padding:24px">reading…</p>';
@@ -1007,7 +1099,7 @@ async function enterCodex(){
 }
 async function startCodex(){
   term.reset();
-  const r = await window.io.codex.start({cols: term.cols, rows: term.rows, chat: !!chatWorkspace});
+  const r = await window.io.codex.start({cols: term.cols, rows: term.rows, chat: !!chatWorkspace, wall: wallChoice});
   if (r && r.error) { cxRunning = false; cxErr('Codex was not started: ' + r.error); $('#cx-restart').style.display = ''; return; }
   cxRunning = true; $('#cx-restart').style.display = 'none';
   term.focus();

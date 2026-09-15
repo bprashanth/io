@@ -99,5 +99,40 @@ test('dev provider block only appears when asked for', () => {
   assert.ok(toml.indexOf('model_provider = "io-dev"') < toml.indexOf('\n['), 'top-level key before any table');
 });
 
+test('the three walls differ only in network, and never in the folder boundary', () => {
+  const read = (name, extra) => {
+    const home = path.join(tmp, 'wall-' + name);
+    codex.writeConfig(home, 9, Object.assign({ wall: name }, extra || {}));
+    return fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
+  };
+  const offline = read('offline'), tools = read('tools'), open_ = read('open');
+  assert.ok(offline.includes('[permissions.io.network]\nenabled = false'), 'offline has no network');
+  assert.ok(tools.includes('[permissions.io.network]\nenabled = false'), 'io-tools gives commands no network');
+  assert.ok(open_.includes('[permissions.io.network]\nenabled = true'), 'open has network');
+  // the folder boundary is the same in all three
+  for (const t of [offline, tools, open_]) {
+    assert.ok(t.includes('default_permissions = "io"'), 'the wall is always on');
+    assert.ok(t.includes('[permissions.io.filesystem.":workspace_roots"]\n"." = "write"'));
+    assert.ok(t.includes('":minimal" = "read"'));
+    assert.ok(!t.includes('[sandbox_workspace_write]'), 'never the unwalled fallback');
+  }
+  // an unknown or missing name falls back to the suggested one, never to the open one
+  const fallback = read('nonsense-value');
+  assert.strictEqual(codex.DEFAULT_WALL, 'tools');
+  assert.ok(fallback.includes('[permissions.io.network]\nenabled = false'), 'unknown wall must not grant network');
+  assert.ok(read(undefined).includes('[permissions.io.network]\nenabled = false'), 'missing wall must not grant network');
+  // a conversation with no folder keeps its network whatever the wall says
+  assert.ok(read('offline', { chat: true }).includes('[permissions.io.network]\nenabled = true'));
+});
+
+test('io ships the analysis packages into the wall, and only io-owned paths', () => {
+  const home = path.join(tmp, 'libs');
+  codex.writeConfig(home, 9, { wall: 'tools', libsDir: '/opt/io/runtime' });
+  const toml = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
+  assert.ok(toml.includes('"/opt/io/runtime" = "read"'), 'io runtime is readable');
+  codex.writeConfig(home, 9, { wall: 'tools' });
+  assert.ok(!fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8').includes('runtime'), 'nothing granted when io has no runtime to grant');
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${passed} launcher tests passed`);
