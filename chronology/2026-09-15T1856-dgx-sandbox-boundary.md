@@ -1,4 +1,4 @@
-# 2026-09-15, 20:40 IST — DGX: the sandbox does run here, and why it did not
+# 2026-09-15, 18:56 IST — DGX: the sandbox does run here, and why it did not
 
 Machine: DGX Spark, Ubuntu 24.04.4, kernel 6.17 (nvidia), aarch64, no display. Follows the
 laptop's three entries of today and answers the handoff's first task: establish the
