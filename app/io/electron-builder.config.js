@@ -127,6 +127,13 @@ module.exports = {
   ],
   // A native module has to be a real file on disk to dlopen; the asar cannot hold it.
   asarUnpack: ['node_modules/node-pty/**'],
+  // Do not rebuild node-pty against Electron. It is a Node-API module (the prebuilt
+  // binaries for mac and windows, and the one `npm install` compiles on linux, all load
+  // in Electron as they are), and electron-builder's rebuild goes through its own old
+  // node-gyp, which fails on the mac runners (python 3.12 has no distutils) and on the
+  // windows runner (no Visual Studio found). Seen on the first CI run after node-pty
+  // was added, 2026-09-15.
+  npmRebuild: false,
   extraResources,
 
   win: {
