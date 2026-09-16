@@ -118,11 +118,14 @@ test('the three walls differ only in network, and never in the folder boundary',
   }
   // Escalation: Codex's default policy lets the model ask the person to run a command
   // outside the sandbox, which would hand it the whole machine and the whole network
-  // whatever setting they chose. Offline must not be able to ask. The other two may,
-  // because that is also how an MCP tool call is approved.
-  assert.strictEqual(codex.wallOf('offline').escalate, false, 'offline may never escalate');
-  assert.strictEqual(codex.wallOf('open').escalate, true);
-  assert.strictEqual(codex.wallOf('nonsense').escalate, codex.wallOf(codex.DEFAULT_WALL).escalate);
+  // whatever setting they chose. No setting may ask: the flag on every command line and
+  // the policy in every profile. Tools reach Codex another way (below).
+  for (const t of [offline, tools, open_]) assert.ok(t.includes('\napproval_policy = "never"\n'), 'no profile may escalate');
+  for (const w of ['offline', 'tools', 'open', 'nonsense']) assert.deepStrictEqual(codex.sessionArgs({ wall: w }).slice(-2), ['-a', 'never']);
+  assert.strictEqual(codex.wallOf('offline').tools, false, 'offline has no toolbox');
+  assert.strictEqual(codex.wallOf('tools').tools, true);
+  assert.strictEqual(codex.wallOf('open').tools, true);
+  assert.strictEqual(codex.wallOf('nonsense').tools, codex.wallOf(codex.DEFAULT_WALL).tools);
   // an unknown or missing name falls back to the suggested one, never to the open one
   const fallback = read('nonsense-value');
   assert.strictEqual(codex.DEFAULT_WALL, 'tools');
@@ -141,5 +144,73 @@ test('io ships the analysis packages into the wall, and only io-owned paths', ()
   assert.ok(!fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8').includes('runtime'), 'nothing granted when io has no runtime to grant');
 });
 
+test('the sandbox check answers with a verdict, and with the admin fix when it fails', () => {
+  const r = codex.sandboxCheck(codex.bundledCodexPath().dir);
+  assert.strictEqual(typeof r.ok, 'boolean');
+  if (process.platform === 'linux') {
+    assert.strictEqual(r.checked, true);
+    if (!r.ok) { assert.ok(r.why); if (r.fix) { assert.ok(/userns/.test(r.fix.profile)); assert.ok(/apparmor_parser/.test(r.fix.install)); } }
+  } else {
+    assert.strictEqual(r.checked, false);
+  }
+  console.log(`   (this machine: ${r.ok ? 'wall can run' : 'wall cannot run - ' + r.why})`);
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
+
+test('the toolbox is registered as an approve-mode server where the setting has tools, and never Offline', () => {
+  const tb = { command: '/opt/io/io', args: ['/opt/io/tools/mcp.js'], env: { ELECTRON_RUN_AS_NODE: '1', IO_TOOLS_PORT: '8123', IO_TOOLS_TOKEN: 'abc' } };
+  const read = (wall, extra) => {
+    const home = path.join(tmp, 'tb-' + wall + (extra ? '-x' : ''));
+    codex.writeConfig(home, 9, Object.assign({ wall, toolbox: tb }, extra || {}));
+    return fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
+  };
+  for (const w of ['tools', 'open']) {
+    const t = read(w);
+    assert.ok(t.includes('[mcp_servers.io]\ncommand = "/opt/io/io"\nargs = ["/opt/io/tools/mcp.js"]\ndefault_tools_approval_mode = "approve"'), w + ' registers the toolbox');
+    assert.ok(t.includes('[mcp_servers.io.env]\nELECTRON_RUN_AS_NODE = "1"\nIO_TOOLS_PORT = "8123"\nIO_TOOLS_TOKEN = "abc"'));
+    assert.ok(t.includes('direct_only_tool_namespaces = ["mcp__io", "io"]'), 'the tool is in the list, not behind tool_search');
+  }
+  // the provider's hosted web search is off unless the setting is Open
+  assert.ok(read('offline').includes('\nweb_search = "disabled"\n'));
+  assert.ok(read('tools').includes('\nweb_search = "disabled"\n'));
+  assert.ok(!read('open').includes('web_search = "disabled"'));
+  assert.ok(!read('offline').includes('mcp_servers'), 'Offline has no toolbox');
+  assert.ok(!read('tools', { toolbox: null }).includes('mcp_servers'), 'no server without a running toolbox');
+  // and the assistant is told about the renderer only where it exists
+  assert.ok(/render_page/.test(codex.agentsMd({ wall: 'tools', toolbox: tb })));
+  assert.ok(!/render_page/.test(codex.agentsMd({ wall: 'offline', toolbox: tb })));
+  assert.ok(codex.TOOLBOX.some(t => t.id === 'render_page' && /nothing/.test(t.reaches)));
+});
+
+test('a switch resumes the thread under the profile, and Offline still cannot escalate', () => {
+  const fresh = codex.sessionArgs({ wall: 'tools' });
+  assert.deepStrictEqual(fresh, ['-p', 'io', '-a', 'never']);
+  const sw = codex.sessionArgs({ wall: 'open', resume: '--last' });
+  assert.deepStrictEqual(sw, ['resume', '--last', '-p', 'io', '-a', 'never']);
+  const off = codex.sessionArgs({ wall: 'offline', resume: '--last' });
+  assert.deepStrictEqual(off, ['resume', '--last', '-p', 'io', '-a', 'never']);
+});
+
+test('the toolbox server speaks MCP over stdio and returns a picture, not the page', () => {
+  const { spawnSync } = require('child_process');
+  const lines = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } },
+    { jsonrpc: '2.0', method: 'notifications/initialized' },
+    { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'render_page', arguments: { file: 'people.html' } } },
+    { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'delete_everything', arguments: {} } },
+  ].map(m => JSON.stringify(m)).join('\n') + '\n';
+  const r = spawnSync(process.execPath, [path.join(__dirname, '..', 'tools', 'mcp.js')], { input: lines, encoding: 'utf8', env: { ...process.env, IO_TOOLS_FAKE: '1' }, timeout: 10000 });
+  const replies = r.stdout.trim().split('\n').map(l => JSON.parse(l));
+  assert.strictEqual(replies.length, 4, r.stderr);
+  assert.strictEqual(replies[0].result.serverInfo.name, 'io');
+  assert.deepStrictEqual(replies[1].result.tools.map(t => t.name), ['render_page']);
+  assert.strictEqual(replies[1].result.tools[0].annotations.openWorldHint, false);
+  const c = replies[2].result.content;
+  assert.strictEqual(c[1].type, 'image'); assert.strictEqual(c[1].mimeType, 'image/png'); assert.ok(c[1].data.length > 20);
+  assert.ok(/codes/.test(c[0].text));
+  assert.strictEqual(replies[3].result.isError, true);
+});
+
 console.log(`\n${passed} launcher tests passed`);

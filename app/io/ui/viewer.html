@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>io viewer</title>
+<style>
+  :root{--bg:#1a1d21;--panel:#22262b;--line:#33383f;--ink:#e8e6e1;--dim:#8b9096;--hi:#e8b26a}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:13.5px/1.5 -apple-system,'Segoe UI',system-ui,sans-serif}
+  body{display:flex;flex-direction:column}
+  #bar{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+  #bar .name{font-weight:600}
+  #bar .dim{color:var(--dim);font-size:12.5px}
+  #bar .grow{flex:1}
+  #bar button{font:inherit;color:var(--ink);background:none;border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer}
+  #bar button:hover{border-color:var(--dim)}
+  #bar button[disabled]{opacity:.35;cursor:default}
+  iframe{flex:1;border:0;background:#fff}
+  img{max-width:100%;margin:auto;display:block}
+  #imgwrap{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;background:#111}
+</style>
+<div id="bar">
+  <span class="name" id="name"></span>
+  <span class="dim" id="note">shown inside io: this window has no internet, so nothing on the page can send your data anywhere</span>
+  <span class="grow"></span>
+  <button id="reload">reload</button>
+  <button id="browser">open in your browser</button>
+</div>
+<div id="imgwrap" style="display:none"><img id="img"></div>
+<iframe id="frame" sandbox="allow-scripts allow-forms allow-popups-to-escape-sandbox" style="display:none"></iframe>
+<script>
+  const q = new URLSearchParams(location.search);
+  const file = q.get('file') || '';
+  const canBrowser = q.get('browser') === '1';
+  document.getElementById('name').textContent = file.split('/').pop();
+  const b = document.getElementById('browser');
+  b.disabled = !canBrowser;
+  b.title = canBrowser ? '' : 'this folder is set to Offline, so pages stay inside io';
+  const isImg = /\.(png|jpe?g|gif|svg|webp)$/i.test(file);
+  const show = () => {
+    if (isImg) { document.getElementById('imgwrap').style.display = 'flex'; document.getElementById('img').src = 'file://' + file + '?t=' + Date.now(); }
+    else { const f = document.getElementById('frame'); f.style.display = ''; f.src = 'file://' + file + '?t=' + Date.now(); }
+  };
+  show();
+  document.getElementById('reload').onclick = show;
+  b.onclick = () => window.ioViewer && window.ioViewer.openInBrowser(file);
+  window.addEventListener('message', e => { if (e.data === 'io-reload') show(); });
+</script>

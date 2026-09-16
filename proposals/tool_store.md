@@ -1,5 +1,11 @@
 # A tool store for io: vetted tools that may reach out, when the assistant may not
 
+> Status, 2026-09-15 (DGX): the first cut is built and is called the **toolbox**, not a
+> store: one local MCP server io registers, one tool (the renderer), and the escalation
+> question below answered without intercepting the PTY. See
+> `chronology/2026-09-15T2350-dgx-toolbox-and-the-closed-escalation.md`. The catalogue,
+> signing and the other two tools remain proposals.
+
 ## Context
 
 io gives a person three settings when they shelter a folder (`Offline`, `T4GC tools`,

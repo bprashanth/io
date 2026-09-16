@@ -42,6 +42,7 @@ input:focus,textarea:focus{border-color:var(--hi)}
            color:var(--hi);background:var(--bg);border:1px solid var(--hi);border-radius:999px;padding:1px 8px}
 .wall .wnote{font-size:11.5px;color:#7a8189;line-height:1.5;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
 .wallfoot{display:flex;justify-content:flex-end;gap:10px;align-items:center}
+.wallfoot .go[disabled]{opacity:.35;cursor:default}
 @media (max-width:880px){.walls{grid-template-columns:1fr}.wall .wone{min-height:0}}
 #s-provider .card, #s-consent .card, #s-scanner .card, #s-login .card{width:400px;display:flex;flex-direction:column;gap:10px}
 #s-provider h1, #s-consent h1, #s-scanner h1, #s-login h1{font-size:34px;font-weight:600;margin:0 0 4px;text-align:center}
@@ -189,6 +190,8 @@ td.tok{background:var(--hibg);color:var(--hi)}
 #cx-top .dot.ok{background:var(--grn)}
 #cx-top .dot.bad{background:#e06c6c}
 #cx-top .brand{color:var(--hi);font-weight:600;letter-spacing:.5px;padding-right:6px;border-right:1px solid var(--line);margin-right:2px}
+.tblink{color:var(--hi);cursor:pointer;text-decoration:underline dotted}
+#cx-wall{font:inherit;font-size:12.5px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:3px 8px}
 #cx-hint{font-size:12px}
 #cx-wrap{flex:1;min-height:0;padding:10px 14px 6px;background:#15181c}
 #term{width:100%;height:100%}
@@ -280,6 +283,7 @@ td.tok{background:var(--hibg);color:var(--hi)}
     about the <b>tools</b> it uses to get the job done. It is not about the conversation
     itself: what you ask, and anything it reads from your files, is turned into codes before
     it leaves this computer and travels encrypted, in all three of these.</p>
+    <div id="wall-halt" style="display:none;border:1px solid #e06c6c;border-radius:12px;padding:14px 16px;color:#e8a0a0;font-size:13.5px;line-height:1.6;white-space:pre-wrap"></div>
     <div class="walls" id="walls"></div>
     <div class="wallfoot">
       <button class="plain" id="wall-cancel">Cancel</button>
@@ -318,12 +322,18 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <span class="pill"><span class="dot" id="cx-dot-priv"></span><span>Privacy</span> <b id="cx-priv">…</b></span>
     <span class="pill"><span class="dot" id="cx-dot-proxy"></span><span>Proxy</span> <b id="cx-proxy">…</b></span>
     <span class="pill"><span class="dot" id="cx-dot-gpt"></span><span>ChatGPT</span> <b id="cx-gpt">…</b></span>
+    <span class="pill" id="cx-wallpill"><span>Setting</span>
+      <select id="cx-wall" title="change what the assistant may reach; the conversation continues">
+        <option value="offline">Offline</option><option value="tools">T4GC tools</option><option value="open">Open</option>
+      </select>
+      <button class="plain" id="cx-toolbox" style="padding:3px 9px;font-size:12px;margin-left:4px" title="what io lets the assistant call, and what it last saw">toolbox</button></span>
   </div>
   <div id="cx-err"></div>
   <div id="cx-wrap"><div id="term"></div></div>
   <div id="cx-bottom">
     <span id="cx-shield">Protected by io</span>
     <span id="cx-stats" class="dim"></span>
+    <span id="cx-page" style="display:none"><a id="cx-page-link" style="color:var(--hi);cursor:pointer"></a></span>
     <span class="grow"></span>
     <span class="dim" id="cx-hint">select text with Shift + drag</span>
     <button id="cx-copy">copy text</button>
@@ -354,6 +364,21 @@ td.tok{background:var(--hibg);color:var(--hi)}
   <div style="display:flex;justify-content:flex-end;gap:8px"><button id="cs-x">Cancel</button><button class="go" id="cs-ok">OK</button></div>
 </div></div>
 
+<div id="toolbox" class="modal"><div class="card" style="width:560px;max-height:88vh;overflow:auto">
+  <h3 style="margin:0 0 6px">The toolbox</h3>
+  <p class="dim" style="margin:0 0 12px;line-height:1.5">Tools written and reviewed by T4GC. They run outside the sandbox, so they can have
+  internet access; each one says what it reaches. The assistant can call them without asking you.</p>
+  <div id="tb-list"></div>
+  <div id="tb-last" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+    <div style="font-weight:600;margin-bottom:4px">What the assistant last saw</div>
+    <div class="dim" id="tb-last-line" style="margin-bottom:8px;line-height:1.5"></div>
+    <img id="tb-img" style="max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff" alt="the coded picture">
+  </div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+    <button class="plain" id="tb-page" style="display:none">show me the real page</button>
+    <button class="go" id="tb-close">Close</button>
+  </div>
+</div></div>
 <div id="browser" class="modal"><div class="card" style="width:460px">
   <div id="br-path" class="dim" style="font-size:13px;word-break:break-all"></div>
   <div id="br-list" style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px"></div>
@@ -567,13 +592,13 @@ const WALL_CHOICES = [
     no:  ['Reach any website', 'Install anything', 'Open a page for you'] },
   { id: 'tools', name: 'T4GC tools', suggested: true,
     one: 'Nothing it runs reaches the internet on its own. io opens the charts and reports it writes, so you can see the work.',
-    yes: ['Everything on the left', 'Show you a page it wrote, in your browser'],
-    no:  ['Go to a website by itself', 'Install anything'],
-    note: 'Only tools T4GC has vetted will ever go online, and they run on io\u2019s side of the wall, never inside this folder\u2019s session. None are shipped yet, so today nothing it runs reaches the internet.' },
+    yes: ['Everything on the left', 'Show you a page it wrote, in your browser', 'Check its own work with io\u2019s renderer, which shows it a coded picture of a page it wrote'],
+    no:  ['Go to a website by itself', 'Install anything', 'Run anything outside this folder'],
+    note: 'The tools in the box are written and reviewed by T4GC. They run outside the sandbox, so they can have internet access. The one in the box today reaches nothing. <span class="tblink" data-tb="1">What\u2019s in the toolbox</span>' },
   { id: 'open', name: 'Open',
     one: 'It may go online and fetch or install whatever it judges useful, the way it would on a programmer\u2019s computer.',
     yes: ['Look things up online', 'Install extra software it needs', 'Open pages in your browser'],
-    no:  ['Read your other folders \u2014 that never changes'],
+    no:  ['Read your other folders \u2014 the same in all three'],
     note: 'The most capable, and the least predictable. It may take steps you did not ask for, and a page it writes can carry your data anywhere once you open it.' },
 ];
 let wallChoice = 'tools';
@@ -592,12 +617,28 @@ function renderWalls(){
       ${w.note ? `<span class="wnote">${w.note}</span>` : ''}
     </button>`).join('');
   document.querySelectorAll('#walls .wall').forEach(b => b.onclick = () => { wallChoice = b.dataset.w; renderWalls(); });
+  document.querySelectorAll('#walls .tblink').forEach(a => a.onclick = e => { e.stopPropagation(); openToolbox(); });
 }
 
 // Between picking the folder and reading a single file: the choice shapes the profile that
 // Codex is launched with, so it has to be made before anything is scanned or coded.
-function chooseWall(path){
+// The wall needs the computer's cooperation. When it cannot run, every setting that relies
+// on it is switched off and the person is told plainly what an administrator has to do
+// once; nothing starts without it.
+async function sandboxHalt(){
+  let st = null;
+  try { st = await window.io.codex.status(); } catch (e) { return 'io could not check this computer.'; }
+  if (!st.sandbox || st.sandbox.ok) return null;
+  let msg = `io cannot protect this folder on this computer: ${st.sandbox.why}. All three settings need that protection, so Codex is switched off here for now.`;
+  if (st.sandbox.install) msg += `\n\nAn administrator can allow it once, in a terminal:\n  cd ${(st.sandbox.profilePath || '').replace(/\/[^/]*$/, '')}\n  ${st.sandbox.install}\n\nThen start io again.`;
+  return msg;
+}
+async function chooseWall(path){
   wallPath = path;
+  const halt = await sandboxHalt();
+  $('#wall-halt').style.display = halt ? 'block' : 'none';
+  $('#wall-halt').textContent = halt || '';
+  $('#wall-go').disabled = !!halt;
   let last = null;
   try { last = localStorage.getItem('io.wall.' + path); } catch (e) {}
   wallChoice = WALL_CHOICES.some(w => w.id === last) ? last : 'tools';
@@ -838,7 +879,7 @@ q.addEventListener('keydown', async e => {
   // In Codex mode the chat box on the landing page always starts a conversation; the old
   // three-model chat is never the destination (it answered "no model could be reached"
   // when a previous folder's file list was still in memory after pressing home).
-  if (codexMode) { q.value = ''; paintMirror(); await startChatWorkspace(text); return; }
+  if (codexMode) { const halt = await sandboxHalt(); if (halt) { alert(halt); return; } q.value = ''; paintMirror(); await startChatWorkspace(text); return; }
   if (!files.length) { pickFolder(); return; }
   if (!accepted) { renderSheet(); return; }
   q.value = ''; paintMirror(); q.disabled = true;
@@ -1082,6 +1123,8 @@ async function enterCodex(){
   ensureTerm();
   show('#s-codex');
   cxErr('');
+  $('#cx-wall').value = wallChoice;
+  $('#cx-wallpill').style.display = chatWorkspace ? 'none' : '';
   $('#cx-attach').style.display = chatWorkspace ? '' : 'none';
   await new Promise(r => setTimeout(r, 60));
   fitTerm();
@@ -1096,6 +1139,16 @@ async function enterCodex(){
   if (!cxTimer) cxTimer = setInterval(paintCodexStatus, 2000);
   term.focus();
   if (pendingSay && cxRunning) { const t = pendingSay; pendingSay = null; sayWhenReady(t); }
+  // a page or chart Codex saved: io has opened it in its viewer; the chip reopens it
+  window.io.onRender(({name, coded}) => {
+    // a footer note, not a line in the terminal: Codex's screen repaints over anything
+    // written into it (the switch note vanished the same way, drive-switch)
+    cxNote = `io showed Codex a picture of ${name}${coded ? ' with names and places as codes' : ''}. Press toolbox to see what it saw.`;
+    cxErr(cxNote);
+  });
+  window.io.onPageReady(({file, name}) => {
+    const c = $('#cx-page'); c.style.display = ''; const a = $('#cx-page-link'); a.textContent = `${name} - show again`; a.onclick = () => window.io.openViewer(file);
+  });
 }
 async function startCodex(){
   term.reset();
@@ -1157,6 +1210,43 @@ $('#cx-attach').onclick = async () => {
   renderSheet();
 };
 $('#cx-restart').onclick = () => startCodex();
+// The toolbox window: what the assistant may call, and the last picture it was shown.
+let tbLastFile = null;
+async function openToolbox(){
+  const r = await window.io.codex.toolbox();
+  $('#tb-list').innerHTML = (r.tools || []).map(t => `
+    <div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="font-weight:600">${t.name}</div>
+      <div class="dim" style="line-height:1.5;margin-top:2px">${t.does}.</div>
+      <div style="font-size:12.5px;line-height:1.6;margin-top:6px"><span class="dim">it sees:</span> ${t.sees}<br><span class="dim">it reaches:</span> <b>${t.reaches}</b></div>
+    </div>`).join('') || '<div class="dim">Nothing yet.</div>';
+  const last = $('#tb-last'); last.style.display = 'none'; $('#tb-page').style.display = 'none'; tbLastFile = null;
+  if (r.last) {
+    const img = await window.io.codex.toolboxImage();
+    if (img && img.ok) {
+      $('#tb-img').src = img.dataUrl; last.style.display = '';
+      $('#tb-last-line').textContent = `${r.last.name}, ${new Date(r.last.at).toLocaleTimeString()}. This is the copy the assistant was shown${r.last.coded ? ', with names and places replaced by codes' : ''}. You see the real page.`;
+      $('#tb-page').style.display = ''; tbLastFile = r.last.file || null;
+    }
+  }
+  $('#toolbox').style.display = 'flex';
+}
+$('#cx-toolbox').onclick = openToolbox;
+$('#tb-close').onclick = () => { $('#toolbox').style.display = 'none'; };
+$('#tb-page').onclick = () => { if (tbLastFile) window.io.openViewer(tbLastFile); };
+// The setting control: relaunches Codex under the new profile with the thread resumed.
+$('#cx-wall').onchange = async () => {
+  const next = $('#cx-wall').value;
+  if (next === wallChoice) return;
+  const prev = wallChoice;
+  wallChoice = next;
+  try { if (wallPath) localStorage.setItem('io.wall.' + wallPath, next); } catch (e) {}
+  const names = { offline: 'Offline', tools: 'T4GC tools', open: 'Open' };
+  term.write(`\r\n\x1b[90m[io: switching to ${names[next]}; Codex continues where it was]\x1b[0m\r\n`);
+  const r = await window.io.codex.switch({cols: term.cols, rows: term.rows, chat: !!chatWorkspace, wall: next});
+  if (r && r.error) { cxErr('could not switch: ' + r.error); wallChoice = prev; $('#cx-wall').value = prev; return; }
+  cxRunning = true; $('#cx-restart').style.display = 'none'; term.focus();
+};
 $('#cx-folders').onclick = () => { chatWorkspace = null; files = []; accepted = false; show('#s-home'); renderShelf(); };
 
 paintMirror();

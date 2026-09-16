@@ -27,6 +27,9 @@ const CHAT = process.argv.includes('--chat');
 // contains (column names or codes) and what the proxy saw. Run with the header fix off
 // (IO_KEEP_HEADERS=0) to reproduce the laptop, on to verify the fix.
 const MAP = process.argv.includes('--map');
+const CHART = process.argv.includes('--chart');
+const RENDER = process.argv.includes('--render');
+const SWITCH = process.argv.includes('--switch');
 const TESTDATA_SRC = MAP ? path.resolve(__dirname, '../../pii/corpus') : path.join(__dirname, 'testdata');
 const PORT_BASE = Number(arg('port-base', 8841));
 const APP = path.resolve(__dirname, '../../../app/io');
@@ -59,11 +62,16 @@ if (FIXTURE) { fs.mkdirSync(codexHome, { recursive: true }); fs.copyFileSync(FIX
 const env = {
   ...process.env,
   IO_DATA_DIR: DATA, IO_HOME: IOHOME, IO_PORT_BASE: String(PORT_BASE), IO_SMOKE: '1',
-  IO_CODEX_NO_SANDBOX: '1', IO_CODEX_DEV_PROVIDER: '1', IO_DEV_KEY: key,
+  IO_CODEX_DEV_PROVIDER: '1', IO_DEV_KEY: key,
   IO_PROXY_DEV_UPSTREAM: '/dev/v1=https://openrouter.ai/api/v1', IO_CODEX_MODEL: process.env.IO_CODEX_MODEL || 'openai/gpt-5.2',
   IO_PROXY_DUMP: path.join(OUT, 'proxy-dump'),
 };
 delete env.OPENAI_API_KEY; delete env.CODEX_HOME;
+// The wall runs here now (chronology 2026-09-15T1856-dgx); IO_DRIVE_BYPASS=1 restores the old
+// no-sandbox drive for a machine that cannot.
+if (process.env.IO_DRIVE_BYPASS === '1') env.IO_CODEX_NO_SANDBOX = '1';
+// --halt: stop at the wall screen and photograph it (used with the AppArmor grants unloaded)
+const HALT = process.argv.includes('--halt');
 
 let child = null;
 function launch() {
@@ -103,7 +111,7 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
   try {
     launch();
     mark('launch');
-    let { page } = await connect();
+    let { browser, page } = await connect();
     await page.setViewportSize({ width: 1280, height: 820 }).catch(() => {});
     await waitFor(page, () => page.locator('#s-provider.on').count(), 60000, 'provider screen');
     await shot(page, 'provider-screen-with-chatgpt');
@@ -125,7 +133,152 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await shot(page, 'login-cancelled');
     }
 
-    if (FIXTURE && MAP) {
+    if (FIXTURE && SWITCH) {
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await page.click('#wall-go');      // T4GC tools, the suggested one
+      await waitFor(page, () => page.locator('#sheet-top').isVisible(), 180000, 'scan finished');
+      await page.click('#sheet-ok');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 60000, 'codex screen');
+      await waitFor(page, async () => (await termText(page)).length > 200, 40000, 'codex TUI first paint');
+      await sleep(2500);
+      const ask = async (q, done, ms) => { await page.click('#term'); await page.keyboard.type(q, { delay: 6 }); await sleep(1200); await page.keyboard.press('Enter'); return waitFor(page, async () => done((await termText(page))), ms); };
+      await ask('Say the word banana and nothing else.', t => /›\s*Ask Codex to do anything/.test(t.slice(-1500)) && /banana/i.test(t.slice(-1500).replace(/Say the word banana.*/, '')), 90000);
+      await shot(page, 'switch-before');
+      results.switch = { setting0: await page.locator('#cx-wall').inputValue() };
+      const probe = 'Run this exact command and tell me only its output: curl -s -m 8 -o /dev/null -w "%{http_code}" https://example.com; echo " exit=$?"';
+      // A result line is "<3 digits> exit=<n>"; the echoed prompt says "exit=$?" and never
+      // matches. Each probe waits for one more result line than the screen already had,
+      // otherwise the previous setting's answer is read as this one's.
+      const nResults = t => (t.match(/\b\d{3} exit=\d+/g) || []).length;
+      const lastResult = t => { const m = t.match(/\b\d{3} exit=\d+/g); return m ? m[m.length - 1] : null; };
+      const probeNet = async () => { const n0 = nResults(await termText(page)); await ask(probe, t => nResults(t) > n0, 150000); await sleep(800); return lastResult(await termText(page)); };
+      results.switch.toolsNet = await probeNet();
+      await shot(page, 'switch-tools-net');
+      // switch to Open: Codex relaunches with the thread resumed
+      await page.selectOption('#cx-wall', 'open');
+      await waitFor(page, async () => /switching to Open/.test(await termText(page)), 10000, 'switch note');
+      await waitFor(page, async () => /›\s*Ask Codex to do anything/.test((await termText(page)).slice(-1500)), 60000, 'resumed TUI ready');
+      await sleep(2500);
+      await shot(page, 'switch-open-resumed');
+      results.switch.resumedShowsBanana = /banana/i.test(await termText(page));
+      results.switch.status = await page.evaluate(() => window.io.codex.status());
+      results.switch.openConfig = await page.evaluate(() => window.io.codex.status()).then(st => require('fs').readFileSync(require('path').join(st.home, 'io.config.toml'), 'utf8').match(/\[permissions\.io\.network\]\s*\n\s*enabled = (\w+)/)?.[1]);
+      results.switch.openNet = await probeNet();
+      await shot(page, 'switch-open-net');
+      // and to Offline
+      await page.selectOption('#cx-wall', 'offline');
+      await waitFor(page, async () => /›\s*Ask Codex to do anything/.test((await termText(page)).slice(-1500)) && /switching to Offline/.test(await termText(page)), 60000, 'offline resumed');
+      await sleep(2500);
+      results.switch.offlineConfig = await page.evaluate(() => window.io.codex.status()).then(st => require('fs').readFileSync(require('path').join(st.home, 'io.config.toml'), 'utf8').match(/\[permissions\.io\.network\]\s*\n\s*enabled = (\w+)/)?.[1]);
+      results.switch.offlineNet = await probeNet();
+      await shot(page, 'switch-offline-net');
+      results.switch.tail = (await termText(page)).slice(-1500);
+    } else if (FIXTURE && RENDER) {
+      // the toolbox: Codex writes a page, asks io for a picture of it, io renders a coded
+      // copy; the person sees the real page and what the assistant saw
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await sleep(400);
+      await shot(page, 'wall-screen-with-toolbox-link');
+      await page.click('#walls .tblink');
+      await sleep(500);
+      await shot(page, 'toolbox-from-the-card');
+      await page.click('#tb-close');
+      await page.click('#wall-go');      // T4GC tools
+      await waitFor(page, () => page.locator('#sheet-top').isVisible(), 180000, 'scan finished');
+      await page.click('#sheet-ok');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 60000, 'codex screen');
+      await waitFor(page, async () => (await termText(page)).length > 200, 40000, 'codex TUI first paint');
+      await sleep(2500);
+      await page.click('#term');
+      await page.keyboard.type('Make a page called visits.html with a table of name, village and visits from visits.csv, then use the render_page tool to check how it looks and tell me what you saw.', { delay: 4 });
+      await sleep(1500);
+      await page.keyboard.press('Enter');
+      const rendersDir = path.join(OUT, 'data', 'renders');
+      const rendered = await waitFor(page, () => fs.existsSync(rendersDir) && fs.readdirSync(rendersDir).some(f => /\.png$/i.test(f)), 300000, 'io rendered a coded copy');
+      await sleep(5000);
+      await shot(page, 'render-request');
+      await waitFor(page, async () => /›\s*Ask Codex to do anything/.test((await termText(page)).slice(-1500)), 180000, 'turn finished');
+      await sleep(800);
+      await shot(page, 'render-answer');
+      const term = await termText(page);
+      const footerNote = await page.locator('#cx-err').textContent().catch(() => '');
+      await page.click('#cx-toolbox');
+      await sleep(1200);
+      await shot(page, 'toolbox-after-render');
+      const pages0 = browser.contexts().flatMap(c => c.pages());
+      await page.click('#tb-page');
+      await sleep(2500);
+      const pages = browser.contexts().flatMap(c => c.pages());
+      const vpage = pages.find(p => /viewer\.html/.test(p.url()));
+      if (vpage) { await sleep(1500); await vpage.screenshot({ path: path.join(OUT, `${String(shotN++).padStart(2, '0')}-viewer-real-page.png`) }); mark('shot viewer real page'); }
+      // what crossed the proxy: requests carrying a picture, and whether the picture was left alone
+      const dumpDir = path.join(OUT, 'proxy-dump');
+      let imageRequests = 0, imageBytesUntouched = null;
+      for (const f of (fs.existsSync(dumpDir) ? fs.readdirSync(dumpDir) : []).filter(f => /request/.test(f))) {
+        const txt = fs.readFileSync(path.join(dumpDir, f), 'utf8');
+        if (txt.includes('data:image/png;base64,')) imageRequests++;
+      }
+      results.render = { rendered, renders: fs.existsSync(rendersDir) ? fs.readdirSync(rendersDir) : [], pageWritten: fs.existsSync(path.join(TESTDATA, 'visits.html')),
+        noteShown: /showed Codex a picture of/.test(footerNote || ''), approvalPromptSeen: /Would you like|Allow the .* MCP server/.test(term), toolCalled: /render_page/.test(term),
+        viewerOpened: !!vpage, viewerUrl: vpage ? vpage.url().slice(0, 160) : null, imageRequests, tail: term.slice(-1200) };
+    } else if (FIXTURE && CHART) {
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await page.click('#walls .wall[data-w="offline"]');
+      await sleep(400);
+      await shot(page, 'wall-offline-chosen');
+      await page.click('#wall-go');
+      await waitFor(page, () => page.locator('#sheet-top').isVisible(), 180000, 'scan finished');
+      await page.click('#sheet-ok');
+      await waitFor(page, () => page.locator('#s-codex.on').count(), 60000, 'codex screen');
+      await waitFor(page, async () => (await termText(page)).length > 200, 40000, 'codex TUI first paint');
+      await sleep(2500);
+      await page.click('#term');
+      await page.keyboard.type('Draw a bar chart of visits per village from visits.csv.', { delay: 6 });
+      await sleep(1200);
+      await page.keyboard.press('Enter');
+      const ok = await waitFor(page, () => fs.readdirSync(TESTDATA).some(f => /\.png$/i.test(f)), 240000, 'a png chart written');
+      await sleep(4000);
+      await shot(page, 'chart-request');
+      const pngs = fs.readdirSync(TESTDATA).filter(f => /\.png$/i.test(f));
+      // the viewer is its own window; playwright sees it as another page
+      const pages = browser.contexts().flatMap(c => c.pages());
+      const vpage = pages.find(p => /viewer\.html/.test(p.url()));
+      if (vpage) { await sleep(1500); await vpage.screenshot({ path: path.join(OUT, `${String(shotN++).padStart(2, '0')}-viewer-window.png`) }); mark('shot viewer window'); }
+      results.chart = { pngWritten: ok, pngs, viewerOpened: !!vpage, viewerUrl: vpage ? vpage.url().slice(0, 160) : null,
+        chip: await page.locator('#cx-page-link').textContent().catch(() => null),
+        browserButtonDisabled: vpage ? await vpage.locator('#browser').isDisabled() : null,
+        tail: (await termText(page)).slice(-900) };
+      results.proxy = await api(page, '/api/codex');
+    } else if (FIXTURE && HALT) {
+      await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
+      await page.click('#c-ok');
+      await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
+      await page.evaluate(p => confirmScan(p), TESTDATA);
+      await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
+      await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await sleep(1500);
+      await shot(page, 'wall-screen');
+      results.halt = { text: await page.locator('#wall-halt').textContent(), continueDisabled: await page.locator('#wall-go').isDisabled() };
+    } else if (FIXTURE && MAP) {
       await waitFor(page, () => page.locator('#s-consent.on').count(), 30000, 'consent');
       await page.click('#c-ok');
       await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
@@ -134,6 +287,8 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await sleep(600);
       await shot(page, 'confirm-scan-spreadsheets-only');
       await page.click('#cs-ok');
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await page.click('#wall-go');
       await waitFor(page, () => page.locator('#sheet-top').isVisible(), 300000, 'scan finished');
       await sleep(600);
       await shot(page, 'review-sheet-corpus');
@@ -158,10 +313,10 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await waitFor(page, () => page.locator('#s-home.on').count(), 30000, 'home');
       await shot(page, 'home-with-chat-box');
       await page.click('#q');
-      await page.keyboard.type('What is a good way to name columns in a spreadsheet? Answer in two lines.', { delay: 5 });
+      await page.keyboard.type('What is the capital of france? Answer in one line.', { delay: 5 });
       await page.keyboard.press('Enter');
       await waitFor(page, () => page.locator('#s-codex.on').count(), 30000, 'codex screen from chat box');
-      await waitFor(page, async () => /columns/i.test((await termText(page)).slice(-4000)) && (await termText(page)).length > 400, 90000, 'first message typed for the person');
+      await waitFor(page, async () => /france/i.test((await termText(page)).slice(-4000)) && (await termText(page)).length > 400, 90000, 'first message typed for the person');
       await sleep(1500);
       await shot(page, 'chat-first-message');
       results.chatHeader = await page.locator('#cx-folder').textContent();
@@ -170,6 +325,9 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await shot(page, 'chat-answer');
       results.chatAnswered = ok;
       results.chatTail = (await termText(page)).slice(-900);
+      results.chatParis = /Paris/.test(await termText(page));
+      const dumps = fs.readdirSync(path.join(OUT, 'proxy-dump')).filter(f => /request/.test(f)).map(f => fs.readFileSync(path.join(OUT, 'proxy-dump', f), 'utf8'));
+      results.chatFranceLeftAsItself = dumps.some(t => /capital of france/i.test(t)) && !dumps.some(t => /capital of PLACE_/i.test(t));
       // attach a file: the picker is native, so call the service the way the button does
       const attached = await api(page, '/api/attach', { path: path.join(TESTDATA, 'visits.csv') });
       results.attach = { attached: attached.attached, files: (attached.files || []).map(f => f.name), error: attached.error };
@@ -205,6 +363,11 @@ const waitFor = async (page, fn, ms, what) => { const t = Date.now(); while (Dat
       await waitFor(page, () => page.locator('#confirmscan.on').count(), 5000, 'confirm modal');
       await shot(page, 'confirm-scan');
       await page.click('#cs-ok');
+      // the settings screen the laptop added between the dialog and the scan
+      await waitFor(page, () => page.locator('#s-wall.on').count(), 20000, 'wall screen');
+      await sleep(600);
+      await shot(page, 'wall-settings');
+      await page.click('#wall-go');
       await waitFor(page, () => page.locator('#sheet-top').isVisible(), 180000, 'scan finished');
       await sleep(800);
       await shot(page, 'review-sheet');

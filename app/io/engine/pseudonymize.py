@@ -30,7 +30,10 @@ PREFIX = {
     "bank_account": "ACCOUNT", "ifsc": "IFSC", "upi_id": "UPI", "ration_card": "RATION", "voter_id": "VOTER",
     "vehicle_number": "VEHICLE", "address": "ADDRESS", "village": "PLACE", "long_number": "NUMBER",
 }
-TOKEN_RE = re.compile(r"\b[A-Z][A-Z_]{1,24}\\?_\d{3,}\b")   # any vault-style token; lookup decides
+# any vault-style token; lookup decides. A code may follow a literal backslash escape as
+# well as a word boundary: a shell command like printf '\nNAME_005,...' glues the code to
+# the "n" of "\n", and \b alone left NAME_005 in a file on disk (DGX, 2026-09-15).
+TOKEN_RE = re.compile(r"(?:(?<!\w)|(?<=\\[ntr]))[A-Z][A-Z_]{1,24}\\?_\d{3,}\b")
 
 
 def normalise(value: str) -> str:
@@ -83,7 +86,8 @@ class PseudonymMap:
         last = getattr(self, "_known_n", -1)
         if last != n and (not getattr(self, "bulk", False) or last <= 0 or n - last >= 64):
             values = sorted((v for v in self.display.values() if len(v) >= 3), key=len, reverse=True)
-            self._known_re = re.compile(r"(?<![\w@.])(?:" + "|".join(re.escape(v) for v in values) + r")(?!(?:[\w@]|\.[\w@]))", re.I)  # a trailing dot only blocks when it starts a domain-like tail; plain sentence periods must not hide a name
+            # same boundary rule as TOKEN_RE: a value glued to a literal \n escape still counts
+            self._known_re = re.compile(r"(?:(?<![\w@.])|(?<=\\[ntr]))(?:" + "|".join(re.escape(v) for v in values) + r")(?!(?:[\w@]|\.[\w@]))", re.I)  # a trailing dot only blocks when it starts a domain-like tail; plain sentence periods must not hide a name
             self._known_n = n
         return self._known_re
 

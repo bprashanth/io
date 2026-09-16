@@ -48,11 +48,13 @@ jobs:
           # smoked under Rosetta, to find out whether the downgraded darwin-x64 pins in
           # pins.json (torch 2.2.2, onnxruntime 1.23.2) actually install and load the
           # scanner. It is deliberately never published to a release from here.
+          # codex is the pinned Codex package for the target (codex-pins.json key), fetched
+          # into app/io/codex-bin/<codex>/ before the pack so the app ships its own Codex.
           all='[
-            {"os":"windows-latest","label":"win-x64","target":"--win zip --x64"},
-            {"os":"ubuntu-latest","label":"linux-x64","target":"--linux tar.gz --x64"},
-            {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64"},
-            {"os":"macos-14","label":"mac-x64","target":"--mac dmg --x64"}
+            {"os":"windows-latest","label":"win-x64","target":"--win zip --x64","codex":"win32-x64"},
+            {"os":"ubuntu-latest","label":"linux-x64","target":"--linux tar.gz --x64","codex":"linux-x64"},
+            {"os":"macos-14","label":"mac-arm64","target":"--mac dmg --arm64","codex":"darwin-arm64"},
+            {"os":"macos-14","label":"mac-x64","target":"--mac dmg --x64","codex":"darwin-x64"}
           ]'
           only='${{ inputs.only }}'
           if [ -n "$only" ]; then
@@ -84,8 +86,20 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
 
+      # The Codex CLI io ships: the release package for the target, checked against the
+      # hash in codex-pins.json. Build-time only; the app never downloads it at run time.
+      - name: fetch the pinned Codex for ${{ matrix.codex }}
+        working-directory: app/io
+        shell: bash
+        run: node fetch-codex.js ${{ matrix.codex }}
+
+      # node-pty is not rebuilt against Electron (npmRebuild is off in the config): the
+      # prebuilt Node-API binaries for mac and windows, and the one npm compiles on linux,
+      # load in Electron as they are. The rebuild was what broke the mac and windows jobs.
       - name: build the app
         working-directory: app/io
+        env:
+          IO_CODEX_TARGET: ${{ matrix.codex }}
         run: |
           npm install --no-audit --no-fund
           npx electron-builder --config electron-builder.config.js ${{ matrix.target }}
@@ -206,10 +220,16 @@ jobs:
         working-directory: app/io
         run: node bootstrap.js --dest payload
 
+      - name: fetch the pinned Codex for ${{ matrix.codex }}
+        working-directory: app/io
+        shell: bash
+        run: node fetch-codex.js ${{ matrix.codex }}
+
       - name: pack with the payload inside
         working-directory: app/io
         env:
           IO_FAT: '1'
+          IO_CODEX_TARGET: ${{ matrix.codex }}
         run: |
           npm install --no-audit --no-fund
           npx electron-builder --config electron-builder.config.js ${{ matrix.target }}

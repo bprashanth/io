@@ -1,10 +1,11 @@
 // io — minimal desktop shell.
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, session: esession } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const net = require('net');
+const crypto = require('crypto');
 
 const runtime = require('./runtime');
 const bootstrap = require('./bootstrap');
@@ -25,6 +26,13 @@ let session = null;      // node-pty process
 let wall = null;         // the setting the person picked for this folder (see codex.js WALLS)
 let login = null;        // child process of `codex login`
 
+const servicePost = (p, body) => new Promise((res, rej) => {
+  const data = JSON.stringify(body || {});
+  const req = http.request({ host: '127.0.0.1', port: servicePort, path: p, method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } }, r => {
+    let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } });
+  });
+  req.on('error', rej); req.end(data);
+});
 const serviceGet = p => new Promise((res, rej) => http.get(`http://127.0.0.1:${servicePort}${p}`, r => {
   let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } });
 }).on('error', rej));
@@ -41,6 +49,13 @@ async function codexStatus() {
                 loginBusy: !!login, running: !!session, folder: session ? session.ioFolder : null, wall };
   if (out.binary) Object.assign(out, codex.loginStatus(bin.path, home));
   else out.line = `bundled Codex is missing (expected ${bin.path})`;
+  // Whether the wall can run here. Written out once so an administrator has the exact file
+  // to install; the page only ever shows the sentence and the path.
+  const sb = process.env.IO_CODEX_NO_SANDBOX === '1' ? { ok: true, checked: false, why: 'dev bypass: no sandbox' } : codex.sandboxCheck(bin.dir);
+  out.sandbox = { ok: sb.ok, checked: sb.checked, why: sb.why || null, profilePath: null, install: sb.fix ? sb.fix.install : null };
+  if (sb.fix) {
+    try { const p = path.join(env.dataDir, 'io-bwrap'); fs.writeFileSync(p, sb.fix.profile); out.sandbox.profilePath = p; } catch {}
+  }
   try { out.service = await serviceGet('/api/codex'); } catch { out.service = null; }
   return out;
 }
@@ -50,6 +65,168 @@ function sendToWin(channel, payload) {
 }
 
 ipcMain.handle('codex-status', codexStatus);
+// ---- the contained viewer -------------------------------------------------------------
+// A page Codex writes is arbitrary JavaScript with full network once it opens in a real
+// browser, carrying whatever data was inlined (demonstrated on the laptop 2026-09-15). So
+// pages open here first: an io-owned window whose session may load nothing but files, so
+// nothing on the page can send anything anywhere. "open in your browser" is one click away
+// unless the folder is set to Offline, so nobody is locked in.
+let viewer = null;
+let viewerFile = null;
+function viewerSession() {
+  const s = esession.fromPartition('io-viewer');
+  if (!s.__ioBlocked) {
+    s.__ioBlocked = true;
+    s.webRequest.onBeforeRequest({ urls: ['*://*/*', 'ws://*/*', 'wss://*/*'] }, (details, cb) => cb({ cancel: !/^(file|data|blob):/.test(details.url) }));
+    s.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  }
+  return s;
+}
+function openViewer(file) {
+  const canBrowser = !(wall && !codex.wallOf(wall).openPages);
+  const url = `file://${path.join(__dirname, 'ui', 'viewer.html')}?file=${encodeURIComponent(file)}&browser=${canBrowser ? 1 : 0}`;
+  if (viewer && !viewer.isDestroyed()) {
+    if (viewerFile === file) { viewer.webContents.send('io-reload'); viewer.webContents.executeJavaScript('window.postMessage("io-reload","*")').catch(() => {}); viewer.focus(); return; }
+    viewer.loadURL(url); viewerFile = file; viewer.focus(); return;
+  }
+  viewer = new BrowserWindow({
+    width: 1000, height: 760, title: 'io', backgroundColor: '#1a1d21',
+    webPreferences: { preload: path.join(__dirname, 'viewer-preload.js'), contextIsolation: true, partition: 'io-viewer', sandbox: true },
+  });
+  viewerSession();
+  viewer.setMenuBarVisibility(false);
+  viewer.on('closed', () => { viewer = null; viewerFile = null; });
+  viewerFile = file;
+  viewer.loadURL(url);
+}
+ipcMain.handle('viewer-open-in-browser', async (_e, file) => {
+  if (wall && !codex.wallOf(wall).openPages) return { error: 'offline' };
+  const err = await shell.openPath(String(file));
+  return err ? { error: err } : { ok: true };
+});
+
+// Codex cannot open a page from inside the wall (no D-Bus, and xdg-open exits 0 anyway),
+// so io watches the folder instead: a page or chart that appears or changes is shown in the
+// viewer, which is what "open it for them" means now.
+let folderWatch = null;
+const watchTimers = new Map();
+function watchFolder(folder) {
+  if (folderWatch) { try { folderWatch.close(); } catch {} folderWatch = null; }
+  if (!folder) return;
+  try {
+    folderWatch = fs.watch(folder, (_ev, name) => {
+      if (!name || !/\.(html?|png|svg|jpe?g)$/i.test(name) || name.startsWith('.')) return;
+      const full = path.join(folder, name);
+      clearTimeout(watchTimers.get(full));
+      watchTimers.set(full, setTimeout(() => {
+        watchTimers.delete(full);
+        let size = 0; try { size = fs.statSync(full).size; } catch { return; }
+        if (!size) return;
+        sendToWin('page-ready', { file: full, name });
+        openViewer(full);
+      }, 1500));
+    });
+  } catch (e) { log && log.write && log.write(`watch failed: ${e.message}\n`); }
+}
+ipcMain.handle('open-viewer', async (_e, file) => { openViewer(String(file)); return { ok: true }; });
+
+// ---- the toolbox --------------------------------------------------------------------
+// io's tools are one local MCP server (tools/mcp.js) that Codex launches as its own child,
+// outside the wall, and that talks back to this process over a loopback port with a token
+// that only the profile file carries (which commands inside the wall cannot read). What a
+// tool may do is decided here. One tool so far: render_page.
+//
+// The proxy is blind to images: a picture crosses it as base64 and the leak check cannot
+// see inside it. So the renderer never screenshots the real page. It asks the service for
+// the page's text coded the way a request is coded, renders that copy in a window that can
+// load nothing but the copy itself, and returns that picture. Values the vault does not
+// hold (free text, amounts) appear as themselves, the same as in every request; a PNG
+// chart is refused, because its labels are pixels and cannot be coded.
+let toolbox = null;       // { port, token }
+let lastRender = null;    // { file, name, png, at, coded }
+function renderSession() {
+  const s = esession.fromPartition('io-render');
+  if (!s.__ioBlocked) {
+    s.__ioBlocked = true;
+    const dir = path.join(env.dataDir, 'renders') + path.sep;
+    s.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, cb) => {
+      let ok = false;
+      if (details.url.startsWith('file://')) { try { ok = decodeURIComponent(details.url.slice(7)).startsWith(dir); } catch { ok = false; } }
+      cb({ cancel: !ok });
+    });
+    s.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  }
+  return s;
+}
+async function renderCoded(fileArg) {
+  const folder = session && session.ioFolder;
+  if (!folder) return { error: 'no session is running' };
+  const full = path.resolve(folder, String(fileArg || ''));
+  if (!(full + path.sep).startsWith(path.resolve(folder) + path.sep)) return { error: 'only a page in the working folder can be rendered' };
+  if (!/\.html?$/i.test(full)) return { error: 'only an .html page can be rendered; a chart image cannot' };
+  let text;
+  try { text = fs.readFileSync(full, 'utf8'); } catch { return { error: 'that file is not in the working folder' }; }
+  if (text.length > 4_000_000) return { error: 'that page is too large to render' };
+  let coded;
+  try { coded = await servicePost('/api/code-text', { text }); } catch { return { error: 'io is not answering' }; }
+  if (!coded || coded.error) return { error: (coded && coded.error) || 'could not code the page' };
+  const dir = path.join(env.dataDir, 'renders');
+  fs.mkdirSync(dir, { recursive: true });
+  const id = `${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
+  const copy = path.join(dir, `${id}.html`);
+  // no relative resources resolve from here (the copy sits alone), and the session refuses
+  // everything but files in this directory, so an <img> of a real chart shows as broken
+  fs.writeFileSync(copy, coded.text);
+  const w = new BrowserWindow({ show: false, width: 1100, height: 800, backgroundColor: '#ffffff',
+    webPreferences: { partition: 'io-render', sandbox: true, contextIsolation: true, javascript: true, images: true } });
+  renderSession();
+  try {
+    await new Promise((res, rej) => {
+      const t = setTimeout(() => res(), 15000);
+      w.webContents.once('did-finish-load', () => { clearTimeout(t); res(); });
+      w.webContents.once('did-fail-load', (_e, code, desc) => { clearTimeout(t); rej(new Error(`${desc || code}`)); });
+      w.loadFile(copy).catch(rej);
+    });
+    await new Promise(r => setTimeout(r, 900));
+    const img = await w.webContents.capturePage();
+    const png = path.join(dir, `${id}.png`);
+    fs.writeFileSync(png, img.toPNG());
+    const size = img.getSize();
+    lastRender = { file: full, name: path.basename(full), png, at: Date.now(), coded: !!coded.changed, leaks: coded.leaks || 0 };
+    sendToWin('render-done', { file: full, name: lastRender.name, coded: lastRender.coded });
+    return { ok: true, file: path.basename(full), width: size.width, height: size.height, png: img.toPNG().toString('base64'), coded: coded.changed ? 1 : 0 };
+  } catch (e) {
+    return { error: `could not render: ${e.message}` };
+  } finally {
+    try { w.destroy(); } catch {}
+    try { fs.unlinkSync(copy); } catch {}
+  }
+}
+function startToolbox() {
+  if (toolbox) return Promise.resolve(toolbox);
+  const token = crypto.randomBytes(16).toString('hex');
+  return new Promise((res, rej) => {
+    const srv = http.createServer((req, resp) => {
+      const deny = (code, msg) => { resp.writeHead(code, { 'content-type': 'application/json' }); resp.end(JSON.stringify({ error: msg })); };
+      if (req.headers['x-io-token'] !== token) return deny(403, 'not io');
+      if (req.method !== 'POST' || req.url !== '/render') return deny(404, 'no such tool');
+      let b = ''; req.on('data', d => { b += d; if (b.length > 1e6) req.destroy(); });
+      req.on('end', async () => {
+        let body = {}; try { body = JSON.parse(b || '{}'); } catch {}
+        const r = await renderCoded(body.file);
+        resp.writeHead(200, { 'content-type': 'application/json' }); resp.end(JSON.stringify(r.error ? { ok: false, error: r.error } : r));
+      });
+    });
+    srv.on('error', rej);
+    srv.listen(0, '127.0.0.1', () => { toolbox = { port: srv.address().port, token, server: srv }; res(toolbox); });
+  });
+}
+ipcMain.handle('toolbox-list', async () => ({ tools: codex.TOOLBOX, last: lastRender ? { name: lastRender.name, file: lastRender.file, at: lastRender.at, coded: lastRender.coded } : null }));
+ipcMain.handle('toolbox-last-image', async () => {
+  if (!lastRender) return { error: 'nothing rendered yet' };
+  try { return { ok: true, name: lastRender.name, dataUrl: 'data:image/png;base64,' + fs.readFileSync(lastRender.png).toString('base64') }; } catch { return { error: 'the last picture is gone' }; }
+});
+
 // Links from the page: the sign-in link Codex printed, anything http(s) a person clicked in
 // the terminal, and local files (a dashboard Codex wrote) as long as they sit under the
 // sheltered folder or io's own data. Nothing else opens.
@@ -76,8 +253,8 @@ ipcMain.handle('open-external', async (_e, url) => {
     if (folder) roots.push(folder);
     const real = fs.existsSync(file) ? fs.realpathSync(file) : file;
     if (!roots.some(r => real.startsWith(path.resolve(r) + path.sep))) return { error: 'not a file io may open' };
-    const err = await shell.openPath(real);
-    return err ? { error: err } : { ok: true };
+    openViewer(real);
+    return { ok: true, viewer: true };
   }
   return { error: 'not a link io may open' };
 });
@@ -100,7 +277,7 @@ ipcMain.handle('codex-login', async (_e, mode) => {
 ipcMain.handle('codex-login-cancel', async () => { if (login) { login.kill('SIGTERM'); login = null; } return { ok: true }; });
 ipcMain.handle('codex-logout', async () => { const { bin, home } = codexPaths(); return codex.logout(bin.path, home); });
 
-ipcMain.handle('codex-start', async (_e, opts) => {
+async function startSession(opts) {
   // A new start for a different folder replaces the running session; the same folder is
   // refused so a double click cannot start two.
   if (session) {
@@ -117,12 +294,18 @@ ipcMain.handle('codex-start', async (_e, opts) => {
   if (!info.folder) return { error: 'no sheltered folder' };
   if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
   wall = (opts && opts.wall) || codex.DEFAULT_WALL;
-  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1' });
+  let tb = null;
+  try { tb = await startToolbox(); } catch (e) { console.error(`toolbox failed to start: ${e.message}`); }
+  // the toolbox server is this process run as plain node (ELECTRON_RUN_AS_NODE); Codex
+  // gives it only the environment written here, nothing inherited
+  const toolboxCfg = tb ? { command: process.execPath, args: [path.join(__dirname, 'tools', 'mcp.js')], env: { ELECTRON_RUN_AS_NODE: '1', IO_TOOLS_PORT: String(tb.port), IO_TOOLS_TOKEN: tb.token } } : null;
+  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1', toolbox: toolboxCfg });
   let mine;
   try {
     mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows, libsDir: env.runtimeDir, wall, resume: opts && opts.resume });
   } catch (e) { return { error: e.message }; }
   mine.ioFolder = info.folder;
+  watchFolder(info.folder);
   mine.onData(d => sendToWin('codex-data', d));
   // Only the *current* session may clear the handle. A killed Codex takes a moment to die,
   // and its exit arrives after the next one has already started: closing over `session`
@@ -135,6 +318,20 @@ ipcMain.handle('codex-start', async (_e, opts) => {
     sendToWin('codex-exit', { exitCode, signal, stale: session !== null });
   });
   return { ok: true, pid: mine.pid, port: info.port, folder: info.folder };
+}
+
+ipcMain.handle('codex-start', async (_e, opts) => startSession(opts));
+
+// Change the setting mid-session: Codex is relaunched under the new profile with the same
+// thread resumed (`codex resume --last`), so the conversation continues and the service,
+// proxy and vault are untouched. The old process is killed first and waited for, because
+// its late exit would otherwise be taken for the new one's (see the stale guard above).
+ipcMain.handle('codex-switch', async (_e, opts) => {
+  if (!session) return { error: 'no session to switch' };
+  const old = session;
+  session = null;
+  await new Promise(res => { let done = false; old.onExit(() => { if (!done) { done = true; res(); } }); try { old.kill(); } catch {} setTimeout(() => { if (!done) { done = true; res(); } }, 4000); });
+  return startSession({ ...(opts || {}), resume: '--last' });
 });
 ipcMain.on('codex-input', (_e, data) => { if (session) session.write(data); });
 ipcMain.on('codex-resize', (_e, { cols, rows }) => { if (session && cols > 0 && rows > 0) { try { session.resize(cols, rows); } catch {} } });
