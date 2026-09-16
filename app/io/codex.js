@@ -96,7 +96,7 @@ const DEFAULT_WALL = 'tools';
 const TOOLBOX = [
   { id: 'render_page', name: 'Renderer',
     does: 'shows the assistant a picture of a page it wrote, so it can check its own work',
-    sees: 'a copy of the page with names, places, phone numbers and the like replaced by codes - never the real page, never a chart image',
+    sees: 'a copy of the page with names, places and phone numbers replaced by codes. It does not see the real page, and it cannot render a chart image',
     reaches: 'nothing' },
 ];
 const wallOf = name => WALLS[name] || WALLS[DEFAULT_WALL];
