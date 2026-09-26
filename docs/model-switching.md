@@ -74,7 +74,10 @@ When a fresh start is needed, the person is told why, in the terms they will und
   to Codex as `IO_DEV_KEY`; that changes.)
 - **Pin OpenRouter to providers that neither store nor train on data.** Codes hold regardless,
   but values outside the vault, such as amounts and notes, reach whoever runs the model.
-- How a person gets a key is open. See the chronology entry that records the decision.
+- **How a person gets a key (decided 2026-09-26).** For testing, a config file on the
+  developer's machine. For people, the organisers hand out OpenRouter keys, for example when
+  someone's ChatGPT allowance runs out, and the person enters it in io's settings at any time,
+  including mid-conversation. No key server, and no key built into the app.
 
 ## Costs
 
