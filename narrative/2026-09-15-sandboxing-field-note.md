@@ -91,5 +91,72 @@ And a privacy setting is only true once someone has tried to defeat it from the 
 of the real holes found today — the escalation prompt and the browser — were reachable
 without any adversary at all, by an assistant being helpful and a person clicking yes.
 
-Evidence for all of it is in `../chronology/2026-09-15T*-laptop-*.md`, with screenshots
-under `../benchmarks/runs/2026-09-15-laptop/`.
+## What the next ten days added
+
+The first day's argument held. Several of its specifics did not, and the corrections are part
+of the story.
+
+**The tool channel and the escalation lock were separable after all.** The first day found
+that switching off Codex's "run this outside the sandbox?" prompt also switched off tool
+calls, and concluded that the strictest setting could have no tools by construction. The DGX
+then found that a tool server registered with `default_tools_approval_mode = "approve"` is
+checked before the approval policy, so vetted tools run with no prompt while every shell
+escalation stays refused. Every setting now launches with escalation closed. Offline still
+has no tools, but because io registers none there, not because of the switch. The lesson is
+the familiar one: a constraint read off the surface of a tool is a hypothesis until someone
+reads the code underneath it.
+
+**The picture problem got its answer.** A tool that lets the assistant see its own work has
+to hand it an image, and the proxy is blind to images: a screenshot is base64 that passes
+through untouched and the leak check cannot see inside it. So the renderer never screenshots
+the real page. io codes the page's text the way a request is coded, renders that copy in a
+window that can load nothing else, and hands back the picture. Tested on the laptop, the
+assistant was shown `NAME_566 / PLACE_003 / PHONE_304` while the person saw
+`U. A. Pillai / Karpi / 099433-78529`, and the toolbox window shows the person both. What the
+picture shows is decided where it is made, because nothing downstream can decide it.
+
+**The wall depends on the computer, and on the most common one it did not run.** Ubuntu 24.04
+ships an AppArmor rule that strips bubblewrap's capabilities the moment it creates a user
+namespace. The namespace is made and then nothing can be done in it. Codex's own sandbox
+fails the same way with or without io. The remedy is a two-line profile per bubblewrap
+binary, which needs an administrator once. Pop!_OS, where most of the testing happened, does
+not carry the rule, which is why none of this was visible from the laptop. A sandbox is a
+contract with the operating system, and the contract differs by distribution in ways no
+amount of testing on one distribution reveals.
+
+**The network was not the network either.** "Open" had network and no name resolution,
+because on systemd-resolved machines `/etc/resolv.conf` is a symlink into a directory the
+wall's minimal preset does not include. Every command could reach loopback and none could
+reach a website. A permission that exists in the config and fails in practice is worse than
+one that is absent, because everyone believes it.
+
+**The strongest check was being applied to the platform that needed it least.** Until
+2026-09-26 io proved the wall only on Linux and refused to start without it there, while on
+macOS and Windows it answered "ok" without looking. The refusal it did have lived only in the
+page. Now one probe runs on every platform: io writes its real profile, asks Codex to run a
+small program under it, and counts the wall as on only if a read beside the folder is refused
+and a write inside it works. A control run with the secret placed where the wall does grant
+access comes back readable, so the probe's "no" is a real refusal. The main process now
+refuses a walled start where the wall failed and refuses to run without it where it works.
+
+**And there is now an honest way to go on without it.** Where the wall cannot run, the person
+is told what that costs in one paragraph: their words and their files still leave only as
+codes, but the commands the assistant runs can reach anything they can. Where io can fix it -
+Linux, through the desktop's own password prompt - it offers to, once. If that fails or is
+declined, io runs without the wall, and says so in red for as long as it does. The earlier
+design halted instead. Halting is safer for the data and useless for the person, and at an
+event a laptop that cannot be used gets used for something else, with no codes at all.
+
+## The argument, restated
+
+A privacy boundary is only as true as its weakest enforcement, and its weakest enforcement is
+usually the one nobody is watching: the page a person double-clicks, the prompt they say yes
+to, the platform nobody has run it on. Each fix in this thread made one of those visible
+rather than making it disappear, and the product got more honest each time without getting
+much more complicated. The pattern worth keeping is that every claim io makes on screen -
+Protected, Offline, Wall on - is now either measured on the computer in front of the person
+or not made.
+
+Evidence for all of it is in `../chronology/2026-09-15T*.md`, `../chronology/2026-09-16T*.md`
+and `../chronology/2026-09-26T*.md`, from both the laptop and the DGX. Screenshots stay on the
+machines that took them, under `../benchmarks/runs/`.

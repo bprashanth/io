@@ -1,6 +1,6 @@
 // io — minimal desktop shell.
 const { app, BrowserWindow, dialog, ipcMain, shell, session: esession } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -42,6 +42,32 @@ function codexPaths() {
   return { bin, home: codex.codexHome(env.dataDir) };
 }
 
+// Whether the wall runs on this computer, in one place. The dev bypass is reported as what it
+// is - no wall - so the status bar says so in red; it never prompts, because it is a
+// developer's own machine.
+function pythonForProbe() {
+  if (env && env.python) return env.python;
+  if (process.platform === 'win32') return null;
+  const r = spawnSync('sh', ['-c', 'command -v python3'], { encoding: 'utf8', timeout: 5000 });
+  return r.status === 0 ? r.stdout.trim() : null;
+}
+let pkexecKnown = null;   // the status is polled every two seconds; look once
+function hasPkexec() {
+  if (process.platform !== 'linux') return false;
+  if (pkexecKnown === null) {
+    const r = spawnSync('sh', ['-c', 'command -v pkexec'], { encoding: 'utf8', timeout: 5000 });
+    pkexecKnown = r.status === 0 && !!r.stdout.trim();
+  }
+  return pkexecKnown;
+}
+function sandboxNow() {
+  if (process.env.IO_CODEX_NO_SANDBOX === '1') {
+    return { ok: true, bypass: true, checked: false, platform: process.platform, why: 'the developer bypass is on (IO_CODEX_NO_SANDBOX=1)', fix: null };
+  }
+  const { bin } = codexPaths();
+  return codex.sandboxCheck({ bin: bin.path, codexDir: bin.dir, libsDir: env.runtimeDir, python: pythonForProbe(), dataDir: env.dataDir });
+}
+
 async function codexStatus() {
   const { bin, home } = codexPaths();
   const info = codex.binaryInfo(bin.path);
@@ -51,8 +77,10 @@ async function codexStatus() {
   else out.line = `bundled Codex is missing (expected ${bin.path})`;
   // Whether the wall can run here. Written out once so an administrator has the exact file
   // to install; the page only ever shows the sentence and the path.
-  const sb = process.env.IO_CODEX_NO_SANDBOX === '1' ? { ok: true, checked: false, why: 'dev bypass: no sandbox' } : codex.sandboxCheck(bin.dir);
-  out.sandbox = { ok: sb.ok, checked: sb.checked, why: sb.why || null, profilePath: null, install: sb.fix ? sb.fix.install : null };
+  const sb = sandboxNow();
+  out.sandbox = { ok: sb.ok, checked: sb.checked, bypass: !!sb.bypass, simulated: !!sb.simulated, platform: sb.platform,
+                  why: sb.why || null, profilePath: null, install: sb.fix ? sb.fix.install : null,
+                  fixable: !!(sb.fix && hasPkexec()) };
   if (sb.fix) {
     try { const p = path.join(env.dataDir, 'io-bwrap'); fs.writeFileSync(p, sb.fix.profile); out.sandbox.profilePath = p; } catch {}
   }
@@ -293,7 +321,16 @@ async function startSession(opts) {
   if (!info.ready || !info.port) return { error: `not protected: ${info.reason || 'proxy not ready'}` };
   if (!info.folder) return { error: 'no sheltered folder' };
   if (!codex.binaryInfo(bin.path).exists) return { error: 'bundled Codex is missing' };
-  wall = (opts && opts.wall) || codex.DEFAULT_WALL;
+  // The wall is decided here, not only in the page. A setting that needs the wall is refused
+  // on a computer where it cannot run; running without it is refused on a computer where it
+  // can, so it stays a fallback the person was warned about and never a shortcut.
+  const wanted = (opts && opts.wall) || codex.DEFAULT_WALL;
+  const sb = sandboxNow();
+  if (!sb.bypass) {
+    if (!sb.ok && wanted !== 'unwalled') return { error: 'nowall', why: sb.why };
+    if (sb.ok && wanted === 'unwalled') return { error: 'the wall works on this computer, so io will not run the assistant without it' };
+  }
+  wall = wanted;
   let tb = null;
   try { tb = await startToolbox(); } catch (e) { console.error(`toolbox failed to start: ${e.message}`); }
   // the toolbox server is this process run as plain node (ELECTRON_RUN_AS_NODE); Codex
@@ -321,6 +358,33 @@ async function startSession(opts) {
 }
 
 ipcMain.handle('codex-start', async (_e, opts) => startSession(opts));
+
+// The setup io can offer when the wall fails: today only Linux, only the AppArmor case, and
+// only through pkexec, so the password goes to the desktop's own prompt and never through
+// io. It installs exactly the file the status reported. Afterwards the wall is probed again;
+// the answer is what the probe says, not what the install claimed.
+ipcMain.handle('sandbox-fix', async () => {
+  const sb = sandboxNow();
+  if (sb.ok) return { ok: true };
+  if (!sb.fix) return { error: 'there is nothing io can set up for this on this computer' };
+  if (!hasPkexec()) return { error: 'this computer has no way for io to ask for an administrator password' };
+  const profilePath = path.join(env.dataDir, 'io-bwrap');
+  try { fs.writeFileSync(profilePath, sb.fix.profile); } catch (e) { return { error: `could not write the setup file: ${e.message}` }; }
+  const r = await new Promise(res => {
+    let err = '';
+    const c = spawn('pkexec', ['sh', '-c', 'install -m 644 "$1" /etc/apparmor.d/io-bwrap && apparmor_parser -r /etc/apparmor.d/io-bwrap', 'sh', profilePath],
+      { stdio: ['ignore', 'ignore', 'pipe'] });
+    c.stderr.on('data', d => { err += d; });
+    c.on('error', e => res({ code: -1, err: e.message }));
+    c.on('close', code => res({ code, err }));
+  });
+  // pkexec: 126 the person closed the password prompt, 127 not authorised
+  if (r.code === 126 || r.code === 127) return { error: 'the administrator password was not given', cancelled: true };
+  if (r.code !== 0) return { error: `the setup did not finish${r.err.trim() ? ': ' + r.err.trim().split('\n')[0] : ''}` };
+  codex.resetSandboxCheck();
+  const again = sandboxNow();
+  return again.ok ? { ok: true } : { error: `the setup ran, but the wall still does not start: ${again.why}` };
+});
 
 // Change the setting mid-session: Codex is relaunched under the new profile with the same
 // thread resumed (`codex resume --last`), so the conversation continues and the service,

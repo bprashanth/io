@@ -86,9 +86,16 @@ const PROFILE = 'io';
 // DGX, chronology 2026-09-15T2330-dgx. Offline has no toolbox: nothing io operates on
 // its behalf, by construction.
 const WALLS = {
-  offline: { network: false, openPages: false, tools: false },
-  tools:   { network: false, openPages: true,  tools: true  },
-  open:    { network: true,  openPages: true,  tools: true  },
+  offline:  { walled: true,  network: false, openPages: false, tools: false },
+  tools:    { walled: true,  network: false, openPages: true,  tools: true  },
+  open:     { walled: true,  network: true,  openPages: true,  tools: true  },
+  // Not a fourth choice on the settings screen. It exists only for a computer where the
+  // wall has been tried and cannot run (sandboxCheck below), after the person has been told
+  // plainly what that means and, where io can offer one, a one-time setup has failed or been
+  // declined. Tokenisation still holds for everything that goes to the model; the commands
+  // Codex runs do not have a wall around them. main.js refuses it on a computer where the
+  // wall works, so it cannot be picked as a convenience.
+  unwalled: { walled: false, network: true,  openPages: true,  tools: true  },
 };
 const DEFAULT_WALL = 'tools';
 // What is in the toolbox, in the person's words. Shown on the setting card and in the
@@ -122,10 +129,10 @@ function writeConfig(home, proxyPort, extra = {}) {
   const tables = [];
   const esc = p => String(p).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   if (extra.model) top.push(`model = "${extra.model}"`);
-  if (extra.noSandbox) {
-    // Development machines whose kernel refuses bwrap (the DGX). Never set for a user.
-    top.push('sandbox_mode = "danger-full-access"');
-  }
+  // No wall: the dev bypass (IO_CODEX_NO_SANDBOX=1), or a person who was told this computer
+  // cannot run the wall and chose to continue without it (WALLS.unwalled).
+  const noWall = !!extra.noSandbox || extra.wall === 'unwalled';
+  if (noWall) top.push('sandbox_mode = "danger-full-access"');
   if (extra.devProvider) {
     // Development only: a Responses-API server behind the proxy's /dev/v1 prefix, with an
     // API key in IO_DEV_KEY, so the interactive session can be tested without a ChatGPT
@@ -183,7 +190,7 @@ function writeConfig(home, proxyPort, extra = {}) {
   // instructions ... fs sandbox helper"), so that one file is granted; the rest of the
   // home - auth.json above all - stays out of reach of commands. IO_CODEX_NO_WALL=1 is the
   // escape hatch if a platform's sandbox cannot do read denial.
-  if (!extra.noSandbox && process.env.IO_CODEX_NO_WALL !== '1') {
+  if (!noWall && process.env.IO_CODEX_NO_WALL !== '1') {
     top.push('default_permissions = "io"');
     // Codex's own runner (bin/codex-code-mode-host, codex-resources/bwrap, zsh, codex-path/rg)
     // lives in the package directory, outside ":minimal" and the folder; without it the
@@ -389,30 +396,124 @@ function spawnSession({ bin, home, cwd, cols, rows, noAltScreen, libsDir, wall, 
 // macOS uses Seatbelt (built in, no setup); Windows uses Codex's own sandbox: both
 // report "not checked here" rather than a guess.
 let sandboxCache = null;
-function sandboxCheck(codexDir) {
-  if (sandboxCache) return sandboxCache;
-  if (process.platform !== 'linux') return (sandboxCache = { ok: true, checked: false, why: `${process.platform}: Codex's own sandbox, not checked by io` });
+
+// Is the wall real on this computer? Proven, not assumed, and the same way on every
+// platform: io writes its own profile into a scratch Codex home, then asks Codex to run one
+// small python program under that profile (`codex sandbox -P io`). The program tries to read
+// a file io just put *beside* the folder and to write a file *inside* it. The wall is on only
+// if the read is refused and the write works. That exercises the exact mechanism a session
+// uses - bubblewrap on Linux, Seatbelt on macOS, the restricted token on Windows - with
+// io's real profile, and costs well under a second.
+//
+// Until 2026-09-26 only Linux was checked (a bubblewrap smoke test), and macOS and Windows
+// answered "ok" on trust, so a Windows participant saw "Protected by io" over a mechanism
+// nobody had run while a Linux one on the wrong distribution was stopped outright. Now every
+// platform is probed and a failure is said out loud everywhere. macOS and Windows use the
+// same probe but it has not been run on either yet: if it cannot even start there, io says
+// the wall could not be proven, which is the safe direction to be wrong in.
+const PROBE_PY = [
+  'import sys',
+  'try:',
+  '    open(sys.argv[1]).read(); print("READ_OUTSIDE=yes")',
+  'except Exception:',
+  '    print("READ_OUTSIDE=no")',
+  'try:',
+  '    open(sys.argv[2], "w").write("io"); print("WRITE_INSIDE=yes")',
+  'except Exception:',
+  '    print("WRITE_INSIDE=no")',
+].join('\n');
+
+// Pure, so it can be tested without a sandbox: what one probe run means.
+function classifyProbe(status, stdout, stderr) {
+  const out = String(stdout || '');
+  const first = String(stderr || '').trim().split('\n')[0].slice(0, 200);
+  const read = /READ_OUTSIDE=(yes|no)/.exec(out), write = /WRITE_INSIDE=(yes|no)/.exec(out);
+  if (!read || !write) return { ok: false, reason: `the wall could not start${first ? ': ' + first : ''}` };
+  if (read[1] === 'yes') return { ok: false, reason: 'the wall started but did not keep a command out of your other files' };
+  if (write[1] === 'no') return { ok: false, reason: 'the wall started but did not let a command write in the folder itself' };
+  if (status !== 0) return { ok: false, reason: `the wall's test ended badly${first ? ': ' + first : ''}` };
+  return { ok: true, reason: null };
+}
+
+function wallProbe({ bin, codexDir, libsDir, python, dataDir, secretDir }) {
+  if (!bin || !fs.existsSync(bin)) return { ok: false, reason: 'the bundled Codex is missing, so the wall could not be tested' };
+  if (!python || !fs.existsSync(python)) return { ok: false, reason: "io's own python is missing, so the wall could not be tested" };
+  const base = fs.mkdtempSync(path.join(dataDir || os.tmpdir(), 'wall-probe-'));
+  let arg0 = null;
+  try {
+    // secretDir is for the test that proves the probe is not vacuous: a secret placed where
+    // the wall does grant access must come back as readable.
+    const home = path.join(base, 'home'), ws = path.join(base, 'ws');
+    const secret = path.join(secretDir || base, `beside-the-folder-${path.basename(base)}.txt`);
+    fs.mkdirSync(ws, { recursive: true });
+    fs.writeFileSync(secret, 'io wall probe');
+    writeConfig(home, 1, { wall: 'offline', codexDir, libsDir });
+    const env = { ...baseEnv(home, libsDir) };
+    // On Linux Codex re-executes itself as `codex-linux-sandbox` inside bubblewrap and finds
+    // it by name. A real session sets that alias up; `codex sandbox` alone does not, and
+    // fails with "execvp codex-linux-sandbox". The alias lives in temp, which the wall grants.
+    if (process.platform === 'linux') {
+      arg0 = fs.mkdtempSync(path.join(os.tmpdir(), 'io-arg0-'));
+      fs.symlinkSync(bin, path.join(arg0, 'codex-linux-sandbox'));
+      env.PATH = arg0 + path.delimiter + (env.PATH || '');
+    }
+    const r = spawnSync(bin, ['sandbox', '-p', PROFILE, '-P', PROFILE, '-C', ws, '--', python, '-c', PROBE_PY, secret, path.join(ws, 'probe.txt')],
+      { env, encoding: 'utf8', timeout: 20000 });
+    return classifyProbe(r.status, r.stdout, (r.stderr || '') + (r.error ? ' ' + r.error.message : ''));
+  } catch (e) {
+    return { ok: false, reason: `the wall could not be tested: ${e.message}` };
+  } finally {
+    try { fs.rmSync(base, { recursive: true, force: true }); } catch {}
+    if (secretDir) { try { fs.rmSync(path.join(secretDir, `beside-the-folder-${path.basename(base)}.txt`), { force: true }); } catch {} }
+    if (arg0) { try { fs.rmSync(arg0, { recursive: true, force: true }); } catch {} }
+  }
+}
+
+// Linux only: when the wall fails because of Ubuntu's AppArmor rule for user namespaces
+// (24.04 onwards), the remedy is two small profiles granting `userns` to bubblewrap - one for
+// a system bwrap, one for the copy bundled with Codex, because Codex prefers the system one.
+// io writes the text and can install it through pkexec (main.js, 'sandbox-fix'); an
+// administrator can also run the printed command by hand.
+function linuxFix(codexDir, force) {
+  if (process.platform !== 'linux') return null;
   const bundled = path.join(codexDir || '', 'codex-resources', 'bwrap');
   let system = null;
   try { system = execFileSyncQuiet('sh', ['-c', 'command -v bwrap']).trim() || null; } catch { system = null; }
-  const bwrap = system || (fs.existsSync(bundled) ? bundled : null);
-  if (!bwrap) return (sandboxCache = { ok: false, checked: true, why: 'no bubblewrap found, neither on PATH nor bundled with Codex', fix: null });
-  const r = spawnSync(bwrap, ['--unshare-user', '--unshare-net', '--unshare-pid', '--ro-bind', '/', '/', '/bin/true'], { encoding: 'utf8', timeout: 10000 });
-  if (r.status === 0) return (sandboxCache = { ok: true, checked: true, bwrap });
-  const err = ((r.stderr || '') + (r.error ? String(r.error.message) : '')).trim().split('\n')[0].slice(0, 200);
   let restricted = false;
   try { restricted = fs.readFileSync('/proc/sys/kernel/apparmor_restrict_unprivileged_userns', 'utf8').trim() === '1'; } catch {}
+  if (!restricted && !force) return null;
   const paths = [...new Set([system, fs.existsSync(bundled) ? bundled : null].filter(Boolean))];
+  if (!paths.length) return null;
   const profile = ['abi <abi/4.0>,', 'include <tunables/global>']
     .concat(paths.map((p, i) => `profile io-bwrap-${i} ${p} flags=(unconfined) {\n  userns,\n}`)).join('\n') + '\n';
-  return (sandboxCache = {
-    ok: false, checked: true, bwrap, error: err,
-    why: restricted
-      ? "this computer's settings (Ubuntu's AppArmor rule for user namespaces) do not let the wall start"
-      : `the wall could not start: ${err}`,
-    fix: restricted ? { profile, install: 'sudo install -m 644 io-bwrap /etc/apparmor.d/io-bwrap && sudo apparmor_parser -r /etc/apparmor.d/io-bwrap' } : null,
-  });
+  return {
+    profile,
+    why: "this computer's settings (Ubuntu's AppArmor rule for user namespaces) do not let the wall start",
+    install: 'sudo install -m 644 io-bwrap /etc/apparmor.d/io-bwrap && sudo apparmor_parser -r /etc/apparmor.d/io-bwrap',
+  };
 }
+
+// opts: { bin, codexDir, libsDir, python, dataDir }. Returns
+// { ok, checked, platform, why, fix } where fix is the Linux AppArmor remedy or null.
+function sandboxCheck(opts = {}) {
+  if (sandboxCache) return sandboxCache;
+  const platform = process.platform;
+  // Development only, like IO_CODEX_NO_SANDBOX: pretend the wall failed, so the warning,
+  // the setup offer and the unwalled path can be exercised on a machine where it works.
+  //   IO_SANDBOX_TEST=broken    the wall failed and there is nothing io can install
+  //   IO_SANDBOX_TEST=fixable   the wall failed and the AppArmor setup is offered (Linux)
+  const test = process.env.IO_SANDBOX_TEST;
+  if (test === 'broken' || test === 'fixable') {
+    const fix = test === 'fixable' ? linuxFix(opts.codexDir, true) : null;
+    return (sandboxCache = { ok: false, checked: true, platform, simulated: true,
+      why: `simulated for testing (IO_SANDBOX_TEST=${test})`, fix });
+  }
+  const probe = wallProbe(opts);
+  if (probe.ok) return (sandboxCache = { ok: true, checked: true, platform, why: null, fix: null });
+  const fix = linuxFix(opts.codexDir, false);
+  return (sandboxCache = { ok: false, checked: true, platform, why: fix ? fix.why : probe.reason, detail: probe.reason, fix });
+}
+function resetSandboxCheck() { sandboxCache = null; }
 
 function execFileSyncQuiet(cmd, args) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 5000 });
@@ -429,4 +530,4 @@ function binaryInfo(bin) {
 }
 
 module.exports = {
-  WALLS, DEFAULT_WALL, TOOLBOX, wallOf, sandboxCheck, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, sessionArgs, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };
+  WALLS, DEFAULT_WALL, TOOLBOX, wallOf, sandboxCheck, resetSandboxCheck, classifyProbe, wallProbe, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, sessionArgs, binaryInfo, hasPty: () => !!pty, PINS, PROFILE };
