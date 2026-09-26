@@ -207,10 +207,17 @@ end from a copied location on 2026-09-14 (`benchmarks/runs/2026-09-14-io-codex/d
 
 | | state |
 |---|---|
-| Linux x64 | binary pinned and hashed (`codex-x86_64-unknown-linux-musl`, static); node-pty builds from source with the usual toolchain; **not yet run** on an x64 laptop |
+| Linux x64 | verified end to end on a Pop!_OS 22.04 laptop (2026-09-15 to 26). Ubuntu 24.04 needs a one-time AppArmor grant for bubblewrap, which io offers through pkexec; see `chronology/2026-09-15T1856-dgx-sandbox-boundary.md` |
 | Linux arm64 | verified end to end here |
 | macOS | Codex ships `aarch64-apple-darwin` and `x86_64-apple-darwin` binaries; node-pty has prebuilds for both; `fetch-codex.js darwin-arm64` records the hash on first fetch. Open questions before claiming support: Gatekeeper on a binary copied from USB (io's own .app is already unsigned and needs right-click Open; the codex binary inside `resources/` inherits that), `xattr` quarantine on the tarball, and whether `codex login`'s `localhost:1455` callback works from a sandboxed .app (it should: io is not sandboxed). Not built, not tested. |
 | Windows | Codex publishes `x86_64-pc-windows-msvc` binaries; node-pty uses ConPTY and has prebuilds; Codex's Windows sandbox is a different mechanism (experimental). Nothing here is tested on Windows. The proxy is pure python and needs nothing platform-specific. |
+
+The wall is proven the same way on every platform before Codex starts (`codex.js`,
+`wallProbe`): a command under io's profile must fail to read a file beside the folder and
+succeed in writing inside it. On macOS and Windows that probe is written but has not been
+run. Where it fails, io says so, offers the setup where one exists, and otherwise runs
+without the wall only after the person has been told what that costs
+(`chronology/2026-09-26T1510-laptop-the-wall-on-every-platform.md`).
 
 ## Known limitations
 

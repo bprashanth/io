@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('io', {
     logout: () => ipcRenderer.invoke('codex-logout'),
     start: opts => ipcRenderer.invoke('codex-start', opts),
     switch: opts => ipcRenderer.invoke('codex-switch', opts),
+    sandboxFix: () => ipcRenderer.invoke('sandbox-fix'),
     toolbox: () => ipcRenderer.invoke('toolbox-list'),
     toolboxImage: () => ipcRenderer.invoke('toolbox-last-image'),
     stop: () => ipcRenderer.invoke('codex-stop'),

@@ -204,6 +204,15 @@ td.tok{background:var(--hibg);color:var(--hi)}
 /* modals */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
 .modal.on{display:flex}
+/* the computer cannot run the wall: said loudly, with the way out and its cost */
+#nowall .card{width:520px;border-color:#e06c6c}
+#nowall h3{margin:0;color:#e8a0a0;font-size:17px}
+#nowall p{margin:0;font-size:13.5px;line-height:1.6;color:var(--ink)}
+#nowall p.dim{color:var(--dim)}
+#nowall pre{margin:0;font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
+#nw-result{display:none;border-left:3px solid #e0a060;padding:4px 0 4px 10px;color:#e8c08a;font-size:13px;line-height:1.55}
+#nowall .row{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:4px}
+#nw-unwalled{border-color:#e0a060;color:#e0a060}
 .modal .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px;width:400px;display:flex;flex-direction:column;gap:10px}
 .br-dir{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px}
 .br-dir:hover{color:var(--hi)}
@@ -283,7 +292,6 @@ td.tok{background:var(--hibg);color:var(--hi)}
     about the <b>tools</b> it uses to get the job done. It is not about the conversation
     itself: what you ask, and anything it reads from your files, is turned into codes before
     it leaves this computer and travels encrypted, in all three of these.</p>
-    <div id="wall-halt" style="display:none;border:1px solid #e06c6c;border-radius:12px;padding:14px 16px;color:#e8a0a0;font-size:13.5px;line-height:1.6;white-space:pre-wrap"></div>
     <div class="walls" id="walls"></div>
     <div class="wallfoot">
       <button class="plain" id="wall-cancel">Cancel</button>
@@ -322,7 +330,8 @@ td.tok{background:var(--hibg);color:var(--hi)}
     <span class="pill"><span class="dot" id="cx-dot-priv"></span><span>Privacy</span> <b id="cx-priv">…</b></span>
     <span class="pill"><span class="dot" id="cx-dot-proxy"></span><span>Proxy</span> <b id="cx-proxy">…</b></span>
     <span class="pill"><span class="dot" id="cx-dot-gpt"></span><span>ChatGPT</span> <b id="cx-gpt">…</b></span>
-    <span class="pill" id="cx-wallpill"><span>Setting</span>
+    <span class="pill" title="the limit on what the commands the assistant runs can reach"><span class="dot" id="cx-dot-sb"></span><span>Wall</span> <b id="cx-sb">…</b></span>
+    <span class="pill" id="cx-wallpill"><span id="cx-wall-label">Setting</span>
       <select id="cx-wall" title="change what the assistant may reach; the conversation continues">
         <option value="offline">Offline</option><option value="tools">T4GC tools</option><option value="open">Open</option>
       </select>
@@ -353,6 +362,23 @@ td.tok{background:var(--hibg);color:var(--hi)}
   </div>
   <div id="note"></div>
 </div>
+
+<div id="nowall" class="modal"><div class="card">
+  <h3>No wall on this computer</h3>
+  <p id="nw-why"></p>
+  <p>Your questions, and anything the assistant reads from your files, still leave this
+  computer only as codes. What the wall adds is a limit on the <b>commands</b> it runs. Without
+  it, those commands can open any file you can open, reach the internet and install software,
+  and the Offline, T4GC tools and Open settings cannot be kept.</p>
+  <p id="nw-fix" class="dim"></p>
+  <pre id="nw-manual" style="display:none"></pre>
+  <div id="nw-result"></div>
+  <div class="row">
+    <button id="nw-cancel">Cancel</button>
+    <button id="nw-unwalled">Continue without the wall</button>
+    <button class="go" id="nw-setup" style="display:none">Set up the wall</button>
+  </div>
+</div></div>
 
 <div id="confirmscan" class="modal"><div class="card" style="width:380px">
   <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
@@ -625,20 +651,58 @@ function renderWalls(){
 // The wall needs the computer's cooperation. When it cannot run, every setting that relies
 // on it is switched off and the person is told plainly what an administrator has to do
 // once; nothing starts without it.
-async function sandboxHalt(){
-  let st = null;
-  try { st = await window.io.codex.status(); } catch (e) { return 'io could not check this computer.'; }
-  if (!st.sandbox || st.sandbox.ok) return null;
-  let msg = `io cannot protect this folder on this computer: ${st.sandbox.why}. All three settings need that protection, so Codex is switched off here for now.`;
-  if (st.sandbox.install) msg += `\n\nAn administrator can allow it once, in a terminal:\n  cd ${(st.sandbox.profilePath || '').replace(/\/[^/]*$/, '')}\n  ${st.sandbox.install}\n\nThen start io again.`;
-  return msg;
+// io tries the wall on this computer before anything runs (codex.js sandboxCheck, the same
+// probe on every platform). When it cannot run, the person is told plainly, offered the
+// one-time setup where io has one (Linux), and otherwise - or if the setup fails or is
+// declined - may continue without the wall knowing exactly what that costs. Resolves to
+// 'walled', 'unwalled', or null for "not now".
+const PLATFORM_NAME = { linux: 'Linux', darwin: 'this Mac', win32: 'Windows' };
+async function sandboxState(){
+  try { const st = await window.io.codex.status(); return st.sandbox || null; } catch (e) { return null; }
+}
+async function resolveWall(){
+  const sb = await sandboxState();
+  if (!sb) { oops('io could not check this computer'); return null; }
+  if (sb.ok) return 'walled';
+  return new Promise(resolve => {
+    const done = v => { $('#nowall').classList.remove('on'); resolve(v); };
+    $('#nw-why').textContent = `io tried to put a wall around the assistant on this computer and could not: ${sb.why}.`;
+    $('#nw-result').style.display = 'none';
+    $('#nw-manual').style.display = 'none';
+    if (sb.fixable) {
+      $('#nw-fix').textContent = 'An administrator can switch the wall on for this computer, once. io will ask for the password.';
+      $('#nw-setup').style.display = '';
+    } else if (sb.install) {
+      $('#nw-fix').textContent = 'An administrator can switch it on once, in a terminal, and then start io again:';
+      $('#nw-manual').textContent = `cd ${(sb.profilePath || '').replace(/\/[^/]*$/, '')}\n${sb.install}`;
+      $('#nw-manual').style.display = '';
+      $('#nw-setup').style.display = 'none';
+    } else {
+      $('#nw-fix').textContent = `There is nothing io can set up for this on ${PLATFORM_NAME[sb.platform] || 'this computer'}.`;
+      $('#nw-setup').style.display = 'none';
+    }
+    $('#nw-cancel').onclick = () => done(null);
+    $('#nw-unwalled').onclick = () => done('unwalled');
+    $('#nw-setup').onclick = async () => {
+      $('#nw-setup').disabled = true; $('#nw-setup').textContent = 'waiting for the password…';
+      let r = null;
+      try { r = await window.io.codex.sandboxFix(); } catch (e) { r = { error: e.message }; }
+      $('#nw-setup').disabled = false; $('#nw-setup').textContent = 'Set up the wall';
+      if (r && r.ok) { done('walled'); return; }
+      $('#nw-result').textContent = `The wall could not be set up: ${(r && r.error) || 'no answer'}. You can still use io on this computer, but only without the wall.`;
+      $('#nw-result').style.display = 'block';
+      $('#nw-setup').style.display = 'none';
+    };
+    $('#nowall').classList.add('on');
+  });
 }
 async function chooseWall(path){
   wallPath = path;
-  const halt = await sandboxHalt();
-  $('#wall-halt').style.display = halt ? 'block' : 'none';
-  $('#wall-halt').textContent = halt || '';
-  $('#wall-go').disabled = !!halt;
+  // Without a wall the three settings cannot be kept, so there is nothing to choose between:
+  // the person decides on the dialog and goes straight on.
+  const w = await resolveWall();
+  if (w === null) { show('#s-home'); renderShelf(); return; }
+  if (w === 'unwalled') { wallChoice = 'unwalled'; openFolder(path); return; }
   let last = null;
   try { last = localStorage.getItem('io.wall.' + path); } catch (e) {}
   wallChoice = WALL_CHOICES.some(w => w.id === last) ? last : 'tools';
@@ -879,7 +943,11 @@ q.addEventListener('keydown', async e => {
   // In Codex mode the chat box on the landing page always starts a conversation; the old
   // three-model chat is never the destination (it answered "no model could be reached"
   // when a previous folder's file list was still in memory after pressing home).
-  if (codexMode) { const halt = await sandboxHalt(); if (halt) { alert(halt); return; } q.value = ''; paintMirror(); await startChatWorkspace(text); return; }
+  if (codexMode) {
+    const w = await resolveWall(); if (w === null) return;
+    wallChoice = w === 'unwalled' ? 'unwalled' : (wallChoice === 'unwalled' ? 'tools' : wallChoice);
+    q.value = ''; paintMirror(); await startChatWorkspace(text); return;
+  }
   if (!files.length) { pickFolder(); return; }
   if (!accepted) { renderSheet(); return; }
   q.value = ''; paintMirror(); q.disabled = true;
@@ -1124,7 +1192,10 @@ async function enterCodex(){
   show('#s-codex');
   cxErr('');
   $('#cx-wall').value = wallChoice;
+  // No setting to change in a conversation, and none that can be kept without a wall; the
+  // toolbox button stays, because what the assistant was shown still matters there.
   $('#cx-wallpill').style.display = chatWorkspace ? 'none' : '';
+  $('#cx-wall').style.display = $('#cx-wall-label').style.display = wallChoice === 'unwalled' ? 'none' : '';
   $('#cx-attach').style.display = chatWorkspace ? '' : 'none';
   await new Promise(r => setTimeout(r, 60));
   fitTerm();
@@ -1152,7 +1223,16 @@ async function enterCodex(){
 }
 async function startCodex(){
   term.reset();
-  const r = await window.io.codex.start({cols: term.cols, rows: term.rows, chat: !!chatWorkspace, wall: wallChoice});
+  let r = await window.io.codex.start({cols: term.cols, rows: term.rows, chat: !!chatWorkspace, wall: wallChoice});
+  // A resumed folder or a restart can reach here without the settings screen; the shell
+  // refuses a walled start on a computer without a wall, and the person decides here.
+  if (r && r.error === 'nowall') {
+    const w = await resolveWall();
+    if (w === null) { cxRunning = false; cxErr('Codex was not started: this computer cannot run the wall.'); $('#cx-restart').style.display = ''; return; }
+    if (w === 'unwalled') wallChoice = 'unwalled';
+    else if (wallChoice === 'unwalled') wallChoice = 'tools';
+    r = await window.io.codex.start({cols: term.cols, rows: term.rows, chat: !!chatWorkspace, wall: wallChoice});
+  }
   if (r && r.error) { cxRunning = false; cxErr('Codex was not started: ' + r.error); $('#cx-restart').style.display = ''; return; }
   cxRunning = true; $('#cx-restart').style.display = 'none';
   term.focus();
@@ -1167,9 +1247,17 @@ async function paintCodexStatus(){
   set('#cx-priv', '#cx-dot-priv', sv ? (sv.ready ? `${sv.vault} codes approved` : (sv.reason || 'not approved')) : 'service not answering', sv ? sv.ready : false);
   set('#cx-proxy', '#cx-dot-proxy', sv && sv.port ? `active on 127.0.0.1:${sv.port}` : 'not running', !!(sv && sv.port && sv.ready));
   set('#cx-gpt', '#cx-dot-gpt', sh ? (sh.loggedIn ? 'connected' : 'not signed in') : 'unknown', sh ? sh.loggedIn : null);
-  const protectedNow = !!(sv && sv.ready && sv.port && sh && sh.loggedIn);
-  $('#cx-shield').textContent = protectedNow ? 'Protected by io' : 'NOT protected';
-  $('#cx-shield').style.color = protectedNow ? 'var(--grn)' : '#e06c6c';
+  // The wall, on every platform: on means io proved it on this computer before starting.
+  const sb = sh && sh.sandbox;
+  const walled = !!(sb && sb.ok && !sb.bypass && wallChoice !== 'unwalled');
+  set('#cx-sb', '#cx-dot-sb',
+    sb && sb.bypass ? 'OFF (developer bypass)'
+      : wallChoice === 'unwalled' ? 'OFF: commands can reach your other files and the internet'
+      : walled ? 'on, checked on this computer' : (sb ? 'not running' : 'unknown'),
+    sb ? walled : null);
+  const codesOk = !!(sv && sv.ready && sv.port && sh && sh.loggedIn);
+  $('#cx-shield').textContent = codesOk && walled ? 'Protected by io' : codesOk ? 'Codes only: no wall' : 'NOT protected';
+  $('#cx-shield').style.color = codesOk && walled ? 'var(--grn)' : codesOk ? '#e0a060' : '#e06c6c';
   if (sv && sv.stats) { const t = sv.stats; $('#cx-stats').textContent = `${t.forwarded} request${t.forwarded === 1 ? '' : 's'} sent as codes, ${t.substitutions} coded, ${t.restorations} restored${t.refused ? ', ' + t.refused + ' refused' : ''}`; }
   if (attaching) return;                       // the rescan withdraws approval for a moment; not an error
   if (!sv) cxErr('io\'s privacy proxy is not answering. Codex cannot reach the model until it is back: press reload.');

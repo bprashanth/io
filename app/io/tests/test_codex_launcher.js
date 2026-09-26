@@ -156,6 +156,49 @@ test('the sandbox check answers with a verdict, and with the admin fix when it f
   console.log(`   (this machine: ${r.ok ? 'wall can run' : 'wall cannot run - ' + r.why})`);
 });
 
+test('unwalled writes no wall at all, and no walled setting ever does', () => {
+  const read = (wall) => {
+    const home = path.join(tmp, 'uw-' + wall);
+    codex.writeConfig(home, 9, { wall, codexDir: '/opt/codex', libsDir: '/opt/io/runtime' });
+    return fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
+  };
+  const un = read('unwalled');
+  assert.ok(un.includes('sandbox_mode = "danger-full-access"'), 'unwalled has no sandbox');
+  assert.ok(!un.includes('default_permissions = "io"') && !un.includes('[permissions.io]'), 'and no permissions profile');
+  assert.ok(un.includes('\napproval_policy = "never"\n'), 'but still never asks to escalate');
+  for (const w of ['offline', 'tools', 'open', 'nonsense']) {
+    const t = read(w);
+    assert.ok(!t.includes('danger-full-access'), `${w} must never drop the wall`);
+    assert.ok(t.includes('default_permissions = "io"'), `${w} keeps the wall`);
+  }
+  assert.strictEqual(codex.wallOf('unwalled').walled, false);
+  for (const w of ['offline', 'tools', 'open']) assert.strictEqual(codex.wallOf(w).walled, true);
+});
+
+test('the wall probe reads its verdicts, and says why when it fails', () => {
+  const c = codex.classifyProbe;
+  assert.deepStrictEqual(c(0, 'READ_OUTSIDE=no\nWRITE_INSIDE=yes\n', ''), { ok: true, reason: null });
+  assert.ok(/did not keep a command out/.test(c(0, 'READ_OUTSIDE=yes\nWRITE_INSIDE=yes\n', '').reason), 'a read beside the folder is a leak');
+  assert.ok(/did not let a command write/.test(c(0, 'READ_OUTSIDE=no\nWRITE_INSIDE=no\n', '').reason));
+  const failed = c(1, '', 'bwrap: setting up uid map: Permission denied\nmore');
+  assert.strictEqual(failed.ok, false);
+  assert.ok(/could not start: bwrap: setting up uid map/.test(failed.reason), failed.reason);
+  assert.strictEqual(c(null, '', '').ok, false, 'no output is never ok');
+});
+
+test('the probe is not vacuous: a secret beside the folder is refused, one in a granted place is read', () => {
+  const b = codex.bundledCodexPath({ packaged: false });
+  const libs = path.join(__dirname, '..', '.venv');
+  const python = path.join(libs, 'bin', 'python3');
+  if (!fs.existsSync(b.path) || !fs.existsSync(python)) { console.log('   (skipped: no bundled codex or runtime)'); return; }
+  const opts = { bin: b.path, codexDir: b.dir, libsDir: libs, python, dataDir: tmp };
+  const real = codex.wallProbe(opts);
+  if (!real.ok) { console.log(`   (skipped: the wall does not run on this computer - ${real.reason})`); return; }
+  const control = codex.wallProbe({ ...opts, secretDir: require('os').tmpdir() });
+  assert.strictEqual(control.ok, false, 'a secret in temp, which the wall grants, must come back readable');
+  assert.ok(/did not keep a command out/.test(control.reason), control.reason);
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 
 test('the toolbox is registered as an approve-mode server where the setting has tools, and never Offline', () => {
