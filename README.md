@@ -69,7 +69,7 @@ These packs carry everything needed to run the app inside them.
    organizers for this. Or press **Sign in with ChatGPT**: the real Codex CLI then runs
    inside io on the sheltered folder, and everything it sends to the model crosses io's
    privacy proxy as codes - no key needed. How that works and what exactly it protects:
-   [docs/io-codex.md](docs/io-codex.md). 
+   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). 
 3. Add a local dir, review the highlights, the "Preview" button shows
    the tokenized versions of data that leaves your laptop. 
 4. Cheat sheet; use `@` while you chat to address specific files, and `~name~` looks up a person (or any pii) in the vault and redacts it from your request. 
@@ -143,6 +143,11 @@ that left.
    [`extension/privacy-shield/TROUBLESHOOTING.md`](extension/privacy-shield/TROUBLESHOOTING.md).
 
 ## Developers: Repository map
+
+**Start with [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**: why io wraps Codex instead of
+using it as it ships, how io controls it, and the three things that make it private:
+[tokenization](docs/tokenization.md), [sandboxing](docs/sandboxing.md) and
+[model switching](docs/model-switching.md).
 
 If you're only here to use the product, ignore this..
 
