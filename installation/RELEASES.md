@@ -1,5 +1,9 @@
 # Putting a release on a USB drive
 
+> **Changing with the next release:** the drives will carry the thin builds, scanning on the
+> privacy server, instead of the offline ones. See `docs/distribution.md`. Until that release
+> exists, follow this page as it stands.
+
 For running an event with many drives at once:
 [EVENTS.md](EVENTS.md).
 

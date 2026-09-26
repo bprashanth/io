@@ -47,6 +47,9 @@ without changing what Codex can do on the folder the person chose.
 - **The model** is ChatGPT through the person's own sign-in today. Moving to other models when
   that allowance runs out is being built. See [model-switching.md](model-switching.md).
 
+- **The build people get** is the thin one, scanning on the organisers' privacy server. See
+  [distribution.md](distribution.md).
+
 The detailed design and the exact privacy claim are in [io-codex.md](io-codex.md).
 
 ## How io controls Codex
@@ -94,6 +97,7 @@ work has gone. Each is covered in the linked doc.
 | A page Codex writes | once opened in a browser it can send anything it contains anywhere, so io shows it in a window with no network | [sandboxing.md](sandboxing.md) |
 | A computer where the wall cannot run | io says so, offers a one-time setup where one exists, and otherwise runs without the wall only after saying what that costs | [sandboxing.md](sandboxing.md) |
 | A conversation with an attached file | commands are online in a conversation today, so the file could be sent anywhere | [sandboxing.md](sandboxing.md) |
+| Scanning on the privacy server | the text being scanned leaves the laptop, and is readable at Cloudflare's edge | [distribution.md](distribution.md) |
 | Another model provider | codes still hold, but values outside the vault reach whoever runs that model | [model-switching.md](model-switching.md) |
 
 ## Where the evidence is
