@@ -42,8 +42,14 @@ reach, never what the model sees.
 The setting can be changed mid-conversation. Codex is relaunched under the new profile and
 resumes the same thread.
 
-**A conversation** (no folder) runs with the wall on and commands online, whatever the folder
-settings say. See the open issues below.
+**A new conversation** (no folder) starts with the wall on and commands online.
+Its terminal bar says whether commands are online or offline. On attachment, io
+asks whether the file is private before copying it. It stops the old assistant,
+scans the copy, and resumes only after review. **Yes** makes this conversation
+T4GC-tools-only, with command networking off; **No** preserves its current setting.
+Private status persists outside the working folder and cannot be undone by a later
+public attachment or restart. A private attachment is refused without a proven wall.
+The model traffic's coding is unchanged.
 
 ## Escalation is closed everywhere
 
@@ -108,10 +114,6 @@ For development, `IO_SANDBOX_TEST=broken` or `fixable` simulates a failed wall, 
 
 ## Open issues
 
-- **A conversation with an attached file.** Commands are online in a conversation, and
-  attaching a file does not change that. Measured: a command read the attached file and
-  reached example.com. Planned: ask the person whether the file is private, and if so relaunch
-  the conversation offline.
 - **The probe has never run on macOS or Windows.** If it cannot start there, io reports the
   wall as unproven, which is the safe direction to be wrong in.
 - **Offline refuses to open a page without saying why.**

@@ -44,8 +44,8 @@ without changing what Codex can do on the folder the person chose.
   [tokenization.md](tokenization.md).
 - **The wall** is Codex's own sandbox, run under a permissions profile io writes. The person
   picks how much it lets commands reach. See [sandboxing.md](sandboxing.md).
-- **The model** is ChatGPT through the person's own sign-in today. Moving to other models when
-  that allowance runs out is being built. See [model-switching.md](model-switching.md).
+- **The model** is ChatGPT through the person's own sign-in today. An explicit OpenRouter fallback is available when
+  that allowance runs out. See [model-switching.md](model-switching.md).
 
 - **The build people get** is the thin one, scanning on the organisers' privacy server. See
   [distribution.md](distribution.md).
@@ -96,7 +96,7 @@ work has gone. Each is covered in the linked doc.
 | Commands and the internet | the proxy never sees command traffic; only the wall limits it | [sandboxing.md](sandboxing.md) |
 | A page Codex writes | once opened in a browser it can send anything it contains anywhere, so io shows it in a window with no network | [sandboxing.md](sandboxing.md) |
 | A computer where the wall cannot run | io says so, offers a one-time setup where one exists, and otherwise runs without the wall only after saying what that costs | [sandboxing.md](sandboxing.md) |
-| A conversation with an attached file | commands are online in a conversation today, so the file could be sent anywhere | [sandboxing.md](sandboxing.md) |
+| A conversation with an attached file | io asks whether the file is private; a private attachment makes commands offline before they can see it | [sandboxing.md](sandboxing.md) |
 | Scanning on the privacy server | the text being scanned leaves the laptop, and is readable at Cloudflare's edge | [distribution.md](distribution.md) |
 | Another model provider | codes still hold, but values outside the vault reach whoever runs that model | [model-switching.md](model-switching.md) |
 

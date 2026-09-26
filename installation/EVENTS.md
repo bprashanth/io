@@ -8,7 +8,7 @@ Built by `.github/workflows/package.yml`:
 
 ```
 gh workflow run package.yml --ref main -f fat=false     # thin, all platforms
-gh workflow run package.yml --ref main -f fat=true      # offline, all platforms
+gh workflow run package.yml --ref main -f fat=true      # fat build, all platforms
 gh workflow run package.yml --ref main -f only=mac      # just one platform
 gh workflow run package.yml --ref main -f fat=true -f release_tag=v0.3.2   # publish as well
 ```
@@ -50,9 +50,8 @@ __What this contains__
 | macOS Intel | **none, and none is possible** | `io-mac-x64.dmg` |
 
 There is no Intel Mac offline build (not possible because currently supported
-pytorch libraries don't support mac-intel). So mac intel users are confined to
-the online only flow - meaning the gliner server must run on a non-mac-intel
-machine. 
+pytorch libraries don't support mac-intel). Intel Mac users use the thin build and the
+privacy server; if the server is not reachable, io falls back to pattern matching only.
 
 ## 2. Put it on the drives [Pre-Event]
 
@@ -76,8 +75,9 @@ insightout/MANIFEST.txt     every file and its size, for --verify
 **Budget 16 GB drives.**
 About 5.6 GB and roughly 45,000 files per drive, for all three platforms.
 
-Expect it to take a while and do not read that as a hang: the Windows offline pack alone is
-22,092 files, and a stick writes many small files far more slowly than its rated speed. The
+Expect it to take a while and do not read that as a hang: the Windows thin pack alone is
+still tens of thousands of small files, and a stick writes many small files far more
+slowly than its rated speed. The
 script prints a per-drive percentage counted in files.
 
 `--platform win|mac|linux` narrows what goes on a drive, for a stick you are handing to
@@ -97,12 +97,12 @@ sudo umount /dev/sdX1 && sudo mkfs.exfat -n "LABEL" /dev/sdX1
 
 Then unplug and replug it so it mounts, or `usb_copy` will not see it.
 
-## At the event 
+## At the event
 
 1. Organizer setup
 2. Participant setup (usb)
-3. Participant acttions (outside-in) 
-4. If someone cannot install something 
+3. Participant acttions (outside-in)
+4. If someone cannot install something
 
 ## 1. Orgranizer Team
 
@@ -118,48 +118,48 @@ on its own if both servers stop.
 - **room board**, default 8890. Put it on the projector; it refreshes itself every three
   seconds and shows what the room preferred. Votes append to `app/io/room-votes.jsonl`, and
   `GET /votes.jsonl` hands the whole log back afterwards.
-- **privacy server**, default 8899. Only for laptops that cannot run the scanner themselves.
+- **privacy server**, default 8899. For laptops that should use the privacy server for scanning.
 
 Everyone must be on the same wifi as that machine, and the first start may raise a firewall
 prompt to allow incoming connections.
 
-## 2. Participatn setup (usb) 
+## 2. Participatn setup (usb)
 
-Plug the drive into each laptop and do the following: 
+Plug the drive into each laptop and do the following:
 
 __Windows__
 
-1. Open `insightout\io\io-win-x64-offline`
-2. Copy that whole folder to their computer (desktop is fine). 
-    - IFF they don't have space, tell them to wait while you copy it to other computers, then give them the usb (they can run it directly from the usb). 
-3. Double click the exe. Windows smartscreen will show a warning, click "Run Anyway". 
+1. Open `insightout\io\io-win-x64`
+2. Copy that whole folder to their computer (desktop is fine).
+    - IFF they don't have space, tell them to wait while you copy it to other computers, then give them the usb (they can run it directly from the usb).
+3. Double click the exe. Windows smartscreen will show a warning, click "Run Anyway".
 
 __MacOS: Silicon__
 
-1. Double click `insightout/io/io-mac-arm64-offline.dmg`
+1. Double click `insightout/io/io-mac-arm64.dmg`
 2. Drag `io` out of the dmg onto their Desktop or home folder (DO NOT DRAG IT INTO APPLICATIONS OR THE APP TRAY)
-3. Right-click `io` -> open -> open again. A plain double-click will be blocked the first time. 
+3. Right-click `io` -> open -> open again. A plain double-click will be blocked the first time.
 
 __MacOS: Intel__
 
-Same as above, but for `io-mac-x64.dmg`. It will say the scanner can't run on an Intel Mac. This is expected, you will hav to use the local address of the privacy-server you started on your laptop (see previous section).
+Same as above, but for `io-mac-x64.dmg`. It will use the privacy server for scanning; if that server is not reachable, io falls back to pattern matching only.
 
 __Linux__
 
-1. Copy `insightout/io/io-linux-x64-offline` to their home dir 
-2. `./io` in a terminal, or right click -> Properties -> Permissions -> "Allow executing file as program" 
+1. Copy `insightout/io/io-linux-x64` to their home dir
+2. `./io` in a terminal, or right click -> Properties -> Permissions -> "Allow executing file as program"
 
-## 3. Participatn Actions 
+## 3. Participatn Actions
 
 Starting io asks for an API key or a server address, shows a short note about data, and is ready
 for a folder. There is sample data at `insightout/data`.
 
-## 4. If someone cannot install something 
+## 4. If someone cannot install something
 
 In order:
 
-1. **The offline build** from the drive. Downloads nothing.
-2. **A privacy server address**, if io says the scanner cannot run on their computer.
+1. **The thin build** from the drive. Downloads nothing big.
+2. **A privacy server address**, if io says the on-device scanner was not downloaded.
 3. **Pattern matching only**, if they would rather not use a server.
 4. **From source**, if a download will not start at all:
    [running io from source](INSTALL-from-source.md). Needs python 3.10+ and node 18+.

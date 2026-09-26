@@ -51,6 +51,17 @@ CONF = Path(os.environ.get("IO_HOME") or (Path.home() / ".config" / "io"))
 CONF.mkdir(parents=True, exist_ok=True)
 DECISIONS_PATH = CONF / "decisions.json"
 FOLDERS_PATH = CONF / "folders.json"
+CHAT_PRIVACY_PATH = CONF / "chat-privacy.json"
+
+def private_chat():
+    try:
+        record = json.loads(CHAT_PRIVACY_PATH.read_text())
+        return True if not isinstance(record, dict) else bool(record.get("__all_private__") or record.get(str(S.folder), False))
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError):
+        return True  # A damaged privacy record must never reopen command networking.
+
 VOTES_PATH = FOLDERS_PATH.with_name("votes.json")
 COMPARE_LOG = str(FOLDERS_PATH.with_name("compare-log.jsonl"))
 
@@ -239,6 +250,8 @@ class State:
             self.sessions[str(self.folder)] = {k: getattr(self, k, None) for k in self.SESSION_FIELDS}
 
     def load_folder(self, folder: Path) -> None:
+        if globals().get("PROXY") and getattr(self, "folder", None) != folder:
+            PROXY.last_user = ""
         # Switching folders must not throw away finished work: scans are stashed in
         # memory, and coming back to a folder whose files are unchanged is instant.
         self.stash_session()
@@ -566,11 +579,13 @@ class IoPolicy(codex_proxy.Policy):
 # prefix to an OpenAI-compatible Responses server, through the same transform code, so the
 # interactive session can be exercised on a machine with no ChatGPT login. Never set for a user.
 _dev = dict(x.split("=", 1) for x in os.environ.get("IO_PROXY_DEV_UPSTREAM", "").split(";") if "=" in x)
+_router_key = ""
+_control_revision = 0
 PROXY = codex_proxy.Proxy(
     IoPolicy(),
     log=lambda line: print("proxy " + line, flush=True),
     dump_dir=Path(os.environ["IO_PROXY_DUMP"]) if os.environ.get("IO_PROXY_DUMP") else None,
-    dev_upstreams=_dev,
+    dev_upstreams=_dev, openrouter_key=lambda: _router_key,
 )
 
 PROMPT = """You are helping someone understand their files. The files are below as CSV. Values like NAME_001,
@@ -906,6 +921,8 @@ class H(BaseHTTPRequestHandler):
                                "files": [{"name": t["name"], "rows": len(t["frame"]), "columns": list(t["frame"].columns)} for t in S.tables],
                                "docs": [{"name": d["name"]} for d in getattr(S, "docs", [])],
                                "turns": [client_view(t) for t in S.turns],
+                               "chat": bool(S.folder and S.folder.parent == CONF / "chats"),
+                               "private_chat": private_chat(),
                                "vault": len(S.pmap.display) if S.pmap else 0, "progress": S.progress[-4:]})
         m = re.match(r"^/api/cpage/(\d+)/(\d)$", p)
         if m:
@@ -959,6 +976,10 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/folders":
             folders = json.loads(FOLDERS_PATH.read_text()) if FOLDERS_PATH.exists() else []
             return self._json({"folders": folders})
+        if p == "/api/codex/last-message":
+            if self.headers.get("X-IO-Shell") != os.environ.get("IO_SHELL_TOKEN") or not os.environ.get("IO_SHELL_TOKEN"):
+                return self._json({"error": "shell only"}, 403)
+            return self._json({"text": PROXY.last_user})
         if p == "/api/codex":
             # Everything the shell needs to launch Codex, and everything the status bar shows.
             # The service is the authority on readiness; the shell never launches on the
@@ -968,6 +989,10 @@ class H(BaseHTTPRequestHandler):
                                "reason": None if pol.ready() else pol.not_ready_reason(),
                                "folder": str(S.folder) if S.folder else None,
                                "vault": len(S.pmap.display) if S.pmap else 0,
+                               "chat": bool(S.folder and S.folder.parent == CONF / "chats"),
+                               "private_chat": private_chat(),
+                               "quota": PROXY.quota, "provider_error": PROXY.provider_error,
+                               "router_configured": bool(_router_key), "control_revision": _control_revision,
                                "stats": PROXY.stats.snapshot(), "dump": bool(PROXY.dump_dir)})
         if p == "/api/preview":
             with S.lock:
@@ -1039,7 +1064,7 @@ class H(BaseHTTPRequestHandler):
                 # policy is approved trivially (nothing to review), the vault starts empty
                 # and grows only from what the person types (validators + scanner, the
                 # same as a typed question). Files come in through /api/attach.
-                ws = CONF / "chats" / time.strftime("%Y%m%d-%H%M%S")
+                ws = CONF / "chats" / (time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6])
                 ws.mkdir(parents=True, exist_ok=True)
                 with S.lock:
                     S.load_folder(ws)
@@ -1047,6 +1072,8 @@ class H(BaseHTTPRequestHandler):
                     S.accepted = True
                 return self._json({"folder": str(ws)})
             if self.path == "/api/attach":
+                if not os.environ.get("IO_SHELL_TOKEN") or self.headers.get("X-IO-Shell") != os.environ.get("IO_SHELL_TOKEN"):
+                    return self._json({"error": "Use io's attach a file button."}, 403)
                 # Bring one file into the current chat workspace: copy it in (Codex works on
                 # real files), rescan the folder so the review sheet shows what will leave.
                 # Approval is withdrawn until the person presses Looks right again; the proxy
@@ -1054,12 +1081,26 @@ class H(BaseHTTPRequestHandler):
                 src = Path(body["path"]).expanduser()
                 if not src.is_file():
                     return self._json({"error": "not a file"}, 400)
-                if not S.folder or not str(S.folder).startswith(str(CONF / "chats")):
+                if not S.folder or S.folder.parent != CONF / "chats":
                     return self._json({"error": "attach works in a conversation without a sheltered folder; shelter the folder instead"}, 400)
                 import shutil  # noqa: PLC0415
                 dest = S.folder / src.name
+                if body.get("private"):
+                    try:
+                        privacy = json.loads(CHAT_PRIVACY_PATH.read_text())
+                        if not isinstance(privacy, dict):
+                            privacy = {"__all_private__": True}
+                    except FileNotFoundError:
+                        privacy = {}
+                    except (OSError, ValueError):
+                        privacy = {"__all_private__": True}
+                    privacy[str(S.folder)] = True
+                    CHAT_PRIVACY_PATH.write_text(json.dumps(privacy))
+                    CHAT_PRIVACY_PATH.chmod(0o600)
                 shutil.copy2(src, dest)
                 with S.lock:
+                    S.accepted = False
+                    S.fsig = None  # Force a rescan even for a same-size, same-timestamp replacement.
                     S.sessions.pop(str(S.folder), None)
                     S.load_folder(S.folder)
                 return self._json({"attached": src.name, **self.review()})
@@ -1136,6 +1177,7 @@ class H(BaseHTTPRequestHandler):
                 FOLDERS_PATH.write_text(json.dumps(folders, indent=1))
                 return self._json({"folders": folders})
             if self.path == "/api/chat/reset":
+                PROXY.last_user = ""
                 with S.lock:
                     S.turns = []           # the chat is forgotten; the scan, vault and decisions survive
                 return self._json({"ok": True})
@@ -1224,7 +1266,21 @@ class H(BaseHTTPRequestHandler):
         return {"files": out, "skipped": getattr(S, "skipped", []), "deferred": getattr(S, "deferred", [])}
 
 
+def shell_control():
+    global _router_key, _control_revision
+    for line in sys.stdin:
+        try:
+            message = json.loads(line)
+            if message.get("op") == "openrouter-key":
+                _router_key = str(message.get("key") or "")
+                _control_revision = int(message.get("revision", 0))
+                PROXY.provider_error = None if _router_key else {"kind": "key", "message": "Add an OpenRouter key in settings to continue."}
+        except (ValueError, TypeError):
+            pass
+
+
 def main():
+    threading.Thread(target=shell_control, daemon=True).start()
     threading.Thread(target=S.get_detector, daemon=True).start()  # warm the scanner
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8801
     # The privacy proxy listens from the start, on a port the OS picks, and refuses every

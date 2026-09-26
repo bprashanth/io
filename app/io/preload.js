@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 // What the page may ask the shell for. Terminal bytes and status strings cross this bridge;
 // paths, ports and credentials are decided on the other side.
 contextBridge.exposeInMainWorld('io', {
+  installScanner: () => ipcRenderer.invoke('scanner-install'),
+  openrouterSettings: () => ipcRenderer.invoke('openrouter-settings'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   openExternal: url => ipcRenderer.invoke('open-external', url),
   pickFile: () => ipcRenderer.invoke('pick-file'),
@@ -15,6 +17,7 @@ contextBridge.exposeInMainWorld('io', {
     logout: () => ipcRenderer.invoke('codex-logout'),
     start: opts => ipcRenderer.invoke('codex-start', opts),
     switch: opts => ipcRenderer.invoke('codex-switch', opts),
+    attach: opts => ipcRenderer.invoke('codex-attach', opts),
     sandboxFix: () => ipcRenderer.invoke('sandbox-fix'),
     toolbox: () => ipcRenderer.invoke('toolbox-list'),
     toolboxImage: () => ipcRenderer.invoke('toolbox-last-image'),

@@ -1,5 +1,11 @@
 # io + Codex: the real Codex CLI inside io, behind the privacy boundary
 
+**Update 2026-09-26:** attachment privacy, explicit OpenRouter fallback, isolated key settings,
+and server-first thin setup are implemented. Current behavior and verification limits are in
+[model-switching.md](model-switching.md), [sandboxing.md](sandboxing.md), and
+[distribution.md](distribution.md). The development drives described below are historical;
+OpenRouter keys no longer enter Codex through `IO_DEV_KEY`.
+
 Status 2026-09-14: built and verified on Linux (arm64 DGX; x64 binary pinned, not yet run on
 an x64 machine). The one step that needs a person is signing io's Codex into a ChatGPT
 account; everything either side of that step has evidence in
@@ -103,7 +109,9 @@ Passed through unchanged, logged: `GET backend-api/codex/models`, `backend-api/w
   are clickable; a local file Codex wrote under the folder opens with one click.
 - **A conversation without a folder**: type into the chat box on the shelf. Codex runs in an
   empty io-owned folder with network on; "attach a file" copies a file in, runs the same
-  review, and returns to the same conversation with a note; nothing is typed for the person.
+  review, and returns to the same conversation. io asks whether the file is private before copying,
+  closes command networking if it is, and sends a clearly labelled io attachment notice
+  only after review approval.
 - **The wall**: a Codex permissions profile (`default_permissions = "io"`) lets commands
   write the working folder, read only what the platform needs plus io's AGENTS.md, and
   nothing else on disk; network only in a conversation. Enforced by Codex through bwrap on

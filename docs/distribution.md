@@ -3,8 +3,7 @@
 Part of [ARCHITECTURE.md](ARCHITECTURE.md). How to prepare the drives is in
 `installation/RELEASES.md` and `installation/EVENTS.md`.
 
-**Status, 2026-09-26: decided, not yet built.** The next release is the first to go on the
-sticks this way.
+**Status, 2026-09-26: implemented; Linux arm64 first-run and packaged smoke tested on the DGX.** The next release is the first to go on the sticks this way.
 
 ## The decision
 
@@ -22,13 +21,22 @@ folder to their laptop and starts io. Scanning for names and places goes to the 
 The offline build stays available for rooms with no internet and for anyone who does not want
 their text sent to the server.
 
-## What still has to be built
+## First-run selection and measurement
 
-Today a thin first run also installs torch and the on-device model, about 1.9 GB, before io
-opens, even though the server is scanned first. io already has the path that skips them: Intel
-Macs, which cannot run the model, install only the readers (about 100 MB). The work is to take
-that path whenever the privacy server answers at first run, and keep the on-device download as
-a choice. Then the drive instructions switch to the thin builds.
+Thin setup probes the privacy server and installs only Python and the file readers.
+It writes an honest marker saying the local scanner was not downloaded. If the
+server is unavailable, the app offers another server, the on-device download, or
+pattern matching. `IO_SCANNER=local` explicitly installs the local model even after
+a readers-only setup. The build-time `bootstrap.js --dest` command still makes a
+full offline payload; thin setup and payload baking are deliberately distinct.
+
+On the DGX (Linux arm64), a new runtime directory with pip caching disabled took
+**19.8 seconds**, occupying **475 MB**. It downloaded the 84 MB standalone Python
+archive and file-reader wheels, **no torch and no model weights**. pandas,
+openpyxl and matplotlib import; a synthetic name/place/phone scan succeeded through
+the privacy server. The unavailable-server screen and pattern-only choice were
+also driven in Electron. This is an empty-install measurement on an existing DGX,
+not a reimaged participant laptop or a measurement of venue Wi-Fi.
 
 ## What leaves the laptop
 

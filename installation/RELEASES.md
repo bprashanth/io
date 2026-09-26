@@ -74,7 +74,7 @@ Everything is on the drive.
 
 **Windows**
 
-1. Open `insightout\io\io-win-x64-offline`
+1. Open `insightout\io\io-win-x64`
 2. Copy that whole folder to your computer - the Desktop is fine. It runs from the drive
    too, but everything is slower.
 3. Double-click `io.exe`
@@ -84,20 +84,20 @@ Everything is on the drive.
 
 **Mac, Apple silicon (M1-M4)**
 
-1. Double-click `insightout/io/io-mac-arm64-offline.dmg`
+1. Double-click `insightout/io/io-mac-arm64.dmg`
 2. Drag `io` out to your Desktop or home folder - **not** into Applications
 3. **Right-click `io` and choose Open**, then Open again. A plain double-click is blocked
    the first time. Normal double-clicks work after that.
 
 **Mac, Intel**
 
-Same as above, with `insightout/io/io-mac-x64.dmg`. Two differences: the first start needs
-internet and takes a few minutes, and io will say the private-data scanner cannot run on an
-Intel Mac. That is expected - ask the organizers for a privacy server address.
+Same as above, with `insightout/io/io-mac-x64.dmg`. The first start may take a few minutes
+while io reaches the privacy server; if that server is not reachable, io still opens with
+pattern matching only. Ask the organisers for the server address if that happens.
 
 **Linux**
 
-1. Copy `insightout/io/io-linux-x64-offline` to your home folder
+1. Copy `insightout/io/io-linux-x64` to your home folder
 2. Run `./io` in a terminal from inside it. Or right-click `io` → Properties → Permissions →
    tick "Allow executing file as program", then double-click.
 

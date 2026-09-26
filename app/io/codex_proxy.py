@@ -202,7 +202,14 @@ def walk_strings(node: Any, fn: Callable[[str, str | None, str | None], str], ro
 
 class Proxy:
     def __init__(self, policy: Policy, upstream: str = "https://chatgpt.com", log: Callable[[str], None] | None = None,
-                 dump_dir: Path | None = None, dev_upstreams: dict[str, str] | None = None) -> None:
+                 dump_dir: Path | None = None, dev_upstreams: dict[str, str] | None = None, openrouter_key=None,
+                 openrouter_upstream="https://openrouter.ai/api/v1") -> None:
+        self.openrouter_key = openrouter_key or (lambda: "")
+        self.openrouter_upstream = openrouter_upstream
+        self.quota = {"exhausted": False}
+        self.provider_error = None
+        self._credentials = set()
+        self.last_user = ""
         self.policy = policy
         self.upstream = upstream
         self.log = log or (lambda line: None)
@@ -325,15 +332,13 @@ class Proxy:
         try:
             self._handle(h, method, path, rid, entry)
         except Exception as exc:  # noqa: BLE001
-            if not isinstance(exc, (OSError, http.client.HTTPException)):
-                traceback.print_exc()
             entry["status"] = 502
-            entry["error"] = f"{type(exc).__name__}: {exc}"[:200]
-            self._reply(h, 502, {"error": {"message": f"io proxy: {type(exc).__name__}: {exc}"[:300]}}, entry)
+            entry["error"] = type(exc).__name__
+            self._reply(h, 502, {"error": {"message": f"io proxy: {type(exc).__name__}"}}, entry)
         finally:
             entry["ms"] = int((time.monotonic() - t0) * 1000)
             self.stats.record(entry)
-            self.log(json.dumps(entry, default=str))
+            self.log(self.scrub(json.dumps(entry, default=str).encode()).decode())
 
     def _reply(self, h, code: int, obj: dict, entry: dict) -> None:
         body = json.dumps(obj).encode()
@@ -353,7 +358,7 @@ class Proxy:
             entry["note"] = "websocket refused, codex falls back to sse"
             return self._reply(h, 426, {"error": {"message": "io proxy speaks HTTP SSE only"}}, entry)
 
-        if not self.policy.ready():
+        if not self.policy.ready() and not (method == "GET" and path.startswith(PASS_PREFIXES)):
             entry["note"] = "not ready"
             return self._reply(h, 403, {"error": {"message": f"io: {self.policy.not_ready_reason()}"}}, entry)
 
@@ -388,19 +393,38 @@ class Proxy:
 
         headers = {k: v for k, v in h.headers.items()
                    if k.lower() not in ("host", "content-length", "transfer-encoding", "connection", "content-encoding", "accept-encoding")}
+        is_router = kind == "router" or (kind == "dev" and "openrouter.ai" in upstream)
+        if is_router:
+            key = self.openrouter_key()
+            if not key:
+                self.provider_error = {"kind": "key", "message": "Add an OpenRouter key in settings to continue."}
+                return self._reply(h, 401, {"error": {"message": self.provider_error["message"]}}, entry)
+            headers = {k: v for k, v in headers.items() if k.lower() not in ("authorization", "chatgpt-account-id", "openai-organization", "openai-project")}
+            self._credentials.add(key)
+            headers["Authorization"] = "Bearer " + key
         headers["Accept-Encoding"] = "identity"
         entry["auth"] = "bearer" if (h.headers.get("Authorization") or "").lower().startswith("bearer ") else "none"
 
         body_out = raw
-        if method in ("GET", "HEAD") and kind == "dev":
+        if method in ("GET", "HEAD") and kind in ("dev", "router"):
             kind = "pass"                   # a GET has no body to transform (the dev route's /models)
-        if kind in ("content", "dev"):
+        if kind in ("content", "dev", "router"):
             kind = "content"
             try:
                 body = json.loads(raw.decode("utf-8")) if raw else None
             except (UnicodeDecodeError, json.JSONDecodeError):
                 entry["note"] = "body is not json"
                 return self._reply(h, 400, {"error": {"message": "io proxy: request body is not JSON"}}, entry)
+            if isinstance(body, dict):
+                for item in reversed(body.get("input", []) if isinstance(body.get("input"), list) else []):
+                    if isinstance(item, dict) and item.get("role") == "user":
+                        content = item.get("content", "")
+                        text = content if isinstance(content, str) else "\n".join(x.get("text", "") for x in content if isinstance(x, dict))
+                        if text and not text.startswith(("<environment_context>", "# AGENTS.md")):
+                            self.last_user = text
+                            break
+                if is_router:
+                    body = self.router_body(body)
             body, subs = self.transform_request(body)
             entry["subs"] = subs
             body_out = json.dumps(body, ensure_ascii=False).encode("utf-8")
@@ -442,7 +466,15 @@ class Proxy:
         h.send_header("Connection", "close")
 
         if kind != "content" or resp.status >= 400 and "event-stream" not in ctype:
-            data = resp.read()
+            data = self.scrub(resp.read())
+            try:
+                self.observe(json.loads(data), path, is_router)
+            except (ValueError, UnicodeDecodeError):
+                pass
+            if is_router and resp.status >= 400:
+                # Providers can echo credentials in diagnostics. Never forward or dump them.
+                self.provider_error = self.provider_error or {"kind": "provider", "message": "OpenRouter could not answer. Check your key and credit in settings."}
+                data = json.dumps({"error": {"message": self.provider_error["message"]}}).encode()
             if kind == "content" and "json" in ctype:
                 try:
                     obj, n = self.restore_value(json.loads(data.decode("utf-8")))
@@ -474,7 +506,11 @@ class Proxy:
             self.stream_sse(resp, h.wfile, rid, entry, prefix)
             return
 
-        data = prefix + resp.read()
+        data = self.scrub(prefix + resp.read())
+        try:
+            self.observe(json.loads(data), path, is_router)
+        except (ValueError, UnicodeDecodeError):
+            pass
         if "json" in ctype:
             try:
                 obj, n = self.restore_value(json.loads(data.decode("utf-8")))
@@ -488,6 +524,8 @@ class Proxy:
         h.wfile.write(data)
 
     def _prefix_for(self, path: str) -> str:
+        if path.startswith("/openrouter/v1/"):
+            return "/openrouter/v1"
         for pre in self.dev_upstreams:
             if path.startswith(pre):
                 return pre
@@ -495,6 +533,8 @@ class Proxy:
 
     def route(self, method: str, path: str) -> tuple[str, str]:
         """-> (upstream base, kind) where kind is content | pass | dev | refuse."""
+        if method == "POST" and path == "/openrouter/v1/responses":
+            return self.openrouter_upstream, "router"
         for pre, up in self.dev_upstreams.items():
             if path.startswith(pre):
                 return up, "dev"
@@ -503,6 +543,51 @@ class Proxy:
         if path.startswith(PASS_PREFIXES):
             return self.upstream, "pass"
         return self.upstream, "refuse"
+
+    def scrub(self, data):
+        key = self.openrouter_key()
+        if key:
+            self._credentials.add(key)
+        for secret in self._credentials.copy():
+            data = data.replace(secret.encode(), b"[credential removed]")
+        return data
+
+    @staticmethod
+    def router_body(body):
+        body = dict(body)
+        # Foreign encrypted reasoning cannot be replayed by another provider.
+        body["input"] = [x for x in body.get("input", [])
+                         if not isinstance(x, dict) or x.get("type") != "reasoning"] if isinstance(body.get("input"), list) else body.get("input", [])
+        body.pop("previous_response_id", None)
+        body.pop("prompt_cache_key", None)
+        body["model"] = "openai/gpt-5-mini"
+        body["store"] = False
+        body["include"] = [x for x in body.get("include", []) if x != "reasoning.encrypted_content"]
+        body["provider"] = {"data_collection": "deny", "zdr": True}
+        return body
+
+    def observe(self, obj, path, router=False):
+        if not isinstance(obj, dict):
+            return
+        if path.endswith("/wham/usage"):
+            rate = obj.get("rate_limit") or {}
+            windows = [rate.get("primary_window") or {}, rate.get("secondary_window") or {}]
+            blocked = [w for w in windows if isinstance(w.get("used_percent"), (int, float)) and w["used_percent"] >= 100]
+            exhausted = rate.get("allowed") is False or rate.get("limit_reached") is True or bool(blocked)
+            self.quota = {"exhausted": exhausted, "reset_at": max((w.get("reset_at", 0) for w in blocked), default=None)}
+        error = obj.get("error") or (obj.get("response") or {}).get("error") or {}
+        if not isinstance(error, dict):
+            return
+        code = error.get("code") or error.get("type")
+        if not router and (code == "usage_limit_reached" or error.get("type") == "usage_limit_reached"):
+            self.quota = {"exhausted": True, "reset_at": error.get("resets_at")}
+        if router and (code in ("context_length_exceeded", "invalid_encrypted_content", "invalid_previous_response_id") or any(term in str(error.get("message", "")).lower() for term in ("context length", "context window", "encrypted_content", "reasoning item", "previous_response_id"))):
+            self.provider_error = {"kind": "handover", "message": "This smaller model could not continue the saved conversation. Start with a catch-up from its visible messages."}
+        if obj.get("type") == "response.completed":
+            if router:
+                self.provider_error = None
+            else:
+                self.quota = {"exhausted": False}
 
     @staticmethod
     def _read_chunked(rfile) -> bytes:
@@ -565,12 +650,13 @@ class Proxy:
             if not data_lines:
                 emit(block + b"\n\n")
                 return
-            payload = b"\n".join(data_lines)
+            payload = self.scrub(b"\n".join(data_lines))
             try:
                 ev = json.loads(payload.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError):
                 emit(block + b"\n\n")
                 return
+            self.observe(ev, entry.get("path", ""), entry.get("path", "").startswith("/openrouter/"))
             if isinstance(ev, dict) and isinstance(ev.get("delta"), str):
                 k = stream_key(ev)
                 flush_held(exclude=k)
@@ -627,6 +713,8 @@ class Proxy:
         if not self.dump_dir:
             return
         try:
+            # Defense in depth: a misbehaving upstream may echo the bearer key.
+            data = self.scrub(data)
             self.dump_dir.mkdir(parents=True, exist_ok=True)
             n = len(list(self.dump_dir.glob("*-request.*")))
             stem = f"{n:04d}-{rid}" if which == "request" else next((p.stem.rsplit("-", 1)[0] for p in self.dump_dir.glob(f"*-{rid}-request.*")), f"{n:04d}-{rid}")

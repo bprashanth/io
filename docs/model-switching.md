@@ -1,85 +1,91 @@
-# Model switching: using another model when ChatGPT runs out
+# Model switching: carrying on when ChatGPT runs out
 
 Part of [ARCHITECTURE.md](ARCHITECTURE.md).
 
-**Status, 2026-09-26: mostly planned.** ChatGPT through the person's own sign-in is the only
-model a person can use today. A development path to OpenRouter exists. The design below is
-being built on the DGX; this page will be updated as parts are measured.
+**Status, 2026-09-26: proof of concept implemented and driven on Linux arm64.**
+ChatGPT is the default. The model control offers **OpenRouter · GPT-5 mini** once a
+key has been entered in settings. Choosing it explicitly relaunches the bundled
+Codex with the same folder and saved conversation. Model traffic still passes
+through the same coding and leak checks in io's proxy.
 
-## Today
+## Allowance and switching
 
-- The person signs in with ChatGPT. Codex's model traffic goes through io's proxy to
-  chatgpt.com, coded on the way out.
-- For development, `IO_CODEX_DEV_PROVIDER=1` adds a model provider pointing at the proxy's
-  `/dev/v1`, which forwards to OpenRouter. The **same tokenising transforms** apply, so
-  OpenRouter sees codes only. Full sessions have been driven this way with an OpenAI model.
-- Nothing notices when the ChatGPT allowance is used up.
+Before the first message, io uses the bundled Codex's supported
+`account/rateLimits/read` app-server method. Codex owns the OAuth token; io does not
+read it. Its `/backend-api/wham/usage` request passes through the proxy even before
+there is an approved folder. Only the existing account/model metadata GET routes
+have that exception; unapproved content requests remain refused.
 
-## One constraint shapes everything
+The proxy observes `rate_limit.allowed`, `limit_reached`, and each window's
+`used_percent` and `reset_at`. An exhausted allowance is shown on the opening
+screen, with the fallback preselected if a key exists. No model starts until the
+person sends a message. During a conversation, an `usage_limit_reached` error
+(in JSON or a streamed `response.failed` event) produces a reset-time notice and a
+**Switch and resend** button. An ordinary HTTP 429 is not assumed to mean quota.
 
-The bundled Codex speaks only OpenAI's **Responses API**. Its own error text says:
-`` `wire_api = "chat"` is no longer supported``. Any other model must be offered on a
-`/v1/responses` endpoint. OpenRouter offers one. It has been proven with OpenAI models only.
+Retry takes the last user message from the **saved thread**, not the latest proxy
+request: Codex also sends background requests to generate conversation titles.
+A live fixture drive caught the wrong title instruction being resent; the saved
+thread fixes that ambiguity and prevents retries leaking across folders.
 
-## The plan
+The field shapes are backed by Codex's source and exercised with a local upstream
+fixture. **A real ChatGPT account's quota exhaustion was not tested on the DGX.**
+The fixture drive does finish with a real OpenRouter answer. See
+[the evidence](../benchmarks/runs/2026-09-26-dgx/quota-results.json) and
+[the official account API](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt).
 
-**A model control** in the terminal bar, next to the Setting control:
+## Conversation continuity
 
-- **ChatGPT**, the person's plan, as the default;
-- **OpenRouter**, starting with one smaller, cheaper model.
+1. Resume the latest saved thread for this exact folder. The proxy removes
+   reasoning items and the previous-provider response reference on the OpenRouter
+   route. Visible history still goes through the normal coding pass.
+2. If the provider rejects the history or context size, offer **Continue with a
+   catch-up**. This starts a fresh thread with up to 24,000 characters of recent
+   visible messages and tool results in `AGENTS.md`. No model is needed to create
+   it; hidden reasoning and system/developer messages are omitted.
+3. If that also fails, offer **Start fresh**, without the catch-up. Say plainly
+   that the smaller model could not carry over the thread; the files remain.
 
-A local or room server (such as a 27B on the organisers' machine) comes later, in
-`proposals/`. It needs a server that speaks the Responses API, or a translator in the proxy.
+Measured with the bundled Codex 0.154.0: a resumed thread remembers its project and
+coordinator after a synthetic foreign encrypted reasoning item is removed.
+**Codex re-reads `AGENTS.md` on resume**: a new marker added between turns reaches
+the model and its answer. A fresh handover also recovered the project name. The
+smaller model executed Python inside the wall and wrote the expected CSV total.
+[Resume evidence](../benchmarks/runs/2026-09-26-dgx/resume-results.json).
 
-**Running out of allowance.** The refusal and Codex's own "how much is left" requests both pass
-through the proxy, so io can see the allowance run out.
+## Keys and provider restrictions
 
-- **Before the person types:** if the allowance is already empty, io says so on the opening
-  screen and has the fallback model selected.
-- **During a conversation:** Codex cannot suggest anything, because with no allowance the
-  model never runs. io shows a line above the terminal, "Your ChatGPT allowance is used up
-  until <time>. Switch to <model> to carry on", with a button that switches and resends the
-  last message.
+The top-right settings button is available during a conversation. **OpenRouter
+key…** opens a separate local window with its own restricted preload. The main
+page receives only whether a key exists and its last four characters. Entry is a
+password field, cleared immediately on submission. OpenRouter validates the key
+through `GET /api/v1/key`; an invalid key does not replace a working one. Remaining
+key allowance is shown when `limit_remaining` is reported. An unlimited key does
+not imply an unlimited account balance, so io does not invent a credit figure.
 
-io offers the switch; it never makes it silently. A different provider receives the coded
-conversation, and that is the person's choice.
+Normal mode saves `<io data>/openrouter-key.json` with mode 0600, by atomic rename.
+Unlike the old general API-key field, this persists because organisers hand out a
+key for repeated visits. Portable mode keeps it **in memory only**, so it does not
+travel with a USB stick. Replace/remove takes effect on the next request, without
+restarting Codex or automatically changing the provider.
 
-## Moving a conversation to another model
+The key goes from Electron's main process to the Python service over its private
+stdin pipe. The proxy inserts Authorization only on the OpenRouter route. Codex's
+profile has no `env_key`; provider keys are stripped from its environment. Logs,
+dumps and provider errors are scrubbed defensively, including previously used keys
+for replies still in flight. Routing requires both `provider.zdr = true` and
+`provider.data_collection = "deny"`; there is no unrestricted fallback. See
+[OpenRouter's routing controls](https://openrouter.ai/docs/guides/routing/provider-selection).
 
-A saved Codex thread is mostly plain: every message, tool call and tool output is readable. Only
-the old model's hidden reasoning is encrypted, and another provider cannot use it. That gives
-three ways to carry on, in order of preference:
+## Limits of this proof of concept
 
-1. **Strip the reasoning and resume.** The proxy drops the encrypted reasoning items on their
-   way to a non-OpenAI provider, and Codex resumes the same thread with the whole visible
-   history. Seamless when it works. The first thing to test.
-2. **Start afresh with a handover.** Needed when the thread is too long for the smaller model.
-   io starts a new thread and writes a summary of the old one into `AGENTS.md`, which is
-   rewritten at every launch and read from the first turn. The summary is built from the plain
-   parts of the saved thread, so it does not need the old model, whose allowance may be gone.
-   It holds real values, but it reaches the new model only through the proxy, so it is coded
-   like everything else.
-3. **Start afresh.** The same opening with no summary, if option 2 misbehaves.
-
-When a fresh start is needed, the person is told why, in the terms they will understand:
-
-> You're switching to a smaller model. It can't pick up this conversation exactly where the
-> bigger one left off, so we'll start fresh. I can still see what was done in this folder.
-> Would you like me to catch up on it first?
-
-## The API key
-
-- **The key never enters Codex's environment.** io's proxy adds it to requests on their way
-  out. A command inside the wall can never read it. (The development path today still passes it
-  to Codex as `IO_DEV_KEY`; that changes.)
-- **Pin OpenRouter to providers that neither store nor train on data.** Codes hold regardless,
-  but values outside the vault, such as amounts and notes, reach whoever runs the model.
-- **How a person gets a key (decided 2026-09-26).** For testing, a config file on the
-  developer's machine. For people, the organisers hand out OpenRouter keys, for example when
-  someone's ChatGPT allowance runs out, and the person enters it in io's settings at any time,
-  including mid-conversation. No key server, and no key built into the app.
-
-## Costs
-
-OpenRouter bills per token. Codex requests measured at roughly 7k to 35k tokens each, and the
-whole history is resent every turn, so long conversations add up.
+- GPT-5 mini works through OpenRouter's Responses API, but Codex lacks a catalogue
+  entry for it and prints a metadata warning. io has not invented capabilities to
+  suppress that warning.
+- Real quota exhaustion, macOS and Windows drives remain unverified.
+- The live history test uses synthetic foreign ciphertext; it does not claim a
+  measured migration from a real ChatGPT account's encrypted history.
+- Codes protect known private values. Values outside the vault still reach the
+  selected provider, as described in [tokenization.md](tokenization.md).
+- OpenRouter bills per token. Long histories are resent and cost more; a local or
+  room server is still a later proposal.

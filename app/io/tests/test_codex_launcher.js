@@ -8,7 +8,8 @@ const path = require('path');
 const { execSync } = require('child_process');
 const codex = require('../codex');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'io-codex-launcher-'));
+// Temp is explicitly readable inside the wall; the denial probe must live elsewhere.
+const tmp = fs.mkdtempSync(path.join(os.homedir(), '.io-codex-launcher-'));
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('ok -', name); };
 
@@ -59,14 +60,21 @@ test('config is rewritten with a new port, not appended', () => {
   assert.ok(!toml.includes(':1111/'));
 });
 
-test('environment carries CODEX_HOME and strips any OpenAI key', () => {
+test('environment carries CODEX_HOME and strips provider/session keys', () => {
   process.env.OPENAI_API_KEY = 'sk-should-not-leak';
   process.env.OPENAI_BASE_URL = 'https://example.invalid';
+  process.env.OPENROUTER_API_KEY = 'or-should-not-leak';
+  process.env.IO_DEV_KEY = 'dev-should-not-leak';
+  process.env.IO_SHELL_TOKEN = 'shell-should-not-leak';
   const env = codex.baseEnv('/data/io/codex/home');
   assert.strictEqual(env.CODEX_HOME, '/data/io/codex/home');
   assert.strictEqual(env.OPENAI_API_KEY, undefined);
   assert.strictEqual(env.OPENAI_BASE_URL, undefined);
+  assert.strictEqual(env.OPENROUTER_API_KEY, undefined);
+  assert.strictEqual(env.IO_DEV_KEY, undefined);
+  assert.strictEqual(env.IO_SHELL_TOKEN, undefined);
   delete process.env.OPENAI_API_KEY; delete process.env.OPENAI_BASE_URL;
+  delete process.env.OPENROUTER_API_KEY; delete process.env.IO_DEV_KEY; delete process.env.IO_SHELL_TOKEN;
 });
 
 test('login status on an empty home is "not logged in" and never reads ~/.codex', () => {
@@ -87,16 +95,31 @@ test('AGENTS.md for the audience is written beside the profile, chat variant dif
   assert.ok(/not programmers/.test(a) && /NAME_001/.test(a) && !/attach a file/.test(a));
   codex.writeConfig(home, 7, { chat: true });
   const b = fs.readFileSync(path.join(home, 'AGENTS.md'), 'utf8');
-  assert.ok(/attach a file/.test(b));
+  assert.ok(/attach a file/.test(b) && /bottom right/.test(b));
   const t = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8'); assert.ok(t.includes('default_permissions = "io"') && t.includes('[permissions.io.network]\nenabled = true') && t.includes('":minimal" = "read"'));
 });
 
-test('dev provider block only appears when asked for', () => {
+test('private chat keeps commands offline even with chat on and the wall open', () => {
+  const home = path.join(tmp, 'home-private');
+  assert.strictEqual(codex.commandsOnline({ chat: true, wall: 'open' }), true);
+  assert.strictEqual(codex.commandsOnline({ chat: true, privateChat: true, wall: 'open' }), false);
+  codex.writeConfig(home, 8, { chat: true, privateChat: true, wall: 'open' });
+  const toml = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
+  assert.ok(toml.includes('default_permissions = "io"'));
+  assert.ok(toml.includes('[permissions.io.network]\nenabled = false'));
+});
+
+test('router config uses the OpenRouter base url and no embedded secret', () => {
   const home = path.join(tmp, 'home3');
   codex.writeConfig(home, 5, { devProvider: true });
   const toml = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
-  assert.ok(toml.includes('model_provider = "io-dev"') && toml.includes('/dev/v1"'));
-  assert.ok(toml.indexOf('model_provider = "io-dev"') < toml.indexOf('\n['), 'top-level key before any table');
+  assert.ok(toml.includes('model_provider = "io-openrouter"'));
+  assert.ok(toml.includes('base_url = "http://127.0.0.1:5/openrouter/v1"'));
+  assert.ok(toml.includes('wire_api = "responses"'));
+  assert.ok(toml.includes('requires_openai_auth = false'));
+  assert.ok(toml.includes('supports_websockets = false'));
+  assert.ok(!/env_key|secret/i.test(toml));
+  assert.ok(toml.indexOf('model_provider = "io-openrouter"') < toml.indexOf('\n['), 'top-level key before any table');
 });
 
 test('the three walls differ only in network, and never in the folder boundary', () => {
@@ -145,13 +168,16 @@ test('io ships the analysis packages into the wall, and only io-owned paths', ()
 });
 
 test('the sandbox check answers with a verdict, and with the admin fix when it fails', () => {
-  const r = codex.sandboxCheck(codex.bundledCodexPath().dir);
+  const b = codex.bundledCodexPath();
+  const libsDir = path.resolve(__dirname, '..', '.venv');
+  const r = codex.sandboxCheck({ bin: b.path, codexDir: b.dir, libsDir,
+    python: path.join(libsDir, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python3'), dataDir: tmp });
   assert.strictEqual(typeof r.ok, 'boolean');
   if (process.platform === 'linux') {
     assert.strictEqual(r.checked, true);
     if (!r.ok) { assert.ok(r.why); if (r.fix) { assert.ok(/userns/.test(r.fix.profile)); assert.ok(/apparmor_parser/.test(r.fix.install)); } }
   } else {
-    assert.strictEqual(r.checked, false);
+    assert.strictEqual(r.checked, true);
   }
   console.log(`   (this machine: ${r.ok ? 'wall can run' : 'wall cannot run - ' + r.why})`);
 });

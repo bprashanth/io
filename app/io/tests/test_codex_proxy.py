@@ -10,6 +10,7 @@ import json
 import sys
 import threading
 import time
+import tempfile
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -149,6 +150,16 @@ class ProxyTests(unittest.TestCase):
         cls.lines = []
         cls.proxy = Proxy(MapPolicy(MAPPING), upstream=f"http://127.0.0.1:{cls.up.port}", log=cls.lines.append)
         cls.port = cls.proxy.start()
+
+    def make_router_proxy(self, key, dump_dir=None, log=None):
+        return Proxy(
+            MapPolicy(MAPPING),
+            upstream=f"http://127.0.0.1:{self.up.port}",
+            openrouter_upstream=f"http://127.0.0.1:{self.up.port}",
+            openrouter_key=key,
+            dump_dir=dump_dir,
+            log=log or (lambda s: None),
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -360,6 +371,11 @@ class ProxyTests(unittest.TestCase):
             self.assertEqual(status, 403)
             self.assertIn("about to leave", data.decode())
             self.assertEqual(len(self.up.received), 0)
+            for _ in range(50):
+                if lines:
+                    break
+                time.sleep(0.01)
+            self.assertTrue(lines, "proxy log line never arrived")
             entry = json.loads(lines[-1])
             self.assertEqual(entry["leaks"], [{"code": "NAME_001", "keys": ["text"]}])
             self.assertNotIn("Alice", lines[-1])
@@ -441,6 +457,110 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(a, "who is NAME_001")
         self.assertEqual(b[0]["content"][0]["text"], "who is NAME_001")
         self.assertEqual(b[1]["content"][0]["text"], "NAME_001 is in PLACE_001")
+
+    def test_openrouter_route_matches_chatgpt_restoration_and_rewrites_router_body(self):
+        body = {
+            "instructions": "use Alice Example and SecretVillage",
+            "previous_response_id": "prev-1",
+            "prompt_cache_key": "cache-1",
+            "include": ["reasoning.encrypted_content", "other"],
+            "provider": {"data_collection": "allow", "zdr": False},
+            "input": [
+                {"type": "reasoning", "summary": "keep this private"},
+                {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hello Alice Example"}]},
+            ],
+        }
+        response = b'{"output":[{"text":"NAME_001 says hi to PLACE_001"}]}'
+        self.up.script.append(("application/json", 200, [response]))
+        self.up.script.append(("application/json", 200, [response]))
+
+        status, _h, chatgpt_data = post(self.port, "/backend-api/codex/responses/compact", body)
+        self.assertEqual(status, 200)
+
+        router = self.make_router_proxy(lambda: "sk-router-123")
+        port = router.start()
+        try:
+            status, _h, router_data = post(
+                port,
+                "/openrouter/v1/responses",
+                body,
+                headers={
+                    "Authorization": "Bearer oauth-token",
+                    "OpenAI-Organization": "org-1",
+                    "OpenAI-Project": "proj-1",
+                },
+            )
+            self.assertEqual(status, 200)
+        finally:
+            router.stop()
+
+        self.assertEqual(json.loads(chatgpt_data)["output"][0]["text"], "Alice Example says hi to SecretVillage")
+        self.assertEqual(json.loads(router_data)["output"][0]["text"], "Alice Example says hi to SecretVillage")
+
+        chat_body = json.loads(self.up.received[0]["body"])
+        router_body = json.loads(self.up.received[1]["body"])
+        self.assertEqual(chat_body["instructions"], "use NAME_001 and PLACE_001")
+        self.assertEqual([item["type"] for item in chat_body["input"]], ["reasoning", "message"])
+        self.assertEqual(chat_body["provider"], {"data_collection": "allow", "zdr": False})
+
+        self.assertEqual(router_body["instructions"], "use NAME_001 and PLACE_001")
+        self.assertEqual([item["type"] for item in router_body["input"]], ["message"])
+        self.assertEqual(router_body["provider"], {"data_collection": "deny", "zdr": True})
+        self.assertFalse(router_body["store"])
+        self.assertNotIn("previous_response_id", router_body)
+        self.assertNotIn("prompt_cache_key", router_body)
+        self.assertNotIn("reasoning.encrypted_content", router_body["include"])
+        self.assertEqual(self.up.received[1]["headers"].get("Authorization"), "Bearer sk-router-123")
+        self.assertNotEqual(self.up.received[1]["headers"].get("Authorization"), "Bearer oauth-token")
+        self.assertNotIn("OpenAI-Organization", self.up.received[1]["headers"])
+        self.assertNotIn("OpenAI-Project", self.up.received[1]["headers"])
+
+    def test_openrouter_key_callback_replacement_and_removal_without_restart(self):
+        state = {"key": "sk-router-1"}
+        router = self.make_router_proxy(lambda: state["key"])
+        port = router.start()
+        try:
+            self.up.script.append(("application/json", 200, [b"{}"]))
+            status, _h, _ = post(port, "/openrouter/v1/responses", {"input": []}, headers={"Authorization": "Bearer oauth-token"})
+            self.assertEqual(status, 200)
+            self.assertEqual(self.up.received[0]["headers"].get("Authorization"), "Bearer sk-router-1")
+            self.assertNotEqual(self.up.received[0]["headers"].get("Authorization"), "Bearer oauth-token")
+
+            state["key"] = "sk-router-2"
+            self.up.script.append(("application/json", 200, [b"{}"]))
+            status, _h, _ = post(port, "/openrouter/v1/responses", {"input": []}, headers={"Authorization": "Bearer oauth-token"})
+            self.assertEqual(status, 200)
+            self.assertEqual(self.up.received[1]["headers"].get("Authorization"), "Bearer sk-router-2")
+
+            state["key"] = ""
+            status, _h, data = post(port, "/openrouter/v1/responses", {"input": []}, headers={"Authorization": "Bearer oauth-token"})
+            self.assertEqual(status, 401)
+            self.assertIn("Add an OpenRouter key", data.decode())
+            self.assertEqual(len(self.up.received), 2)
+        finally:
+            router.stop()
+
+    def test_openrouter_dump_and_log_redact_echoed_key(self):
+        secret = "sk-router-leak"
+        with tempfile.TemporaryDirectory() as td:
+            dump_dir = Path(td)
+            lines = []
+            router = self.make_router_proxy(lambda: secret, dump_dir=dump_dir, log=lines.append)
+            port = router.start()
+            try:
+                self.up.script.append(("application/json", 200, [json.dumps({"message": f"echo {secret}"}).encode("utf-8")]))
+                status, _h, _ = post(port, "/openrouter/v1/responses", {"input": []}, headers={"Authorization": "Bearer oauth-token"})
+                self.assertEqual(status, 200)
+            finally:
+                router.stop()
+
+            dumped = sorted(dump_dir.glob("*.txt"))
+            self.assertGreaterEqual(len(dumped), 2)
+            for p in dumped:
+                text = p.read_text("utf-8")
+                self.assertNotIn(secret, text)
+            self.assertTrue(any("[credential removed]" in p.read_text("utf-8") for p in dumped))
+            self.assertNotIn(secret, "\n".join(lines))
 
 
 

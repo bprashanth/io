@@ -10,6 +10,10 @@ const crypto = require('crypto');
 const runtime = require('./runtime');
 const bootstrap = require('./bootstrap');
 const codex = require('./codex');
+const {KeyStore} = require('./openrouter');
+const SHELL_TOKEN = crypto.randomBytes(32).toString('hex');
+let routerKeys = null, keyWindow = null, keyRevision = 0;
+let selectedProvider = process.env.IO_CODEX_DEV_PROVIDER === '1' ? 'openrouter' : 'chatgpt';
 
 const PORT_BASE = Number(process.env.IO_PORT_BASE || 8801);
 let proc = null;
@@ -28,12 +32,12 @@ let login = null;        // child process of `codex login`
 
 const servicePost = (p, body) => new Promise((res, rej) => {
   const data = JSON.stringify(body || {});
-  const req = http.request({ host: '127.0.0.1', port: servicePort, path: p, method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } }, r => {
+  const req = http.request({ host: '127.0.0.1', port: servicePort, path: p, method: 'POST', headers: { 'X-IO-Shell': SHELL_TOKEN, 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } }, r => {
     let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } });
   });
   req.on('error', rej); req.end(data);
 });
-const serviceGet = p => new Promise((res, rej) => http.get(`http://127.0.0.1:${servicePort}${p}`, r => {
+const serviceGet = p => new Promise((res, rej) => http.get(`http://127.0.0.1:${servicePort}${p}`, {headers: {"X-IO-Shell": SHELL_TOKEN}}, r => {
   let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch (e) { rej(e); } });
 }).on('error', rej));
 
@@ -68,11 +72,12 @@ function sandboxNow() {
   return codex.sandboxCheck({ bin: bin.path, codexDir: bin.dir, libsDir: env.runtimeDir, python: pythonForProbe(), dataDir: env.dataDir });
 }
 
+let quotaCheckedAt = 0, quotaPending = null;
 async function codexStatus() {
   const { bin, home } = codexPaths();
   const info = codex.binaryInfo(bin.path);
   const out = { version: bin.version, target: bin.key, binary: info.exists && info.executable, home, pty: codex.hasPty(),
-                loginBusy: !!login, running: !!session, folder: session ? session.ioFolder : null, wall };
+                provider: selectedProvider, openrouter: routerKeys ? routerKeys.status() : {configured: false}, loginBusy: !!login, handover: session ? !!session.ioHandover : false, network: session ? session.ioNetwork : null, privateChat: session ? session.ioPrivate : false, running: !!session, pid: session ? session.pid : null, folder: session ? session.ioFolder : null, wall };
   if (out.binary) Object.assign(out, codex.loginStatus(bin.path, home));
   else out.line = `bundled Codex is missing (expected ${bin.path})`;
   // Whether the wall can run here. Written out once so an administrator has the exact file
@@ -84,13 +89,68 @@ async function codexStatus() {
   if (sb.fix) {
     try { const p = path.join(env.dataDir, 'io-bwrap'); fs.writeFileSync(p, sb.fix.profile); out.sandbox.profilePath = p; } catch {}
   }
-  try { out.service = await serviceGet('/api/codex'); } catch { out.service = null; }
+  try {
+    out.service = await serviceGet('/api/codex');
+    if (!session && out.loggedIn && Date.now() - quotaCheckedAt > 60000) {
+      if (!quotaPending) quotaPending = require('./quota').readQuota(bin.path, home, out.service.port).finally(() => {quotaCheckedAt = Date.now(); quotaPending = null;});
+      await quotaPending;
+      out.service = await serviceGet('/api/codex');
+    }
+  } catch { out.service = null; }
   return out;
 }
 
 function sendToWin(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
+
+async function sendRouterKey() {
+  if (!proc || !proc.stdin.writable) throw new Error('service not ready');
+  const revision = ++keyRevision;
+  proc.stdin.write(JSON.stringify({op: 'openrouter-key', key: routerKeys.key, revision}) + '\n');
+  for (let i = 0; i < 50; i++) {
+    const st = await serviceGet('/api/codex');
+    if (st.control_revision >= revision) return;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  throw new Error('service did not accept key update');
+}
+function fromKeyWindow(e) { return keyWindow && !keyWindow.isDestroyed() && e.sender === keyWindow.webContents; }
+let installingScanner = false;
+ipcMain.handle('scanner-install', async () => {
+  if (session) return {error: 'Finish the conversation before installing the scanner.'};
+  if (installingScanner) return {error: 'The scanner is already downloading.'};
+  installingScanner = true;
+  try {
+    const result = await bootstrap.install({dest: env.dataDir, scanner: 'local'});
+    if (!result.scanner) return {error: result.scannerError || 'The on-device scanner could not be installed.'};
+    app.relaunch(); app.exit(0); return {ok: true};
+  } catch { return {error: 'The scanner download did not finish. Try again or use pattern matching.'}; }
+  finally { installingScanner = false; }
+});
+ipcMain.handle('openrouter-settings', () => {
+  if (keyWindow && !keyWindow.isDestroyed()) { keyWindow.focus(); return; }
+  keyWindow = new BrowserWindow({parent: win, width: 520, height: 470, resizable: false,
+    webPreferences: {preload: path.join(__dirname, 'key-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true}});
+  keyWindow.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
+  keyWindow.webContents.on('will-navigate', e => e.preventDefault());
+  keyWindow.loadFile(path.join(env.appDir, 'ui/key.html'));
+  keyWindow.on('closed', () => { keyWindow = null; });
+});
+ipcMain.handle('openrouter-key-status', e => fromKeyWindow(e) ? routerKeys.status() : {error: 'Key settings only.'});
+ipcMain.handle('openrouter-key-save', async (e, value) => {
+  if (!fromKeyWindow(e)) return {error: 'Key settings only.'};
+  try {
+    const result = await routerKeys.replace(value);
+    if (result.ok) await sendRouterKey();
+    return result;
+  } catch { return {error: 'The key could not be saved or applied. Please try again.'}; }
+});
+ipcMain.handle('openrouter-key-remove', async e => {
+  if (!fromKeyWindow(e)) return {error: 'Key settings only.'};
+  try { const result = routerKeys.remove(); await sendRouterKey(); return result; }
+  catch { return {error: 'Could not apply the removal. Close io before continuing.'}; }
+});
 
 ipcMain.handle('codex-status', codexStatus);
 // ---- the contained viewer -------------------------------------------------------------
@@ -112,7 +172,7 @@ function viewerSession() {
 }
 function openViewer(file) {
   const canBrowser = !(wall && !codex.wallOf(wall).openPages);
-  const url = `file://${path.join(__dirname, 'ui', 'viewer.html')}?file=${encodeURIComponent(file)}&browser=${canBrowser ? 1 : 0}`;
+  const url = `file://${path.join(env.appDir, 'ui', 'viewer.html')}?file=${encodeURIComponent(file)}&browser=${canBrowser ? 1 : 0}`;
   if (viewer && !viewer.isDestroyed()) {
     if (viewerFile === file) { viewer.webContents.send('io-reload'); viewer.webContents.executeJavaScript('window.postMessage("io-reload","*")').catch(() => {}); viewer.focus(); return; }
     viewer.loadURL(url); viewerFile = file; viewer.focus(); return;
@@ -324,24 +384,32 @@ async function startSession(opts) {
   // The wall is decided here, not only in the page. A setting that needs the wall is refused
   // on a computer where it cannot run; running without it is refused on a computer where it
   // can, so it stays a fallback the person was warned about and never a shortcut.
-  const wanted = (opts && opts.wall) || codex.DEFAULT_WALL;
+  const provider = opts && opts.provider || selectedProvider;
+  if (!['chatgpt', 'openrouter'].includes(provider)) return {error: 'Unknown model.'};
+  if (provider === 'openrouter' && (!routerKeys || !routerKeys.key)) return {error: 'Add an OpenRouter key in settings first.'};
+  const wanted = info.private_chat ? "tools" : (opts && opts.wall) || codex.DEFAULT_WALL;
   const sb = sandboxNow();
+  if (info.private_chat && (!sb.ok || sb.bypass)) return { error: "A private attachment needs a working wall. Set up the wall before attaching it." };
   if (!sb.bypass) {
     if (!sb.ok && wanted !== 'unwalled') return { error: 'nowall', why: sb.why };
     if (sb.ok && wanted === 'unwalled') return { error: 'the wall works on this computer, so io will not run the assistant without it' };
   }
   wall = wanted;
+  selectedProvider = provider;
   let tb = null;
   try { tb = await startToolbox(); } catch (e) { console.error(`toolbox failed to start: ${e.message}`); }
   // the toolbox server is this process run as plain node (ELECTRON_RUN_AS_NODE); Codex
   // gives it only the environment written here, nothing inherited
   const toolboxCfg = tb ? { command: process.execPath, args: [path.join(__dirname, 'tools', 'mcp.js')], env: { ELECTRON_RUN_AS_NODE: '1', IO_TOOLS_PORT: String(tb.port), IO_TOOLS_TOKEN: tb.token } } : null;
-  codex.writeConfig(home, info.port, { model: process.env.IO_CODEX_MODEL, trust: info.folder, chat: !!(opts && opts.chat), codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: process.env.IO_CODEX_DEV_PROVIDER === '1', toolbox: toolboxCfg });
+  codex.writeConfig(home, info.port, { model: provider === 'openrouter' ? codex.ROUTER_MODEL : process.env.IO_CODEX_MODEL, provider, handover: opts && opts.handover, trust: info.folder, chat: !!info.chat, chatNetwork: wanted === 'open' || wanted === 'unwalled' || sb.bypass, privateChat: !!info.private_chat, codexDir: bin.dir, wall, libsDir: env.runtimeDir, noSandbox: process.env.IO_CODEX_NO_SANDBOX === '1', devProvider: false, toolbox: toolboxCfg });
   let mine;
   try {
     mine = session = codex.spawnSession({ bin: bin.path, home, cwd: info.folder, cols: opts && opts.cols, rows: opts && opts.rows, libsDir: env.runtimeDir, wall, resume: opts && opts.resume });
   } catch (e) { return { error: e.message }; }
   mine.ioFolder = info.folder;
+  mine.ioPrivate = !!info.private_chat;
+  mine.ioHandover = !!(opts && opts.handover);
+  mine.ioNetwork = codex.commandsOnline({chat: !!info.chat, chatNetwork: wanted === 'open' || wanted === 'unwalled' || sb.bypass, privateChat: !!info.private_chat, wall});
   watchFolder(info.folder);
   mine.onData(d => sendToWin('codex-data', d));
   // Only the *current* session may clear the handle. A killed Codex takes a moment to die,
@@ -390,12 +458,22 @@ ipcMain.handle('sandbox-fix', async () => {
 // thread resumed (`codex resume --last`), so the conversation continues and the service,
 // proxy and vault are untouched. The old process is killed first and waited for, because
 // its late exit would otherwise be taken for the new one's (see the stale guard above).
-ipcMain.handle('codex-switch', async (_e, opts) => {
+ipcMain.handle('codex-switch', async (_e, opts = {}) => {
   if (!session) return { error: 'no session to switch' };
+  if (opts.provider === 'openrouter' && !routerKeys.key) return {error: 'Add an OpenRouter key in settings first.'};
+  if (session.ioPrivate && opts.wall && opts.wall !== 'tools') return {error: 'This conversation contains a private file. Commands must stay offline.'};
+  const folder = session.ioFolder;
+  let retryText = '';
+
   const old = session;
   session = null;
   await new Promise(res => { let done = false; old.onExit(() => { if (!done) { done = true; res(); } }); try { old.kill(); } catch {} setTimeout(() => { if (!done) { done = true; res(); } }, 4000); });
-  return startSession({ ...(opts || {}), resume: '--last' });
+  const thread = require('./handover').latestThread(codexPaths().home, folder);
+  // The proxy also sees background title requests. Only the saved thread is the
+  // authority for what the person actually said.
+  if (opts.retry) retryText = thread.lastUser || '';
+  const result = await startSession({ ...opts, resume: opts.fresh ? undefined : thread && thread.id || '--last', handover: opts.fresh && !opts.noHandover && thread ? thread.text : '' });
+  return {...result, retryText, handover: !!(opts.fresh && !opts.noHandover && thread && thread.text), fresh: !!opts.fresh, retryMissing: !!opts.retry && !retryText};
 });
 ipcMain.on('codex-input', (_e, data) => { if (session) session.write(data); });
 ipcMain.on('codex-resize', (_e, { cols, rows }) => { if (session && cols > 0 && rows > 0) { try { session.resize(cols, rows); } catch {} } });
@@ -469,7 +547,7 @@ function borrowedPython() {
 // First run only. A packaged fat build never gets here: its runtime and model cache
 // shipped inside resources/, so env.ready is already true.
 async function ensureRuntime() {
-  if (env.ready) return;
+  if (env.ready && !(process.env.IO_SCANNER === 'local' && !runtime.hasScanner(env.hfCache))) return;
   if (!env.python && borrowedPython()) return;   // dev checkout with the plugin installed
 
   await openSplash();
@@ -481,7 +559,7 @@ async function ensureRuntime() {
 
   const NOTE = {
     python: 'a self-contained python, no installer and no admin',
-    packages: 'about 1.2 GB on disk. Windows Defender scans every file, so an older laptop can sit here for several minutes.',
+    packages: 'installing the file readers; this may take a few minutes on an older laptop.',
     model: 'the part that spots names and numbers, and never phones home',
   };
 
@@ -528,7 +606,8 @@ async function ensureRuntime() {
   }
   clearInterval(tick);
   log.write(`done in ${elapsed()}\n`);
-  env = runtime.resolve({ packaged: app.isPackaged });   // re-resolve: the paths exist now
+  env = runtime.resolve({ packaged: app.isPackaged });
+   // re-resolve: the paths exist now
 }
 
 async function openSplash() {
@@ -553,6 +632,7 @@ const closeSplash = () => { if (splash && !splash.isDestroyed()) splash.destroy(
 
 async function start() {
   env = runtime.resolve({ packaged: app.isPackaged });
+  routerKeys = new KeyStore(env.dataDir, !!PORTABLE);
   await ensureRuntime();
 
   const python = env.python || borrowedPython();
@@ -565,7 +645,8 @@ async function start() {
 
   // Only point the service at a cache that actually holds the scanner. Handing it an empty
   // one turns the offline fast path off and sends it to the network at startup.
-  const senv = { ...process.env };
+  const senv = { ...process.env, IO_SHELL_TOKEN: SHELL_TOKEN };
+  delete senv.IO_DEV_KEY; delete senv.OPENROUTER_API_KEY;
   if (runtime.hasScanner(env.hfCache)) senv.HF_HOME = env.hfCache;
   // Tell the service the local scanner is not available here, and why, so it can offer
   // the choice rather than silently dropping to pattern matching.
@@ -588,8 +669,10 @@ async function start() {
   const log = fs.createWriteStream(logPath, { flags: 'a' });
   log.write(`\n--- ${new Date().toISOString()} ${python} ${env.service} ${port} ---\n`);
   log.write(PORTABLE ? `portable mode: everything stays under ${PORTABLE}\n` : 'normal mode: data in the user profile\n');
-  proc = spawn(python, [env.service, String(port)], { stdio: ['ignore', 'pipe', 'pipe'], env: senv });
+  proc = spawn(python, [env.service, String(port)], { stdio: ['pipe', 'pipe', 'pipe'], env: senv });
   proc.stdout.pipe(log); proc.stderr.pipe(log);
+  proc.stdin.on('error', () => {});
+  proc.stdin.write(JSON.stringify({op: 'openrouter-key', key: routerKeys.key, revision: ++keyRevision}) + '\n');
   // A spawn that never starts writes nothing to stdout, so say so explicitly.
   proc.on('error', e => log.write(`spawn failed: ${e && e.stack || e}\n`));
   proc.on('exit', (code, sig) => log.write(`service exited code=${code} signal=${sig}\n`));
@@ -622,6 +705,29 @@ async function start() {
   }
 }
 
+// Stop the assistant before copying any attachment: an in-flight command must not
+// observe a private file while still using the old online profile.
+ipcMain.handle('codex-attach', async (_e, opts) => {
+  if (!opts || typeof opts.path !== 'string' || typeof opts.private !== 'boolean') return {error: 'Choose whether this file is private.'};
+  if (opts.private) {
+    const sb = sandboxNow();
+    if (!sb.ok || sb.bypass) return {error: 'A private attachment needs a working wall. Set up the wall before attaching it.'};
+  }
+  if (session) {
+    const old = session;
+    session = null;
+    const stopped = await new Promise(resolve => {
+      let done = false;
+      const finish = value => { if (!done) { done = true; resolve(value); } };
+      old.onExit(() => finish(true));
+      try { process.kill(-old.pid, 'SIGKILL'); } catch { try { old.kill('SIGKILL'); } catch {} }
+      setTimeout(() => finish(false), 4000);
+    });
+    if (!stopped) { session = old; return {error: 'The assistant could not be stopped. The file was not copied; close io and try again.'}; }
+  }
+  return servicePost('/api/attach', {path: opts.path, private: opts.private});
+});
+
 ipcMain.handle('pick-file', async () => { const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'spreadsheets', extensions: ['csv', 'xlsx', 'xls'] }] }); return r.canceled ? null : r.filePaths[0]; });
 // A line typed into the terminal on the person's behalf (the first message of a
 // conversation started from the chat box, or "I attached x.csv"). Visible in the terminal.
@@ -631,10 +737,14 @@ ipcMain.handle('codex-say', async (_e, text) => {
   // shortcut key otherwise), then Enter after the pause the composer needs to see the
   // paste as finished; an Enter inside that window is folded into the paste as a newline.
   const line = String(text).replace(/[\r\n]+/g, ' ').trim();
-  session.write('\x1b[200~' + line + '\x1b[201~');
-  setTimeout(() => { if (session) session.write('\r'); }, 1500);
+  const recipient = session;
+  recipient.write('\x1b[200~' + line + '\x1b[201~');
+  setTimeout(() => { if (session === recipient) recipient.write('\r'); }, 1500);
   return { ok: true };
 });
 ipcMain.handle('pick-folder', async () => { const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); return r.canceled ? null : r.filePaths[0]; });
 app.whenReady().then(start);
 app.on('window-all-closed', () => { if (session) { try { session.kill(); } catch {} } if (login) { try { login.kill(); } catch {} } if (proc) proc.kill(); app.quit(); });
+
+// app.quit() (including automated drives) can bypass window-all-closed.
+app.on('before-quit', () => { if (session) { try { session.kill(); } catch {} } if (login) login.kill(); if (proc) proc.kill(); });

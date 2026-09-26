@@ -1,19 +1,23 @@
-// First run: put a python runtime and the scanner model on disk. No shell scripts, no
-// PowerShell execution policy, no bash on Windows, no admin anywhere.
+// First run: put a python runtime on disk, then decide whether to download the local
+// scanner or stay on the readers-only path. No shell scripts, no PowerShell execution
+// policy, no bash on Windows, no admin anywhere.
 //
 // The old install.ps1 assumed Python and Node were already on PATH, which is why it never
 // worked for a real participant. This does the whole thing itself: fetch a
 // python-build-standalone tarball (a plain extract - no registry, no PATH, no installer),
-// pip the pinned packages into it, then warm the model into the cache.
+// pip the pinned packages into it, then either leave the readers-only set in place or
+// warm the model into the cache when the on-device scanner was requested.
 //
 // It is also the build-time tool for the fat artifacts:
 //     node bootstrap.js --dest out/payload
 // produces out/payload/{runtime,hf-cache}, which the packer drops into resources/.
-// Thin and fat therefore install the exact same bytes; fat just does it before shipping.
+// The thin first run uses the same runtime, but now stops at readers-only when the
+// privacy server answers instead of downloading the local scanner.
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const http = require('http');
 const https = require('https');
 const { spawn } = require('child_process');
 
@@ -22,6 +26,95 @@ const WIN = process.platform === 'win32';
 const MAC = process.platform === 'darwin';
 
 const noop = () => {};
+
+function privacyServerAddress() {
+  return (process.env.IO_PRIVACY_SERVER || 'https://privacy.idli.cc').trim();
+}
+
+function safeServerLabel(raw) {
+  try {
+    const u = new URL(raw);
+    const pathname = u.pathname && u.pathname !== '/' ? u.pathname.replace(/\/$/, '') : '';
+    return `${u.protocol}//${u.host}${pathname}`;
+  } catch {
+    return 'the configured privacy server';
+  }
+}
+
+function probePrivacyServer(rawUrl, { timeoutMs = 5000 } = {}) {
+  const base = new URL(rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`);
+  const attempt = (url, hops, resolve) => {
+    const health = new URL('health', url);
+    const client = health.protocol === 'http:' ? http : https;
+    const req = client.get(health, { headers: { 'User-Agent': 'io-bootstrap/1' }, timeout: timeoutMs }, res => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && hops < 4) {
+        res.resume();
+        try { return attempt(new URL(res.headers.location, health), hops + 1, resolve); }
+        catch { return resolve(false); }
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return resolve(false);
+      }
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => {
+        body += chunk;
+        if (body.length > 8192) body = body.slice(0, 8192);
+      });
+      res.on('end', () => resolve(/io privacy server/i.test(body)));
+      res.on('error', () => resolve(false));
+    });
+    req.on('timeout', () => req.destroy(new Error(`no response in ${timeoutMs / 1000}s`)));
+    req.on('error', () => resolve(false));
+  };
+  return new Promise(resolve => attempt(base, 0, resolve));
+}
+
+async function scannerInstallPlan({
+  platformKey = `${process.platform}-${process.arch}`,
+  scanner = process.env.IO_SCANNER || 'auto',
+  fat = process.env.IO_FAT === '1',
+  privacyServer = privacyServerAddress(),
+  probe = probePrivacyServer,
+} = {}) {
+  const requested = String(scanner || 'auto').trim().toLowerCase();
+  const explicit = requested === 'scanner' ? 'local' : requested;
+  const unsupported = (PINS.scannerUnsupported || []).includes(platformKey);
+  const server = safeServerLabel(privacyServer);
+  if (unsupported) {
+    return {
+      mode: 'readers',
+      marker: `io did not download the on-device scanner on ${platformKey}. It installed the readers-only set instead and will use a privacy server or pattern matching.`,
+      packageNote: 'this platform uses the readers-only install',
+      doneNote: 'ready without the local scanner',
+    };
+  }
+  if (explicit === 'local' || fat) {
+    return { mode: 'local' };
+  }
+  const serverUp = await probe(privacyServer);
+  if (serverUp) {
+    return {
+      mode: 'readers',
+      marker: `The privacy server at ${server} answered during setup, so io installed the readers-only set and will use the server for scanning.`,
+      packageNote: `privacy server at ${server} answered; installing readers only`,
+      doneNote: 'ready for the privacy server',
+    };
+  }
+  return {
+    mode: 'readers',
+    marker: `io could not reach the privacy server at ${server} during setup, so it installed the readers-only set. You can still start with pattern matching, or start again with IO_SCANNER=local to download the on-device scanner.`,
+    packageNote: `privacy server at ${server} did not answer; installing readers only`,
+    doneNote: 'ready without the privacy server',
+  };
+}
+
+function installThresholds(plan) {
+  return plan && plan.mode === 'local'
+    ? { roomGb: 3.5, ramGb: 3.5 }
+    : { roomGb: 1.0, ramGb: null };
+}
 
 function pythonTarball() {
   const key = `${process.platform}-${process.arch}`;
@@ -211,28 +304,47 @@ function desymlink(dir, onNote = noop) {
  * @param dest      directory that will hold runtime/ and hf-cache/
  * @param onProgress ({phase, detail, frac}) - frac is 0..1 within the phase, or null
  */
-async function install({ dest, onProgress = noop }) {
+async function install({
+  dest,
+  onProgress = noop,
+  scanner = process.env.IO_SCANNER || 'auto',
+  fat = process.env.IO_FAT === '1',
+  probe = probePrivacyServer,
+} = {}) {
   const say = (phase, detail, frac = null) => onProgress({ phase, detail, frac });
   const runtimeDir = path.join(dest, 'runtime');
   const hfCache = path.join(dest, 'hf-cache');
   fs.mkdirSync(dest, { recursive: true });
 
-  // Before downloading 1.9 GB onto a machine that cannot hold it or run it, look. A laptop
-  // that fills its disk or swaps itself to a standstill is a worse experience than being
-  // told up front and offered a privacy server. The thresholds are deliberately generous:
-  // this only fires when it is clearly not going to work.
+  const platformKey = `${process.platform}-${process.arch}`;
+  const plan = await scannerInstallPlan({ platformKey, scanner, fat, privacyServer: privacyServerAddress(), probe });
+
+  // Some platforms cannot install the versions everything else uses, because the wheels do
+  // not exist for them. An override replaces a pin of the same package and adds any others.
+  const key = `${process.platform}-${process.arch}`;
+  const overrides = (PINS.packageOverrides || {})[key] || [];
+  const nameOf = spec => spec.split('==')[0].toLowerCase();
+  const overridden = new Set(overrides.map(nameOf));
+  const wanted = PINS.packages.filter(p => !overridden.has(nameOf(p))).concat(overrides);
+  if (overrides.length) say('packages', `using ${key} pins: ${overrides.join(' ')}`);
+
+  // Before downloading onto a machine that cannot hold or run the selected path, look.
+  // The readers-only install is lighter than the full local scanner, so it gets a smaller
+  // disk floor and no model-memory gate.
   const room = freeSpace(dest);
-  const ram = os.totalmem() / 1e9;
-  if (room !== null && room < 3.5) {
+  const ram = plan.mode === 'local' ? os.totalmem() / 1e9 : null;
+  const { roomGb, ramGb } = installThresholds(plan);
+  if (room !== null && room < roomGb) {
+    const target = plan.mode === 'local' ? 'the scanner' : 'the readers-only set';
     fs.writeFileSync(path.join(dest, 'scanner-unavailable.txt'),
-      `There is about ${room.toFixed(1)} GB free on this drive and the scanner needs a little ` +
-      `over 2 GB, plus room to unpack it. Free some space and start io again to try, or use ` +
-      `a privacy server.\n`);
-    say('done', 'not enough space for the scanner');
+      `There is about ${room.toFixed(1)} GB free on this drive and ${target} needs ` +
+      `more room to unpack it. Free some space and start io again to try, or use a ` +
+      `privacy server.\n`);
+    say('done', plan.mode === 'local' ? 'not enough space for the scanner' : 'not enough space for the readers-only install');
     return { runtimeDir, hfCache, python: pythonIn(runtimeDir), scanner: false, retryable: true,
              scannerError: fs.readFileSync(path.join(dest, 'scanner-unavailable.txt'), 'utf8').trim() };
   }
-  if (ram && ram < 3.5) {
+  if (ramGb && ram && ram < ramGb) {
     fs.writeFileSync(path.join(dest, 'scanner-unavailable.txt'),
       `This computer has about ${ram.toFixed(1)} GB of memory and the scanner needs roughly ` +
       `1.5 GB while it runs, which would leave very little for anything else. Use a privacy ` +
@@ -270,44 +382,29 @@ async function install({ dest, onProgress = noop }) {
   }
   const py = pythonIn(runtimeDir);
 
-  // 2. packages. Some platforms cannot run the scanner at all, so they do not install it:
-  //    an Intel Mac has had no PyTorch wheel since 2.2.2, and the transformers we need
-  //    wants a newer torch than that. Those machines get only what reads files, which is
-  //    about 100 MB rather than 1.9 GB, and io offers them a privacy server instead.
-  //    torch comes from the CPU-only index on Windows and Linux so we do not
-  //    drag in a couple of GB of CUDA. macOS wheels on PyPI are already CPU/MPS.
+  // 2. packages. The thin path now stays readers-only unless someone explicitly asks
+  //    for the on-device scanner. That keeps the first run light when the privacy
+  //    server answers, and it still gives unsupported platforms the same readers-only
+  //    install they already had. torch comes from the CPU-only index on Windows and
+  //    Linux so we do not drag in a couple of GB of CUDA. macOS wheels on PyPI are
+  //    already CPU/MPS.
   const pip = (args, label) => run(py, ['-m', 'pip', 'install', '--no-input', '--disable-pip-version-check', ...args],
     { env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: '1' } },
     line => { if (/^(Collecting|Downloading|Installing|Successfully)/.test(line)) say('packages', label + ' - ' + line.slice(0, 70)); });
 
-  // Some platforms cannot install the versions everything else uses, because the wheels do
-  // not exist for them. An override replaces a pin of the same package and adds any others.
-  const key = `${process.platform}-${process.arch}`;
-  const overrides = (PINS.packageOverrides || {})[key] || [];
-  const nameOf = spec => spec.split('==')[0].toLowerCase();
-  const overridden = new Set(overrides.map(nameOf));
-  const wanted = PINS.packages.filter(p => !overridden.has(nameOf(p))).concat(overrides);
-  if (overrides.length) say('packages', `using ${key} pins: ${overrides.join(' ')}`);
-
-  const platformKey = `${process.platform}-${process.arch}`;
-  const noScanner = (PINS.scannerUnsupported || []).includes(platformKey);
   const scannerPkgs = new Set((PINS.scannerPackages || []).map(n => n.toLowerCase()));
   const markerPath = path.join(dest, 'scanner-unavailable.txt');
-  if (noScanner) {
-    say('packages', 'this computer cannot run the on-device scanner, installing the rest');
-    const readers = PINS.packages.filter(p => !scannerPkgs.has(p.split('==')[0].toLowerCase()));
-    await pip(readers, 'packages');
-    fs.mkdirSync(hfCache, { recursive: true });
-    fs.writeFileSync(markerPath,
-      `This computer is ${platformKey}. The scanner needs PyTorch, and PyTorch has shipped ` +
-      `no build for it since 2.2.2, which is older than the rest of io needs. Nothing is ` +
-      `broken here and reinstalling will not change it.\n`);
-    say('done', 'ready without the local scanner');
-    return { runtimeDir, hfCache, python: py, scanner: false, scannerError: fs.readFileSync(markerPath, 'utf8').trim() };
-  }
-
   const torch = wanted.find(p => p.startsWith('torch=='));
   const rest = wanted.filter(p => p !== torch);
+  const readers = PINS.packages.filter(p => !scannerPkgs.has(p.split('==')[0].toLowerCase()));
+  if (plan.mode !== 'local') {
+    say('packages', plan.packageNote);
+    await pip(readers, 'packages');
+    fs.mkdirSync(hfCache, { recursive: true });
+    fs.writeFileSync(markerPath, `${plan.marker}\n`);
+    say('done', plan.doneNote);
+    return { runtimeDir, hfCache, python: py, scanner: false, scannerError: fs.readFileSync(markerPath, 'utf8').trim() };
+  }
 
   say('packages', 'preparing pip');
   await pip(['--upgrade', 'pip'], 'pip');
@@ -316,8 +413,8 @@ async function install({ dest, onProgress = noop }) {
   say('packages', 'installing the rest');
   await pip(rest, 'packages');
 
-  // 3. the scanner. Warmed through the same code path the app uses, into the same cache,
-  //    so a fat build's cache is byte-identical to what a thin first run would produce.
+  // 3. the scanner. Only run this when the on-device model was explicitly requested.
+  //    It still uses the same code path the app uses, into the same cache.
   //
   //    The os._exit is not a shortcut. huggingface_hub's hf_xet transfer layer leaves a
   //    Rust tokio runtime running - a dozen non-daemon hf-xet threads plus a tracing
@@ -359,12 +456,23 @@ async function install({ dest, onProgress = noop }) {
   return { runtimeDir, hfCache, python: py, scanner: true };
 }
 
-module.exports = { install, download, desymlink, pythonIn, PINS };
+module.exports = {
+  install,
+  download,
+  desymlink,
+  pythonIn,
+  probePrivacyServer,
+  scannerInstallPlan,
+  installThresholds,
+  safeServerLabel,
+  privacyServerAddress,
+  PINS,
+};
 
 if (require.main === module) {
   const i = process.argv.indexOf('--dest');
   const dest = i > -1 ? path.resolve(process.argv[i + 1]) : path.join(os.tmpdir(), 'io-payload');
-  install({ dest, onProgress: p => console.log(`[${p.phase}] ${p.detail}${p.frac != null ? ` ${Math.round(p.frac * 100)}%` : ''}`) })
+  install({ dest, fat: true, onProgress: p => console.log(`[${p.phase}] ${p.detail}${p.frac != null ? ` ${Math.round(p.frac * 100)}%` : ''}`) })
     .then(r => { console.log('payload ready:', r.runtimeDir, r.hfCache); })
     .catch(e => { console.error(String(e.message || e)); process.exit(1); });
 }

@@ -21,7 +21,8 @@ read -r TORCH_INDEX TORCH REST <<EOF
 $(node -e '
   const p = require("./pins.json");
   const torch = p.packages.find(x => x.startsWith("torch=="));
-  const rest = p.packages.filter(x => x !== torch);
+  const rest = p.packages.filter(x => x !== torch).map(x =>
+    x.startsWith("matplotlib==") ? "matplotlib==3.10.9" : x);
   console.log(p.torchIndex, torch, rest.join(" "));
 ')
 EOF
