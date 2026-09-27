@@ -39,3 +39,7 @@ The fixture client checks and real container checks are deliberately separate cl
 
 CI results will be recorded in a subsequent chronology entry; see the new
 remote-codex workflow for the four client targets and Linux x64 container job.
+
+Final CI: [36300866276](https://github.com/bprashanth/io/actions/runs/36300866276),
+all five jobs passed. Redacted report and run/job metadata are in ci-36300866276/.
+This adds actual Linux x64 server evidence and four-platform transport fixture evidence.
