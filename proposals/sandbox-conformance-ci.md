@@ -97,3 +97,14 @@ Electron viewer/toolbox isolation; io fail-closed behavior; privileged broker/to
 other full-application functionality. CI bootstrap is supporting plumbing, not a mandate to
 expand the tests into those surfaces. Screenshots are not needed for this headless first pass;
 real browser testing resumes when the integrated io stage begins.
+
+## First-pass result, 2026-09-27
+
+Implemented and measured in [three native CI runs](../chronology/2026-09-27T1044-dgx-codex-sandbox-baseline-established.md).
+Linux passes after the explicit io AppArmor setup, and both Mac architectures pass directly.
+The intended Windows profile is rejected by its unelevated backend. A separate, ineligible
+read-all diagnostic demonstrates actual parent/child direct TCP access while offline.
+An elevated diagnostic enforces filesystem restrictions in Open but cannot launch Offline
+(error 5), so it is not yet a solution. The first-stage aggregate remains red; do not rewrite
+that finding as an expected-failure pass. Windows remediation and ordinary-user operation
+are the next sandbox-stage work, followed by io integration and then the deferred surfaces.
