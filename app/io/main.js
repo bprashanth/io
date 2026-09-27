@@ -743,7 +743,23 @@ ipcMain.handle('codex-say', async (_e, text) => {
   return { ok: true };
 });
 ipcMain.handle('pick-folder', async () => { const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); return r.canceled ? null : r.filePaths[0]; });
-app.whenReady().then(start);
+app.whenReady().then(async () => {
+  if (!process.env.IO_REMOTE_CONNECTION) return start();
+  // Explicit opt-in: no Python/scanner bootstrap, local Codex, host login or provider key.
+  try {
+    const connectionFile = path.resolve(process.env.IO_REMOTE_CONNECTION);
+    const st = fs.statSync(connectionFile);
+    if (!st.isFile() || st.size > 16384) throw Error('Invalid remote connection file');
+    if (process.platform !== 'win32' && (st.mode & 0o077)) throw Error('Remote connection file must be private (chmod 600)');
+    const connection = JSON.parse(fs.readFileSync(connectionFile, 'utf8'));
+    const result = await require('./remote/client').install({app, BrowserWindow, ipcMain, dialog, shell}, connection);
+    if (result && result.error) throw Error(result.error);
+  } catch (error) {
+    if (process.env.IO_SMOKE) console.error('Remote io: ' + error.message);
+    else dialog.showErrorBox('Remote io', error.message);
+    app.quit();
+  }
+});
 app.on('window-all-closed', () => { if (session) { try { session.kill(); } catch {} } if (login) { try { login.kill(); } catch {} } if (proc) proc.kill(); app.quit(); });
 
 // app.quit() (including automated drives) can bypass window-all-closed.

@@ -1,0 +1,52 @@
+name: remote Codex experiment
+on:
+  workflow_dispatch:
+  push:
+    branches: ['remote-codex/**']
+    paths: ['app/io/remote/**', 'app/io/tests/remote/**', 'app/io/ui/remote.html', '.github/workflows/remote-codex.yml']
+  pull_request:
+    paths: ['app/io/remote/**', 'app/io/tests/remote/**', 'app/io/ui/remote.html', '.github/workflows/remote-codex.yml']
+permissions:
+  contents: read
+jobs:
+  client:
+    name: client transport ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test app/io/tests/remote/test_client.js
+  linux-worker:
+    name: real Linux Codex container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch io pinned Codex package
+        run: node app/io/fetch-codex.js
+      - name: Provision nested user namespace profile
+        run: sudo apparmor_parser -r app/io/remote/io-remote.apparmor
+      - name: Build controlled execution environment
+        run: docker build -f app/io/remote/Dockerfile --build-arg CODEX_TARGET=linux-x64 -t io-remote-codex:experiment app/io
+      - name: Actual sandbox, two-session boundaries and lifecycle (no model credentials)
+        run: python3 app/io/tests/remote/test_worker.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: remote-worker-results
+          path: benchmarks/runs/2026-09-27-remote-codex/api-isolation.json
+          if-no-files-found: warn

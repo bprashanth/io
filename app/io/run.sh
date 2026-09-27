@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Double-click me. First run sets things up, after that it just opens.
 cd "$(dirname "$0")"
+if [ -n "${IO_REMOTE_CONNECTION:-}" ]; then
+  [ -d node_modules ] || npm install --silent
+  exec npm start
+fi
 [ -d .venv ] || ./install.sh
 [ -d node_modules ] || npm install --silent
 # a dependency added since the last install (node-pty, for the Codex terminal)

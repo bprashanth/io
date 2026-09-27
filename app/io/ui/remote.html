@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;">
+<title>Remote Linux experiment</title>
+<style>
+:root{--bg:#1a1d21;--panel:#22262b;--line:#33383f;--ink:#e8e6e1;--dim:#8b9096;--hi:#e8b26a;--hibg:rgba(232,178,106,.13);--grn:#7fbf7f;--grnbg:rgba(110,190,120,.16);--warn:#e0a060;--warnbg:rgba(224,160,96,.12)}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,'Segoe UI',system-ui,sans-serif;overflow:hidden}
+button,input{font:inherit}
+button{color:var(--ink);background:none;border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer}
+button:hover{border-color:var(--dim)}
+button.go{border-color:var(--hi);color:var(--hi)}
+button[disabled]{opacity:.45;cursor:default}
+a{color:var(--hi)}
+#app{height:100%;display:flex;flex-direction:column}
+#top{padding:16px 18px 12px;border-bottom:1px solid var(--line);background:linear-gradient(180deg, rgba(255,255,255,.01), transparent)}
+#title-row{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
+#banner{margin:6px 0 0;max-width:860px;color:var(--ink);font-size:13px;line-height:1.55}
+#banner b{color:var(--hi);font-weight:600}
+#statusbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;max-width:580px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02);font-size:12.5px;color:var(--dim)}
+.pill b{color:var(--ink);font-weight:500}
+.pill.ok{color:var(--grn);border-color:rgba(127,191,127,.45);background:var(--grnbg)}
+.pill.warn{color:var(--warn);border-color:rgba(224,160,96,.45);background:var(--warnbg)}
+.pill.bad{color:#e06c6c;border-color:rgba(224,108,108,.45);background:rgba(224,108,108,.12)}
+#loginbox{margin-top:14px;display:grid;grid-template-columns:auto auto 1fr;gap:10px 12px;align-items:start}
+#loginbox .stack{display:flex;flex-direction:column;gap:8px}
+#sign-in{justify-self:start}
+#start{justify-self:start}
+#login-state{grid-column:1 / span 3;color:var(--dim);font-size:12.5px;line-height:1.5;min-height:18px}
+#login-link{grid-column:1 / span 3;display:none;word-break:break-all;font-size:12.5px}
+#login-code{grid-column:1 / span 3;display:none;font:600 28px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:4px;color:var(--hi);user-select:all}
+#login-log{grid-column:1 / span 3;display:flex;flex-direction:column;gap:4px;max-height:112px;overflow:auto;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--dim);font-size:12.5px;line-height:1.45;white-space:pre-wrap}
+#main{flex:1;min-height:0;display:flex}
+#term-shell{flex:1;min-width:0;min-height:0;padding:12px 12px 10px}
+#term{width:100%;height:100%;min-height:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#15181c}
+.xterm .xterm-viewport{background:#15181c!important}
+#bottom{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid var(--line);background:rgba(255,255,255,.01)}
+#notice{margin-left:auto;min-height:18px;color:var(--dim);font-size:12.5px}
+#notice.ok{color:var(--grn)}
+#notice.warn{color:var(--warn)}
+#notice.bad{color:#e06c6c}
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:50}
+.modal.on{display:flex}
+.card{width:420px;max-width:calc(100vw - 28px);background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.card h2,.card h3{margin:0}
+.card p{margin:0;color:var(--dim);line-height:1.55}
+.row{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.filelist{display:flex;flex-direction:column;gap:8px;max-height:min(56vh,460px);overflow:auto;padding-right:2px}
+.fileitem{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel)}
+.fileitem .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fileitem .size{color:var(--dim);font-size:12px;flex:none}
+.fileitem button{padding:6px 10px;font-size:12.5px}
+.dim{color:var(--dim)}
+@media (max-width: 760px){
+  #loginbox{grid-template-columns:1fr}
+  #login-state,#login-link,#login-code,#login-log{grid-column:1}
+  #statusbar{justify-content:flex-start}
+  #notice{margin-left:0;width:100%}
+}
+</style>
+<link rel="stylesheet" href="./vendor/xterm.css">
+<script src="./vendor/xterm.js"></script>
+<script src="./vendor/addon-fit.js"></script>
+<script src="./vendor/addon-web-links.js"></script>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div id="title-row">
+      <div>
+        <h1>io <span class="dim">/ remote workspace</span></h1>
+        <p id="banner"><b>Remote workspace:</b> uploaded files are processed on the server and by ChatGPT. This experiment does not use local masking.</p>
+      </div>
+      <div id="statusbar">
+        <span class="pill" id="pill-conn">connecting…</span>
+        <span class="pill" id="pill-run">running: unknown</span>
+        <span class="pill" id="pill-mode">mode: unknown</span>
+        <span class="pill" id="pill-version">version: unknown</span>
+        <span class="pill" id="pill-policy">policy: unknown</span>
+        <span class="pill" id="pill-ended">ended: unknown</span>
+      </div>
+    </div>
+    <div id="loginbox">
+      <button id="sign-in">Sign in</button>
+      <button id="start" class="go">Start/resume</button>
+      <div class="stack">
+        <div id="login-state">Waiting for the remote worker.</div>
+        <a id="login-link" href="#" target="_blank" rel="noreferrer noopener"></a>
+        <div id="login-code"></div>
+      </div>
+      <div id="login-log" aria-live="polite"></div>
+    </div>
+  </header>
+  <main id="main">
+    <div id="term-shell">
+      <div id="term" aria-label="Remote terminal"></div>
+    </div>
+  </main>
+  <footer id="bottom">
+    <button id="results">Results</button>
+    <button id="interrupt">Interrupt</button>
+    <button id="end">End session</button>
+    <span id="notice"></span>
+    <button id="attach">Attach a copy</button>
+  </footer>
+</div>
+
+<div id="results-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="results-title">
+  <div class="card" style="width:640px">
+    <h2 id="results-title">Results</h2>
+    <p>Choose a file to save a copy on your computer.</p>
+    <div id="results-list" class="filelist"></div>
+    <div class="row">
+      <button id="results-close">Close</button>
+      <button id="results-refresh" class="go">Refresh</button>
+    </div>
+  </div>
+</div>
+
+<div id="attach-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="attach-title">
+  <div class="card">
+    <h2 id="attach-title">Attach a copy</h2>
+    <p>The file leaves this machine and is processed on the remote worker and by ChatGPT. This experiment does not use local masking.</p>
+    <p class="dim">The upload is limited to 10 MiB and keeps the original file here untouched.</p>
+    <div class="row">
+      <button id="attach-cancel">Cancel</button>
+      <button id="attach-go" class="go">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div id="end-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="end-title">
+  <div class="card">
+    <h2 id="end-title">End session</h2>
+    <p>This deletes the remote files and login state on the server.</p>
+    <div class="row">
+      <button id="end-cancel">Cancel</button>
+      <button id="end-go" class="go">End session</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const remote = window.remote;
+  const $ = id => document.getElementById(id);
+  const els = {
+    pillConn: $('pill-conn'),
+    pillRun: $('pill-run'),
+    pillMode: $('pill-mode'),
+    pillVersion: $('pill-version'),
+    pillPolicy: $('pill-policy'),
+    pillEnded: $('pill-ended'),
+    signIn: $('sign-in'),
+    start: $('start'),
+    loginState: $('login-state'),
+    loginLink: $('login-link'),
+    loginCode: $('login-code'),
+    loginLog: $('login-log'),
+    notice: $('notice'),
+    attach: $('attach'),
+    results: $('results'),
+    interrupt: $('interrupt'),
+    end: $('end'),
+    resultsModal: $('results-modal'),
+    resultsList: $('results-list'),
+    resultsClose: $('results-close'),
+    resultsRefresh: $('results-refresh'),
+    attachModal: $('attach-modal'),
+    attachCancel: $('attach-cancel'),
+    attachGo: $('attach-go'),
+    endModal: $('end-modal'),
+    endCancel: $('end-cancel'),
+    endGo: $('end-go'),
+    term: $('term'),
+  };
+
+  const state = {
+    status: null,
+    loginPending: false,
+    loginOpened: false,
+    terminalReady: false,
+    busyResults: false,
+  };
+
+  let term = null;
+  let fitAddon = null;
+  let resizeObserver = null;
+  let noticeTimer = null;
+
+  function resizeRemote(cols, rows) { if (state.status?.running) remote.resize(cols, rows); }
+
+  function setNotice(text, kind = '') {
+    els.notice.textContent = text || '';
+    els.notice.className = kind || '';
+    if (noticeTimer) clearTimeout(noticeTimer);
+    if (text) {
+      noticeTimer = setTimeout(() => {
+        els.notice.textContent = '';
+        els.notice.className = '';
+      }, 5000);
+    }
+  }
+
+  function showModal(modal, on = true) {
+    modal.classList.toggle('on', !!on);
+  }
+
+  function formatBytes(n) {
+    const value = Number(n) || 0;
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(value % 1024 ? 1 : 0)} KiB`;
+    return `${(value / 1024 / 1024).toFixed(value % (1024 * 1024) ? 1 : 0)} MiB`;
+  }
+
+  function setPill(el, text, kind = '') {
+    el.textContent = text;
+    el.className = `pill${kind ? ` ${kind}` : ''}`;
+  }
+
+  function appendLoginLine(text, kind = '') {
+    const line = document.createElement('div');
+    line.textContent = text;
+    if (kind) line.className = kind;
+    els.loginLog.appendChild(line);
+    while (els.loginLog.children.length > 12) {
+      els.loginLog.removeChild(els.loginLog.firstChild);
+    }
+    els.loginLog.scrollTop = els.loginLog.scrollHeight;
+  }
+
+  function renderStatus(st) {
+    state.status = st || null;
+    const loggedIn = !!(st && st.loggedIn);
+    const running = !!(st && st.running);
+    const ended = !!(st && st.ended);
+    const connection = st && st.connection ? st.connection : {};
+    const live = !!connection.live;
+    const reconnecting = !!connection.reconnecting;
+    const gap = !!connection.gap;
+
+    if (gap) {
+      setPill(els.pillConn, 'gap detected', 'warn');
+    } else if (live) {
+      setPill(els.pillConn, 'stream live', 'ok');
+    } else if (reconnecting) {
+      setPill(els.pillConn, 'reconnecting', 'warn');
+    } else {
+      setPill(els.pillConn, 'stream offline', 'bad');
+    }
+    setPill(els.pillRun, running ? 'running' : (ended ? 'ended' : 'idle'), running ? 'ok' : (ended ? 'warn' : ''));
+    setPill(els.pillMode, loggedIn ? 'ChatGPT signed in' : 'ChatGPT signed out');
+    setPill(els.pillVersion, `version: ${st && st.version ? st.version : 'unknown'}`);
+    setPill(els.pillPolicy, st?.policy === 'offline' ? 'Commands offline' : 'Checking command policy');
+    setPill(els.pillEnded, 'Session ended', 'warn');
+    els.pillEnded.style.display = ended ? '' : 'none';
+
+    if (loggedIn) {
+      els.loginLink.style.display = 'none';
+      els.loginCode.style.display = 'none';
+      state.loginPending = false;
+      els.loginState.textContent = 'Signed in.';
+    } else if (state.loginPending || st?.mode === 'login') {
+      els.loginState.textContent = 'Finish sign-in in your browser. The code will appear here.';
+    } else { els.loginState.textContent = ended ? 'This workspace has ended.' : 'Sign in with your own ChatGPT account to begin.'; }
+    els.signIn.textContent = loggedIn ? 'Signed in' : 'Sign in';
+    els.signIn.disabled = loggedIn || state.loginPending || st?.mode === 'login' || ended;
+    els.start.disabled = state.loginPending || running || !loggedIn || ended;
+    els.interrupt.disabled = !running;
+    els.end.disabled = ended;
+    els.attach.disabled = ended;
+    els.results.disabled = ended;
+
+    if (st && st.error) setNotice(st.error, 'bad');
+    else if (connection.gap) setNotice('Earlier terminal output is no longer available. New output continues below.', 'warn');
+    else if (reconnecting && running) setNotice('The worker is still running, but the stream is reconnecting.', 'warn');
+  }
+
+  async function refreshStatus() {
+    try {
+      const st = await remote.status();
+      if (st && st.error) {
+        renderStatus(st);
+        return st;
+      }
+      renderStatus(st);
+      return st;
+    } catch (error) {
+      setNotice(error.message || String(error), 'bad');
+      return null;
+    }
+  }
+
+  async function openLoginUrl(url) {
+    if (!url || state.loginOpened) return;
+    state.loginOpened = true;
+    const res = await remote.openExternal(url);
+    if (res && res.error) setNotice(res.error, 'warn');
+  }
+
+  function handleLoginEvent(text) {
+    if (!text || state.status?.loggedIn || (!state.loginPending && state.status?.mode !== 'login')) return;
+    text = text.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+    appendLoginLine(text);
+    const url = (text.match(/https:\/\/auth\.openai\.com\/codex\/device(?:[^\s]*)?/i) || [])[0] || '';
+    if (url) {
+      els.loginLink.textContent = url;
+      els.loginLink.style.display = 'block';
+      els.loginLink.onclick = e => {
+        e.preventDefault();
+        remote.openExternal(url).then(res => {
+          if (res && res.error) setNotice(res.error, 'warn');
+        }).catch(err => setNotice(err.message || String(err), 'warn'));
+      };
+      if (state.loginPending) openLoginUrl(url);
+    }
+    const code = (text.match(/\b([A-Z0-9]{4,}(?:-[A-Z0-9]{4,})+|[A-Z0-9]{8,})\b/) || [])[1] || '';
+    if (code && code.length >= 8) {
+      els.loginCode.textContent = code;
+      els.loginCode.style.display = 'block';
+    }
+    if (/logged in|sign-in complete|authorized|connected/i.test(text)) {
+      state.loginPending = false;
+      els.signIn.disabled = false;
+    }
+  }
+
+  function writeTerminal(data) {
+    if (!term || !data) return;
+    term.write(data);
+    try { term.scrollToBottom(); } catch {}
+  }
+
+  async function handleEvent(evt) {
+    if (!evt || !evt.kind) return;
+    if (evt.kind === 'reset') {
+      term.reset();
+      state.loginPending = false;
+      els.loginCode.textContent = '';
+      els.loginCode.style.display = 'none';
+      els.loginLink.style.display = 'none';
+      els.loginLog.replaceChildren();
+      appendLoginLine(evt.data);
+      setNotice(evt.data, 'warn');
+      return;
+    }
+    if (evt.kind === 'data') {
+      writeTerminal(evt.data || '');
+      return;
+    }
+    if (evt.kind === 'login') {
+      handleLoginEvent(evt.data || '');
+      await refreshStatus();
+      return;
+    }
+    if (evt.kind === 'state') {
+      if (evt.data) appendLoginLine(evt.data, 'dim');
+      await refreshStatus();
+      return;
+    }
+    if (evt.kind === 'exit') {
+      if (evt.data) appendLoginLine(evt.data, 'dim');
+      state.loginPending = false;
+      await refreshStatus();
+      return;
+    }
+    if (evt.kind === 'gap') {
+      appendLoginLine('Earlier terminal output is no longer available.', 'warn');
+      setNotice('Earlier terminal output is no longer available. New output continues below.', 'warn');
+      await refreshStatus();
+    }
+  }
+
+  async function login() {
+    state.loginPending = true;
+    state.loginOpened = false;
+    els.signIn.disabled = true;
+    els.loginLink.style.display = 'none';
+    els.loginCode.style.display = 'none';
+    els.loginCode.textContent = '';
+    els.loginState.textContent = 'Starting device sign-in on the remote worker.';
+    const reply = await remote.login();
+    if (reply && reply.error) {
+      state.loginPending = false;
+      els.signIn.disabled = false;
+      els.loginState.textContent = reply.error;
+      setNotice(reply.error, 'bad');
+      return;
+    }
+    els.loginState.textContent = 'Finish sign-in in your browser. The code will appear here.';
+    setNotice('Login started. Watch the browser for the device page.', 'ok');
+    await refreshStatus();
+  }
+
+  async function startSession() {
+    const st = state.status || {};
+    const resume = !!st.hasConversation;
+    const reply = await remote.start({
+      cols: term ? term.cols : 80,
+      rows: term ? term.rows : 24,
+      resume,
+    });
+    if (reply && reply.error) {
+      setNotice(reply.error, 'bad');
+      return;
+    }
+    setNotice(resume ? 'Resuming the remote session.' : 'Starting the remote session.', 'ok');
+    await refreshStatus();
+    term.focus();
+  }
+
+  async function interruptSession() {
+    const reply = await remote.interrupt();
+    if (reply && reply.error) {
+      setNotice(reply.error, 'bad');
+      return;
+    }
+    setNotice('Interrupt sent.', 'ok');
+    await refreshStatus();
+  }
+
+  async function endSession() {
+    const reply = await remote.end();
+    if (reply && reply.error) {
+      setNotice(reply.error, 'bad');
+      return;
+    }
+    setNotice('The remote session ended and its files were deleted.', 'ok');
+    await refreshStatus();
+    if ($('results-modal').classList.contains('on')) await loadResults();
+  }
+
+  async function loadResults() {
+    if (state.busyResults) return;
+    state.busyResults = true;
+    els.resultsRefresh.disabled = true;
+    try {
+      const reply = await remote.files();
+      if (reply && reply.error) {
+        setNotice(reply.error, 'bad');
+        els.resultsList.replaceChildren();
+        const empty = document.createElement('div');
+        empty.className = 'dim';
+        empty.textContent = 'No files available.';
+        els.resultsList.appendChild(empty);
+        return;
+      }
+      const files = Array.isArray(reply && reply.files) ? reply.files : [];
+      els.resultsList.replaceChildren();
+      if (!files.length) {
+        const empty = document.createElement('div');
+        empty.className = 'dim';
+        empty.textContent = 'No files yet.';
+        els.resultsList.appendChild(empty);
+        return;
+      }
+      for (const file of files) {
+        const row = document.createElement('div');
+        row.className = 'fileitem';
+        const name = document.createElement('div');
+        name.className = 'name';
+        name.textContent = file.name || '';
+        const size = document.createElement('div');
+        size.className = 'size';
+        size.textContent = formatBytes(file.size);
+        const btn = document.createElement('button');
+        btn.textContent = 'Download';
+        btn.onclick = async () => {
+          btn.disabled = true;
+          const reply = await remote.download(file.name);
+          btn.disabled = false;
+          if (reply && reply.error) {
+            setNotice(reply.error, 'bad');
+            return;
+          }
+          setNotice(`Saved ${file.name}.`, 'ok');
+        };
+        row.appendChild(name);
+        row.appendChild(size);
+        row.appendChild(btn);
+        els.resultsList.appendChild(row);
+      }
+    } catch (error) {
+      setNotice(error.message || String(error), 'bad');
+    } finally {
+      els.resultsRefresh.disabled = false;
+      state.busyResults = false;
+    }
+  }
+
+  async function attachCopy() {
+    const reply = await remote.attach();
+    if (reply && reply.error) {
+      setNotice(reply.error, 'bad');
+      return;
+    }
+    if (reply && reply.canceled) return;
+    setNotice(`Uploaded ${reply.name}.`, 'ok');
+    if (els.resultsModal.classList.contains('on')) await loadResults();
+    await refreshStatus();
+  }
+
+  function ensureTerminal() {
+    if (term) return;
+    term = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: 'ui-monospace, Menlo, Consolas, "DejaVu Sans Mono", monospace',
+      scrollback: 6000,
+      allowProposedApi: true,
+      theme: {
+        background: '#15181c',
+        foreground: '#e8e6e1',
+        cursor: '#e8b26a',
+        selectionBackground: 'rgba(232,178,106,.25)',
+        black: '#1a1d21',
+        brightBlack: '#5c636b',
+      },
+    });
+    window.term = term;
+    fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.loadAddon(new WebLinksAddon.WebLinksAddon((_e, uri) => {
+      remote.openExternal(uri).then(reply => {
+        if (reply && reply.error) setNotice(reply.error, 'warn');
+      }).catch(error => setNotice(error.message || String(error), 'warn'));
+    }));
+    term.open(els.term);
+    term.attachCustomKeyEventHandler(ev => {
+      if (ev.type !== 'keydown') return true;
+      const ctrl = ev.ctrlKey || ev.metaKey;
+      if (ctrl && ev.key.toLowerCase() === 'c' && term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection()).catch(() => {});
+        term.clearSelection();
+        return false;
+      }
+      if (ctrl && ev.key.toLowerCase() === 'c') {
+        remote.input('\u0003');
+        return false;
+      }
+      if (ctrl && ev.key.toLowerCase() === 'v') {
+        navigator.clipboard.readText().then(text => {
+          if (text) term.paste(text);
+        }).catch(() => {});
+        return false;
+      }
+      return true;
+    });
+    term.onData(data => remote.input(data));
+    term.onResize(({ cols, rows }) => resizeRemote(cols, rows));
+    resizeObserver = new ResizeObserver(() => {
+      try {
+        fitAddon.fit();
+        resizeRemote(term.cols, term.rows);
+      } catch {}
+    });
+    resizeObserver.observe(els.term);
+    window.addEventListener('resize', () => {
+      try {
+        fitAddon.fit();
+        resizeRemote(term.cols, term.rows);
+      } catch {}
+    });
+    state.terminalReady = true;
+    try {
+      fitAddon.fit();
+      resizeRemote(term.cols, term.rows);
+    } catch {}
+    term.focus();
+  }
+
+  els.signIn.onclick = () => login();
+  els.start.onclick = () => startSession();
+  els.interrupt.onclick = () => interruptSession();
+  els.attach.onclick = () => showModal(els.attachModal, true);
+  els.results.onclick = async () => {
+    showModal(els.resultsModal, true);
+    await loadResults();
+  };
+  els.end.onclick = () => showModal(els.endModal, true);
+  els.attachCancel.onclick = () => showModal(els.attachModal, false);
+  els.attachGo.onclick = async () => {
+    showModal(els.attachModal, false);
+    await attachCopy();
+  };
+  els.endCancel.onclick = () => showModal(els.endModal, false);
+  els.endGo.onclick = async () => {
+    showModal(els.endModal, false);
+    await endSession();
+  };
+  els.resultsClose.onclick = () => showModal(els.resultsModal, false);
+  els.resultsRefresh.onclick = () => loadResults();
+  els.loginLink.onclick = e => {
+    e.preventDefault();
+    const url = els.loginLink.textContent.trim();
+    if (!url) return;
+    remote.openExternal(url).then(reply => {
+      if (reply && reply.error) setNotice(reply.error, 'warn');
+    }).catch(error => setNotice(error.message || String(error), 'warn'));
+  };
+  document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('click', e => {
+      if (e.target === modal) showModal(modal, false);
+    });
+  });
+
+  ensureTerminal();
+  setInterval(() => { if (!state.status?.ended) refreshStatus(); }, 3000);
+  remote.onEvent(evt => {
+    handleEvent(evt).catch(error => setNotice(error.message || String(error), 'bad'));
+  });
+  remote.onStatus(st => {
+    renderStatus(st);
+  });
+  remote.onError(msg => {
+    if (!msg) return;
+    setNotice(msg, 'bad');
+  });
+
+  refreshStatus().then(st => {
+    if (st && st.loggedIn) {
+      state.loginPending = false;
+      els.loginState.textContent = 'Signed in.';
+    }
+    if (st && st.connection && st.connection.reconnecting) {
+      setNotice('The stream is reconnecting.', 'warn');
+    }
+    if (term) term.focus();
+  });
+})();
+</script>
+</body>
+</html>

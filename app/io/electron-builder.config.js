@@ -121,7 +121,7 @@ module.exports = {
   asar: true,
   files: [
     'main.js', 'preload.js', 'runtime.js', 'bootstrap.js', 'codex.js', 'openrouter.js', 'key-preload.js', 'viewer-preload.js', 'handover.js', 'quota.js', 'tools/mcp.js', 'pins.json', 'codex-pins.json', 'splash.html',
-    'icons/icon.png',
+    'icons/icon.png', 'remote/client.js', 'remote/preload.js',
     // node-pty (dependencies are included by electron-builder; listed so a prune never drops it)
     'node_modules/node-pty/**',
   ],
