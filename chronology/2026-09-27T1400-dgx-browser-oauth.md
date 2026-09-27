@@ -37,3 +37,8 @@ still applies. No unrelated workspace data was discarded.
 
 [Evidence](../benchmarks/runs/2026-09-27-browser-oauth/README.md),
 [guide](../app/io/remote/README.md), [proposal](../proposals/remote-linux-codex.md).
+
+Code `98610f1` pushed to `remote-codex/experiment`. All five jobs in
+[CI run 36307529463](https://github.com/bprashanth/io/actions/runs/36307529463)
+passed: real Linux container plus eight transport/callback tests on Linux, Windows,
+macOS arm64 and macOS Intel. Desktop screenshots remain local ignored evidence.
