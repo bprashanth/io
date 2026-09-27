@@ -4,6 +4,10 @@ const http = require('http');
 const https = require('https');
 const { StringDecoder } = require('string_decoder');
 const { URL } = require('url');
+const {createBrowserLogin} = require('./browser-login');
+let browserLogin = null;
+let loginStarting = false;
+function closeBrowserLogin() { browserLogin?.close(); browserLogin = null; }
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const JSON_BYTES = 1024 * 1024;
@@ -281,7 +285,8 @@ async function connectEvents() {
         send('remote-status', decorateStatus(current.status || {}));
         return;
       }
-      if (payload.kind === 'reset') current.gapSeen = false;
+      if (payload.kind === 'reset') {current.gapSeen = false; closeBrowserLogin();}
+      if (payload.kind === 'exit' && payload.data === 'login') closeBrowserLogin();
       send('remote-event', { ...payload, seq: current.lastSeq });
       if (payload.kind === 'reset' || payload.kind === 'state' || payload.kind === 'login' || payload.kind === 'exit') {
         refreshStatus().catch(() => {});
@@ -430,16 +435,44 @@ function registerIpc({ app, BrowserWindow, ipcMain, dialog, shell }) {
     if (!current.status?.ended) await refreshStatus().catch(() => {});
     return current.status ? decorateStatus(current.status) : { error: 'Remote status is unavailable.' };
   });
-  ipcMain.handle('remote-login', async () => {
+  ipcMain.handle('remote-login', async (_event, method = 'browser') => {
+    if (loginStarting || browserLogin) return {error:'Sign-in is already in progress. Cancel it before retrying.'};
+    loginStarting = true;
+    let started = false;
     try {
-      const reply = await requestJson('POST', '/login', { maxBytes: JSON_BYTES });
+      if (!['browser','device'].includes(method)) throw new Error('Unknown sign-in method.');
+      if (browserLogin) throw new Error('Sign-in is already in progress. Cancel it before retrying.');
+      if (method === 'browser') {
+        browserLogin = await createBrowserLogin({
+          forward: callback => requestJson('POST', '/login/callback', {body:{callback}, timeoutMs:45000}),
+          onComplete: error => {
+            closeBrowserLogin();
+            if (error) { send('remote-error',error.message); requestJson('POST','/stop').catch(()=>{}); }
+            refreshStatus().catch(()=>{});
+          },
+          onTimeout: () => {
+            closeBrowserLogin(); requestJson('POST','/stop').catch(()=>{});
+            send('remote-error','Browser sign-in expired. Please try again.');
+          },
+        });
+      }
+      const reply = await requestJson('POST', '/login', {body:{method}, maxBytes: JSON_BYTES});
+      started = true;
+      if (method === 'browser') {
+        reply.authUrl = browserLogin.activate(reply.authUrl);
+        await shell.openExternal(reply.authUrl);
+      }
       await refreshStatus().catch(() => {});
       return reply;
     } catch (error) {
-      return { error: error.message || String(error) };
-    }
+      // A busy port must never stop an unrelated existing remote conversation.
+      if (started) await requestJson('POST','/stop').catch(()=>{});
+      closeBrowserLogin();
+      return { error: connectionError(error) };
+    } finally { loginStarting = false; }
   });
   ipcMain.handle('remote-logout', async () => {
+    closeBrowserLogin();
     try {
       const reply = await requestJson('POST', '/logout', {body:{}});
       send('remote-event', {kind:'reset', data:'Signed out and cleared the saved chat. Uploaded files remain in this workspace.'});
@@ -489,6 +522,7 @@ function registerIpc({ app, BrowserWindow, ipcMain, dialog, shell }) {
     }
   });
   ipcMain.handle('remote-interrupt', async () => {
+    closeBrowserLogin();
     try {
       const reply = await requestJson('POST', '/interrupt', { maxBytes: JSON_BYTES });
       await refreshStatus().catch(() => {});
@@ -498,6 +532,7 @@ function registerIpc({ app, BrowserWindow, ipcMain, dialog, shell }) {
     }
   });
   ipcMain.handle('remote-stop', async () => {
+    closeBrowserLogin();
     try {
       const reply = await requestJson('POST', '/stop', { maxBytes: JSON_BYTES });
       await refreshStatus().catch(() => {});
@@ -507,6 +542,7 @@ function registerIpc({ app, BrowserWindow, ipcMain, dialog, shell }) {
     }
   });
   ipcMain.handle('remote-end', async () => {
+    closeBrowserLogin();
     try {
       const reply = await requestJson('POST', '/end', { maxBytes: JSON_BYTES });
       stopStream(true);
@@ -544,12 +580,12 @@ function registerIpc({ app, BrowserWindow, ipcMain, dialog, shell }) {
     try {
       parsed = new URL(target);
     } catch {
-      return { error: 'Only the device login page may be opened.' };
+      return { error: 'Only the active sign-in page may be opened.' };
     }
-    const allowed = parsed.protocol === 'https:' &&
+    const allowed = browserLogin?.permits(parsed.href) || (parsed.protocol === 'https:' &&
       parsed.origin === 'https://auth.openai.com' &&
-      /^\/codex\/device(?:[/?#]|$)/.test(parsed.pathname);
-    if (!allowed) return { error: 'Only the device login page may be opened.' };
+      /^\/codex\/device(?:[/?#]|$)/.test(parsed.pathname));
+    if (!allowed) return { error: 'Only the active sign-in page may be opened.' };
     await shell.openExternal(parsed.toString());
     return { ok: true };
   });
@@ -611,6 +647,8 @@ async function install({ app, BrowserWindow, ipcMain, dialog, shell }, connectio
     current.window = null;
   });
   win.on('close', () => {
+    if (browserLogin) requestJson('POST','/stop').catch(()=>{});
+    closeBrowserLogin();
     // Keep the remote session alive. Only the local SSE bridge is shut down.
     stopStream(true);
   });
@@ -618,6 +656,7 @@ async function install({ app, BrowserWindow, ipcMain, dialog, shell }, connectio
     current.beforeQuitHookInstalled = true;
     app.on('before-quit', () => {
       current.quitting = true;
+      closeBrowserLogin();
       stopStream(true);
     });
   }

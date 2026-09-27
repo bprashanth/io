@@ -3,6 +3,7 @@ import base64
 import errno
 import fcntl
 import hmac
+import re
 import http.server
 import json
 import os
@@ -30,6 +31,7 @@ os.umask(0o077)
 ENV = dict(PATH='/opt/codex/bin:/usr/local/bin:/usr/bin:/bin', HOME='/state',
            CODEX_HOME='/state/codex', LANG='C.UTF-8', TERM='xterm-256color', COLORTERM='truecolor')
 subprocess.run(['node', '/opt/remote/config.js'], env=ENV, check=True)
+from oauth_callback import deliver
 from conformance import check
 CONFORMANCE = check()
 VERSION = subprocess.check_output([CODEX, '--version'], env=ENV, text=True).strip()
@@ -43,6 +45,8 @@ process = None
 master = None
 mode = None
 ended = False
+browser_auth = None
+browser_consumed = False
 # Serialize lifecycle operations, so concurrent requests cannot create two Codex processes.
 operation = threading.RLock()
 actions = threading.RLock()
@@ -77,6 +81,22 @@ def dimensions(body):
     return struct.pack('HHHH', rows, cols, 0, 0)
 
 
+def browser_output(text):
+    global browser_auth
+    # Collect only the authorization URL; never replay OAuth parameters into terminal logs.
+    match = re.search(r'https://auth\.openai\.com/oauth/authorize\?[^\s]+(?=\s)', text)
+    if match:
+        candidate = match.group(0)
+        parsed = urllib.parse.urlsplit(candidate)
+        query = urllib.parse.parse_qs(parsed.query)
+        if (query.get('redirect_uri') == ['http://localhost:1455/auth/callback'] and
+                query.get('response_type') == ['code'] and query.get('code_challenge_method') == ['S256'] and
+                len(query.get('state', [''])[0]) >= 16):
+            with condition:
+                browser_auth = candidate
+                condition.notify_all()
+
+
 def start(args, kind, body):
     global process, master, mode
     with operation:
@@ -102,18 +122,25 @@ def start(args, kind, body):
             global process, master, mode
             import codecs
             decoder = codecs.getincrementaldecoder('utf8')('replace')
+            login_buffer = ''
+            browser = kind == 'login' and '--device-auth' not in args
             try:
                 while True:
                     data = os.read(fd, 8192)
                     if not data:
                         break
-                    emit(kind, decoder.decode(data))
+                    text = decoder.decode(data)
+                    if browser:
+                        login_buffer = (login_buffer + text)[-32768:]
+                        browser_output(login_buffer)
+                    else:
+                        emit(kind, text)
             except OSError as e:
                 if e.errno != errno.EIO:
                     emit('state', 'Terminal stream ended unexpectedly')
             finally:
                 tail = decoder.decode(b'', final=True)
-                if tail:
+                if tail and not browser:
                     emit(kind, tail)
                 code = child.wait()
                 with operation:
@@ -243,7 +270,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.reply(400, dict(error=type(e).__name__ + ': request failed'))
 
     def do_POST(self):
-        global ended, event_bytes
+        global ended, event_bytes, browser_auth, browser_consumed
         if not self.authorized():
             return
         try:
@@ -282,7 +309,49 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 raise ValueError('Expected object')
             with actions:
                 if path.path == '/login':
-                    start(['login', '--device-auth'], 'login', body)
+                    method = body.get('method', 'browser')
+                    if method not in ('browser', 'device'):
+                        raise ValueError('Unknown sign-in method')
+                    if process is not None:
+                        raise ValueError('A process is already running; stop it first')
+                    browser_auth = None
+                    browser_consumed = False
+                    start(['login'] + (['--device-auth'] if method == 'device' else []), 'login', body)
+                    if method == 'browser':
+                        emit('login', 'Finish sign-in in your browser. No device-code setting is required.')
+                        deadline = time.monotonic() + 15
+                        with condition:
+                            while browser_auth is None and process is not None and time.monotonic() < deadline:
+                                condition.wait(.1)
+                        if browser_auth is None:
+                            stop()
+                            raise ValueError('Browser sign-in did not start. Please retry.')
+                        return self.reply(200, dict(ok=True, authUrl=browser_auth))
+                elif path.path == '/login/callback':
+                    callback = body.get('callback', '')
+                    if not isinstance(callback, str) or len(callback) > 16384:
+                        raise ValueError('Invalid callback')
+                    parsed = urllib.parse.urlsplit(callback)
+                    query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+                    expected = urllib.parse.parse_qs(urllib.parse.urlsplit(browser_auth or '').query).get('state', [''])[0]
+                    if (not expected or browser_consumed or mode != 'login' or process is None or
+                            parsed.scheme or parsed.netloc or parsed.fragment or parsed.path != '/auth/callback' or
+                            any(len(v) != 1 for v in query.values()) or
+                            set(query) - {'code','state','error','error_description','scope','session_state','iss'} or
+                            ('iss' in query and query['iss'] != ['https://auth.openai.com']) or
+                            ('code' in query and 'error' in query) or
+                            not hmac.compare_digest(query.get('state', [''])[0], expected) or
+                            not (query.get('code', [''])[0] or query.get('error', [''])[0])):
+                        raise ValueError('Callback does not match the active sign-in')
+                    browser_consumed = True
+                    try:
+                        deliver(callback)
+                        if not status()['loggedIn']:
+                            raise ValueError('Authentication was not saved')
+                    except Exception:
+                        stop()
+                        raise ValueError('Browser sign-in did not complete. Please retry.') from None
+                    browser_auth = None
                 elif path.path == '/start':
                     if not status()['loggedIn']:
                         raise ValueError('Sign in with ChatGPT first')
@@ -301,8 +370,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                 raise ValueError('Invalid terminal input')
                             os.write(master, data.encode())
                 elif path.path == '/stop':
+                    browser_auth = None
                     stop()
                 elif path.path == '/logout':
+                    browser_auth = None
                     stop()
                     result = subprocess.run([CODEX, 'logout'], env=ENV, capture_output=True, timeout=20)
                     if result.returncode or status()['loggedIn']:

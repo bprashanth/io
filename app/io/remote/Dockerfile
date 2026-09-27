@@ -3,7 +3,7 @@ FROM node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d43
 ARG CODEX_TARGET
 COPY codex-bin/${CODEX_TARGET}/ /opt/codex/
 COPY codex.js codex-pins.json /opt/io/
-COPY remote/config.js remote/worker.py remote/conformance.py /opt/remote/
+COPY remote/config.js remote/worker.py remote/oauth_callback.py remote/conformance.py /opt/remote/
 COPY tests/sandbox/probe.py /opt/remote/probe.py
 RUN ln -s /opt/codex/bin/codex /usr/local/bin/codex-linux-sandbox \
  && mkdir /state /workspace && chown 1000:1000 /state /workspace \

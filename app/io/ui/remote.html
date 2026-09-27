@@ -30,7 +30,8 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
 #loginbox{margin-top:10px;display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:8px 10px;align-items:center;max-width:100%}
 #loginbox.signedin #login-log,
 #loginbox.signedin #login-link,
-#loginbox.signedin #login-code{display:none}
+#loginbox.signedin #login-code,
+#loginbox.signedin #login-device{display:none}
 #loginbox .stack{display:flex;flex-direction:column;gap:8px;grid-column:1 / -1;min-width:0}
 #loginbox.signedin .stack{display:none}
 #sign-in{justify-self:start}
@@ -40,6 +41,7 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
 #start{justify-self:start}
 #login-state{grid-column:1 / -1;color:var(--dim);font-size:12.5px;line-height:1.5;min-height:18px;overflow-wrap:anywhere}
 #login-link{grid-column:1 / span 3;display:none;word-break:break-all;font-size:12.5px}
+#login-device{align-self:flex-start}
 #login-code{grid-column:1 / span 3;display:none;font:600 28px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:4px;color:var(--hi);user-select:all}
 #login-log{grid-column:1 / span 3;display:flex;flex-direction:column;gap:4px;max-height:96px;overflow:auto;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--dim);font-size:12.5px;line-height:1.45;white-space:pre-wrap}
 #main{flex:1;min-height:0;display:flex}
@@ -97,15 +99,16 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
       </div>
     </div>
     <div id="loginbox">
-      <button id="sign-in">Sign in</button>
+      <button id="sign-in">Sign in with browser</button>
       <button id="sign-out">Sign out</button>
       <button id="start" class="go">Start/resume</button>
       <div class="stack">
         <div id="login-state">Waiting for the remote worker.</div>
-        <a id="login-link" href="#" target="_blank" rel="noreferrer noopener"></a>
+        <a id="login-link" href="#"></a>
+        <button id="login-device" type="button">Use device code fallback</button>
         <div id="login-code"></div>
+        <div id="login-log" aria-live="polite"></div>
       </div>
-      <div id="login-log" aria-live="polite"></div>
     </div>
   </header>
   <main id="main">
@@ -187,6 +190,7 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
     start: $('start'),
     loginState: $('login-state'),
     loginLink: $('login-link'),
+    loginDevice: $('login-device'),
     loginCode: $('login-code'),
     loginLog: $('login-log'),
     notice: $('notice'),
@@ -215,6 +219,8 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
   const state = {
     status: null,
     loginPending: false,
+    loginMethod: 'browser',
+    loginAuthUrl: '',
     loginOpened: false,
     terminalReady: false,
     busyResults: false,
@@ -272,9 +278,44 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
     els.loginLog.replaceChildren();
     els.loginLink.textContent = '';
     els.loginLink.style.display = 'none';
+    els.loginLink.href = '#';
     els.loginCode.textContent = '';
     els.loginCode.style.display = 'none';
     els.loginState.textContent = message;
+    state.loginAuthUrl = '';
+    state.loginOpened = false;
+  }
+
+  function loginMethodLabel(method) {
+    return method === 'device' ? 'device code' : 'browser';
+  }
+
+  function loginStartMessage(method) {
+    return method === 'device'
+      ? 'Starting device-code sign-in on the remote worker.'
+      : 'Starting browser sign-in on the remote worker.';
+  }
+
+  function loginPendingMessage(method) {
+    return method === 'device'
+      ? 'Enter the device code shown here to finish sign-in.'
+      : 'Finish sign-in in your browser. Use the Reopen sign-in page link if needed.';
+  }
+
+  function loginRetryMessage(method) {
+    return `${loginMethodLabel(method)} sign-in failed. You can try again.`;
+  }
+
+  function setLoginLink(authUrl) {
+    state.loginAuthUrl = authUrl || '';
+    els.loginLink.href = '#';
+    if (!state.loginAuthUrl) {
+      els.loginLink.textContent = '';
+      els.loginLink.style.display = 'none';
+      return;
+    }
+    els.loginLink.textContent = 'Reopen sign-in page';
+    els.loginLink.style.display = 'block';
   }
 
   function setAttachmentStatus(file, reused = false) {
@@ -317,11 +358,13 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
     }
     clearLoginUi(message);
     els.loginBox.classList.remove('signedin');
-    els.signIn.textContent = 'Sign in';
+    els.signIn.textContent = 'Sign in with browser';
     els.signOut.style.display = 'none';
     els.signOut.disabled = false;
+    els.loginDevice.disabled = false;
     state.loginPending = false;
     state.logoutPending = false;
+    state.loginMethod = 'browser';
     state.loginOpened = false;
   }
 
@@ -334,6 +377,7 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
     const live = !!connection.live;
     const reconnecting = !!connection.reconnecting;
     const gap = !!connection.gap;
+    const loginBusy = state.loginPending || (st?.mode === 'login' && !st?.error);
 
     if (gap) {
       setPill(els.pillConn, 'gap detected', 'warn');
@@ -356,18 +400,23 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
 
     if (loggedIn) {
       state.loginPending = false;
+      state.loginAuthUrl = '';
       els.signOut.style.display = 'inline-flex';
       els.signOut.disabled = ended || state.logoutPending;
       els.loginState.textContent = 'Signed in. Sign out stops the assistant and clears the ChatGPT login; the saved chat is cleared and uploaded files stay.';
-    } else if (state.loginPending || st?.mode === 'login') {
+    } else if (loginBusy) {
       els.signOut.style.display = 'none';
-      els.loginState.textContent = 'Finish sign-in in your browser. The code will appear here.';
+      els.loginState.textContent = loginPendingMessage(state.loginMethod);
+    } else if (st?.error) {
+      els.signOut.style.display = 'none';
+      els.loginState.textContent = loginRetryMessage(state.loginMethod);
     } else {
       els.signOut.style.display = 'none';
-      els.loginState.textContent = ended ? 'This workspace has ended.' : 'Sign in with your own ChatGPT account to begin.';
+      els.loginState.textContent = ended ? 'This workspace has ended.' : 'Sign in with your own ChatGPT account in the browser to begin.';
     }
-    els.signIn.textContent = loggedIn ? 'Signed in' : 'Sign in';
-    els.signIn.disabled = loggedIn || state.loginPending || st?.mode === 'login' || ended || state.logoutPending;
+    els.signIn.textContent = loggedIn ? 'Signed in' : 'Sign in with browser';
+    els.signIn.disabled = loggedIn || loginBusy || ended || state.logoutPending;
+    els.loginDevice.disabled = loggedIn || loginBusy || ended || state.logoutPending;
     els.start.disabled = state.loginPending || running || !loggedIn || ended;
     els.interrupt.disabled = !running;
     els.end.disabled = ended;
@@ -406,27 +455,25 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
   function handleLoginEvent(text) {
     if (!text || state.status?.loggedIn || (!state.loginPending && state.status?.mode !== 'login')) return;
     text = text.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
-    appendLoginLine(text);
-    const url = (text.match(/https:\/\/auth\.openai\.com\/codex\/device(?:[^\s]*)?/i) || [])[0] || '';
-    if (url) {
-      els.loginLink.textContent = url;
-      els.loginLink.style.display = 'block';
-      els.loginLink.onclick = e => {
-        e.preventDefault();
-        remote.openExternal(url).then(res => {
-          if (res && res.error) setNotice(res.error, 'warn');
-        }).catch(err => setNotice(err.message || String(err), 'warn'));
-      };
-      if (state.loginPending) openLoginUrl(url);
-    }
-    const code = (text.match(/\b([A-Z0-9]{4,}(?:-[A-Z0-9]{4,})+|[A-Z0-9]{8,})\b/) || [])[1] || '';
-    if (code && code.length >= 8) {
-      els.loginCode.textContent = code;
-      els.loginCode.style.display = 'block';
+    const isDevice = state.loginMethod === 'device';
+    const displayText = text.replace(/https?:\/\/\S+/gi, '[link]');
+    if (displayText) appendLoginLine(displayText);
+    if (isDevice) {
+      const url = (text.match(/https:\/\/auth\.openai\.com\/codex\/device(?:[^\s]*)?/i) || [])[0] || '';
+      if (url) {
+        setLoginLink(url);
+        if (state.loginPending) openLoginUrl(url);
+      }
+      const code = (text.match(/\b([A-Z0-9]{4,}(?:-[A-Z0-9]{4,})+|[A-Z0-9]{8,})\b/) || [])[1] || '';
+      if (code && code.length >= 8) {
+        els.loginCode.textContent = code;
+        els.loginCode.style.display = 'block';
+      }
     }
     if (/logged in|sign-in complete|authorized|connected/i.test(text)) {
       state.loginPending = false;
       els.signIn.disabled = false;
+      els.loginDevice.disabled = false;
     }
   }
 
@@ -473,24 +520,32 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
     }
   }
 
-  async function login() {
+  async function login(method = 'browser') {
+    state.loginMethod = method === 'device' ? 'device' : 'browser';
     state.loginPending = true;
     state.loginOpened = false;
     els.signIn.disabled = true;
-    els.loginLink.style.display = 'none';
+    els.loginDevice.disabled = true;
+    setLoginLink('');
     els.loginCode.style.display = 'none';
     els.loginCode.textContent = '';
-    els.loginState.textContent = 'Starting device sign-in on the remote worker.';
-    const reply = await remote.login();
-    if (reply && reply.error) {
+    els.loginState.textContent = loginStartMessage(state.loginMethod);
+    const reply = await remote.login(state.loginMethod);
+    if (!reply || reply.error || reply.ok === false) {
       state.loginPending = false;
+      state.loginOpened = false;
       els.signIn.disabled = false;
-      els.loginState.textContent = reply.error;
-      setNotice(reply.error, 'bad');
+      els.loginDevice.disabled = false;
+      const error = reply && reply.error ? reply.error : 'Sign-in could not be started.';
+      els.loginState.textContent = loginRetryMessage(state.loginMethod);
+      setNotice(error, 'bad');
       return;
     }
-    els.loginState.textContent = 'Finish sign-in in your browser. The code will appear here.';
-    setNotice('Login started. Watch the browser for the device page.', 'ok');
+    if (reply.authUrl) setLoginLink(reply.authUrl);
+    els.loginState.textContent = loginPendingMessage(state.loginMethod);
+    setNotice(state.loginMethod === 'device'
+      ? 'Device-code sign-in started. Watch for the code below.'
+      : 'Browser sign-in started. Finish in the browser window that opened.', 'ok');
     await refreshStatus();
   }
 
@@ -710,7 +765,8 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
     term.focus();
   }
 
-  els.signIn.onclick = () => login();
+  els.signIn.onclick = () => login('browser');
+  els.loginDevice.onclick = () => login('device');
   els.signOut.onclick = () => openLogoutModal();
   els.start.onclick = () => startSession();
   els.interrupt.onclick = () => interruptSession();
@@ -747,7 +803,7 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
   els.resultsRefresh.onclick = () => loadResults();
   els.loginLink.onclick = e => {
     e.preventDefault();
-    const url = els.loginLink.textContent.trim();
+    const url = state.loginAuthUrl;
     if (!url) return;
     remote.openExternal(url).then(reply => {
       if (reply && reply.error) setNotice(reply.error, 'warn');

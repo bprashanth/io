@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test app/io/tests/remote/test_client.js
+      - run: node --test app/io/tests/remote/test_client.js app/io/tests/remote/test_browser_login.js
   linux-worker:
     name: real Linux Codex container
     runs-on: ubuntu-24.04
@@ -43,7 +43,9 @@ jobs:
       - name: Build controlled execution environment
         run: docker build -f app/io/remote/Dockerfile --build-arg CODEX_TARGET=linux-x64 -t io-remote-codex:experiment app/io
       - name: Actual sandbox, two-session boundaries and lifecycle (no model credentials)
-        run: python3 app/io/tests/remote/test_worker.py
+        run: |
+          python3 app/io/tests/remote/test_oauth_callback.py
+          python3 app/io/tests/remote/test_worker.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

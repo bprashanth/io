@@ -44,10 +44,20 @@ IO_REMOTE_CONNECTION="$HOME/.local/share/io-remote/laptop.json" ./run.sh
 
 This skips local scanner/Python/Codex bootstrap. The connection capability stays in
 Electron's main process. The file must be private (`chmod 600` on Unix).
-Use **Sign in**, authorize the displayed fresh device code in your own browser, then
-**Start/resume**. Device login may need enabling in ChatGPT security settings.
-See [official authentication guidance](https://developers.openai.com/codex/auth).
-No API key, copied auth.json, or existing developer login is needed.
+Use **Sign in with browser**. io opens the normal ChatGPT/Codex authorization page
+in your default browser; choose your account, then return to io and **Start/resume**.
+No device-code setting, API key, or copied auth cache is needed for this path.
+The **Use device code fallback** option still requires enabling device login in
+ChatGPT security/workspace settings. See [official authentication guidance](https://learn.chatgpt.com/docs/auth).
+
+io temporarily listens on laptop loopback port 1455 (IPv4 and IPv6 where available).
+It forwards only the active, state-matched OAuth callback through the existing
+session-authenticated connection to Codex's callback inside the container. No extra
+SSH tunnel or public callback port is needed. Codex owns PKCE, token exchange and
+credential storage. The client closes the listener after completion, cancellation,
+window close, or ten minutes. If another application is using port 1455, io reports
+that conflict before starting remote login. **Interrupt** cancels a pending attempt.
+Browser completion text never includes tokens or callback parameters.
 
 ## Pop!_OS laptop via Tailscale
 
@@ -122,7 +132,8 @@ ChatGPT credentials. Direct tailnet HTTPS hosting is a separate deployment optio
 ## Verification
 
 ```sh
-node --test app/io/tests/remote/test_client.js
+node --test app/io/tests/remote/test_client.js app/io/tests/remote/test_browser_login.js
+python3 app/io/tests/remote/test_oauth_callback.py
 python3 app/io/tests/remote/test_worker.py
 # A dedicated disposable session; this drive starts/cancels device login, but never authorizes it.
 IO_REMOTE_CONNECTION=/path/to/test.json xvfb-run -a node app/io/tests/remote/ui-drive.js
@@ -144,3 +155,15 @@ xvfb-run -a node app/io/tests/remote/ui-regressions.js
 
 It checks heartbeat handling, duplicate image attachment and unsent path draft,
 compact layout, sign-out/delete controls, and readable connection errors.
+
+Browser-login UI drive, using a dedicated real container (opens/cancels OAuth;
+does not authorize any account or change account settings):
+
+```sh
+IO_REMOTE_CONNECTION=/path/to/test.json xvfb-run -a node app/io/tests/remote/ui-browser-drive.js
+```
+
+The harness captures the browser-open request, checks the real Codex URL, hidden
+parameters, rejection of wrong/stale states, cancellation/port release, retry and
+device fallback. A successful real-account browser authorization remains a human
+check; synthetic callback tests cannot establish account eligibility.

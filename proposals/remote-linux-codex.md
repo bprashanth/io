@@ -106,3 +106,14 @@ attachment path handoff and destructive session/account-switch confusion, then
 verify a live model-driven file round trip. Changing an account uses Sign out
 (clear authentication/chat, keep files); Delete workspace destroys the endpoint.
 A different person still requires their own workspace/capability.
+
+## Browser OAuth default, September 27
+
+NGO-like test accounts may have device-code login disabled. Preserve that setting:
+use ordinary Codex browser OAuth by default, with an io-owned short-lived loopback
+callback relay over the existing authenticated session connection. Codex generates
+PKCE/state, validates OAuth and stores credentials in that user's container. The
+relay checks the active state, issuer and callback shape, cannot choose an arbitrary
+upstream, and closes on completion/cancel/timeout. Device codes remain optional.
+This is Codex's existing sign-in flow, not a new general-purpose io OAuth client.
+A real browser authorization with the user's unchanged account is still required.

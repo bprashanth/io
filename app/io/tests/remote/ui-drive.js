@@ -25,7 +25,7 @@ const before=fs.readFileSync(csv);
  await page.locator('.fileitem').filter({hasText:'summary.csv'}).getByRole('button',{name:/save|download/i}).click();
  if(!fs.readFileSync(csv).equals(before))throw Error('Local original modified');
  if(fs.readFileSync(download,'utf8')!=='total\n20\n')throw Error('Bad downloaded result');
- await page.click('#results-close'); await page.click('#sign-in');
+ await page.click('#results-close'); await page.click('#login-device');
  await page.waitForFunction(()=>document.querySelector('#login-code')?.textContent.trim().length>=8,null,{timeout:20000});
  await page.screenshot({path:path.join(out,'device-login-redacted.png'),mask:[page.locator('#login-code'),page.locator('#login-log')]});
  await page.click('#interrupt');

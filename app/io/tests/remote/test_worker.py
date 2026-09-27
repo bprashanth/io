@@ -324,6 +324,34 @@ class RemoteWorkerIntegrationTests(unittest.TestCase):
         self._mark("startup", "fresh_sessions_signed_out")
         self._mark("startup", "start_without_login_fails")
 
+    def test_25_browser_oauth_is_default_and_session_scoped(self) -> None:
+        code, _, reply = self.a.request_json('POST', '/login', body={})
+        self.assertEqual(code, 200)
+        url = urllib.parse.urlsplit(reply['authUrl'])
+        query = urllib.parse.parse_qs(url.query)
+        self.assertEqual((url.scheme, url.netloc, url.path), ('https', 'auth.openai.com', '/oauth/authorize'))
+        self.assertEqual(query['redirect_uri'], ['http://localhost:1455/auth/callback'])
+        self.assertEqual(query['code_challenge_method'], ['S256'])
+        state = query['state'][0]
+        self.assertGreaterEqual(len(state), 16)
+        try:
+            for callback in ['/auth/callback?code=fixture&state=wrong',
+                             'http://other.invalid/auth/callback?code=fixture&state=' + state,
+                             '/auth/callback?code=fixture&state=' + state + '&state=duplicate',
+                             '/status?code=fixture&state=' + state]:
+                code, _, _ = self.a.request_json('POST', '/login/callback', body={'callback':callback})
+                self.assertEqual(code, 400)
+            callback = '/auth/callback?code=fixture&state=' + state
+            code, _, _ = self.b.request_json('POST', '/login/callback', body={'callback':callback})
+            self.assertEqual(code, 400)
+            code, _, current = self.a.request_json('GET', '/status')
+            self.assertFalse(current['loggedIn'])
+            self.assertEqual(current['mode'], 'login')
+        finally:
+            self.a.request_json('POST', '/stop', body={})
+        code, _, _ = self.a.request_json('POST', '/login/callback', body={'callback':callback})
+        self.assertEqual(code, 400)
+
     def test_30_csv_upload_download_and_duplicate_reuse_original(self) -> None:
         name = f"sample-{secrets.token_hex(4)}.csv"
         original = b"name,value\nalpha,1\n"
