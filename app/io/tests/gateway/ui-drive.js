@@ -1,0 +1,47 @@
+// Real Electron client, signed local identities, real Docker/Codex login startup.
+const {_electron:electron}=require('../../../../installation/smoke/node_modules/playwright');
+const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const root=path.resolve(__dirname,'../../../..');
+const state=process.argv[2], out=path.resolve(process.argv[3]);
+(async()=>{
+ const app=await electron.launch({executablePath:path.join(root,'app/io/node_modules/electron/dist/electron'),args:['--no-sandbox',path.join(root,'app/io/gateway/desktop.js')],env:{...process.env,IO_GATEWAY_URL:'http://127.0.0.1:8788',IO_GATEWAY_TEST_TOKEN_FILE:path.join(state,'alice.jwt'),IO_DIAGNOSTIC_RUNTIME:'/tmp/io-conformance-python-check/runtime'}});
+ const errors=[];
+ try{
+  const page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));
+  await page.waitForFunction(()=>document.querySelector('#pill-version')?.textContent.includes('0.154.0'));
+  assert.equal(await page.locator('#v1-controls').isVisible(),true);
+  await page.screenshot({path:path.join(out,'v1-initial.png')});
+  await page.click('#local-diagnostic');
+  await page.waitForFunction(()=>document.querySelector('#diagnostic-detail')?.textContent.includes('"status": "PASS"'));
+  await page.screenshot({path:path.join(out,'v1-local-diagnostic.png')});
+  await page.click('#diagnostic-close');
+  const local=path.join(state,'attached.csv');fs.writeFileSync(local,'item,count\nbooks,5\n');
+  const download=path.join(state,'downloaded.csv');
+  await app.evaluate(({dialog}, paths)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[paths.local]});dialog.showSaveDialog=async()=>({canceled:false,filePath:paths.download});},{local,download});
+  await page.click('#attach');
+  await page.click('#attach-go');
+  await page.waitForFunction(()=>document.querySelector('#attach-status')?.textContent.includes('attached.csv'));
+  await page.click('#results');
+  const row=page.locator('.fileitem').filter({hasText:'attached.csv'});
+  await row.getByRole('button',{name:'Download'}).click();
+  await page.waitForFunction(()=>document.querySelector('#notice')?.textContent.includes('Saved')) ;
+  assert.equal(fs.readFileSync(download,'utf8'),fs.readFileSync(local,'utf8'));
+  await page.screenshot({path:path.join(out,'v1-files.png')});
+  await page.click('#results-close');
+  await page.click('#live-proof');
+  await page.waitForFunction(()=>document.querySelector('#notice')?.textContent.includes('Test service downloaded'));
+  assert.ok(fs.readFileSync(download,'utf8').includes('IO gateway live service proof'));
+  await app.evaluate(({shell})=>{globalThis.opened=[];shell.openExternal=async url=>globalThis.opened.push(url);});
+  await page.click('#sign-in');
+  await page.locator('#login-link').waitFor({state:'visible',timeout:25000});
+  const authUrl=await app.evaluate(()=>globalThis.opened[0]);
+  assert.equal(new URL(authUrl).origin,'https://auth.openai.com');
+  assert.equal(new URL(authUrl).searchParams.get('redirect_uri'),'http://localhost:1455/auth/callback');
+  await page.screenshot({path:path.join(out,'v1-browser-oauth.png')});
+  await page.click('#interrupt');
+  await page.waitForFunction(()=>!document.querySelector('#sign-in').disabled);
+  assert.deepEqual(errors,[]);
+  const result={realElectron:true,realDocker:true,realCodexOAuthStartup:true,cloudflareHumanLogin:false,chatgptAuthorization:false,attachmentRoundTrip:true,localOriginalUnchanged:fs.readFileSync(local,'utf8')==='item,count\nbooks,5\n',diagnosticPassStillRemote:true,liveServiceGatewayDownload:true,rendererErrors:errors};
+  fs.writeFileSync(path.join(out,'ui-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+ }finally{await app.close();}
+})().catch(e=>{console.error(e);process.exitCode=1});

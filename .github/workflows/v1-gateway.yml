@@ -1,0 +1,56 @@
+name: V1 gateway and local diagnostic
+on:
+  workflow_dispatch:
+  push:
+    branches: ['remote-codex/**']
+    paths: ['app/io/gateway/**', 'app/io/diagnostic/**', 'app/io/tests/gateway/**', 'app/io/tests/test_diagnostic.js', '.github/workflows/v1-gateway.yml']
+  pull_request:
+    paths: ['app/io/gateway/**', 'app/io/diagnostic/**', 'app/io/tests/gateway/**', 'app/io/tests/test_diagnostic.js', '.github/workflows/v1-gateway.yml']
+permissions:
+  contents: read
+jobs:
+  portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node --test app/io/tests/test_diagnostic.js app/io/tests/remote/test_client.js app/io/tests/remote/test_browser_login.js
+  gateway:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r app/io/gateway/requirements.txt
+      - run: python -m pytest -q app/io/tests/gateway/test_gateway.py
+      - run: python -m unittest app/io/tests/remote/test_conversations.py
+      - run: node app/io/fetch-codex.js
+      - run: sudo apparmor_parser -r app/io/remote/io-remote.apparmor
+      - run: docker build -f app/io/remote/Dockerfile --build-arg CODEX_TARGET=linux-x64 -t io-remote-codex:v1 app/io
+      - name: Real private runtimes, signed identities, restart and file boundaries
+        run: |
+          python app/io/tests/gateway/serve_fixture.py /tmp/io-v1-fixture > /tmp/io-v1-fixture.log 2>&1 &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -s http://127.0.0.1:8788/identity >/dev/null; then break; fi
+            sleep 1
+          done
+          python app/io/tests/gateway/integration.py /tmp/io-v1-fixture /tmp/io-v1-evidence
+          python app/io/tests/gateway/finish_fixture.py /tmp/io-v1-fixture /tmp/io-v1-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v1-gateway-evidence
+          path: /tmp/io-v1-evidence/*.json
+          if-no-files-found: warn

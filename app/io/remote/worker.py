@@ -1,5 +1,6 @@
-"""One ephemeral container/session. No shell-execution API; PTY runs pinned Codex only."""
+"""One container/workspace (ephemeral or explicitly persistent). No shell-execution API; PTY runs pinned Codex only."""
 import base64
+import datetime
 import errno
 import fcntl
 import hmac
@@ -19,6 +20,7 @@ import termios
 import threading
 import time
 import urllib.parse
+import uuid
 
 LIMIT = 10 * 1024 * 1024
 CODEX = '/opt/codex/bin/codex'
@@ -47,9 +49,213 @@ mode = None
 ended = False
 browser_auth = None
 browser_consumed = False
+active_conversation_id = None
+PERSISTENT = os.environ.get('IO_REMOTE_PERSISTENT') == '1'
+SESSION_ROOT = pathlib.Path('/state/codex/sessions')
 # Serialize lifecycle operations, so concurrent requests cannot create two Codex processes.
 operation = threading.RLock()
 actions = threading.RLock()
+
+
+def _uuid_text(value):
+    if not isinstance(value, str):
+        return None
+    try:
+        return str(uuid.UUID(value))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _clean_text(value, fallback):
+    if not isinstance(value, str):
+        return fallback
+    text = re.sub(r'[\x00-\x1f\x7f]+', ' ', value)
+    text = re.sub(r'\s+', ' ', text).strip()
+    if not text:
+        return fallback
+    return text[:120]
+
+
+def _timestamp_text(value):
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        dt = datetime.datetime.fromtimestamp(value, datetime.timezone.utc)
+        return dt.strftime('%Y-%m-%d %H:%M UTC')
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if re.fullmatch(r'\d+(?:\.\d+)?', text):
+            return _timestamp_text(float(text))
+        try:
+            dt = datetime.datetime.fromisoformat(text.replace('Z', '+00:00'))
+        except ValueError:
+            return _clean_text(text, None)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+    return None
+
+
+def _conversation_date(meta, fallback_mtime=None):
+    for key in ('created_at', 'createdAt', 'created', 'started_at', 'startedAt', 'timestamp', 'time', 'updated_at', 'updatedAt'):
+        text = _timestamp_text(meta.get(key))
+        if text:
+            return text
+    if fallback_mtime is not None:
+        return datetime.datetime.fromtimestamp(fallback_mtime, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+    return 'Unknown date'
+
+
+def _session_root(root=None):
+    return pathlib.Path('/state/codex/sessions') if root is None else pathlib.Path(root)
+
+
+def _resolve_session_relative(root, relative):
+    root = _session_root(root)
+    parts = pathlib.PurePosixPath(str(relative)).parts
+    if not parts or any(p in ('', '.', '..') or '\\' in p or '\x00' in p for p in parts):
+        raise ValueError('Invalid conversation path')
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in parts[:-1]:
+            nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = nxt
+        result = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+    finally:
+        os.close(fd)
+    st = os.fstat(result)
+    if not stat.S_ISREG(st.st_mode):
+        os.close(result)
+        raise ValueError('Only regular conversation files can be used')
+    return result
+
+
+def _iter_session_relpaths(root=None, limit=500):
+    root = _session_root(root)
+    seen = 0
+    visited = 0
+    for current, dirs, files in os.walk(root, followlinks=False):
+        visited += 1
+        if visited > 2000:
+            return
+        dirs[:] = sorted(d for d in dirs if not d.startswith('.') and not os.path.islink(os.path.join(current, d)))
+        for name in sorted(files):
+            if seen >= limit:
+                return
+            if name.startswith('.') or not name.endswith('.jsonl'):
+                continue
+            path = pathlib.Path(current) / name
+            if path.is_symlink():
+                continue
+            relative = os.path.relpath(path, root)
+            if relative.startswith('..'):
+                continue
+            seen += 1
+            yield relative
+
+
+def _read_session_meta(root, relative, limit=256 * 1024):
+    fd = _resolve_session_relative(root, relative)
+    with os.fdopen(fd, 'rb') as f:
+        stat_result = os.fstat(f.fileno())
+        raw = f.readline(limit + 1)
+    if not raw or len(raw) > limit:
+        return None
+    try:
+        meta = json.loads(raw.decode('utf-8'))
+    except Exception:
+        return None
+    if not isinstance(meta, dict) or meta.get('type') != 'session_meta':
+        return None
+    payload = meta.get('payload', meta)
+    if not isinstance(payload, dict):
+        return None
+    return payload, stat_result
+
+
+def conversation_records(root=None, limit=500):
+    root = _session_root(root)
+    records = []
+    for relative in _iter_session_relpaths(root, limit=limit):
+        try:
+            result = _read_session_meta(root, relative)
+        except (OSError, ValueError, OverflowError):
+            continue
+        if not result:
+            continue
+        meta, stat_result = result
+        conversation_id = None
+        for key in ('id', 'conversationId', 'conversation_id', 'session_id', 'thread_id'):
+            conversation_id = _uuid_text(meta.get(key))
+            if conversation_id:
+                break
+        if not conversation_id:
+            conversation_id = _uuid_text(pathlib.PurePosixPath(relative).stem)
+        if not conversation_id:
+            continue
+        records.append(dict(
+            id=conversation_id,
+            title=_clean_text(
+                meta.get('title')
+                or meta.get('subject')
+                or meta.get('summary')
+                or meta.get('conversationName')
+                or meta.get('name'),
+                'Untitled conversation',
+            ),
+            date=_conversation_date(meta, stat_result.st_mtime),
+            _path=relative,
+            _mtime=stat_result.st_mtime,
+        ))
+    records.sort(key=lambda r: (r['_mtime'], r['id']), reverse=True)
+    return records
+
+
+def list_conversations(root=None, limit=500):
+    return [dict(id=r['id'], title=r['title'], date=r['date']) for r in conversation_records(root, limit=limit)]
+
+
+def find_conversation_path(root, conversation_id, limit=500):
+    conversation_id = _uuid_text(conversation_id)
+    if not conversation_id:
+        raise ValueError('Invalid conversationId')
+    match = None
+    for record in conversation_records(root, limit=limit):
+        if record['id'] != conversation_id:
+            continue
+        if match is not None:
+            raise ValueError('Conversation id is ambiguous')
+        match = record['_path']
+    return match
+
+
+def delete_conversation(root, conversation_id, limit=500):
+    relative = find_conversation_path(root, conversation_id, limit=limit)
+    if relative is None:
+        raise ValueError('Conversation not found')
+    root = _session_root(root)
+    parts = pathlib.PurePosixPath(str(relative)).parts
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in parts[:-1]:
+            nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = nxt
+        os.unlink(parts[-1], dir_fd=fd)
+    finally:
+        os.close(fd)
+
+
+def status_snapshot(*, logged_in, running, mode, ended, sandbox, persistent, instance, version, active_conversation_id=None, root=None):
+    conversations = list_conversations(root)
+    active = active_conversation_id if running else None
+    if active is None and running and conversations:
+        active = None  # Do not attribute a new process to a previous conversation.
+    return dict(instance=instance, loggedIn=logged_in, running=running,
+                hasConversation=bool(conversations), mode=mode, version=version,
+                policy='offline', ended=ended, sandbox=sandbox, persistent=persistent,
+                conversationId=active)
 
 
 def emit(kind, data='', **extra):
@@ -70,8 +276,16 @@ def status():
                             text=True, timeout=15)
     # No auth file contents ever leave the worker.
     logged = result.returncode == 0 and 'chatgpt' in (result.stdout + result.stderr).lower()
-    return dict(instance=INSTANCE, loggedIn=logged, running=process is not None and process.poll() is None,
-                hasConversation=any(pathlib.Path('/state/codex/sessions').rglob('*.jsonl')), mode=mode, version=VERSION, policy='offline', ended=ended, sandbox=CONFORMANCE['ok'])
+    return status_snapshot(logged_in=logged,
+                           running=process is not None and process.poll() is None,
+                           mode=mode,
+                           ended=ended,
+                           sandbox=CONFORMANCE['ok'],
+                           persistent=PERSISTENT,
+                           instance=INSTANCE,
+                           version=VERSION,
+                           active_conversation_id=active_conversation_id,
+                           root=SESSION_ROOT)
 
 
 def dimensions(body):
@@ -97,8 +311,8 @@ def browser_output(text):
                 condition.notify_all()
 
 
-def start(args, kind, body):
-    global process, master, mode
+def start(args, kind, body, conversation_id=None):
+    global process, master, mode, active_conversation_id
     with operation:
         if ended:
             raise ValueError('Session has ended')
@@ -118,8 +332,9 @@ def start(args, kind, body):
         finally:
             os.close(slave)
         process, master, mode = child, fd, kind
+        active_conversation_id = conversation_id
         def pump():
-            global process, master, mode
+            global process, master, mode, active_conversation_id
             import codecs
             decoder = codecs.getincrementaldecoder('utf8')('replace')
             login_buffer = ''
@@ -147,6 +362,7 @@ def start(args, kind, body):
                     os.close(fd)
                     if process is child:
                         process = master = mode = None
+                        active_conversation_id = None
                 emit('exit', kind, code=code)
         threading.Thread(target=pump, daemon=True).start()
 
@@ -218,6 +434,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             query = urllib.parse.parse_qs(path.query)
             if path.path == '/status':
                 return self.reply(200, status())
+            if path.path == '/conversations':
+                conversations = list_conversations(SESSION_ROOT, limit=501)
+                return self.reply(200, dict(conversations=conversations[:500], truncated=len(conversations) > 500))
             if path.path == '/events':
                 after = int(query.get('after', ['0'])[0])
                 if after < 0 or after > sequence:
@@ -355,8 +574,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 elif path.path == '/start':
                     if not status()['loggedIn']:
                         raise ValueError('Sign in with ChatGPT first')
-                    args = ['resume', '--last', '-p', 'io'] if body.get('resume') else ['-p', 'io']
-                    start(args + ['-a', 'never', '--no-alt-screen'], 'data', body)
+                    conversation_id = body.get('conversationId')
+                    if conversation_id is not None:
+                        conversation_id = _uuid_text(conversation_id)
+                        if not conversation_id:
+                            raise ValueError('Invalid conversationId')
+                        if find_conversation_path(SESSION_ROOT, conversation_id) is None:
+                            raise ValueError('Conversation not found')
+                        args = ['resume', conversation_id, '-p', 'io']
+                    elif body.get('resume'):
+                        saved = list_conversations(SESSION_ROOT)
+                        if not saved:
+                            raise ValueError('No saved conversation to resume')
+                        conversation_id = saved[0]['id']
+                        args = ['resume', conversation_id, '-p', 'io']
+                    else:
+                        args = ['-p', 'io']
+                    start(args + ['-a', 'never', '--no-alt-screen'], 'data', body, conversation_id=conversation_id)
+                elif path.path == '/conversations/delete':
+                    conversation_id = _uuid_text(body.get('conversationId'))
+                    if not conversation_id:
+                        raise ValueError('Invalid conversationId')
+                    with operation:
+                        if process is not None and process.poll() is None:
+                            raise ValueError('Stop Codex before deleting a conversation')
+                        delete_conversation(SESSION_ROOT, conversation_id)
+                    return self.reply(200, dict(ok=True))
                 elif path.path in ('/input', '/resize', '/interrupt'):
                     with operation:
                         if master is None:
@@ -427,16 +670,17 @@ class Server(http.server.ThreadingHTTPServer):
 
 if __name__ == '__main__':
     server = Server(('0.0.0.0', 8787), Handler)
-    # Ephemeral experiment expires even if client disappears. Operator cannot extend it remotely.
-    expiry = max(60, min(int(os.environ.get('IO_REMOTE_TTL', '14400')), 86400))
-    def expire():
-        global ended
-        time.sleep(expiry)
-        stop()
-        ended = True
-        server.shutdown()
-    threading.Thread(target=expire, daemon=True).start()
-    print(json.dumps(dict(ready=True, version=VERSION, expiresIn=expiry)), flush=True)
+    expiry = None if PERSISTENT else max(60, min(int(os.environ.get('IO_REMOTE_TTL', '14400')), 86400))
+    if expiry is not None:
+        # Ephemeral experiment expires even if client disappears. Operator cannot extend it remotely.
+        def expire():
+            global ended
+            time.sleep(expiry)
+            stop()
+            ended = True
+            server.shutdown()
+        threading.Thread(target=expire, daemon=True).start()
+    print(json.dumps(dict(ready=True, version=VERSION, persistent=PERSISTENT, expiresIn=expiry)), flush=True)
     server.serve_forever()
     stop()
     server.server_close()

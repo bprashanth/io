@@ -102,6 +102,13 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
       <button id="sign-in">Sign in with browser</button>
       <button id="sign-out">Sign out</button>
       <button id="start" class="go">Start/resume</button>
+      <div id="v1-controls" hidden>
+        <button id="new-chat">New conversation</button>
+        <button id="list-chats">Conversations</button>
+        <button id="local-diagnostic">Local diagnostic</button>
+        <button id="live-proof">Download test service</button>
+        <span id="diagnostic-summary">V1 always runs remotely</span>
+      </div>
       <div class="stack">
         <div id="login-state">Waiting for the remote worker.</div>
         <a id="login-link" href="#"></a>
@@ -151,6 +158,12 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
   </div>
 </div>
 
+<div id="chats-modal" class="modal" role="dialog" aria-modal="true">
+  <div class="card"><h2>Saved conversations</h2><p>Conversations share this workspace's files. Opening one stops the current terminal.</p><div id="chats-list" class="filelist"></div><button id="chats-close">Close</button></div>
+</div>
+<div id="diagnostic-modal" class="modal" role="dialog" aria-modal="true">
+  <div class="card"><h2>Local capability diagnostic</h2><p>This synthetic check does not change V1: your work runs remotely. Reports stay on this device.</p><pre id="diagnostic-detail" style="white-space:pre-wrap;max-height:45vh;overflow:auto"></pre><button id="diagnostic-run">Select prepared Python runtime and test</button><button id="diagnostic-close">Close</button></div>
+</div>
 <div id="end-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="end-title">
   <div class="card">
     <h2 id="end-title">Delete workspace</h2>
@@ -370,6 +383,8 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
 
   function renderStatus(st) {
     state.status = st || null;
+    $('v1-controls').hidden = !st?.persistent;
+    $('new-chat').disabled = !st?.loggedIn || !!st?.ended;
     const loggedIn = !!(st && st.loggedIn);
     const running = !!(st && st.running);
     const ended = !!(st && st.ended);
@@ -568,6 +583,55 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
     await refreshStatus();
   }
 
+  $('new-chat').onclick = async () => {
+    const stopped = await remote.stop();
+    if (stopped?.error) return setNotice(stopped.error, 'bad');
+    term.reset();
+    const reply = await remote.start({cols:term.cols, rows:term.rows, resume:false});
+    if (reply?.error) setNotice(reply.error, 'bad');
+    await refreshStatus();
+  };
+  $('list-chats').onclick = async () => {
+    showModal($('chats-modal'), true);
+    const reply = await remote.conversations();
+    const list = $('chats-list'); list.replaceChildren();
+    if (reply?.error) { list.textContent = reply.error; return; }
+    for (const chat of reply.conversations || []) {
+      const row = document.createElement('div'); row.className='fileitem';
+      const title = document.createElement('span'); title.className='name'; title.textContent=(chat.title || 'Conversation')+' · '+(chat.date || '')+' · '+chat.id.slice(0,8);
+      const open = document.createElement('button'); open.textContent='Open';
+      open.onclick = async () => {
+        const stopped = await remote.stop(); if(stopped?.error) return setNotice(stopped.error,'bad');
+        term.reset();
+        const result = await remote.start({cols:term.cols,rows:term.rows,conversationId:chat.id});
+        if (result?.error) setNotice(result.error,'bad'); else showModal($('chats-modal'),false);
+        await refreshStatus();
+      };
+      const remove = document.createElement('button'); remove.textContent='Delete';
+      remove.onclick = async () => {
+        if (!confirm('Delete this saved conversation? Workspace files remain. Stop the terminal first.')) return;
+        const result = await remote.deleteConversation(chat.id);
+        if (result?.error) setNotice(result.error,'bad'); else row.remove();
+      };
+      row.append(title,open,remove); list.append(row);
+    }
+    if (!list.children.length) list.textContent='No saved conversations yet.';
+  };
+  $('chats-close').onclick=()=>showModal($('chats-modal'),false);
+  async function showDiagnostic(run=false) {
+    showModal($('diagnostic-modal'),true);
+    $('diagnostic-detail').textContent=run ? 'Running synthetic tests… Remote execution is unchanged.' : 'Loading report…';
+    $('diagnostic-run').disabled=true;
+    const report=await remote.diagnostic(run);
+    $('diagnostic-detail').textContent=JSON.stringify(report,null,2);
+    $('diagnostic-summary').textContent='Local: '+(report?.verdict || report?.status || 'INCONCLUSIVE')+' · execution: remote';
+    $('diagnostic-run').disabled=false;
+  }
+  $('local-diagnostic').onclick=()=>showDiagnostic();
+  $('diagnostic-run').onclick=()=>showDiagnostic(true);
+  $('diagnostic-close').onclick=()=>showModal($('diagnostic-modal'),false);
+  $('live-proof').onclick=async()=>{const result=await remote.liveProof();setNotice(result?.error || (result?.canceled ? 'Download canceled.' : 'Test service downloaded through the gateway.'),result?.error?'bad':'ok');};
+
   async function startSession() {
     const st = state.status || {};
     const resume = !!st.hasConversation;
@@ -603,7 +667,7 @@ h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
     }
     clearSessionUi('This workspace has ended.');
     setAttachmentStatus(null);
-    setNotice('The remote container/endpoint was deleted. Provision it again before continuing.', 'ok');
+    setNotice(state.status?.persistent ? 'Workspace deleted. Reopen IO to create an empty workspace.' : 'The remote container/endpoint was deleted. Provision it again before continuing.', 'ok');
     await refreshStatus();
     if ($('results-modal').classList.contains('on')) await loadResults();
   }

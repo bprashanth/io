@@ -34,7 +34,13 @@ function validateConnection(connection) {
   if (url.username || url.password || url.hash || url.search || connection.token.length < 40 || (url.protocol !== 'https:' && !isLoopbackHttp(url))) {
     return { error: 'Remote connection must use https, except for literal loopback http.' };
   }
-  return { url, token: connection.token };
+  if (connection.auth && connection.auth !== 'cloudflare') return {error:'Unknown remote authentication mode.'};
+  if (/[\r\n;]/.test(connection.token)) return {error:'Invalid remote credential.'};
+  return { url, token: connection.token, auth: connection.auth };
+}
+
+function authHeaders(connection) {
+  return connection.auth === 'cloudflare' ? {Cookie: 'CF_Authorization=' + connection.token, 'Cf-Access-Jwt-Assertion': connection.token} : {Authorization: 'Bearer ' + connection.token};
 }
 
 function joinUrl(baseUrl, endpoint) {
@@ -77,7 +83,7 @@ function normalizeBody(body, headers) {
 function performRequest(method, endpoint, { body, headers = {}, maxBytes = JSON_BYTES, timeoutMs = 30000 } = {}) {
   if (!current || !current.connection) return Promise.reject(new Error('Remote connection is not ready.'));
   const url = joinUrl(current.connection.url, endpoint);
-  const payloadHeaders = { Authorization: `Bearer ${current.connection.token}`, ...headers };
+  const payloadHeaders = { ...authHeaders(current.connection), ...headers };
   const payload = normalizeBody(body, payloadHeaders);
   if (payload != null && payloadHeaders['Content-Length'] == null && payloadHeaders['content-length'] == null) {
     payloadHeaders['Content-Length'] = Buffer.byteLength(payload);
@@ -94,7 +100,7 @@ function performRequest(method, endpoint, { body, headers = {}, maxBytes = JSON_
     }, res => {
       const statusCode = res.statusCode || 0;
       if (statusCode >= 300 && statusCode < 400) {
-        const where = res.headers.location ? ` (${res.headers.location})` : '';
+        const where = current.connection.auth === 'cloudflare' ? '. Close and reopen IO to sign in to Cloudflare Access again' : '';
         res.resume();
         reject(new Error(`redirects are not allowed${where}`));
         return;
@@ -175,7 +181,7 @@ async function refreshStatus() {
       current.streamClosing = false;
       current.lastSeq = 0;
       current.gapSeen = false;
-      send('remote-event', {kind:'reset', data:'The server restarted. Files, conversation and login were erased.'});
+      send('remote-event', {kind:'reset', data:status.persistent ? 'The runtime restarted. Saved files, conversations and login remain in your workspace.' : 'The server restarted. Files, conversation and login were erased.'});
       connectEvents().catch(() => {});
     }
     current.status = status;
@@ -222,7 +228,7 @@ async function connectEvents() {
     method: 'GET',
     path: `${url.pathname}${url.search}`,
     headers: {
-      Authorization: `Bearer ${current.connection.token}`,
+      ...authHeaders(current.connection),
       Accept: 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
@@ -412,7 +418,7 @@ async function pickFileForUpload() {
   return { ok: true, name: reply.name || name, size: bytes.length, reused: !!reply.reused };
 }
 
-async function saveRemoteFile(name) {
+async function saveRemoteFile(name, endpoint) {
   if (!current || !current.window || current.window.isDestroyed()) return { canceled: true };
   const cleanName = String(name || '').trim();
   if (!cleanName) return { error: 'No file name was provided.' };
@@ -421,7 +427,7 @@ async function saveRemoteFile(name) {
     defaultPath: path.basename(cleanName),
   });
   if (result.canceled || !result.filePath) return { canceled: true };
-  const bytes = await requestBytes('GET', `/file?name=${encodeURIComponent(cleanName)}`, { maxBytes: MAX_FILE_BYTES });
+  const bytes = await requestBytes('GET', endpoint || `/file?name=${encodeURIComponent(cleanName)}`, { maxBytes: MAX_FILE_BYTES });
   await fs.promises.writeFile(result.filePath, bytes);
   return { ok: true, path: result.filePath, name: cleanName, size: bytes.length };
 }
@@ -485,7 +491,7 @@ function registerIpc({ app, BrowserWindow, ipcMain, dialog, shell }) {
     const rows = Number(opts.rows || 0);
     try {
       const reply = await requestJson('POST', '/start', {
-        body: { cols, rows, resume: !!opts.resume },
+        body: { cols, rows, resume: !!opts.resume, conversationId: opts.conversationId },
         maxBytes: JSON_BYTES,
       });
       await refreshStatus().catch(() => {});
@@ -552,6 +558,15 @@ function registerIpc({ app, BrowserWindow, ipcMain, dialog, shell }) {
     } catch (error) {
       return { error: error.message || String(error) };
     }
+  });
+  ipcMain.handle('remote-conversations', async () => {
+    try {return await requestJson('GET', '/conversations');} catch(error) {return {error:error.message};}
+  });
+  ipcMain.handle('remote-delete-conversation', async (_event, id) => {
+    try {return await requestJson('POST', '/conversations/delete', {body:{conversationId:id}});} catch(error) {return {error:error.message};}
+  });
+  ipcMain.handle('remote-live-proof', async () => {
+    try {return await saveRemoteFile('workspace-service.html', '/ports/8080');} catch(error) {return {error:error.message};}
   });
   ipcMain.handle('remote-files', async () => {
     try {
