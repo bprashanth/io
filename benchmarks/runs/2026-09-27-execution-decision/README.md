@@ -32,3 +32,22 @@ caches). A command-launch failure cannot prove network confinement.
 
 Validation before first CI: unchanged harness classification tests, 19 launcher
 checks and 34 proxy tests pass on DGX. Windows behavior awaits native execution.
+
+## First measurement: run 36310702342
+
+All six required jobs failed. On both Server 2022 and 2025, pinned elevated now
+launches and passes 13/17 properties: outside filesystem/junction boundaries and
+public internet denial hold, but parent/child loopback and host-interface TCP
+connect (four violations independently acknowledged by the host receiver). This
+is not arbitrary LAN reachability: the non-loopback endpoint is the runner itself.
+Error 5 did not reproduce on these clean jobs; the old and new 2025 images and
+Codex binary hashes match. Earlier diagnostic order and Node 20 versus 22 are
+hypotheses for a focused next run, not established causes.
+
+Candidate elevated rejects default root-deny policies on both images, explicitly
+requiring effective `:root` read access. Upstream has a test asserting this rejection
+(`windows_elevated_setup_rejects_default_root_deny`); no grant will be widened here.
+Candidate MXC explicitly reports unavailable on both images. No candidate passes,
+so the planned ordinary-account acceptance and startup-smoke implementation gate
+has not been reached. A daily sandbox log naming change was found in source;
+collection now includes only `sandbox.YYYY-MM-DD.log` and legacy `sandbox.log`.

@@ -1,0 +1,49 @@
+name: Windows launch error diagnosis
+on:
+  workflow_dispatch:
+  push:
+    branches: ['remote-codex/**', 'execution-decision/**']
+    paths: ['.github/workflows/windows-launch-diagnosis.yml']
+permissions:
+  contents: read
+jobs:
+  launch:
+    name: Node ${{ matrix.node }} - ${{ matrix.history }} - pinned elevated
+    runs-on: windows-2025
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20','22']
+        history: [clean, prior-unelevated]
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '${{ matrix.node }}'}
+      - run: node app/io/fetch-codex.js
+      - run: node app/io/tests/sandbox/prepare.js
+      - name: Reproduce earlier unelevated diagnostic sequence (not a conformance pass)
+        if: matrix.history == 'prior-unelevated'
+        shell: pwsh
+        run: |
+          & node app/io/tests/sandbox/run.js --out diagnosis-results/prior-exact
+          $exact = $LASTEXITCODE
+          & node app/io/tests/sandbox/run.js --windows-diagnostic unelevated-network --out diagnosis-results/prior-network-only
+          @{exactExit=$exact; weakenedDiagnosticExit=$LASTEXITCODE} | ConvertTo-Json | Set-Content diagnosis-results/sequence.json
+          # These are intentionally failed preconditions, retained as evidence.
+          # The unchanged elevated test below determines this job's verdict.
+          exit 0
+      - name: Exact contract using pinned elevated backend
+        run: node app/io/tests/sandbox/run.js --windows-diagnostic elevated --out diagnosis-results/elevated
+      - name: Environment after
+        if: always()
+        shell: pwsh
+        run: ./app/io/tests/sandbox/windows/environment.ps1 -Out diagnosis-results/environment
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launch-node${{ matrix.node }}-${{ matrix.history }}
+          path: diagnosis-results/
+          if-no-files-found: error
+          retention-days: 30

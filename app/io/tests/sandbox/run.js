@@ -201,8 +201,13 @@ async function main() {
         result = await execute(bin.path, ['sandbox', '-p', 'io', '-P', 'io', '-C', ws, '--', python, script, manifestFile, label], childEnv, ws);
       }
       if (process.platform === 'win32') {
-        const log = path.join(home, '.sandbox', 'sandbox.log');
-        if (fs.existsSync(log)) fs.copyFileSync(log, path.join(out, `${label}.sandbox.log`));
+        const logDir = path.join(home, '.sandbox');
+        if (fs.existsSync(logDir)) for (const name of fs.readdirSync(logDir)) {
+          if (/^sandbox(?:\.\d{4}-\d{2}-\d{2})?\.log$/.test(name)) {
+            const log = path.join(logDir, name);
+            if (fs.lstatSync(log).isFile()) fs.copyFileSync(log, path.join(out, `${label}.${name}`));
+          }
+        }
         // Explicit file allowlist: never collect .sandbox-secrets, auth or whole CODEX_HOME.
       }
       result.mutations = {};
