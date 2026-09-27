@@ -105,3 +105,16 @@ compatibility result.
 Write chronology entries, reproducible commands and synthetic artifacts under
 `benchmarks/runs/2026-09-27-execution-decision/`. Archive failures and source findings,
 then synthesize into narrative once results support a recommendation.
+
+## Decision after the September 27 available-host experiments
+
+Recommend C as the product direction, with current Windows execution remaining
+remote. Pinned elevated violates local TCP isolation even when its launch works;
+newer elevated refuses restricted reads; strict MXC is unavailable on both hosted
+images. A delay recovers the reproduced pinned launch error, without fixing the
+boundary. No permission widening, product pin bump or Windows support claim.
+The ordinary-user and Windows startup-smoke stages remain gated, not silently
+completed. Desktop builds are NOT RUN. The next agent can use the
+[ordinary-machine handoff](windows-ordinary-user-handoff.md) once a backend remedy
+can meet the unchanged contract. [Narrative](../narrative/2026-09-27-local-remote-execution-decision.md)
+records the recommendation and what could change it.

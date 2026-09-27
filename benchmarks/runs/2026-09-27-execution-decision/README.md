@@ -51,3 +51,40 @@ Candidate MXC explicitly reports unavailable on both images. No candidate passes
 so the planned ordinary-account acceptance and startup-smoke implementation gate
 has not been reached. A daily sandbox log naming change was found in source;
 collection now includes only `sandbox.YYYY-MM-DD.log` and legacy `sandbox.log`.
+
+## Repeats and launch timing
+
+- `ci-36310871779`: repeat six-case matrix with daily logs. Same candidate failures;
+  clean pinned Server 2022 also had error 5 once, so history is not its sole trigger.
+- `ci-36310871868`: 2x2 Node 20/22 and clean/prior-unelevated comparison on Server
+  2025. Clean runs launched but violated local TCP; both prior-history runs failed
+  first Offline launch with error 5. Open launched in all four.
+- `ci-36311032651`: same 2x2 plus explicit two-second, same-profile retry only after
+  error 5. Both history cases fail first then launch on retry. Original stderr and
+  `firstAttempt` are preserved. All four final probes still have four local-TCP
+  violations; none passes. This is strong setup-timing evidence, not a complete
+  proof of the exact failed access check or a product workaround.
+- `ci-36311032673`: final unchanged six-case matrix; both pinned runs launch and
+  violate local TCP, elevated candidate rejects root-deny, MXC unavailable.
+
+Source corroboration: 154 `windows-sandbox-rs/src/bin/setup_main/win.rs`,
+`spawn_read_acl_helper`, starts the read-ACL helper with `.spawn()` and no wait;
+refresh delegates read roots. This is a likely race mechanism. We did not rebuild
+Codex with instrumentation or identify the exact object/ACE denied at process start.
+No permission was broadened and no Windows product backend was changed.
+
+`observations.json` indexes all 26 case reports from the five runs. Prior weakened
+unelevated preparations remain separately named artifacts and never count toward
+acceptance. `dgx-regression` contains a real 17/17 passing Linux arm64 run with the
+same harness. Existing 19 launcher and 34 proxy checks and synthetic classifier
+checks pass; no new UI behavior was introduced in this experiment.
+
+Recommendation and limits: [narrative](../../../narrative/2026-09-27-local-remote-execution-decision.md).
+Ordinary account, Windows 11 23H2/24H2/25H2, and Windows 10 remain NOT RUN. No Windows
+backend passed the prerequisite gate; no local Windows support is claimed. No
+pricing/latency benchmark, production fallback, or startup smoke gate was built.
+
+Daily sandbox logs are committed as `.log.txt` (original `.log` files remain ignored).
+Only synthetic-run allowlisted logs are archived; no authentication/secret caches.
+[Final chronology](../../../chronology/2026-09-27T1531-dgx-execution-decision-results.md)
+records conclusions, provenance and deferred stages.
