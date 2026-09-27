@@ -96,6 +96,7 @@ async function main() {
   const out = path.resolve(arg('--out') || 'sandbox-results'); fs.mkdirSync(out, {recursive: true});
   const target = `${process.platform}-${process.arch}`;
   const diagnostic = arg('--windows-diagnostic');
+  const candidateVersion = arg('--candidate');
   const report = {schema: 1, target, overall: 'FAIL', metadata: {
     timestamp: new Date().toISOString(), commit: process.env.GITHUB_SHA || spawnSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).stdout?.trim(),
     os: os.type(), release: os.release(), version: os.version(), arch: process.arch, node: process.version,
@@ -106,22 +107,26 @@ async function main() {
   }, properties: [], runs: {}};
   let base, alias, server;
   try {
-    if (diagnostic && (process.platform !== 'win32' || !['elevated', 'unelevated-network'].includes(diagnostic))) throw Error('Unknown/non-Windows diagnostic');
-    report.conformanceEligible = !diagnostic;
+    if (diagnostic && (process.platform !== 'win32' || !['elevated', 'mxc', 'unelevated-network'].includes(diagnostic))) throw Error('Unknown/non-Windows diagnostic');
+    report.conformanceEligible = !diagnostic && !candidateVersion;
+    if (candidateVersion) report.candidate = candidateVersion;
+    if (diagnostic === 'mxc' && !candidateVersion) throw Error('MXC requires an explicitly pinned candidate');
     if (diagnostic) report.diagnostic = diagnostic;
     if (process.getuid?.() === 0) throw Error('Run Unix conformance as an ordinary user, not root');
     // Product generator consults process.env for a dev bypass; remove it before generation.
     for (const k of Object.keys(process.env)) if (/^IO_(CODEX_|SANDBOX_)/.test(k)) delete process.env[k];
-    const bin = codex.bundledCodexPath();
+    const candidate = candidateVersion ? require('./candidate').candidate(candidateVersion) : null;
+    const bin = candidate ? {...candidate, pinned:candidate.pin} : codex.bundledCodexPath();
+    const expectedVersion = candidate ? candidate.pin.version : codex.PINS.version;
     if (!bin.pinned?.sha256 || !/^[0-9a-f]{64}$/.test(bin.pinned.sha256)) throw Error('Missing pinned package hash');
     const stamp = JSON.parse(fs.readFileSync(path.join(bin.dir, 'VERSION.json'), 'utf8'));
-    if (stamp.version !== codex.PINS.version || stamp.sha256 !== bin.pinned.sha256 || stamp.binary_sha256 !== hash(bin.path)) throw Error('Bundled package/binary does not match pin metadata');
+    if (stamp.version !== expectedVersion || stamp.sha256 !== bin.pinned.sha256 || stamp.binary_sha256 !== hash(bin.path)) throw Error('Bundled package/binary does not match pin metadata');
     if (!codex.binaryInfo(bin.path).host) throw Error('Missing bundled command host');
-    const archive = path.join(__dirname, '../../codex-bin/downloads', bin.pinned.asset);
+    const archive = candidate ? candidate.archive : path.join(__dirname, '../../codex-bin/downloads', bin.pinned.asset);
     if (!fs.existsSync(archive) || hash(archive) !== bin.pinned.sha256) throw Error('Pinned package archive unavailable or hash differs; run fetch-codex.js');
     report.metadata.codexPackage = stamp;
     const version = spawnSync(bin.path, ['--version'], {encoding: 'utf8', env: cleanEnv(process.env), timeout: 15000});
-    if (version.status !== 0 || version.stdout.trim() !== `codex-cli ${codex.PINS.version}`) throw Error(`Wrong Codex version/status: ${version.stdout} ${version.stderr}`);
+    if (version.status !== 0 || version.stdout.trim() !== `codex-cli ${expectedVersion}`) throw Error(`Wrong Codex version/status: ${version.stdout} ${version.stderr}`);
     report.metadata.codexVersion = version.stdout.trim();
     const runtime = fs.realpathSync(arg('--runtime') || process.env.IO_PROBE_RUNTIME || path.join(__dirname, '../../.venv'));
     const python = path.resolve(arg('--python') || process.env.IO_PROBE_PYTHON || pythonIn(runtime) || 'missing-python');
@@ -185,7 +190,8 @@ async function main() {
       else {
         codex.writeConfig(home, 1, {wall: label, trust: ws, codexDir: bin.dir, libsDir: runtime});
         let profile = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
-        if (diagnostic === 'elevated') profile = profile.replace('[windows]\nsandbox = "unelevated"', '[windows]\nsandbox = "elevated"');
+        if (['elevated','mxc'].includes(diagnostic)) profile = profile.replace('[windows]\nsandbox = "unelevated"', `[windows]\nsandbox = "${diagnostic}"`);
+        if (candidate) profile = profile.replace('[features]\n', '[features]\nprefer_mxc = false\n');
         // Only for isolating the legacy backend's NETWORK behavior. Full read access
         // explicitly violates io's contract and can never satisfy the required gate.
         if (diagnostic === 'unelevated-network') profile = profile.replace('[permissions.io.filesystem]\n', '[permissions.io.filesystem]\n":root" = "read"\n');
@@ -193,6 +199,11 @@ async function main() {
         if (!profile.includes('default_permissions = "io"') || profile.includes('danger-full-access')) throw Error('Wall missing from generated profile');
         fs.writeFileSync(path.join(out, `${label}.config.toml`), profile);
         result = await execute(bin.path, ['sandbox', '-p', 'io', '-P', 'io', '-C', ws, '--', python, script, manifestFile, label], childEnv, ws);
+      }
+      if (process.platform === 'win32') {
+        const log = path.join(home, '.sandbox', 'sandbox.log');
+        if (fs.existsSync(log)) fs.copyFileSync(log, path.join(out, `${label}.sandbox.log`));
+        // Explicit file allowlist: never collect .sandbox-secrets, auth or whole CODEX_HOME.
       }
       result.mutations = {};
       for (const [id, file] of [['outside_write', manifest.outside_write], ['link_write', path.join(outside, 'link-write.txt')]]) {

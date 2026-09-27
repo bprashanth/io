@@ -61,3 +61,15 @@ start, isolating its networking behavior; it cannot prove io's filesystem contra
 `--windows-diagnostic elevated` preserves the filesystem/network permissions and changes only
 the selected backend. It tests a possible next-stage remedy, not io's current launch behavior.
 Neither diagnostic changes the application's default Windows backend.
+
+## Execution decision experiments
+
+[Decision proposal](../../../../proposals/local-remote-execution-decision.md) and
+`.github/workflows/execution-decision.yml` compare pinned elevated and independently
+pinned 0.157.1 elevated/MXC on Windows Server 2022/2025. They do not change product
+pins or certify desktop Windows. Use `candidate.js 0.157.1` to fetch the separate
+Windows package, then `run.js --candidate 0.157.1 --windows-diagnostic mxc --out ...`.
+For candidate elevated, use `--windows-diagnostic elevated`. Explicit MXC must fail
+when unavailable; automatic `prefer_mxc` selection is disabled to preserve labels.
+The same probe/classifier is used. Only `.sandbox/sandbox.log` is retained from
+synthetic Codex homes; never archive their secret cache or the entire home.

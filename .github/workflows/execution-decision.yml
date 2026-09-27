@@ -1,0 +1,66 @@
+name: local remote execution decision
+on:
+  workflow_dispatch:
+  push:
+    branches: ['remote-codex/**', 'execution-decision/**']
+    paths: ['app/io/tests/sandbox/**', '.github/workflows/execution-decision.yml']
+permissions:
+  contents: read
+jobs:
+  windows:
+    name: ${{ matrix.os }} Codex ${{ matrix.version }} ${{ matrix.backend }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+        version: ['0.154.0', '0.157.1']
+        backend: [elevated, mxc]
+        exclude:
+          - {version: '0.154.0', backend: mxc}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Harness checks (not sandbox evidence)
+        run: node app/io/tests/sandbox/test_contract.js
+      - name: Machine context before sandbox setup
+        shell: pwsh
+        run: ./app/io/tests/sandbox/windows/environment.ps1 -Out decision-results/environment-before
+      - name: Fetch shipped package
+        if: matrix.version == '0.154.0'
+        run: node app/io/fetch-codex.js
+      - name: Fetch experiment-only candidate package
+        if: matrix.version != '0.154.0'
+        run: node app/io/tests/sandbox/candidate.js '${{ matrix.version }}'
+      - name: Prepare standalone Python
+        run: node app/io/tests/sandbox/prepare.js
+      - name: Exact contract through selected backend
+        id: probe
+        shell: pwsh
+        run: |
+          $arguments = @('app/io/tests/sandbox/run.js','--windows-diagnostic','${{ matrix.backend }}','--out','decision-results/conformance')
+          if ('${{ matrix.version }}' -ne '0.154.0') { $arguments += @('--candidate','${{ matrix.version }}') }
+          & node @arguments
+          exit $LASTEXITCODE
+      - name: Machine context after sandbox setup
+        if: always()
+        shell: pwsh
+        run: ./app/io/tests/sandbox/windows/environment.ps1 -Out decision-results/environment-after
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path decision-results/conformance/summary.md) { Get-Content decision-results/conformance/summary.md >> $env:GITHUB_STEP_SUMMARY }
+          else { 'No report: this platform/backend is NOT proven.' >> $env:GITHUB_STEP_SUMMARY }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: decision-${{ matrix.os }}-${{ matrix.version }}-${{ matrix.backend }}
+          path: decision-results/
+          if-no-files-found: error
+          retention-days: 30
