@@ -1,0 +1,102 @@
+name: sandbox conformance
+
+on:
+  push:
+    branches: [main, 'sandbox-conformance/**']
+    paths:
+      - 'app/io/codex.js'
+      - 'app/io/codex-pins.json'
+      - 'app/io/fetch-codex.js'
+      - 'app/io/pins.json'
+      - 'app/io/bootstrap.js'
+      - 'app/io/tests/sandbox/**'
+      - '.github/workflows/sandbox-conformance.yml'
+  pull_request:
+    paths:
+      - 'app/io/codex.js'
+      - 'app/io/codex-pins.json'
+      - 'app/io/fetch-codex.js'
+      - 'app/io/pins.json'
+      - 'app/io/bootstrap.js'
+      - 'app/io/tests/sandbox/**'
+      - '.github/workflows/sandbox-conformance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: sandbox ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64}
+          - {os: macos-15-intel, target: darwin-x64}
+          - {os: macos-14, target: darwin-arm64}
+          - {os: windows-2025, target: win32-x64}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Assert native target and complete pins
+        shell: bash
+        run: |
+          node -e 'const p=require("./app/io/codex-pins.json"); const t=process.platform+"-"+process.arch; if(t!==process.argv[1])throw Error("Wrong native target: "+t); for(const [k,v] of Object.entries(p.targets))if(!/^[0-9a-f]{64}$/.test(v.sha256||""))throw Error("Unpinned package: "+k); console.log(t,p.version);' '${{ matrix.target }}'
+      - name: Test result classification (not sandbox evidence)
+        run: node app/io/tests/sandbox/test_contract.js
+      - name: Fetch exact bundled Codex package
+        run: node app/io/fetch-codex.js
+      - name: Prepare pinned Python only
+        run: node app/io/tests/sandbox/prepare.js
+      - name: Probe actual command sandbox
+        run: node app/io/tests/sandbox/run.js --out sandbox-results
+      - name: Record per-platform summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f sandbox-results/summary.md ]; then
+            cat sandbox-results/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No conformance report: setup failed. This platform is NOT proven.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sandbox-${{ matrix.target }}
+          path: sandbox-results/
+          if-no-files-found: warn
+          retention-days: 30
+
+  matrix:
+    name: sandbox contract (all platforms)
+    if: always()
+    needs: probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sandbox-*
+          path: sandbox-artifacts
+      - name: Require every property on every target
+        if: always()
+        run: node app/io/tests/sandbox/report.js sandbox-artifacts sandbox-matrix
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sandbox-conformance-matrix
+          path: sandbox-matrix/
+          if-no-files-found: error
