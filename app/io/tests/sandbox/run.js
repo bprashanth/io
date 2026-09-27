@@ -99,6 +99,7 @@ async function main() {
     os: os.type(), release: os.release(), version: os.version(), arch: process.arch, node: process.version,
     runnerImage: process.env.ImageOS || null, runnerImageVersion: process.env.ImageVersion || null,
     username: os.userInfo().username, uid: process.getuid?.() ?? null,
+    provisioning: process.env.IO_CONFORMANCE_SETUP || 'none',
     sourceHashes: {runner: hash(__filename), probe: hash(path.join(__dirname, 'probe.py')), profileGenerator: hash(path.join(__dirname, '../../codex.js'))},
   }, properties: [], runs: {}};
   let base, alias, server;

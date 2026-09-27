@@ -55,6 +55,11 @@ jobs:
         run: node app/io/fetch-codex.js
       - name: Prepare pinned Python only
         run: node app/io/tests/sandbox/prepare.js
+      # Stock-image failure is preserved in baseline run 36296098245. This is an
+      # explicitly labeled supported-setup experiment, not a stock Ubuntu claim.
+      - name: Apply io's narrow AppArmor setup (Linux only)
+        if: runner.os == 'Linux'
+        run: node app/io/tests/sandbox/setup-linux.js
       - name: Probe actual command sandbox
         run: node app/io/tests/sandbox/run.js --out sandbox-results
       - name: Record per-platform summary

@@ -210,7 +210,9 @@ function writeConfig(home, proxyPort, extra = {}) {
     // the XML by hand - badly (2026-09-15). io ships a runtime that has them, io owns it,
     // and it holds nobody's data, so every setting may read it.
     if (extra.libsDir) fsEntries.push(`"${esc(extra.libsDir)}" = "read"`);
-    for (const t of new Set([os.tmpdir(), '/tmp'].filter(Boolean))) fsEntries.push(`"${esc(t)}" = "write"`);
+    // A Unix /tmp entry is invalid in Windows' absolute-path permissions parser.
+    const tempRoots = process.platform === 'win32' ? [os.tmpdir()] : [os.tmpdir(), '/tmp'];
+    for (const t of new Set(tempRoots.filter(Boolean))) fsEntries.push(`"${esc(t)}" = "write"`);
     const wall = wallOf(extra.wall);
     // "Open" had the network but no name resolution (DGX, 2026-09-15): ":minimal" does not
     // include /run, and on systemd-resolved machines /etc/resolv.conf is a symlink into
@@ -535,4 +537,4 @@ function binaryInfo(bin) {
 }
 
 module.exports = {
-  WALLS, DEFAULT_WALL, TOOLBOX, wallOf, commandsOnline, sandboxCheck, resetSandboxCheck, classifyProbe, wallProbe, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, sessionArgs, binaryInfo, hasPty: () => !!pty, PINS, PROFILE, ROUTER_MODEL };
+  WALLS, DEFAULT_WALL, TOOLBOX, wallOf, commandsOnline, sandboxCheck, resetSandboxCheck, classifyProbe, wallProbe, linuxFix, bundledCodexPath, codexHome, writeConfig, agentsMd, baseEnv, loginStatus, startLogin, logout, spawnSession, sessionArgs, binaryInfo, hasPty: () => !!pty, PINS, PROFILE, ROUTER_MODEL };

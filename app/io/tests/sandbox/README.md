@@ -47,3 +47,10 @@ The Windows baseline uses io's existing unelevated mode and the runner's actual 
 recorded group memberships identify that context. It does not claim ordinary-user Windows
 coverage. Linux execution makes no automatic AppArmor or root-mode accommodation. Preserve
 an unsupported result before any separately labeled administrator setup experiment.
+
+Initial native baseline: [run 36296098245](https://github.com/bprashanth/io/actions/runs/36296098245).
+Both Mac architectures passed. Stock Ubuntu could not start bubblewrap; Windows rejected
+io's literal `/tmp` grant. The subsequent workflow explicitly installs io's narrow userns
+AppArmor profile before the Linux probes and labels the report `io-apparmor-userns`.
+`setup-linux.js` exports the exact applied profile as an artifact. This is a supported-setup
+measurement, not a stock Ubuntu claim; the original failure remains in the archived baseline.
