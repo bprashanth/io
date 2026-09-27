@@ -54,6 +54,7 @@ jobs:
       - name: Fetch exact bundled Codex package
         run: node app/io/fetch-codex.js
       - name: Prepare pinned Python only
+        id: python
         run: node app/io/tests/sandbox/prepare.js
       # Stock-image failure is preserved in baseline run 36296098245. This is an
       # explicitly labeled supported-setup experiment, not a stock Ubuntu claim.
@@ -76,6 +77,24 @@ jobs:
         with:
           name: sandbox-${{ matrix.target }}
           path: sandbox-results/
+          if-no-files-found: warn
+          retention-days: 30
+
+      # These cannot turn the required row green. They establish what Codex can
+      # enforce when the current unelevated backend rejects restricted reads.
+      - name: Diagnostic - unelevated direct networking with read-all policy
+        if: always() && runner.os == 'Windows' && steps.python.outcome == 'success'
+        continue-on-error: true
+        run: node app/io/tests/sandbox/run.js --windows-diagnostic unelevated-network --out diagnostic-results/unelevated-network
+      - name: Diagnostic - exact filesystem policy with elevated backend
+        if: always() && runner.os == 'Windows' && steps.python.outcome == 'success'
+        continue-on-error: true
+        run: node app/io/tests/sandbox/run.js --windows-diagnostic elevated --out diagnostic-results/elevated
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Windows'
+        with:
+          name: diagnostic-windows-backends
+          path: diagnostic-results/
           if-no-files-found: warn
           retention-days: 30
 

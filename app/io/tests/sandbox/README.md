@@ -54,3 +54,10 @@ io's literal `/tmp` grant. The subsequent workflow explicitly installs io's narr
 AppArmor profile before the Linux probes and labels the report `io-apparmor-userns`.
 `setup-linux.js` exports the exact applied profile as an artifact. This is a supported-setup
 measurement, not a stock Ubuntu claim; the original failure remains in the archived baseline.
+
+Windows diagnostics are separate artifacts and explicitly rejected by the aggregate gate:
+`--windows-diagnostic unelevated-network` adds root read permission to let the legacy backend
+start, isolating its networking behavior; it cannot prove io's filesystem contract.
+`--windows-diagnostic elevated` preserves the filesystem/network permissions and changes only
+the selected backend. It tests a possible next-stage remedy, not io's current launch behavior.
+Neither diagnostic changes the application's default Windows backend.

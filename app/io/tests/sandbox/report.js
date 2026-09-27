@@ -129,6 +129,9 @@ function analyzeReport(file, report) {
   if (outcome.cleanupError != null) {
     issues.push(`report.cleanupError present for ${outcome.target}`);
   }
+  if (report.diagnostic || report.conformanceEligible === false) {
+    issues.push(`Diagnostic report cannot satisfy io conformance for ${outcome.target}`);
+  }
 
   const properties = Array.isArray(report.properties) ? report.properties : null;
   if (!properties) {

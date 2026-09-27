@@ -86,6 +86,7 @@ function evaluate(runs, endpoints) {
 }
 function markdown(report) {
   return `# Codex sandbox conformance: ${report.target}\n\nOverall: **${report.overall}**\n\n` +
+    (report.diagnostic ? `**Diagnostic only: ${report.diagnostic}. Ineligible for the io conformance gate.**\n\n` : '') +
     (report.error ? `Setup error: ${report.error}\n\n` : '') +
     '| Property | Result | Reason |\n|---|---|---|\n' +
     (report.properties || []).map(p => `| ${p.name} | ${p.status} | ${p.reason} |`).join('\n') + '\n';
@@ -94,6 +95,7 @@ async function main() {
   const arg = name => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
   const out = path.resolve(arg('--out') || 'sandbox-results'); fs.mkdirSync(out, {recursive: true});
   const target = `${process.platform}-${process.arch}`;
+  const diagnostic = arg('--windows-diagnostic');
   const report = {schema: 1, target, overall: 'FAIL', metadata: {
     timestamp: new Date().toISOString(), commit: process.env.GITHUB_SHA || spawnSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).stdout?.trim(),
     os: os.type(), release: os.release(), version: os.version(), arch: process.arch, node: process.version,
@@ -104,6 +106,9 @@ async function main() {
   }, properties: [], runs: {}};
   let base, alias, server;
   try {
+    if (diagnostic && (process.platform !== 'win32' || !['elevated', 'unelevated-network'].includes(diagnostic))) throw Error('Unknown/non-Windows diagnostic');
+    report.conformanceEligible = !diagnostic;
+    if (diagnostic) report.diagnostic = diagnostic;
     if (process.getuid?.() === 0) throw Error('Run Unix conformance as an ordinary user, not root');
     // Product generator consults process.env for a dev bypass; remove it before generation.
     for (const k of Object.keys(process.env)) if (/^IO_(CODEX_|SANDBOX_)/.test(k)) delete process.env[k];
@@ -179,7 +184,12 @@ async function main() {
       if (label.startsWith('host_')) result = await execute(python, [script, manifestFile, label], childEnv, ws);
       else {
         codex.writeConfig(home, 1, {wall: label, trust: ws, codexDir: bin.dir, libsDir: runtime});
-        const profile = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
+        let profile = fs.readFileSync(path.join(home, 'io.config.toml'), 'utf8');
+        if (diagnostic === 'elevated') profile = profile.replace('[windows]\nsandbox = "unelevated"', '[windows]\nsandbox = "elevated"');
+        // Only for isolating the legacy backend's NETWORK behavior. Full read access
+        // explicitly violates io's contract and can never satisfy the required gate.
+        if (diagnostic === 'unelevated-network') profile = profile.replace('[permissions.io.filesystem]\n', '[permissions.io.filesystem]\n":root" = "read"\n');
+        fs.writeFileSync(path.join(home, 'io.config.toml'), profile);
         if (!profile.includes('default_permissions = "io"') || profile.includes('danger-full-access')) throw Error('Wall missing from generated profile');
         fs.writeFileSync(path.join(out, `${label}.config.toml`), profile);
         result = await execute(bin.path, ['sandbox', '-p', 'io', '-P', 'io', '-C', ws, '--', python, script, manifestFile, label], childEnv, ws);

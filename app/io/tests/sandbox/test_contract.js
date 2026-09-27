@@ -282,6 +282,8 @@ function main() {
     duplicateProps.push(makeProperty('outside_read'));
     writeReport(artifactRoot, 'linux-x64', {properties: duplicateProps}, 'nested/deeper');
     assert.notEqual(runReportCli(artifactRoot, path.join(tempRoot, 'duplicate-props-out')).status, 0);
+    writeReport(artifactRoot, 'linux-x64', {extra: {diagnostic: 'elevated', conformanceEligible: false}}, 'nested/deeper');
+    assert.notEqual(runReportCli(artifactRoot, path.join(tempRoot, 'diagnostic-out')).status, 0);
   } finally {
     fs.rmSync(tempRoot, {recursive: true, force: true});
   }
