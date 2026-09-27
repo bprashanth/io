@@ -150,6 +150,13 @@ function decorateStatus(status) {
   return { ...status, connection };
 }
 
+function connectionError(error) {
+  if (['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'].includes(error.code) || /socket hang up|event stream ended|timed out/i.test(error.message || '')) {
+    return 'Remote workspace is unreachable. Check the tunnel; a deleted or expired workspace must be restored on the server.';
+  }
+  return error.message || String(error);
+}
+
 function send(channel, payload) {
   if (!current || !current.window || current.window.isDestroyed()) return;
   current.window.webContents.send(channel, payload);
@@ -171,8 +178,9 @@ async function refreshStatus() {
     send('remote-status', decorateStatus(status));
     return status;
   } catch (error) {
-    const payload = { error: error.message || String(error), connection: { live: false, reconnecting: false, gap: !!current.gapSeen, error: error.message || String(error), after: current.lastSeq || 0 } };
-    send('remote-status', payload);
+    const payload = { error: connectionError(error), connection: { live: false, reconnecting: false, gap: !!current.gapSeen, error: error.message || String(error), after: current.lastSeq || 0 } };
+    current.status = {...current.status, ...payload};
+    send('remote-status', current.status);
     send('remote-error', payload.error);
     return payload;
   }
@@ -250,6 +258,8 @@ async function connectEvents() {
       if (!block.length) return;
       const event = parseEventBlock(block.join('\n'));
       block = [];
+      // SSE comments/heartbeats (and id-only blocks) are not JSON messages.
+      if (!event.data) return;
       if (event.id != null) {
         const seq = Number(event.id);
         if (Number.isFinite(seq)) {
@@ -271,8 +281,9 @@ async function connectEvents() {
         send('remote-status', decorateStatus(current.status || {}));
         return;
       }
+      if (payload.kind === 'reset') current.gapSeen = false;
       send('remote-event', { ...payload, seq: current.lastSeq });
-      if (payload.kind === 'state' || payload.kind === 'login' || payload.kind === 'exit') {
+      if (payload.kind === 'reset' || payload.kind === 'state' || payload.kind === 'login' || payload.kind === 'exit') {
         refreshStatus().catch(() => {});
       }
 
@@ -334,7 +345,7 @@ async function connectEvents() {
     }
     current.stream = null;
     current.streamReconnecting = true;
-    current.streamError = error.message || String(error);
+    current.streamError = connectionError(error);
     send('remote-error', current.streamError);
     send('remote-status', decorateStatus(current.status || {}));
     if (!current.permanentClose) scheduleReconnect();
@@ -393,7 +404,7 @@ async function pickFileForUpload() {
   });
   if (reply && reply.error) return { error: reply.error };
   await refreshStatus().catch(() => {});
-  return { ok: true, name, size: stat.size };
+  return { ok: true, name: reply.name || name, size: bytes.length, reused: !!reply.reused };
 }
 
 async function saveRemoteFile(name) {
@@ -427,6 +438,14 @@ function registerIpc({ app, BrowserWindow, ipcMain, dialog, shell }) {
     } catch (error) {
       return { error: error.message || String(error) };
     }
+  });
+  ipcMain.handle('remote-logout', async () => {
+    try {
+      const reply = await requestJson('POST', '/logout', {body:{}});
+      send('remote-event', {kind:'reset', data:'Signed out and cleared the saved chat. Uploaded files remain in this workspace.'});
+      await refreshStatus();
+      return reply;
+    } catch (error) { return {error:connectionError(error)}; }
   });
   ipcMain.handle('remote-start', async (_event, opts = {}) => {
     const cols = Number(opts.cols || 0);

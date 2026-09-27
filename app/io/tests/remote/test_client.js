@@ -31,6 +31,8 @@ test('stream replay/gap, ordered input, transfers, redirect refusal and end', as
    if(req.url.startsWith('/events')){
     connections++;resumeAfter=new URL(req.url,'http://x').searchParams.get('after');
     res.writeHead(200,{'Content-Type':'text/event-stream'});stream=res;
+    res.write(': keepalive\n\n');
+    res.write('id: 999\n: id-only heartbeat\n\n');
     if(connections===1){res.write('id: 1\ndata: {"kind":"data","data":"hello"}\n\n');}
     else{res.write('data: {"kind":"gap","data":"older output unavailable"}\n\n');
      res.write('id: 1\ndata: {"kind":"data","data":"duplicate"}\n\n');
@@ -66,7 +68,13 @@ test('stream replay/gap, ordered input, transfers, redirect refusal and end', as
   handlers.get('remote-input')(null,'a');handlers.get('remote-input')(null,'b');handlers.get('remote-input')(null,'c');
   await until(()=>keys.length===3);assert.deepEqual(keys,['a','b','c']);
   assert.equal((await handlers.get('remote-attach')()).ok,true);
-  assert.equal(received.length,1);assert.equal(fs.readFileSync(source,'utf8'),'n\n3\n');
+  assert.equal(received.length,1);
+  assert.ok(!sent.some(([c,p])=>c==='remote-error'&&/malformed/i.test(p)), 'valid heartbeats must not be parsed as JSON');
+  stream.write('id: 3\ndata: {not json}\n\n');
+  await until(()=>sent.some(([c,p])=>c==='remote-error'&&/malformed/i.test(p)));
+  assert.equal((await handlers.get('remote-logout')()).ok,true);
+  assert.ok(calls.includes('/logout'));
+  assert.equal(fs.readFileSync(source,'utf8'),'n\n3\n');
   assert.equal((await handlers.get('remote-download')(null,'nested/result.csv')).ok,true);
   assert.match(downloadName,/nested%2Fresult.csv/);assert.equal(fs.readFileSync(dest,'utf8'),'total\n3\n');
   assert.ok((await handlers.get('remote-open-external')(null,'https://evil.test')).error);

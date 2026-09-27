@@ -10,9 +10,11 @@ import sys
 import time
 import socket
 import urllib.request
+import urllib.parse
+import tempfile
 
 p = argparse.ArgumentParser()
-p.add_argument('action', choices=['create', 'destroy'])
+p.add_argument('action', choices=['create', 'restore', 'destroy'])
 p.add_argument('--connection', required=True, type=pathlib.Path)
 p.add_argument('--image', default='io-remote-codex:experiment')
 p.add_argument('--port', type=int, default=0)
@@ -27,7 +29,16 @@ if a.action == 'destroy':
     subprocess.run(['docker', 'network', 'rm', data['network']], check=True)
     a.connection.unlink()
     sys.exit()
-if a.connection.exists():
+previous = None
+if a.action == 'restore':
+    previous = json.loads(a.connection.read_text())
+    if subprocess.run(['docker', 'inspect', previous['container']], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        p.error('The previous container still exists; restore never replaces a live or stopped workspace')
+    url = urllib.parse.urlsplit(previous['url'])
+    if url.scheme != 'http' or url.hostname != '127.0.0.1' or not url.port or len(previous.get('token', '')) < 40:
+        p.error('Restore requires the original server-side connection file')
+    a.port = url.port
+elif a.connection.exists():
     p.error('Connection file already exists; do not replace a live session')
 if not 0 <= a.port <= 65535 or not 60 <= a.ttl <= 86400:
     p.error('Invalid port or TTL')
@@ -37,7 +48,7 @@ if a.port == 0:
         reserve.bind(('127.0.0.1', 0))
         a.port = reserve.getsockname()[1]
 name = 'io-remote-' + secrets.token_hex(8)
-token = secrets.token_urlsafe(48)
+token = previous['token'] if previous else secrets.token_urlsafe(48)
 network = name + '-net'
 docker('network', 'create', network)
 try:
@@ -70,9 +81,20 @@ try:
     if not ready:
         raise RuntimeError('Worker did not establish sandbox readiness')
     a.connection.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    fd = os.open(a.connection, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, 'w') as f:
-        json.dump(dict(url='http://127.0.0.1:' + port, token=token, container=name, network=network), f)
+    metadata = dict(url='http://127.0.0.1:' + port, token=token, container=name, network=network)
+    if previous:
+        fd, staged = tempfile.mkstemp(prefix='.connection-', dir=a.connection.parent)
+        try:
+            with os.fdopen(fd, 'w') as f:
+                json.dump(metadata, f)
+            os.replace(staged, a.connection)
+        finally:
+            if os.path.exists(staged): os.unlink(staged)
+        subprocess.run(['docker', 'network', 'rm', previous['network']], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        fd = os.open(a.connection, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as f:
+            json.dump(metadata, f)
     print(json.dumps(dict(connection=str(a.connection), endpoint='http://127.0.0.1:' + port,
                           expiresIn=a.ttl)))
 except Exception:

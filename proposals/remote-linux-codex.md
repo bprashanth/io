@@ -95,3 +95,14 @@ Defer production TLS/account management, durable storage, retention/encryption,
 quotas, multi-tenant orchestration, automatic sync, local executors/MCP bridging,
 proxy/tokenisation redesign, Electron toolbox changes and native Windows sandbox
 repairs. After evidence, compare native, fully remote, and later hybrid paths.
+
+## Laptop feedback, September 27
+
+The user demonstrated real ChatGPT OAuth and subsequent assistant replies through
+the laptop client. The separate remote screen is temporary experiment UI. The
+intended product is the main io interface with a remote execution backend; that
+integration is not implemented yet. First fix the observed heartbeat warnings,
+attachment path handoff and destructive session/account-switch confusion, then
+verify a live model-driven file round trip. Changing an account uses Sign out
+(clear authentication/chat, keep files); Delete workspace destroys the endpoint.
+A different person still requires their own workspace/capability.

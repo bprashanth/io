@@ -9,6 +9,7 @@ import os
 import pathlib
 import pty
 import signal
+import shutil
 import socket
 import stat
 import struct
@@ -44,6 +45,7 @@ mode = None
 ended = False
 # Serialize lifecycle operations, so concurrent requests cannot create two Codex processes.
 operation = threading.RLock()
+actions = threading.RLock()
 
 
 def emit(kind, data='', **extra):
@@ -241,7 +243,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.reply(400, dict(error=type(e).__name__ + ': request failed'))
 
     def do_POST(self):
-        global ended
+        global ended, event_bytes
         if not self.authorized():
             return
         try:
@@ -259,45 +261,70 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not name or name.startswith('.') or '/' in name or '\\' in name or '\x00' in name or len(name) > 240:
                     raise ValueError('Choose a simple filename')
                 with operation:
-                    fd = os.open(os.path.join(ROOT, name), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                    try:
+                        fd = os.open(os.path.join(ROOT, name), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                    except FileExistsError:
+                        # Identical retries are safe; never overwrite an existing file or follow a link.
+                        try:
+                            existing = open_file(name)
+                            with os.fdopen(existing, 'rb') as f:
+                                same = f.read(LIMIT + 1) == raw
+                        except (ValueError, OSError):
+                            same = False
+                        if same:
+                            return self.reply(200, dict(name=name, size=length, reused=True))
+                        raise ValueError('A different file already uses this name. Rename your copy and attach it again; the existing file was not changed.')
                     with os.fdopen(fd, 'wb') as f:
                         f.write(raw)
                 return self.reply(201, dict(name=name, size=length))
             body = json.loads(raw or b'{}')
             if not isinstance(body, dict):
                 raise ValueError('Expected object')
-            if path.path == '/login':
-                start(['login', '--device-auth'], 'login', body)
-            elif path.path == '/start':
-                if not status()['loggedIn']:
-                    raise ValueError('Sign in with ChatGPT first')
-                args = ['resume', '--last', '-p', 'io'] if body.get('resume') else ['-p', 'io']
-                start(args + ['-a', 'never', '--no-alt-screen'], 'data', body)
-            elif path.path in ('/input', '/resize', '/interrupt'):
-                with operation:
-                    if master is None:
-                        raise ValueError('No running Codex process')
-                    if path.path == '/resize':
-                        fcntl.ioctl(master, termios.TIOCSWINSZ, dimensions(body))
-                        os.killpg(process.pid, signal.SIGWINCH)
-                    else:
-                        data = '\x03' if path.path == '/interrupt' else body.get('data', '')
-                        if not isinstance(data, str) or len(data) > 32768:
-                            raise ValueError('Invalid terminal input')
-                        os.write(master, data.encode())
-            elif path.path == '/stop':
-                stop()
-            elif path.path == '/end':
-                stop()
+            with actions:
+                if path.path == '/login':
+                    start(['login', '--device-auth'], 'login', body)
+                elif path.path == '/start':
+                    if not status()['loggedIn']:
+                        raise ValueError('Sign in with ChatGPT first')
+                    args = ['resume', '--last', '-p', 'io'] if body.get('resume') else ['-p', 'io']
+                    start(args + ['-a', 'never', '--no-alt-screen'], 'data', body)
+                elif path.path in ('/input', '/resize', '/interrupt'):
+                    with operation:
+                        if master is None:
+                            raise ValueError('No running Codex process')
+                        if path.path == '/resize':
+                            fcntl.ioctl(master, termios.TIOCSWINSZ, dimensions(body))
+                            os.killpg(process.pid, signal.SIGWINCH)
+                        else:
+                            data = '\x03' if path.path == '/interrupt' else body.get('data', '')
+                            if not isinstance(data, str) or len(data) > 32768:
+                                raise ValueError('Invalid terminal input')
+                            os.write(master, data.encode())
+                elif path.path == '/stop':
+                    stop()
+                elif path.path == '/logout':
+                    stop()
+                    result = subprocess.run([CODEX, 'logout'], env=ENV, capture_output=True, timeout=20)
+                    if result.returncode or status()['loggedIn']:
+                        raise ValueError('Sign-out failed. Delete the workspace to remove its login.')
+                    # A different account must start a new chat, not resume cached account state.
+                    shutil.rmtree('/state/codex')
+                    subprocess.run(['node', '/opt/remote/config.js'], env=ENV, check=True, timeout=20)
+                    with condition:
+                        events.clear()
+                        event_bytes = 0
+                    emit('reset', 'Signed out. Saved chat cleared; uploaded files remain in this workspace.')
+                elif path.path == '/end':
+                    stop()
+                    self.reply(200, dict(ok=True))
+                    ended = True
+                    with condition:
+                        condition.notify_all()
+                    threading.Thread(target=self.server.shutdown, daemon=True).start()
+                    return
+                else:
+                    return self.reply(404, dict(error='Unknown endpoint'))
                 self.reply(200, dict(ok=True))
-                ended = True
-                with condition:
-                    condition.notify_all()
-                threading.Thread(target=self.server.shutdown, daemon=True).start()
-                return
-            else:
-                return self.reply(404, dict(error='Unknown endpoint'))
-            self.reply(200, dict(ok=True))
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:

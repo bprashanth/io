@@ -7,6 +7,7 @@ const on = (channel, fn) => {
 
 contextBridge.exposeInMainWorld('remote', {
   status: () => ipcRenderer.invoke('remote-status'),
+  logout: () => ipcRenderer.invoke('remote-logout'),
   login: () => ipcRenderer.invoke('remote-login'),
   start: opts => ipcRenderer.invoke('remote-start', opts),
   input: data => ipcRenderer.send('remote-input', data),

@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import copy
+import base64
 import contextlib
 import http.client
 import json
+import os
 import secrets
 import subprocess
 import sys
@@ -22,7 +24,7 @@ REMOTE_DIR = REPO_ROOT / "app" / "io" / "remote"
 SESSION_SCRIPT = REMOTE_DIR / "session.py"
 CONFORMANCE_SCRIPT = Path("/opt/remote/conformance.py")
 IMAGE = "io-remote-codex:experiment"
-REPORT_PATH = REPO_ROOT / "benchmarks" / "runs" / "2026-09-27-remote-codex" / "api-isolation.json"
+REPORT_PATH = Path(os.environ.get("IO_REMOTE_EVIDENCE", str(REPO_ROOT / "benchmarks/runs/2026-09-27-remote-codex"))) / "api-isolation.json"
 
 _MISSING = object()
 
@@ -250,7 +252,8 @@ class RemoteSession:
                 status, _, _ = self.request_json("GET", "/status", timeout=3)
                 last_error = f"still reachable with status {status}"
             except (ConnectionRefusedError, ConnectionResetError, TimeoutError, OSError):
-                return
+                if _run(['docker', 'inspect', self.container]).returncode != 0:
+                    return
             time.sleep(0.5)
         raise RuntimeError(f"Remote worker stayed reachable after /end: {last_error}")
 
@@ -338,13 +341,17 @@ class RemoteWorkerIntegrationTests(unittest.TestCase):
         self.assertEqual(download_status, 200)
         self.assertEqual(download_raw, original)
 
+        retry_status, _, retry_payload = self.a.request_json('POST', f'/files?name={name}', body=original)
+        self.assertEqual(retry_status, 200)
+        self.assertTrue(retry_payload['reused'])
+
         dup_status, _, dup_payload = self.a.request_json(
             "POST",
             f"/files?name={urllib.parse.quote(name, safe='/')}",
             body=replacement,
         )
         self.assertEqual(dup_status, 400)
-        self.assertIn("request failed", dup_payload["error"])
+        self.assertIn("existing file was not changed", dup_payload["error"])
 
         still_status, _, still_raw = self.a.request("GET", f"/file?name={urllib.parse.quote(name, safe='/')}")
         self.assertEqual(still_status, 200)
@@ -370,6 +377,18 @@ class RemoteWorkerIntegrationTests(unittest.TestCase):
             or "request failed" in trav_download_payload["error"]
         )
         self._mark("files", "traversal_blocked")
+
+    def test_35_binary_image_upload_and_identical_retry(self) -> None:
+        image = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9kAAAAASUVORK5CYII=')
+        name = urllib.parse.quote('Synthetic photo ü.png')
+        code, _, first = self.a.request_json('POST', '/files?name='+name, body=image)
+        self.assertEqual(code, 201)
+        code, _, retry = self.a.request_json('POST', '/files?name='+name, body=image)
+        self.assertEqual(code, 200)
+        self.assertTrue(retry['reused'])
+        code, _, copied = self.a.request('GET', '/file?name='+name)
+        self.assertEqual(code, 200)
+        self.assertEqual(copied, image)
 
     def test_40_traversal_symlink_fifo_and_nested_download_rules(self) -> None:
         setup = """
@@ -410,7 +429,7 @@ os.mkfifo(root / 'testfifo')
             body=b"blocked",
         )
         self.assertEqual(symlink_upload_status, 400)
-        self.assertIn("request failed", symlink_upload_payload["error"])
+        self.assertIn("existing file was not changed", symlink_upload_payload["error"])
         self._mark("files", "symlink_blocked")
 
         begin = time.monotonic()
@@ -566,12 +585,43 @@ print(proc.stderr.strip())
             self.assertGreater(compact["control"]["total"], 0)
             self.assertGreater(compact["sandbox"]["total"], 0)
 
+    def test_80_logout_preserves_endpoint_and_files(self) -> None:
+        # Explicitly fake cached credentials; no model call or real OAuth is made.
+        fixture = (REPO_ROOT / 'benchmarks/runs/2026-09-14-io-codex/fixtures/auth-fixture.json').read_text()
+        setup = self.a.exec_python("from pathlib import Path; Path('/state/codex/auth.json').write_text(" + repr(fixture) + "); Path('/workspace/logout-keep.txt').write_text('keep'); Path('/state/codex/sessions').mkdir(exist_ok=True); Path('/state/codex/sessions/old.jsonl').write_text('synthetic chat')")
+        self.assertEqual(setup.returncode, 0, setup.stderr)
+        _, _, before = self.a.request_json('GET', '/status')
+        self.assertTrue(before['loggedIn'], 'fixture exercises cached ChatGPT login detection only')
+        code, _, result = self.a.request_json('POST', '/logout', body={})
+        self.assertEqual(code, 200, result)
+        _, _, after = self.a.request_json('GET', '/status')
+        self.assertFalse(after['loggedIn'])
+        self.assertEqual(after['instance'], before['instance'])
+        self.assertFalse(after['hasConversation'])
+        check = self.a.exec_python("from pathlib import Path; assert not Path('/state/codex/auth.json').exists(); assert Path('/workspace/logout-keep.txt').read_text() == 'keep'")
+        self.assertEqual(check.returncode, 0, check.stderr)
+
     def test_90_end_via_api_stops_worker_and_refuses_followup_requests(self) -> None:
         status, _, payload = self.b.request_json("POST", "/end", body={})
         self.assertEqual(status, 200)
         self.assertTrue(payload["ok"])
         self.b.wait_gone()
         self._mark("lifecycle", "api_end_refuses_followup")
+
+    def test_95_restore_deleted_workspace_keeps_private_connection(self) -> None:
+        old_token, old_port = self.b.token, self.b.port
+        _checked([sys.executable, str(SESSION_SCRIPT), 'restore', '--connection', str(self.b.connection_path), '--ttl', '600'])
+        data = json.loads(self.b.connection_path.read_text())
+        self.b.container, self.b.network = data['container'], data['network']
+        self.assertEqual(data['token'], old_token)
+        self.assertEqual(int(urllib.parse.urlsplit(data['url']).port), old_port)
+        fresh = self.b.wait_ready()
+        self.assertFalse(fresh['loggedIn'])
+        code, _, listing = self.b.request_json('GET', '/files')
+        self.assertEqual(code, 200)
+        self.assertEqual(listing['files'], [])
+        refused = _run([sys.executable, str(SESSION_SCRIPT), 'restore', '--connection', str(self.b.connection_path)])
+        self.assertNotEqual(refused.returncode, 0, 'must not replace an existing workspace')
 
     def test_99_restart_clears_files_and_login_state(self) -> None:
         name = f"restart-{secrets.token_hex(4)}.txt"
