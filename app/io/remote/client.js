@@ -62,7 +62,7 @@ function parseBodyText(buffer) {
   try {
     return JSON.parse(text);
   } catch {
-    return { error: text };
+    return { error: 'Remote endpoint returned a non-JSON response. Check the gateway address and sign-in.' };
   }
 }
 
@@ -237,7 +237,7 @@ async function connectEvents() {
     const statusCode = res.statusCode || 0;
     if (statusCode >= 300 && statusCode < 400) {
       res.resume();
-      onStreamFailure(new Error('redirects are not allowed'));
+      onStreamFailure(new Error(current.connection.auth === 'cloudflare' ? 'Cloudflare Access sign-in expired. Close and reopen IO to sign in again.' : 'redirects are not allowed'));
       return;
     }
     if (statusCode !== 200) {

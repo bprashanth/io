@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('remote', {
   interrupt: () => ipcRenderer.invoke('remote-interrupt'),
   stop: () => ipcRenderer.invoke('remote-stop'),
   end: () => ipcRenderer.invoke('remote-end'),
+  accessLogout: () => ipcRenderer.invoke('v1-access-logout'),
   diagnostic: run => ipcRenderer.invoke('v1-diagnostic', run),
   conversations: () => ipcRenderer.invoke('remote-conversations'),
   deleteConversation: id => ipcRenderer.invoke('remote-delete-conversation', id),

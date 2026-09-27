@@ -49,7 +49,9 @@ $env:IO_GATEWAY_URL='https://io.idli.cc'
    No device-code setting is needed. These are separate identity and Codex authorization steps.
 4. Upload a copy, start a conversation, download results. New conversations share workspace files.
 5. Closing IO leaves the workspace and active process running. Reopen to reconnect. Access expiry
-   requires closing/reopening IO to sign in again. Explicit Delete workspace removes files/auth.
+   requires closing/reopening IO to sign in again. **Sign out of IO** clears the local Access
+   session and closes the app, so next launch can use another approved identity; it keeps the
+   remote workspace and ChatGPT login. Explicit Delete workspace removes files/auth.
 
 If an identity provider rejects the embedded sign-in window, that provider flow still needs
 an external-browser Access handoff; don't enable a weaker Access policy to bypass it.

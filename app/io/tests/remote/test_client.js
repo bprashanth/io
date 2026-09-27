@@ -22,7 +22,7 @@ test('capability transport only permits TLS or literal loopback',()=>{
 test('stream replay/gap, ordered input, transfers, redirect refusal and end', async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'io-remote-client-'));
  const source=path.join(dir,'input.csv'),dest=path.join(dir,'download.csv');fs.writeFileSync(source,'n\n3\n');
- const received=[],calls=[],keys=[],sent=[],handlers=new Map();let stream,resumeAfter,connections=0,redirect=false,downloadName,instance='first';
+ const received=[],calls=[],keys=[],sent=[],handlers=new Map();let stream,resumeAfter,connections=0,redirect=false,htmlError=false,downloadName,instance='first';
  const server=http.createServer(async(req,res)=>{
   try{
    assert.equal(req.headers.authorization,`Bearer ${token}`);
@@ -44,6 +44,7 @@ test('stream replay/gap, ordered input, transfers, redirect refusal and end', as
    if(req.url==='/input'){keys.push(JSON.parse(body).data);if(keys.length===1)await delay(40);return res.end('{}');}
    if(req.url.startsWith('/files?')){assert.equal(body.toString(),'n\n3\n');received.push(body);return res.end('{"name":"input.csv"}');}
    if(req.url.startsWith('/file?')){downloadName=req.url;return res.end('total\n3\n');}
+   if(req.url==='/files'&&htmlError){res.writeHead(403,{'Content-Type':'text/html'});return res.end('<html>private sign-in diagnostic</html>');}
    if(req.url==='/files'&&redirect){res.writeHead(302,{Location:'http://127.0.0.1:1/stolen'});return res.end();}
    res.end('{"ok":true}');
   }catch(e){res.statusCode=500;res.end(JSON.stringify({error:e.message}));}
@@ -86,6 +87,9 @@ test('stream replay/gap, ordered input, transfers, redirect refusal and end', as
   await until(()=>connections===3);
   assert.equal(resumeAfter,'0');
   redirect=true;assert.match((await handlers.get('remote-files')()).error,/redirect/);
+  redirect=false;htmlError=true;
+  const accessError=(await handlers.get('remote-files')()).error;
+  assert.match(accessError,/sign-in/);assert.ok(!accessError.includes('<html>'));assert.ok(!accessError.includes('private'));
   assert.equal((await handlers.get('remote-end')()).ok,true);
   assert.equal((await handlers.get('remote-status')()).ended,true);
   assert.ok(!JSON.stringify(sent).includes(token),'capability must not enter renderer');

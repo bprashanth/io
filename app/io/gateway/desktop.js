@@ -87,6 +87,11 @@ async function accessLogin(base) {
 }
 
 async function main() {
+  ipcMain.handle('v1-access-logout', async () => {
+    await session.fromPartition('persist:io-cloudflare-access').clearStorageData();
+    app.quit();
+    return {ok:true};
+  });
   ipcMain.handle('v1-diagnostic',async (_event, run)=>{
     if (run) {
       const selected=await dialog.showOpenDialog({title:'Select prepared standalone Python runtime',properties:['openDirectory']});

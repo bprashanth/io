@@ -32,3 +32,8 @@ unbounded lifecycle lock map; weak references now retire unused locks.
 Unmeasured: completed Cloudflare human sign-in, a fresh ChatGPT-authorized model turn/resume
 through this new gateway, real Windows/macOS office diagnostic runs, arbitrary live-app rendering,
 production containment/quotas/storage recovery and migration of the prior ephemeral workspace.
+
+The initial CI run `36317584243` passed on GitHub Linux x64; its integration/lifecycle JSON is in
+`ci-initial/`. Both that workflow and the legacy remote workflow passed all five jobs. The final
+Electron rerun additionally verifies Access sign-out closes the client while preserving the
+remote workspace. The final client rejects raw HTML error pages with a readable message.

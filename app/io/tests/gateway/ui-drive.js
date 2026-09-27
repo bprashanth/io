@@ -42,6 +42,14 @@ const state=process.argv[2], out=path.resolve(process.argv[3]);
   await page.waitForFunction(()=>!document.querySelector('#sign-in').disabled);
   assert.deepEqual(errors,[]);
   const result={realElectron:true,realDocker:true,realCodexOAuthStartup:true,cloudflareHumanLogin:false,chatgptAuthorization:false,attachmentRoundTrip:true,localOriginalUnchanged:fs.readFileSync(local,'utf8')==='item,count\nbooks,5\n',diagnosticPassStillRemote:true,liveServiceGatewayDownload:true,rendererErrors:errors};
+  const exited=new Promise(resolve=>app.process().once('exit',resolve));
+  page.once('dialog', dialog=>dialog.accept());
+  await page.click('#access-signout');
+  await exited;
+  const id=JSON.parse(fs.readFileSync(path.join(state,'workspaces.json'),'utf8')).alice;
+  const alive=await fetch('http://127.0.0.1:8788/workspaces/'+id+'/status',{headers:{'Cf-Access-Jwt-Assertion':fs.readFileSync(path.join(state,'alice.jwt'),'utf8')}});
+  assert.equal(alive.status,200);
+  result.accessSignoutKeepsRemoteWorkspace=true;
   fs.writeFileSync(path.join(out,'ui-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
- }finally{await app.close();}
+ }finally{await app.close().catch(()=>{});}
 })().catch(e=>{console.error(e);process.exitCode=1});
