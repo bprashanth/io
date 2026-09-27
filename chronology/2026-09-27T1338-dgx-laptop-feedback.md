@@ -40,3 +40,9 @@ Docs: [operator/client guide](../app/io/remote/README.md),
 Existing local regressions: 19 launcher checks and 34 proxy tests pass. The first
 proxy invocation used system Python and lacked pandas; rerunning with the existing
 `.venv-v2` environment passed all 34.
+
+Pushed code `504ee44` to `remote-codex/experiment`. All five jobs in
+[CI run 36305352075](https://github.com/bprashanth/io/actions/runs/36305352075)
+passed: actual Linux Codex container and transport fixtures on Linux, macOS arm64,
+macOS Intel, and Windows. This does not turn fixture transport into desktop/model
+coverage. Final server restoration was about 13:36 IST, with the default four-hour TTL.
