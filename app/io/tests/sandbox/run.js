@@ -97,6 +97,7 @@ async function main() {
   const target = `${process.platform}-${process.arch}`;
   const diagnostic = arg('--windows-diagnostic');
   const candidateVersion = arg('--candidate');
+  const retryLaunch = process.argv.includes('--retry-launch');
   const report = {schema: 1, target, overall: 'FAIL', metadata: {
     timestamp: new Date().toISOString(), commit: process.env.GITHUB_SHA || spawnSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).stdout?.trim(),
     os: os.type(), release: os.release(), version: os.version(), arch: process.arch, node: process.version,
@@ -112,6 +113,8 @@ async function main() {
     if (candidateVersion) report.candidate = candidateVersion;
     if (diagnostic === 'mxc' && !candidateVersion) throw Error('MXC requires an explicitly pinned candidate');
     if (diagnostic) report.diagnostic = diagnostic;
+    if (retryLaunch && diagnostic !== 'elevated') throw Error('Launch retry is an elevated diagnostic only');
+    if (retryLaunch) report.launchRetryDiagnostic = true;
     if (process.getuid?.() === 0) throw Error('Run Unix conformance as an ordinary user, not root');
     // Product generator consults process.env for a dev bypass; remove it before generation.
     for (const k of Object.keys(process.env)) if (/^IO_(CODEX_|SANDBOX_)/.test(k)) delete process.env[k];
@@ -199,6 +202,15 @@ async function main() {
         if (!profile.includes('default_permissions = "io"') || profile.includes('danger-full-access')) throw Error('Wall missing from generated profile');
         fs.writeFileSync(path.join(out, `${label}.config.toml`), profile);
         result = await execute(bin.path, ['sandbox', '-p', 'io', '-P', 'io', '-C', ws, '--', python, script, manifestFile, label], childEnv, ws);
+        if (retryLaunch && !result.probe && /CreateProcessAsUserW failed: 5/.test(result.stderr)) {
+          const first = result;
+          fs.writeFileSync(path.join(out, `${label}.first.stderr.txt`), first.stderr);
+          // Test the asynchronous read-ACL setup hypothesis, without changing any grant.
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          result = await execute(bin.path, ['sandbox', '-p', 'io', '-P', 'io', '-C', ws, '--', python, script, manifestFile, label], childEnv, ws);
+          result.firstAttempt = first;
+          result.retryDelayMs = 2000;
+        }
       }
       if (process.platform === 'win32') {
         const logDir = path.join(home, '.sandbox');
