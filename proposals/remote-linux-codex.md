@@ -116,4 +116,14 @@ PKCE/state, validates OAuth and stores credentials in that user's container. The
 relay checks the active state, issuer and callback shape, cannot choose an arbitrary
 upstream, and closes on completion/cancel/timeout. Device codes remain optional.
 This is Codex's existing sign-in flow, not a new general-purpose io OAuth client.
-A real browser authorization with the user's unchanged account is still required.
+The user subsequently confirmed browser authorization works with the unchanged
+second account; see the [confirmation chronology](../chronology/2026-09-27T1506-dgx-remote-user-confirmation.md).
+
+## Current routing versus future provisioning
+
+Opening io does not create a container: an operator provisions it beforehand. The
+private endpoint/capability config and SSH port mapping identify the existing
+container; no account-to-container lookup exists. HTTP requests carry input and
+controls, SSE carries terminal/state output, and files transfer explicitly. Closing
+io preserves the container until deletion or expiry. Automatic provisioning/lookup
+and io service authentication are future product work, separate from ChatGPT OAuth.

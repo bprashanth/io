@@ -167,3 +167,17 @@ The harness captures the browser-open request, checks the real Codex URL, hidden
 parameters, rejection of wrong/stale states, cancellation/port release, retry and
 device fallback. A successful real-account browser authorization remains a human
 check; synthetic callback tests cannot establish account eligibility.
+
+## Current provisioning and transport
+
+Opening io and signing in do not create a container. An operator provisions it
+first; the private config's endpoint/capability and port forwarding select it.
+Input and controls use HTTP requests, terminal/state output uses Server-Sent Events
+(SSE), and file transfers are separate explicit requests. ChatGPT OAuth authenticates
+Codex within that session, not a container-discovery or io account service.
+Automatic provisioning and account-based lookup are not implemented.
+
+The user has now confirmed browser OAuth works with the second account while
+leaving device-code login disabled. This is human-reported evidence, separate from
+the automated checks described above. See the
+[confirmation chronology](../../../chronology/2026-09-27T1506-dgx-remote-user-confirmation.md).

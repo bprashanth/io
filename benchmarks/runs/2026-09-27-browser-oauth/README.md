@@ -20,3 +20,10 @@
 Screenshots remain ignored. Real-account successful browser OAuth and the user's
 NGO-like account eligibility are NOT established by these tests. Device-login
 settings and user account credentials were never changed or copied.
+
+## Subsequent human confirmation
+
+The user subsequently reported browser OAuth working with the second account,
+without enabling device login. This closes the pending human login check; it does
+not change the scope/results of the automated tests above. See
+[chronology](../../../chronology/2026-09-27T1506-dgx-remote-user-confirmation.md).
