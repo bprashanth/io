@@ -115,8 +115,9 @@ Passed through unchanged, logged: `GET backend-api/codex/models`, `backend-api/w
 - **The wall**: a Codex permissions profile (`default_permissions = "io"`) lets commands
   write the working folder, read only what the platform needs plus io's AGENTS.md, and
   nothing else on disk; network only in a conversation. Enforced by Codex through bwrap on
-  Linux. `IO_CODEX_NO_WALL=1` switches it off. Untested on a machine that can run bwrap as
-  of 2026-09-14 evening.
+  Linux. The configured DGX passes all 17 conformance properties as of 2026-10-11;
+  see [current sandbox state](sandboxing.md#dgx-state-verified-2026-10-11).
+  `IO_CODEX_NO_WALL=1` is a development bypass, never a supported setup remedy.
 - **home** returns to the shelf and leaves Codex running; opening another folder replaces it.
 
 ## The privacy claim, precisely
@@ -192,12 +193,15 @@ in the per-user data dir.
   screen, a fixture credential in io's Codex home (so the sign-in gate passes) and the dev
   upstream behind the same proxy (`IO_CODEX_DEV_PROVIDER=1`, `IO_PROXY_DEV_UPSTREAM`,
   `IO_DEV_KEY`). None of these env vars exist in a user's environment.
-- `IO_CODEX_NO_SANDBOX=1` sets `sandbox_mode = "danger-full-access"` for machines whose
-  kernel refuses bwrap (the DGX). Never for users.
+- `IO_CODEX_NO_SANDBOX=1` sets `sandbox_mode = "danger-full-access"` for development only.
+  The DGX no longer needs this workaround: its installed AppArmor grants allow the bundled
+  bubblewrap to run. Never enable this bypass for users or conformance qualification.
 - `IO_PROXY_DUMP=<dir>` writes the tokenised request bodies and the raw upstream events -
   the evidence that only codes left - with nothing from the local side.
 
-Tests: `app/io/.venv/bin/python app/io/tests/test_codex_proxy.py` (24: substitutions,
+Historical test inventory (counts below describe the earlier implementation; the September
+verification recorded 34 proxy and 19 launcher checks):
+`app/io/.venv/bin/python app/io/tests/test_codex_proxy.py` (24: substitutions,
 overlaps, Unicode, JSON, split tokens across chunks, tool args and outputs, unknown codes,
 426, refusals, encodings, upstream errors, upstream down, not-ready, leak stop, multi-turn
 cache, live-engine policy) and `node app/io/tests/test_codex_launcher.js` (8: paths, home,
@@ -216,16 +220,15 @@ end from a copied location on 2026-09-14 (`benchmarks/runs/2026-09-14-io-codex/d
 | | state |
 |---|---|
 | Linux x64 | verified end to end on a Pop!_OS 22.04 laptop (2026-09-15 to 26). Ubuntu 24.04 needs a one-time AppArmor grant for bubblewrap, which io offers through pkexec; see `chronology/2026-09-15T1856-dgx-sandbox-boundary.md` |
-| Linux arm64 | verified end to end here |
-| macOS | Codex ships `aarch64-apple-darwin` and `x86_64-apple-darwin` binaries; node-pty has prebuilds for both; `fetch-codex.js darwin-arm64` records the hash on first fetch. Open questions before claiming support: Gatekeeper on a binary copied from USB (io's own .app is already unsigned and needs right-click Open; the codex binary inside `resources/` inherits that), `xattr` quarantine on the tarball, and whether `codex login`'s `localhost:1455` callback works from a sandboxed .app (it should: io is not sandboxed). Not built, not tested. |
-| Windows | Codex publishes `x86_64-pc-windows-msvc` binaries; node-pty uses ConPTY and has prebuilds; Codex's Windows sandbox is a different mechanism (experimental). Nothing here is tested on Windows. The proxy is pure python and needs nothing platform-specific. |
+| Linux arm64 | DGX local conformance 17/17 and a fresh remote container's nested sandbox pass on 2026-10-11, with explicit AppArmor setup. See [sandbox state](sandboxing.md#dgx-state-verified-2026-10-11). |
+| macOS | Both architectures passed direct sandbox conformance in September CI, and portable remote client tests passed. This is not a claim of a signed/notarized desktop release or full GUI acceptance on ordinary Macs. |
+| Windows | Tested in CI, but native execution does not meet the required contract. Earlier elevated-backend probes allowed loopback/host-interface TCP; other backend/profile combinations failed startup or were unavailable. Use the remote experiment pending a passing real-machine qualification. See [decision evidence](../proposals/local-remote-execution-decision.md). |
 
-The wall is proven the same way on every platform before Codex starts (`codex.js`,
-`wallProbe`): a command under io's profile must fail to read a file beside the folder and
-succeed in writing inside it. On macOS and Windows that probe is written but has not been
-run. Where it fails, io says so, offers the setup where one exists, and otherwise runs
-without the wall only after the person has been told what that costs
-(`chronology/2026-09-26T1510-laptop-the-wall-on-every-platform.md`).
+The main app's `wallProbe` is a narrow startup read/write check, not the full 17-property
+filesystem/child/network diagnostic. Passing that narrow check alone does not qualify a laptop
+for the local rollout contract. The legacy app still offers an explicit unwalled fallback;
+do not select it for supported local deployment. V1 gateway mode always executes remotely,
+regardless of its informational local diagnostic. See [laptop rollout](execution-and-laptop-rollout.md).
 
 ## Known limitations
 

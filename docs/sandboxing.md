@@ -3,6 +3,9 @@
 Part of [ARCHITECTURE.md](ARCHITECTURE.md). The argument behind these choices is in
 `narrative/2026-09-15-sandboxing-field-note.md`.
 
+This page describes the local main application unless explicitly marked remote. The separate
+V1 gateway launcher always executes remotely; see [rollout guide](execution-and-laptop-rollout.md).
+
 ## Why a wall at all
 
 The proxy protects what goes to the model. It never sees what the **commands** Codex runs do.
@@ -79,7 +82,7 @@ So Codex cannot open a browser from inside the wall. io watches the folder and s
 and charts in its own viewer window, which refuses every request that is not a local file.
 "Open in your browser" is a separate, deliberate step, and it is disabled under Offline.
 
-## Is the wall on? Proven, on every platform
+## Startup indication versus full conformance
 
 Before Codex starts, io runs one probe (`wallProbe` in `app/io/codex.js`): a small program run
 through `codex sandbox -P io` under io's real profile. It must fail to read a file placed
@@ -90,11 +93,40 @@ The terminal bar shows the result on every platform: green **Wall on, checked on
 computer**, or red **Wall OFF**. The footer says **Protected by io** only when both the codes
 and the wall hold, and **Codes only: no wall** otherwise.
 
+The startup probe covers only a narrow read/write boundary. It does not prove network,
+child-process or path-traversal confinement. Qualify a local installation with the complete
+synthetic conformance suite, not the green startup indicator alone.
+
+## DGX state: verified 2026-10-11
+
+**The bundled bubblewrap works on this box.** Fresh Codex 0.154.0 conformance passed all
+17 properties (workspace read/write, outside reads/writes, child execution/confinement,
+symlink traversal, loopback/host-interface/public TCP under the intended profiles).
+A newly created remote Docker container also completed its inner Linux conformance check;
+the synthetic container was then removed. [Evidence](../benchmarks/runs/2026-10-11-dgx-sandbox/README.md).
+
+`kernel.apparmor_restrict_unprivileged_userns` remains 1. `/etc/apparmor.d/io-bwrap`
+grants user namespaces to `/usr/bin/bwrap` and this checkout's bundled bwrap path.
+This is a configured-host result, not proof that every stock Ubuntu install works.
+Moving the checkout or replacing the binary path may require updating the grant and retesting.
+Neither `IO_CODEX_NO_SANDBOX` nor `IO_CODEX_NO_WALL` is needed for supported execution here.
+
+The remote runtime additionally uses the named `io-remote-experiment` AppArmor profile and
+`seccomp=unconfined` to permit nested bubblewrap. Those outer-container exceptions remain
+experimental hardening limitations. Passing the inner command tests is not a production
+multi-tenant isolation certification. Remote mode uses user-owned ChatGPT OAuth directly;
+it does not currently use the local masking proxy described elsewhere in these docs.
+
+On October 1 this coding-agent session could not access Docker or the user service bus.
+That was an agent permission restriction, not a new failure of IO's bubblewrap sandbox.
+Docker/service access was restored and exercised on October 11.
+
 ## When the wall cannot run
 
-**Ubuntu 24.04** ships an AppArmor rule that strips bubblewrap's capabilities as soon as it
-creates a namespace, so neither io's wall nor Codex's own sandbox runs. The remedy is a small
-AppArmor profile per bubblewrap binary, installed once by an administrator.
+**Ubuntu 24.04** can restrict unprivileged user namespaces through AppArmor, preventing
+bubblewrap from starting without a suitable grant. The supported remedy is an explicit
+AppArmor profile for the bubblewrap binary, installed once by an administrator, followed
+by a fresh conformance run. That setup is already present on this DGX.
 
 When the probe fails, io shows a dialog that states the cost plainly:
 
@@ -114,6 +146,8 @@ For development, `IO_SANDBOX_TEST=broken` or `fixable` simulates a failed wall, 
 
 ## Open issues
 
-- **The probe has never run on macOS or Windows.** If it cannot start there, io reports the
-  wall as unproven, which is the safe direction to be wrong in.
+- **Cross-platform evidence has limits.** Both Mac architectures passed direct sandbox
+  conformance in September CI. Windows experiments did not establish the required contract.
+  A real laptop must pass the complete suite for its actual build/backend; CI client tests
+  are not native sandbox certification. See [rollout steps](execution-and-laptop-rollout.md).
 - **Offline refuses to open a page without saying why.**

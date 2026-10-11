@@ -108,8 +108,9 @@ through `/end`, then stop the fixture server. The production CLI has no signatur
 
 The user service `io-v1-gateway.service` currently listens on **127.0.0.1:8789**, configured for
 `t4gc.cloudflareaccess.com` and the verified `io.idli.cc` application audience. Change the
-Cloudflare tunnel destination to `http://localhost:8789` to reach V1. The previous signed-in
-prototype remains on 8787; its workspace is not automatically assigned to a Cloudflare user.
+Cloudflare tunnel destination to `http://localhost:8789` to reach V1. As rechecked on 2026-10-11, the old prototype container on8787 is no longer running.
+The gateway on8789 is active and returns 401 without authentication. The current Cloudflare
+dashboard destination still needs confirmation; change it only if it still points at 8787.
 Use `systemctl --user status io-v1-gateway.service` on the DGX for service status. This service
 configuration is machine-local; credentials and database are not committed.
 
@@ -117,5 +118,5 @@ Human acceptance: after changing the destination, launch V1 on the laptop, compl
 logins, attach a small CSV and ask Codex to total a column and create `result.csv`. Download it,
 start a second conversation, reopen the first, close/reopen IO, and confirm the same files and
 conversations remain. Test a second approved Cloudflare identity with its own ChatGPT login;
-it should receive an empty separate workspace. Do not delete your original 8787 session until
-any files you need have been downloaded.
+it should receive an empty separate workspace. Do not assume the earlier ephemeral8787 session retained files over the break.
+For the current local-versus-remote pilot steps, see [rollout guide](../../../docs/execution-and-laptop-rollout.md).
