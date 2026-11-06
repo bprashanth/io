@@ -26,15 +26,15 @@ works but not an NGO tool), Dimillian/CodexMonitor (Codex only).
 | | T3 Code | Paseo | Happy | AionUi |
 |---|---|---|---|---|
 | Desktop OS (doc) | macOS arm64+x64, Windows x64+arm64 native, Linux x64+arm64; WSL optional | macOS arm64+x64, Windows x64+arm64, Linux x64 (deb/rpm/AppImage) | macOS, Windows, Linux (separate young repo, 106 stars) | macOS, Windows, Linux |
-| How it runs Codex (src) | real `codex app-server` (JSON-RPC) | real `codex app-server` | reimplemented inside Happy Agent by default | via ACP adapter in AionCore |
-| How it runs Claude Code (src) | `@anthropic-ai/claude-agent-sdk` (spawns real `claude`) | Claude Agent SDK | default harness reads `claudeAiOauth.accessToken` from `.credentials.json` and calls the model itself; real Claude Code only as optional "foreign harness" | ACP adapter (`claude-code-acp`) |
+| How it runs Codex (src/run) | real `codex app-server` (JSON-RPC) | real `codex app-server` (**run**) | reimplemented inside Happy Agent by default | **run**: real `codex app-server` from PATH (managed `codex-acp` exists for other setups) |
+| How it runs Claude Code (src/run) | `@anthropic-ai/claude-agent-sdk` (spawns real `claude`) | Claude Agent SDK (**run**: real `claude`) | default harness reads `claudeAiOauth.accessToken` from `.credentials.json` and calls the model itself; real Claude Code only as optional "foreign harness" | **run**: real `claude --print --input-format stream-json` (warns: verified only against 2.1.236) |
 | Native subscription login for Open (doc) | yes: `codex login`, `claude auth login` on the host. Also offers OpenAI app token-sharing where T3 holds the token | yes, uses the CLIs' own logins | conflicts with brief: extracts OAuth tokens by default | yes for external agents; built-in agent wants an API key |
-| Execution model (doc) | client to one "environment" server that owns providers, files, terminals | client to one daemon that owns agents and files | daemon + E2E relay | Electron app plus local HTTP backend; remote = browser WebUI of a headless Electron under Xvfb |
+| Execution model (doc/run) | client to one "environment" server that owns providers, files, terminals | client to one daemon that owns agents and files | daemon + E2E relay | Electron app plus Rust backend `aioncore`; remote = browser WebUI. **run**: official binary runs aioncore in `aionpro` identity mode, needs an `aionui.com` sign-in on desktop, and its WebUI password login fails; `aioncore --identity-mode webui` (open-source mode) works |
 | Remote execution (doc) | pairing link with scoped bearer/DPoP tokens; desktop-managed SSH starts a server on a Linux host and forwards the port; T3 Connect relay (their cloud) | direct WebSocket with `PASEO_PASSWORD`; official Docker image; optional E2E relay (self-hostable) | relay server (self-host package exists) | `--webui --remote`, browser login |
 | Multi-user on one host (doc) | no: a session holds `terminal:operate`, a shell as the server's user. One server per Unix user/container | no: one password per daemon. One container per user | not designed for it | no |
 | Model endpoint for Private (doc/src) | per-instance env vars; Codex reads its own `CODEX_HOME` config; `T3CODE_CODEX_LAUNCH_ARGS` passes `-c` overrides; T3 forces no provider (src) | documented: `extends: codex` + `OPENAI_BASE_URL` maps to a Responses provider (llama.cpp named); `extends: claude` + `ANTHROPIC_BASE_URL` | n/a | "any API key" for built-in agent |
 | Its "Muse" provider | Meta's Muse Code (`muse login`, `META_API_KEY`), **not** our llama.cpp Muse | same Meta product | none | none |
-| Telemetry (doc/src) | ON by default: product events to `ingest.t3.codes` then PostHog with hashed OpenAI/Claude account ids; relay traces to Axiom. Off with `T3CODE_TELEMETRY_ENABLED=false` or managed policy; browser/mobile clients not covered | claims none; no analytics packages found in source | analytics catalog in repo | Sentry wired in the desktop, reporting only when `SENTRY_DSN` is set |
+| Telemetry (doc/src/run) | ON by default: product events to `ingest.t3.codes` then PostHog with hashed OpenAI/Claude account ids; relay traces to Axiom. Off with `T3CODE_TELEMETRY_ENABLED=false` or managed policy; browser/mobile clients not covered | claims none; no analytics packages in source; **run**: server made no non-model connection | analytics catalog in repo | **run** (release 2.2.2): Sentry DSN, Firebase and GA4 compiled in; GA4 events sent from the UI, including from a browser on the WebUI; desktop also contacts `static.aionui.com` (updates) and Google `gvt1.com` (dictionaries). My earlier "only when `SENTRY_DSN` is set" was source-only and wrong for the binary |
 | Non-developer fit | project/git-oriented developer UI; works on plain folders | developer UI (worktrees, diffs, terminals) | developer | strongest: office assistants (xlsx/docx/pptx), "cowork" framing |
 | Activity | 49k stars, pushed today | 23k stars, pushed today | 25k (mobile/CLI), desktop 106 | 34k, pushed yesterday |
 
@@ -91,7 +91,14 @@ Caveats found:
   fit for non-developers but its remote mode is a browser in front of a headless Electron per
   user, not a desktop client to a remote environment.
 
-## Not done
+## Behavioural runs added later the same evening
+
+Paseo and AionUi were each run as one container per user on isolated networks against real Muse,
+driven through their UIs with screenshots and in-namespace packet capture:
+[Paseo](paseo/README.md), [AionUi](aionui/README.md), [manual tests](MANUAL-TESTS.md). The section
+below describes the state before those runs.
+
+## Not done (as of the source-only pass)
 
 No candidate installed or launched, no UI screenshots, no remote-environment test, no
 two-user test, no egress capture of any desktop app, no Windows/macOS run. The other
