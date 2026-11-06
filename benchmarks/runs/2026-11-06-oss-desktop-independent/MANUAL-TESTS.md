@@ -1,5 +1,9 @@
 # Manual tests: Paseo and AionUi with Idli Muse
 
+For laptop testing of all three apps (T3, Paseo, AionUi) see
+[docs/oss-desktop-laptop-testing.md](../../../docs/oss-desktop-laptop-testing.md); the DGX side is
+[dgx/up.sh](dgx/up.sh) (per-user Paseo and AionUi with fixed IPs, plus the other agent's T3 runtime).
+
 These reproduce the 2026-11-06 runs on the DGX (Linux arm64, Docker). They are an experiment,
 not an installer. Don't route `io.idli.cc` to these servers: they are single-user and use plain HTTP.
 Keep passwords and homes out of git. Use synthetic CSVs only.
