@@ -243,3 +243,5 @@ an image upgrade. Wider unattended hosting still requires disk/admission control
 of the experimental outer-container AppArmor/seccomp exceptions. Remote V1 does not provide
 local model-traffic masking. Main IO UI consolidation and automatic local/remote selection
 remain deferred.
+
+For **how to test**, start with the [ordered manual test checklist](docs/execution-and-laptop-rollout.md#start-here-how-to-test).

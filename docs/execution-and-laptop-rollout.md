@@ -1,10 +1,26 @@
 # Local execution or shared remote execution: minimum pilot
 
-As of 2026-10-11, this checkout and the remote branch were at `fdc6457`, which contains V1.
-`775d06b` predates it by eight commits. Check the actual laptop revision rather than assuming
-matching branch names mean matching code. No native Windows fix or automatic local/remote
-selection was introduced. This page describes an explicitly managed pilot, not a production
-release guarantee.
+## Start here: how to test
+
+Current checkpoint: `e1a8069` on main; follow-on work is on `io_silo_untested`.
+**Human end-to-end acceptance is still untested.** November 6: 19 launcher checks
+and 34 proxy tests passed; the server gateway is active and returns unauthenticated401.
+
+For the next manual test, choose **B below (remote V1)**:
+
+1. Server operator confirms Cloudflare `io.idli.cc` targets localhost8789 and permits your identity.
+2. Laptop checks out the agreed revision, runs `npm ci --prefix app/io`, then
+   `IO_GATEWAY_URL=https://io.idli.cc app/io/gateway/run.sh` (PowerShell below).
+3. Complete Cloudflare login, then ChatGPT browser OAuth. Upload a synthetic CSV,
+   ask for a computed result.csv, download it and check the values.
+4. Start another conversation, resume the first, close/reopen IO and check persistence.
+5. Repeat concurrently with a second person/laptop; test isolation, runtime/gateway
+   restart and private backup restoration before widening the pilot.
+
+Record the revision, platform, steps, expected/actual result and screenshots in a
+new benchmarks run linked from chronology. Never put login tokens or real documents there.
+Use **A** only when intentionally testing local execution on an individually qualified machine.
+Remote V1 stays remote regardless of diagnostic PASS/FAIL/INCONCLUSIVE.
 
 ## A. Execute on each person's laptop
 
@@ -96,7 +112,7 @@ remote experiment. Main IO interface consolidation is still deferred.
 
 ## Testing and pushing a stable pilot revision
 
-Use `remote-codex/experiment`, review `git status --short` (including untracked files), and push
+Use the agreed checkpoint from `main` or the follow-on `io_silo_untested` branch, review `git status --short` (including untracked files), and push
 an explicitly reviewed commit. Require the V1 gateway and legacy remote CI workflows to pass.
 Keep their run links and the real two-laptop acceptance results in chronology/benchmarks. Then
 tag that accepted revision and deploy the same tag on pilot laptops and server; retain the
