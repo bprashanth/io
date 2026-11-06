@@ -177,3 +177,69 @@ Every reportable experiment should retain its exact inputs and questions,
 model and settings, selected SQL or plan, deterministic checks, browser output,
 screenshot, timing and cost. Append a chronology entry as the work progresses;
 update a narrative only when there is a coherent new result.
+
+## Untested release checkpoint: local and remote IO
+
+**This checkpoint has not been validated end-to-end on real user laptops and is not a
+production-ready release.** Automated sandbox, gateway and client tests have passed;
+they do not establish completed human Cloudflare/ChatGPT login, real model/file processing,
+concurrent office use or backup restoration. Keep this distinction when sharing or deploying.
+The planned follow-on branch is `io_silo_untested`, created from updated `main` after publication.
+
+Detailed commands and limitations: [local and remote rollout guide](docs/execution-and-laptop-rollout.md).
+Current measured server sandbox state: [sandboxing](docs/sandboxing.md).
+
+### A. Test execution locally on a person's laptop
+
+1. Use the agreed repository revision and install IO's normal dependencies and pinned Codex.
+2. Prepare standalone Python and run the **full sandbox diagnostic on that laptop**, following
+   the rollout guide. Require PASS for every property, including filesystem, child-process,
+   traversal and network boundaries. The small startup wall probe alone is insufficient.
+   Apply the supported Linux AppArmor setup if needed and rerun. Do not enable no-wall or
+   no-sandbox bypasses. Current Windows evidence does not qualify native execution; Linux
+   and Mac candidates still need actual-machine qualification.
+3. Clear any old `IO_REMOTE_CONNECTION`, `IO_CODEX_NO_SANDBOX`, `IO_CODEX_NO_WALL` and
+   `IO_SANDBOX_TEST` settings, then run `app/io/run.sh` for the local application.
+4. Complete ChatGPT browser login. In Offline mode, process a synthetic CSV, verify the generated
+   result and reopen the conversation. Record OS/build, Codex version, diagnostic report and
+   observed UI behavior. Repeat qualification after relevant OS/Codex/profile changes.
+
+### B. Test execution remotely on the Linux server
+
+1. On the server, verify `io-v1-gateway.service` is active and
+   `http://127.0.0.1:8789/identity` returns HTTP401 without credentials. This proves the listener
+   is responding, not that authenticated routing works. The old 8787 prototype is no longer running.
+2. Confirm Cloudflare's `io.idli.cc` tunnel destination is `http://localhost:8789`; change it
+   only if necessary. Ensure the Access policy permits both intended test users. No per-user
+   tunnel, SSH forwarding or copied connection JSON is needed.
+3. On each laptop, use the same revision and run from the repository root:
+
+   ```bash
+   npm ci --prefix app/io
+   IO_GATEWAY_URL=https://io.idli.cc app/io/gateway/run.sh
+   ```
+
+   Windows PowerShell:
+
+   ```powershell
+   npm ci --prefix app/io
+   $env:IO_GATEWAY_URL='https://io.idli.cc'
+   & .\app\io\node_modules\.bin\electron.cmd .\app\io\gateway\desktop.js
+   ```
+
+4. Complete Cloudflare login and then ChatGPT **browser OAuth**, without enabling device-code
+   sign-in. V1 executes remotely even if its informational local diagnostic is INCONCLUSIVE.
+5. Test **two real users on two laptops concurrently**. Upload separate synthetic CSVs, ask Codex
+   to produce results, download and verify them, start/resume multiple conversations, and
+   close/reopen IO. Confirm each user returns to their own persistent workspace and cannot access
+   the other user's files/session. Restart the gateway and test runtimes and verify persistence.
+6. Establish a consistent private backup of the gateway mapping database and matching workspace/
+   auth volumes, and test restoration. Keep credentials, database and workspace backups out of git.
+   Record the accepted revision and evidence in chronology/benchmarks before inviting more users.
+
+For either path, distribute one accepted tag rather than drifting branch tips. Remote deployment
+must coordinate server code, container image and service restart; pulling source alone is not
+an image upgrade. Wider unattended hosting still requires disk/admission controls and review
+of the experimental outer-container AppArmor/seccomp exceptions. Remote V1 does not provide
+local model-traffic masking. Main IO UI consolidation and automatic local/remote selection
+remain deferred.
