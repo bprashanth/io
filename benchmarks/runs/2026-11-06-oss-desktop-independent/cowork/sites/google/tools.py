@@ -342,7 +342,8 @@ def t_gsheet_read(sheet_id=None, tab=None, max_rows=15):
         tab = names[0] if names else None
 
     rows = []
-    for offset in range(0, MAX_ROWS, PAGE):
+    offset = 0
+    while offset < MAX_ROWS:
         path = "gviz/tq?tqx=out:html&tq=" + urllib.parse.quote(f"select * limit {PAGE} offset {offset}")
         if tab:
             path += "&sheet=" + urllib.parse.quote(tab)
@@ -356,11 +357,17 @@ def t_gsheet_read(sheet_id=None, tab=None, max_rows=15):
         if not page:
             break
         labels, data = page[0], page[1:]  # gviz always emits a label row first (blank if no header found)
+        # Paseo cuts long snapshots (~20k chars) and ends them with "Snapshot truncated.": the last row
+        # may be partial, so drop it and read on from there instead of taking a short page as the end.
+        truncated = "Snapshot truncated" in snap[-200:]
+        if truncated and data:
+            data = data[:-1]
         if offset == 0:
             rows.append(labels)
         rows.extend(data)
-        if len(data) < PAGE:
+        if not data or (not truncated and len(data) < PAGE):
             break
+        offset += len(data)
     paseo("browser_navigate", browserId=btab, url=sheets_url(sheet_id, "edit"))  # leave the user on the sheet
 
     if len(rows) > 1 and not any(rows[0]):
