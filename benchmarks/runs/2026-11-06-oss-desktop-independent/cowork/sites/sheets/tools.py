@@ -107,7 +107,7 @@ def t_sheet_list():
         except Exception as e:  # unreadable file: say so, keep going
             out.append({"file": f, "error": str(e)[:120]})
     return {"folder": data_dir(), "files": out,
-            "note": "Use sheet_profile(file, sheet) before querying." if out else "No Excel or CSV files here."}
+            "note": "Open a file with file_open before answering questions about it." if out else "No Excel or CSV files here."}
 
 
 def t_sheet_profile(file, sheet=None):
@@ -220,8 +220,8 @@ TOOLS = {
     "sheet_profile": (t_sheet_profile, "Load one sheet and describe it: columns, types, blanks, examples, first rows. "
                       "Finds the header row even under title rows. Returns the SQL table name.",
                       {"file": {"type": "string"}, "sheet": {"type": "string"}}, ["file"]),
-    "sheet_query": (t_sheet_query, "Run a read-only DuckDB SQL query over loaded sheets (load them with "
-                    "sheet_profile first). Returns at most max_rows rows.",
+    "sheet_query": (t_sheet_query, "Run a read-only DuckDB SQL query over loaded sheets. Use it only when the user chose not to "
+                    "teach Idli a file; otherwise use file_open and file_answer. Returns at most max_rows rows.",
                     {"sql": {"type": "string"}, "max_rows": {"type": "integer"}}, ["sql"]),
     "sheet_chart": (t_sheet_chart, "Make a dashboard of bar charts. Each chart is a SQL query whose first column is "
                     "the label and second column the number. Writes an HTML file and returns its path.",

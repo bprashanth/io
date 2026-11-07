@@ -400,7 +400,7 @@ def t_gsheet_read(sheet_id=None, tab=None, max_rows=15):
     out = {"title": title, "sheet_id": sheet_id, "tab": tab, "tabs": names, "rows": len(body),
            "columns": header, "first_rows": preview, "saved_csv": rel,
            "note": (f"Showing {len(preview)} of {len(body)} rows. " if len(preview) < len(body) else "All rows shown. ")
-           + f"For totals, averages, sorting or filtering call sheet_profile(file='{rel}') then sheet_query. "
+           + f"Next call file_open(file='{rel}'): never total, average or count it yourself. "
            "Numbers had their formatting ($ , %) removed."
            + (f" Columns {pct} were percentages (12% is stored as 12)." if pct else "")
            + (" Use tab=... to read another tab." if len(names) > 1 else "")

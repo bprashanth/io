@@ -104,7 +104,8 @@ def main():
         run([py, "make_sample_sheets.py", "real", os.path.join(real, "field_visits_q3.xlsx")], cwd=COWORK)
     if not DRY:
         with open(os.path.join(real, "cowork.sites"), "w") as f:
-            f.write("google\nsheets\n")
+            f.write("google\nsheets\nfiles\n")
+        shutil.copy(os.path.join(COWORK, "idli", "CLAUDE.md"), os.path.join(real, "CLAUDE.md"))
     if not os.path.exists(os.path.join(COWORK, "sites", "sheets", "testdata", "field_visits_mock.xlsx")):
         run([py, "make_sample_sheets.py", "test", "sites/sheets/testdata/field_visits_mock.xlsx"], cwd=COWORK)
 

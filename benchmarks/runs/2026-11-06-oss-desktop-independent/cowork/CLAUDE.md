@@ -2,6 +2,7 @@
 
 This folder holds the co-work site plugins used by the private T4GC model in co-work mode.
 Here you build and repair them against TEST accounts and mock data only. Use the `add-site`
-skill for any gap report, new site, or failing test. Stay in this folder and this workspace's
+skill for any gap report, new site, or failing test, and the `teach-file` skill when Idli asks to be
+taught a spreadsheet (teach/inbox, or an Excel with a hidden `_idli_teach` sheet). Stay in this folder and this workspace's
 browser; don't look for other accounts or the user's real data. The only file you may read under
 `~/idli-insights` is `config/accounts.json` (the test account); everything else there is private.
