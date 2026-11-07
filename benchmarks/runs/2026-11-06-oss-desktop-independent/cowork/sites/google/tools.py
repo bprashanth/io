@@ -399,6 +399,12 @@ def t_gsheet_read(sheet_id=None, tab=None, max_rows=15):
     with open(path, "w", newline="") as f:
         csv.writer(f).writerows([header] + body)
     rel = os.path.relpath(path, data_dir())
+    side = path + ".hidden.json"  # travels with the copy so later answers repeat the caveat
+    if hidden:
+        with open(side, "w") as f:
+            json.dump(hidden, f)
+    elif os.path.exists(side):
+        os.remove(side)
 
     shown = body[:max(0, min(max_rows, 50))]
     preview = [dict(zip(header, r)) for r in shown]

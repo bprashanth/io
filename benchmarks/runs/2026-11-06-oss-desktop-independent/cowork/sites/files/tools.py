@@ -99,12 +99,23 @@ def t_file_answer(file, question, params=None):
     except ValueError as e:
         return {"error": str(e), "hint": "Ask the user for the missing value, then call again."}
     df = sh._con.execute(sql).fetchdf()
+    caveat = ""
+    try:
+        with open(sh.resolve(file) + ".hidden.json") as f:
+            hidden = json.load(f)
+        used = [c for c in hidden if fk.slug(c) in sql]
+        if used:
+            caveat = (f" Also say plainly: {', '.join(f'{c} ({hidden[c]} cells)' for c in used)} may be missing values, "
+                      "because Google's sheet export hides text in number columns (like 'Rs. 300'); totals from those "
+                      "columns may be too low until the cells hold plain numbers.")
+    except (OSError, ValueError):
+        pass
     return {"question": q.get("ask", question), "params": params or {}, "rows": sh.rows(df, 50),
             "row_count": int(len(df)), "unresolved_problems": _open[file].get("problems"),
             "tell_the_user": "Give these numbers exactly as returned (format them, never change or re-add them). "
                              "Mention the parameters used, e.g. the date range."
                              + (" Say the answer includes rows that failed checks." if _open[file].get("problems")
-                                else "")}
+                                else "") + caveat}
 
 
 def t_teach_file(file, question, share_labels=None):
