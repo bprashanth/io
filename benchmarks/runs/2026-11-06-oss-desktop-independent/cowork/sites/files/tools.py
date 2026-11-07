@@ -144,14 +144,32 @@ def t_teach_send(request_id):
               f"and a hidden _idli_teach sheet, plus request.json). Question: \"{req['question']}\". "
               "Use the teach-file skill.")
     paseo = _paseo()
-    r = subprocess.run([paseo, "run", "--provider", "diy-claude", "--cwd", HERE, "--mode", "acceptEdits",
+    # Run the CLI as the user, not as this Idli agent: an agent-scoped CLI defaults to the caller's (private)
+    # workspace and ignores --cwd. The Teach chat must run in the Teach folder, never in the private one.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
+    ws = subprocess.run([paseo, "workspace", "ls", "--json"], capture_output=True, text=True, timeout=60, env=env)
+    try:
+        wid = next(w["workspaceId"] for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(HERE))
+    except (ValueError, StopIteration):
+        return {"error": "No Teach workspace found (a Paseo workspace on the co-work plugin folder). Open one, then retry."}
+    r = subprocess.run([paseo, "run", "--provider", "diy-claude", "--workspace", wid, "--mode", "acceptEdits",
                         "--title", f"Teach: {req['title']}", "--no-wait", "--json", prompt],
-                       capture_output=True, text=True, timeout=90)
+                       capture_output=True, text=True, timeout=90, env=env)
     if r.returncode:
         return {"error": f"Could not start the Teach chat: {(r.stderr or r.stdout)[-300:]}"}
+    try:
+        info = json.loads(r.stdout)
+        agent, cwd = info.get("agentId"), info.get("cwd", "")
+    except ValueError:
+        agent, cwd = None, ""
+    if not agent or os.path.realpath(cwd) != os.path.realpath(HERE):
+        if agent:
+            subprocess.run([paseo, "stop", agent], capture_output=True, timeout=60, env=env)
+            subprocess.run([paseo, "archive", agent], capture_output=True, timeout=60, env=env)
+        return {"error": f"The Teach chat did not start in the Teach folder (got '{cwd}'); stopped it. Nothing was sent."}
     if req.get("caller_agent"):
         subprocess.Popen([sys.executable, "-I", os.path.join(HERE, "lib", "teachwatch.py"), rdir,
-                          req["caller_agent"], paseo], start_new_session=True,
+                          req["caller_agent"], paseo], start_new_session=True, env=env,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {"started": True, "teach_chat": f"Teach: {req['title']}",
             "tell_the_user": "Say teaching has started in the 'Teach - Claude' workspace, in the chat called "
