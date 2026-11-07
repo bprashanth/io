@@ -380,6 +380,13 @@ def t_gsheet_read(sheet_id=None, tab=None, max_rows=15):
     used = [j for j in range(width) if any(r[j] for r in rows)]
     rows = [[r[j] for j in used] for r in rows]
     header, body = [h or f"column_{j + 1}" for j, h in enumerate(rows[0])], rows[1:]
+    hidden = {}
+    for j, h in enumerate(header):  # Google types a mostly-numeric column as numbers and blanks any text in it
+        vals = [r[j] for r in body]
+        nums = sum(1 for v in vals if NUM.match(v.replace(" ", "")))
+        blanks = sum(1 for v in vals if not v.strip())
+        if blanks and nums >= 0.7 * max(1, len(vals) - blanks):
+            hidden[h] = blanks
     pct = clean_numbers(header, body)
 
     import csv
@@ -405,6 +412,10 @@ def t_gsheet_read(sheet_id=None, tab=None, max_rows=15):
            + (f" Columns {pct} were percentages (12% is stored as 12)." if pct else "")
            + (" Use tab=... to read another tab." if len(names) > 1 else "")
            + " Read-only: never edit the sheet."}
+    if hidden:
+        out["warning"] = (f"Blank cells in number columns {hidden} may not be blank: Google's sheet export hides text in "
+                          "a number column (e.g. 'Rs. 300', 'pending'). Tell the user totals may be missing those "
+                          "values until the cells hold plain numbers.")
     if len(body) >= MAX_ROWS - 1:
         out["note"] += f" Stopped at {MAX_ROWS} rows."
     return out

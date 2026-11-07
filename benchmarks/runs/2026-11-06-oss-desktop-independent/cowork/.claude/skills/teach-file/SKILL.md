@@ -62,7 +62,9 @@ Write `file-skills/<id>/skill.json`. The `<id>` is a slug of the file's title. I
 - **Column names** in SQL are those slugs. In `{{table}}`, `date` columns are DATE and `number` columns
   are DOUBLE, after `normalize`. Unparseable values become NULL.
 - **Rules:** `required`, `number`, `date` (`arg`: list of formats), `email`, `phone`, `in_list` (`arg`:
-  values), `range` (`arg`: `[min, max]`), `regex` (`arg`: pattern). Each becomes an Excel formula
+  values), `range` (`arg`: `[min, max]`), `regex` (`arg`: pattern), `not_future` (`arg`: date formats).
+  If no rule fits, you may add a *generic* rule to `RULES` and `excel_formula` in `lib/filekit.py`, with a
+  test. Tell the user plainly, because the change affects every file skill. Each becomes an Excel formula
   column in Idli's "- checked" copy.
 - **Questions:** generalise the user's question into parameters: dates, a status, a place. Write one
   query per question; it may return several columns or rows. Prefer a query that also shows its

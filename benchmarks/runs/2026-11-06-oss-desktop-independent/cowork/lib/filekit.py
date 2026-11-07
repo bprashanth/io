@@ -117,6 +117,17 @@ def load_skills():
     return out
 
 
+def _overlap(a, b):
+    """Share of headers that correspond, counting 'title_row_volunteer_name' ~ 'volunteer_name'."""
+    hit, used = 0, set()
+    for x in a:
+        y = next((y for y in b if y not in used and (y == x or x.endswith("_" + y) or y.endswith("_" + x))), None)
+        if y:
+            hit += 1
+            used.add(y)
+    return hit / len(a | b - used) if (a or b) else 0.0
+
+
 def match(df):
     """Best skill for this table: same header set (>= 80% overlap), whatever the file is called."""
     have = set(header_set(df))
@@ -125,7 +136,7 @@ def match(df):
         want = set(s.get("headers") or [])
         if not want:
             continue
-        j = len(have & want) / len(have | want)
+        j = _overlap(have, want)
         if j > score:
             best, score = s, j
     return (best, round(score, 2)) if score >= 0.8 else (None, round(score, 2))
@@ -196,6 +207,16 @@ def _parses(v, fmt):
         return False
 
 
+def _not_future(v, fmts):
+    """True unless v parses (in one of fmts) to a date after today. Unparseable is left to the 'date' rule."""
+    for f in fmts or ["%d/%m/%Y"]:
+        try:
+            return dt.datetime.strptime(v, f).date() <= dt.date.today()
+        except ValueError:
+            pass
+    return True
+
+
 # ---------------------------------------------------------------- mocks
 WORDS = ("lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore "
          "et dolore magna aliqua enim ad minim veniam quis nostrud").split()
@@ -215,6 +236,10 @@ def mock_column(series, header, rnd, keep_labels=False):
     kind, out = info["kind"], []
     vals = list(series)
     real_variants = _variant_groups(vals) if kind == "category" else {}
+    if kind == "date":  # fake dates stay inside the real column's range (no invented future dates)
+        fmts = [info["format"]] + [f for f in DATE_FORMATS if f != info["format"]]
+        ds = [dt.datetime.strptime(v, f).date() for v in vals if v for f in [next((f for f in fmts if _parses(v, f)), None)] if f]
+        lo_d, hi_d = (min(ds), max(ds)) if ds else (dt.date(2026, 1, 1), dt.date(2026, 6, 30))
     cats = {}
     for i, v in enumerate(vals):
         if v == "":
@@ -222,11 +247,11 @@ def mock_column(series, header, rnd, keep_labels=False):
             continue
         if kind == "date":
             if _parses(v, info["format"]):
-                d = dt.date(2026, 1, 1) + dt.timedelta(days=rnd.randint(0, 330))
+                d = lo_d + dt.timedelta(days=rnd.randint(0, max(0, (hi_d - lo_d).days)))
                 out.append(d.strftime(info["format"]))
             else:  # another date format keeps its format (mixed formats are a real-world quirk); junk stays junk
                 other = next((f for f in DATE_FORMATS if _parses(v, f)), None)
-                d = dt.date(2026, 1, 1) + dt.timedelta(days=rnd.randint(0, 330))
+                d = lo_d + dt.timedelta(days=rnd.randint(0, max(0, (hi_d - lo_d).days)))
                 out.append(d.strftime(other) if other else rnd.choice(["TBD", "31/02/2026", "next week", "2026"]))
         elif kind == "number":
             x = as_number(v)
@@ -395,6 +420,7 @@ RULES = {
     "in_list": lambda v, a: v == "" or v.strip().lower() in {str(x).strip().lower() for x in (a or [])},
     "range": lambda v, a: v == "" or (as_number(v) is not None and a[0] <= as_number(v) <= a[1]),
     "regex": lambda v, a: v == "" or bool(re.fullmatch(a, v)),
+    "not_future": lambda v, a: v == "" or _not_future(v, a),  # arg: date formats
 }
 
 
@@ -430,6 +456,17 @@ def excel_formula(rule, ref, arg, message):
         return f'=IF({ref}="","",IF(OR({opts}),"","{m}"))'
     if rule == "range":
         return f'=IF({ref}="","",IFERROR(IF(AND(VALUE({ref})>={arg[0]},VALUE({ref})<={arg[1]}),"","{m}"),"{m}"))'
+    if rule == "not_future":
+        to_date = {"%d/%m/%Y": f"DATE(VALUE(RIGHT({ref},4)),VALUE(MID({ref},4,2)),VALUE(LEFT({ref},2)))",
+                   "%d-%m-%Y": f"DATE(VALUE(RIGHT({ref},4)),VALUE(MID({ref},4,2)),VALUE(LEFT({ref},2)))",
+                   "%Y-%m-%d": f"DATE(VALUE(LEFT({ref},4)),VALUE(MID({ref},6,2)),VALUE(RIGHT({ref},2)))"}
+        fmts = arg or ["%d/%m/%Y"]
+        if any(f not in to_date for f in fmts):
+            return None
+        d = to_date["%Y-%m-%d"] if fmts == ["%Y-%m-%d"] else to_date[fmts[0]]
+        if "%Y-%m-%d" in fmts and fmts != ["%Y-%m-%d"]:
+            d = f'IF(MID({ref},5,1)="-",{to_date["%Y-%m-%d"]},{d})'
+        return f'=IF({ref}="","",IFERROR(IF(IF(ISNUMBER({ref}),{ref},{d})>TODAY(),"{m}",""),""))'
     return None  # computed in Python only (e.g. regex)
 
 
