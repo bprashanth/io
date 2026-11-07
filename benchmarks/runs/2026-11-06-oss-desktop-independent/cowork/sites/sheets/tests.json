@@ -1,0 +1,15 @@
+{
+  "data_dir": "testdata",
+  "tests": [
+    {"name": "lists the mock workbook", "tool": "sheet_list", "expect": {"nonempty": ["files"], "contains": ["field_visits_mock.xlsx", "Distribution"]}},
+    {"name": "finds header under the title rows", "tool": "sheet_profile", "args": {"file": "field_visits_mock.xlsx"},
+     "expect": {"contains": ["\"header_found_on_row\": 3", "beneficiary_name", "weight_kg"]}},
+    {"name": "query counts visits", "tool": "sheet_query", "args": {"sql": "SELECT count(*) AS n FROM field_visits_mock__visits"},
+     "expect": {"contains": ["\"n\": 14"]}},
+    {"name": "second sheet loads", "tool": "sheet_profile", "args": {"file": "field_visits_mock.xlsx", "sheet": "Distribution"},
+     "expect": {"contains": ["quantity", "\"type\": \"number\""]}},
+    {"name": "chart writes a dashboard", "tool": "sheet_chart",
+     "args": {"title": "Test dashboard", "charts": [{"title": "Quantity by item", "sql": "SELECT item, sum(quantity) FROM field_visits_mock__distribution GROUP BY 1 ORDER BY 2 DESC"}]},
+     "expect": {"contains": ["dashboards/test_dashboard.html"]}}
+  ]
+}
