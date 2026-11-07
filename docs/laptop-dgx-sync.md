@@ -66,3 +66,11 @@ cd benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && desktop/check-fr
 ```
 It ends in `ALL CHECKS PASSED`. The first FAIL line names the cause (tunnel down, DevTools port missing,
 provider missing, no agent in a workspace, no `accounts.json`).
+
+If the laptop has no DIY workspace (the repo's `cowork/` folder) or no agent in it, the DGX can create both:
+```sh
+P=desktop/paseo-remote.sh; L=<laptop path to the repo>/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
+$P workspace create --isolation local --path "$L" --title "DIY (cowork)"
+$P run --provider diy-claude --workspace <wks id> --title bootstrap "Reply with the single word OK. Do not use any tools."
+```
+The run is one short call on the owner's Claude subscription.
