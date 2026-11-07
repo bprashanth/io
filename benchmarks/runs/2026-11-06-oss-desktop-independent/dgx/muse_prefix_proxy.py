@@ -14,10 +14,12 @@ Usage: muse_prefix_proxy.py [LISTEN_PORT=8185] [UPSTREAM=127.0.0.1:8181]   (bind
 import http.client
 import http.server
 import json
+import os
 import sys
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8185
 UP_HOST, UP_PORT = (sys.argv[2] if len(sys.argv) > 2 else "127.0.0.1:8181").rsplit(":", 1)
+DUMP = os.environ.get("MUSE_PROXY_DUMP")  # debug only: write the last /v1/messages body here (contains user data)
 HOP = {"host", "content-length", "connection", "transfer-encoding", "keep-alive"}
 
 
@@ -50,6 +52,9 @@ class H(http.server.BaseHTTPRequestHandler):
         body = self.rfile.read(n) if n else None
         if body is not None and self.command == "POST" and self.path.split("?")[0] in ("/v1/messages", "/v1/messages/count_tokens"):
             body = rewrite(body)
+            if DUMP:
+                fd = os.open(DUMP, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                os.write(fd, body); os.close(fd)
         up = http.client.HTTPConnection(UP_HOST, int(UP_PORT), timeout=900)
         hdrs = {k: v for k, v in self.headers.items() if k.lower() not in HOP}
         if body is not None:

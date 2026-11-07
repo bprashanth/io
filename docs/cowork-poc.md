@@ -18,7 +18,11 @@ Either agent adds an entry here for every change that needs something done on th
     Claude Code assumed 200k).
   - **Laptop action:** `git pull`; merge the three keys from `laptop/claude-t4gc-settings.json` into
     `~/idli-insights/config/claude-t4gc/settings.json`; `laptop-up.sh stop && laptop-up.sh` (its `-L 8181` now targets DGX 8185).
-    The DGX did this through a laptop terminal on 2026-11-07; see the next entry if it didn't.
+    Done by the DGX through a laptop terminal on 2026-11-07 (settings backed up as `settings.json.bak-20261107`).
+  - **Co-work tool list trimmed** (`desktop/setup-laptop.py`, and merged into the laptop's `~/.paseo/config.json`):
+    unused Claude Code built-ins (Workflow, Cron*, plan mode, worktrees, SendMessage, ...) are disallowed, and so is
+    `gmail_draft_reply`, because co-work is read-only (find, suggest, download). Co-work prompt 17,180 -> 3,859 tokens;
+    measured co-work "hi": cold prefill 4.3 s, warm ~6 s end to end including agent start.
 - **2026-11-07 20:xx, DGX: `~/idli-insights` bootstrapped.** Moved the DGX's old `cowork/accounts.local.json` to `~/idli-insights/config/accounts.json` (chmod 600), so no `scp` was needed. If the laptop's copy has changed since, `scp` it over. Added [laptop-dgx-sync.md](laptop-dgx-sync.md). `lib/accounts.py` now resolves the new path. `check-from-dgx.sh`: ALL CHECKS PASSED (google 8/8, sheets 5/5) once the tunnel was back. The laptop had no workspace on the repo's `cowork/` folder, so the DGX created one ("DIY (cowork)") and started a one-line DIY chat in it.
 
 - **2026-11-07 19:50, `~/idli-insights` and Paseo only.**

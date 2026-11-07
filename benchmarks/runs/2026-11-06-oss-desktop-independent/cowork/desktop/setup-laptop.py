@@ -39,7 +39,12 @@ COWORK_PROVIDER = {
     "env": {"CLAUDE_CONFIG_DIR": T4GC_CLAUDE, "ENABLE_TOOL_SEARCH": "false"},
     "models": [{"id": "muse-glimmer-30b", "label": "T4GC model (Idli)", "isDefault": True}],
     "disallowedTools": ["Bash", "BashOutput", "KillShell", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit",
-                        "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite", "Skill", "mcp__paseo"],
+                        "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite", "Skill", "mcp__paseo",
+                        # unused built-ins: ~60k chars of tool schema = ~11k prompt tokens on Muse
+                        "Workflow", "SendMessage", "ScheduleWakeup", "CronCreate", "CronDelete", "CronList",
+                        "EnterPlanMode", "ExitPlanMode", "EnterWorktree", "ExitWorktree", "ReportFindings", "ListAgents",
+                        # co-work is read-only: find, suggest, download. Drafting mail is a write.
+                        "mcp__cowork__gmail_draft_reply"],
 }
 DIY_PROVIDER = {"extends": "claude", "label": "DIY · Claude (builds co-work tools, test accounts only)"}
 
