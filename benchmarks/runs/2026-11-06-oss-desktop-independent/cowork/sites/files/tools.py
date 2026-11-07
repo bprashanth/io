@@ -152,7 +152,7 @@ def t_teach_send(request_id):
         wid = next(w["workspaceId"] for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(HERE))
     except (ValueError, StopIteration):
         return {"error": "No Teach workspace found (a Paseo workspace on the co-work plugin folder). Open one, then retry."}
-    r = subprocess.run([paseo, "run", "--provider", "diy-claude", "--workspace", wid, "--mode", "acceptEdits",
+    r = subprocess.run([paseo, "run", "--provider", "diy-claude", "--workspace", wid, "--mode", "auto",
                         "--title", f"Teach: {req['title']}", "--no-wait", "--json", prompt],
                        capture_output=True, text=True, timeout=90, env=env)
     if r.returncode:

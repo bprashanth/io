@@ -19,8 +19,8 @@ look for the real file.
 - If `existing_skill` is set, load `file-skills/<existing_skill>/skill.json` and **extend** it. Keep its
   questions and checks, add the new question, and bump `version`.
 
-## 2. Walk the user through it (short, at most two rounds)
-In one message:
+## 2. Walk the user through it (always one confirmation round before writing anything)
+Ask in one message, then wait for the reply:
 1. "Your columns are:" then each header with its meaning and type (date in format X, amount, phone,
    email, category, free text). Ask them to confirm or correct.
 2. Suggested checks: phone or email shape, dates that don't parse, amounts that aren't numbers,
@@ -30,7 +30,7 @@ In one message:
    statuses or approved only?"
 
 Skip anything already settled in an existing skill. Use their answers. If they say "you decide", pick
-the sensible default and say what you chose.
+the sensible default and say what you chose. Don't write the skill until they've replied.
 
 ## 3. Write the file skill
 Write `file-skills/<id>/skill.json`. The `<id>` is a slug of the file's title. It is data only, never Python:

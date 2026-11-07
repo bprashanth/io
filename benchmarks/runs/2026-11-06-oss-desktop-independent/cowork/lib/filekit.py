@@ -283,12 +283,12 @@ def _variant_groups(vals):
     return {v: canon[re.sub(r"[^a-z0-9]", "", v.lower())] for v in vals if v != ""}
 
 
-def scrub(text, sheets):
+def scrub(text, sheets, keep=()):
     """Replace any real value from the file's text columns that appears in `text` (names, villages...)."""
     for df in sheets.values():
         for c in df.columns:
             info = classify(df[c])
-            if info["kind"] in ("number", "date", "empty"):
+            if info["kind"] in ("number", "date", "empty") or fk_slug_in(c, keep):
                 continue
             for v in sorted({x for x in df[c] if len(x) >= 3}, key=len, reverse=True):
                 if re.search(r"(?i)\b" + re.escape(v) + r"\b", text):
@@ -309,7 +309,7 @@ def make_mock(path, question, title=None, caller_agent=None, seed=7, share_label
     rid = f"{slug(title)[:40]}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     rdir = os.path.join(TEACH_DIR, rid)
     os.makedirs(rdir, exist_ok=True)
-    clean_q = scrub(question, sheets)
+    clean_q = scrub(question, sheets, keep=share_labels)
     mocks, kinds = {}, {}
     for name, df in sheets.items():
         cols, k = {}, {}
