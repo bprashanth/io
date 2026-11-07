@@ -18,7 +18,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 os.environ["COWORK_MODE"] = "test"
-from lib.accounts import account  # noqa: E402
+from lib.accounts import account, load_accounts  # noqa: E402
 from lib.browser import NotSignedIn  # noqa: E402
 
 
@@ -42,12 +42,8 @@ def run_site(site):
     sdir = os.path.join(HERE, "sites", site)
     with open(os.path.join(sdir, "tests.json")) as f:
         raw = f.read()
-    # {{name}} placeholders are test-account fixtures kept out of git in accounts.local.json
-    try:
-        with open(os.path.join(HERE, "accounts.local.json")) as f:
-            fixtures = json.load(f).get(site, {}).get("fixtures", {})
-    except (OSError, ValueError):
-        fixtures = {}
+    # {{name}} placeholders are test-account fixtures kept out of git (see lib/accounts.py)
+    fixtures = load_accounts().get(site, {}).get("fixtures", {})
     for k, v in fixtures.items():
         raw = raw.replace("{{%s}}" % k, v)
     spec = json.loads(raw)

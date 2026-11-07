@@ -10,7 +10,7 @@ write here are later used in **co-work mode** by the private T4GC model (no shel
 REAL accounts. You never see real data, so build tools that are robust and generic.
 
 ## Rules
-- Work only in this folder. Use only the test account named in `accounts.local.json` for the site,
+- Work only in this folder. Use only the test account named in `~/idli-insights/config/accounts.json` for the site,
   signed in to this workspace's browser. Do not look for or use other accounts, browser profiles,
   cookies, `~/.paseo`, or other folders. If the test account isn't signed in, ask the user to sign in.
 - Tools are read-only or draft-only. Never write a tool that sends, deletes, edits, submits, pays
@@ -40,7 +40,7 @@ REAL accounts. You never see real data, so build tools that are robust and gener
    - Files the user may want to analyse go into the co-work workspace folder, where the
      `sheets` site (Excel/CSV + SQL) can read them.
 6. **Tests.** Add cases to `sites/<site>/tests.json` and update `sites/<site>/site.json`.
-   Put ids/names of test-account items in `accounts.local.json` under `<site>.fixtures` and refer
+   Put ids/names of test-account items in `~/idli-insights/config/accounts.json` under `<site>.fixtures` and refer
    to them as `{{name}}` in tests.json, so nothing from an account is committed.
    Run `.venv/bin/python run_tests.py <site>` until it passes. Run all sites at the end.
 7. **Hand back.** Tell the user, in plain words: what the new tool does, the test result,

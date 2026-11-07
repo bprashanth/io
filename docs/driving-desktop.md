@@ -28,12 +28,51 @@ All three forwards bind to 127.0.0.1 on both ends.
 >
 > The daemon has no password. Keep the tunnel up only during experiments: `laptop-up.sh stop`.
 
+## ~/idli-insights
+
+Everything outside the repo lives in one folder, on both machines. The repo has only code and docs.
+
+```
+~/idli-insights/
+  config/                 chmod 700
+    accounts.json         the test account + fixture ids (lib/accounts.py)        laptop + DGX
+    claude-t4gc/          Claude Code config: model = Muse (CLAUDE_CONFIG_DIR)     laptop
+    codex-t4gc/           Codex config: model = Muse (CODEX_HOME)                  laptop
+    claude-or-9b/         OpenRouter 9B test config (holds the OpenRouter key)     laptop
+  cowork-real/            co-work workspace: the "private" data (+ cowork.sites)  laptop
+  cowork-real-9b/         the 9B test workspace (kept for now)                    laptop
+  oss-test/, oss-test-paseo/   earlier dashboard test folders                     laptop
+```
+- **Workspaces:** each private-data workspace is a folder here.
+- **DIY's limits:** its workspace is the repo's `cowork/` folder. Its sandbox blocks the private folders here; it may read only `config/accounts.json`.
+- **Paseo only:** T3 and AionUi are no longer maintained against this layout.
+
+**Bootstrap the laptop** (once):
+```sh
+mkdir -p ~/idli-insights/config/claude-t4gc && chmod 700 ~/idli-insights/config
+R=~/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent
+cp $R/laptop/claude-t4gc-settings.json ~/idli-insights/config/claude-t4gc/settings.json   # Muse via 127.0.0.1:8181
+#  ~/idli-insights/config/accounts.json: write it by hand (format below), chmod 600
+```
+
+**Bootstrap the DGX** (once). The DGX only runs the checks and tests through the tunnel, so it needs just
+the test-account file:
+```sh
+mkdir -p ~/idli-insights/config && chmod 700 ~/idli-insights/config
+# from the LAPTOP:
+scp ~/idli-insights/config/accounts.json beeps@gx10-0a47.tail5ef239.ts.net:idli-insights/config/accounts.json
+# on the DGX:
+chmod 600 ~/idli-insights/config/accounts.json
+rm -f ~/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/accounts.local.json   # old location
+```
+`lib/accounts.py` still falls back to `cowork/accounts.local.json`, so nothing breaks before the move.
+
 ## One-time setup on the laptop
 
-Prerequisites, from [oss-desktop-laptop-testing.md](oss-desktop-laptop-testing.md):
+Prerequisites:
 - Paseo 0.15.2;
 - Claude Code;
-- `~/.claude-t4gc/settings.json` (the T4GC model provider);
+- `~/idli-insights/config/claude-t4gc/settings.json` (above);
 - Tailscale access to the DGX (`ssh beeps@gx10-0a47.tail5ef239.ts.net true` works).
 
 Then do the following:
@@ -47,9 +86,9 @@ Then do the following:
    - the providers "Co-work · T4GC" and "DIY · Claude";
    - browser tools and plugins;
    - `cowork.mcp.json` and `.venv`;
-   - `~/cowork-real`, the stand-in "real" workbook;
+   - `~/idli-insights/cowork-real`, the stand-in "real" workbook;
    - the `dashboard-links` plugin.
-2. **Create `cowork/accounts.local.json`.** It is never committed:
+2. **Create `~/idli-insights/config/accounts.json`** (chmod 600; outside the repo):
    ```json
    {"google": {"test": "<the Google account signed in to Paseo>",
                "fixtures": {"pbv_sheet": "<sheet id>", "multi_tab_sheet": "<sheet id>", "a_doc": "<doc id>"}}}
@@ -66,7 +105,7 @@ Then do the following:
      /usr/share/applications/Paseo.desktop > ~/.local/share/applications/Paseo.desktop
    ```
    Workspace browser tabs come back after a restart. Sign-ins persist.
-4. **In the app**, sign in to Google in a workspace browser tab. Open one workspace on `~/cowork-real` and
+4. **In the app**, sign in to Google in a workspace browser tab. Open one workspace on `~/idli-insights/cowork-real` and
    one on the cowork folder, and start any chat in each, so that both have an agent.
 5. **Don't take Paseo's in-app update** (0.15.3) unless you also move the DGX CLI image to that version.
 
@@ -84,7 +123,7 @@ On the DGX (checkout `~/src/github.com/bprashanth/io`, branch `oss-desktop-eval`
 ```sh
 cd ~/src/github.com/bprashanth/io && git pull
 cd benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
-desktop/check-from-dgx.sh     # first time: copy accounts.local.json over first (see below)
+desktop/check-from-dgx.sh     # first time: bootstrap ~/idli-insights on the DGX (above)
 ```
 `check-from-dgx.sh` checks, in order:
 - the tunnel;
@@ -94,8 +133,7 @@ desktop/check-from-dgx.sh     # first time: copy accounts.local.json over first 
 - a screenshot (`~/io-oss-state/desktop-shots/dgx-check.png`);
 - the site tests run **from the DGX copy** against the laptop's browser tabs.
 
-It ends with `ALL CHECKS PASSED`. Copy `accounts.local.json` to the DGX from the laptop (the laptop can reach the DGX):
-`scp accounts.local.json beeps@gx10-0a47.tail5ef239.ts.net:src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`.
+It ends with `ALL CHECKS PASSED`.
 
 ## Common operations from the DGX
 
@@ -164,7 +202,7 @@ Pushing to GitHub stays the owner's call; `declaude` before any push.
 
 1. Install Paseo 0.15.2, Claude Code, and the T4GC Claude config (laptop guide).
 2. Check out branch `oss-desktop-eval`.
-3. Run `python3 desktop/setup-laptop.py` and create `accounts.local.json`.
+3. Bootstrap `~/idli-insights` (above), then run `python3 desktop/setup-laptop.py`.
 4. Restart Paseo with `--remote-debugging-port=9333`.
 5. Sign in to Google in a workspace tab and open the two workspaces.
 6. Run `desktop/laptop-up.sh`.

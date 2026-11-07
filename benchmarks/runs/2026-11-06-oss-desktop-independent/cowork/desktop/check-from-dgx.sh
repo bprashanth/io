@@ -25,7 +25,7 @@ cw=[w for w in ws if w["cwd"].endswith("/cowork-real")]
 print((diy[0]["workspaceId"] if diy else "-"), (cw[0]["workspaceId"] if cw else "-"), (diy[0]["cwd"] if diy else "-"))')
 read -r DIY_WS COWORK_WS LAPTOP_COWORK <<<"$WS"
 [ "$DIY_WS" != "-" ] && ok "DIY workspace $DIY_WS ($LAPTOP_COWORK)" || bad "no DIY workspace for the cowork/ folder on the laptop"
-[ "$COWORK_WS" != "-" ] && ok "co-work workspace $COWORK_WS (~/cowork-real)" || bad "no co-work workspace for ~/cowork-real"
+[ "$COWORK_WS" != "-" ] && ok "co-work workspace $COWORK_WS (~/idli-insights/cowork-real)" || bad "no co-work workspace for ~/cowork-real"
 
 if [ "$DIY_WS" != "-" ]; then
   T=$($P terminal create --workspace "$DIY_WS" --name dgx-check --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
@@ -47,8 +47,8 @@ a=[x for x in json.load(sys.stdin) if x["cwd"].endswith("/2026-11-06-oss-desktop
 print(a[0]["id"] if a else "")')
 if [ -z "$AGENT" ]; then
   bad "no agent in the DIY workspace yet; start any DIY chat on the laptop, then rerun"
-elif [ ! -f accounts.local.json ]; then
-  bad "accounts.local.json missing here (copy it from the laptop's cowork/ folder; it is not in git)"
+elif ! python3 -c 'import sys; sys.path.insert(0, "."); from lib.accounts import load_accounts; sys.exit(0 if load_accounts() else 1)'; then
+  bad "no test-account file: copy the laptop's ~/idli-insights/config/accounts.json to the same path here (see docs/driving-desktop.md)"
 else
   [ -x .venv/bin/python ] || { python3 -m venv .venv && .venv/bin/pip -q install duckdb pandas openpyxl; }
   # Browser tools need a LIVE caller agent (idle agents get closed) and new tabs only open in the

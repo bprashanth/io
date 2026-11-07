@@ -25,7 +25,7 @@ Everything here is a laptop POC (Pop!_OS, Paseo 0.15.2) with the shortcuts liste
 | `.claude/skills/add-site/`, `CLAUDE.md`, `.claude/settings.json` | DIY mode: the build skill, the scope rules and the sandbox settings |
 | `dashboard-links/` | Paseo plugin. A reply that mentions an `.html` file gets an **Open** button, which serves the file locally and opens it in the workspace browser |
 | `make_sample_sheets.py` | Synthetic NGO field-visit workbooks: `test` is the mock; `real` stands in for private data |
-| `accounts.local.json` (not committed) | `{"google": {"test": "<email>", "fixtures": {...}}}` |
+| `~/idli-insights/config/accounts.json` (outside the repo) | `{"google": {"test": "<email>", "fixtures": {...}}}`; see `lib/accounts.py` |
 
 ## Paseo wiring (`~/.paseo/config.json`)
 
@@ -69,6 +69,20 @@ Everything here is a laptop POC (Pop!_OS, Paseo 0.15.2) with the shortcuts liste
   or a Unix-socket proxy.
 - **Qwen3.5's chat template rejects Claude Code's mid-conversation system messages.** I patched it to render
   them in place (`qwen35-midsystem.jinja`).
+- **On Muse, first-turn latency is spent reading Claude Code's own prompt**, not on the question. Measured
+  2026-11-07 with "are you there?":
+
+  | Provider | Prompt size | Reading it | Total |
+  |---|---|---|---|
+  | `t4gc-claude` (all tools) | 33,752 tokens | 38.2 s at about 880 tokens/s | 40.4 s |
+  | `t4gc-cowork` (shell and file tools removed) | 16,438 tokens | 19.2 s | 22 s |
+
+  Anthropic's servers have the same prompt cached, so Claude replies in about 10 s. Muse's prompt cache had
+  evicted it ("removing oldest entry"). Ways to cut it, none of them tried yet:
+  - a larger llama.cpp prompt cache on the DGX (`--cache-ram`), so the shared Claude Code prefix stays warm
+    across chats;
+  - fewer slots;
+  - a shorter Claude Code system prompt for co-work.
 - **Gmail `/mail/u/<email>/` URLs give "Temporary Error".** `?authuser=<email>` works for Gmail, Drive and Docs.
 
 ## Caveats (POC shortcuts, agreed)

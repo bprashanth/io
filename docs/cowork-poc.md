@@ -4,6 +4,26 @@
 The owner tests it by hand next and designs the next experiments. **Agents: verify, and fix what the owner
 asks. Don't start new experiments on your own.**
 
+## What changed (newest first): DGX agent, read this after every `git pull`
+
+The laptop agent adds an entry here for every change that needs something done on the DGX.
+
+- **2026-11-07 19:50, `~/idli-insights` and Paseo only.**
+  - **What moved:**
+    - Everything outside the repo now lives in `~/idli-insights` (layout in
+      [driving-desktop.md](driving-desktop.md#idli-insights)).
+    - The test-account file moved from `cowork/accounts.local.json` to `~/idli-insights/config/accounts.json`.
+      `lib/accounts.py` still falls back to the old path.
+    - The co-work workspace is now `~/idli-insights/cowork-real`.
+    - The DIY sandbox blocks the private folders there.
+    - T3 and AionUi are no longer maintained.
+  - **DGX action:** do "Bootstrap the DGX" in driving-desktop.md. That means creating
+    `~/idli-insights/config/accounts.json` (the owner copies it from the laptop) and deleting the old
+    `cowork/accounts.local.json`. Then rerun `desktop/check-from-dgx.sh`.
+  - **Also recorded:** Muse first-turn latency (cowork/README.md, "Findings"): about 16k prompt tokens (co-work)
+    or 34k (full Claude Code) are re-read when the prompt cache is cold.
+- **2026-11-07 18:xx, single DGX checkout.** The DGX agent moved to `~/src/github.com/bprashanth/io` (`7a8a140`).
+
 ## The idea in one paragraph
 
 NGO staff do repetitive work on websites and spreadsheets that hold personal data. Two modes:

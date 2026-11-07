@@ -1,6 +1,11 @@
 # Testing T3 Code, Paseo and AionUi from a laptop
 
 This is an evaluation guide. IO itself and `io.idli.cc` are unchanged.
+
+> **2026-11-07: Paseo only from here.** The T4GC config folders moved to `~/idli-insights/config/`
+> (see [driving-desktop.md](driving-desktop.md#idli-insights)). T3 and AionUi still point at the old
+> `~/.codex-t4gc` / `~/.claude-t4gc` paths and are no longer maintained. Their sections below are a
+> record; re-point them by hand if you need them again.
 Evidence: [T3 (other agent)](../benchmarks/runs/2026-11-06-oss-desktop/t3-private/README.md),
 [Paseo](../benchmarks/runs/2026-11-06-oss-desktop-independent/paseo/README.md),
 [AionUi](../benchmarks/runs/2026-11-06-oss-desktop-independent/aionui/README.md).
@@ -21,7 +26,7 @@ traffic goes depends only on the model you picked in step 2:
 - the T4GC entry goes to Idli
 
 It never silently switches between them. In every app below, the T4GC entry is a separate
-provider with its own config folder (`~/.codex-t4gc`, `~/.claude-t4gc`). That folder holds no
+provider with its own config folder (`~/idli-insights/config/codex-t4gc`, `~/idli-insights/config/claude-t4gc`). That folder holds no
 login, so your subscription token is never sent to Idli.
 
 ## One-time setup on the laptop
@@ -35,16 +40,16 @@ login, so your subscription token is never sent to Idli.
 
    macOS or Linux:
    ```sh
-   mkdir -p ~/.codex-t4gc ~/.claude-t4gc
-   cp $R/laptop/codex-t4gc-config.toml ~/.codex-t4gc/config.toml
-   cp $R/laptop/claude-t4gc-settings.json ~/.claude-t4gc/settings.json
+   mkdir -p ~/idli-insights/config/codex-t4gc ~/idli-insights/config/claude-t4gc && chmod 700 ~/idli-insights/config
+   cp $R/laptop/codex-t4gc-config.toml ~/idli-insights/config/codex-t4gc/config.toml
+   cp $R/laptop/claude-t4gc-settings.json ~/idli-insights/config/claude-t4gc/settings.json
    ```
    Windows PowerShell:
    ```powershell
    $R='benchmarks\runs\2026-11-06-oss-desktop-independent'
-   mkdir $HOME\.codex-t4gc, $HOME\.claude-t4gc -Force
-   copy $R\laptop\codex-t4gc-config.toml $HOME\.codex-t4gc\config.toml
-   copy $R\laptop\claude-t4gc-settings.json $HOME\.claude-t4gc\settings.json
+   mkdir $HOME\idli-insights\config\codex-t4gc, $HOME\idli-insights\config\claude-t4gc -Force
+   copy $R\laptop\codex-t4gc-config.toml $HOME\idli-insights\config\codex-t4gc\config.toml
+   copy $R\laptop\claude-t4gc-settings.json $HOME\idli-insights\config\claude-t4gc\settings.json
    ```
 5. **Open the tunnel** and leave it running while you test:
    ```sh
@@ -87,10 +92,10 @@ arm64/x64, Windows x64/arm64, Linux).
   You should see native approval prompts. Traffic goes to OpenAI or Anthropic.
 - **T4GC model (Private-A):**
   1. Open Settings → Providers → **Add provider**. Choose driver **Codex**, name it
-     "T4GC model". Set **CODEX_HOME path** to `~/.codex-t4gc` and add custom model
+     "T4GC model". Set **CODEX_HOME path** to `~/idli-insights/config/codex-t4gc` and add custom model
      `muse-glimmer-30b`.
   2. Add another provider with driver **Claude**, named "T4GC Claude". Set **CLAUDE_CONFIG_DIR path**
-     to `~/.claude-t4gc` and add custom model `muse-glimmer-30b`.
+     to `~/idli-insights/config/claude-t4gc` and add custom model `muse-glimmer-30b`.
   3. In a new chat, pick T4GC model → `muse-glimmer-30b`, then run the CSV prompt.
   4. Also set the title / text-generation model to T4GC. Otherwise titles still go to your
      default provider (the other agent saw this).
@@ -142,7 +147,7 @@ Install from https://www.aionui.com/ (binaries are on `static.aionui.com`, not G
     base URL `http://127.0.0.1:8181/v1`, any key, model `muse-glimmer-30b`. Then pick **Aion CLI**
     with that model. This is AionUi's own agent, not Codex or Claude.
   - **Codex or Claude:** Settings → Agents → **Codex CLI** → Edit → Environment Variables →
-    `CODEX_HOME=<home>/.codex-t4gc`. For Claude Code, use `CLAUDE_CONFIG_DIR=<home>/.claude-t4gc`.
+    `CODEX_HOME=<home>/idli-insights/config/codex-t4gc`. For Claude Code, use `CLAUDE_CONFIG_DIR=<home>/idli-insights/config/claude-t4gc`.
     This switches that agent *entirely* to Muse until you remove the variable; it is a toggle,
     not a second entry.
 

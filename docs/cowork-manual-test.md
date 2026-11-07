@@ -9,7 +9,7 @@ candidate for the DGX agent's first fix.
 
 The paths below are short:
 - `cowork/` means `~/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork`.
-- `~/cowork-real` is the "private data" folder. It holds a synthetic stand-in workbook.
+- `~/idli-insights/cowork-real` is the "private data" folder. It holds a synthetic stand-in workbook.
 
 ## 0. Bring it up (laptop terminal)
 
@@ -26,7 +26,7 @@ If `laptop-up.sh` says Paseo has no DevTools port, quit Paseo and start it the w
 
 ## 1. Co-work on a spreadsheet (private data path)
 
-1. In Paseo, open the **cowork-real** workspace, or create one on `~/cowork-real`.
+1. In Paseo, open the **cowork-real** workspace, or create one on `~/idli-insights/cowork-real`.
 2. Start a new chat and pick **Co-work · T4GC (private data, no shell)**, model **T4GC model (Idli)**.
 3. Ask: *"I've put our field visits spreadsheet in this folder. Which village had the most visits, and how
    many visits led to a referral? Then make me a dashboard of visits by village and by health worker."*

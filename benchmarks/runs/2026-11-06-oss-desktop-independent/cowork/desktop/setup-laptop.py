@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Recreate the co-work POC on a laptop that already has Paseo 0.15.2, Claude Code and the T4GC
-Claude config (~/.claude-t4gc, see docs/oss-desktop-laptop-testing.md). Idempotent; prints what it did.
+Claude config in ~/idli-insights/config/claude-t4gc (docs/driving-desktop.md, "~/idli-insights").
+Idempotent; prints what it did.
 
   python3 desktop/setup-laptop.py            # run from the cowork/ folder
   python3 desktop/setup-laptop.py --dry-run
@@ -10,10 +11,11 @@ It:
   2. creates .venv (duckdb, pandas, openpyxl) with uv or python3 -m venv;
   3. merges into ~/.paseo/config.json (backup first): daemon.browserTools.enabled, pluginsEnabled,
      providers t4gc-cowork + diy-claude;
-  4. creates ~/cowork-real (stand-in "real" workbook + cowork.sites) for the co-work workspace;
+  4. creates ~/idli-insights/cowork-real (stand-in "real" workbook + cowork.sites) for the co-work workspace.
+     ~/idli-insights (override with IDLI_HOME) holds every co-work workspace folder: the private-data side;
   5. builds and installs the dashboard-links Paseo plugin (npm install, typecheck, paseo plugin install);
   6. reloads Paseo. Plugin install needs a daemon restart; the script tells you.
-It never writes credentials. accounts.local.json (test account + fixtures) is yours to create.
+It never writes credentials. ~/idli-insights/config/accounts.json (test account + fixtures) is yours to create.
 """
 import json
 import os
@@ -26,13 +28,15 @@ DRY = "--dry-run" in sys.argv
 COWORK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOME = os.path.expanduser("~")
 CONFIG = os.path.join(HOME, ".paseo", "config.json")
+IDLI = os.environ.get("IDLI_HOME", os.path.join(HOME, "idli-insights"))
+T4GC_CLAUDE = os.path.join(IDLI, "config", "claude-t4gc")
 CLAUDE = shutil.which("claude") or os.path.join(HOME, ".local", "bin", "claude")
 
 COWORK_PROVIDER = {
     "extends": "claude",
     "label": "Co-work · T4GC (private data, no shell)",
     "command": [CLAUDE, "--mcp-config", os.path.join(COWORK, "cowork.mcp.json")],
-    "env": {"CLAUDE_CONFIG_DIR": os.path.join(HOME, ".claude-t4gc"), "ENABLE_TOOL_SEARCH": "false"},
+    "env": {"CLAUDE_CONFIG_DIR": T4GC_CLAUDE, "ENABLE_TOOL_SEARCH": "false"},
     "models": [{"id": "muse-glimmer-30b", "label": "T4GC model (Idli)", "isDefault": True}],
     "disallowedTools": ["Bash", "BashOutput", "KillShell", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit",
                         "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite", "Skill", "mcp__paseo"],
@@ -51,9 +55,8 @@ def run(cmd, cwd=None):
 
 
 def main():
-    if not os.path.exists(os.path.join(HOME, ".claude-t4gc", "settings.json")):
-        sys.exit("~/.claude-t4gc/settings.json missing: set up the T4GC Claude provider first "
-                 "(docs/oss-desktop-laptop-testing.md).")
+    if not os.path.exists(os.path.join(T4GC_CLAUDE, "settings.json")):
+        sys.exit(f"{T4GC_CLAUDE}/settings.json missing: create it first (docs/driving-desktop.md, '~/idli-insights').")
     py = os.path.join(COWORK, ".venv", "bin", "python")
 
     mcp = {"mcpServers": {"cowork": {"type": "stdio", "command": py,
@@ -88,7 +91,7 @@ def main():
         with open(CONFIG, "w") as f:
             json.dump(cfg, f, indent=2)
 
-    real = os.path.join(HOME, "cowork-real")
+    real = os.path.join(IDLI, "cowork-real")
     if not os.path.exists(os.path.join(real, "field_visits_q3.xlsx")):
         step(f"create {real}")
         if not DRY:
@@ -110,7 +113,7 @@ def main():
         step("dashboard-links plugin already installed")
     run(["paseo", "reload", "--json"])
     print("\nDone. If the plugin is new, restart the Paseo app once (Quit, then start it with "
-          "--remote-debugging-port=9333). Then: create accounts.local.json, open a workspace on "
+          "--remote-debugging-port=9333). Then: create ~/idli-insights/config/accounts.json, open a workspace on "
           f"{real} and one on {COWORK}, and run desktop/laptop-up.sh.")
 
 
