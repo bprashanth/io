@@ -29,7 +29,7 @@ def files():
     out = []
     root = data_dir()
     for dirpath, dirnames, names in os.walk(root):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d != "dashboards"]
+        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in ("dashboards", "checked")]
         if dirpath.count(os.sep) - root.count(os.sep) > 1:
             continue
         for n in sorted(names):

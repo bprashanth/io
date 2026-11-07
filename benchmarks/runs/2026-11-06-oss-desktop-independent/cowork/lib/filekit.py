@@ -94,7 +94,8 @@ def main_sheet(sheets):
 
 # ---------------------------------------------------------------- recognising a file
 def header_set(df):
-    return sorted(slug(c) for c in df.columns)
+    """Slugged headers, ignoring the 'Check: ...' columns Idli adds to a '- checked' copy."""
+    return sorted(slug(c) for c in df.columns if not str(c).lower().startswith("check:"))
 
 
 def fingerprint(df):
