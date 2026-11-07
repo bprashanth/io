@@ -44,10 +44,10 @@ def t_file_open(file):
     if not skill:
         _open[file] = {"skill": None}
         return {"file": file, "known": False, "rows": len(df), "columns": list(df.columns)[:30],
-                "tell_the_user": "Say: I haven't seen this file before. Rather than guess, I'd like you to teach me "
-                                 "how to read it. I'll make a copy with fake data (same columns, no real values) "
-                                 "and send it with your question to Claude in the Teach workspace. Ask if that's OK; "
-                                 "if yes, call teach_file. Don't work out numbers from this file yourself."}
+                "say_to_user": "I haven't seen this file before. Rather than guess, I'd like you to teach me how to read "
+                               "it. I'll make a copy with fake data (same columns, no real values) and send it with "
+                               "your question to Claude in the Teach workspace. Is that OK?",
+                "then": "If they agree, call teach_file. Don't work out numbers from this file yourself."}
     table = fk.slug(skill["id"])
     fk.build_tables(sh._con, path, skill, table)
     sh._tables[table] = {"file": file, "sheet": main, "columns": {fk.slug(c): c for c in df.columns}}

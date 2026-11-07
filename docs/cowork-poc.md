@@ -8,6 +8,12 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-08, DGX: teach Idli a file.** New `files` site (file_open, file_check, file_answer, teach_file, teach_send),
+  `lib/filekit.py`, the `teach-file` Claude skill, `idli/CLAUDE.md` (copied into `~/idli-insights/cowork-real/CLAUDE.md`), and
+  `cowork.sites` gains `files`. Three file skills taught in human-style runs; results in
+  [TEACH-FILE.md](../benchmarks/runs/2026-11-07-cowork-event-eval/TEACH-FILE.md).
+  - **Laptop action:** `git pull` (done by the DGX). If you rebuild the laptop, `setup-laptop.py` now writes both.
+  - **Open:** Google's sheet export blanks text in number columns; Idli warns but a real Drive download is still needed.
 - **2026-11-07 20:xx, DGX: Muse latency fixes.** Claude Code's "hi" in a new chat re-read 18.6k tokens cold (~28-41 s).
   - **Muse** now runs with `--cache-ram 32768` (same flags otherwise; restarted with silo's `tg-bridge/serve_muse.sh`).
   - **Prefix proxy** `dgx/muse_prefix_proxy.py` on DGX `127.0.0.1:8185` (user service `muse-prefix-proxy`). It rewrites

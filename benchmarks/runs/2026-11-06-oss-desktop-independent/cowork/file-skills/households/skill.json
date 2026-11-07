@@ -1,0 +1,52 @@
+{
+ "id": "households",
+ "title": "Households",
+ "version": 1,
+ "headers": ["debts_inr", "household_head", "lat", "lon", "members", "monthly_income_inr", "savings_inr", "vulnerability_score_1to10", "ward"],
+ "sheet": "csv",
+ "summary": "Household survey: one row per household with the head's name, ward, number of members, monthly income, savings and debts (rupees), a 1-10 vulnerability score and its location (lat/lon).",
+ "columns": {
+  "household_head": {"type": "text", "meaning": "name of the head of the household"},
+  "ward": {"type": "category", "meaning": "ward the household is in (no fixed list)"},
+  "members": {"type": "number", "meaning": "number of people in the household"},
+  "monthly_income_inr": {"type": "number", "meaning": "household's monthly income in rupees"},
+  "savings_inr": {"type": "number", "meaning": "household's total savings in rupees"},
+  "debts_inr": {"type": "number", "meaning": "household's total outstanding debt in rupees"},
+  "vulnerability_score_1to10": {"type": "number", "meaning": "vulnerability score, 1 (least) to 10 (most)"},
+  "lat": {"type": "number", "meaning": "latitude of the household"},
+  "lon": {"type": "number", "meaning": "longitude of the household"}
+ },
+ "normalize": {
+  "ward": {"case": "title"},
+  "members": {"type": "number"},
+  "monthly_income_inr": {"type": "number"},
+  "savings_inr": {"type": "number"},
+  "debts_inr": {"type": "number"},
+  "vulnerability_score_1to10": {"type": "number"},
+  "lat": {"type": "number"},
+  "lon": {"type": "number"}
+ },
+ "validations": [
+  {"column": "household_head", "rule": "required", "message": "household head is missing"},
+  {"column": "ward", "rule": "required", "message": "ward is missing"},
+  {"column": "members", "rule": "range", "arg": [1, 30], "message": "members is not a number between 1 and 30"},
+  {"column": "monthly_income_inr", "rule": "number", "message": "monthly income is not a number"},
+  {"column": "monthly_income_inr", "rule": "range", "arg": [0, 1000000000], "message": "monthly income is negative"},
+  {"column": "savings_inr", "rule": "number", "message": "savings is not a number"},
+  {"column": "savings_inr", "rule": "range", "arg": [0, 1000000000], "message": "savings is negative"},
+  {"column": "debts_inr", "rule": "number", "message": "debts is not a number"},
+  {"column": "debts_inr", "rule": "range", "arg": [0, 1000000000], "message": "debts is negative"},
+  {"column": "vulnerability_score_1to10", "rule": "range", "arg": [1, 10], "message": "vulnerability score is not between 1 and 10"},
+  {"column": "lat", "rule": "range", "arg": [-90, 90], "message": "latitude is not between -90 and 90"},
+  {"column": "lon", "rule": "range", "arg": [-180, 180], "message": "longitude is not between -180 and 180"}
+ ],
+ "questions": [
+  {"id": "ward_totals",
+   "ask": "Which ward has the highest total debt, savings or monthly income: every ward ranked by the total, with household count and average per household",
+   "params": {
+    "measure": {"type": "text", "optional": true, "default": "debt", "description": "what to add up: debt, savings or income (default debt)"}
+   },
+   "sql": "WITH m AS (SELECT ward, CASE lower(trim({{measure}})) WHEN 'debt' THEN debts_inr WHEN 'debts' THEN debts_inr WHEN 'savings' THEN savings_inr WHEN 'saving' THEN savings_inr WHEN 'income' THEN monthly_income_inr WHEN 'monthly income' THEN monthly_income_inr ELSE error('measure must be debt, savings or income') END AS v FROM {{table}}) SELECT ward, count(*) AS households, sum(v) AS total_inr, round(avg(v), 0) AS average_per_household_inr, count(*) - count(v) AS households_missing_value FROM m GROUP BY ward ORDER BY total_inr DESC NULLS LAST, ward"}
+ ],
+ "history": [{"version": 1, "taught": "rank wards by total debt, savings or monthly income"}]
+}
