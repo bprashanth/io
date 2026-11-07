@@ -80,9 +80,9 @@ desktop/laptop-up.sh          # status / stop also work
 If it says `ssh exited`, run `ssh beeps@gx10-0a47.tail5ef239.ts.net true` once by hand. Tailscale sometimes
 asks for a browser sign-in.
 
-On the DGX (worktree `~/src/github.com/bprashanth/io-oss-eval`, branch `oss-desktop-eval`):
+On the DGX (checkout `~/src/github.com/bprashanth/io`, branch `oss-desktop-eval`):
 ```sh
-cd ~/src/github.com/bprashanth/io-oss-eval && git pull
+cd ~/src/github.com/bprashanth/io && git pull
 cd benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
 desktop/check-from-dgx.sh     # first time: copy accounts.local.json over first (see below)
 ```
@@ -95,7 +95,7 @@ desktop/check-from-dgx.sh     # first time: copy accounts.local.json over first 
 - the site tests run **from the DGX copy** against the laptop's browser tabs.
 
 It ends with `ALL CHECKS PASSED`. Copy `accounts.local.json` to the DGX from the laptop (the laptop can reach the DGX):
-`scp accounts.local.json beeps@gx10-0a47.tail5ef239.ts.net:src/github.com/bprashanth/io-oss-eval/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`.
+`scp accounts.local.json beeps@gx10-0a47.tail5ef239.ts.net:src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`.
 
 ## Common operations from the DGX
 
@@ -143,7 +143,7 @@ The site plugins **run on the laptop** when co-work uses them, because the lapto
    ```sh
    PASEO_MCP_URL=http://127.0.0.1:46767/mcp/agents .venv/bin/python run_tests.py --agent <agent in the DIY workspace>
    ```
-2. Commit on the DGX (branch `oss-desktop-eval` in the `io-oss-eval` worktree).
+2. Commit on the DGX (branch `oss-desktop-eval` in `~/src/github.com/bprashanth/io`).
 3. Pull on the laptop from the DGX, through a laptop terminal: `git pull dgx oss-desktop-eval`. The laptop's
    `dgx` remote points at the DGX repo, which shares refs with the worktree.
 4. Start a new co-work chat.

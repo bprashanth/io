@@ -34,7 +34,7 @@ The user then retries co-work in a new chat.
 
 The owner starts the tunnel on the laptop (`desktop/laptop-up.sh`). Then, on the DGX:
 ```sh
-cd ~/src/github.com/bprashanth/io-oss-eval && git pull
+cd ~/src/github.com/bprashanth/io && git pull
 cd benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
 desktop/check-from-dgx.sh
 ```
