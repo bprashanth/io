@@ -54,14 +54,14 @@ login, so your subscription token is never sent to Idli.
 5. **Open the tunnel** and leave it running while you test:
    ```sh
    ssh -N beeps@gx10-0a47.tail5ef239.ts.net \
-     -L 8181:127.0.0.1:8181 \
+     -L 8181:127.0.0.1:8185 \
      -L 16767:172.31.77.2:6767 -L 26767:172.31.78.2:6767 \
      -L 25808:172.31.77.3:25808 -L 35808:172.31.78.3:25808 \
      -L 8791:127.0.0.1:8791
    ```
    | Local port | What it reaches |
    |---|---|
-   | 8181 | Muse (Private-A) |
+   | 8181 | Muse (Private-A), via the DGX prefix proxy on 8185 |
    | 16767 | Paseo, user A |
    | 26767 | Paseo, user B |
    | 25808 | AionUi, user A |

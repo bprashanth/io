@@ -2,7 +2,7 @@
 # Laptop side: make this laptop's Paseo drivable from the DGX.
 #   1. Paseo desktop must be running with a DevTools port (9333). If it isn't, this script says how.
 #   2. Opens ONE ssh connection to the DGX that carries:
-#        -L 8181  laptop -> DGX Muse (the T4GC model), unless something already listens on 8181
+#        -L 8181  laptop -> DGX 8185: Muse (the T4GC model) via the prefix proxy, unless something already listens on 8181
 #        -R 46767 DGX -> laptop Paseo daemon (127.0.0.1:6767)
 #        -R 49333 DGX -> laptop Paseo DevTools (127.0.0.1:9333)
 #      All forwards bind to 127.0.0.1 on both ends.
@@ -29,7 +29,7 @@ case "${1:-start}" in
       exit 1
     fi
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then status; exit 0; fi
-    L=""; listening 8181 || L="-L 127.0.0.1:8181:127.0.0.1:8181"
+    L=""; listening 8181 || L="-L 127.0.0.1:8181:127.0.0.1:8185"   # DGX 8185 = Muse via dgx/muse_prefix_proxy.py
     # shellcheck disable=SC2086
     setsid ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $L \
       -R 127.0.0.1:46767:127.0.0.1:6767 -R 127.0.0.1:49333:127.0.0.1:9333 "$DGX" </dev/null >/dev/null 2>&1 &

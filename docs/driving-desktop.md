@@ -190,7 +190,8 @@ Pushing to GitHub stays the owner's call; `declaude` before any push.
 
 ## Models
 
-- **Muse 30B:** `idli-muse` on the DGX, port 8181, reaches the laptop through `-L 8181`.
+- **Muse 30B:** `idli-muse` on the DGX, port 8181. Claude Code reaches it through the prefix proxy on DGX 8185
+  (`dgx/muse_prefix_proxy.py`, user service `muse-prefix-proxy`), which the laptop gets as `-L 8181:127.0.0.1:8185`.
 - **Another DGX model** (e.g. a 9B): serve it on another DGX port, add `-L <port>:127.0.0.1:<port>` to
   `laptop-up.sh`, and add a provider like `t4gc-cowork` whose `CLAUDE_CONFIG_DIR` settings point
   `ANTHROPIC_BASE_URL` at that port.

@@ -8,6 +8,17 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-07 20:xx, DGX: Muse latency fixes.** Claude Code's "hi" in a new chat re-read 18.6k tokens cold (~28-41 s).
+  - **Muse** now runs with `--cache-ram 32768` (same flags otherwise; restarted with silo's `tg-bridge/serve_muse.sh`).
+  - **Prefix proxy** `dgx/muse_prefix_proxy.py` on DGX `127.0.0.1:8185` (user service `muse-prefix-proxy`). It rewrites
+    Claude Code's mid-conversation `system` message to user text, so Muse's template stops printing every tool twice.
+    Prompt 18.6k -> 10.7k tokens; a new folder re-reads ~2.2k ("hi" ~4-6 s instead of ~28 s).
+  - **T4GC Claude settings** add `autoMemoryEnabled: false`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` (the per-folder memory path
+    sat before the tools and broke the cache for every new folder) and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=65536` (Muse's slot size;
+    Claude Code assumed 200k).
+  - **Laptop action:** `git pull`; merge the three keys from `laptop/claude-t4gc-settings.json` into
+    `~/idli-insights/config/claude-t4gc/settings.json`; `laptop-up.sh stop && laptop-up.sh` (its `-L 8181` now targets DGX 8185).
+    The DGX did this through a laptop terminal on 2026-11-07; see the next entry if it didn't.
 - **2026-11-07 20:xx, DGX: `~/idli-insights` bootstrapped.** Moved the DGX's old `cowork/accounts.local.json` to `~/idli-insights/config/accounts.json` (chmod 600), so no `scp` was needed. If the laptop's copy has changed since, `scp` it over. Added [laptop-dgx-sync.md](laptop-dgx-sync.md). `lib/accounts.py` now resolves the new path. `check-from-dgx.sh`: ALL CHECKS PASSED (google 8/8, sheets 5/5) once the tunnel was back. The laptop had no workspace on the repo's `cowork/` folder, so the DGX created one ("DIY (cowork)") and started a one-line DIY chat in it.
 
 - **2026-11-07 19:50, `~/idli-insights` and Paseo only.**
