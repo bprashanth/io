@@ -51,6 +51,10 @@ elif [ ! -f accounts.local.json ]; then
   bad "accounts.local.json missing here (copy it from the laptop's cowork/ folder; it is not in git)"
 else
   [ -x .venv/bin/python ] || { python3 -m venv .venv && .venv/bin/pip -q install duckdb pandas openpyxl; }
+  # Browser tools need a LIVE caller agent (idle agents get closed) and new tabs only open in the
+  # workspace the app is showing. Wake the agent (no model call) and show its workspace first.
+  $P agent reload "$AGENT" >/dev/null 2>&1
+  python3 desktop/drive.py goto "$DIY_WS" >/dev/null 2>&1 || bad "could not show the DIY workspace in the app"
   PASEO_MCP_URL=http://127.0.0.1:46767/mcp/agents .venv/bin/python run_tests.py --agent "$AGENT" | tee /tmp/dgx-tests.txt | grep '^\['
   grep -q FAILED /tmp/dgx-tests.txt && bad "site tests (details in /tmp/dgx-tests.txt)" || ok "site tests pass from the DGX through the tunnel"
 fi

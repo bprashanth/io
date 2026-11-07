@@ -108,6 +108,11 @@ $P run --provider t4gc-cowork --workspace <wks_cowork_real> --mode bypassPermiss
 $P logs <agent-id> | tail -40                               # its tool calls and answer
 $P run --provider diy-claude --workspace <wks_diy> --mode bypassPermissions "…"   # DIY mode
 ```
+- **Show the workspace in the app first:** `python3 desktop/drive.py goto <wks>`. Paseo opens a new browser
+  tab only in the workspace the app is displaying. Otherwise the site tools fail with "Could not open a
+  browser tab … open the browser pane". Tabs that already exist keep working.
+- **Browser tools need a live caller agent.** Idle agents get closed (`inspect` shows `closed`), and then calls fail
+  with "Parent agent … not found". `$P agent reload <id>` wakes one without a model call.
 - **Always pass `--workspace` or `--cwd`** with laptop paths. The CLI runs in a container whose own folder means nothing to the laptop.
 - **Tools load when a chat starts.** After changing a site plugin, start a new chat.
 - **Tool-call log:** each co-work tool call is logged on the laptop in `/tmp/cowork.log`. Read it from a laptop terminal.
