@@ -6,7 +6,9 @@ asks. Don't start new experiments on your own.**
 
 ## What changed (newest first): DGX agent, read this after every `git pull`
 
-The laptop agent adds an entry here for every change that needs something done on the DGX.
+Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
+
+- **2026-11-07 20:xx, DGX: `~/idli-insights` bootstrapped.** Moved the DGX's old `cowork/accounts.local.json` to `~/idli-insights/config/accounts.json` (chmod 600), so no `scp` was needed. If the laptop's copy has changed since, `scp` it over. Added [laptop-dgx-sync.md](laptop-dgx-sync.md). `lib/accounts.py` now resolves the new path. `check-from-dgx.sh` not yet passed: the tunnel dropped mid-check (46767 refused).
 
 - **2026-11-07 19:50, `~/idli-insights` and Paseo only.**
   - **What moved:**
@@ -48,7 +50,7 @@ The user then retries co-work in a new chat.
 5. Background, only if needed:
    - [field note](../narrative/2026-11-07-cowork-ui-as-api-field-note.md)
    - [laptop app guide](oss-desktop-laptop-testing.md)
-   - [handing work between agents](agent-handoff.md)
+   - [handing work between agents](agent-handoff.md), [laptop ↔ DGX sync](laptop-dgx-sync.md)
 
 ## Verify before anything else (DGX agent)
 
