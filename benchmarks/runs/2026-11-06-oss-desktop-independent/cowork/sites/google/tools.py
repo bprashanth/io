@@ -488,6 +488,62 @@ SWITCH_CARD = ('Then call AskUserQuestion with one question: header "Progress", 
 PEEK_STATE = os.path.expanduser("~/idli-insights/config/peek-tabs.json")
 
 
+def _preview(f):
+    """A small picture of the file's first rows (from the index), shown inline in the chat; clicking it opens it
+    full size. Written into the workspace folder, which Paseo's chat can read. Returns markdown, or None."""
+    import html
+    from lib import driveindex as di
+    try:
+        row = di._read("SELECT coalesce(peek, '') FROM files WHERE id = ?", [f["id"]])
+    except Exception:
+        return None
+    peek = (row[0][0] if row else "") or ""
+    if not peek or peek.startswith("(not read"):
+        return None
+    esc = lambda t: html.escape(str(t), quote=True)
+    clip = lambda t, n: t if len(t) <= n else t[: n - 1] + "…"
+    W, H, PAD = 680, 22, 10
+    out = []
+    if " | " in peek or f.get("kind") in ("Google Sheets", "Microsoft Excel"):
+        rows = [r.split(", ") for r in peek.split(" | ")][:7]
+        ncol = min(8, max(len(r) for r in rows))
+        cw = (W - 2 * PAD) / ncol
+        y = PAD + 26
+        for i, r in enumerate(rows):
+            fill = "#e8f0fe" if i == 0 else ("#ffffff" if i % 2 else "#f7f7f7")
+            out.append(f'<rect x="{PAD}" y="{y}" width="{W - 2 * PAD}" height="{H}" fill="{fill}" stroke="#d0d0d0"/>')
+            for j in range(ncol):
+                cell = clip(r[j] if j < len(r) else "", int(cw / 7))
+                weight = ' font-weight="600"' if i == 0 else ""
+                out.append(f'<text x="{PAD + j * cw + 5}" y="{y + 15}"{weight}>{esc(cell)}</text>')
+            y += H
+        height = y + PAD
+    else:
+        words, lines, cur = peek.split(), [], ""
+        for w in words:
+            if len(cur) + len(w) + 1 > 95:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = (cur + " " + w).strip()
+        lines = (lines + [cur])[:8]
+        y = PAD + 26
+        for ln in lines:
+            out.append(f'<text x="{PAD + 5}" y="{y + 15}">{esc(ln)}</text>')
+            y += H - 4
+        height = y + PAD + 6
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{height}" font-family="sans-serif" '
+           f'font-size="12" fill="#202124"><rect width="100%" height="100%" fill="#ffffff" rx="6"/>'
+           f'<text x="{PAD + 5}" y="{PAD + 14}" font-weight="700" font-size="13">{esc(clip(f["name"], 80))}'
+           f'<tspan font-weight="400" fill="#5f6368"> · first rows</tspan></text>' + "".join(out) + "</svg>")
+    d = os.path.join(data_dir(), "previews")
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, re.sub(r"[^\w-]", "_", f["id"]) + ".svg")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(svg)
+    return f"![{f['name']}]({path})"
+
+
 def _peek_url(fid, kind):
     if kind == "Google Sheets":
         return f"https://docs.google.com/spreadsheets/d/{fid}/preview"
@@ -653,11 +709,15 @@ def t_drive_find(query):
         return r
     if r["status"] == "found":
         best = r["results"][0]
-        r["then"] = (f"If the user asked a question about what's inside (numbers, totals, who, how many): call file_get "
-                     f"with link '{best['id']}' now. Otherwise (find, open, see, show; any kind of file): call "
-                     f"AskUserQuestion with one question, header \"File\", question \"Found {best['name']} in "
-                     f"{best['folder']}. Open it here to take a look?\", options \"Yes, open it\" and \"No\"; on yes call "
-                     f"file_peek with id '{best['id']}' and name '{best['name']}'. Don't download.")
+        pv = _preview(best)
+        if pv:
+            r["preview"] = pv
+        r["then"] = (f"If the user asked about what's inside or to analyse it (numbers, totals, who, how many, a "
+                     f"dashboard): call file_get with link '{best['id']}' now. Otherwise (find, open, see, show; any kind "
+                     f"of file): " + ("write `preview` exactly, on its own line, then " if pv else "")
+                     + f"call AskUserQuestion with one question, header \"File\", question \"Found {best['name']} in "
+                     f"{best['folder']}. Open it here to take a look?\", options \"Yes, open it\" and \"No\"; on yes "
+                     f"call file_peek with id '{best['id']}' and name '{best['name']}'. Don't download.")
     elif r["status"] == "choose":
         r["say_to_user"] = "Ask which one they mean, listing these (name, kind, folder) in one short message."
         r["then"] = "Don't search again unless they give new words."

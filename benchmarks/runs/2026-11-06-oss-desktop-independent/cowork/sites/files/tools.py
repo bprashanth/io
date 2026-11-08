@@ -277,10 +277,9 @@ def t_file_open(file, show_form=True):
     meta = files().meta(file)
     if not meta["known"]:
         return {"file": file, "known": False,
-                "say_to_user": "I haven't seen this file before. Rather than guess, I'd like you to teach me how to read "
-                               "it. I'll make a copy with fake data (same columns, no real values) and send it to Claude "
-                               "in the Teach workspace. Is that OK?",
-                "then": "If they agree, call teach_file. Don't work out numbers from this file yourself."}
+                "then": "Idli hasn't been taught this file. Call teach_file now with the user's request as the question "
+                        "(it only prepares a copy with fake values; nothing is sent until they say yes on its card). "
+                        "Don't work out numbers from this file yourself."}
     c = meta["contract"]
     url = form_url(file)
     shown = _show(url, file) if show_form and c["status"] != "changed" else False
@@ -358,25 +357,60 @@ def t_file_ask(file, spec, tab=None):
                            + (" Rows that failed checks are included." if n_prob else "") + note}
 
 
+_teach_src = {}  # request_id -> (path, question), so teach_send can remake the copy with the labels they allowed
+
+
 def t_teach_file(file, question, share_labels=None):
     path = sh.resolve(file)
     req, mock, preview = fk.make_mock(path, question, caller_agent=os.environ.get("PASEO_AGENT_ID"),
                                       share_labels=share_labels or ())
-    cols = {c: v["kind"] for c, v in req["columns"][req["main_sheet"]].items()}
+    _teach_src[req["id"]] = (path, question)
+    cols = list(req["columns"][req["main_sheet"]])
+    tabs = list(req["columns"])
     labels = {c: v for c, v in fk.label_columns(path).items() if c not in (req.get("real_labels") or [])}
-    out = {"request_id": req["id"], "will_send": {"question": req["question"], "columns": cols,
-                                                   "example_fake_rows": preview[req["main_sheet"]][:2],
-                                                   "real_labels_sent_for": req.get("real_labels") or "none"},
-           "updating": req["existing_skill"]}
-    if labels and share_labels is None:
-        out["could_share_labels"] = labels
-        out["tell_the_user"] = ("Show what will be sent: the question and the column list, all values fake. Then show "
-                                "could_share_labels and ask which columns' labels may be sent as they are (e.g. a "
-                                "status like Approved/Pending helps Claude; names of people or places should stay "
-                                "fake). Call teach_file again with share_labels=[...] (or [] for none), then "
-                                "teach_send after they confirm.")
-    else:
-        out["tell_the_user"] = "Show what will be sent and ask them to confirm. If they agree, call teach_send(request_id)."
+    title = req["title"]
+    col_text = ", ".join(cols[:12]) + (f" and {len(cols) - 12} more" if len(cols) > 12 else "")
+    questions = [{
+        "header": "Claude",
+        "question": (f"I haven't seen {title} before. Claude can build its dashboard with you from a copy with fake "
+                     f"values: same {'tabs and ' if len(tabs) > 1 else ''}columns ({col_text}), every value made up, "
+                     f"and your question with names removed. Send it and switch to Claude?"),
+        "multiSelect": False,
+        "options": [{"label": "Yes, send and switch", "description": "Claude asks a few questions about the columns there"},
+                    {"label": "Not now", "description": "Nothing is sent"}]}]
+    shareable = list(labels.items())[:4]
+    if shareable:
+        questions.append({
+            "header": "Labels",
+            "question": "These columns hold labels. Tick any Claude may see as they are (helps it; leave people's and "
+                        "places' names unticked). Untick all to keep every label fake.",
+            "multiSelect": True,
+            "options": [{"label": c, "description": "e.g. " + ", ".join(str(x) for x in v[:4])} for c, v in shareable]})
+    return {"request_id": req["id"], "updating": req["existing_skill"], "card": {"questions": questions},
+            "then": ("Call AskUserQuestion with exactly `card` (don't write anything first). If they pick \"Yes, send "
+                     "and switch\", call teach_send with request_id and share_labels = the label columns they ticked "
+                     "([] if none). If not, say nothing was sent and offer it again any time.")}
+
+
+def t_teach_send(request_id, share_labels=None, switch=True):
+    if share_labels and request_id in _teach_src:  # remake the copy with the labels they allowed, as one request
+        path, question = _teach_src.pop(request_id)
+        req, _, _ = fk.make_mock(path, question, caller_agent=os.environ.get("PASEO_AGENT_ID"), share_labels=share_labels)
+        shutil.rmtree(os.path.join(fk.TEACH_DIR, request_id), ignore_errors=True)
+        request_id = req["id"]
+    out = _teach_send(request_id)
+    if out.get("started") and switch:
+        try:
+            with open(os.path.join(fk.TEACH_DIR, request_id, "teach_agent.json")) as f:
+                agent = json.load(f)["agent"]
+            from lib import uiswitch
+            out["switched"] = uiswitch.show_agent(agent)["ok"]
+        except (OSError, ValueError, KeyError):
+            out["switched"] = False
+        out["tell_the_user"] = ("Say in one line: sent a copy with fake values to Claude"
+                                + (", and switched there to answer its questions." if out["switched"] else
+                                   f"; open the Claude workspace (chat '{out['teach_chat']}') to answer its questions.")
+                                + " This chat carries on when teaching is done.")
     return out
 
 
@@ -387,7 +421,7 @@ def _paseo():
     raise RuntimeError("The paseo command was not found on this computer.")
 
 
-def t_teach_send(request_id):
+def _teach_send(request_id):
     rdir = os.path.join(fk.TEACH_DIR, request_id)
     with open(os.path.join(rdir, "request.json")) as f:
         req = json.load(f)
@@ -424,13 +458,7 @@ def t_teach_send(request_id):
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     with open(os.path.join(rdir, "teach_agent.json"), "w") as f:
         json.dump({"agent": agent}, f)
-    return {"started": True, "teach_chat": f"Teach: {req['title']}",
-            "tell_the_user": "Say in one line that teaching has started in the 'Claude' workspace, in the chat called "
-                             f"'Teach: {req['title']}'. Then call AskUserQuestion with one question: header \"Claude\", "
-                             "question \"Opening Claude to teach this file. It will ask you a few questions about the "
-                             "columns. Switch there now?\", options \"Yes, open Claude\" and \"Not now\". If they pick "
-                             "yes, call show_teach_chat. Either way: when teaching finishes, this chat gets a message "
-                             "and you continue."}
+    return {"started": True, "teach_chat": f"Teach: {req['title']}"}
 
 
 def t_show_teach_chat(request_id):
@@ -480,10 +508,12 @@ TOOLS = {
                     "share_labels": {"type": "array", "items": {"type": "string"},
                                      "description": "Columns whose category labels the user agreed to send as they are"}},
                    ["file", "question"]),
-    "show_teach_chat": (t_show_teach_chat, "Switch the app to the Teach chat in the Claude workspace. Only after "
-                        "the user said yes on the card.", {"request_id": {"type": "string"}}, ["request_id"]),
-    "teach_send": (t_teach_send, "After the user agrees, send the teaching request to Claude in the Teach workspace.",
-                   {"request_id": {"type": "string"}}, ["request_id"]),
+    "teach_send": (t_teach_send, "After the user said yes on teach_file's card: send the fake copy to Claude in the "
+                   "Claude workspace and switch the app there.",
+                   {"request_id": {"type": "string"},
+                    "share_labels": {"type": "array", "items": {"type": "string"},
+                                     "description": "Label columns the user ticked on the card ([] for none)"}},
+                   ["request_id"]),
 }
 
 
