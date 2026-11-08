@@ -123,11 +123,47 @@ def _download_dirs():
     except (OSError, subprocess.SubprocessError):
         pass
     out += [os.path.expanduser("~/Downloads"), sh.data_dir()]
+    out += _recent_dirs()
     seen = []
     for p in out:
         if os.path.isdir(p) and os.path.realpath(p) not in seen:
             seen.append(os.path.realpath(p))
     return seen
+
+
+def _recent_dirs(limit=6):
+    """Folders the desktop's Save dialog recently saved spreadsheets into (it reopens the last one used),
+    from GTK's recently-used list. Only folders are taken, and only for .xlsx/.csv entries."""
+    import html
+    p = os.path.expanduser("~/.local/share/recently-used.xbel")
+    try:
+        with open(p, encoding="utf-8", errors="ignore") as f:
+            text = f.read()[-400000:]
+    except OSError:
+        return []
+    dirs = []
+    for m in re.finditer(r'href="file://([^"]+?\.(?:xlsx|csv))"', text):
+        d = os.path.dirname(urllib.parse.unquote(html.unescape(m.group(1))))
+        if d in dirs:
+            dirs.remove(d)
+        dirs.append(d)
+    return list(reversed(dirs))[:limit]
+
+
+def _raise_save_dialog():
+    """Bring the browser's Save dialog to the front (Linux/X11 with xdotool). Its title is the download URL,
+    so people don't recognise it, and it can open behind the Paseo window. Best effort."""
+    if not shutil.which("xdotool"):
+        return False
+    try:
+        ids = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "^https://doc-.*googleusercontent"],
+                             capture_output=True, text=True, timeout=5).stdout.split()
+        if ids:
+            subprocess.run(["xdotool", "windowactivate", ids[-1]], capture_output=True, timeout=5)
+            return True
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return False
 
 
 def _new_download(since, title):
@@ -180,9 +216,12 @@ def t_file_get(link, wait_seconds=120):
         except RuntimeError:
             pass  # the page load is cancelled because the response is a file; the download goes on
         deadline = since + max(10, min(int(wait_seconds or 120), 300))
+        raised = False
         while time.time() < deadline and not got:
             time.sleep(1.5)
             got = _new_download(since, title)
+            if not got and not raised and time.time() - since > 3:
+                raised = _raise_save_dialog()
         if sheet:
             try:
                 paseo("browser_navigate", browserId=btab, url=g.sheets_url(fid, "edit"))
@@ -190,10 +229,11 @@ def t_file_get(link, wait_seconds=120):
                 pass
     if not got:
         return {"downloaded": False,
-                "say_to_user": "I asked the browser to download the file. If a Save dialog is open, click Save (any "
-                               "folder is fine), then tell me 'done'.",
-                "then": "When they say done, call file_get again with the same link. If downloading isn't possible, "
-                        "gsheet_read can read the sheet, but Google's export may hide text in number columns."}
+                "say_to_user": "I've asked the browser to download the file. A Save box should be open (its title is "
+                               "a long Google address; it may be behind this window). Click Save, then tell me 'done'.",
+                "then": "When they say done (or that they saved it), call file_get again with the same link. Only if "
+                        "they can't download it, use gsheet_read, and tell them totals may be low because Google's "
+                        "quick export hides text in number columns."}
     out_dir = os.path.join(sh.data_dir(), "drive")
     os.makedirs(out_dir, exist_ok=True)
     name = (re.sub(r"[^\w .()-]+", "_", title).strip() or os.path.splitext(os.path.basename(got))[0])[:80]
@@ -255,6 +295,10 @@ def t_file_open(file, show_form=True):
         out["then"] = "If they agree, call teach_file with their question (it updates the taught version)."
     else:
         bits = [f"I've opened the form for {meta['title']}" + (" in a new tab." if shown else f": {url}")]
+        if meta.get("hidden_cells"):
+            bits.append("Careful: this copy came from Google's quick export, which leaves some cells blank ("
+                        + ", ".join(f"{k}: {v}" for k, v in meta["hidden_cells"].items())
+                        + "), so totals from those columns may be low. I can download the real file instead.")
         if c["status"] == "drift":
             bits.append("It has changed a little since I was taught it: " + " ".join(c["messages"]))
         if e["problems"]:
