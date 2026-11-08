@@ -410,19 +410,36 @@ def make_mock(path, question, title=None, caller_agent=None, seed=7, share_label
     rid = f"{slug(title)[:40]}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     rdir = os.path.join(TEACH_DIR, rid)
     os.makedirs(rdir, exist_ok=True)
-    mocks, kinds, shared = {}, {}, _name_fakes(sheets, share_labels)
+    mocks, kinds, layouts, shared = {}, {}, {}, _name_fakes(sheets, share_labels)
     for name, df in sheets.items():
         cols, k = {}, {}
         for c in df.columns:
             cols[c], info = mock_column(df[c], c, rnd, keep_labels=c in share_labels or fk_slug_in(c, share_labels),
                                         shared=shared)
             k[c] = {x: info[x] for x in ("kind", "format", "bad", "blank", "distinct") if x in info}
-        mocks[name] = pd.DataFrame(cols)[list(df.columns)].head(300)
+        mock = pd.DataFrame(cols)[list(df.columns)]
+        from lib import fixkit
+        lay = fixkit.layout_rows(df)  # rows that are layout, not data: Claude needs to see their shape
+        heads = 0
+        for i, kind in lay.items():
+            if kind == "repeated_header":  # only column names, which are sent anyway
+                mock.iloc[i] = df.iloc[i].values
+            elif kind == "total":
+                first = next(c for c in df.columns if str(df.iloc[i][c]).strip())
+                mock.at[i, first] = "Total"
+            elif kind == "subheading":
+                heads += 1
+                first = next(c for c in df.columns if str(df.iloc[i][c]).strip())
+                mock.iloc[i] = ""
+                mock.at[i, first] = f"Heading {heads}"
+        layouts[name] = {kd: n for kd, n in __import__("collections").Counter(lay.values()).items()}
+        mocks[name] = mock.head(300)
         kinds[name] = k
     clean_q = scrub(question, sheets, keep=share_labels, fakes=shared)  # real values -> the mock's own fakes
     req = {"kind": "idli-teach-request", "version": 1, "id": rid, "title": title, "fingerprint": fp,
            "main_sheet": main, "question": clean_q, "existing_skill": skill["id"] if skill else None,
            "missing": scrub(missing, sheets, keep=share_labels, fakes=shared) if missing else None,
+           "layout": {t: v for t, v in layouts.items() if v},
            "existing_version": skill.get("version") if skill else None, "caller_agent": caller_agent,
            "created": dt.datetime.now().isoformat(timespec="seconds"), "columns": kinds,
            "real_labels": sorted(c for df in sheets.values() for c in df.columns if fk_slug_in(c, share_labels))}

@@ -79,14 +79,14 @@ def _num(v):
     low = s.lower()
     if low in PLACEHOLDERS:
         return {"to": "", "why": f"'{s}' stands for no value; leave the cell blank."}
-    nums = re.findall(r"-?\d+(?:\.\d+)?", s.replace(",", "") if re.fullmatch(r"[\d,.\s]+", s) else s)
-    if len(nums) >= 2:
-        return {"to": None, "why": f"{len(nums)} numbers in one cell ({', '.join(nums[:3])}): keep one, or record "
-                                   "them in separate columns."}
     fixed = re.sub(r"(?<=\d)[oO]|[oO](?=\d)", "0", s)
     fixed = re.sub(r"(?<=\d)[lI]|[lI](?=\d)", "1", fixed)
     if fixed != s and fk.as_number(fixed) is not None:
         return {"to": fixed, "why": "letters that look like digits (O for 0, l for 1)."}
+    nums = re.findall(r"-?\d+(?:\.\d+)?", s.replace(",", "") if re.fullmatch(r"[\d,.\s]+", s) else s)
+    if len(nums) >= 2:
+        return {"to": None, "why": f"{len(nums)} numbers in one cell ({', '.join(nums[:3])}): keep one, or record "
+                                   "them in separate columns."}
     m = re.fullmatch(r"(?i)\s*(?:approx\.?|about|around|~|c\.|ca\.?)\s*(-?[\d,]+(?:\.\d+)?)\s*\??\s*", s) or \
         re.fullmatch(r"\s*(-?[\d,]+(?:\.\d+)?)\s*(?:\?|\+|approx\.?)\s*", s)
     if m:

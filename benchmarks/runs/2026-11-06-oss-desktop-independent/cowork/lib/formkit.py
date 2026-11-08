@@ -857,6 +857,17 @@ def check(path, skill, out_dir):
                                  "suggestion": None if shared else fixkit.suggest("lookup", v, None, originals,
                                                                                   f"the {other} tab")})
                 notes[(row, by_slug[left])] = problems[-1]
+            # a missing value that recurs is more likely a code people use than a typo: say so instead of guessing
+            mine = [p for p in problems if p["tab"] == sheet and p["rule"] == "lookup" and p["column"] == by_slug[left]]
+            seen = {}
+            for p in mine:
+                seen.setdefault(re.sub(r"\s+", " ", p["value"]).strip().lower(), []).append(p)
+            for k, ps in seen.items():
+                if len(ps) >= 3:
+                    for p in ps:
+                        p["suggestion"] = {"to": None, "why": f"'{ps[0]['value']}' appears {len(ps)} times but isn't in the "
+                                                             f"{other} tab ({ob[right]}). If it's a code your team uses, "
+                                                             "add it there; if not, correct these cells."}
         ws = wb.create_sheet(str(sheet if sheet != "csv" else "Data")[:31])
         headers = list(df.columns)
         ws.append(headers + [f"Check: {by_slug[r['column']]}" for r in rules])

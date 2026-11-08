@@ -45,11 +45,23 @@ The mainline:
    field visit. Columns: visit_date (date, dd/mm/yyyy), officer (name), amount (rupees), status (Done /
    Follow-up / Cancelled). Right?" Options "Yes, that's right (Recommended)" and "Not quite". On "Not quite"
    or a note in Other, talk it through in chat, then carry on.
+   **Layout, if `request.json` has `layout`** (rows that aren't records: `repeated_header` rows that repeat the
+   column names, e.g. a sheet made of sections pasted one under another; `subheading` rows with one label like
+   "Transect 2"; `total` rows). Idli skips repeated headings by default and lists the others as problems. Say
+   what you see and discuss it in chat, briefly: (a) keep the layout and skip those rows (set `"skip_rows":
+   ["repeated_header", "subheading", "total"]` as fits), or (b) if a cleaner layout would help them (one table
+   with a Transect column instead of sections, codes explained in their own tab), describe it as a suggestion
+   for their next version of the sheet. Idli never changes their file; they decide. Don't push (b) on a sheet
+   that works for them.
 2. **Checks.** One card, multiSelect: "Which checks should I add? Tick all you want." Options are your
    suggestions (phone/email shape, dates that don't parse or are in the future, amounts that aren't numbers,
    required fields, allowed values, keys that must exist in another tab), at most 4 per question; use a second
    question in the same card for more. Then ask in one line whether they want to add any of their own; keep
-   taking them, one per message, until they say that's all.
+   taking them, one per message, until they say that's all. For a code list (species, villages) checked against
+   another tab: codes that recur but aren't in the list (e.g. "UKS1" for an unidentified species) are probably
+   the team's own conventions; ask whether to accept them (add to `normalize` maps or the check's list) rather
+   than flag every one. Every problem Idli finds gets a suggested fix or a note in the dashboard, which the
+   person accepts or rejects; you don't need to write fixes.
 3. **Clean-ups.** Same shape: a multiSelect card of what you'd tidy (spelling variants of one category, "Rs. 1,200"
    amounts, mixed date formats, header rows repeated mid-sheet), then "any others?".
 4. **The words of this file.** One card question per decision that has clear options: what they add up or count
