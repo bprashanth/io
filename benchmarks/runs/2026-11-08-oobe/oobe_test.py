@@ -118,6 +118,11 @@ class Screen:
         except Exception:
             return ""
 
+    def tabs(self):
+        return self.pg.evaluate("""() => [...document.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect();
+            return e.childElementCount === 0 && r.top > 40 && r.top < 66 && r.left > 320 && (e.innerText || '').trim(); })
+            .map(e => e.innerText.trim())""")
+
     def close(self):
         self.pw.stop()
 
@@ -198,6 +203,7 @@ def case(a, lap):
         return "finish" in seen and status(agent) == "idle" or None
     wait(finished, limit, 2)
     res["progress_lines_seen"] = len(lines)
+    res["tabs"] = scr.tabs()
     res["seen_at_s"] = seen
     res["finish"] = "finish" in seen
     res["total_s"] = round(time.time() - t1, 1)

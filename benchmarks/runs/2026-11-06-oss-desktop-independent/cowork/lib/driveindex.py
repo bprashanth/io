@@ -283,10 +283,11 @@ def build(minutes=5.0, workers=5, muse_parallel=4):
     try:
         _build(minutes, workers, muse_parallel)
     except Exception:
-        notify("Indexing finished with a problem: " + progress_line() + " Tell the user in one line and offer "
-               "\"rebuild index\".")
+        notify("Drive index: stopped with a problem.")
         raise
-    notify("Indexing finished: " + progress_line() + " Now write the finish message.")
+    st = status()
+    sec = st.get("seconds") or 0
+    notify(f"Drive index: done ({st.get('files', 0)} files, {sec // 60}:{sec % 60:02d}).")
 
 
 def _build(minutes=5.0, workers=5, muse_parallel=4):
