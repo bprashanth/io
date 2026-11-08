@@ -64,8 +64,14 @@ def show_agent(agent):
     return {"ok": True}
 
 
-# ---- a minimal DevTools (CDP) client: one Runtime.evaluate over a websocket, standard library only
+# ---- a minimal DevTools (CDP) client over a websocket, standard library only
 def _ws_eval(ws_url, expression, timeout=10):
+    got = _cdp(ws_url, [("Runtime.evaluate", {"expression": expression, "returnByValue": True})], timeout)
+    return (got[0] or {}).get("result", {}).get("value")
+
+
+def _cdp(ws_url, calls, timeout=10):
+    """Send CDP calls one after another; returns each call's result (None on error)."""
     rest = ws_url.split("://", 1)[1]
     hostport, path = rest.split("/", 1)
     host, port = hostport.split(":")
@@ -83,13 +89,14 @@ def _ws_eval(ws_url, expression, timeout=10):
         if b" 101 " not in head.split(b"\r\n", 1)[0]:
             raise ConnectionError(head.split(b"\r\n", 1)[0].decode(errors="replace"))
         buf = head.split(b"\r\n\r\n", 1)[1]
-        msg = json.dumps({"id": 1, "method": "Runtime.evaluate",
-                          "params": {"expression": expression, "returnByValue": True}}).encode()
-        mask = os.urandom(4)
-        n = len(msg)
-        hdr = bytes([0x81]) + (bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536
-                               else bytes([0x80 | 127]) + struct.pack(">Q", n))
-        s.sendall(hdr + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(msg)))
+
+        def send(i, method, params):
+            msg = json.dumps({"id": i, "method": method, "params": params}).encode()
+            mask = os.urandom(4)
+            n = len(msg)
+            hdr = bytes([0x81]) + (bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536
+                                   else bytes([0x80 | 127]) + struct.pack(">Q", n))
+            s.sendall(hdr + mask + bytes(b ^ mask[k % 4] for k, b in enumerate(msg)))
 
         def need(k):
             nonlocal buf
@@ -100,20 +107,26 @@ def _ws_eval(ws_url, expression, timeout=10):
                 buf += chunk
             out, buf = buf[:k], buf[k:]
             return out
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            b1, b2 = need(2)
-            ln = b2 & 0x7F
-            if ln == 126:
-                ln = struct.unpack(">H", need(2))[0]
-            elif ln == 127:
-                ln = struct.unpack(">Q", need(8))[0]
-            data = need(ln)
-            if b1 & 0x0F == 1:
-                reply = json.loads(data)
-                if reply.get("id") == 1:
-                    return reply.get("result", {}).get("result", {}).get("value")
-        raise TimeoutError("no reply")
+        results = []
+        for i, (method, params) in enumerate(calls, 1):
+            send(i, method, params)
+            deadline = time.time() + timeout
+            while True:
+                if time.time() > deadline:
+                    raise TimeoutError("no reply")
+                b1, b2 = need(2)
+                ln = b2 & 0x7F
+                if ln == 126:
+                    ln = struct.unpack(">H", need(2))[0]
+                elif ln == 127:
+                    ln = struct.unpack(">Q", need(8))[0]
+                data = need(ln)
+                if b1 & 0x0F == 1:
+                    reply = json.loads(data)
+                    if reply.get("id") == i:
+                        results.append(reply.get("result") if "error" not in reply else None)
+                        break
+        return results
     finally:
         s.close()
 
@@ -156,3 +169,19 @@ if __name__ == "__main__":
     if len(sys.argv) != 3 or sys.argv[1] not in ("agent", "tab"):
         sys.exit(__doc__)
     print(json.dumps(show_agent(sys.argv[2]) if sys.argv[1] == "agent" else show_tab(sys.argv[2])))
+
+
+def save_downloads_to(folder):
+    """Dev builds only: make the built-in browser save downloads into `folder` without a Save box (every browser
+    session: Paseo's browser tabs use their own). folder=None puts the Save box back. Shipping fix: Paseo patch
+    P1. Returns True if it took effect."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json/version", timeout=3) as r:
+            ws = json.load(r)["webSocketDebuggerUrl"]
+        ctxs = (_cdp(ws, [("Target.getBrowserContexts", {})])[0] or {}).get("browserContextIds", [])
+        params = {"behavior": "allow", "downloadPath": folder} if folder else {"behavior": "default"}
+        calls = [("Browser.setDownloadBehavior", params)] + [
+            ("Browser.setDownloadBehavior", dict(params, browserContextId=c)) for c in ctxs]
+        return any(x is not None for x in _cdp(ws, calls))
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError):
+        return False
