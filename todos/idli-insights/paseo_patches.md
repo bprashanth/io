@@ -10,6 +10,7 @@ patch file until we decide between upstream PRs and our own build. Running list.
 | P3 | **Default permission mode per provider**: let a provider in `config.json` set its default mode (e.g. `"defaultModeId": "bypassPermissions"` for the Idli providers) | Claude-based providers default to Auto (`claudeModeCatalog` in `packages/server/src/server/agent/providers/claude/agent.ts`); Auto's safety check can't run with Muse, so every tool call in a new Idli chat is blocked until the user switches to Bypass | ❌ to write |
 | P4 | **Pinned tab** (optional): keep a chat (Start here) as the first tab, not closable | Paseo can pin workspaces, not tabs; dragging the tab first does persist, so this is nice-to-have | ❌ optional |
 | P5 | **Hide providers** (optional): a config switch to hide built-in providers (Claude, Codex, OpenCode, ...) from the model picker | The picker shows every provider; an Idli install should show only Idli 30B, (Idli 9B), Claude | ❌ check whether `enabled: false` in config already does this |
+| P7 | **Bring an agent's tab forward** (option on `browser_new_tab`, or a `browser_focus` tool) | Agent tabs open in the background by design; Idli's drive-index progress tab is easy to miss | ❌ to write |
 | P6 | **Cosmetic**: no red `GUEST_VIEW_MANAGER_CALL ... ERR_FAILED (-2)` line when a navigation turns into a download | Looks like an error to people; it's only the page load being replaced by the file | ❌ optional |
 
 Notes

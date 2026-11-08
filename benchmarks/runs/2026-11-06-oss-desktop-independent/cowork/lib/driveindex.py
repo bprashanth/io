@@ -239,7 +239,9 @@ def summarise(batch, timeout=180):
     items = [{"n": i + 1, "name": f["name"], "kind": f["kind"], "folder": f["path"], "inside": (f.get("peek") or "")[:400]}
              for i, f in enumerate(batch)]
     prompt = ("For each file, write one short line: what it is and the key words someone might search for "
-              "(people, places, projects, topics, years). Use only what is shown. Reply with JSON only: "
+              "(people, places, projects, topics, years), plus the everyday words a non-expert would use for it "
+              "(e.g. disbursements -> money given out, payments; 80G receipts -> donation tax receipts). Use only "
+              "what is shown. Reply with JSON only: "
               '{"1": "...", "2": "..."}\n\n' + json.dumps(items, ensure_ascii=False))
     body = {"model": "muse-glimmer-30b", "temperature": 0, "max_tokens": 4000, "response_format": {"type": "json_object"},
             "messages": [{"role": "user", "content": prompt}]}

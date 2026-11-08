@@ -45,6 +45,8 @@ Claude      <- heading 3: Claude teaches Idli a file, from fake data only
 | 14 | Updates: re-index Drive when it changes | manual: "re-index my Drive" in Start here | ❌ no incremental refresh yet |
 | 15 | A second Google account on the same machine | one index per computer user; re-indexing another account replaces it | ❌ index per account |
 | 16 | Photo/video location for searches like "event in December in Kolkata" | dates and names only | ❌ EXIF location needs the details panel or the Drive API |
+| 18 | Muse answers a find question in 30-45 s (reasoning at ~30 tok/s); the 9B in ~7 s | measured in the OOBE run | ❌ cap or skip reasoning for simple turns; faster decode |
+| 19 | Progress while indexing | `drive-index.localhost` tab + finish in chat | ✅ (tab opens in the background: P7) |
 | 17 | Paseo's remote-debugging port | only for driving from the DGX during development | must NOT be on in a shipped build |
 
 ## First-run order of operations (target)

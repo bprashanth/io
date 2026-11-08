@@ -8,6 +8,18 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-08 (late), DGX: first-run experience (OOBE) played as a new user.** Field note:
+  [narrative/2026-11-08-oobe-field-note.md](../narrative/2026-11-08-oobe-field-note.md); runs and numbers:
+  `benchmarks/runs/2026-11-08-oobe/` (`oobe_test.py`, `results.jsonl`, `search_eval.py`, `search_chat_test.py`).
+  - **Layout:** headings Start here / Idli / Claude, laid out by `desktop/idli-bootstrap.py` (run by
+    `desktop/idli-launch.sh`, the "Idli" app-menu entry). Start here chat opens on low thinking.
+  - **Start here:** greeting, "yes" (any go-ahead) starts the index, progress in a `drive-index.localhost` tab,
+    finish with next steps in the chat (the indexer's "Drive index: done" note prompts it if the model stopped).
+    30B: greeting ~10 s, acts ~5 s, index 182 files in 5.5 min; 9B: same, waits silently and writes the finish.
+  - **Search:** vector index 23/25 first-place vs 22/25 for today's lexical+summaries; not adopted yet. Summaries
+    now carry everyday words. 30B chat search 34-80 s (reasoning tokens at ~30 tok/s), 9B 7 s.
+  - **Fixed:** double `.xlsx` on downloaded Excel names; Idli no longer downloads when only asked to find.
+  - **Laptop:** `fastembed` added to the cowork venv (eval only).
 - **2026-11-08 (night), owner + DGX: finding files in Drive.** The owner's live run took ~5 min of substring
   searching before Idli asked anything. Now:
   - **Drive index** (`lib/driveindex.py`, tools `drive_index` / `drive_index_status` / `drive_find`), built by Idli

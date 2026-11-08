@@ -236,6 +236,7 @@ def t_file_get(link, wait_seconds=45):
                         "quick export hides text in number columns."}
     out_dir = os.path.join(sh.data_dir(), "drive")
     os.makedirs(out_dir, exist_ok=True)
+    title = re.sub(r"(?i)\.(xlsx|xls|csv)$", "", title or "")  # uploaded Excel files keep .xlsx in their Drive name
     name = (re.sub(r"[^\w .()-]+", "_", title).strip() or os.path.splitext(os.path.basename(got))[0])[:80]
     dest = os.path.join(out_dir, name + os.path.splitext(got)[1])
     if os.path.realpath(got) != os.path.realpath(dest):
