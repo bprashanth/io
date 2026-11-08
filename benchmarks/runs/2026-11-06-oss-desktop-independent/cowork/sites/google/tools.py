@@ -505,7 +505,8 @@ def t_drive_find(query):
             if len(live) <= 3:  # a specific word: stop here
                 break
         best = min(per, key=lambda w: len(per[w])) if per else None  # the word that matched the fewest files
-        hits = [(best, f) for f in per[best][:4]] if best else []
+        hits = [(best, f) for f in per[best][:4]] if best and len(per[best]) <= 3 else []
+        common = {w: len(v) for w, v in per.items() if len(v) > 3}
         if hits:
             seen, res = set(), []
             for w, f in hits:
@@ -521,7 +522,16 @@ def t_drive_find(query):
             r["then"] = "Don't search again unless they give new words."
             r["ms"] = int((time.time() - t0) * 1000)
             return r
-        r["drive_search"] = {"no_file_mentions": missed}
+        r["drive_search"] = {"no_file_mentions": missed, "in_many_files": common}
+        r["say_to_user"] = (("No file in Drive mentions " + ", ".join(f"'{m}'" for m in missed) + ". " if missed else "")
+                            + ("".join(f"'{w}' is in many files. " for w in common))
+                            + "Ask for another word from the file's name, its folder, or something written in it "
+                              "(a place, a person, a species, a project).")
+        r["then"] = "Don't keep searching until they answer."
+        r["ms"] = int((time.time() - t0) * 1000)
+        r["status"] = "none"
+        r["results"] = []
+        return r
     if r["status"] == "found":
         best = r["results"][0]
         r["then"] = (f"Tell the user you found '{best['name']}' ({best['kind']}, in {best['folder']}). For a spreadsheet, "
