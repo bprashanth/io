@@ -445,6 +445,9 @@ def t_drive_index():
     st = di.status()
     if st.get("phase") in ("starting", "listing", "reading", "summarising"):
         return {"started": False, "running": True, "say_to_user": "I'm already indexing your Drive: " + di.progress_line(st)}
+    if os.path.exists(os.path.splitext(di.DB)[0] + ".dryrun"):  # test switch: time the chat without a rebuild
+        return {"started": True, "dry_run": True, "say_to_user": "Indexing your Drive now (test run).",
+                "then": "Call drive_index_wait now."}
     import subprocess
     import sys
     here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -463,9 +466,8 @@ def t_drive_index():
         pass
     return {"started": True,
             "say_to_user": "Indexing your Drive now. It stays on this computer and takes 1 to 5 minutes. "
-                           + ("Progress is in the Drive index tab at the top. " if shown else "")
-                           + "I'll tell you here when it's done.",
-            "then": "Write say_to_user, then stop. A message will arrive when indexing finishes."}
+                           "I'll post progress here" + (" (details in the Drive index tab)." if shown else "."),
+            "then": "In this same reply: write say_to_user, then call drive_index_wait. Keep going until it says done."}
 
 
 def t_drive_index_status():
@@ -509,7 +511,8 @@ def t_drive_index_wait(seconds=20):
     elif done:
         out["then"] = "Tell the user, and offer to try again (say \"rebuild index\")."
     else:
-        out["then"] = "Write progress_line to the user as one short line, then call drive_index_wait again."
+        out["then"] = ("In this same reply: write progress_line as one short line, then call drive_index_wait again. "
+                       "Don't end your turn before done.")
     return out
 
 

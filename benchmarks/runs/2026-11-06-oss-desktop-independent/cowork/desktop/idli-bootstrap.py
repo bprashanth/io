@@ -34,7 +34,7 @@ LAYOUT = [  # (heading and workspace name, folder, instructions copied to <folde
 ]
 SITES = "google\nsheets\nfiles\n"
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
-TABS = ["https://drive.google.com/drive/my-drive", "https://mail.google.com/mail/u/0/#inbox"]
+TABS = ["https://drive.google.com/drive/my-drive"]  # Gmail later; Drive is all the first run needs
 
 
 def say(msg):
