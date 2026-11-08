@@ -443,7 +443,7 @@ def whoami():
 def t_drive_index():
     from lib import driveindex as di
     st = di.status()
-    if st.get("phase") in ("listing", "reading", "summarising"):
+    if st.get("phase") in ("starting", "listing", "reading", "summarising"):
         return {"started": False, "running": True, "status": st,
                 "say_to_user": "I'm already indexing your Drive; I'll be able to search it shortly."}
     import subprocess
@@ -458,18 +458,50 @@ def t_drive_index():
                            "Sheet and the opening lines of each Doc, summarised by the private model. It stays on "
                            "this computer and takes 1 to 5 minutes; a few tabs will open and close on their own. "
                            "You can keep chatting.",
-            "then": "Use drive_index_status if they ask how it's going; drive_find works as soon as listing is done."}
+            "then": "Say say_to_user, then call drive_index_wait and keep writing its progress_line, one short line "
+                    "each time, until it says done; then write its finish message."}
 
 
 def t_drive_index_status():
     from lib import driveindex as di
     st = di.status()
+    return {"status": st, "say_to_user": di.progress_line(st), "running": st.get("phase") in ("starting", "listing", "reading", "summarising")}
     words = {"none": "Drive hasn't been indexed yet.", "listing": f"Listing files: {st.get('files', 0)} so far.",
              "reading": f"Reading inside Sheets and Docs ({st.get('peeked', 0)} done).",
              "summarising": f"Summarising: {st.get('summarised', 0)} of {st.get('files', 0)} files. Search works already.",
              "done": f"Done: {st.get('files', 0)} files indexed at {st.get('finished', '')}.",
              "failed": f"Indexing failed: {st.get('error')}", "stopped": "Indexing stopped before it finished."}
     return {"status": st, "say_to_user": words.get(st.get("phase"), str(st.get("phase")))}
+
+
+NEXT_STEPS = ("Next: go to Idli insights in the left sidebar and ask about any file, for example \"find the volunteer "
+              "register\" or \"how much did we disburse last quarter\". To refresh this later, come back here and "
+              "say \"rebuild index\".")
+
+
+def t_drive_index_wait(seconds=20):
+    """Wait (up to `seconds`) for the Drive index to make progress, then say where it is."""
+    from lib import driveindex as di
+    t0, start = time.time(), di.status()
+    key = lambda st: (st.get("phase"), st.get("files"), st.get("peeked"), st.get("summarised"))
+    st = start
+    while time.time() - t0 < max(5, min(int(seconds or 20), 60)):
+        time.sleep(2)
+        st = di.status()
+        if st.get("phase") in ("done", "failed", "stopped", "none"):
+            break
+        if st.get("phase") != start.get("phase") and time.time() - t0 > 6:
+            break
+    done = st.get("phase") in ("done", "failed", "stopped", "none")
+    out = {"done": done, "progress_line": di.progress_line(st)}
+    if st.get("phase") == "done":
+        out["finish"] = di.progress_line(st) + " " + NEXT_STEPS
+        out["then"] = "Write `finish` to the user, as is. Stop calling drive_index_wait."
+    elif done:
+        out["then"] = "Tell the user, and offer to try again (say \"rebuild index\")."
+    else:
+        out["then"] = "Write progress_line to the user as one short line, then call drive_index_wait again."
+    return out
 
 
 def t_drive_find(query):
@@ -553,6 +585,9 @@ TOOLS = {
     "drive_index": (t_drive_index, "Start indexing the user's Drive in the background (1-5 minutes, stays on this "
                     "computer). Only after the user agrees.", {}, []),
     "drive_index_status": (t_drive_index_status, "How far the Drive index has got.", {}, []),
+    "drive_index_wait": (t_drive_index_wait, "Wait up to ~20 s for the Drive index to progress; returns a one-line "
+                         "progress_line to show the user, and done/finish at the end.",
+                         {"seconds": {"type": "integer", "description": "How long to wait, default 20"}}, []),
     "list_tabs": (t_list_tabs, "List the browser tabs the user has open in Paseo (title, url, which is active).", {}, []),
     "gmail_search": (t_gmail_search, "Search the user's Gmail (Gmail search syntax works, e.g. from:aws "
                      "newer_than:2m payment). Shows the results in the user's Gmail tab and returns a short list.",

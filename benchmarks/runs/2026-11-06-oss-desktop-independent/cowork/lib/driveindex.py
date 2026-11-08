@@ -256,8 +256,9 @@ def build(minutes=5.0, workers=5, muse_parallel=4):
     from lib.browser import paseo
     started = time.time()
     deadline = started + minutes * 60
-    _write_state(phase="listing", pid=os.getpid(), started=dt.datetime.now().isoformat(timespec="seconds"),
-                 files=0, peeked=0, summarised=0, error=None)
+    _write_state(phase="starting", pid=os.getpid(), started=dt.datetime.now().isoformat(timespec="seconds"),
+                 started_ts=started, files=0, folders_opened=0, folders_left=0, peeked=0, to_read=0, summarised=0,
+                 to_summarise=0, error=None, finished=None, seconds=None)
     tabs = []
     try:
         for _ in range(max(1, workers)):
@@ -276,8 +277,8 @@ def build(minutes=5.0, workers=5, muse_parallel=4):
             con.execute("INSERT INTO files (id, name, kind, path, where_, indexed_at, modified) VALUES (?, ?, ?, ?, ?, ?, ?)",
                         [f["id"], f["name"], f["kind"], f["path"], f["where_"], now, f.get("modified")])
         con.close()
-        _write_state(phase="reading", files=len(files))
         todo = [f for f in files if f["kind"] in ("Google Sheets", "Microsoft Excel", "Google Docs")]
+        _write_state(phase="reading", files=len(files), to_read=len(todo))
         done = 0
         with cf.ThreadPoolExecutor(len(tabs)) as ex:
             free = list(tabs)
@@ -319,6 +320,7 @@ def build(minutes=5.0, workers=5, muse_parallel=4):
     order = [f for f in sorted(files, key=lambda f: 0 if f.get("peek") else 1)
              if not is_folder(f["kind"]) and f["kind"] not in MEDIA]
     batches = [order[i:i + 12] for i in range(0, len(order), 12)]
+    _write_state(to_summarise=len(order))
     n = 0
     with cf.ThreadPoolExecutor(max(1, muse_parallel)) as ex:
         futs = {ex.submit(summarise, b, max(30, int(deadline - time.time()))): b for b in batches}
@@ -449,6 +451,34 @@ def rarity(words):
     rows = _read("SELECT name || ' ' || path || ' ' || coalesce(peek, '') || ' ' || coalesce(summary, '') FROM files")
     docs = [set(_tokens(r[0])) for r in rows]
     return {w: sum(1 for d in docs if any(t == w or (len(w) >= 5 and t.startswith(w)) for t in d)) for w in words}
+
+
+def progress_line(st=None):
+    """One plain line about where the build is, for the chat."""
+    st = st or status()
+    el = ""
+    if st.get("started_ts") and st.get("phase") not in ("done", "failed", "none"):
+        sec = int(time.time() - st["started_ts"])
+        el = f" ({sec // 60}:{sec % 60:02d})"
+    ph = st.get("phase")
+    if ph == "starting":
+        return "Opening your Drive in a few background tabs" + el + "."
+    if ph == "listing":
+        return (f"Listing your Drive: {st.get('files', 0)} files so far, {st.get('folders_opened', 0)} folders opened, "
+                f"{st.get('folders_left', 0)} to go{el}.")
+    if ph == "reading":
+        return f"Reading inside Sheets, Excel files and Docs: {st.get('peeked', 0)} of {st.get('to_read', 0)}{el}."
+    if ph == "summarising":
+        return (f"Summarising with the private model: {st.get('summarised', 0)} of {st.get('to_summarise', 0)}{el}. "
+                "Search already works.")
+    if ph == "done":
+        sec = st.get("seconds") or 0
+        return f"Done: {st.get('files', 0)} files indexed in {sec // 60}:{sec % 60:02d}."
+    if ph == "failed":
+        return f"Indexing failed: {st.get('error')}"
+    if ph == "stopped":
+        return "Indexing stopped before it finished."
+    return "Drive hasn't been indexed yet."
 
 
 if __name__ == "__main__":
