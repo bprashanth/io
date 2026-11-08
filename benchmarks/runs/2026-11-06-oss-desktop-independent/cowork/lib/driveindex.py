@@ -83,13 +83,13 @@ def connect(read_only=False):
     return con
 
 
-def _read(sql, tries=20):
+def _read(sql, params=None, tries=20):
     """Read the index, waiting briefly if the builder holds DuckDB's write lock (it writes in short bursts)."""
     for i in range(tries):
         try:
             con = connect(read_only=True)
             try:
-                return con.execute(sql).fetchall()
+                return con.execute(sql, params or []).fetchall()
             finally:
                 con.close()
         except Exception as e:
@@ -425,8 +425,10 @@ def _match(q, words):
             return 1.0
         if w.isdigit():
             continue
-        if len(q) >= 3 and (w.startswith(q) or q.startswith(w)) and min(len(w), len(q)) >= 3:
+        if len(q) >= 3 and w.startswith(q):
             best = max(best, 0.9)
+        elif len(w) >= 3 and q.startswith(w):  # a short word covering only the start of what they typed says less
+            best = max(best, 0.9 * len(w) / len(q))
         elif len(q) >= 4 and len(w) >= 4:
             r = difflib.SequenceMatcher(None, q, w).ratio()
             if r >= 0.75:
