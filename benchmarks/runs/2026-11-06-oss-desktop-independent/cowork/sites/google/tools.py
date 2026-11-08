@@ -462,7 +462,12 @@ def t_drive_index():
         port, token = ft._server()
         # *.localhost reaches this computer in Chromium, and the tab is labelled "drive-index.localhost" even
         # before it loads (background tabs load when clicked), instead of a bare 127.0.0.1
-        paseo("browser_new_tab", url=f"http://drive-index.localhost:{port}/index?t={token}")
+        url = f"http://drive-index.localhost:{port}/index?t={token}"
+        old = next((t for t in tabs() if "drive-index.localhost" in t["url"]), None)
+        if old:  # "rebuild index": reuse the tab
+            paseo("browser_navigate", browserId=old["id"], url=url)
+        else:
+            paseo("browser_new_tab", url=url)
         shown = True
     except Exception:
         pass
