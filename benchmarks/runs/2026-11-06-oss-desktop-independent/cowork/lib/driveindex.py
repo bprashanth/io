@@ -429,6 +429,17 @@ def search(query, limit=5):
     return {"status": "found" if clear else "choose", "results": top if not clear else top[:3]}
 
 
+def rarity(words):
+    """How many indexed files mention each word (name, folder, first rows, summary): rarer words say more."""
+    if not os.path.exists(DB):
+        return {w: 0 for w in words}
+    con = connect(read_only=True)
+    rows = con.execute("SELECT name || ' ' || path || ' ' || coalesce(peek, '') || ' ' || coalesce(summary, '') FROM files").fetchall()
+    con.close()
+    docs = [set(_tokens(r[0])) for r in rows]
+    return {w: sum(1 for d in docs if any(t == w or (len(w) >= 5 and t.startswith(w)) for t in d)) for w in words}
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "build":

@@ -488,15 +488,23 @@ def t_drive_find(query):
         from lib.driveindex import KIND_WORDS, STOP, _tokens
         dates = {"january", "february", "march", "april", "june", "july", "august", "september", "october", "november",
                  "december", "last", "this", "month", "year", "week"}
-        words = sorted({t for t in _tokens(query) if t not in STOP and t not in KIND_WORDS and t not in dates
-                        and len(t) >= 4 and not t.isdigit()}, key=len, reverse=True)[:2]
+        cand = {t for t in _tokens(query) if t not in STOP and t not in KIND_WORDS and t not in dates
+                and len(t) >= 4 and not t.isdigit()}
+        rare = di.rarity(cand)
+        words = sorted(cand, key=lambda w: (rare[w], -len(w)))[:3]  # rarest in this Drive first
         hits, missed = [], []
         for w in words:
             try:
-                live = t_drive_search(w, max_wait=4).get("files", [])[:4]
+                live = t_drive_search(w, max_wait=4).get("files", [])
             except Exception:
                 live = []
-            (hits.extend((w, f) for f in live) if live else missed.append(w))
+            if not live:
+                missed.append(w)
+            elif len(live) <= 3:  # a specific word: these files are the answer
+                hits.extend((w, f) for f in live)
+                break
+            elif not hits:  # a common word: keep only as a last resort
+                hits.extend((w, f) for f in live[:3])
         if hits:
             seen, res = set(), []
             for w, f in hits:
