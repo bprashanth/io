@@ -114,7 +114,7 @@ def projects_and_workspaces():
 
 def start_chat(ws_id):
     folder = LAYOUT[0][1]
-    agent = next((a for a in paseo("ls") if a["name"] == "Start here" and same(a.get("cwd") or "", folder)), None)
+    agent = next((a for a in paseo("ls", "--global") if a["name"] == "Start here" and same(a.get("cwd") or "", folder)), None)
     if agent:
         say("Start here chat exists")
         return agent["id"]
