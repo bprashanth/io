@@ -523,13 +523,20 @@ def answer_text(res, f, spec):
             v = int(v)
         if isinstance(v, (int, float)):
             return ("Rs " if money.search(str(label)) else "") + indian(v)
+        if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+            return _dmy(v)
         return str(v)
     head = res["described"] + "."
     if not res["rows"]:
         return head + " No rows match."
     if not spec.get("measures"):
         n = list(res["total"].values())[0] if res["total"] else len(res["rows"])
-        return head + f" {n} match" + (f"; the first {len(res['rows'])} are in the form." if n > len(res["rows"]) else ".")
+        kinds = {k["label"]: k["kind"] for k in f["_kinds"].values()}
+        cols = [c for c in res["columns"] if kinds.get(c) not in ("contact",)][:6]
+        lines = ["- " + ", ".join(f"{c}: {fmt(c, r[c])}" for c in cols if r.get(c) not in (None, ""))
+                 for r in res["rows"][:15]]
+        more = f"\n({n - 15} more in the form)" if n > 15 else ""
+        return head + f" {n} match:\n" + "\n".join(lines) + more
     gcols = [c for c in res["columns"] if c not in (res["total"] or {}) and c not in
              [f["_measures"][m]["label"] for m in spec.get("measures") or [] if m in f["_measures"]]]
     mcols = [c for c in res["columns"] if c not in gcols]

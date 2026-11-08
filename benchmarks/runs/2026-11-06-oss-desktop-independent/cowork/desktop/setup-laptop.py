@@ -44,7 +44,7 @@ COWORK_PROVIDER = {
                         "Workflow", "SendMessage", "ScheduleWakeup", "CronCreate", "CronDelete", "CronList",
                         "EnterPlanMode", "ExitPlanMode", "EnterWorktree", "ExitWorktree", "ReportFindings", "ListAgents",
                         # co-work is read-only: find, suggest, download. Drafting mail is a write.
-                        "mcp__cowork__gmail_draft_reply"],
+                        "mcp__cowork__gmail_draft_reply", "mcp__cowork__sheet_query", "mcp__cowork__sheet_profile"],
 }
 DIY_PROVIDER = {"extends": "claude", "label": "DIY · Claude (builds co-work tools, test accounts only)"}
 
