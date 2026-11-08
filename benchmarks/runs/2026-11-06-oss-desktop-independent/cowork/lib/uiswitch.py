@@ -122,8 +122,11 @@ def _ws_eval(ws_url, expression, timeout=10):
 CLICK_TAB = """(label => { const rows = [...document.querySelectorAll('[data-testid="workspace-tabs-row"]')]
     .filter(r => { const b = r.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
   if (!rows.length) return 'no-row';
+  // the row also holds an off-screen copy of each label (for measuring): take the one actually on screen
+  const onScreen = e => { const r = e.getBoundingClientRect(); if (!r.width) return false;
+    const c = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return c && (c === e || e.contains(c) || c.contains(e)); };
   for (const row of rows) {
-    const leaf = [...row.querySelectorAll('*')].find(e => e.childElementCount === 0 && (e.innerText || '').trim() === label);
+    const leaf = [...row.querySelectorAll('*')].filter(e => e.childElementCount === 0 && (e.innerText || '').trim() === label).find(onScreen);
     if (leaf) { (leaf.parentElement || leaf).click(); return 'ok'; } }
   return 'no-tab'; })(%s)"""
 
