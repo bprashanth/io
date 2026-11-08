@@ -485,6 +485,58 @@ SWITCH_CARD = ('Then call AskUserQuestion with one question: header "Progress", 
                'show_progress. ')
 
 
+PEEK_STATE = os.path.expanduser("~/idli-insights/config/peek-tabs.json")
+
+
+def _peek_url(fid, kind):
+    if kind == "Google Sheets":
+        return f"https://docs.google.com/spreadsheets/d/{fid}/preview"
+    if kind == "Google Docs":
+        return f"https://docs.google.com/document/d/{fid}/preview"
+    if kind == "Google Slides":
+        return f"https://docs.google.com/presentation/d/{fid}/preview"
+    return f"https://drive.google.com/file/d/{fid}/view"
+
+
+def t_file_peek(id, name=""):
+    """After the person said yes on the card: open the file read-only in a tab in this workspace and bring it
+    forward. One peek tab per workspace, reused for the next file."""
+    from lib import driveindex as di
+    from lib import uiswitch
+    kind, title = "", name
+    try:
+        row = di._read("SELECT name, kind FROM files WHERE id = ?", [id]) if os.path.exists(di.DB) else []
+        if row:
+            title, kind = title or row[0][0], row[0][1]
+    except Exception:
+        pass
+    url = _peek_url(id, kind)
+    ws = os.environ.get("PASEO_WORKSPACE_ID") or os.getcwd()
+    try:
+        with open(PEEK_STATE) as f:
+            state = json.load(f)
+    except (OSError, ValueError):
+        state = {}
+    open_ids = {t["id"] for t in tabs()}
+    tab = state.get(ws)
+    if tab in open_ids:
+        paseo("browser_navigate", browserId=tab, url=url)
+    else:
+        out = paseo("browser_new_tab", url=url)
+        m = re.search(r"browserId=(\S+)", out) or re.search(r'"browserId"\s*:\s*"([^"]+)"', out)
+        tab = m.group(1) if m else None
+        state[ws] = tab
+        os.makedirs(os.path.dirname(PEEK_STATE), exist_ok=True)
+        with open(PEEK_STATE, "w") as f:
+            json.dump(state, f)
+    time.sleep(1.5)
+    host = urllib.parse.urlparse(url).hostname
+    got = uiswitch.show_tab([f"{title}*" if title else host, host])
+    return {"opened": True, "shown": got["ok"], "say_to_user": (
+        f"It's open in the tab at the top (read only)." if got["ok"]
+        else f"It's open in a new tab at the top ({host}); click it to take a look (read only).")}
+
+
 def t_show_progress():
     """After the person said yes on the card: bring the drive-index progress tab to the front."""
     from lib import uiswitch
@@ -619,6 +671,10 @@ TOOLS = {
                    {"query": {"type": "string", "description": "The user's words for the file"}}, ["query"]),
     "drive_index": (t_drive_index, "Start indexing the user's Drive in the background (1-5 minutes, stays on this "
                     "computer). Only after the user agrees.", {}, []),
+    "file_peek": (t_file_peek, "Open a Drive file read-only in a tab in this workspace and bring that tab forward, "
+                  "so the user can take a quick look. Only after the user said yes on the card. Nothing is downloaded.",
+                  {"id": {"type": "string", "description": "The file id from drive_find"},
+                   "name": {"type": "string", "description": "The file name from drive_find"}}, ["id"]),
     "show_progress": (t_show_progress, "Bring the drive-index progress tab to the front. Only after the user said "
                       "yes on the card.", {}, []),
     "drive_index_status": (t_drive_index_status, "How far the Drive index has got.", {}, []),

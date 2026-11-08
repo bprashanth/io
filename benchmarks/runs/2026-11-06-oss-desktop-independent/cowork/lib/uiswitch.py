@@ -118,21 +118,25 @@ def _ws_eval(ws_url, expression, timeout=10):
         s.close()
 
 
-# Paseo keeps other workspaces' tab rows mounted but hidden: use the row that is on screen
-CLICK_TAB = """(label => { const rows = [...document.querySelectorAll('[data-testid="workspace-tabs-row"]')]
+# Paseo keeps other workspaces' tab rows mounted but hidden: use the row that is on screen. The row also holds an
+# off-screen copy of each label (for measuring): take the one actually on screen. A label matches if it equals, or
+# starts with, one of the candidates (a tab shows its host until it loads, then the page title); the newest wins.
+CLICK_TAB = """(labels => { const rows = [...document.querySelectorAll('[data-testid="workspace-tabs-row"]')]
     .filter(r => { const b = r.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
   if (!rows.length) return 'no-row';
-  // the row also holds an off-screen copy of each label (for measuring): take the one actually on screen
   const onScreen = e => { const r = e.getBoundingClientRect(); if (!r.width) return false;
     const c = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return c && (c === e || e.contains(c) || c.contains(e)); };
+  const fits = t => labels.some(l => t === l || (l.endsWith('*') && t.startsWith(l.slice(0, -1))));
   for (const row of rows) {
-    const leaf = [...row.querySelectorAll('*')].filter(e => e.childElementCount === 0 && (e.innerText || '').trim() === label).find(onScreen);
-    if (leaf) { (leaf.parentElement || leaf).click(); return 'ok'; } }
+    const hits = [...row.querySelectorAll('*')].filter(e => e.childElementCount === 0 && fits((e.innerText || '').trim())).filter(onScreen);
+    if (hits.length) { const leaf = hits[hits.length - 1]; (leaf.parentElement || leaf).click(); return 'ok'; } }
   return 'no-tab'; })(%s)"""
 
 
 def show_tab(label):
-    """Click the tab with this label in the workspace that's showing (dev builds only, see above)."""
+    """Click the tab with this label in the workspace that's showing (dev builds only, see above). label: a string or
+    a list of candidates; a candidate ending in * matches labels starting with it."""
+    labels = [label] if isinstance(label, str) else list(label)
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json", timeout=3) as r:
             pages = json.load(r)
@@ -142,7 +146,7 @@ def show_tab(label):
     if not page:
         return {"ok": False, "why": "app page not found"}
     try:
-        got = _ws_eval(page["webSocketDebuggerUrl"], CLICK_TAB % json.dumps(label))
+        got = _ws_eval(page["webSocketDebuggerUrl"], CLICK_TAB % json.dumps(labels))
     except (OSError, ValueError, ConnectionError, TimeoutError) as e:
         return {"ok": False, "why": f"{type(e).__name__}: {e}"[:120]}
     return {"ok": got == "ok", "why": None if got == "ok" else got}
