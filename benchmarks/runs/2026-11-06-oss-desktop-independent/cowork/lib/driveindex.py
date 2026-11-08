@@ -37,7 +37,8 @@ KINDS = ["Google Sheets", "Google Docs", "Google Slides", "Google Forms", "Googl
 ROWS_JS = ('() => { const out = []; const seen = {};'
            ' for (const e of document.querySelectorAll("[data-id]")) { const id = e.getAttribute("data-id");'
            '  if (id.length < 20 || seen[id]) continue; seen[id] = 1;'
-           '  out.push({id, label: (e.getAttribute("aria-label") || "").replace(/ More info.*$/, "")}); }'
+           '  out.push({id, label: (e.getAttribute("aria-label") || "").replace(/ More info.*$/, ""),'
+           '            text: (e.innerText || "").replace(/\\s+/g, " ").slice(0, 300)}); }'
            ' for (const x of document.querySelectorAll("*")) { if (x.scrollHeight > x.clientHeight + 50'
            '  && /auto|scroll/.test(getComputedStyle(x).overflowY)) x.scrollTop = x.scrollHeight; }'
            ' return JSON.stringify(out); }')
@@ -77,7 +78,8 @@ def connect(read_only=False):
     if not read_only:
         con.execute("""CREATE TABLE IF NOT EXISTS files (
             id VARCHAR PRIMARY KEY, name VARCHAR, kind VARCHAR, path VARCHAR, where_ VARCHAR,
-            peek VARCHAR, summary VARCHAR, indexed_at TIMESTAMP)""")
+            peek VARCHAR, summary VARCHAR, indexed_at TIMESTAMP, modified DATE)""")
+        con.execute("ALTER TABLE files ADD COLUMN IF NOT EXISTS modified DATE")
     return con
 
 
@@ -89,6 +91,38 @@ def parse_label(label):
         if label.endswith(" " + k):
             return label[: -len(k) - 1].strip(), k
     return label, "Unknown"
+
+
+MEDIA = ("Image", "Video", "Audio")
+_MON3 = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec"
+
+
+def parse_modified(text, today=None):
+    """Drive's list shows when a file was last modified: '7 Nov 2025', 'Nov 7, 2025', 'Nov 7' (this year) or
+    '10:01 AM' (today). Returns a date or None."""
+    t = today or dt.date.today()
+    s = (text or "").lower()
+    for pat, order in ((r"\b(\d{1,2}) (" + _MON3 + r")[a-z]* (\d{4})\b", "dmy"), (r"\b(" + _MON3 + r")[a-z]* (\d{1,2}),? (\d{4})\b", "mdy"),
+                       (r"\b(\d{1,2}) (" + _MON3 + r")[a-z]*\b", "dm"), (r"\b(" + _MON3 + r")[a-z]* (\d{1,2})\b", "md")):
+        m = re.search(pat, s)
+        if not m:
+            continue
+        g = m.groups()
+        try:
+            if order == "dmy":
+                return dt.date(int(g[2]), MONTHS3[g[1]], int(g[0]))
+            if order == "mdy":
+                return dt.date(int(g[2]), MONTHS3[g[0]], int(g[1]))
+            d = dt.date(t.year, MONTHS3[g[1] if order == "dm" else g[0]], int(g[0] if order == "dm" else g[1]))
+            return d if d <= t else d.replace(year=t.year - 1)
+        except ValueError:
+            continue
+    if re.search(r"\b\d{1,2}:\d{2}\s?(am|pm)?\b", s):
+        return t
+    return None
+
+
+MONTHS3 = {m: i for i, m in enumerate(_MON3.split("|"), 1)}
 
 
 def is_folder(kind):
@@ -158,7 +192,8 @@ def crawl(tabs, deadline, max_depth=10, max_files=5000):
                     if not name:
                         continue
                     if r["id"] not in found:
-                        found[r["id"]] = {"id": r["id"], "name": name, "kind": kind, "path": path, "where_": root}
+                        found[r["id"]] = {"id": r["id"], "name": name, "kind": kind, "path": path, "where_": root,
+                                          "modified": parse_modified((r.get("text") or "").replace(name, " ", 1))}
                     if is_folder(kind) and depth < max_depth and r["id"] not in opened:
                         queue.append((root, f"{path} / {name}", g.drive_url(f"folders/{r['id']}"), depth + 1, r["id"]))
             _write_state(phase="listing", files=len(found), folders_opened=len(opened), folders_left=len(queue))
@@ -211,7 +246,7 @@ def build(minutes=5.0, workers=5, muse_parallel=4):
     tabs = []
     try:
         for _ in range(max(1, workers)):
-            out = paseo("browser_new_tab", url="about:blank")
+            out = paseo("browser_new_tab", url="https://drive.google.com/drive/my-drive")
             m = re.search(r"browserId=(\S+)", out) or re.search(r'"browserId"\s*:\s*"([^"]+)"', out)
             if m:
                 tabs.append(m.group(1))
@@ -223,8 +258,8 @@ def build(minutes=5.0, workers=5, muse_parallel=4):
         now = dt.datetime.now()
         con.execute("DELETE FROM files")
         for f in files:
-            con.execute("INSERT INTO files VALUES (?, ?, ?, ?, ?, NULL, NULL, ?)",
-                        [f["id"], f["name"], f["kind"], f["path"], f["where_"], now])
+            con.execute("INSERT INTO files (id, name, kind, path, where_, indexed_at, modified) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        [f["id"], f["name"], f["kind"], f["path"], f["where_"], now, f.get("modified")])
         con.close()
         _write_state(phase="reading", files=len(files))
         todo = [f for f in files if f["kind"] in ("Google Sheets", "Google Docs")]
@@ -265,7 +300,9 @@ def build(minutes=5.0, workers=5, muse_parallel=4):
                 pass
     # Muse summaries, several batches at once (Muse serves 4 slots), while time remains; search works already
     _write_state(phase="summarising")
-    order = [f for f in sorted(files, key=lambda f: (0 if f.get("peek") else 1, f["kind"] == "Image")) if not is_folder(f["kind"])]
+    # media (photos, videos) and folders keep their metadata only: name, folder, date
+    order = [f for f in sorted(files, key=lambda f: 0 if f.get("peek") else 1)
+             if not is_folder(f["kind"]) and f["kind"] not in MEDIA]
     batches = [order[i:i + 12] for i in range(0, len(order), 12)]
     n = 0
     with cf.ThreadPoolExecutor(max(1, muse_parallel)) as ex:
@@ -345,16 +382,24 @@ def search(query, limit=5):
     if not os.path.exists(DB):
         return {"status": "no_index", "results": []}
     con = connect(read_only=True)
-    rows = con.execute("SELECT id, name, kind, path, coalesce(peek, ''), coalesce(summary, '') FROM files").fetchall()
+    rows = con.execute("SELECT id, name, kind, path, coalesce(peek, ''), coalesce(summary, ''), modified FROM files").fetchall()
     con.close()
     if not rows:
         return {"status": "no_index", "results": []}
-    qt = [t for t in _tokens(query) if t not in STOP and t not in KIND_WORDS and len(t) > 1]
+    from lib.formkit import parse_when
+    when = parse_when(query)
+    date_words = set(MONTHS3) | {m for m in ("january", "february", "march", "april", "june", "july", "august",
+                                             "september", "october", "november", "december", "sept")} | \
+        {"last", "this", "month", "year", "week", "quarter", "days", "since", "before", "after", "ago", "fy"}
+    qt = [t for t in _tokens(query) if t not in STOP and t not in KIND_WORDS and len(t) > 1
+          and not (when and t in date_words)]
     want = {KIND_WORDS[t] for t in _tokens(query) if t in KIND_WORDS}
-    if not qt:
+    if not qt and not when:
         return {"status": "none", "results": [], "why": "no searchable words"}
     scored = []
-    for fid, name, kind, path, pk, summ in rows:
+    lo = dt.date.fromisoformat(when[0]) if when and when[0] else None
+    hi = dt.date.fromisoformat(when[1]) if when and when[1] else None
+    for fid, name, kind, path, pk, summ, modified in rows:
         nt, pt, ct = _tokens(name), _tokens(path), _tokens(pk + " " + summ)
         s, why = 0.0, []
         for q in qt:
@@ -363,13 +408,19 @@ def search(query, limit=5):
             s += best
             if best >= 0.5:
                 why.append(f"'{q}' in {'name' if best == a else 'folder' if best == b * 0.6 else 'contents'}")
-        s /= len(qt)
+        s = s / len(qt) if qt else 0.5
+        if when:
+            inside = modified is not None and (lo is None or modified >= lo) and (hi is None or modified <= hi)
+            s += 0.25 if inside else -0.2
+            if inside:
+                why.append(f"modified {modified.isoformat()}")
         if want:
             fam = _kind_family(kind)
             s += 0.08 if fam in want else (-0.3 if fam == "folder" else -0.05)
         if s > 0.15:
             scored.append((round(min(s, 1.0), 2), {"id": fid, "name": name, "kind": kind, "folder": path,
-                                                   "about": (summ or pk)[:160], "why": ", ".join(why)}))
+                                                   "about": (summ or pk)[:160], "why": ", ".join(why),
+                                                   "modified": modified.isoformat() if modified else None}))
     scored.sort(key=lambda x: -x[0])
     top = [dict(r, score=s) for s, r in scored[:limit]]
     if not top or top[0]["score"] < 0.35:

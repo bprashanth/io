@@ -24,6 +24,7 @@ os.environ["MUSE_URL"] = "http://127.0.0.1:9"  # summaries fail fast: the index 
 # ---------------------------------------------------------------- the fake Drive
 TREE = {}  # folder id -> list of (id, label)
 PEEKS = {}  # file id -> peek text (sheets: gviz rows, docs: paragraphs)
+MODIFIED = {}  # file id -> what Drive's list shows in the "Last modified" column
 
 
 def fid(n):
@@ -33,9 +34,10 @@ def fid(n):
 counter = [0]
 
 
-def new(label, folder, peek=None):
+def new(label, folder, peek=None, modified="3 Mar 2025"):
     counter[0] += 1
     i = fid(counter[0])
+    MODIFIED[i] = modified
     TREE.setdefault(folder, []).append((i, label))
     if peek is not None:
         PEEKS[i] = peek
@@ -67,6 +69,11 @@ new("Bikapathymund plot register Google Sheets", sh,
 TREE[ROOT].append((sh, "[Shared] Bikapathymund experiment Shared folder"))  # also added to My Drive
 new("Volunteer register Google Sheets", ROOT, [["Volunteer name", "District", "Stipend"], ["Asha", "Pune", "300"]])
 new("Broken sheet Google Sheets", ROOT, RuntimeError("boom"))  # peeking it fails
+ev = new("Events Folder", ROOT)
+KOL_DEC = new("Kolkata volunteer meetup group photo.jpg Image", ev, modified="14 Dec 2025")
+new("Kolkata volunteer meetup stage.jpg Image", ev, modified="Oct 5, 2025")
+new("Pune volunteer meetup.jpg Image", ev, modified="15 Dec 2025")
+new("Kolkata meetup video.mp4 Video", ev, modified="13 Dec 2025")
 
 URLS = {}  # current url per tab
 SCROLLS = {}  # how far each tab has "scrolled"
@@ -102,7 +109,7 @@ def fake_evaluate(tab, js):
     rows = TREE.get(f, [])
     shown = rows[: 50 * SCROLLS[tab]]  # lazy list: 50 more rows each time it is scrolled
     SCROLLS[tab] += 1
-    return [{"id": i, "label": label} for i, label in shown]
+    return [{"id": i, "label": label, "text": f"{label.split(' ')[0]} me {MODIFIED.get(i, '')}"} for i, label in shown]
 
 
 browser = types.ModuleType("lib.browser")
@@ -143,7 +150,7 @@ di.build(minutes=2, workers=5)
 took = time.time() - t0
 st = di.status()
 con = di.connect(read_only=True)
-rows = {r[0]: r for r in con.execute("SELECT id, name, kind, path, where_, peek FROM files").fetchall()}
+rows = {r[0]: r for r in con.execute("SELECT id, name, kind, path, where_, peek, modified FROM files").fetchall()}
 con.close()
 ok(st["phase"] == "done", f"build finishes ({took:.1f}s, phase {st['phase']})")
 ok(DEEPEST in rows, "finds a file 9 folders down")
@@ -155,6 +162,9 @@ sheet = next(r for r in rows.values() if r[1] == "Bikapathymund plot register")
 ok("Species" in (sheet[5] or ""), "peeks inside a Google Sheet (first rows)")
 ok(next(r for r in rows.values() if r[1] == "Broken sheet")[5].startswith("(not read"), "an unreadable file doesn't stop the index")
 ok(st.get("summarised") == 0, "no Muse: summaries skipped, index still usable")
+ok(str(rows[KOL_DEC][6]) == "2025-12-14", "keeps Drive's modified date")
+media = [r for r in rows.values() if r[2] in ("Image", "Video")]
+ok(all(not r[5] for r in media), "photos and videos: metadata only, nothing read")
 ok(not URLS, "closes its own tabs")
 
 for words, want, status in [
@@ -166,6 +176,8 @@ for words, want, status in [
         ("cestrum", None, "choose"),
         ("untitled document", None, "choose"),
         ("quarterly tax filing for 2019", None, "none"),
+        ("event in december in kolkata", None, "choose"),
+        ("kolkata meetup photos in december", "Kolkata volunteer meetup group photo.jpg", None),
 ]:
     r = di.search(words)
     names = [x["name"] for x in r["results"]]
