@@ -91,7 +91,9 @@ def form_url(file, tab=None, spec=None):
         q["tab"] = tab
     if spec:
         q["spec"] = json.dumps(spec, separators=(",", ":"))
-    return f"http://127.0.0.1:{port}/?" + urllib.parse.urlencode(q)
+    # *.localhost reaches this computer; the tab reads "dashboard.localhost" until it loads (then the file's title),
+    # instead of a bare 127.0.0.1 nobody recognises
+    return f"http://dashboard.localhost:{port}/?" + urllib.parse.urlencode(q)
 
 
 def _show(url, file):
@@ -99,7 +101,7 @@ def _show(url, file):
     try:
         from lib.browser import paseo, tabs
         port = urllib.parse.urlparse(url).port
-        mine = [t for t in tabs() if f"127.0.0.1:{port}/" in t["url"]
+        mine = [t for t in tabs() if (f"127.0.0.1:{port}/" in t["url"] or f"localhost:{port}/" in t["url"])
                 and urllib.parse.parse_qs(urllib.parse.urlparse(t["url"]).query).get("file", [""])[0] == file]
         if mine:
             paseo("browser_navigate", browserId=mine[0]["id"], url=url)
@@ -319,7 +321,28 @@ def t_file_open(file, show_form=True):
         out["then"] = ("For a question about this file, call file_ask with a spec built only from these tabs' measures, "
                        "group_by, filters and presets. Ask the user if a value is unclear. If no measure or filter fits "
                        "the question, offer teach_file.")
+        if shown:
+            out["card"] = {"questions": [{"header": "Dashboard", "multiSelect": False,
+                                          "question": f"The dashboard for {meta['title']} is open in a tab. Switch to it?",
+                                          "options": [{"label": "Yes, show it", "description": "Pick what to see with "
+                                                       "tick-boxes and dropdowns; answers show there too"},
+                                                      {"label": "Stay here", "description": "Ask me in the chat"}]}]}
+            out["then"] = ("Call AskUserQuestion with exactly `card` (don't write anything first); on \"Yes, show it\" "
+                           "call show_dashboard. Then: " + out["then"])
     return out
+
+
+def t_show_dashboard(file=None):
+    """After the person said yes on the card: bring the file's dashboard tab to the front."""
+    from lib import uiswitch
+    title = ""
+    if file:
+        try:
+            title = files().meta(file)["title"]
+        except Exception:
+            pass
+    got = uiswitch.show_tab(([f"{title} - dashboard*"] if title else []) + ["dashboard.localhost", "Dashboard"])
+    return {"shown": True} if got["ok"] else {"shown": False, "say_to_user": "Click the dashboard tab at the top."}
 
 
 def t_file_ask(file, spec, tab=None):
@@ -497,6 +520,8 @@ TOOLS = {
                   "anything about a spreadsheet.", {**FILE, "show_form": {"type": "boolean",
                                                                           "description": "Open the form tab (default true)"}},
                   ["file"]),
+    "show_dashboard": (t_show_dashboard, "Bring the file's dashboard (form) tab to the front. Only after the user "
+                       "said yes on the card.", {"file": {"type": "string", "description": "The file from file_open"}}, []),
     "file_ask": (t_file_ask, "Answer a question about an opened file by filling its form. The numbers come from the "
                  "data, never from you; the form tab shows the same answer.",
                  {**FILE, "spec": SPEC, "tab": {"type": "string", "description": "Tab name from file_open (default: "
