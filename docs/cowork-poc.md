@@ -185,3 +185,15 @@ you control the app:
 - The laptop has no disk space for models. Serve models on the DGX.
 - Commits are `declaude`d before they go to GitHub. Pushing is the owner's call.
 - Write a chronology entry before you stop (see agent-handoff.md).
+
+### 2026-11-09, DGX: cards before switching views
+
+When Idli wants the person somewhere else, it asks first with a yes/no card, and switches only on yes. Two places:
+after "yes, index my Drive" ("Switch to the progress tab to watch it?"), and when teaching starts ("Opening Claude to
+teach this file. Switch there now?"), with Claude asking "Go back to Idli?" when teaching is done. Switching to a
+chat in another workspace uses Paseo's own deep link (`paseo://h/<server>/agent/<id>`, handed to the running app by
+launching it again), so it works in a normal install. Browser tabs have no deep link, so the progress tab is
+clicked through the DevTools port for now (dev only; Paseo patch P7). Measured on the 30B: card 23 s after
+"rebuild index", yes brought the progress tab forward, and the chat carried on waiting for the index. The teaching
+round trip is wired but not yet run end to end.
+
