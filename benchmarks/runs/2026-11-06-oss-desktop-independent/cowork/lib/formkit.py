@@ -91,7 +91,7 @@ def column_kinds(spec, df):
             if k == "category" and (norm.get(s) or {}).get("case"):
                 kind = "category"
         if kind in ("email", "phone"):
-            kind = "text"
+            kind = "contact"  # searchable, never a breakdown
         out[s] = {"kind": kind, "label": info.get("label") or c, "header": c, "meaning": info.get("meaning", "")}
     return out
 
@@ -230,7 +230,9 @@ def form(con, skill, tab, built):
         if c in hidden:
             continue
         f = {"column": c, "label": k["label"], "kind": k["kind"]}
-        if k["kind"] in ("category", "text"):
+        if k["kind"] == "contact":
+            f["kind"] = "contains"
+        elif k["kind"] in ("category", "text"):
             vals = con.execute(f'SELECT "{c}", count(*) FROM "{b["table"]}" WHERE "{c}" IS NOT NULL GROUP BY 1 '
                                f'ORDER BY 2 DESC, 1 LIMIT 501').fetchall()
             if k["kind"] == "category" or len(vals) <= 60:
