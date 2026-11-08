@@ -204,12 +204,12 @@ def t_gmail_draft_reply(text):
                       "the user reviews and sends it themselves."}
 
 
-def t_drive_search(query):
+def t_drive_search(query, max_wait=8):
     tab = tab_for("drive.google.com", "docs.google.com", open_url=drive_url())
     paseo("browser_navigate", browserId=tab,
           url=drive_url("search?q=" + urllib.parse.quote_plus(query)))
     files = []
-    for _ in range(8):
+    for _ in range(max(1, int(max_wait))):
         time.sleep(1)
         snap_url = next((t["url"] for t in tabs() if t["id"] == tab), "")
         if "accounts.google.com" in snap_url:
@@ -483,20 +483,36 @@ def t_drive_find(query):
         r["then"] = "If they agree, call drive_index. If not, use drive_search."
         return r
     if r["status"] in ("none", "choose") and (r["status"] == "none" or r["results"][0]["score"] < 0.6):
-        # Drive's own search reads the full text of every file (the index only has names, folders, dates and
-        # first rows). One live search with the user's distinctive words, never a string of retries.
+        # Drive's own search reads the full text of every file (the index has names, folders, dates and first
+        # rows). Drive matches all words, so try the two most distinctive words one at a time, briefly, once.
         from lib.driveindex import KIND_WORDS, STOP, _tokens
-        words = " ".join(t for t in _tokens(query) if t not in STOP and t not in KIND_WORDS)
-        if words:
+        dates = {"january", "february", "march", "april", "june", "july", "august", "september", "october", "november",
+                 "december", "last", "this", "month", "year", "week"}
+        words = sorted({t for t in _tokens(query) if t not in STOP and t not in KIND_WORDS and t not in dates
+                        and len(t) >= 4 and not t.isdigit()}, key=len, reverse=True)[:2]
+        hits, missed = [], []
+        for w in words:
             try:
-                live = t_drive_search(words).get("files", [])[:5]
+                live = t_drive_search(w, max_wait=4).get("files", [])[:4]
             except Exception:
                 live = []
-            if live:
-                r["drive_search"] = {"words": words, "files": live}
-                r["status"] = "found" if len(live) == 1 else "choose"
-                r["results"] = [{"id": f["id"], "name": f["name"], "kind": f["type"], "folder": "(Drive search: "
-                                 "matched inside the file)", "score": None} for f in live]
+            (hits.extend((w, f) for f in live) if live else missed.append(w))
+        if hits:
+            seen, res = set(), []
+            for w, f in hits:
+                if f["id"] not in seen:
+                    seen.add(f["id"])
+                    res.append({"id": f["id"], "name": f["name"], "kind": f["type"], "folder": f"(contains '{w}')",
+                                "score": None})
+            r.update(status="choose", results=res[:5], drive_search={"matched": sorted({w for w, _ in hits}),
+                                                                     "no_file_mentions": missed})
+            r["say_to_user"] = (("No file mentions " + ", ".join(f"'{m}'" for m in missed) + ". " if missed else "")
+                                + "Ask whether it's one of these (the word each contains is in 'folder'), in one short "
+                                  "message.")
+            r["then"] = "Don't search again unless they give new words."
+            r["ms"] = int((time.time() - t0) * 1000)
+            return r
+        r["drive_search"] = {"no_file_mentions": missed}
     if r["status"] == "found":
         best = r["results"][0]
         r["then"] = (f"Tell the user you found '{best['name']}' ({best['kind']}, in {best['folder']}). For a spreadsheet, "
