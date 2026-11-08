@@ -83,6 +83,21 @@ def connect(read_only=False):
     return con
 
 
+def _read(sql, tries=20):
+    """Read the index, waiting briefly if the builder holds DuckDB's write lock (it writes in short bursts)."""
+    for i in range(tries):
+        try:
+            con = connect(read_only=True)
+            try:
+                return con.execute(sql).fetchall()
+            finally:
+                con.close()
+        except Exception as e:
+            if "lock" not in str(e).lower() or i == tries - 1:
+                raise
+            time.sleep(0.25)
+
+
 # ---------------------------------------------------------------- parsing what Drive shows
 def parse_label(label):
     """'volunteer_register Google Sheets' -> ('volunteer_register', 'Google Sheets')."""
@@ -381,9 +396,7 @@ def search(query, limit=5):
     """Rank indexed files for the user's words. Returns {"status": found|choose|none|no_index, "results": [...]}."""
     if not os.path.exists(DB):
         return {"status": "no_index", "results": []}
-    con = connect(read_only=True)
-    rows = con.execute("SELECT id, name, kind, path, coalesce(peek, ''), coalesce(summary, ''), modified FROM files").fetchall()
-    con.close()
+    rows = _read("SELECT id, name, kind, path, coalesce(peek, ''), coalesce(summary, ''), modified FROM files")
     if not rows:
         return {"status": "no_index", "results": []}
     from lib.formkit import parse_when
@@ -433,9 +446,7 @@ def rarity(words):
     """How many indexed files mention each word (name, folder, first rows, summary): rarer words say more."""
     if not os.path.exists(DB):
         return {w: 0 for w in words}
-    con = connect(read_only=True)
-    rows = con.execute("SELECT name || ' ' || path || ' ' || coalesce(peek, '') || ' ' || coalesce(summary, '') FROM files").fetchall()
-    con.close()
+    rows = _read("SELECT name || ' ' || path || ' ' || coalesce(peek, '') || ' ' || coalesce(summary, '') FROM files")
     docs = [set(_tokens(r[0])) for r in rows]
     return {w: sum(1 for d in docs if any(t == w or (len(w) >= 5 and t.startswith(w)) for t in d)) for w in words}
 
