@@ -211,3 +211,21 @@ round trip is wired but not yet run end to end.
   match ("field" for "fieldvars"). Search check after the fixes: 23 of 25 right first with today's index, same as
   the vector index.
 
+### 2026-11-09, DGX: from problems to fixes; gaps go to Claude and back
+
+- A question the dashboard can't answer (here: sheet row numbers) now goes to Claude with a card, not a paste-in
+  gap report: Idli sends the fake copy plus what was missing, switches to Claude, Claude extends the skill (one
+  card: "add row numbers"), and on "back to Idli" the watcher outside Claude's sandbox switches the app and Idli
+  reruns the question. Ran end to end on Muse + Claude.
+- Problems became fixes. Each problem has its real cell (blank rows and columns count, as in the sheet), and
+  either a suggested fix (approx 12 -> 12, "pending" -> blank, a date in another format, a code one typo away
+  from the list) or a note saying what a person must check. Accept/reject per fix in the dashboard; "Save fix
+  list" writes the list and a fixed copy of the original with each changed cell commented. The checked copy has
+  a comment on every problem cell. Nothing is written to the person's Drive.
+- Layout: rows that repeat the headings are skipped (49 in the cestrum file, which had 439 problems; now 196),
+  sub-headings and totals rows are suggested skips, and Claude sees them in the fake copy and discusses them in
+  teach mode (skip, or a cleaner layout for their next version; their choice). A code missing from the list that
+  recurs (UKS1, Fern) gets "add it to the list if your team uses it" rather than a typo guess.
+- Not done: links straight to a cell in Google (needs each tab's id; clicking tabs to read them was unreliable),
+  and comments on the live Google Sheet (a write; the person's call).
+
