@@ -714,11 +714,13 @@ def t_drive_find(query):
             r["preview"] = pv
         r["then"] = (f"If the user asked about what's inside or to analyse it (numbers, totals, who, how many, a "
                      f"dashboard): call file_get with link '{best['id']}' now. Otherwise (find, open, see, show; any kind "
-                     f"of file): " + (f"first write this line exactly as it is (it shows a picture of the first rows): {pv}  -- then "
-                                   if pv else "")
-                     + f"call AskUserQuestion with one question, header \"File\", question \"Found {best['name']} in "
-                     f"{best['folder']}. Open it here to take a look?\", options \"Yes, open it\" and \"No\"; on yes "
+                     f"of file): call AskUserQuestion with exactly `card` (don't write anything first); on \"Yes, open it\" "
                      f"call file_peek with id '{best['id']}' and name '{best['name']}'. Don't download.")
+        r["card"] = {"questions": [{"header": "File", "multiSelect": False,
+                                    "question": (pv + "\n\n" if pv else "") + f"Found {best['name']} in {best['folder']}. "
+                                                "Open it here to take a look?",
+                                    "options": [{"label": "Yes, open it", "description": "Read only, in a tab here"},
+                                                {"label": "No", "description": "Leave it closed"}]}]}
     elif r["status"] == "choose":
         r["say_to_user"] = "Ask which one they mean, listing these (name, kind, folder) in one short message."
         r["then"] = "Don't search again unless they give new words."
