@@ -481,7 +481,23 @@ def t_drive_find(query):
         r["say_to_user"] = ("I haven't indexed your Drive yet, so finding files is slow. Can I take 1 to 5 minutes to "
                             "index it? It stays on this computer.")
         r["then"] = "If they agree, call drive_index. If not, use drive_search."
-    elif r["status"] == "found":
+        return r
+    if r["status"] in ("none", "choose") and (r["status"] == "none" or r["results"][0]["score"] < 0.6):
+        # Drive's own search reads the full text of every file (the index only has names, folders, dates and
+        # first rows). One live search with the user's distinctive words, never a string of retries.
+        from lib.driveindex import KIND_WORDS, STOP, _tokens
+        words = " ".join(t for t in _tokens(query) if t not in STOP and t not in KIND_WORDS)
+        if words:
+            try:
+                live = t_drive_search(words).get("files", [])[:5]
+            except Exception:
+                live = []
+            if live:
+                r["drive_search"] = {"words": words, "files": live}
+                r["status"] = "found" if len(live) == 1 else "choose"
+                r["results"] = [{"id": f["id"], "name": f["name"], "kind": f["type"], "folder": "(Drive search: "
+                                 "matched inside the file)", "score": None} for f in live]
+    if r["status"] == "found":
         best = r["results"][0]
         r["then"] = (f"Tell the user you found '{best['name']}' ({best['kind']}, in {best['folder']}). For a spreadsheet, "
                      f"call file_get with link '{best['id']}' next.")

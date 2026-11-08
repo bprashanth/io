@@ -205,7 +205,7 @@ def peek(tab, f):
     from lib.browser import paseo, snapshot
     from sites.google import tools as g
     try:
-        if f["kind"] == "Google Sheets":
+        if f["kind"] in ("Google Sheets", "Microsoft Excel"):  # Google's quick view reads uploaded Excel files too
             paseo("browser_navigate", browserId=tab,
                   url=g.sheets_url(f["id"], "gviz/tq?tqx=out:html&tq=" + urllib.request.quote("select * limit 6")))
             snap = snapshot(tab, lambda s: "- table" in s or "Error" in s[:400], tries=5)
@@ -262,7 +262,7 @@ def build(minutes=5.0, workers=5, muse_parallel=4):
                         [f["id"], f["name"], f["kind"], f["path"], f["where_"], now, f.get("modified")])
         con.close()
         _write_state(phase="reading", files=len(files))
-        todo = [f for f in files if f["kind"] in ("Google Sheets", "Google Docs")]
+        todo = [f for f in files if f["kind"] in ("Google Sheets", "Microsoft Excel", "Google Docs")]
         done = 0
         with cf.ThreadPoolExecutor(len(tabs)) as ex:
             free = list(tabs)
