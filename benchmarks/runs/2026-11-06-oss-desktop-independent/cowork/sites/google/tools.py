@@ -653,8 +653,11 @@ def t_drive_find(query):
         return r
     if r["status"] == "found":
         best = r["results"][0]
-        r["then"] = (f"Tell the user you found '{best['name']}' ({best['kind']}, in {best['folder']}). For a spreadsheet, "
-                     f"call file_get with link '{best['id']}' next.")
+        r["then"] = (f"If the user asked a question about what's inside (numbers, totals, who, how many): call file_get "
+                     f"with link '{best['id']}' now. Otherwise (find, open, see, show; any kind of file): call "
+                     f"AskUserQuestion with one question, header \"File\", question \"Found {best['name']} in "
+                     f"{best['folder']}. Open it here to take a look?\", options \"Yes, open it\" and \"No\"; on yes call "
+                     f"file_peek with id '{best['id']}' and name '{best['name']}'. Don't download.")
     elif r["status"] == "choose":
         r["say_to_user"] = "Ask which one they mean, listing these (name, kind, folder) in one short message."
         r["then"] = "Don't search again unless they give new words."
