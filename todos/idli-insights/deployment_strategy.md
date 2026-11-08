@@ -5,7 +5,8 @@ and open it for the first time, and what has to work with no help. A running lis
 become true on a clean machine, add new ones as the walkthroughs find them.
 
 Today's prototype of the first-run step: `benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/desktop/idli-bootstrap.py`
-(safe to rerun), started by `desktop/idli-launch.sh`. Paseo changes we depend on: [paseo_patches.md](paseo_patches.md).
+(safe to rerun), started by `desktop/idli-launch.sh`. On the laptop an "Idli" app-menu entry
+(`~/.local/share/applications/idli.desktop`) runs the launcher; the plain Paseo entry skips the bootstrap. Paseo changes we depend on: [paseo_patches.md](paseo_patches.md).
 
 ## What the person sees on first open
 
