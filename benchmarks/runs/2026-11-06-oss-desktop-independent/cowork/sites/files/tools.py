@@ -253,6 +253,8 @@ def t_file_get(link, wait_seconds=45):
     dest = os.path.join(out_dir, name + os.path.splitext(got)[1])
     if os.path.realpath(got) != os.path.realpath(dest):
         shutil.copy2(got, dest)
+    with open(dest + ".source.json", "w") as f:
+        json.dump({"id": fid, "url": (g.sheets_url(fid, "edit") if sheet else f"https://drive.google.com/file/d/{fid}/view")}, f)
     _last_get.pop(fid, None)
     rel = os.path.relpath(dest, sh.data_dir())
     return {"downloaded": True, "file": rel, "title": title or name,

@@ -8,6 +8,7 @@ every request needs the token written to <data dir>/.idli/form-server.json (mode
     python -I -m lib.formserver <data dir>     (started on demand by the files site's file_form tool)
 """
 import json
+import re
 import os
 import secrets
 import sys
@@ -71,20 +72,114 @@ class Files:
             self.cache[rel] = entry
             return entry
 
+    # ---- suggested fixes: the person accepts or rejects each one; nothing touches the original file
+    def _decisions_path(self, rel):
+        name = os.path.splitext(os.path.basename(self.resolve(rel)))[0]
+        return os.path.join(self.data_dir, "checked", f"{name}.decisions.json")
+
+    def decisions(self, rel):
+        try:
+            with open(self._decisions_path(rel)) as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    def decide(self, rel, keys, decision):
+        d = self.decisions(rel)
+        for k in keys:
+            if decision in ("accept", "reject"):
+                d[k] = decision
+            else:
+                d.pop(k, None)
+        os.makedirs(os.path.dirname(self._decisions_path(rel)), exist_ok=True)
+        with open(self._decisions_path(rel), "w") as f:
+            json.dump(d, f, indent=1)
+        return {"ok": True, "accepted": sum(v == "accept" for v in d.values()), "rejected": sum(v == "reject" for v in d.values())}
+
+    @staticmethod
+    def pkey(p):
+        return f"{p['tab']}|{p.get('cell')}|{p.get('rule')}"
+
+    def source(self, rel):
+        try:
+            with open(self.resolve(rel) + ".source.json") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+
+    def fixlist(self, rel):
+        """Write '<name> - fixes.xlsx' (the accepted fixes, cell by cell) and, for Excel files, '<name> - fixed.xlsx':
+        the original with accepted fixes applied at the same cells (formatting kept), each changed cell commented
+        with its old value, and accepted skipped rows removed. The original is never touched."""
+        from openpyxl import Workbook, load_workbook
+        from openpyxl.comments import Comment
+        from openpyxl.utils.cell import coordinate_from_string
+        e = self.open(rel)
+        d = self.decisions(rel)
+        acc = [p for p in e["problems"] if d.get(self.pkey(p)) == "accept" and p.get("suggestion")]
+        name = os.path.splitext(os.path.basename(e["path"]))[0]
+        out_dir = os.path.join(self.data_dir, "checked")
+        os.makedirs(out_dir, exist_ok=True)
+        src = self.source(rel) or {}
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Fix list"
+        ws.append(["Tab", "Cell", "Was", "Change to", "Why", "Open"])
+        for p in acc:
+            sg = p["suggestion"]
+            to = "(delete the row)" if sg.get("action") == "skip_row" else ("(blank)" if sg.get("to") == "" else sg.get("to"))
+            ws.append([p["tab"], p.get("cell"), p["value"], to, sg.get("why"), src.get("url") or ""])
+        fixes = os.path.join(out_dir, f"{name} - fixes.xlsx")
+        wb.save(fixes)
+        fixed = None
+        if e["path"].lower().endswith(".xlsx"):
+            book = load_workbook(e["path"])
+            drop = {}
+            for p in acc:
+                if p["tab"] not in book.sheetnames or not p.get("cell"):
+                    continue
+                sh = book[p["tab"]]
+                sg = p["suggestion"]
+                col, row = coordinate_from_string(p["cell"])
+                if sg.get("action") == "skip_row":
+                    drop.setdefault(p["tab"], set()).add(row)
+                elif sg.get("to") is not None:
+                    c = sh[p["cell"]]
+                    new = sg["to"]
+                    num = fk.as_number(new) if new else None
+                    c.value = num if num is not None and re.fullmatch(r"-?\d+(\.\d+)?", new) else (new or None)
+                    c.comment = Comment(f"Idli: was '{p['value']}'. {sg.get('why', '')}", "Idli")
+            for tab, rows in drop.items():
+                for r in sorted(rows, reverse=True):
+                    book[tab].delete_rows(r)
+            fixed = os.path.join(out_dir, f"{name} - fixed.xlsx")
+            book.save(fixed)
+        rel_ = lambda x: os.path.relpath(x, self.data_dir) if x else None
+        return {"fixes": len(acc), "fix_list": rel_(fixes), "fixed_copy": rel_(fixed)}
+
     def meta(self, rel):
         e = self.open(rel)
         title = os.path.splitext(os.path.basename(e["path"]))[0]
         if not e["skill"]:
             return {"file": rel, "title": title, "known": False, "overlap": e["score"],
                     "sheets": {n: {"rows": len(df), "columns": list(df.columns)} for n, df in e["sheets"].items()}}
-        groups = {}
+        groups, skipped = {}, {}
+        dec = self.decisions(rel)
         for p in e["problems"]:
+            if p.get("skipped"):
+                k = skipped.setdefault(p["tab"], {}).setdefault(p["problem"], [])
+                k.append(p["row"])
+                continue
             g = groups.setdefault(p["tab"], {}).setdefault((p["column"], p["problem"]),
                                                            {"column": p["column"], "problem": p["problem"], "rows": []})
-            g["rows"].append({"row": p["row"], "value": p["value"]})
+            g["rows"].append({"row": p["row"], "value": p["value"], "cell": p.get("cell"), "key": self.pkey(p),
+                              "suggestion": p.get("suggestion"), "decision": dec.get(self.pkey(p))})
+        real = [p for p in e["problems"] if not p.get("skipped")]
         return {"file": rel, "title": e["skill"].get("title") or title, "known": True,
                 "skill": {"id": e["skill"]["id"], "version": e["skill"].get("version", 1)},
-                "contract": e["contract"], "checked_copy": e["checked"], "problem_count": len(e["problems"]),
+                "contract": e["contract"], "checked_copy": e["checked"], "problem_count": len(real),
+                "source": self.source(rel),
+                "skipped": {t: [{"why": w, "rows": r} for w, r in v.items()] for t, v in skipped.items()},
                 "problems": {t: list(v.values()) for t, v in groups.items()},
                 "hidden_cells": e.get("hidden"),
                 "tabs": [dict(fm.public(f), rows=len(e["built"][t]["df"])) for t, f in e["forms"].items()]}
@@ -165,6 +260,10 @@ def make_handler(files, token):
                 body = json.loads(self.rfile.read(min(n, 100000)) or b"{}")
                 if u.path == "/api/run":
                     return self._send(200, files.run(body["file"], body.get("tab"), body.get("spec") or {}))
+                if u.path == "/api/decide":
+                    return self._send(200, files.decide(body["file"], list(body["keys"]), body.get("decision")))
+                if u.path == "/api/fixlist":
+                    return self._send(200, files.fixlist(body["file"]))
             except fm.SpecError as e:
                 return self._send(400, {"error": str(e)})
             except (ValueError, KeyError) as e:

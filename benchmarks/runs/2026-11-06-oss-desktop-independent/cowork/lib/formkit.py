@@ -105,7 +105,7 @@ def _clean_view(con, df, spec, name, header_row=None):
     d = df.copy()
     d.columns = [fk.slug(c) for c in d.columns]
     if header_row is not None:  # the spreadsheet row each record came from (as the checks number them)
-        d["_row"] = [header_row + 1 + i for i in range(len(d))]
+        d["_row"] = [fk.sheet_row(df, i, header_row) for i in range(len(d))]
     con.register(name + "_raw", d)
     cols, norm = spec.get("columns") or {}, spec.get("normalize") or {}
     sel = []
@@ -144,7 +144,8 @@ def build(con, path, skill, base):
         if sheet is None:
             continue
         name = table_name(base, tab, many)
-        _clean_view(con, sheets[sheet], spec, name, hdr[sheet])
+        from lib import fixkit
+        _clean_view(con, fixkit.keep_rows(sheets[sheet], spec), spec, name, hdr[sheet])
         out[tab] = {"table": name, "sheet": sheet, "df": sheets[sheet], "header_row": hdr[sheet]}
     for tab, spec in tabs.items():
         if tab not in out:
@@ -766,15 +767,18 @@ def check(path, skill, out_dir):
     per check, problem cells in red, and a Problems sheet. The original is never touched.
     Returns (problems, out_path); a problem is {"tab", "row", "column", "value", "problem"}."""
     from openpyxl import Workbook
+    from openpyxl.comments import Comment
     from openpyxl.styles import Font, PatternFill
     from openpyxl.utils import get_column_letter
 
+    from lib import fixkit
     sheets, hdr = fk.raw_sheets(path)
     m = map_tabs(skill, sheets)
     problems = []
     wb = Workbook()
     wb.remove(wb.active)
     red = PatternFill("solid", fgColor="F8D7DA")
+    grey = PatternFill("solid", fgColor="E9ECEF")
     for tab, spec in tabs_of(skill).items():
         sheet = m[tab][0]
         if sheet is None:
@@ -782,19 +786,44 @@ def check(path, skill, out_dir):
         df = sheets[sheet]
         by_slug = {fk.slug(c): c for c in df.columns}
         rules = [r for r in spec.get("validations") or [] if r.get("column") in by_slug and r.get("rule") in fk.RULES]
-        bad = set()
+        bad, notes = set(), {}
+        layout = fixkit.layout_rows(df)
+        skipped = set(fixkit.skip_kinds(spec))
+        for i, kind in layout.items():  # one note per layout row, not one per cell in it
+            row = fk.sheet_row(df, i, hdr[sheet])
+            first = next((c for c in df.columns if str(df.iloc[i][c]).strip()), df.columns[0])
+            preview = " | ".join(str(v) for v in df.iloc[i] if str(v).strip())[:80]
+            if kind in skipped:
+                problems.append({"tab": sheet, "row": row, "column": "(whole row)", "value": preview, "rule": "layout",
+                                 "kind": kind, "cell": fk.cell_ref(df, i, first, hdr[sheet]), "skipped": True,
+                                 "problem": fixkit.LAYOUT_WHY[kind] + " Skipped: not counted in answers.",
+                                 "suggestion": None})
+            else:
+                problems.append({"tab": sheet, "row": row, "column": "(whole row)", "value": preview, "rule": "layout",
+                                 "kind": kind, "cell": fk.cell_ref(df, i, first, hdr[sheet]),
+                                 "problem": fixkit.LAYOUT_WHY[kind] + " It is counted in answers as if it were a record.",
+                                 "suggestion": {"to": None, "action": "skip_row",
+                                                "why": "Skip this row (delete it, or keep such rows out of the table)."}})
+            notes[(row, first)] = problems[-1]
         for r in rules:
             col = by_slug[r["column"]]
             for i, v in enumerate(df[col]):
+                if i in layout:
+                    continue
                 try:
                     ok = fk.RULES[r["rule"]](v, r.get("arg"))
                 except Exception:
                     ok = False
                 if not ok:
-                    row = hdr[sheet] + 1 + i
+                    row = fk.sheet_row(df, i, hdr[sheet])
                     bad.add((row, col))
-                    problems.append({"tab": sheet, "row": row, "column": col, "value": v,
-                                     "problem": r.get("message") or f"{r['rule']} check failed"})
+                    problems.append({"tab": sheet, "row": row, "column": col, "value": v, "rule": r["rule"],
+                                     "cell": fk.cell_ref(df, i, col, hdr[sheet]),
+                                     "problem": r.get("message") or f"{r['rule']} check failed",
+                                     "suggestion": fixkit.suggest(r["rule"], v, r.get("arg"),
+                                                                  r.get("arg") if r["rule"] == "in_list" else None,
+                                                                  "the allowed values")})
+                    notes[(row, col)] = problems[-1]
         for lk in spec.get("lookups") or []:  # a key with no match in the other tab (e.g. a misspelt officer name)
             other = m.get(lk.get("tab"), (None,))[0]
             (left, right), = lk["on"].items()
@@ -804,22 +833,30 @@ def check(path, skill, out_dir):
             if right not in ob:
                 continue
             keys = {re.sub(r"\s+", " ", str(x)).strip().lower() for x in sheets[other][ob[right]] if str(x).strip()}
+            originals = [str(x) for x in sheets[other][ob[right]] if str(x).strip()]
             amap = {str(k).strip().lower(): str(x) for k, x in ((spec.get("normalize") or {}).get(left, {}).get("map") or {}).items()}
             firsts = {}
             if lk.get("match") == "first_name":
                 for x in keys:
                     firsts.setdefault(x.split(" ")[0], set()).add(x)
             for i, v in enumerate(df[by_slug[left]]):
+                if i in layout:
+                    continue
                 k = re.sub(r"\s+", " ", v).strip().lower()
                 if not v.strip() or k in keys or amap.get(k, "").strip().lower() in keys:
                     continue
                 if " " not in k and len(firsts.get(k, ())) == 1:
                     continue
-                row = hdr[sheet] + 1 + i
+                row = fk.sheet_row(df, i, hdr[sheet])
                 bad.add((row, by_slug[left]))
+                shared = " " not in k and len(firsts.get(k, ())) > 1
                 why = (f"first name shared by several people in the {other} tab ({ob[right]})"
-                       if " " not in k and len(firsts.get(k, ())) > 1 else f"not found in the {other} tab ({ob[right]})")
-                problems.append({"tab": sheet, "row": row, "column": by_slug[left], "value": v, "problem": why})
+                       if shared else f"not found in the {other} tab ({ob[right]})")
+                problems.append({"tab": sheet, "row": row, "column": by_slug[left], "value": v, "rule": "lookup",
+                                 "cell": fk.cell_ref(df, i, by_slug[left], hdr[sheet]), "problem": why,
+                                 "suggestion": None if shared else fixkit.suggest("lookup", v, None, originals,
+                                                                                  f"the {other} tab")})
+                notes[(row, by_slug[left])] = problems[-1]
         ws = wb.create_sheet(str(sheet if sheet != "csv" else "Data")[:31])
         headers = list(df.columns)
         ws.append(headers + [f"Check: {by_slug[r['column']]}" for r in rules])
@@ -831,18 +868,30 @@ def check(path, skill, out_dir):
                 v = row[h]
                 x = fk.as_number(v) if re.fullmatch(r"-?\d+(\.\d+)?", v or "") else None
                 ws.cell(r, j, x if x is not None else v)
-                if (hdr[sheet] + 1 + i, h) in bad:
+                srow = fk.sheet_row(df, i, hdr[sheet])
+                if i in layout:
+                    ws.cell(r, j).fill = grey
+                if (srow, h) in bad:
                     ws.cell(r, j).fill = red
+                note = notes.get((srow, h))
+                if note:
+                    sg = note.get("suggestion") or {}
+                    text = note["problem"] + (f"\nSuggested: {sg['to'] or '(leave blank)'} ({sg['why']})"
+                                              if sg.get("to") is not None else (f"\n{sg['why']}" if sg.get("why") else ""))
+                    ws.cell(r, j).comment = Comment(f"{text}\nOriginal cell {note['cell']}.", "Idli")
             for k, rule in enumerate(rules):
                 ref = f"{get_column_letter(headers.index(by_slug[rule['column']]) + 1)}{r}"
                 fml = fk.excel_formula(rule["rule"], ref, rule.get("arg"), rule.get("message") or rule["rule"])
                 if fml is None:
-                    fml = "" if (hdr[sheet] + 1 + i, by_slug[rule["column"]]) not in bad else (rule.get("message") or "check")
+                    fml = "" if (fk.sheet_row(df, i, hdr[sheet]), by_slug[rule["column"]]) not in bad else (rule.get("message") or "check")
                 ws.cell(r, len(headers) + k + 1, fml)
     ps = wb.create_sheet("Problems")
-    ps.append(["Tab", "Row in original", "Column", "Value", "Problem"])
+    ps.append(["Tab", "Cell in original", "Row in original", "Column", "Value", "Problem", "Suggested fix", "Why"])
     for p in problems:
-        ps.append([p["tab"], p["row"], p["column"], p["value"], p["problem"]])
+        sg = p.get("suggestion") or {}
+        ps.append([p["tab"], p.get("cell"), p["row"], p["column"], p["value"], p["problem"],
+                   ("(skip row)" if sg.get("action") == "skip_row" else "(leave blank)" if sg.get("to") == "" else sg.get("to") or ""),
+                   sg.get("why", "")])
     import os
     os.makedirs(out_dir, exist_ok=True)
     name = re.sub(r"\s*-\s*checked$", "", os.path.splitext(os.path.basename(path))[0])

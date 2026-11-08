@@ -55,11 +55,29 @@ def raw_sheets(path):
             continue
         h = _header_index(df)
         header = [str(v).strip() or f"column_{j + 1}" for j, v in enumerate(df.iloc[h])]
-        body = df.iloc[h + 1:].reset_index(drop=True)
+        body = df.iloc[h + 1:]
+        rows = [int(ix) + 1 for ix in body.index]  # real spreadsheet rows (blank rows were dropped above)
+        cols = [int(c) for c in df.columns]        # real spreadsheet columns, 0 = A (blank columns dropped)
+        body = body.reset_index(drop=True)
         body.columns = _unique(header)
+        body.attrs["sheet_rows"], body.attrs["sheet_cols"] = rows, cols
         out[name] = body
         hdr[name] = int(df.index[h]) + 1
     return out, hdr
+
+
+def sheet_row(df, i, header_row):
+    """The spreadsheet row of data row i (blank rows in the sheet count, as people see them)."""
+    rows = df.attrs.get("sheet_rows")
+    return rows[i] if rows and i < len(rows) else header_row + 1 + i
+
+
+def cell_ref(df, i, col, header_row):
+    """'D54'-style address of data row i, column `col`, in the original sheet."""
+    from openpyxl.utils import get_column_letter
+    cols = df.attrs.get("sheet_cols")
+    j = list(df.columns).index(col)
+    return f"{get_column_letter((cols[j] if cols and j < len(cols) else j) + 1)}{sheet_row(df, i, header_row)}"
 
 
 def _cell_text(v):
