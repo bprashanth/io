@@ -18,7 +18,10 @@ Either agent adds an entry here for every change that needs something done on th
   - **drive_find**: index search in ~0.3 s (names, folders, contents, modified dates, date words such as "in
     December"). With no clear match, one quick Drive full-text search on the rarest word, then ask the user.
     "bikapathymund cestrum datasheet": "no file mentions 'bikapathymund'; 'cestrum' is in field_vars_indicators.xlsx".
-  - **Greeting**: a "Start here" chat (30B, Bypass) asks the user to sign in and offers to index.
+  - **Sidebar, top to bottom**: "Start here" (its own folder `~/idli-insights/start-here`, instructions from
+    `idli/START-HERE.md`: greeting, sign-in, Drive index; tabs: the chat, Drive, Gmail), "Idli insights" (the
+    private folder, where the work happens), "Teacher - Claude" (the Teach folder). Order set by dragging in the
+    app. `setup-laptop.py` doesn't create the start-here folder yet.
   - **Providers** relabelled: "Idli - 30B (private, on Muse)", "Idli - 9B (OpenRouter, not private)",
     "Teach - Claude (fake data and test accounts only)" (backup `~/.paseo/config.json.bak-20261108-labels`).
   - **Workspaces** renamed "Idli - private" and "Teach - Claude"; old chats and two extra workspaces archived;
