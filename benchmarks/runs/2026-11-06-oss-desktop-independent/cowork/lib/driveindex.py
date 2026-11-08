@@ -121,29 +121,47 @@ def _rows(tab, url, deadline, max_scrolls=200):
     return order
 
 
-def crawl(tab, deadline, max_depth=10, max_files=5000):
-    """Breadth first from My Drive and Shared with me, into folders up to max_depth levels: shallow files are
-    found first, so a time limit cuts off only the deepest corners. A folder is opened once even if it shows up
-    in several places (shortcuts, shared folders also in My Drive), so loops can't happen. Returns
-    (files, folders_not_opened)."""
+def crawl(tabs, deadline, max_depth=10, max_files=5000):
+    """Breadth first from My Drive and Shared with me, into folders up to max_depth levels, several folders at
+    once (one per tab). Shallow files are found first, so a time limit cuts off only the deepest corners. A
+    folder is opened once even if it shows up in several places (shortcuts, shared folders also in My Drive),
+    so loops can't happen. Returns (files, folders_not_opened)."""
     from sites.google import tools as g
+    if isinstance(tabs, str):
+        tabs = [tabs]
     found, opened = {}, set()
     queue = [("my-drive", "My Drive", g.drive_url("my-drive"), 0, "root:my-drive"),
              ("shared", "Shared with me", g.drive_url("shared-with-me"), 0, "root:shared")]
-    while queue and time.time() < deadline and len(found) < max_files:
-        root, path, url, depth, fid = queue.pop(0)
-        if fid in opened:
-            continue
-        opened.add(fid)
-        for r in _rows(tab, url, deadline):
-            name, kind = parse_label(r["label"])
-            if not name:
-                continue
-            if r["id"] not in found:
-                found[r["id"]] = {"id": r["id"], "name": name, "kind": kind, "path": path, "where_": root}
-            if is_folder(kind) and depth < max_depth and r["id"] not in opened:
-                queue.append((root, f"{path} / {name}", g.drive_url(f"folders/{r['id']}"), depth + 1, r["id"]))
-        _write_state(phase="listing", files=len(found), folders_opened=len(opened), folders_left=len(queue))
+    free = list(tabs)
+    with cf.ThreadPoolExecutor(len(tabs)) as ex:
+        running = {}
+        while (queue or running) and len(found) < max_files:
+            while queue and free and time.time() < deadline:
+                item = queue.pop(0)
+                if item[4] in opened:
+                    continue
+                opened.add(item[4])
+                t = free.pop()
+                running[ex.submit(_rows, t, item[2], deadline)] = (item, t)
+            if not running:
+                break
+            done, _ = cf.wait(running, return_when=cf.FIRST_COMPLETED)
+            for fut in done:
+                (root, path, url, depth, fid), t = running.pop(fut)
+                free.append(t)
+                try:
+                    rows = fut.result()
+                except Exception:
+                    continue  # one folder that won't load doesn't stop the rest
+                for r in rows:
+                    name, kind = parse_label(r["label"])
+                    if not name:
+                        continue
+                    if r["id"] not in found:
+                        found[r["id"]] = {"id": r["id"], "name": name, "kind": kind, "path": path, "where_": root}
+                    if is_folder(kind) and depth < max_depth and r["id"] not in opened:
+                        queue.append((root, f"{path} / {name}", g.drive_url(f"folders/{r['id']}"), depth + 1, r["id"]))
+            _write_state(phase="listing", files=len(found), folders_opened=len(opened), folders_left=len(queue))
     return list(found.values()), len({q[4] for q in queue} - opened)
 
 
@@ -184,7 +202,7 @@ def summarise(batch, timeout=180):
     return {batch[int(k) - 1]["id"]: str(v)[:300] for k, v in got.items() if str(k).isdigit() and 0 < int(k) <= len(batch)}
 
 
-def build(minutes=5.0, workers=3):
+def build(minutes=5.0, workers=5, muse_parallel=4):
     from lib.browser import paseo
     started = time.time()
     deadline = started + minutes * 60
@@ -199,7 +217,7 @@ def build(minutes=5.0, workers=3):
                 tabs.append(m.group(1))
         if not tabs:
             raise RuntimeError("could not open a browser tab")
-        files, unopened = crawl(tabs[0], started + minutes * 60 * 0.5)
+        files, unopened = crawl(tabs, started + minutes * 60 * 0.5)
         _write_state(folders_not_opened=unopened)
         con = connect()
         now = dt.datetime.now()
@@ -245,26 +263,28 @@ def build(minutes=5.0, workers=3):
                 paseo("browser_close_tab", browserId=t)
             except Exception:
                 pass
-    # Muse summaries, in batches, while time remains (the index is already searchable)
+    # Muse summaries, several batches at once (Muse serves 4 slots), while time remains; search works already
     _write_state(phase="summarising")
-    order = sorted(files, key=lambda f: (0 if f.get("peek") else 1, f["kind"] == "Image"))
+    order = [f for f in sorted(files, key=lambda f: (0 if f.get("peek") else 1, f["kind"] == "Image")) if not is_folder(f["kind"])]
+    batches = [order[i:i + 12] for i in range(0, len(order), 12)]
     n = 0
-    for i in range(0, len(order), 12):
-        if time.time() > deadline:
-            break
-        batch = [f for f in order[i:i + 12] if not is_folder(f["kind"])]
-        if not batch:
-            continue
+    with cf.ThreadPoolExecutor(max(1, muse_parallel)) as ex:
+        futs = {ex.submit(summarise, b, max(30, int(deadline - time.time()))): b for b in batches}
         try:
-            got = summarise(batch, timeout=max(30, int(deadline - time.time())))
-        except Exception:
-            continue
-        con = connect()
-        for fid, s in got.items():
-            con.execute("UPDATE files SET summary = ? WHERE id = ?", [s, fid])
-        con.close()
-        n += len(got)
-        _write_state(summarised=n)
+            for fut in cf.as_completed(futs, timeout=max(5, deadline - time.time())):
+                try:
+                    got = fut.result()
+                except Exception:
+                    continue
+                con = connect()
+                for fid, s_ in got.items():
+                    con.execute("UPDATE files SET summary = ? WHERE id = ?", [s_, fid])
+                con.close()
+                n += len(got)
+                _write_state(summarised=n)
+        except cf.TimeoutError:
+            for f in futs:
+                f.cancel()
     _write_state(phase="done", finished=dt.datetime.now().isoformat(timespec="seconds"),
                  seconds=int(time.time() - started), files=len(files), summarised=n)
 
@@ -361,7 +381,7 @@ def search(query, limit=5):
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "build":
-        build(float(os.environ.get("IDLI_INDEX_MINUTES") or 5))
+        build(float(os.environ.get("IDLI_INDEX_MINUTES") or 5), int(os.environ.get("IDLI_INDEX_TABS") or 5))
     elif cmd == "status":
         print(json.dumps(status(), indent=1))
     elif cmd == "find":

@@ -139,7 +139,7 @@ def ok(cond, what):
 
 
 t0 = time.time()
-di.build(minutes=2, workers=3)
+di.build(minutes=2, workers=5)
 took = time.time() - t0
 st = di.status()
 con = di.connect(read_only=True)
