@@ -714,7 +714,8 @@ def t_drive_find(query):
             r["preview"] = pv
         r["then"] = (f"If the user asked about what's inside or to analyse it (numbers, totals, who, how many, a "
                      f"dashboard): call file_get with link '{best['id']}' now. Otherwise (find, open, see, show; any kind "
-                     f"of file): " + ("write `preview` exactly, on its own line, then " if pv else "")
+                     f"of file): " + (f"first write this line exactly as it is (it shows a picture of the first rows): {pv}  -- then "
+                                   if pv else "")
                      + f"call AskUserQuestion with one question, header \"File\", question \"Found {best['name']} in "
                      f"{best['folder']}. Open it here to take a look?\", options \"Yes, open it\" and \"No\"; on yes "
                      f"call file_peek with id '{best['id']}' and name '{best['name']}'. Don't download.")

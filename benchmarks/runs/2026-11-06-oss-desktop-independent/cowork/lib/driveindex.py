@@ -456,9 +456,12 @@ def search(query, limit=5):
     hi = dt.date.fromisoformat(when[1]) if when and when[1] else None
     for fid, name, kind, path, pk, summ, modified in rows:
         nt, pt, ct = _tokens(name), _tokens(path), _tokens(pk + " " + summ)
+        joined = "".join(nt)  # "fieldvars" typed as one word still finds field_vars_indicators
         s, why = 0.0, []
         for q in qt:
             a, b, c = _match(q, nt), _match(q, pt), _match(q, ct)
+            if len(q) >= 6 and q not in nt and q in joined:
+                a = max(a, 0.95)
             best = max(a * 1.0, b * 0.6, c * 0.7)
             s += best
             if best >= 0.5:
