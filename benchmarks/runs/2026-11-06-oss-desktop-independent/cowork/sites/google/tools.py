@@ -474,7 +474,7 @@ def t_drive_index_status():
     return {"status": st, "say_to_user": words.get(st.get("phase"), str(st.get("phase")))}
 
 
-NEXT_STEPS = ("Next: go to Idli insights in the left sidebar and ask about any file, for example \"find the volunteer "
+NEXT_STEPS = ("Next: go to Idli in the left sidebar and ask about any file, for example \"find the volunteer "
               "register\" or \"how much did we disburse last quarter\". To refresh this later, come back here and "
               "say \"rebuild index\".")
 

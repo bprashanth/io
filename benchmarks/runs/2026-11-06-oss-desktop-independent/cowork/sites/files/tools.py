@@ -412,7 +412,7 @@ def t_teach_send(request_id):
                           req["caller_agent"], paseo], start_new_session=True, env=env,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {"started": True, "teach_chat": f"Teach: {req['title']}",
-            "tell_the_user": "Say teaching has started in the 'Teacher - Claude' workspace, in the chat called "
+            "tell_the_user": "Say teaching has started in the 'Claude' workspace, in the chat called "
                              f"'Teach: {req['title']}'. Claude will ask a few questions about the columns there. "
                              "When it finishes, this chat gets a message and you will continue."}
 

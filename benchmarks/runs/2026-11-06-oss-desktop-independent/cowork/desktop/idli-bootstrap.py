@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Idli first-run bootstrap: make a Paseo install look the way Idli insights should on first open.
+"""Idli first-run bootstrap: make a Paseo install look the way Idli should on first open.
 Safe to rerun: it only adds what's missing.
 
   Start here            its own folder (~/idli-insights/start-here): the setup chat (tab 0) with Idli's
      Start here         greeting, plus a Drive tab and a Gmail tab for signing in
-  Idli insights         the private folder (~/idli-insights/cowork-real): where the work happens
-     Idli insights
-  Teacher - Claude      this cowork/ folder: Claude teaches Idli a file, from fake data only
-     Teacher - Claude
+  Idli         the private folder (~/idli-insights/cowork-real): where the work happens
+     Idli
+  Claude      this cowork/ folder: Claude teaches Idli a file, from fake data only
+     Claude
 
 Runs on the machine with Paseo, after the daemon is up (desktop/idli-launch.sh does that). The heading order
 needs Paseo patch P2 (todos/idli-insights/paseo_patches.md); until then the person drags them once.
@@ -29,8 +29,8 @@ IDLI = os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights")
 DRY = "--dry-run" in sys.argv
 LAYOUT = [  # (heading and workspace name, folder, instructions copied to <folder>/CLAUDE.md)
     ("Start here", os.path.join(IDLI, "start-here"), os.path.join(COWORK, "idli", "START-HERE.md")),
-    ("Idli insights", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
-    ("Teacher - Claude", COWORK, None),
+    ("Idli", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
+    ("Claude", COWORK, None),
 ]
 SITES = "google\nsheets\nfiles\n"
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
@@ -155,7 +155,7 @@ def main():
     ids = projects_and_workspaces()
     agent = start_chat(ids.get("Start here"))
     start_tabs(agent)
-    say("done. Heading order: Start here, Idli insights, Teacher - Claude (drag once until Paseo patch P2).")
+    say("done. Heading order: Start here, Idli, Claude (drag once until Paseo patch P2).")
 
 
 if __name__ == "__main__":

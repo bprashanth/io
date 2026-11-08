@@ -46,7 +46,7 @@ COWORK_PROVIDER = {
                         # co-work is read-only: find, suggest, download. Drafting mail is a write.
                         "mcp__cowork__gmail_draft_reply", "mcp__cowork__sheet_query", "mcp__cowork__sheet_profile"],
 }
-DIY_PROVIDER = {"extends": "claude", "label": "Teacher - Claude (fake data and test accounts only)"}
+DIY_PROVIDER = {"extends": "claude", "label": "Claude (teaches Idli; fake data and test accounts only)"}
 
 
 def step(msg):

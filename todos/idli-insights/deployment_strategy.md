@@ -1,4 +1,4 @@
-# Idli insights: deployment strategy
+# Idli: deployment strategy
 
 What a person gets when they install "Idli" (an AppImage, a .dmg, a Windows installer: whatever wraps Paseo)
 and open it for the first time, and what has to work with no help. A running list: tick items off as they
@@ -13,17 +13,17 @@ Today's prototype of the first-run step: `benchmarks/runs/2026-11-06-oss-desktop
 ```
 Start here            <- heading 1: the setup chat (tab 0), a Drive tab, a Gmail tab
    Start here            Idli has already said: sign in to Google in the Drive tab, then say yes to indexing
-Idli insights         <- heading 2: the private model at work (find files, forms, questions)
-   Idli insights
-Teacher - Claude      <- heading 3: Claude teaches Idli a file, from fake data only
-   Teacher - Claude
+Idli         <- heading 2: the private model at work (find files, forms, questions)
+   Idli
+Claude      <- heading 3: Claude teaches Idli a file, from fake data only
+   Claude
 ```
 
 1. They sign in to Google in the Drive tab (the only manual step before using it).
 2. They say yes; Idli indexes Drive in 1 to 5 minutes (names, folders, dates, first rows, Muse summaries), on
    their machine.
-3. Idli says "You're set. Go to Idli insights". From there: find a file, open its form, ask questions; teach a
-   new file through Teacher - Claude when Idli asks.
+3. Idli says "You're set. Go to Idli". From there: find a file, open its form, ask questions; teach a
+   new file through Claude when Idli asks.
 
 ## Must work out of the box
 
@@ -32,13 +32,13 @@ Teacher - Claude      <- heading 3: Claude teaches Idli a file, from fake data o
 | 1 | The three headings, in this order, with one workspace each | bootstrap creates projects and workspaces through the Paseo CLI | ✅ created; ❌ order needs patch P2 |
 | 2 | Start here chat already open as the first tab, greeting shown, in Bypass mode | bootstrap: `paseo run --provider t4gc-cowork --mode bypassPermissions --title "Start here" start` | ✅ |
 | 3 | Drive and Gmail tabs in Start here | bootstrap opens them through Paseo's browser tools as the Start here chat | ✅ (needs the app running) |
-| 4 | Model picker shows only: Idli 30B (private), Idli 9B (not private, optional), Teacher - Claude | `setup-laptop.py` merges providers into `~/.paseo/config.json` | ⚠️ other providers (Claude, Codex, T4GC experiments) still listed |
+| 4 | Model picker shows only: Idli 30B (private), Idli 9B (not private, optional), Claude | `setup-laptop.py` merges providers into `~/.paseo/config.json` | ⚠️ other providers (Claude, Codex, T4GC experiments) still listed |
 | 5 | New Idli chats can use their tools | Paseo defaults Claude-based chats to Auto mode, whose safety check can't run on Muse, so every tool is blocked | ❌ patch P3, or the user picks Bypass |
 | 6 | Instructions in each folder (`start-here/CLAUDE.md`, private folder `CLAUDE.md`) | bootstrap copies `idli/START-HERE.md` and `idli/CLAUDE.md` | ✅ |
 | 7 | Drive index builds on "yes" and is shared by all workspaces | `drive_index` tool, `lib/driveindex.py`, DuckDB in `~/idli-insights/config/` | ✅ |
 | 8 | Downloads of real files land without the user hunting for them | `file_get` triggers the export; the user clicks Save in the system dialog | ⚠️ works; silent with patch P1 |
 | 9 | The private model is reachable | Muse 30B on the DGX through an ssh tunnel (`laptop-up.sh`) | ❌ not shippable: decide hosted endpoint vs local model per install |
-| 10 | Teacher - Claude works | the `claude` CLI signed in (Anthropic account) on the machine | ❌ install needs a Claude sign-in step or a bundled key |
+| 10 | Claude works | the `claude` CLI signed in (Anthropic account) on the machine | ❌ install needs a Claude sign-in step or a bundled key |
 | 11 | Python runtime for the tools (DuckDB, pandas, openpyxl) | the repo's `.venv` | ❌ ship a bundled venv or a single binary for `cowork_mcp.py` |
 | 12 | The tools' code itself | a git checkout of this repo | ❌ ship the `cowork/` tree inside the package |
 | 13 | Nothing private leaves the machine except to the chosen model | Idli 30B is private; Idli 9B goes to OpenRouter (labelled "not private") | ⚠️ decide whether 9B ships at all |
