@@ -204,8 +204,10 @@ def form(con, skill, tab, built):
     noun = spec.get("row_noun") or "rows"
     measures = list(spec.get("measures") or [])
     have = {m["id"] for m in measures}
-    if "rows" not in have:
-        measures.insert(0, {"id": "rows", "label": f"Number of {noun}", "sql": "count(*)", "format": "count"})
+    if "rows" not in have:  # the plain row count, unless a taught measure already is it (same name)
+        same = next((m for m in measures if str(m.get("label", "")).strip().lower() == f"number of {noun}".lower()), None)
+        measures.insert(0, {"id": "rows", "label": f"Number of {noun}", "sql": "count(*)", "format": "count",
+                            **({"hidden": True} if same else {})})
     taught_sql = {re.sub(r'[\s"]', "", m.get("sql", "")).lower() for m in measures}
     for c, k in kinds.items():
         if k["kind"] == "number" and c not in hidden:

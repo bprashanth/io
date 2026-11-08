@@ -101,7 +101,8 @@ def _show(url, file):
     try:
         from lib.browser import paseo, tabs
         port = urllib.parse.urlparse(url).port
-        mine = [t for t in tabs() if (f"127.0.0.1:{port}/" in t["url"] or f"localhost:{port}/" in t["url"])
+        # this file's dashboard tab, even one left from an earlier run of the server (another port)
+        mine = [t for t in tabs() if urllib.parse.urlparse(t["url"]).hostname in ("127.0.0.1", "dashboard.localhost")
                 and urllib.parse.parse_qs(urllib.parse.urlparse(t["url"]).query).get("file", [""])[0] == file]
         if mine:
             paseo("browser_navigate", browserId=mine[0]["id"], url=url)
@@ -290,13 +291,15 @@ def t_file_open(file, show_form=True):
     e = files().open(file)
     kinds = {}
     for p in e["problems"]:
+        if p.get("skipped"):
+            continue
         k = kinds.setdefault((p["tab"], p["column"], p["problem"]), {"tab": p["tab"], "column": p["column"],
                                                                     "problem": p["problem"], "rows": []})
         if len(k["rows"]) < 4:
             k["rows"].append(p["row"])
     out = {"file": file, "title": meta["title"], "known": True, "today": fm.today(),
            "layout": c["status"], "layout_changes": c["messages"],
-           "problems": len(e["problems"]), "problem_kinds": list(kinds.values())[:12],
+           "problems": len([p for p in e["problems"] if not p.get("skipped")]), "problem_kinds": list(kinds.values())[:12],
            "checked_copy": meta["checked_copy"], "form_link": url, "form_opened": shown,
            "tabs": [_brief(f) for f in e["forms"].values()]}
     if meta.get("hidden_cells"):
@@ -315,10 +318,12 @@ def t_file_open(file, show_form=True):
                         + "), so totals from those columns may be low. I can download the real file instead.")
         if c["status"] == "drift":
             bits.append("It has changed a little since I was taught it: " + " ".join(c["messages"]))
-        if e["problems"]:
-            bits.append(f"The checks found {len(e['problems'])} problem{'s' if len(e['problems']) > 1 else ''} "
-                        f"(listed in the form; the checked copy {meta['checked_copy']} has them in red; the original is "
-                        "unchanged).")
+        real = [p for p in e["problems"] if not p.get("skipped")]
+        if real:
+            fixable = sum(1 for p in real if (p.get("suggestion") or {}).get("to") is not None
+                          or (p.get("suggestion") or {}).get("action"))
+            bits.append(f"The checks found {len(real)} problem{'s' if len(real) > 1 else ''}; {fixable} have a suggested fix "
+                        "you can accept or reject in the dashboard (the original is unchanged).")
         out["say_to_user"] = " ".join(bits)
         out["then"] = ("For a question about this file, call file_ask with a spec built only from these tabs' measures, "
                        "group_by, filters and presets. Ask the user if a value is unclear. If no measure or filter fits "

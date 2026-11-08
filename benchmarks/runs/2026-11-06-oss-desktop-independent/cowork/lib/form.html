@@ -155,8 +155,8 @@ function render() {
   $("tabs").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.tab === TAB));
   if (!SPEC.measures && f.rows <= 30 && !f.measures.some(m => !m.auto && m.id !== "rows")) SPEC.measures = [];
   if (!SPEC.measures) SPEC.measures = [f.measures.find(m => !m.auto && m.id !== "rows") ? f.measures.find(m => !m.auto && m.id !== "rows").id : "rows"];
-  const shown = f.measures.filter(m => !m.auto || SPEC.measures.includes(m.id));
-  const extra = f.measures.filter(m => m.auto && !SPEC.measures.includes(m.id));
+  const shown = f.measures.filter(m => !m.hidden && (!m.auto || SPEC.measures.includes(m.id)));
+  const extra = f.measures.filter(m => !m.hidden && m.auto && !SPEC.measures.includes(m.id));
   $("measures").innerHTML = shown.map(m => `<label class="check"><input type="checkbox" value="${esc(m.id)}" ${SPEC.measures.includes(m.id) ? "checked" : ""}>${esc(m.label)}</label>`).join("")
     + `<label class="check"><input type="checkbox" value="" ${SPEC.measures.length === 0 ? "checked" : ""}>List the matching ${esc(f.row_noun)}</label>`
     + (extra.length ? `<select id="moremeasure" class="addbtn"><option value="">+ more</option>${extra.map(m => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join("")}</select>` : "");
