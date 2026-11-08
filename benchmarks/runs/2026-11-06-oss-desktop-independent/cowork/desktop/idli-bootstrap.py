@@ -123,6 +123,7 @@ def start_chat(ws_id):
     if DRY or not ws_id:
         return None
     out = paseo("run", "--provider", START_PROVIDER, "--workspace", ws_id, "--mode", "bypassPermissions",
+                "--thinking", "low",  # measured: low acts on "yes" in ~5 s vs ~10 s on high, same choices
                 "--title", "Start here", "--no-wait", "hello")
     return (out or {}).get("agentId")
 

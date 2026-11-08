@@ -460,14 +460,18 @@ def t_drive_index():
     try:  # a live progress page in a tab: the chat can't update itself while the index builds
         from sites.files import tools as ft
         port, token = ft._server()
-        paseo("browser_new_tab", url=f"http://127.0.0.1:{port}/index?t={token}")
+        # *.localhost reaches this computer in Chromium, and the tab is labelled "drive-index.localhost" even
+        # before it loads (background tabs load when clicked), instead of a bare 127.0.0.1
+        paseo("browser_new_tab", url=f"http://drive-index.localhost:{port}/index?t={token}")
         shown = True
     except Exception:
         pass
     return {"started": True,
-            "say_to_user": "Indexing your Drive now. It stays on this computer and takes 1 to 5 minutes. "
-                           "I'll post progress here" + (" (details in the Drive index tab)." if shown else "."),
-            "then": "In this same reply: write say_to_user, then call drive_index_wait. Keep going until it says done."}
+            "say_to_user": "Indexing your Drive now. It stays on this computer and takes 1 to 5 minutes."
+                           + (" Watch it in the drive-index tab at the top." if shown else "")
+                           + " I'll say here when it's done.",
+            "then": "In this same reply: write say_to_user, then call drive_index_wait, and keep calling it (no need to "
+                    "write anything in between) until it says done; then write its finish message."}
 
 
 def t_drive_index_status():
@@ -511,8 +515,7 @@ def t_drive_index_wait(seconds=20):
     elif done:
         out["then"] = "Tell the user, and offer to try again (say \"rebuild index\")."
     else:
-        out["then"] = ("In this same reply: write progress_line as one short line, then call drive_index_wait again. "
-                       "Don't end your turn before done.")
+        out["then"] = "Call drive_index_wait again (nothing to write yet). Don't end your turn before done."
     return out
 
 

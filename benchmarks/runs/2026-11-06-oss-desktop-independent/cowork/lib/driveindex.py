@@ -262,6 +262,17 @@ def notify(text):
     if not agent or not exe:
         return
     env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
+    # Only if the chat has stopped: a chat still waiting on drive_index_wait writes the finish itself, and a
+    # message sent from here shows in the chat as if the person had typed it.
+    time.sleep(25)
+    try:
+        rows = json.loads(subprocess.run([exe, "ls", "--global", "--json"], env=env, capture_output=True, text=True,
+                                         timeout=60).stdout or "[]")
+        me = next((r for r in rows if str(r.get("id", "")).startswith(agent[:8])), None)
+        if me and me.get("status") != "idle":
+            return
+    except Exception:
+        pass
     try:
         subprocess.run([exe, "send", "--no-wait", agent, text], env=env, capture_output=True, timeout=60)
     except Exception:
