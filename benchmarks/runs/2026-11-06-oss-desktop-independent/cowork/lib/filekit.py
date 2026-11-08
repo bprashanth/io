@@ -319,16 +319,25 @@ def _variant_groups(vals):
     return {v: canon[re.sub(r"[^a-z0-9]", "", v.lower())] for v in vals if v != ""}
 
 
-def scrub(text, sheets, keep=()):
-    """Replace any real value from the file's text columns that appears in `text` (names, villages...)."""
+def scrub(text, sheets, keep=(), fakes=None):
+    """Replace any real value from the file's text columns that appears in `text` (names, villages...).
+    A value that has a fake in the mock (`fakes`, e.g. "Meena Kulkarni" -> "Person1 Surname1", "Meena" ->
+    "Person1") is replaced by that fake, so the question still matches the mock; others by a placeholder."""
+    fakes = fakes or {}
+    vals = {}
     for df in sheets.values():
         for c in df.columns:
             info = classify(df[c])
             if info["kind"] in ("number", "date", "empty") or fk_slug_in(c, keep):
                 continue
-            for v in sorted({x for x in df[c] if len(x) >= 3}, key=len, reverse=True):
-                if re.search(r"(?i)\b" + re.escape(v) + r"\b", text):
-                    text = re.sub(r"(?i)\b" + re.escape(v) + r"\b", f"<a value from '{c}'>", text)
+            for x in df[c]:
+                if len(x) >= 3:
+                    vals.setdefault(x, c)
+    for v in sorted(vals, key=len, reverse=True):
+        pat = r"(?i)(?<![\w<])" + re.escape(v) + r"(?![\w>])"
+        if re.search(pat, text):
+            fake = fakes.get(re.sub(r"[^a-z0-9]", "", v.lower()))
+            text = re.sub(pat, (fake or f"<a value from '{vals[v]}'>").replace("\\", ""), text)
     return text
 
 
@@ -383,7 +392,6 @@ def make_mock(path, question, title=None, caller_agent=None, seed=7, share_label
     rid = f"{slug(title)[:40]}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     rdir = os.path.join(TEACH_DIR, rid)
     os.makedirs(rdir, exist_ok=True)
-    clean_q = scrub(question, sheets, keep=share_labels)
     mocks, kinds, shared = {}, {}, _name_fakes(sheets, share_labels)
     for name, df in sheets.items():
         cols, k = {}, {}
@@ -393,6 +401,7 @@ def make_mock(path, question, title=None, caller_agent=None, seed=7, share_label
             k[c] = {x: info[x] for x in ("kind", "format", "bad", "blank", "distinct") if x in info}
         mocks[name] = pd.DataFrame(cols)[list(df.columns)].head(300)
         kinds[name] = k
+    clean_q = scrub(question, sheets, keep=share_labels, fakes=shared)  # real values -> the mock's own fakes
     req = {"kind": "idli-teach-request", "version": 1, "id": rid, "title": title, "fingerprint": fp,
            "main_sheet": main, "question": clean_q, "existing_skill": skill["id"] if skill else None,
            "existing_version": skill.get("version") if skill else None, "caller_agent": caller_agent,

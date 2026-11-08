@@ -1,70 +1,291 @@
 {
- "id": "field_programme_tracker", "title": "Field programme tracker", "version": 1, "format": 2,
+ "id": "field_programme_tracker",
+ "title": "Field programme tracker",
+ "version": 2,
+ "format": 2,
  "tabs": {
   "Visits": {
-   "headers": ["amount_disbursed", "field_officer", "households_visited", "notes", "status", "village", "visit_date"],
-   "summary": "One row per field visit. 'Disbursed' is the total of Amount disbursed; a visit's district is the district of the village visited (Villages tab), with the officer's district (Officers tab) as a second option. Cancelled visits are left out unless asked for: use the 'not_cancelled' preset by default.",
+   "headers": [
+    "amount_disbursed",
+    "field_officer",
+    "households_visited",
+    "notes",
+    "status",
+    "village",
+    "visit_date"
+   ],
+   "summary": "One row per field visit. 'Disbursed' is the total of Amount disbursed; a visit's district is the district of the village visited (Villages tab), with the officer's district (Officers tab) as a second option. Cancelled visits are left out unless asked for: use the 'not_cancelled' preset by default. To break down by officer, use 'Officer' (officer_name): the officer's full name from the Officers tab, so a first-name-only or differently-capitalised entry is the same line as the full name. 'Field officer' is the name as typed.",
    "row_noun": "visits",
    "columns": {
-    "visit_date": {"type": "date", "formats": ["%d/%m/%Y", "%Y-%m-%d"], "label": "Visit date"},
-    "field_officer": {"type": "category", "label": "Field officer", "meaning": "Officer who made the visit; often just a first name"},
-    "village": {"type": "category", "label": "Village"},
-    "households_visited": {"type": "number", "label": "Households visited"},
-    "amount_disbursed": {"type": "number", "label": "Amount disbursed (Rs)"},
-    "status": {"type": "category", "label": "Status", "values": ["Done", "Follow-up", "Cancelled"]},
-    "notes": {"type": "text", "label": "Notes"}
+    "visit_date": {
+     "type": "date",
+     "formats": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "label": "Visit date"
+    },
+    "field_officer": {
+     "type": "category",
+     "label": "Field officer",
+     "meaning": "Officer who made the visit as typed; often just a first name. Use 'Officer' (officer_name) to count each person once."
+    },
+    "village": {
+     "type": "category",
+     "label": "Village"
+    },
+    "households_visited": {
+     "type": "number",
+     "label": "Households visited"
+    },
+    "amount_disbursed": {
+     "type": "number",
+     "label": "Amount disbursed (Rs)"
+    },
+    "status": {
+     "type": "category",
+     "label": "Status",
+     "values": [
+      "Done",
+      "Follow-up",
+      "Cancelled"
+     ]
+    },
+    "notes": {
+     "type": "text",
+     "label": "Notes"
+    }
    },
    "normalize": {
-    "field_officer": {"case": "title"},
-    "village": {"case": "title"},
-    "status": {"map": {"done": "Done", "follow-up": "Follow-up", "follow up": "Follow-up", "cancelled": "Cancelled"}}
+    "field_officer": {
+     "case": "title"
+    },
+    "village": {
+     "case": "title"
+    },
+    "status": {
+     "map": {
+      "done": "Done",
+      "follow-up": "Follow-up",
+      "follow up": "Follow-up",
+      "cancelled": "Cancelled"
+     }
+    }
    },
    "validations": [
-    {"column": "visit_date", "rule": "date", "arg": ["%d/%m/%Y", "%Y-%m-%d"], "message": "visit date is not a date"},
-    {"column": "visit_date", "rule": "not_future", "arg": ["%d/%m/%Y", "%Y-%m-%d"], "message": "visit date in the future"},
-    {"column": "amount_disbursed", "rule": "number", "message": "amount is not a number"},
-    {"column": "households_visited", "rule": "number", "message": "households visited is not a number"},
-    {"column": "field_officer", "rule": "required", "message": "field officer missing"},
-    {"column": "village", "rule": "required", "message": "village missing"},
-    {"column": "status", "rule": "in_list", "arg": ["Done", "Follow-up", "Cancelled"], "message": "status is not Done, Follow-up or Cancelled"}
+    {
+     "column": "visit_date",
+     "rule": "date",
+     "arg": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "message": "visit date is not a date"
+    },
+    {
+     "column": "visit_date",
+     "rule": "not_future",
+     "arg": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "message": "visit date in the future"
+    },
+    {
+     "column": "amount_disbursed",
+     "rule": "number",
+     "message": "amount is not a number"
+    },
+    {
+     "column": "households_visited",
+     "rule": "number",
+     "message": "households visited is not a number"
+    },
+    {
+     "column": "field_officer",
+     "rule": "required",
+     "message": "field officer missing"
+    },
+    {
+     "column": "village",
+     "rule": "required",
+     "message": "village missing"
+    },
+    {
+     "column": "status",
+     "rule": "in_list",
+     "arg": [
+      "Done",
+      "Follow-up",
+      "Cancelled"
+     ],
+     "message": "status is not Done, Follow-up or Cancelled"
+    }
    ],
    "measures": [
-    {"id": "disbursed", "label": "Amount disbursed (Rs)", "sql": "sum(amount_disbursed)", "format": "inr"},
-    {"id": "households", "label": "Households visited", "sql": "sum(households_visited)", "format": "count"},
-    {"id": "villages_visited", "label": "Villages visited", "sql": "count(DISTINCT village)", "format": "count"}
+    {
+     "id": "disbursed",
+     "label": "Amount disbursed (Rs)",
+     "sql": "sum(amount_disbursed)",
+     "format": "inr"
+    },
+    {
+     "id": "households",
+     "label": "Households visited",
+     "sql": "sum(households_visited)",
+     "format": "count"
+    },
+    {
+     "id": "villages_visited",
+     "label": "Villages visited",
+     "sql": "count(DISTINCT village)",
+     "format": "count"
+    }
    ],
    "presets": [
-    {"id": "not_cancelled", "label": "Done and follow-up visits (leave out cancelled) - the usual rule", "filters": {"status": {"not": ["Cancelled"]}}},
-    {"id": "completed", "label": "Done visits only", "filters": {"status": ["Done"]}}
+    {
+     "id": "not_cancelled",
+     "label": "Done and follow-up visits (leave out cancelled) - the usual rule",
+     "filters": {
+      "status": {
+       "not": [
+        "Cancelled"
+       ]
+      }
+     }
+    },
+    {
+     "id": "completed",
+     "label": "Done visits only",
+     "filters": {
+      "status": [
+       "Done"
+      ]
+     }
+    }
    ],
-   "date_columns": ["visit_date"],
+   "date_columns": [
+    "visit_date"
+   ],
    "lookups": [
-    {"tab": "Villages", "on": {"village": "village"}, "columns": ["district", "block"], "prefix": "village_",
-     "labels": {"district": "District", "block": "Block"}},
-    {"tab": "Officers", "on": {"field_officer": "name"}, "columns": ["district"], "prefix": "officer_", "match": "first_name",
-     "labels": {"district": "Officer's district"}}
+    {
+     "tab": "Villages",
+     "on": {
+      "village": "village"
+     },
+     "columns": [
+      "district",
+      "block"
+     ],
+     "prefix": "village_",
+     "labels": {
+      "district": "District",
+      "block": "Block"
+     }
+    },
+    {
+     "tab": "Officers",
+     "on": {
+      "field_officer": "name"
+     },
+     "columns": [
+      "district",
+      "name"
+     ],
+     "prefix": "officer_",
+     "match": "first_name",
+     "labels": {
+      "district": "Officer's district",
+      "name": "Officer"
+     }
+    }
    ],
-   "hidden": ["notes"]
+   "hidden": [
+    "notes"
+   ]
   },
   "Officers": {
-   "headers": ["district", "email", "name", "phone"], "summary": "One row per field officer.", "row_noun": "officers",
-   "normalize": {"district": {"case": "title"}},
+   "headers": [
+    "district",
+    "email",
+    "name",
+    "phone"
+   ],
+   "summary": "One row per field officer.",
+   "row_noun": "officers",
+   "normalize": {
+    "district": {
+     "case": "title"
+    }
+   },
    "validations": [
-    {"column": "name", "rule": "required", "message": "officer name missing"},
-    {"column": "phone", "rule": "phone", "message": "not a 10-digit phone"},
-    {"column": "email", "rule": "email", "message": "not an email"}
+    {
+     "column": "name",
+     "rule": "required",
+     "message": "officer name missing"
+    },
+    {
+     "column": "phone",
+     "rule": "phone",
+     "message": "not a 10-digit phone"
+    },
+    {
+     "column": "email",
+     "rule": "email",
+     "message": "not an email"
+    }
    ]
   },
   "Villages": {
-   "headers": ["block", "district", "population", "village"], "summary": "One row per village.", "row_noun": "villages",
-   "columns": {"population": {"type": "number", "label": "Population"}},
-   "normalize": {"district": {"case": "title"}, "village": {"case": "title"}},
+   "headers": [
+    "block",
+    "district",
+    "population",
+    "village"
+   ],
+   "summary": "One row per village.",
+   "row_noun": "villages",
+   "columns": {
+    "population": {
+     "type": "number",
+     "label": "Population"
+    }
+   },
+   "normalize": {
+    "district": {
+     "case": "title"
+    },
+    "village": {
+     "case": "title"
+    }
+   },
    "validations": [
-    {"column": "village", "rule": "required", "message": "village name missing"},
-    {"column": "district", "rule": "required", "message": "district missing"},
-    {"column": "population", "rule": "number", "message": "population is not a number"}
+    {
+     "column": "village",
+     "rule": "required",
+     "message": "village name missing"
+    },
+    {
+     "column": "district",
+     "rule": "required",
+     "message": "district missing"
+    },
+    {
+     "column": "population",
+     "rule": "number",
+     "message": "population is not a number"
+    }
    ]
   }
  },
- "history": [{"version": 1, "taught": "amount disbursed / households / visits by village district or officer district, done+follow-up (cancelled left out), date ranges; officer first names matched to Officers"}]
+ "history": [
+  {
+   "version": 1,
+   "taught": "amount disbursed / households / visits by village district or officer district, done+follow-up (cancelled left out), date ranges; officer first names matched to Officers"
+  },
+  {
+   "version": 2,
+   "taught": "Officer breakdown (officer_name) merges first-name-only and case variants of one officer into her full name from the Officers tab; e.g. September disbursed per officer, cancelled left out"
+  }
+ ]
 }
