@@ -439,7 +439,69 @@ def whoami():
     return email
 
 
+# ---------------------------------------------------------------- Drive index (lib/driveindex.py)
+def t_drive_index():
+    from lib import driveindex as di
+    st = di.status()
+    if st.get("phase") in ("listing", "reading", "summarising"):
+        return {"started": False, "running": True, "status": st,
+                "say_to_user": "I'm already indexing your Drive; I'll be able to search it shortly."}
+    import subprocess
+    import sys
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    log = os.path.join(os.path.dirname(di.STATE), "drive-index.log")
+    os.makedirs(os.path.dirname(log), exist_ok=True)
+    subprocess.Popen([sys.executable, "-I", os.path.join(here, "lib", "driveindex.py"), "build"],
+                     start_new_session=True, stdin=subprocess.DEVNULL, stdout=open(log, "a"), stderr=subprocess.STDOUT)
+    return {"started": True,
+            "say_to_user": "I've started indexing your Drive: file names, folders, the first rows of each Google "
+                           "Sheet and the opening lines of each Doc, summarised by the private model. It stays on "
+                           "this computer and takes 1 to 5 minutes; a few tabs will open and close on their own. "
+                           "You can keep chatting.",
+            "then": "Use drive_index_status if they ask how it's going; drive_find works as soon as listing is done."}
+
+
+def t_drive_index_status():
+    from lib import driveindex as di
+    st = di.status()
+    words = {"none": "Drive hasn't been indexed yet.", "listing": f"Listing files: {st.get('files', 0)} so far.",
+             "reading": f"Reading inside Sheets and Docs ({st.get('peeked', 0)} done).",
+             "summarising": f"Summarising: {st.get('summarised', 0)} of {st.get('files', 0)} files. Search works already.",
+             "done": f"Done: {st.get('files', 0)} files indexed at {st.get('finished', '')}.",
+             "failed": f"Indexing failed: {st.get('error')}", "stopped": "Indexing stopped before it finished."}
+    return {"status": st, "say_to_user": words.get(st.get("phase"), str(st.get("phase")))}
+
+
+def t_drive_find(query):
+    from lib import driveindex as di
+    t0 = time.time()
+    r = di.search(query)
+    r["ms"] = int((time.time() - t0) * 1000)
+    if r["status"] == "no_index":
+        r["say_to_user"] = ("I haven't indexed your Drive yet, so finding files is slow. Can I take 1 to 5 minutes to "
+                            "index it? It stays on this computer.")
+        r["then"] = "If they agree, call drive_index. If not, use drive_search."
+    elif r["status"] == "found":
+        best = r["results"][0]
+        r["then"] = (f"Tell the user you found '{best['name']}' ({best['kind']}, in {best['folder']}). For a spreadsheet, "
+                     f"call file_get with link '{best['id']}' next.")
+    elif r["status"] == "choose":
+        r["say_to_user"] = "Ask which one they mean, listing these (name, kind, folder) in one short message."
+        r["then"] = "Don't search again unless they give new words."
+    else:
+        r["say_to_user"] = ("Say nothing in the index matches, and ask for another word from the file's name, its "
+                            "folder, or what's in it.")
+        r["then"] = "Don't keep searching. If the index might be old, offer drive_index to refresh it."
+    return r
+
+
 TOOLS = {
+    "drive_find": (t_drive_find, "Find a file in the user's Drive from their words, using Idli's local index (fast). "
+                   "Use this first to find any Drive file. Says found / choose / none.",
+                   {"query": {"type": "string", "description": "The user's words for the file"}}, ["query"]),
+    "drive_index": (t_drive_index, "Start indexing the user's Drive in the background (1-5 minutes, stays on this "
+                    "computer). Only after the user agrees.", {}, []),
+    "drive_index_status": (t_drive_index_status, "How far the Drive index has got.", {}, []),
     "list_tabs": (t_list_tabs, "List the browser tabs the user has open in Paseo (title, url, which is active).", {}, []),
     "gmail_search": (t_gmail_search, "Search the user's Gmail (Gmail search syntax works, e.g. from:aws "
                      "newer_than:2m payment). Shows the results in the user's Gmail tab and returns a short list.",
@@ -449,7 +511,8 @@ TOOLS = {
     "gmail_read_open_email": (t_gmail_read_open_email, "Read the email the user currently has open in Gmail.", {}, []),
     "gmail_draft_reply": (t_gmail_draft_reply, "Write a reply to the open email as a DRAFT in the user's Gmail "
                           "tab. It is never sent; the user reviews it.", {"text": {"type": "string"}}, ["text"]),
-    "drive_search": (t_drive_search, "Search the user's Google Drive by name or content; returns files with ids and types.",
+    "drive_search": (t_drive_search, "Live Google Drive search (slow). Only when drive_find has no index or the user "
+                     "asks to search Drive directly.",
                      {"query": {"type": "string"}}, ["query"]),
     "doc_read": (t_doc_read, "Read the text of a Google Doc (by id from drive_search, or the doc open in the "
                  "user's tab when no id is given). Read-only. Google Docs only.", {"doc_id": {"type": "string"}}, []),

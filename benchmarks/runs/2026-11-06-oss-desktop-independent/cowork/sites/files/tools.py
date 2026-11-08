@@ -187,7 +187,7 @@ def _new_download(since, title):
     return p if os.path.getsize(p) == size else None
 
 
-def t_file_get(link, wait_seconds=120):
+def t_file_get(link, wait_seconds=45):
     m = LINK.search(link or "")
     fid = m.group(1) if m else (link.strip() if re.fullmatch(r"[\w-]{20,}", (link or "").strip()) else None)
     if not fid:

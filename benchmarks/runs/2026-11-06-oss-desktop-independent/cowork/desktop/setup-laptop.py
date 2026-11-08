@@ -34,10 +34,10 @@ CLAUDE = shutil.which("claude") or os.path.join(HOME, ".local", "bin", "claude")
 
 COWORK_PROVIDER = {
     "extends": "claude",
-    "label": "Co-work · T4GC (private data, no shell)",
+    "label": "Idli - 30B (private, on Muse)",
     "command": [CLAUDE, "--mcp-config", os.path.join(COWORK, "cowork.mcp.json")],
     "env": {"CLAUDE_CONFIG_DIR": T4GC_CLAUDE, "ENABLE_TOOL_SEARCH": "false"},
-    "models": [{"id": "muse-glimmer-30b", "label": "T4GC model (Idli)", "isDefault": True}],
+    "models": [{"id": "muse-glimmer-30b", "label": "Idli 30B", "isDefault": True}],
     "disallowedTools": ["Bash", "BashOutput", "KillShell", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit",
                         "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite", "Skill", "mcp__paseo",
                         # unused built-ins: ~60k chars of tool schema = ~11k prompt tokens on Muse
@@ -46,7 +46,7 @@ COWORK_PROVIDER = {
                         # co-work is read-only: find, suggest, download. Drafting mail is a write.
                         "mcp__cowork__gmail_draft_reply", "mcp__cowork__sheet_query", "mcp__cowork__sheet_profile"],
 }
-DIY_PROVIDER = {"extends": "claude", "label": "DIY · Claude (builds co-work tools, test accounts only)"}
+DIY_PROVIDER = {"extends": "claude", "label": "Teach - Claude (fake data and test accounts only)"}
 
 
 def step(msg):
