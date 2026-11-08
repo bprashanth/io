@@ -118,9 +118,14 @@ def _ws_eval(ws_url, expression, timeout=10):
         s.close()
 
 
-CLICK_TAB = """(label => { const row = document.querySelector('[data-testid="workspace-tabs-row"]'); if (!row) return 'no-row';
-  const leaf = [...row.querySelectorAll('*')].find(e => e.childElementCount === 0 && (e.innerText || '').trim() === label);
-  if (!leaf) return 'no-tab'; (leaf.parentElement || leaf).click(); return 'ok'; })(%s)"""
+# Paseo keeps other workspaces' tab rows mounted but hidden: use the row that is on screen
+CLICK_TAB = """(label => { const rows = [...document.querySelectorAll('[data-testid="workspace-tabs-row"]')]
+    .filter(r => { const b = r.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
+  if (!rows.length) return 'no-row';
+  for (const row of rows) {
+    const leaf = [...row.querySelectorAll('*')].find(e => e.childElementCount === 0 && (e.innerText || '').trim() === label);
+    if (leaf) { (leaf.parentElement || leaf).click(); return 'ok'; } }
+  return 'no-tab'; })(%s)"""
 
 
 def show_tab(label):
