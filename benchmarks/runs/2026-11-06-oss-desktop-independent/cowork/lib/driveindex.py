@@ -252,7 +252,33 @@ def summarise(batch, timeout=180):
     return {batch[int(k) - 1]["id"]: str(v)[:300] for k, v in got.items() if str(k).isdigit() and 0 < int(k) <= len(batch)}
 
 
+def notify(text):
+    """Tell the chat that started the build (IDLI_NOTIFY_AGENT), so Idli can say it's done. Best effort."""
+    import shutil
+    import subprocess
+    agent = os.environ.get("IDLI_NOTIFY_AGENT")
+    exe = next((p for p in (shutil.which("paseo"), os.path.expanduser("~/.local/bin/paseo"), "/usr/bin/paseo")
+                if p and os.path.exists(p)), None)
+    if not agent or not exe:
+        return
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
+    try:
+        subprocess.run([exe, "send", "--no-wait", agent, text], env=env, capture_output=True, timeout=60)
+    except Exception:
+        pass
+
+
 def build(minutes=5.0, workers=5, muse_parallel=4):
+    try:
+        _build(minutes, workers, muse_parallel)
+    except Exception:
+        notify("Indexing finished with a problem: " + progress_line() + " Tell the user in one line and offer "
+               "\"rebuild index\".")
+        raise
+    notify("Indexing finished: " + progress_line() + " Now write the finish message.")
+
+
+def _build(minutes=5.0, workers=5, muse_parallel=4):
     from lib.browser import paseo
     started = time.time()
     deadline = started + minutes * 60

@@ -444,27 +444,36 @@ def t_drive_index():
     from lib import driveindex as di
     st = di.status()
     if st.get("phase") in ("starting", "listing", "reading", "summarising"):
-        return {"started": False, "running": True, "status": st,
-                "say_to_user": "I'm already indexing your Drive; I'll be able to search it shortly."}
+        return {"started": False, "running": True, "say_to_user": "I'm already indexing your Drive: " + di.progress_line(st)}
     import subprocess
     import sys
     here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     log = os.path.join(os.path.dirname(di.STATE), "drive-index.log")
     os.makedirs(os.path.dirname(log), exist_ok=True)
-    subprocess.Popen([sys.executable, "-I", os.path.join(here, "lib", "driveindex.py"), "build"],
+    env = dict(os.environ, IDLI_NOTIFY_AGENT=os.environ.get("PASEO_AGENT_ID", ""))
+    subprocess.Popen([sys.executable, "-I", os.path.join(here, "lib", "driveindex.py"), "build"], env=env,
                      start_new_session=True, stdin=subprocess.DEVNULL, stdout=open(log, "a"), stderr=subprocess.STDOUT)
+    shown = False
+    try:  # a live progress page in a tab: the chat can't update itself while the index builds
+        from sites.files import tools as ft
+        port, token = ft._server()
+        paseo("browser_new_tab", url=f"http://127.0.0.1:{port}/index?t={token}")
+        shown = True
+    except Exception:
+        pass
     return {"started": True,
-            "say_to_user": "I've started indexing your Drive: file names, folders, the first rows of each Google "
-                           "Sheet and the opening lines of each Doc, summarised by the private model. It stays on "
-                           "this computer and takes 1 to 5 minutes; a few tabs will open and close on their own. "
-                           "You can keep chatting.",
-            "then": "Say say_to_user, then call drive_index_wait and keep writing its progress_line, one short line "
-                    "each time, until it says done; then write its finish message."}
+            "say_to_user": "Indexing your Drive now. It stays on this computer and takes 1 to 5 minutes. "
+                           + ("Progress is in the Drive index tab at the top. " if shown else "")
+                           + "I'll tell you here when it's done.",
+            "then": "Write say_to_user, then stop. A message will arrive when indexing finishes."}
 
 
 def t_drive_index_status():
     from lib import driveindex as di
     st = di.status()
+    if st.get("phase") == "done":
+        return {"status": st, "done": True, "finish": di.progress_line(st) + " " + NEXT_STEPS,
+                "say_to_user": di.progress_line(st)}
     return {"status": st, "say_to_user": di.progress_line(st), "running": st.get("phase") in ("starting", "listing", "reading", "summarising")}
     words = {"none": "Drive hasn't been indexed yet.", "listing": f"Listing files: {st.get('files', 0)} so far.",
              "reading": f"Reading inside Sheets and Docs ({st.get('peeked', 0)} done).",

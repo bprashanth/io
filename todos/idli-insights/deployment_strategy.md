@@ -30,7 +30,7 @@ Claude      <- heading 3: Claude teaches Idli a file, from fake data only
 | # | What | How today | Status |
 |---|---|---|---|
 | 1 | The three headings, in this order, with one workspace each | bootstrap creates projects and workspaces through the Paseo CLI | ✅ created; ❌ order needs patch P2 |
-| 2 | Start here chat already open as the first tab, greeting shown, in Bypass mode | bootstrap: `paseo run --provider t4gc-cowork --mode bypassPermissions --title "Start here" start` | ✅ |
+| 2 | Start here chat already open as the first tab, greeting shown, in Bypass mode | bootstrap: `paseo run --provider t4gc-cowork --mode bypassPermissions --title "Start here" hello` | ✅ |
 | 3 | Drive and Gmail tabs in Start here | bootstrap opens them through Paseo's browser tools as the Start here chat | ✅ (needs the app running) |
 | 4 | Model picker shows only: Idli 30B (private), Idli 9B (not private, optional), Claude | `setup-laptop.py` merges providers into `~/.paseo/config.json` | ⚠️ other providers (Claude, Codex, T4GC experiments) still listed |
 | 5 | New Idli chats can use their tools | Paseo defaults Claude-based chats to Auto mode, whose safety check can't run on Muse, so every tool is blocked | ❌ patch P3, or the user picks Bypass |

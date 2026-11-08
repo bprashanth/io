@@ -140,6 +140,13 @@ def make_handler(files, token):
                 if u.path == "/":
                     with open(PAGE, encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
+                if u.path == "/index":
+                    with open(os.path.join(HERE, "lib", "index.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/index":
+                    from lib import driveindex as di
+                    st = di.status()
+                    return self._send(200, {"status": st, "line": di.progress_line(st)})
                 if u.path == "/api/form":
                     return self._send(200, files.meta(qs["file"][0]))
             except (ValueError, KeyError) as e:
