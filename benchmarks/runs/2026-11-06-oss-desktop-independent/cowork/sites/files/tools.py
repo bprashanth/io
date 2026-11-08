@@ -383,11 +383,11 @@ def t_file_ask(file, spec, tab=None):
 _teach_src = {}  # request_id -> (path, question), so teach_send can remake the copy with the labels they allowed
 
 
-def t_teach_file(file, question, share_labels=None):
+def t_teach_file(file, question, share_labels=None, missing=None):
     path = sh.resolve(file)
     req, mock, preview = fk.make_mock(path, question, caller_agent=os.environ.get("PASEO_AGENT_ID"),
-                                      share_labels=share_labels or ())
-    _teach_src[req["id"]] = (path, question)
+                                      share_labels=share_labels or (), missing=missing)
+    _teach_src[req["id"]] = (path, question, missing)
     cols = list(req["columns"][req["main_sheet"]])
     tabs = list(req["columns"])
     labels = {c: v for c, v in fk.label_columns(path).items() if c not in (req.get("real_labels") or [])}
@@ -395,9 +395,10 @@ def t_teach_file(file, question, share_labels=None):
     col_text = ", ".join(cols[:12]) + (f" and {len(cols) - 12} more" if len(cols) > 12 else "")
     questions = [{
         "header": "Claude",
-        "question": (f"I haven't seen {title} before. Claude can build its dashboard with you from a copy with fake "
-                     f"values: same {'tabs and ' if len(tabs) > 1 else ''}columns ({col_text}), every value made up, "
-                     f"and your question with names removed. Send it and switch to Claude?"),
+        "question": ((f"The dashboard for {title} can't do this yet: {req['missing']}. Claude can add it" if req.get("missing")
+                      and req["existing_skill"] else f"I haven't seen {title} before. Claude can build its dashboard with you")
+                     + f" from a copy with fake values: same {'tabs and ' if len(tabs) > 1 else ''}columns ({col_text}), "
+                     f"every value made up, and your question with names removed. Send it and switch to Claude?"),
         "multiSelect": False,
         "options": [{"label": "Yes, send and switch", "description": "Claude asks a few questions about the columns there"},
                     {"label": "Not now", "description": "Nothing is sent"}]}]
@@ -417,8 +418,9 @@ def t_teach_file(file, question, share_labels=None):
 
 def t_teach_send(request_id, share_labels=None, switch=True):
     if share_labels and request_id in _teach_src:  # remake the copy with the labels they allowed, as one request
-        path, question = _teach_src.pop(request_id)
-        req, _, _ = fk.make_mock(path, question, caller_agent=os.environ.get("PASEO_AGENT_ID"), share_labels=share_labels)
+        path, question, missing = _teach_src.pop(request_id)
+        req, _, _ = fk.make_mock(path, question, caller_agent=os.environ.get("PASEO_AGENT_ID"), share_labels=share_labels,
+                                 missing=missing)
         shutil.rmtree(os.path.join(fk.TEACH_DIR, request_id), ignore_errors=True)
         request_id = req["id"]
     out = _teach_send(request_id)
@@ -450,7 +452,9 @@ def _teach_send(request_id):
         req = json.load(f)
     prompt = (f"Idli asked to be taught a file. The request is in teach/inbox/{request_id}/ (mock.xlsx with fake data "
               f"and a hidden _idli_teach sheet, plus request.json). Question: \"{req['question']}\". "
-              "Use the teach-file skill.")
+              + (f"Idli already has a form for this file; it couldn't do this: \"{req['missing']}\". "
+                 if req.get("missing") else "")
+              + "Use the teach-file skill.")
     paseo = _paseo()
     # Run the CLI as the user, not as this Idli agent: an agent-scoped CLI defaults to the caller's (private)
     # workspace and ignores --cwd. The Teach chat must run in the Teach folder, never in the private one.
@@ -530,6 +534,9 @@ TOOLS = {
                    "question the form can't answer: a copy of the file with fake values and the user's question with "
                    "names removed. Shows what would be sent; nothing is sent yet.",
                    {**FILE, "question": {"type": "string", "description": "The user's question, in their words"},
+                    "missing": {"type": "string", "description": "For a file Idli already has a form for: what the "
+                                "form couldn't do and what you tried, e.g. 'list sheet row numbers for matching trees; "
+                                "file_ask lists the trees without row numbers'"},
                     "share_labels": {"type": "array", "items": {"type": "string"},
                                      "description": "Columns whose category labels the user agreed to send as they are"}},
                    ["file", "question"]),

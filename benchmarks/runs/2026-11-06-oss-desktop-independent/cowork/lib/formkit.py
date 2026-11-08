@@ -101,13 +101,18 @@ def table_name(base, tab, many):
     return f"{base}__{fk.slug(tab)}" if many else base
 
 
-def _clean_view(con, df, spec, name):
+def _clean_view(con, df, spec, name, header_row=None):
     d = df.copy()
     d.columns = [fk.slug(c) for c in d.columns]
+    if header_row is not None:  # the spreadsheet row each record came from (as the checks number them)
+        d["_row"] = [header_row + 1 + i for i in range(len(d))]
     con.register(name + "_raw", d)
     cols, norm = spec.get("columns") or {}, spec.get("normalize") or {}
     sel = []
     for c in d.columns:
+        if c == "_row":
+            sel.append('"_row"')
+            continue
         cs, n = cols.get(c, {}), norm.get(c, {})
         expr = f'NULLIF(TRIM("{c}"), \'\')'
         if n.get("map"):
@@ -139,7 +144,7 @@ def build(con, path, skill, base):
         if sheet is None:
             continue
         name = table_name(base, tab, many)
-        _clean_view(con, sheets[sheet], spec, name)
+        _clean_view(con, sheets[sheet], spec, name, hdr[sheet])
         out[tab] = {"table": name, "sheet": sheet, "df": sheets[sheet], "header_row": hdr[sheet]}
     for tab, spec in tabs.items():
         if tab not in out:
@@ -253,7 +258,7 @@ def form(con, skill, tab, built):
             "filters": filters, "date_columns": dates,
             "presets": [{k: v for k, v in p.items()} for p in spec.get("presets") or []],
             "_measures": {m["id"]: m for m in measures}, "_groups": {g["id"]: g for g in groups},
-            "_kinds": kinds}
+            "_kinds": kinds, "_row_numbers": bool(spec.get("row_numbers"))}
 
 
 def public(f):
@@ -508,6 +513,8 @@ def compile_spec(f, table, spec):
     if not measures:  # list the matching rows
         cols = [c for c in f["_kinds"]]
         sel = ", ".join(f'"{c}" AS {_q(f["_kinds"][c]["label"])}' for c in cols)
+        if f.get("_row_numbers"):  # taught: listings say which spreadsheet row each record is on
+            sel = f'"_row" AS {_q("Sheet row")}, ' + sel
         order = ""
         if spec.get("sort", {}).get("by") in f["_kinds"]:
             order = f' ORDER BY "{spec["sort"]["by"]}" {"DESC" if spec["sort"].get("dir", "desc") == "desc" else "ASC"} NULLS LAST'

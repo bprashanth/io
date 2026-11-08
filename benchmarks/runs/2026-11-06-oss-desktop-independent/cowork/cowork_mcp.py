@@ -87,7 +87,8 @@ def t_report_gap(wanted, tried="", site=""):
 
 TOOLS["report_gap"] = (t_report_gap,
                        "Call this when the user asks for something none of your tools can do (or a tool says it "
-                       "cannot). Do not improvise or guess an answer instead. Describe what is needed in general "
+                       "cannot). Not for a spreadsheet that has a form (file_open said known): use teach_file with "
+                       "`missing` instead, so Claude can extend its form. Do not improvise or guess an answer instead. Describe what is needed in general "
                        "terms (the kind of action and data), not the user's personal data.",
                        {"wanted": {"type": "string", "description": "The missing capability, e.g. 'read the "
                                                                     "cells of a Google Sheet'"},

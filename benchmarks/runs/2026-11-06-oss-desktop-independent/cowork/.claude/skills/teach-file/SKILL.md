@@ -21,6 +21,14 @@ look for the real file.
   a changed layout, add what's missing, and bump `version`. A version-1 skill (keys at the top level, no
   `tabs`) still works; convert it to `tabs` when you change it.
 
+### A request with `missing` (Idli has a form; it couldn't do one thing)
+Only that gap is open. Skip the mainline below except what the gap touches: say in one line what you'll add
+(e.g. "I'll add sheet row numbers to the tree listings"), confirm it with one card ("Yes, add that
+(Recommended)" / "Let's discuss"), extend the skill, test, and hand back. Ways to close common gaps:
+- **Row numbers in listings:** set `"row_numbers": true` on the tab; listings then start with "Sheet row"
+  (the spreadsheet row, as the checks number them).
+- **A question the form's dropdowns can't express:** a taught query in `questions` (section 3).
+
 ## 2. Walk the user through it, one small step at a time
 People can't weigh five topics in one message. Keep a running list of what you still need (the mainline below),
 ask about **one step at a time**, and come back to the list after every answer or side discussion. Start each
