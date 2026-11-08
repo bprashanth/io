@@ -197,3 +197,17 @@ clicked through the DevTools port for now (dev only; Paseo patch P7). Measured o
 "rebuild index", yes brought the progress tab forward, and the chat carried on waiting for the index. The teaching
 round trip is wired but not yet run end to end.
 
+### 2026-11-09, DGX: fewer rounds between finding and analysing
+
+- Found a file: the open-it card now carries a picture of its first rows (an SVG drawn from the index, kept in the
+  private workspace folder). Muse reliably calls a card but often stops after writing a line before one, so the
+  picture goes inside the card. "Yes" opens the file read-only in a tab here (`file_peek`).
+- "Help me analyse X": no Save box (dev builds set each browser tab's download behaviour over DevTools; shipping
+  needs patch P1), then for a file Idli hasn't been taught, one card instead of four rounds: send a copy with fake
+  values to Claude and switch there, plus which label columns may go as they are. Measured on Muse: find to card
+  20 s; analyse to the teach card 42 s (search, download, open, fake copy).
+- Bugs found on the way: the find tool still said "download spreadsheets" (overrode the peek card); index reads
+  with parameters failed silently (no previews); a short word covering the start of a longer one scored as a near
+  match ("field" for "fieldvars"). Search check after the fixes: 23 of 25 right first with today's index, same as
+  the vector index.
+

@@ -19,3 +19,6 @@ Notes
   as tab 0 because the bootstrap creates it before opening the Drive and Gmail tabs.
 - Plugins (`packages/plugin`) run in the daemon and app UI, not in the browser session: P1 can't be a plugin.
   The bootstrap could be one (daemon lifecycle hooks).
+- Until P1 ships, dev builds skip the Save box by setting each browser tab's download behaviour over the DevTools
+  port for the length of one download (`lib/uiswitch.py` QuietDownloads, used by `file_get`). Browser-wide
+  `Browser.setDownloadBehavior` does not reach Paseo's browser tabs; per-tab `Page.setDownloadBehavior` does.
