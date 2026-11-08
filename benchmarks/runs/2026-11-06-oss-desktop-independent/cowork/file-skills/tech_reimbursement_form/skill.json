@@ -1,7 +1,7 @@
 {
  "id": "tech_reimbursement_form",
  "title": "Tech reimbursement form",
- "version": 2,
+ "version": 3,
  "headers": [
   "amount_inr",
   "category",
@@ -16,27 +16,45 @@
   "claim_date": {
    "type": "date",
    "format": "%d/%m/%Y",
-   "meaning": "date the claim was made (DD/MM/YYYY)"
+   "meaning": "date the claim was made (DD/MM/YYYY)",
+   "label": "Claim date"
   },
   "employee": {
    "type": "text",
-   "meaning": "employee who made the claim"
+   "meaning": "employee who made the claim",
+   "label": "Employee"
   },
   "item": {
    "type": "text",
-   "meaning": "item being reimbursed"
+   "meaning": "item being reimbursed",
+   "label": "Item"
   },
   "category": {
    "type": "category",
-   "meaning": "kind of expense: Connectivity, Hardware, Software or Supplies"
+   "meaning": "kind of expense: Connectivity, Hardware, Software or Supplies",
+   "label": "Category",
+   "values": [
+    "Connectivity",
+    "Hardware",
+    "Software",
+    "Supplies"
+   ]
   },
   "amount_inr": {
    "type": "number",
-   "meaning": "claimed amount in rupees"
+   "meaning": "claimed amount in rupees",
+   "label": "Amount (Rs)"
   },
   "status": {
    "type": "category",
-   "meaning": "claim status: Approved, Paid, Pending or Rejected"
+   "meaning": "claim status: Approved, Paid, Pending or Rejected",
+   "label": "Status",
+   "values": [
+    "Approved",
+    "Paid",
+    "Pending",
+    "Rejected"
+   ]
   }
  },
  "normalize": {
@@ -169,6 +187,52 @@
   {
    "version": 2,
    "taught": "rank employees by Amount (INR) claimed in a category between two dates, excluding Rejected"
+  },
+  {
+   "version": 3,
+   "taught": "form fields: labels, measures, business rules (DGX migration to the form format)"
   }
- ]
+ ],
+ "row_noun": "claims",
+ "measures": [
+  {
+   "id": "amount",
+   "label": "Amount (Rs)",
+   "sql": "sum(amount_inr)",
+   "format": "inr"
+  },
+  {
+   "id": "average_claim",
+   "label": "Average claim (Rs)",
+   "sql": "avg(amount_inr)",
+   "format": "inr"
+  }
+ ],
+ "presets": [
+  {
+   "id": "paid_out",
+   "label": "Paid out or approved",
+   "filters": {
+    "status": [
+     "Approved",
+     "Paid"
+    ]
+   }
+  },
+  {
+   "id": "not_rejected",
+   "label": "Leave out rejected claims",
+   "filters": {
+    "status": {
+     "not": [
+      "Rejected"
+     ]
+    }
+   }
+  }
+ ],
+ "date_columns": [
+  "claim_date"
+ ],
+ "hidden": []
 }

@@ -1,0 +1,23 @@
+{"id": "field_programme_tracker", "title": "Field programme tracker", "version": 1, "format": 2,
+ "tabs": {
+  "Visits": {"headers": ["amount_disbursed","field_officer","households_visited","notes","status","village","visit_date"],
+    "summary": "One row per field visit.", "row_noun": "visits",
+    "columns": {"visit_date": {"type": "date", "formats": ["%d/%m/%Y", "%Y-%m-%d"], "label": "Visit date"},
+                "households_visited": {"type": "number"}, "amount_disbursed": {"type": "number", "label": "Amount disbursed (Rs)"},
+                "status": {"type": "category", "values": ["Done", "Follow-up", "Cancelled"]},
+                "notes": {"type": "text"}},
+    "normalize": {"field_officer": {"case": "title", "map": {"meena": "Meena Kulkarni", "ravi": "Ravi Patil", "sunita": "Sunita Jadhav", "arjun": "Arjun Shinde", "kavita": "Kavita More", "imran": "Imran Shaikh"}},
+                  "village": {"case": "title"}, "status": {"case": "title"}},
+    "validations": [{"column": "visit_date", "rule": "date", "arg": ["%d/%m/%Y", "%Y-%m-%d"], "message": "not a date"},
+                    {"column": "visit_date", "rule": "not_future", "arg": ["%d/%m/%Y", "%Y-%m-%d"], "message": "date in the future"},
+                    {"column": "households_visited", "rule": "number", "message": "not a number"},
+                    {"column": "amount_disbursed", "rule": "number", "message": "not a number"}],
+    "measures": [{"id": "disbursed", "label": "Amount disbursed (Rs)", "sql": "sum(amount_disbursed)", "format": "inr"},
+                 {"id": "households", "label": "Households visited", "sql": "sum(households_visited)", "format": "count"}],
+    "presets": [{"id": "completed", "label": "Completed visits", "filters": {"status": ["Done"]}}],
+    "lookups": [{"tab": "Officers", "on": {"field_officer": "name"}, "columns": ["district"], "prefix": "officer_", "labels": {"district": "Officer's district"}},
+                {"tab": "Villages", "on": {"village": "village"}, "columns": ["block"]}]},
+  "Officers": {"headers": ["district","email","name","phone"], "row_noun": "officers",
+    "validations": [{"column": "phone", "rule": "phone", "message": "not a 10-digit phone"}, {"column": "email", "rule": "email", "message": "not an email"}]},
+  "Villages": {"headers": ["block","district","population","village"], "row_noun": "villages", "columns": {"population": {"type": "number"}}}
+ }}

@@ -1,121 +1,306 @@
-"""Files site: spreadsheets Idli has been *taught* (file skills), and asking to be taught new ones.
+"""Files site: the form for a spreadsheet Idli has been taught, and asking to be taught new ones.
 
-Idli never computes numbers itself. For a spreadsheet it calls file_open; a known file has a file
-skill (built by Claude in the Teach workspace from a junk-data mock) with validations and taught
-questions, run here with DuckDB. An unknown file, or a new kind of question, goes to teach_file /
-teach_send. Originals are never changed: validations go into a separate "<name> - checked.xlsx".
+Idli never computes numbers. For a spreadsheet it calls file_open, which recognises the file by its
+headers (whatever its name), runs the contract test and the taught checks, and opens the file's
+**form** in a browser tab: dropdowns built from the file skill and the data. A typed question becomes
+a form spec for file_ask; the form tab follows along, so the person sees exactly what was counted.
+An unknown file, or one whose layout changed, goes to teach_file / teach_send (Claude in the Teach
+workspace, from a junk-data mock). Originals are never changed: checks go into "<name> - checked.xlsx".
+file_get downloads the real file from a Google Sheets or Drive link (Google's quick export hides text in
+number columns, so a download is better).
 """
+import glob
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import time
+import urllib.parse
+import urllib.request
 
 from lib import filekit as fk
+from lib import formkit as fm
+from lib import formserver
 from sites.sheets import tools as sh
 
 HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_open = {}  # file -> {"skill", "table", "problems"}
+_files = None  # formserver.Files for this workspace (same code the page uses)
+_last_get = {}  # link -> time the download was started
 
 
-def _skill_summary(skill):
-    return {"name": skill.get("title") or skill["id"], "version": skill.get("version", 1),
-            "what_it_knows": skill.get("summary", ""),
-            "questions": [{"id": q["id"], "answers": q.get("ask", ""),
-                           "params": {k: v.get("description", v.get("type", "")) + (" (optional)" if v.get("optional") else "")
-                                      for k, v in (q.get("params") or {}).items()}}
-                          for q in skill.get("questions", [])],
-            "checks": len(skill.get("validations") or [])}
+def files():
+    global _files
+    if _files is None or _files.data_dir != os.path.realpath(sh.data_dir()):
+        _files = formserver.Files(sh.data_dir())
+    return _files
 
 
-def _load(file):
-    path = sh.resolve(file)
-    sheets, _ = fk.raw_sheets(path)
-    if not sheets:
-        raise ValueError(f"'{file}' has no data.")
-    main = fk.main_sheet(sheets)
-    skill, score = fk.match(sheets[main])
-    return path, sheets, main, skill, score
-
-
-def t_file_open(file):
-    path, sheets, main, skill, score = _load(file)
-    df = sheets[main]
-    if not skill:
-        _open[file] = {"skill": None}
-        return {"file": file, "known": False, "rows": len(df), "columns": list(df.columns)[:30],
-                "say_to_user": "I haven't seen this file before. Rather than guess, I'd like you to teach me how to read "
-                               "it. I'll make a copy with fake data (same columns, no real values) and send it with "
-                               "your question to Claude in the Teach workspace. Is that OK?",
-                "then": "If they agree, call teach_file. Don't work out numbers from this file yourself."}
-    table = fk.slug(skill["id"])
-    fk.build_tables(sh._con, path, skill, table)
-    sh._tables[table] = {"file": file, "sheet": main, "columns": {fk.slug(c): c for c in df.columns}}
-    _open[file] = {"skill": skill, "table": table}
-    return {"file": file, "known": True, "rows": len(df), **_skill_summary(skill),
-            "next": "Call file_check(file) once in this chat. Then pick the question that fits what the user "
-                    "asked and call file_answer with its parameters (ask the user if a value is unclear). If no "
-                    "question fits, tell the user you haven't been taught this kind of question and offer "
-                    "teach_file."}
-
-
-def t_file_check(file):
-    if file not in _open:
-        t_file_open(file)
-    skill = _open[file].get("skill")
-    if not skill:
-        return {"error": "Idli hasn't been taught this file yet. Offer teach_file."}
-    out_dir = os.path.join(sh.data_dir(), "checked")
-    problems, out, sheet = fk.check(sh.resolve(file), skill, out_dir)
-    _open[file]["problems"] = len(problems)
-    groups = {}
-    for p in problems:
-        g = groups.setdefault((p["column"], p["problem"]), {"column": p["column"], "problem": p["problem"],
-                                                           "count": 0, "examples": []})
-        g["count"] += 1
-        if len(g["examples"]) < 4:
-            g["examples"].append({"row": p["row"], "value": p["value"]})
-    rel = os.path.relpath(out, sh.data_dir())
-    return {"file": file, "problems": len(problems), "by_kind": list(groups.values())[:10], "checked_copy": rel,
-            "tell_the_user": ("No problems found." if not problems else
-                              f"List the problem kinds briefly (counts and a couple of row numbers). Say the "
-                              f"checked copy at {rel} has the check formulas and the problem cells in red, and the "
-                              "original is unchanged. Ask whether to carry on now or wait while they fix the "
-                              "original.")}
-
-
-def t_file_answer(file, question, params=None):
-    if file not in _open or not _open[file].get("table"):
-        r = t_file_open(file)
-        if not r.get("known"):
-            return {"error": "Idli hasn't been taught this file yet. Offer teach_file."}
-    skill, table = _open[file]["skill"], _open[file]["table"]
-    qs = {q["id"]: q for q in skill.get("questions", [])}
-    q = qs.get(question)
-    if not q:
-        return {"error": f"No taught question '{question}'. Taught: {list(qs)}. If none fits, offer teach_file."}
+# ---------------------------------------------------------------- the form server
+def _server():
+    """(port, token) of this workspace's form server, starting it if needed."""
+    sf = formserver.state_file(sh.data_dir())
+    def alive(st):
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{st['port']}/api/form?t={st['token']}&file=_", timeout=2):
+                return True
+        except urllib.error.HTTPError as e:
+            return e.code == 400  # the server answered with our token: it's ours
+        except OSError:
+            return False
     try:
-        sql = fk.fill(q["sql"].replace("{{table}}", f'"{table}"'), params or {}, q.get("params"))
-    except ValueError as e:
-        return {"error": str(e), "hint": "Ask the user for the missing value, then call again."}
-    df = sh._con.execute(sql).fetchdf()
-    caveat = ""
-    try:
-        with open(sh.resolve(file) + ".hidden.json") as f:
-            hidden = json.load(f)
-        used = [c for c in hidden if fk.slug(c) in sql]
-        if used:
-            caveat = (f" Also say plainly: {', '.join(f'{c} ({hidden[c]} cells)' for c in used)} may be missing values, "
-                      "because Google's sheet export hides text in number columns (like 'Rs. 300'); totals from those "
-                      "columns may be too low until the cells hold plain numbers.")
-    except (OSError, ValueError):
+        with open(sf) as f:
+            st = json.load(f)
+        if alive(st):
+            return st["port"], st["token"]
+    except (OSError, ValueError, KeyError):
         pass
-    return {"question": q.get("ask", question), "params": params or {}, "rows": sh.rows(df, 50),
-            "row_count": int(len(df)), "unresolved_problems": _open[file].get("problems"),
-            "tell_the_user": "Give these numbers exactly as returned (format them, never change or re-add them). "
-                             "Mention the parameters used, e.g. the date range."
-                             + (" Say the answer includes rows that failed checks." if _open[file].get("problems")
-                                else "") + caveat}
+    import socket
+    port = None
+    for p in range(formserver.PORT, formserver.PORT + 20):
+        with socket.socket() as so:
+            if so.connect_ex(("127.0.0.1", p)) != 0:
+                port = p
+                break
+    if port is None:
+        raise RuntimeError("No free port for the form page.")
+    if os.path.exists(sf):
+        os.remove(sf)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
+    subprocess.Popen([sys.executable, "-I", os.path.join(HERE, "lib", "formserver.py"), sh.data_dir(), str(port)],
+                     start_new_session=True, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=open(os.path.join(os.path.dirname(sf) if os.path.isdir(os.path.dirname(sf)) else "/tmp",
+                                              "form-server.log"), "a"))
+    for _ in range(40):
+        time.sleep(0.25)
+        try:
+            with open(sf) as f:
+                st = json.load(f)
+            if alive(st):
+                return st["port"], st["token"]
+        except (OSError, ValueError, KeyError):
+            pass
+    raise RuntimeError("The form page did not start.")
+
+
+def form_url(file, tab=None, spec=None):
+    port, token = _server()
+    q = {"t": token, "file": file}
+    if tab:
+        q["tab"] = tab
+    if spec:
+        q["spec"] = json.dumps(spec, separators=(",", ":"))
+    return f"http://127.0.0.1:{port}/?" + urllib.parse.urlencode(q)
+
+
+def _show(url, file):
+    """Open the form in a Paseo browser tab (reusing this file's form tab). Best effort: never fails the tool."""
+    try:
+        from lib.browser import paseo, tabs
+        port = urllib.parse.urlparse(url).port
+        mine = [t for t in tabs() if f"127.0.0.1:{port}/" in t["url"]
+                and urllib.parse.parse_qs(urllib.parse.urlparse(t["url"]).query).get("file", [""])[0] == file]
+        if mine:
+            paseo("browser_navigate", browserId=mine[0]["id"], url=url)
+        else:
+            paseo("browser_new_tab", url=url)
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------- getting the real file
+LINK = re.compile(r"(?:/spreadsheets/(?:u/\d+/)?d/|/file/(?:u/\d+/)?d/|[?&]id=)([\w-]{20,})")
+
+
+def _download_dirs():
+    out = [p for p in (os.environ.get("IDLI_DOWNLOAD_DIRS") or "").split(os.pathsep) if p]
+    try:
+        x = subprocess.run(["xdg-user-dir", "DOWNLOAD"], capture_output=True, text=True, timeout=5).stdout.strip()
+        if x:
+            out.append(x)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    out += [os.path.expanduser("~/Downloads"), sh.data_dir()]
+    seen = []
+    for p in out:
+        if os.path.isdir(p) and os.path.realpath(p) not in seen:
+            seen.append(os.path.realpath(p))
+    return seen
+
+
+def _new_download(since, title):
+    """A finished .xlsx/.csv saved after `since`, preferring one named like the sheet."""
+    found = []
+    for d in _download_dirs():
+        for p in glob.glob(os.path.join(d, "*.xlsx")) + glob.glob(os.path.join(d, "*.csv")):
+            try:
+                st = os.stat(p)
+            except OSError:
+                continue
+            if st.st_mtime >= since - 2 and st.st_size > 0 and "/checked/" not in p:
+                name = os.path.splitext(os.path.basename(p))[0]
+                score = 2 if title and fk.slug(name).startswith(fk.slug(title)[:20]) else 1
+                found.append((score, st.st_mtime, p))
+    if not found:
+        return None
+    p = max(found)[2]
+    size = os.path.getsize(p)
+    time.sleep(1)
+    return p if os.path.getsize(p) == size else None
+
+
+def t_file_get(link, wait_seconds=120):
+    m = LINK.search(link or "")
+    fid = m.group(1) if m else (link.strip() if re.fullmatch(r"[\w-]{20,}", (link or "").strip()) else None)
+    if not fid:
+        return {"error": "That doesn't look like a Google Sheets or Drive link. Use drive_search to find the file."}
+    from lib.browser import paseo, tab_for
+    from sites.google import tools as g
+    sheet = "/spreadsheets/" in link or "/file/" not in link
+    btab = tab_for("docs.google.com", "drive.google.com", open_url=g.drive_url())
+    title = ""
+    if sheet:
+        try:
+            title, _ = g.sheet_tabs(btab, fid)
+        except ValueError as e:
+            if "/spreadsheets/" in link:
+                return {"error": str(e)}
+            sheet = False
+    since = _last_get.get(fid)
+    got = _new_download(since, title) if since else None
+    if not got:
+        since = time.time()
+        _last_get[fid] = since
+        url = (g.sheets_url(fid, "export?format=xlsx") if sheet else
+               "https://drive.google.com/uc?export=download&id=" + fid + g.au("&"))
+        try:
+            paseo("browser_navigate", browserId=btab, url=url)
+        except RuntimeError:
+            pass  # the page load is cancelled because the response is a file; the download goes on
+        deadline = since + max(10, min(int(wait_seconds or 120), 300))
+        while time.time() < deadline and not got:
+            time.sleep(1.5)
+            got = _new_download(since, title)
+        if sheet:
+            try:
+                paseo("browser_navigate", browserId=btab, url=g.sheets_url(fid, "edit"))
+            except RuntimeError:
+                pass
+    if not got:
+        return {"downloaded": False,
+                "say_to_user": "I asked the browser to download the file. If a Save dialog is open, click Save (any "
+                               "folder is fine), then tell me 'done'.",
+                "then": "When they say done, call file_get again with the same link. If downloading isn't possible, "
+                        "gsheet_read can read the sheet, but Google's export may hide text in number columns."}
+    out_dir = os.path.join(sh.data_dir(), "drive")
+    os.makedirs(out_dir, exist_ok=True)
+    name = (re.sub(r"[^\w .()-]+", "_", title).strip() or os.path.splitext(os.path.basename(got))[0])[:80]
+    dest = os.path.join(out_dir, name + os.path.splitext(got)[1])
+    if os.path.realpath(got) != os.path.realpath(dest):
+        shutil.copy2(got, dest)
+    _last_get.pop(fid, None)
+    rel = os.path.relpath(dest, sh.data_dir())
+    return {"downloaded": True, "file": rel, "title": title or name,
+            "then": f"Call file_open(file='{rel}')."}
+
+
+# ---------------------------------------------------------------- the form
+def _brief(f):
+    """What the model needs to fill a spec for one tab, kept short."""
+    def vals(x):
+        v = x.get("values") or []
+        return v if len(v) <= 15 else v[:15] + [f"... {len(v) - 15} more"]
+    return {"tab": f["tab"], "row_noun": f["row_noun"], "summary": f.get("summary", ""),
+            "measures": {m["id"]: m["label"] for m in f["measures"]},
+            "group_by": {g["id"]: g["label"] for g in f["group_by"]},
+            "filters": {x["column"]: ({"label": x["label"], "values": vals(x)} if x["kind"] == "choice" else
+                                      {"label": x["label"], "kind": x["kind"], "min": x.get("min"), "max": x.get("max")})
+                        for x in f["filters"]},
+            "presets": {p["id"]: p["label"] for p in f["presets"]},
+            "date_columns": f["date_columns"]}
+
+
+def t_file_open(file, show_form=True):
+    meta = files().meta(file)
+    if not meta["known"]:
+        return {"file": file, "known": False,
+                "say_to_user": "I haven't seen this file before. Rather than guess, I'd like you to teach me how to read "
+                               "it. I'll make a copy with fake data (same columns, no real values) and send it to Claude "
+                               "in the Teach workspace. Is that OK?",
+                "then": "If they agree, call teach_file. Don't work out numbers from this file yourself."}
+    c = meta["contract"]
+    url = form_url(file)
+    shown = _show(url, file) if show_form and c["status"] != "changed" else False
+    e = files().open(file)
+    kinds = {}
+    for p in e["problems"]:
+        k = kinds.setdefault((p["tab"], p["column"], p["problem"]), {"tab": p["tab"], "column": p["column"],
+                                                                    "problem": p["problem"], "rows": []})
+        if len(k["rows"]) < 4:
+            k["rows"].append(p["row"])
+    out = {"file": file, "title": meta["title"], "known": True, "today": fm.today(),
+           "layout": c["status"], "layout_changes": c["messages"],
+           "problems": len(e["problems"]), "problem_kinds": list(kinds.values())[:12],
+           "checked_copy": meta["checked_copy"], "form_link": url, "form_opened": shown,
+           "tabs": [_brief(f) for f in e["forms"].values()]}
+    if meta.get("hidden_cells"):
+        out["warning"] = ("This copy came from Google's quick export, which hides text in number columns: "
+                          + ", ".join(f"{k} ({v} cells)" for k, v in meta["hidden_cells"].items())
+                          + ". Offer to download the real file with file_get.")
+    if c["status"] == "changed":
+        out["say_to_user"] = ("This file has changed since I was taught it: " + " ".join(c["messages"])
+                              + " I'd like you to teach me the new layout before I answer. Is that OK?")
+        out["then"] = "If they agree, call teach_file with their question (it updates the taught version)."
+    else:
+        bits = [f"I've opened the form for {meta['title']}" + (" in a new tab." if shown else f": {url}")]
+        if c["status"] == "drift":
+            bits.append("It has changed a little since I was taught it: " + " ".join(c["messages"]))
+        if e["problems"]:
+            bits.append(f"The checks found {len(e['problems'])} problem{'s' if len(e['problems']) > 1 else ''} "
+                        f"(listed in the form; the checked copy {meta['checked_copy']} has them in red; the original is "
+                        "unchanged).")
+        out["say_to_user"] = " ".join(bits)
+        out["then"] = ("For a question about this file, call file_ask with a spec built only from these tabs' measures, "
+                       "group_by, filters and presets. Ask the user if a value is unclear. If no measure or filter fits "
+                       "the question, offer teach_file.")
+    return out
+
+
+def t_file_ask(file, spec, tab=None):
+    if isinstance(spec, str):
+        try:
+            spec = json.loads(spec)
+        except ValueError:
+            return {"error": "spec must be a JSON object."}
+    try:
+        res = files().run(file, tab, spec or {})
+    except fm.SpecError as e:
+        return {"error": str(e), "hint": "Use only ids from file_open's tabs. If nothing fits, offer teach_file."}
+    except ValueError as e:
+        msg = str(e)
+        if "changed since" in msg:
+            return {"error": msg, "then": "Offer teach_file to re-teach the new layout."}
+        if "taught" in msg:
+            return {"error": msg, "then": "Call file_open first; offer teach_file if Idli doesn't know the file."}
+        return {"error": msg}
+    url = form_url(file, res["tab"], spec)
+    shown = _show(url, file)
+    meta = files().meta(file)
+    note = ""
+    if meta.get("hidden_cells"):
+        used = [k for k in meta["hidden_cells"] if fk.slug(k) in res["sql"]]
+        if used:
+            note = (" Say: " + ", ".join(used) + " may be missing values because this copy came from Google's quick "
+                    "export; offer to download the real file with file_get.")
+    if meta["contract"]["status"] == "drift":
+        note += " Mention: " + " ".join(meta["contract"]["messages"])
+    n_prob = meta.get("problem_count") or 0
+    return {"answer": res["text"], "form_link": url, "form_updated": shown,
+            "say_to_user": "Give the answer exactly as written (numbers unchanged), in a sentence or a short list. "
+                           + ("Say the form tab now shows it." if shown else "Share the form link.")
+                           + (" Rows that failed checks are included." if n_prob else "") + note}
 
 
 def t_teach_file(file, question, share_labels=None):
@@ -188,22 +373,34 @@ def t_teach_send(request_id):
                              "When it finishes, this chat gets a message and you will continue."}
 
 
-FILE = {"file": {"type": "string", "description": "Path in the workspace folder, e.g. from gsheet_read's saved_csv "
-                                                  "or sheet_list"}}
+FILE = {"file": {"type": "string", "description": "Path in the workspace folder, from file_get, gsheet_read's "
+                                                  "saved_csv or sheet_list"}}
+SPEC = {"type": "object", "description":
+        "Form spec, using ids from file_open's tab. Keys (all optional): measures [ids], group_by [up to 2 ids], "
+        "filters {column: [values]} or {column: {min, max}} or {column: {not: [values]}}, preset [ids], "
+        "date {column, period} or {column, from, to}; period is one of " + ", ".join(fm.PERIODS)
+        + "; from/to are YYYY-MM-DD or a month like 2026-09. sort {by: id, dir: desc|asc}, limit n. "
+        "No measures lists the matching rows. Example: {\"measures\": [\"amount\"], \"group_by\": [\"employee\"], "
+        "\"filters\": {\"category\": [\"Hardware\"]}, \"date\": {\"period\": \"this_year\"}}"}
 TOOLS = {
-    "file_open": (t_file_open, "Open a spreadsheet (Excel or CSV in the workspace folder, e.g. a Google Sheet saved by "
-                  "gsheet_read). Says whether Idli has been taught this file and which questions it can answer. "
-                  "Always call this before answering anything about a spreadsheet.", FILE, ["file"]),
-    "file_check": (t_file_check, "Run the taught checks on a known file (phones, emails, dates, amounts...). Writes a "
-                   "separate '<name> - checked.xlsx' with formulas; never changes the original.", FILE, ["file"]),
-    "file_answer": (t_file_answer, "Answer a taught question on a known file. The numbers come from the data, never "
-                    "from you.", {**FILE, "question": {"type": "string", "description": "Question id from file_open"},
-                                  "params": {"type": "object", "description": "Values for the question's params, "
-                                             "e.g. {\"start\": \"2026-08-26\", \"end\": \"2026-10-26\"}"}},
-                    ["file", "question"]),
-    "teach_file": (t_teach_file, "Prepare a teaching request for a file Idli doesn't know (or a question it hasn't "
-                   "been taught): a copy of the file with fake values and the user's question with names removed. "
-                   "Shows what would be sent; nothing is sent yet.",
+    "file_get": (t_file_get, "Download the real spreadsheet from a Google Sheets or Drive link into this folder (better "
+                 "than gsheet_read: Google's quick export hides text in number columns). The browser may show a Save "
+                 "dialog; the user clicks Save. Then call file_open.",
+                 {"link": {"type": "string", "description": "A docs.google.com/spreadsheets or drive.google.com link, or "
+                                                            "a file id from drive_search"}}, ["link"]),
+    "file_open": (t_file_open, "Open a spreadsheet's form: says whether Idli has been taught this file, whether its "
+                  "layout changed, the problems the checks found, and what the form can answer (measures, group_by, "
+                  "filters, presets per tab). Opens the form in a browser tab. Always call this before answering "
+                  "anything about a spreadsheet.", {**FILE, "show_form": {"type": "boolean",
+                                                                          "description": "Open the form tab (default true)"}},
+                  ["file"]),
+    "file_ask": (t_file_ask, "Answer a question about an opened file by filling its form. The numbers come from the "
+                 "data, never from you; the form tab shows the same answer.",
+                 {**FILE, "spec": SPEC, "tab": {"type": "string", "description": "Tab name from file_open (default: "
+                                                                                  "the first)"}}, ["file", "spec"]),
+    "teach_file": (t_teach_file, "Prepare a teaching request for a file Idli doesn't know, or whose layout changed, or a "
+                   "question the form can't answer: a copy of the file with fake values and the user's question with "
+                   "names removed. Shows what would be sent; nothing is sent yet.",
                    {**FILE, "question": {"type": "string", "description": "The user's question, in their words"},
                     "share_labels": {"type": "array", "items": {"type": "string"},
                                      "description": "Columns whose category labels the user agreed to send as they are"}},

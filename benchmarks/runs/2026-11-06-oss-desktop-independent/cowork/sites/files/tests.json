@@ -1,10 +1,18 @@
 {
   "data_dir": "testdata",
   "tests": [
-    {"name": "unknown file asks to be taught", "tool": "file_open", "args": {"file": "volunteer_register.xlsx"},
+    {"name": "unknown file asks to be taught", "tool": "file_open", "args": {"file": "mystery_batches.csv", "show_form": false},
      "expect": {"contains": ["\"known\": false", "teach"]}},
-    {"name": "teaching request sends fake values only", "tool": "teach_file",
-     "args": {"file": "volunteer_register.xlsx", "question": "how many joined from Pune since July?"},
-     "expect": {"contains": ["request_id", "Volunteer name 1", "could_share_labels", "<a value from 'District'>"]}}
+    {"name": "known file opens its form with checks", "tool": "file_open", "args": {"file": "volunteer_register.xlsx", "show_form": false},
+     "expect": {"contains": ["\"known\": true", "form_link", "stipend", "problem_kinds"]}},
+    {"name": "a form spec answers from the data", "tool": "file_ask",
+     "args": {"file": "volunteer_register.xlsx", "spec": {"measures": ["rows", "stipend"], "group_by": ["district"], "date": {"from": "2026-07-01"}}},
+     "expect": {"contains": ["All: Number of volunteers 25", "Rs 32,100"]}},
+    {"name": "a spec outside the form is refused", "tool": "file_ask",
+     "args": {"file": "volunteer_register.xlsx", "spec": {"measures": ["sum(1)"]}},
+     "expect": {"contains": ["No measure"], "error_ok": true}},
+    {"name": "teaching request sends fake values only, same fakes across tabs", "tool": "teach_file",
+     "args": {"file": "field_programme_tracker.xlsx", "question": "how much did Meena disburse in Wai last quarter?"},
+     "expect": {"contains": ["request_id", "Field officer A", "could_share_labels", "<a value from 'Field officer'>"]}}
   ]
 }

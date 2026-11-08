@@ -8,6 +8,19 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-08 (later), owner + DGX: downloads work, and the file flow becomes a form.**
+  - **Correction:** Paseo's browser *does* download. Opening `…/spreadsheets/d/<id>/export?format=xlsx` shows a red
+    `GUEST_VIEW_MANAGER_CALL … ERR_FAILED (-2)` line (cosmetic: the page load is cancelled because the response is a
+    file), then the system "Save as" dialog. The owner saved the volunteer register to `~/idli-insights/testdata` on the
+    laptop and it is intact (`Rs. 300` present). Paseo 0.15.2 has no `will-download` handler, so Electron falls back to
+    the dialog. Idli can't click a system dialog, so automatic downloads still need a small Paseo change (save into the
+    workspace folder, no dialog). Plugins can't do it: they run in the daemon and app UI, not the browser session.
+  - **Decision (owner):** for single-file work, the model's role shrinks. Teach describes a file once (measures,
+    groupings, date columns, business rules, checks, every tab). Idli then opens a **form** for that file: dropdowns
+    tailored to its data, the schema problems, and the answer, all computed by code. The model finds files, talks, and
+    fills the form from a typed question; it never writes SQL or numbers. A **contract test** runs before every query,
+    and a changed schema asks for re-teaching. The entry point is "open the form for <link>". Next: compare a plain form,
+    a classifier with a date parser, and 4B/9B/30B models on filling the form from vague questions.
 - **2026-11-08, DGX: teach Idli a file.** New `files` site (file_open, file_check, file_answer, teach_file, teach_send),
   `lib/filekit.py`, the `teach-file` Claude skill, `idli/CLAUDE.md` (copied into `~/idli-insights/cowork-real/CLAUDE.md`), and
   `cowork.sites` gains `files`. Three file skills taught in human-style runs; results in

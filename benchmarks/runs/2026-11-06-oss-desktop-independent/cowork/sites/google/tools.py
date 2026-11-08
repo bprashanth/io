@@ -453,8 +453,9 @@ TOOLS = {
                      {"query": {"type": "string"}}, ["query"]),
     "doc_read": (t_doc_read, "Read the text of a Google Doc (by id from drive_search, or the doc open in the "
                  "user's tab when no id is given). Read-only. Google Docs only.", {"doc_id": {"type": "string"}}, []),
-    "gsheet_read": (t_gsheet_read, "Read the cells of a Google Sheet (id from drive_search, or the sheet open in the "
-                    "user's tab when no id is given). Returns the tab names, columns and first rows, and saves the "
+    "gsheet_read": (t_gsheet_read, "Read the cells of a Google Sheet through Google's quick export (id from drive_search, or "
+                    "the sheet open in the user's tab when no id is given). Prefer file_get, which downloads the real "
+                    "file; the quick export hides text in number columns. Returns the tab names, columns and first rows, and saves the "
                     "whole tab as a CSV in the workspace folder for sheet_profile / sheet_query. Read-only.",
                     {"sheet_id": {"type": "string"}, "tab": {"type": "string", "description": "Tab name; default "
                      "the first tab"}, "max_rows": {"type": "integer", "description": "Rows to show (default 15)"}},

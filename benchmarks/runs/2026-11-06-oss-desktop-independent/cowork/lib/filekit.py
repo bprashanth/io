@@ -232,7 +232,10 @@ def _variant(fake, real):
     return fake
 
 
-def mock_column(series, header, rnd, keep_labels=False):
+def mock_column(series, header, rnd, keep_labels=False, shared=None):
+    """`shared` maps a real value to its fake across every column and tab, so a name in Visits and the same
+    name in Officers get the same fake, and lookups between tabs still join in the mock."""
+    shared = {} if shared is None else shared
     info = classify(series)
     kind, out = info["kind"], []
     vals = list(series)
@@ -277,15 +280,22 @@ def mock_column(series, header, rnd, keep_labels=False):
             out.append(v)  # the user agreed these labels (e.g. Approved / Pending) are not private
         elif kind == "category":
             base = real_variants.get(v, v)
+            key = re.sub(r"[^a-z0-9]", "", base.lower())
+            if key in shared:
+                cats.setdefault(base, shared[key])
             if base not in cats:
                 cats[base] = f"{header} {_label(len(cats))}"
+                shared[key] = cats[base]
             fake = cats[base]
             out.append(_variant(fake, v))
         elif kind == "longtext":
             n = max(3, len(v) // 6)
             out.append(" ".join(rnd.choice(WORDS) for _ in range(n)).capitalize())
         else:
-            out.append(f"{header} {i + 1}")
+            key = re.sub(r"[^a-z0-9]", "", v.lower())
+            if key not in shared:
+                shared[key] = f"{header} {len([x for x in shared.values() if x.startswith(header + ' ')]) + 1}"
+            out.append(_variant(shared[key], v))
     return out, info
 
 
@@ -330,17 +340,19 @@ def make_mock(path, question, title=None, caller_agent=None, seed=7, share_label
     rnd = random.Random(seed)
     main = main_sheet(sheets)
     fp = fingerprint(sheets[main])
-    skill, score = match(sheets[main])
+    from lib import formkit  # late import: formkit builds on this module
+    skill, score, _ = formkit.match_file(sheets)
     title = title or re.sub(r"\s*-\s*checked$", "", os.path.splitext(os.path.basename(path))[0])
     rid = f"{slug(title)[:40]}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}"
     rdir = os.path.join(TEACH_DIR, rid)
     os.makedirs(rdir, exist_ok=True)
     clean_q = scrub(question, sheets, keep=share_labels)
-    mocks, kinds = {}, {}
+    mocks, kinds, shared = {}, {}, {}
     for name, df in sheets.items():
         cols, k = {}, {}
         for c in df.columns:
-            cols[c], info = mock_column(df[c], c, rnd, keep_labels=c in share_labels or fk_slug_in(c, share_labels))
+            cols[c], info = mock_column(df[c], c, rnd, keep_labels=c in share_labels or fk_slug_in(c, share_labels),
+                                        shared=shared)
             k[c] = {x: info[x] for x in ("kind", "format", "bad", "blank", "distinct") if x in info}
         mocks[name] = pd.DataFrame(cols)[list(df.columns)].head(300)
         kinds[name] = k
@@ -581,32 +593,62 @@ def _inspect(path):
 
 
 def _test(skill_dir, mock=None):
+    """Run a skill's tests.json on its mock. A test is either a form spec
+    {"tab": "Visits", "spec": {...}, "expect": [[...], ...]} (rows as lists, in the form's column order) or a
+    taught question {"question": id, "params": {...}, "expect": [...]}."""
     import duckdb
+    from lib import formkit as fm
     with open(os.path.join(skill_dir, "skill.json")) as f:
         skill = json.load(f)
     with open(os.path.join(skill_dir, "tests.json")) as f:
         tests = json.load(f)
     mock = mock or os.path.join(skill_dir, "mock.xlsx")
     sheets, _ = raw_sheets(mock)
-    s, score = match(sheets[main_sheet(sheets)])
+    global SKILLS_DIR
+    saved, SKILLS_DIR = SKILLS_DIR, os.path.dirname(os.path.abspath(skill_dir))
+    try:
+        s, score, tabmap = fm.match_file(sheets)
+    finally:
+        SKILLS_DIR = saved
     fails = 0 if (s and s.get("id") == skill.get("id")) else 1
-    print(("ok  " if not fails else "FAIL") + f" recognises the mock (overlap {score})")
+    print(("ok  " if not fails else "FAIL") + f" recognises the mock (overlap {score}; tabs {dict((k, v[0]) for k, v in tabmap.items())})")
     con = duckdb.connect()
-    build_tables(con, mock, skill, "t")
-    problems, _, _ = check(mock, skill, os.path.join(skill_dir, ".check"))
-    print(f"ok   validations ran: {len(problems)} problems in the mock")
+    built = fm.build(con, mock, skill, "t")
+    c = fm.contract(skill, sheets, con, built)
+    print(("ok  " if c["status"] != "changed" else "FAIL") + f" contract on the mock: {c['status']} {c['messages']}")
+    fails += c["status"] == "changed"
+    forms = {}
+    for tab in built:
+        try:
+            forms[tab] = fm.form(con, skill, tab, built)
+            print(f"ok   form for '{tab}': {len(forms[tab]['measures'])} measures, {len(forms[tab]['group_by'])} groupings, "
+                  f"{len(forms[tab]['filters'])} filters, {len(forms[tab]['presets'])} presets")
+        except Exception as e:
+            print(f"FAIL form for '{tab}': {e}")
+            fails += 1
+    problems, _ = fm.check(mock, skill, os.path.join(skill_dir, ".check"))
+    print(f"ok   checks ran: {len(problems)} problems in the mock")
+    first = next(iter(built))
     qs = {q["id"]: q for q in skill.get("questions", [])}
     for t in tests:
-        q = qs.get(t["question"])
         try:
-            got = con.execute(fill(q["sql"].replace("{{table}}", '"t"'), t.get("params", {}), q.get("params"))).fetchall()
+            if "spec" in t:
+                tab = t.get("tab") or first
+                r = fm.run(con, forms[tab], built[tab]["table"], t["spec"])
+                got = [list(x.values()) for x in r["rows"]]
+                label = f"{tab}: {json.dumps(t['spec'])}"
+            else:
+                q = qs[t["question"]]
+                table = built[q.get("tab") or first]["table"]
+                got = con.execute(fill(q["sql"].replace("{{table}}", f'"{table}"'), t.get("params", {}),
+                                       q.get("params"))).fetchall()
+                label = f"{t['question']} {t.get('params', {})}"
             exp = t.get("expect")
             ok = exp is None or _close(got, exp)
-            print(("ok  " if ok else "FAIL") + f" {t['question']} {t.get('params', {})} -> {got[:3]}"
-                  + ("" if ok else f" expected {exp}"))
+            print(("ok  " if ok else "FAIL") + f" {label} -> {got[:3]}" + ("" if ok else f" expected {exp}"))
             fails += 0 if ok else 1
         except Exception as e:
-            print(f"FAIL {t['question']}: {e}")
+            print(f"FAIL {t.get('question') or t.get('spec')}: {e}")
             fails += 1
     print("ALL PASSED" if not fails else f"{fails} FAILED")
     return fails
