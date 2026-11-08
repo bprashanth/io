@@ -412,10 +412,28 @@ def t_teach_send(request_id):
         subprocess.Popen([sys.executable, "-I", os.path.join(HERE, "lib", "teachwatch.py"), rdir,
                           req["caller_agent"], paseo], start_new_session=True, env=env,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with open(os.path.join(rdir, "teach_agent.json"), "w") as f:
+        json.dump({"agent": agent}, f)
     return {"started": True, "teach_chat": f"Teach: {req['title']}",
-            "tell_the_user": "Say teaching has started in the 'Claude' workspace, in the chat called "
-                             f"'Teach: {req['title']}'. Claude will ask a few questions about the columns there. "
-                             "When it finishes, this chat gets a message and you will continue."}
+            "tell_the_user": "Say in one line that teaching has started in the 'Claude' workspace, in the chat called "
+                             f"'Teach: {req['title']}'. Then call AskUserQuestion with one question: header \"Claude\", "
+                             "question \"Opening Claude to teach this file. It will ask you a few questions about the "
+                             "columns. Switch there now?\", options \"Yes, open Claude\" and \"Not now\". If they pick "
+                             "yes, call show_teach_chat. Either way: when teaching finishes, this chat gets a message "
+                             "and you continue."}
+
+
+def t_show_teach_chat(request_id):
+    """After the person said yes on the card: switch Paseo to the Teach chat in the Claude workspace."""
+    from lib import uiswitch
+    try:
+        with open(os.path.join(fk.TEACH_DIR, request_id, "teach_agent.json")) as f:
+            agent = json.load(f)["agent"]
+    except (OSError, ValueError, KeyError):
+        return {"shown": False, "say_to_user": "Open the Claude workspace in the left sidebar to answer its questions."}
+    got = uiswitch.show_agent(agent)
+    return {"shown": got["ok"]} if got["ok"] else {
+        "shown": False, "say_to_user": "Open the Claude workspace in the left sidebar to answer its questions."}
 
 
 FILE = {"file": {"type": "string", "description": "Path in the workspace folder, from file_get, gsheet_read's "
@@ -452,6 +470,8 @@ TOOLS = {
                     "share_labels": {"type": "array", "items": {"type": "string"},
                                      "description": "Columns whose category labels the user agreed to send as they are"}},
                    ["file", "question"]),
+    "show_teach_chat": (t_show_teach_chat, "Switch the app to the Teach chat in the Claude workspace. Only after "
+                        "the user said yes on the card.", {"request_id": {"type": "string"}}, ["request_id"]),
     "teach_send": (t_teach_send, "After the user agrees, send the teaching request to Claude in the Teach workspace.",
                    {"request_id": {"type": "string"}}, ["request_id"]),
 }

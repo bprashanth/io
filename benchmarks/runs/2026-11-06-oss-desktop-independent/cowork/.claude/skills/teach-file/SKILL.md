@@ -115,3 +115,7 @@ Write `file-skills/<id>/skill.json`. The `<id>` is a slug of the file's title. I
   Idli's chat is told automatically.
 - Tell the user in two lines what Idli's form for this file now offers, and that their Idli chat will
   continue.
+- Then ask with a card (AskUserQuestion), header "Idli", question "Teaching is done. Go back to Idli to see
+  your answer?", options "Yes, back to Idli" and "Stay here". If they pick yes, run
+  `.venv/bin/python -m lib.uiswitch agent <caller_agent>` with `caller_agent` from request.json (skip the
+  card if it's empty).

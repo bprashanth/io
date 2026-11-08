@@ -447,7 +447,7 @@ def t_drive_index():
         return {"started": False, "running": True, "say_to_user": "I'm already indexing your Drive: " + di.progress_line(st)}
     if os.path.exists(os.path.splitext(di.DB)[0] + ".dryrun"):  # test switch: time the chat without a rebuild
         return {"started": True, "dry_run": True, "say_to_user": "Indexing your Drive now (test run).",
-                "then": "Call drive_index_wait now."}
+                "then": "Write say_to_user. " + SWITCH_CARD + "Then call drive_index_wait."}
     import subprocess
     import sys
     here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -475,8 +475,23 @@ def t_drive_index():
             "say_to_user": "Indexing your Drive now. It stays on this computer and takes 1 to 5 minutes."
                            + (" Watch it in the drive-index tab at the top." if shown else "")
                            + " I'll say here when it's done.",
-            "then": "In this same reply: write say_to_user, then call drive_index_wait, and keep calling it (no need to "
-                    "write anything in between) until it says done; then write its finish message."}
+            "then": "In this same reply: write say_to_user. " + (SWITCH_CARD if shown else "") + "Then call "
+                    "drive_index_wait, and keep calling it (no need to write anything in between) until it says done; "
+                    "then write its finish message."}
+
+
+SWITCH_CARD = ('Then call AskUserQuestion with one question: header "Progress", question "Indexing has started. Switch '
+               'to the progress tab to watch it?", options "Yes, show me" and "No, stay here". If they pick yes, call '
+               'show_progress. ')
+
+
+def t_show_progress():
+    """After the person said yes on the card: bring the drive-index progress tab to the front."""
+    from lib import uiswitch
+    got = uiswitch.show_tab("drive-index.localhost")
+    if got["ok"]:
+        return {"shown": True}
+    return {"shown": False, "say_to_user": "Click the drive-index tab at the top to watch it."}
 
 
 def t_drive_index_status():
@@ -604,6 +619,8 @@ TOOLS = {
                    {"query": {"type": "string", "description": "The user's words for the file"}}, ["query"]),
     "drive_index": (t_drive_index, "Start indexing the user's Drive in the background (1-5 minutes, stays on this "
                     "computer). Only after the user agrees.", {}, []),
+    "show_progress": (t_show_progress, "Bring the drive-index progress tab to the front. Only after the user said "
+                      "yes on the card.", {}, []),
     "drive_index_status": (t_drive_index_status, "How far the Drive index has got.", {}, []),
     "drive_index_wait": (t_drive_index_wait, "Wait up to ~20 s for the Drive index to progress; returns a one-line "
                          "progress_line to show the user, and done/finish at the end.",
