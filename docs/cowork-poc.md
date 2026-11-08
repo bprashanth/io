@@ -8,6 +8,23 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-08 (night), owner + DGX: finding files in Drive.** The owner's live run took ~5 min of substring
+  searching before Idli asked anything. Now:
+  - **Drive index** (`lib/driveindex.py`, tools `drive_index` / `drive_index_status` / `drive_find`), built by Idli
+    on the laptop after the user says yes. It walks My Drive and Shared with me (10 levels, loop-safe, big folders
+    scrolled to the end) with 5 tabs, reads the first rows of Sheets/Excel and the opening of Docs, and Muse
+    writes a one-line summary per file, 4 at a time. Photos and videos: name, folder, date only. Stored in
+    `~/idli-insights/config/drive-index.duckdb`. Real Drive (182 files, 19 folders): ~3.5 min.
+  - **drive_find**: index search in ~0.3 s (names, folders, contents, modified dates, date words such as "in
+    December"). With no clear match, one quick Drive full-text search on the rarest word, then ask the user.
+    "bikapathymund cestrum datasheet": "no file mentions 'bikapathymund'; 'cestrum' is in field_vars_indicators.xlsx".
+  - **Greeting**: a "Start here" chat (30B, Bypass) asks the user to sign in and offers to index.
+  - **Providers** relabelled: "Idli - 30B (private, on Muse)", "Idli - 9B (OpenRouter, not private)",
+    "Teach - Claude (fake data and test accounts only)" (backup `~/.paseo/config.json.bak-20261108-labels`).
+  - **Workspaces** renamed "Idli - private" and "Teach - Claude"; old chats and two extra workspaces archived;
+    leftovers from the form runs moved to `~/idli-insights/archive/cowork-real-20261108/`.
+  - **Open**: photo location (EXIF) isn't visible in Drive's list; needs the details panel or the Drive API.
+    Paseo always defaults new Claude-based chats to Auto mode, which blocks Idli's tools; pick Bypass.
 - **2026-11-08 (evening), DGX: the file form is built and run end to end.** Details and results:
   [JOURNEY.md](../benchmarks/runs/2026-11-08-form-fill-eval/JOURNEY.md) and the model comparison in
   [README.md](../benchmarks/runs/2026-11-08-form-fill-eval/README.md).
