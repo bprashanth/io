@@ -36,6 +36,13 @@ OR_MODELS = {"9b": "qwen/qwen3.5-9b", "gemma4b": "google/gemma-3-4b-it", "minist
 def openrouter_key():
     if os.environ.get("OPENROUTER_API_KEY"):
         return os.environ["OPENROUTER_API_KEY"]
+    try:
+        with open(os.path.expanduser("~/.config/idlisseus/openrouter.json")) as f:
+            k = json.load(f).get("api_key", "")
+        if k.startswith("sk-or-"):
+            return k
+    except (OSError, ValueError):
+        pass
     for p in ("~/idli-insights/config/claude-or-9b/settings.json",):
         try:
             with open(os.path.expanduser(p)) as f:
@@ -48,8 +55,8 @@ def openrouter_key():
     raise SystemExit("No OpenRouter key (set OPENROUTER_API_KEY).")
 
 
-def chat(model, system, user):
-    body = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+def chat(model, system, user, history=()):
+    body = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": user}, *history],
             "temperature": 0, "max_tokens": 3000}
     if model == "muse":
         url = (os.environ.get("MUSE_URL") or "http://127.0.0.1:8181") + "/v1/chat/completions"
@@ -192,9 +199,20 @@ def result_map(res, spec):
 
 
 def same(gold, got, top):
+    """Same answer, whatever the shape. Equivalences (documented in the README): a row listing matches a
+    breakdown with the same number of rows (e.g. "who joined" grouped by name); a single total matches a
+    one-row breakdown with the same value (e.g. Pune's hours grouped by the filtered district)."""
     if "__rows__" in gold:
-        return "__rows__" in got and gold["__rows__"] == got["__rows__"]
+        if "__rows__" in got:
+            return gold["__rows__"] == got["__rows__"]
+        return len(got) == gold["__rows__"] and gold["__rows__"] > 0
+    if "__rows__" in got:
+        return False
     gm = {k: list(v.values())[0] for k, v in gold.items()}
+    if len(gm) == 1 and len(got) == 1 and "__rows__" not in got and () in gm:
+        gold_v = gm[()]
+        return any(v is not None and gold_v is not None and abs(v - gold_v) <= 0.01 * max(1, abs(gold_v))
+                   for v in next(iter(got.values())).values() if isinstance(v, (int, float)))
     if top:
         gk = max(gm, key=lambda k: (gm[k] or 0))
         for col in (next(iter(got.values())) or {}) if got else []:
@@ -212,11 +230,37 @@ def same(gold, got, top):
     return False
 
 
+def judge(q, out, con, fs, built, tab):
+    """(correct, note, error to show the model or None)."""
+    if q["gold"] == "teach":
+        return bool(out) and out.get("action") == "teach", (out or {}).get("action", "no json"), None
+    if not out:
+        return False, "no json", "Reply with one JSON object only."
+    if out.get("action") != "answer":
+        return False, f"action={out.get('action')}", None
+    spec = out.get("spec") or {}
+    t = out.get("tab") if out.get("tab") in fs else tab
+    try:
+        got = result_map(fm.run(con, fs[t], built[t]["table"], spec), spec)
+    except fm.SpecError as e:
+        return False, f"spec error: {e}"[:200], f"{e} Use only ids from the form."
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"[:200], f"{type(e).__name__}: {e}"[:300]
+    for g in (q["gold"] if isinstance(q["gold"], list) else [q["gold"]]):
+        want = result_map(fm.run(con, fs[tab], built[tab]["table"], g), g)
+        if same(want, got, q.get("top")):
+            return True, "", None
+    return False, f"got {str(got)[:160]}", None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", default="keywords,muse,9b,gemma4b,ministral3b")
     ap.add_argument("--only", default="")
     ap.add_argument("--questions", default="questions.json")
+    ap.add_argument("--prompt", default="v1", choices=["v1", "v2"], help="v1: model resolves dates; v2: user's date words")
+    ap.add_argument("--tag", default="", help="suffix for results files, e.g. a prompt version")
+    ap.add_argument("--rescore", action="store_true", help="re-score saved outputs, no model calls")
     a = ap.parse_args()
     with open(os.path.join(HERE, a.questions)) as f:
         Q = json.load(f)
@@ -230,55 +274,74 @@ def main():
         built = fm.build(con, p, skill, "t")
         tab = next(iter(built))
         forms[key] = (con, built, {t: fm.form(con, skill, t, built) for t in built}, tab)
-    system = SYSTEM.format(today=Q["today"], spec=SPEC["description"])
+    spec_text = SPEC["description"]  # v1, as Idli's file_ask tool describes it: the model resolves dates
+    if a.prompt == "v2":  # tried and dropped: the user's date words, resolved by formkit.parse_when
+        spec_text = re.sub(r"date \{column, period\}.*?a month like 2026-09\. ",
+                           'date {column, text}: put the user\'s own date words in text (e.g. "last month", "since july", '
+                           '"08/26 to 10/26", "this FY"); code works out the dates. Add date only if the user mentions a time. ',
+                           spec_text, flags=re.S)
+        spec_text = spec_text.replace('"date": {"period": "this_year"}', '"date": {"text": "this year"}')
+    system = SYSTEM.format(today=Q["today"], spec=spec_text)
     board = {}
     for model in a.models.split(","):
-        rows, ok, secs = [], 0, 0.0
+        rows, ok, ok1, secs = [], 0, 0, 0.0
         for q in Q["questions"]:
             if a.only and q["id"] not in a.only.split(","):
                 continue
             con, built, fs, tab = forms[q["file"]]
             brief = {"tabs": [_brief(fs[tab])]}
-            if model == "keywords":
+            saved = None
+            retry_rec = None
+            if a.rescore:
+                try:
+                    with open(os.path.join(HERE, f"results-{os.path.splitext(a.questions)[0]}-{model}{a.tag}.json")) as f:
+                        saved = {r["id"]: r for r in json.load(f)}
+                except OSError:
+                    saved = None
+            if saved is not None and q["id"] in saved:
+                out, raw, took = saved[q["id"]]["output"], saved[q["id"]].get("raw", ""), saved[q["id"]]["secs"]
+            elif model == "keywords":
                 t0 = time.time()
                 out, raw = keywords(fs[tab], q["q"], today), ""
                 took = time.time() - t0
             else:
                 raw, took = chat(model, system, f"Form:\n{json.dumps(brief, ensure_ascii=False)}\n\nQuestion: {q['q']}")
                 out = parse(raw)
+            first_out = out
+            first_ok = None
+            for attempt in (0, 1):
+                verdict, note, err = judge(q, out, con, fs, built, tab)
+                if attempt == 0:
+                    first_ok = verdict
+                if verdict or not err or model == "keywords" or attempt == 1:
+                    break
+                old = (saved or {}).get(q["id"], {}).get("retry")
+                if old:  # re-scoring: reuse the saved retry
+                    raw2, took2, retry_out = old.get("raw", ""), 0.0, old["output"]
+                else:
+                    raw2, took2 = chat(model, system, f"Form:\n{json.dumps(brief, ensure_ascii=False)}\n\nQuestion: {q['q']}",
+                                       [{"role": "assistant", "content": json.dumps(out) if out else raw[-2000:]},
+                                        {"role": "user", "content": f"The tool said: {err} Fix the JSON and reply again."}])
+                    retry_out = parse(raw2)
+                took += took2
+                retry_rec = {"output": retry_out, "raw": raw2[-1500:] if not retry_out else ""}
+                out = retry_out
             secs += took
-            verdict, note = False, ""
-            if q["gold"] == "teach":
-                verdict = bool(out) and out.get("action") == "teach"
-                note = (out or {}).get("action", "no json")
-            elif not out or out.get("action") != "answer":
-                note = f"action={(out or {}).get('action', 'no json')}"
-            else:
-                spec = out.get("spec") or {}
-                try:
-                    got = result_map(fm.run(con, fs[out.get("tab") or tab] if out.get("tab") in fs else fs[tab],
-                                            built[out.get("tab") if out.get("tab") in built else tab]["table"], spec), spec)
-                    golds = q["gold"] if isinstance(q["gold"], list) else [q["gold"]]
-                    for g in golds:
-                        want = result_map(fm.run(con, fs[tab], built[tab]["table"], g), g)
-                        if same(want, got, q.get("top")):
-                            verdict = True
-                            break
-                    note = "" if verdict else f"got {str(got)[:160]}"
-                except fm.SpecError as e:
-                    note = f"spec error: {e}"[:200]
-                except Exception as e:
-                    note = f"{type(e).__name__}: {e}"[:200]
             ok += verdict
-            rows.append({"id": q["id"], "q": q["q"], "ok": verdict, "secs": round(took, 1), "output": out,
-                         "note": note, "raw": raw[-1500:] if not out else ""})
-            print(f"{model:12s} {q['id']:3s} {'ok  ' if verdict else 'MISS'} {took:5.1f}s {note[:120]}", flush=True)
-        board[model] = (ok, len(rows), secs / max(1, len(rows)))
-        with open(os.path.join(HERE, f"results-{os.path.splitext(a.questions)[0]}-{model}.json"), "w") as f:
+            ok1 += bool(first_ok)
+            rec = {"id": q["id"], "q": q["q"], "ok": verdict, "first_try_ok": bool(first_ok), "secs": round(took, 1),
+                   "output": first_out, "note": note, "raw": raw[-1500:] if not first_out else ""}
+            if out is not first_out:
+                rec["retry"] = retry_rec
+            rows.append(rec)
+            print(f"{model:12s} {q['id']:4s} {'ok  ' if verdict else 'MISS'}{' (retry)' if verdict and not first_ok else ''} "
+                  f"{took:5.1f}s {note[:110]}", flush=True)
+        board[model] = (ok1, ok, len(rows), secs / max(1, len(rows)))
+        with open(os.path.join(HERE, f"results-{os.path.splitext(a.questions)[0]}-{model}{a.tag}.json"), "w") as f:
             json.dump(rows, f, indent=1, ensure_ascii=False, default=str)
-    print("\nmodel         correct   avg s/question")
-    for m, (ok, n, s) in board.items():
-        print(f"{m:12s}  {ok:2d}/{n:2d}     {s:5.1f}")
+    print(f"\n{a.questions}: model   first try   with one retry   avg s/question")
+    for m, (ok1, ok, n, s) in board.items():
+        print(f"{m:12s}  {ok1:2d}/{n:2d}       {ok:2d}/{n:2d}           {s:5.1f}")
 
 
 if __name__ == "__main__":

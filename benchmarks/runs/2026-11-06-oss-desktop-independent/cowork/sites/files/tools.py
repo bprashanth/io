@@ -424,7 +424,8 @@ SPEC = {"type": "object", "description":
         "filters {column: [values]} or {column: {min, max}} or {column: {not: [values]}} or {column: {blank: true}} "
         "(empty or unreadable), preset [ids], "
         "date {column, period} or {column, from, to}; period is one of " + ", ".join(fm.PERIODS)
-        + "; from/to are YYYY-MM-DD or a month like 2026-09. sort {by: id, dir: desc|asc}, limit n. "
+        + "; from/to are YYYY-MM-DD or a month like 2026-09. "
+        "sort {by: id, dir: desc|asc}, limit n. "
         "measures [] lists the matching rows: use it for who/which questions. Example: {\"measures\": [\"amount\"], \"group_by\": [\"employee\"], "
         "\"filters\": {\"category\": [\"Hardware\"]}, \"date\": {\"period\": \"this_year\"}}"}
 TOOLS = {

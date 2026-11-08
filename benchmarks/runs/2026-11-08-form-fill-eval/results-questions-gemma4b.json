@@ -1,0 +1,933 @@
+[
+ {
+  "id": "T1",
+  "q": "get me the reimbursement figures from 08/26 to 10/26, only approved and paid ones",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 2.4,
+  "output": {
+   "action": "answer",
+   "tab": "Tech reimbursement form",
+   "spec": {
+    "measures": [
+     "amount"
+    ],
+    "group_by": [
+     "category",
+     "status"
+    ],
+    "filters": {
+     "claim_date": {
+      "period": "this_month",
+      "min": "2026-11-08",
+      "max": "2026-10-26"
+     },
+     "status": {
+      "label": "Status",
+      "values": [
+       "Approved",
+       "Paid"
+      ]
+     }
+    }
+   }
+  },
+  "note": "spec error: Filter for 'status' should be a list of values or {min/max/from/to/contains/not}.",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "answer",
+    "tab": "Tech reimbursement form",
+    "spec": {
+     "measures": [
+      "amount"
+     ],
+     "group_by": [
+      "category",
+      "status"
+     ],
+     "filters": {
+      "claim_date": {
+       "period": "this_month",
+       "min": "2026-11-08",
+       "max": "2026-10-26"
+      },
+      "status": {
+       "label": "Status",
+       "values": [
+        "Approved",
+        "Paid"
+       ]
+      }
+     }
+    }
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "T2",
+  "q": "who has claimed the most for hardware this year? leave out rejected claims",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 2.0,
+  "output": {
+   "action": "answer",
+   "tab": "Tech reimbursement form",
+   "spec": {
+    "measures": [
+     "amount"
+    ],
+    "group_by": [
+     "employee"
+    ],
+    "filters": {
+     "category": [
+      "Hardware"
+     ],
+     "status": "Paid out or approved",
+     "claim_date:year": "2026"
+    },
+    "preset": "Paid out or approved",
+    "date": {
+     "column": "claim_date",
+     "period": "this_year"
+    }
+   }
+  },
+  "note": "got {}",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "answer",
+    "tab": "Tech reimbursement form",
+    "spec": {
+     "measures": [
+      "amount"
+     ],
+     "group_by": [
+      "employee"
+     ],
+     "filters": {
+      "category": [
+       "Hardware"
+      ],
+      "status": "paid_out"
+     },
+     "preset": "paid_out",
+     "date": {
+      "column": "claim_date",
+      "period": "this_year"
+     }
+    }
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "T3",
+  "q": "what's the total of software claims last month?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.9,
+  "output": {
+   "action": "answer",
+   "tab": "Tech reimbursement form",
+   "spec": {
+    "measures": [
+     "amount"
+    ],
+    "group_by": [],
+    "filters": {
+     "claim_date": {
+      "period": "last_month"
+     }
+    },
+    "preset": []
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "Please specify the exact date range for 'claim_date' to filter the software claims last month. You can use a specific date, a date range (min/max), or a period like 'last_month'."
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "T4",
+  "q": "monthly totals of reimbursement claims this year",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 5.7,
+  "output": {
+   "action": "answer",
+   "tab": "Tech reimbursement form",
+   "spec": {
+    "measures": [
+     "Number of claims",
+     "Amount (Rs)",
+     "Average claim (Rs)"
+    ],
+    "group_by": [
+     "Claim date: month"
+    ],
+    "date": {
+     "period": "this_year"
+    },
+    "filters": {
+     "status": {
+      "values": [
+       "Approved",
+       "Paid",
+       "Pending"
+      ]
+     }
+    }
+   }
+  },
+  "note": "spec error: Filter for 'status' should be a list of values or {min/max/from/to/contains/not}.",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "answer",
+    "tab": "Tech reimbursement form",
+    "spec": {
+     "measures": [
+      "Number of claims",
+      "Amount (Rs)",
+      "Average claim (Rs)"
+     ],
+     "group_by": [
+      "Claim date: month"
+     ],
+     "date": {
+      "period": "this_year"
+     },
+     "filters": {
+      "status": {
+       "values": [
+        "Approved",
+        "Paid",
+        "Pending"
+       ]
+      }
+     }
+    }
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "T5",
+  "q": "how many claims are still pending?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 2.1,
+  "output": {
+   "action": "answer",
+   "tab": "Tech reimbursement form",
+   "spec": {
+    "measures": [
+     "Number of claims"
+    ],
+    "filters": {
+     "status": {
+      "values": [
+       "Pending"
+      ]
+     }
+    }
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "Please specify the exact values or range for the 'status' filter. The form supports a list of values, or a range using 'min', 'max', 'from', 'to', 'contains', or 'not'."
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "T6",
+  "q": "approved or paid amounts by category for september",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.7,
+  "output": {
+   "action": "answer",
+   "tab": "Tech reimbursement form",
+   "spec": {
+    "measures": [
+     "amount"
+    ],
+    "group_by": [
+     "category"
+    ],
+    "filters": {
+     "claim_date:month": "September"
+    },
+    "presets": [
+     "paid_out"
+    ]
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "Please specify the exact date range for September. For example, 'claim_date:month' should be 'September' or 'claim_date:quarter' should be 'September 2026 Q3'."
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "T7",
+  "q": "what's the average claim size in each category?",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 0.8,
+  "output": {
+   "action": "answer",
+   "tab": "Tech reimbursement form",
+   "spec": {
+    "measures": [
+     "average_claim"
+    ],
+    "group_by": [
+     "category"
+    ]
+   }
+  },
+  "note": "",
+  "raw": ""
+ },
+ {
+  "id": "T8",
+  "q": "show me Kabir's claims from october",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.8,
+  "output": {
+   "action": "answer",
+   "tab": "Tech reimbursement form",
+   "spec": {
+    "measures": [
+     "Number of claims"
+    ],
+    "group_by": [
+     "Employee"
+    ],
+    "filters": {
+     "claim_date:month": [
+      "October"
+     ],
+     "employee": [
+      "Kabir Menon"
+     ]
+    },
+    "date_columns": [
+     "claim_date"
+    ]
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "The tool is unable to filter by 'claim_date:month'. Could you please specify the exact date range for Kabir's claims in October? For example, you could provide a start and end date, or a single date within October."
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "V1",
+  "q": "how many volunteers have joined since july, district wise?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 2.1,
+  "output": {
+   "action": "answer",
+   "tab": "Volunteer register",
+   "spec": {
+    "measures": [
+     "Number of volunteers"
+    ],
+    "group_by": [
+     "district"
+    ],
+    "filters": {
+     "joined_on": {
+      "kind": "date",
+      "min": "2026-07-01",
+      "max": "2026-10-09"
+     }
+    }
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach"
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "V2",
+  "q": "what's the total stipend we've paid so far?",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 1.5,
+  "output": {
+   "action": "answer",
+   "tab": "Volunteer register",
+   "spec": {
+    "measures": [
+     "stipend"
+    ],
+    "filters": {
+     "stipend_paid": {
+      "max": "3000.0"
+     }
+    }
+   }
+  },
+  "note": "",
+  "raw": ""
+ },
+ {
+  "id": "V3",
+  "q": "how many hours did the pune volunteers put in in september?",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 1.1,
+  "output": {
+   "action": "answer",
+   "tab": "Volunteer register",
+   "spec": {
+    "measures": [
+     "hours"
+    ],
+    "group_by": [
+     "district"
+    ],
+    "filters": {
+     "district": [
+      "Pune"
+     ]
+    }
+   }
+  },
+  "note": "",
+  "raw": ""
+ },
+ {
+  "id": "V4",
+  "q": "who joined last month?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.9,
+  "output": {
+   "action": "answer",
+   "tab": "Volunteer register",
+   "spec": {
+    "filters": {
+     "joined_on": {
+      "period": "last_month"
+     }
+    }
+   }
+  },
+  "note": "action=ask",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "ask",
+    "question_to_user": "Please specify the exact date range or values for 'joined_on' to filter by. For example, you can provide a specific date like '2026-10-01' or a date range like '2026-09-01 to 2026-10-01', or a period like 'last_month'."
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "V5",
+  "q": "volunteers per district",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.6,
+  "output": {
+   "action": "answer",
+   "tab": "Volunteer register",
+   "spec": {
+    "group_by": [
+     "district"
+    ],
+    "measures": [
+     "Number of volunteers"
+    ]
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "The tool is having trouble finding the 'Number of volunteers' measure. Could you please clarify if you want to know the total number of volunteers in each district, or something else?"
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "V6",
+  "q": "how many volunteers don't have a stipend recorded, by district?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 2.4,
+  "output": {
+   "action": "answer",
+   "tab": "Volunteer register",
+   "spec": {
+    "measures": [
+     "no_stipend"
+    ],
+    "group_by": [
+     "district"
+    ],
+    "filters": {
+     "no_stipend": {
+      "blank": true
+     }
+    }
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "The tool indicates that filtering on 'no_stipend' is not possible using the available filters. Could you please clarify what you mean by 'don't have a stipend recorded'? Are you looking for volunteers where the 'stipend_paid' field is blank, or is there another way to identify volunteers without a stipend?"
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "H1",
+  "q": "which ward has the highest debt?",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 1.1,
+  "output": {
+   "action": "answer",
+   "tab": "Households",
+   "spec": {
+    "measures": [
+     "debt"
+    ],
+    "group_by": [
+     "ward"
+    ],
+    "filters": {},
+    "sort": {
+     "by": "debt",
+     "dir": "desc"
+    },
+    "limit": 1
+   }
+  },
+  "note": "",
+  "raw": ""
+ },
+ {
+  "id": "H2",
+  "q": "average vulnerability score in each ward",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 1.0,
+  "output": {
+   "action": "answer",
+   "tab": "Households",
+   "spec": {
+    "measures": [
+     "avg_vulnerability"
+    ],
+    "group_by": [
+     "ward"
+    ]
+   }
+  },
+  "note": "",
+  "raw": ""
+ },
+ {
+  "id": "H3",
+  "q": "how many households owe more than a lakh?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.4,
+  "output": {
+   "action": "answer",
+   "tab": "Households",
+   "spec": {
+    "measures": [
+     "debt"
+    ],
+    "filters": {
+     "debts_inr": {
+      "max": "100000.0"
+     }
+    }
+   }
+  },
+  "note": "got {(): {'Total debt (Rs)': 1496000.0}}",
+  "raw": ""
+ },
+ {
+  "id": "H4",
+  "q": "total savings across all the households",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 1.1,
+  "output": {
+   "action": "answer",
+   "tab": "Households",
+   "spec": {
+    "measures": [
+     "savings"
+    ],
+    "group_by": [],
+    "filters": {},
+    "date_columns": []
+   }
+  },
+  "note": "",
+  "raw": ""
+ },
+ {
+  "id": "H5",
+  "q": "how many people live in kasewadi households?",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 0.9,
+  "output": {
+   "action": "answer",
+   "tab": "Households",
+   "spec": {
+    "measures": [
+     "people"
+    ],
+    "filters": {
+     "ward": "Kasewadi"
+    }
+   }
+  },
+  "note": "",
+  "raw": ""
+ },
+ {
+  "id": "H6",
+  "q": "number of highly vulnerable households (score 8 and up) per ward",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.7,
+  "output": {
+   "action": "answer",
+   "tab": "Households",
+   "spec": {
+    "measures": [
+     "sum:vulnerability_score_1to10"
+    ],
+    "group_by": [
+     "ward"
+    ],
+    "filters": {
+     "vulnerability_score_1to10": {
+      "min": "8.0"
+     }
+    }
+   }
+  },
+  "note": "got {('Ramtekdi',): {'Total Vulnerability score (1-10)': 17.0}, ('Yerawada Ward',): {'Total Vulnerability score (1-10)': 8.0}}",
+  "raw": ""
+ },
+ {
+  "id": "F1",
+  "q": "how much did each district disburse last quarter?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 2.5,
+  "output": {
+   "action": "answer",
+   "tab": "Visits",
+   "spec": {
+    "measures": [
+     "disbursed"
+    ],
+    "group_by": [
+     "village_district"
+    ],
+    "filters": {
+     "date": {
+      "period": "last_quarter"
+     }
+    },
+    "preset": "completed"
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "The tool couldn't filter by 'date' as requested. To fulfill the request 'how much did each district disburse last quarter?', we need to specify the date range. Please provide the start and end dates for the 'last quarter' period. For example, '2026-07-01' to '2026-09-30'."
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "F2",
+  "q": "households covered this financial year, month by month",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 0.8,
+  "output": {
+   "action": "answer",
+   "tab": "Visits",
+   "spec": {
+    "measures": [
+     "households"
+    ],
+    "group_by": [
+     "visit_date:month"
+    ],
+    "date": {
+     "period": "this_financial_year"
+    },
+    "preset": "completed"
+   }
+  },
+  "note": "got {('2026-04',): {'Households visited': 273.0}, ('2026-05',): {'Households visited': 197.0}, ('2026-06',): {'Households visited': 308.0}, ('2026-07',): {'Househol",
+  "raw": ""
+ },
+ {
+  "id": "F3",
+  "q": "how many visits are still on follow-up in satara district?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.9,
+  "output": {
+   "action": "answer",
+   "tab": "Visits",
+   "spec": {
+    "measures": [
+     "Number of visits"
+    ],
+    "filters": {
+     "village_district": "Satara",
+     "status": "Follow-up"
+    }
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "The tool is having trouble finding the 'Number of visits' measure. Please double-check the form to ensure the correct measure ID is used. The available measures are: 'Number of visits', 'avg:amount_disbursed', 'avg:households_visited', 'disbursed', 'households', 'villages_visited'.  Can you confirm which measure you're looking for?"
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "F4",
+  "q": "which blocks got the most money in august?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.6,
+  "output": {
+   "action": "answer",
+   "tab": "Visits",
+   "spec": {
+    "measures": [
+     "amount_disbursed"
+    ],
+    "group_by": [
+     "village_block"
+    ],
+    "filters": {
+     "visit_date:month": "August"
+    },
+    "preset": "completed"
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "The tool is having trouble filtering by month. It suggests using 'visit_date' directly. Could you please specify the exact date range for August 2026, or would you like me to use the 'visit_date:month' filter as it was originally intended?"
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "F5",
+  "q": "how many different villages did we visit in september?",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 0.8,
+  "output": {
+   "action": "answer",
+   "tab": "Visits",
+   "spec": {
+    "measures": [
+     "villages_visited"
+    ],
+    "filters": {
+     "visit_date": {
+      "period": "this_month",
+      "from": "2026-09-01",
+      "to": "2026-09-30"
+     }
+    }
+   },
+   "rows": "Villages visited"
+  },
+  "note": "",
+  "raw": ""
+ },
+ {
+  "id": "F6",
+  "q": "list the cancelled visits in october",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.3,
+  "output": {
+   "action": "answer",
+   "tab": "Visits",
+   "spec": {
+    "measures": [
+     "Number of visits"
+    ],
+    "filters": {
+     "visit_date": {
+      "period": "this_month",
+      "from": "2026-10-01",
+      "to": "2026-10-31"
+     },
+     "status": {
+      "values": [
+       "Cancelled"
+      ]
+     },
+     "not_cancelled": false
+    }
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach"
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "F7",
+  "q": "how much did each officer give out in september?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.7,
+  "output": {
+   "action": "answer",
+   "tab": "Visits",
+   "spec": {
+    "measures": [
+     "disbursed"
+    ],
+    "group_by": [
+     "officer_name"
+    ],
+    "filters": {
+     "visit_date:month": "September"
+    },
+    "preset": "completed"
+   }
+  },
+  "note": "action=teach",
+  "raw": "",
+  "retry": {
+   "output": {
+    "action": "teach",
+    "question_to_user": "The tool is having trouble filtering by month. To get the amount disbursed by each officer in September, we need to specify the month using the 'visit_date:month' filter. The available options are 'this_month', 'last_month', 'this_quarter', 'last_quarter', 'this_year', 'last_year', 'this_financial_year', 'last_financial_year', 'last_7_days', 'last_30_days', 'last_90_days'. Please provide the exact month name (e.g., 'September')."
+   },
+   "raw": ""
+  }
+ },
+ {
+  "id": "X1",
+  "q": "what's the month on month growth rate of reimbursement spending?",
+  "ok": true,
+  "first_try_ok": true,
+  "secs": 1.9,
+  "output": {
+   "action": "teach",
+   "question_to_user": "I need to calculate the month-on-month growth rate of reimbursement spending. To do this, I need to know the 'Amount (Rs)' for each month. Could you please specify the months you want to compare?"
+  },
+  "note": "teach",
+  "raw": ""
+ },
+ {
+  "id": "X2",
+  "q": "what's the stipend per hour worked for each district?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 0.9,
+  "output": {
+   "action": "answer",
+   "tab": "Volunteer register",
+   "spec": {
+    "measures": [
+     "stipend_paid",
+     "hours"
+    ],
+    "group_by": [
+     "district"
+    ],
+    "filters": {}
+   }
+  },
+  "note": "answer",
+  "raw": ""
+ },
+ {
+  "id": "X3",
+  "q": "how many households have more savings than debt?",
+  "ok": false,
+  "first_try_ok": false,
+  "secs": 1.1,
+  "output": {
+   "action": "answer",
+   "tab": "Households",
+   "spec": {
+    "measures": [
+     "Number of households"
+    ],
+    "filters": {
+     "debt": {
+      "min": "5000.0"
+     }
+    }
+   }
+  },
+  "note": "answer",
+  "raw": ""
+ }
+]

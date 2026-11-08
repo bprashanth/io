@@ -161,5 +161,13 @@ r = fm.run(con, f, b[t]["table"], {"measures": ["rows", "stipend"], "date": {"fr
 ok(r["rows"][0]["Number of volunteers"] == 25 and r["rows"][0]["Stipend paid (Rs)"] == 32100,
    "volunteers since July from the real file: 25 / 32,100")
 ok(fm.indian(3245678.5) == "32,45,678.5", "Indian digit grouping")
+import datetime as _dt  # noqa: E402
+T = _dt.date(2026, 11, 8)
+for words, want in [("last month", ("2026-10-01", "2026-10-31")), ("this FY", ("2026-04-01", "2026-11-08")),
+                    ("since july", ("2026-07-01", None)), ("after august", ("2026-09-01", None)),
+                    ("08/26 to 10/26", ("2026-08-26", "2026-10-26")), ("26/08 to 26/10", ("2026-08-26", "2026-10-26")),
+                    ("july to sept", ("2026-07-01", "2026-09-30")), ("december", ("2025-12-01", "2025-12-31")),
+                    ("so far", None), ("last 7 days", ("2026-11-02", "2026-11-08"))]:
+    ok(fm.parse_when(words, T) == want, f"date words: {words!r}")
 print("ALL PASSED" if not fails else f"{fails} FAILED")
 sys.exit(1 if fails else 0)

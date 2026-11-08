@@ -321,9 +321,7 @@ def _where(f, spec, table_cols):
                             raise SpecError(f"'{x}' is not a number for {c}.")
         else:
             raise SpecError(f"Filter for '{c}' should be a list of values or {{min/max/from/to/contains/not}}.")
-    d = dict(spec.get("date") or {})
-    if d.get("period"):
-        d["from"], d["to"] = period(d["period"])
+    d = _resolve_date(spec.get("date"))
     if d.get("from") or d.get("to"):
         col = d.get("column") or (f["date_columns"][0] if f["date_columns"] else None)
         if col not in f["date_columns"]:
@@ -371,6 +369,94 @@ def period(name, today=None):
     return a.isoformat(), b.isoformat()
 
 
+MONTH_NAMES = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct",
+                                             "nov", "dec"], 1)}
+_MON = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:\s+(\d{4}))?"
+
+
+def _month_range(mon, year, today):
+    y = int(year) if year else today.year
+    i = MONTH_NAMES[mon[:3]]
+    if not year and dt.date(y, i, 1) > today:  # "december" in November means last December
+        y -= 1
+    a = dt.date(y, i, 1)
+    b = (a.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
+    return a, b
+
+
+def parse_when(text, today=None):
+    """The user's own date words -> (from, to) ISO strings (either may be None), or None if no date is meant.
+    Code does the date arithmetic so the model never has to: 'last month', 'this FY', 'since july',
+    'july to sept', 'after august', 'in october', '08/26 to 10/26', 'last 30 days', '2026-09-01 to 2026-09-30'."""
+    t = today or dt.date.today()
+    s = " " + re.sub(r"\s+", " ", str(text).lower()).strip() + " "
+    if re.search(r"\b(so far|till date|to date|all time|ever|overall)\b", s) and not re.search(r"\b(this|last|since)\b", s):
+        return None
+    named = [("last financial year", "last_financial_year"), ("last fy", "last_financial_year"),
+             ("previous fy", "last_financial_year"), ("this financial year", "this_financial_year"),
+             ("current financial year", "this_financial_year"), ("this fy", "this_financial_year"),
+             ("current fy", "this_financial_year"), ("financial year", "this_financial_year"), (" fy ", "this_financial_year"),
+             ("last month", "last_month"), ("previous month", "last_month"), ("this month", "this_month"),
+             ("last quarter", "last_quarter"), ("previous quarter", "last_quarter"), ("this quarter", "this_quarter"),
+             ("last year", "last_year"), ("this year", "this_year"), ("year to date", "this_year"), ("ytd", "this_year")]
+    m = re.search(r"\b(?:last|past|previous)\s+(\d+)\s+days?\b", s)
+    if m:
+        return (t - dt.timedelta(days=int(m.group(1)) - 1)).isoformat(), t.isoformat()
+    if re.search(r"\b(last|past) week\b", s):
+        return (t - dt.timedelta(days=6)).isoformat(), t.isoformat()
+    for phrase, name in named:
+        if phrase in s:
+            return period(name, t)
+    iso = re.findall(r"\d{4}-\d{2}-\d{2}", s)
+    if len(iso) >= 2:
+        return iso[0], iso[1]
+    m = re.search(r"(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\s*(?:to|till|until|-|and)\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?", s)
+    if m:
+        a1, a2, ay, b1, b2, by = m.groups()
+        a1, a2, b1, b2 = map(int, (a1, a2, b1, b2))
+        if a2 > 12 or b2 > 12:  # month/day, e.g. 08/26
+            (ma, da), (mb, db) = (a1, a2), (b1, b2)
+        else:  # day/month, the Indian default
+            (da, ma), (db, mb) = (a1, a2), (b1, b2)
+        def yr(y):
+            return (2000 + int(y) if len(y) == 2 else int(y)) if y else t.year
+        try:
+            return dt.date(yr(ay), ma, da).isoformat(), dt.date(yr(by), mb, db).isoformat()
+        except ValueError:
+            pass
+    m = re.search(r"\b" + _MON + r"\s*(?:to|till|until|-|through|and)\s*" + _MON, s)
+    if m:
+        a, _ = _month_range(m.group(1), m.group(2), t)
+        _, b = _month_range(m.group(3), m.group(4), t)
+        if b < a:
+            a = a.replace(year=a.year - 1)
+        return a.isoformat(), b.isoformat()
+    m = re.search(r"\b(since|from|after|post|before|until|till|up to|upto)\s+(?:the\s+)?(?:start of\s+)?" + _MON, s)
+    if m:
+        a, b = _month_range(m.group(2), m.group(3), t)
+        w = m.group(1)
+        if w in ("since", "from"):
+            return a.isoformat(), None
+        if w in ("after", "post"):
+            return (b + dt.timedelta(days=1)).isoformat(), None
+        return None, ((a - dt.timedelta(days=1)) if w == "before" else b).isoformat()
+    m = re.search(r"\b" + _MON + r"\b", s)
+    if m and not re.search(r"\b(may|mar)\b", m.group(0)) or (m and re.search(r"\b(in|for|of|during) (may|march)\b", s)):
+        a, b = _month_range(m.group(1), m.group(2), t)
+        return a.isoformat(), b.isoformat()
+    one = re.search(r"\b(since|from|after|before|on)\s+(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?", s)
+    if one:
+        w, d1, m1, y1 = one.groups()
+        try:
+            d = dt.date((2000 + int(y1) if y1 and len(y1) == 2 else int(y1)) if y1 else t.year, int(m1), int(d1))
+        except ValueError:
+            return None
+        return {"since": (d.isoformat(), None), "from": (d.isoformat(), None),
+                "after": ((d + dt.timedelta(days=1)).isoformat(), None), "before": (None, (d - dt.timedelta(days=1)).isoformat()),
+                "on": (d.isoformat(), d.isoformat())}[w]
+    return None
+
+
 def _iso_edge(v, end):
     """A date, or a month ('2026-09', 'Sep 2026'): a month means its first day, or its last day for 'to'."""
     v = str(v).strip()
@@ -383,6 +469,22 @@ def _iso_edge(v, end):
             d = (d.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
         return d.isoformat()
     return _iso(v)
+
+
+def _resolve_date(d):
+    """A spec's date: {column, text} (the user's words), {column, period} or {column, from, to}."""
+    d = dict(d or {})
+    if d.get("text"):
+        got = parse_when(d["text"])
+        if got is None and not (d.get("from") or d.get("to") or d.get("period")):
+            if re.search(r"\d|\b(day|week|month|quarter|year|fy|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)", str(d["text"]).lower()) \
+                    and not re.search(r"\b(so far|till date|to date|all time|ever|overall)\b", str(d["text"]).lower()):
+                raise SpecError(f"Couldn't read the date '{d['text']}'. Give from/to as YYYY-MM-DD instead.")
+        elif got:
+            d["from"], d["to"] = got
+    if d.get("period"):
+        d["from"], d["to"] = period(d["period"])
+    return d
 
 
 def compile_spec(f, table, spec):
@@ -461,9 +563,7 @@ def describe(f, spec, presets):
             bits = [f"{ {'min': 'from', 'max': 'up to', 'to': 'up to'}.get(k, k)} {_dmy(v[k]) if isdate and k in ('from', 'to', 'min', 'max') else (', '.join(v[k]) if isinstance(v[k], list) else v[k])}"
                     for k in ("from", "to", "min", "max", "contains", "not") if v.get(k) not in (None, "")]
             parts.append(f"{labels.get(c, c)} " + ", ".join(bits))
-    d = dict(spec.get("date") or {})
-    if d.get("period"):
-        d["from"], d["to"] = period(d["period"])
+    d = _resolve_date(spec.get("date"))
     if d.get("from") or d.get("to"):
         d = {**d, "from": d.get("from") and _iso_edge(d["from"], False), "to": d.get("to") and _iso_edge(d["to"], True)}
         col = d.get("column") or (f["date_columns"][0] if f["date_columns"] else "")

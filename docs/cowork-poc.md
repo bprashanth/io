@@ -8,6 +8,23 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-08 (evening), DGX: the file form is built and run end to end.** Details and results:
+  [JOURNEY.md](../benchmarks/runs/2026-11-08-form-fill-eval/JOURNEY.md) and the model comparison in
+  [README.md](../benchmarks/runs/2026-11-08-form-fill-eval/README.md).
+  - **Code:** `lib/formkit.py` (form per tab, spec to SQL, lookups across tabs, contract test, date words),
+    `lib/formserver.py` + `lib/form.html` (the page, 127.0.0.1 only, token per start), files site tools
+    `file_get` / `file_open` / `file_ask` / `teach_file` / `teach_send` (file_check and file_answer are gone),
+    teach-file skill writes the form format; `idli/CLAUDE.md` rewritten.
+  - **Skills:** existing three gained labels, measures and rules; `field_programme_tracker` (3 tabs) taught v1 and
+    re-taught v2 by the laptop's Teach chat.
+  - **Laptop actions (done by the DGX):** `git pull`; `idli/CLAUDE.md` copied to `~/idli-insights/cowork-real/`;
+    `~/.paseo/config.json` co-work providers also disallow `mcp__cowork__sheet_query` and `sheet_profile`
+    (backup `config.json.bak-20261108-forms`). Paseo's download behaviour was set to "save without asking" over
+    DevTools for testing and set back to default.
+  - **Owner:** four stale Save dialogs on the laptop need Cancel. `~/Downloads/volunteer_register.xlsx` was
+    replaced by a fresh export of the same sheet during the test.
+  - **Moving code:** the laptop's `ssh` to the DGX hangs (Tailscale check?), so code moved through GitHub
+    (declaude, force-with-lease) and laptop files came back as base64 through a Paseo terminal.
 - **2026-11-08 (later), owner + DGX: downloads work, and the file flow becomes a form.**
   - **Correction:** Paseo's browser *does* download. Opening `…/spreadsheets/d/<id>/export?format=xlsx` shows a red
     `GUEST_VIEW_MANAGER_CALL … ERR_FAILED (-2)` line (cosmetic: the page load is cancelled because the response is a
