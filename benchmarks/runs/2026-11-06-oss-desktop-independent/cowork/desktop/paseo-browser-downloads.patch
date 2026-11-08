@@ -1,0 +1,121 @@
+diff --git a/packages/desktop/src/features/browser-downloads.test.ts b/packages/desktop/src/features/browser-downloads.test.ts
+new file mode 100644
+index 00000000..64da434b
+--- /dev/null
++++ b/packages/desktop/src/features/browser-downloads.test.ts
+@@ -0,0 +1,28 @@
++import { describe, expect, test } from "vitest";
++import { browserDownloadDir, installBrowserDownloads, safeDownloadName, uniqueDownloadPath } from "./browser-downloads.js";
++
++describe("browser downloads", () => {
++  test("uses PASEO_BROWSER_DOWNLOAD_DIR, else the Downloads folder", () => {
++    expect(browserDownloadDir({ PASEO_BROWSER_DOWNLOAD_DIR: "/tmp/dl" }, "/home/u/Downloads")).toBe("/tmp/dl");
++    expect(browserDownloadDir({}, "/home/u/Downloads")).toBe("/home/u/Downloads");
++  });
++
++  test("keeps file names inside the folder", () => {
++    expect(safeDownloadName("../../etc/passwd")).toBe("passwd");
++    expect(safeDownloadName("a:b?.xlsx")).toBe("a_b_.xlsx");
++    expect(safeDownloadName("")).toBe("download");
++  });
++
++  test("never overwrites an existing file", () => {
++    const taken = new Set(["/d/report.xlsx", "/d/report (1).xlsx"]);
++    expect(uniqueDownloadPath("/d", "report.xlsx", (p) => taken.has(p))).toBe("/d/report (2).xlsx");
++  });
++
++  test("sets the save path so no dialog is shown", () => {
++    let listener: ((e: unknown, item: { getFilename(): string; setSavePath(p: string): void }) => void) | undefined;
++    installBrowserDownloads({ on: (_e, l) => { listener = l; } }, { env: { PASEO_BROWSER_DOWNLOAD_DIR: "/tmp/paseo-dl-test" }, downloadsPath: "/x" });
++    let saved = "";
++    listener?.({}, { getFilename: () => "sheet.xlsx", setSavePath: (p) => { saved = p; } });
++    expect(saved.startsWith("/tmp/paseo-dl-test/sheet")).toBe(true);
++  });
++});
+diff --git a/packages/desktop/src/features/browser-downloads.ts b/packages/desktop/src/features/browser-downloads.ts
+new file mode 100644
+index 00000000..1d8154ad
+--- /dev/null
++++ b/packages/desktop/src/features/browser-downloads.ts
+@@ -0,0 +1,57 @@
++import path from "node:path";
++import { existsSync, mkdirSync } from "node:fs";
++
++/**
++ * Downloads from Paseo's built-in browser go straight to a folder, without a Save dialog.
++ *
++ * Without a `will-download` handler Electron shows a native Save dialog. Its title is the download URL,
++ * it can open behind the app window, and an agent driving the browser can't answer it, so a download an
++ * agent starts (for example a spreadsheet export) never lands. With this handler the file is saved to
++ * PASEO_BROWSER_DOWNLOAD_DIR, or the user's Downloads folder, under a name that never overwrites an
++ * existing file.
++ */
++export interface BrowserDownloadItem {
++  getFilename(): string;
++  setSavePath(savePath: string): void;
++}
++
++export interface BrowserDownloadSession {
++  on(event: "will-download", listener: (event: unknown, item: BrowserDownloadItem) => void): unknown;
++}
++
++export function browserDownloadDir(env: NodeJS.ProcessEnv, downloadsPath: string): string {
++  const dir = env.PASEO_BROWSER_DOWNLOAD_DIR?.trim();
++  return dir ? path.resolve(dir) : downloadsPath;
++}
++
++export function safeDownloadName(name: string): string {
++  const base = path.basename(name || "").replace(/[\u0000-\u001f<>:"/\\|?*]+/g, "_").trim();
++  return base && base !== "." && base !== ".." ? base.slice(0, 200) : "download";
++}
++
++export function uniqueDownloadPath(dir: string, name: string, exists: (p: string) => boolean = existsSync): string {
++  const ext = path.extname(name);
++  const stem = name.slice(0, name.length - ext.length);
++  let candidate = path.join(dir, name);
++  for (let n = 1; exists(candidate); n++) {
++    candidate = path.join(dir, `${stem} (${n})${ext}`);
++  }
++  return candidate;
++}
++
++export function installBrowserDownloads(
++  profileSession: BrowserDownloadSession,
++  options: { env: NodeJS.ProcessEnv; downloadsPath: string; log?: (message: string) => void },
++): void {
++  profileSession.on("will-download", (_event, item) => {
++    const dir = browserDownloadDir(options.env, options.downloadsPath);
++    try {
++      mkdirSync(dir, { recursive: true });
++    } catch {
++      return; // fall back to Electron's own Save dialog
++    }
++    const target = uniqueDownloadPath(dir, safeDownloadName(item.getFilename()));
++    item.setSavePath(target);
++    options.log?.(`[browser-downloads] saving to ${target}`);
++  });
++}
+diff --git a/packages/desktop/src/main.ts b/packages/desktop/src/main.ts
+index 072f96a2..cc22f0f2 100644
+--- a/packages/desktop/src/main.ts
++++ b/packages/desktop/src/main.ts
+@@ -102,6 +102,7 @@ import {
+ } from "./daemon/quit-lifecycle.js";
+ import { runDesktopStartup } from "./desktop-startup.js";
+ import { registerBrowserAutomationIpc } from "./features/browser-automation/ipc.js";
++import { installBrowserDownloads } from "./features/browser-downloads.js";
+ import { BrowserKeyboard } from "./features/browser-keyboard/index.js";
+ import { installAppUpdateOnQuit } from "./features/auto-updater.js";
+ import {
+@@ -973,6 +974,11 @@ async function bootstrap(): Promise<void> {
+   ipcMain.handle("paseo:opener:openUrl", (_event, value: unknown) => openExternalUrl(value));
+   registerEditorTargetHandlers();
+   registerBrowserAutomationIpc();
++  installBrowserDownloads(session.fromPartition(PASEO_BROWSER_PROFILE_PARTITION), {
++    env: process.env,
++    downloadsPath: app.getPath("downloads"),
++    log: (message) => log.info(message),
++  });
+ 
+   // In-app "Open in new window": opens a window that lands on the given project
+   // via the same open-project flow as a CLI launch (no move, no ownership).

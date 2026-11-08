@@ -332,6 +332,43 @@ def scrub(text, sheets, keep=()):
     return text
 
 
+NAMEISH = re.compile(r"[A-Za-z][A-Za-z.'-]*(?: [A-Za-z][A-Za-z.'-]*){1,2}")
+
+
+def _name_fakes(sheets, share_labels=()):
+    """Fakes for people's names that keep how names relate: "Meena Kulkarni" -> "Person1 Surname1", and a
+    bare "Meena" in any name column -> "Person1". Without this, a first-name-only entry and the full name in
+    another tab get unrelated fakes, and Claude can't test a first-name match on the mock."""
+    cols = []
+    for df in sheets.values():
+        for c in df.columns:
+            if fk_slug_in(c, share_labels):
+                continue
+            vals = [v.strip() for v in df[c] if v.strip()]
+            if not vals or classify(df[c])["kind"] not in ("category", "text"):
+                continue
+            if sum(1 for v in vals if NAMEISH.fullmatch(v) and (v.istitle() or v.isupper())) >= 0.6 * len(vals):
+                cols.append(vals)
+    firsts, out, n_full = {}, {}, 0
+    for vals in cols:
+        for v in vals:
+            parts = v.split()
+            if len(parts) >= 2 and NAMEISH.fullmatch(v):
+                firsts.setdefault(parts[0].lower(), f"Person{len(firsts) + 1}")
+    for vals in cols:
+        for v in vals:
+            key = re.sub(r"[^a-z0-9]", "", v.lower())
+            if key in out:
+                continue
+            parts = v.split()
+            if len(parts) >= 2 and parts[0].lower() in firsts:
+                n_full += 1
+                out[key] = f"{firsts[parts[0].lower()]} Surname{n_full}"
+            elif len(parts) == 1 and v.lower() in firsts:
+                out[key] = firsts[v.lower()]
+    return out
+
+
 def make_mock(path, question, title=None, caller_agent=None, seed=7, share_labels=()):
     """Write teach/inbox/<id>/mock.xlsx (+ request.json). Returns the request dict and a preview."""
     sheets, hdr = raw_sheets(path)
@@ -347,7 +384,7 @@ def make_mock(path, question, title=None, caller_agent=None, seed=7, share_label
     rdir = os.path.join(TEACH_DIR, rid)
     os.makedirs(rdir, exist_ok=True)
     clean_q = scrub(question, sheets, keep=share_labels)
-    mocks, kinds, shared = {}, {}, {}
+    mocks, kinds, shared = {}, {}, _name_fakes(sheets, share_labels)
     for name, df in sheets.items():
         cols, k = {}, {}
         for c in df.columns:

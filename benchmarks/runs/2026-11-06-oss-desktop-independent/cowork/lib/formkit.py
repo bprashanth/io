@@ -9,7 +9,8 @@ Approved or Paid). From that, every tab gets a **form**:
   filters    which rows                     Status in [...], Category in [...], Amount 1000..5000
   date       a date range on a date column  Claim date 26/08/2026 .. 26/10/2026
   presets    named business rules           "Paid out" = Status in [Approved, Paid]
-  lookups    columns joined in from another tab (Officer -> Officers tab -> District)
+  lookups    columns joined in from another tab (Officer -> Officers tab -> District); "match": "first_name"
+             also joins a bare first name ("Meena") to the one person in the other tab with that first name
 
 A form state (the *spec*) is plain JSON. `run()` turns it into one DuckDB query; every id and column
 is checked against the skill and every value is quoted, so a spec can never become arbitrary SQL.
@@ -152,9 +153,18 @@ def build(con, path, skill, base):
             (left, right), = lk["on"].items()
             a = f"l{k}"
             cols = ", ".join(f'any_value("{c}") AS "{c}"' for c in lk["columns"])
-            joins.append(f'LEFT JOIN (SELECT lower(trim(CAST("{right}" AS VARCHAR))) AS _k, {cols} FROM '
-                         f'"{other["table"]}_clean" GROUP BY 1) {a} ON lower(trim(CAST(t."{left}" AS VARCHAR))) = {a}._k')
-            extra += [f'{a}."{c}" AS "{lk.get("prefix", "")}{c}"' for c in lk["columns"]]
+            lkey = f'lower(trim(CAST(t."{left}" AS VARCHAR)))'
+            rkey = f'lower(trim(CAST("{right}" AS VARCHAR)))'
+            joins.append(f'LEFT JOIN (SELECT {rkey} AS _k, {cols} FROM '
+                         f'"{other["table"]}_clean" GROUP BY 1) {a} ON {lkey} = {a}._k')
+            if lk.get("match") == "first_name":
+                # "Meena" -> "Meena Kulkarni", only when one person in the other tab has that first name
+                joins.append(f'LEFT JOIN (SELECT split_part({rkey}, \' \', 1) AS _k, {cols} FROM '
+                             f'"{other["table"]}_clean" WHERE {rkey} <> \'\' GROUP BY 1 HAVING count(DISTINCT {rkey}) = 1) {a}f '
+                             f'ON {a}._k IS NULL AND position(\' \' IN {lkey}) = 0 AND {lkey} = {a}f._k')
+                extra += [f'COALESCE({a}."{c}", {a}f."{c}") AS "{lk.get("prefix", "")}{c}"' for c in lk["columns"]]
+            else:
+                extra += [f'{a}."{c}" AS "{lk.get("prefix", "")}{c}"' for c in lk["columns"]]
         con.execute(f'CREATE OR REPLACE VIEW "{name}" AS SELECT t.*{"".join(", " + e for e in extra)} '
                     f'FROM "{name}_clean" t {" ".join(joins)}')
     return out
@@ -679,13 +689,21 @@ def check(path, skill, out_dir):
                 continue
             keys = {re.sub(r"\s+", " ", str(x)).strip().lower() for x in sheets[other][ob[right]] if str(x).strip()}
             amap = {str(k).strip().lower(): str(x) for k, x in ((spec.get("normalize") or {}).get(left, {}).get("map") or {}).items()}
+            firsts = {}
+            if lk.get("match") == "first_name":
+                for x in keys:
+                    firsts.setdefault(x.split(" ")[0], set()).add(x)
             for i, v in enumerate(df[by_slug[left]]):
                 k = re.sub(r"\s+", " ", v).strip().lower()
-                if v.strip() and k not in keys and amap.get(k, "").strip().lower() not in keys:
-                    row = hdr[sheet] + 1 + i
-                    bad.add((row, by_slug[left]))
-                    problems.append({"tab": sheet, "row": row, "column": by_slug[left], "value": v,
-                                     "problem": f"not found in the {other} tab ({ob[right]})"})
+                if not v.strip() or k in keys or amap.get(k, "").strip().lower() in keys:
+                    continue
+                if " " not in k and len(firsts.get(k, ())) == 1:
+                    continue
+                row = hdr[sheet] + 1 + i
+                bad.add((row, by_slug[left]))
+                why = (f"first name shared by several people in the {other} tab ({ob[right]})"
+                       if " " not in k and len(firsts.get(k, ())) > 1 else f"not found in the {other} tab ({ob[right]})")
+                problems.append({"tab": sheet, "row": row, "column": by_slug[left], "value": v, "problem": why})
         ws = wb.create_sheet(str(sheet if sheet != "csv" else "Data")[:31])
         headers = list(df.columns)
         ws.append(headers + [f"Check: {by_slug[r['column']]}" for r in rules])

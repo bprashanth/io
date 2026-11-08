@@ -104,6 +104,43 @@ c = edited("newcol", new_column)
 ok(c["status"] == "drift" and any("Pincode" in m for m in c["messages"]), "new column -> drift")
 c = edited("tabname", renamed_tab)
 ok(c["status"] == "drift" and any("Field visits" in m for m in c["messages"]), "renamed tab -> drift, still maps")
+
+# --- lookups with "match": "first_name": "Meena" in Visits is Meena Kulkarni in Officers, if no one else is a Meena
+import json  # noqa: E402
+sk_dir = os.path.join(tmp, "skills", "field_programme_tracker")
+shutil.copytree(os.path.join(TD, "skills", "field_programme_tracker"), sk_dir)
+sj = json.load(open(os.path.join(sk_dir, "skill.json")))
+sj["tabs"]["Visits"]["lookups"][0]["match"] = "first_name"
+sj["tabs"]["Visits"]["normalize"]["field_officer"].pop("map")  # the first-name match must do the work, not a hand map
+json.dump(sj, open(os.path.join(sk_dir, "skill.json"), "w"))
+sh, s, c, bb = opened(TRACKER, os.path.join(tmp, "skills"))
+f = fm.form(c, s, "Visits", bb)
+r = fm.run(c, f, bb["Visits"]["table"], {"measures": ["rows"], "group_by": ["officer_district"]})
+got = {x["Officer's district"]: x["Number of visits"] for x in r["rows"]}
+ok(got == {"Kolhapur": 23, "Pune": 47, "Sangli": 26, "Satara": 44}, "first-name lookup: every visit gets its officer's district")
+probs, _ = fm.check(TRACKER, s, tmp)
+ok(not any(p["column"] == "Field officer" for p in probs), "first-name lookup: unique first names are not reported")
+
+
+def second_ravi(fr):
+    o = fr["Officers"]
+    o.loc[len(o)] = ["Ravi Deshmukh", "9800000000", "ravi.d@saathi.org", "Sangli"]
+
+
+p = os.path.join(tmp, "ravi.xlsx")
+frames = pd.read_excel(TRACKER, sheet_name=None, header=None, dtype=object)
+second_ravi(frames)
+with pd.ExcelWriter(p) as w:
+    for k, df in frames.items():
+        df.to_excel(w, sheet_name=k, index=False, header=False)
+sh, s, c, bb = opened(p, os.path.join(tmp, "skills"))
+f = fm.form(c, s, "Visits", bb)
+r = fm.run(c, f, bb["Visits"]["table"], {"measures": ["rows"], "group_by": ["officer_district"]})
+got = {x["Officer's district"]: x["Number of visits"] for x in r["rows"]}
+ok(got.get("Satara") == 41 and got.get("(blank)") == 3, "first-name lookup: an ambiguous first name stays unmatched")
+probs, _ = fm.check(p, s, tmp)
+ok(sum("shared by several" in x["problem"] for x in probs) == 3, "first-name lookup: ambiguous first name is reported")
+fk.SKILLS_DIR = os.path.join(TD, "skills")
 shutil.rmtree(tmp)
 
 # --- the taught single-tab skills, on the event-eval files, through the generic form (no taught SQL)
