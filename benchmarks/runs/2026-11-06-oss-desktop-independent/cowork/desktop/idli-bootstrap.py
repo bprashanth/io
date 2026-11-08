@@ -63,7 +63,8 @@ def paseo(*args, parse=True, change=False):
 
 
 def same(a, b):
-    return os.path.realpath(a) == os.path.realpath(b)
+    """Same folder; the CLI sometimes prints paths with ~."""
+    return bool(a) and os.path.realpath(os.path.expanduser(a)) == os.path.realpath(os.path.expanduser(b))
 
 
 def folders():
