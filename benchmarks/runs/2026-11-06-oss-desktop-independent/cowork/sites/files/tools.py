@@ -213,7 +213,8 @@ def t_file_get(link, wait_seconds=45):
         from lib import uiswitch
         incoming = os.path.join(sh.data_dir(), "drive", "incoming", str(int(since)))
         os.makedirs(incoming, exist_ok=True)
-        if uiswitch.save_downloads_to(incoming):  # dev builds: no Save box (shipping: Paseo patch P1)
+        quiet = uiswitch.QuietDownloads(incoming)  # dev builds: no Save box (shipping: Paseo patch P1)
+        if quiet.ok:
             silent = incoming
             os.environ["IDLI_DOWNLOAD_DIRS"] = os.pathsep.join(
                 [incoming] + [p for p in (os.environ.get("IDLI_DOWNLOAD_DIRS") or "").split(os.pathsep) if p])
@@ -230,8 +231,7 @@ def t_file_get(link, wait_seconds=45):
             got = _new_download(since, title)
             if not got and not raised and not silent and time.time() - since > 3:
                 raised = _raise_save_dialog()
-        if silent:
-            uiswitch.save_downloads_to(None)
+        quiet.close()
         if sheet:
             try:
                 paseo("browser_navigate", browserId=btab, url=g.sheets_url(fid, "edit"))

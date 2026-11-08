@@ -65,70 +65,109 @@ def show_agent(agent):
 
 
 # ---- a minimal DevTools (CDP) client over a websocket, standard library only
-def _ws_eval(ws_url, expression, timeout=10):
-    got = _cdp(ws_url, [("Runtime.evaluate", {"expression": expression, "returnByValue": True})], timeout)
-    return (got[0] or {}).get("result", {}).get("value")
-
-
-def _cdp(ws_url, calls, timeout=10):
-    """Send CDP calls one after another; returns each call's result (None on error)."""
-    rest = ws_url.split("://", 1)[1]
-    hostport, path = rest.split("/", 1)
-    host, port = hostport.split(":")
-    s = socket.create_connection((host, int(port)), timeout=timeout)
-    try:
+class Cdp:
+    def __init__(self, ws_url, timeout=10):
+        rest = ws_url.split("://", 1)[1]
+        hostport, path = rest.split("/", 1)
+        host, port = hostport.split(":")
+        self.timeout, self.n, self.buf = timeout, 0, b""
+        self.s = socket.create_connection((host, int(port)), timeout=timeout)
         key = base64.b64encode(os.urandom(16)).decode()
-        s.sendall((f"GET /{path} HTTP/1.1\r\nHost: {hostport}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                   f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+        self.s.sendall((f"GET /{path} HTTP/1.1\r\nHost: {hostport}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                        f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
         head = b""
         while b"\r\n\r\n" not in head:
-            chunk = s.recv(1024)
+            chunk = self.s.recv(1024)
             if not chunk:
                 raise ConnectionError("no handshake")
             head += chunk
         if b" 101 " not in head.split(b"\r\n", 1)[0]:
             raise ConnectionError(head.split(b"\r\n", 1)[0].decode(errors="replace"))
-        buf = head.split(b"\r\n\r\n", 1)[1]
+        self.buf = head.split(b"\r\n\r\n", 1)[1]
 
-        def send(i, method, params):
-            msg = json.dumps({"id": i, "method": method, "params": params}).encode()
-            mask = os.urandom(4)
-            n = len(msg)
-            hdr = bytes([0x81]) + (bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536
-                                   else bytes([0x80 | 127]) + struct.pack(">Q", n))
-            s.sendall(hdr + mask + bytes(b ^ mask[k % 4] for k, b in enumerate(msg)))
+    def _need(self, k):
+        while len(self.buf) < k:
+            chunk = self.s.recv(65536)
+            if not chunk:
+                raise ConnectionError("closed")
+            self.buf += chunk
+        out, self.buf = self.buf[:k], self.buf[k:]
+        return out
 
-        def need(k):
-            nonlocal buf
-            while len(buf) < k:
-                chunk = s.recv(65536)
-                if not chunk:
-                    raise ConnectionError("closed")
-                buf += chunk
-            out, buf = buf[:k], buf[k:]
-            return out
-        results = []
-        for i, (method, params) in enumerate(calls, 1):
-            send(i, method, params)
-            deadline = time.time() + timeout
-            while True:
-                if time.time() > deadline:
-                    raise TimeoutError("no reply")
-                b1, b2 = need(2)
-                ln = b2 & 0x7F
-                if ln == 126:
-                    ln = struct.unpack(">H", need(2))[0]
-                elif ln == 127:
-                    ln = struct.unpack(">Q", need(8))[0]
-                data = need(ln)
-                if b1 & 0x0F == 1:
-                    reply = json.loads(data)
-                    if reply.get("id") == i:
-                        results.append(reply.get("result") if "error" not in reply else None)
-                        break
-        return results
+    def call(self, method, params=None):
+        """One CDP call; its result, or None if the browser answered with an error."""
+        self.n += 1
+        msg = json.dumps({"id": self.n, "method": method, "params": params or {}}).encode()
+        mask, n = os.urandom(4), len(msg)
+        hdr = bytes([0x81]) + (bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536
+                               else bytes([0x80 | 127]) + struct.pack(">Q", n))
+        self.s.sendall(hdr + mask + bytes(b ^ mask[k % 4] for k, b in enumerate(msg)))
+        deadline = time.time() + self.timeout
+        while time.time() < deadline:
+            b1, b2 = self._need(2)
+            ln = b2 & 0x7F
+            if ln == 126:
+                ln = struct.unpack(">H", self._need(2))[0]
+            elif ln == 127:
+                ln = struct.unpack(">Q", self._need(8))[0]
+            data = self._need(ln)
+            if b1 & 0x0F == 1:
+                reply = json.loads(data)
+                if reply.get("id") == self.n:
+                    return reply.get("result") if "error" not in reply else None
+        raise TimeoutError("no reply")
+
+    def close(self):
+        try:
+            self.s.close()
+        except OSError:
+            pass
+
+
+def _ws_eval(ws_url, expression, timeout=10):
+    c = Cdp(ws_url, timeout)
+    try:
+        return ((c.call("Runtime.evaluate", {"expression": expression, "returnByValue": True}) or {})
+                .get("result", {}).get("value"))
     finally:
-        s.close()
+        c.close()
+
+
+def _targets():
+    with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json", timeout=3) as r:
+        return json.load(r)
+
+
+class QuietDownloads:
+    """Dev builds only: while open, Paseo's browser tabs save downloads into `folder` without a Save box. The
+    setting lives on each tab's DevTools connection, so the connections stay open until close(), which puts the
+    Save box back. Shipping fix: Paseo patch P1. `ok` says whether it took effect."""
+
+    def __init__(self, folder):
+        self.conns, self.ok = [], False
+        try:
+            tabs = [t for t in _targets() if t.get("type") == "webview"]
+        except (OSError, ValueError):
+            return
+        for t in tabs:
+            try:
+                c = Cdp(t["webSocketDebuggerUrl"])
+                if c.call("Page.setDownloadBehavior", {"behavior": "allow", "downloadPath": folder}) is not None:
+                    self.conns.append(c)
+                    self.ok = True
+                else:
+                    c.close()
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError):
+                pass
+
+    def close(self):
+        for c in self.conns:
+            try:
+                c.call("Page.setDownloadBehavior", {"behavior": "default"})
+            except (OSError, ConnectionError, TimeoutError):
+                pass
+            c.close()
+        self.conns = []
 
 
 # Paseo keeps other workspaces' tab rows mounted but hidden: use the row that is on screen. The row also holds an
@@ -169,19 +208,3 @@ if __name__ == "__main__":
     if len(sys.argv) != 3 or sys.argv[1] not in ("agent", "tab"):
         sys.exit(__doc__)
     print(json.dumps(show_agent(sys.argv[2]) if sys.argv[1] == "agent" else show_tab(sys.argv[2])))
-
-
-def save_downloads_to(folder):
-    """Dev builds only: make the built-in browser save downloads into `folder` without a Save box (every browser
-    session: Paseo's browser tabs use their own). folder=None puts the Save box back. Shipping fix: Paseo patch
-    P1. Returns True if it took effect."""
-    try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json/version", timeout=3) as r:
-            ws = json.load(r)["webSocketDebuggerUrl"]
-        ctxs = (_cdp(ws, [("Target.getBrowserContexts", {})])[0] or {}).get("browserContextIds", [])
-        params = {"behavior": "allow", "downloadPath": folder} if folder else {"behavior": "default"}
-        calls = [("Browser.setDownloadBehavior", params)] + [
-            ("Browser.setDownloadBehavior", dict(params, browserContextId=c)) for c in ctxs]
-        return any(x is not None for x in _cdp(ws, calls))
-    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError):
-        return False
