@@ -492,7 +492,7 @@ def t_drive_find(query):
                 and len(t) >= 4 and not t.isdigit()}
         rare = di.rarity(cand)
         words = sorted(cand, key=lambda w: (rare[w], -len(w)))[:3]  # rarest in this Drive first
-        hits, missed = [], []
+        per, missed = {}, []
         for w in words:
             try:
                 live = t_drive_search(w, max_wait=4).get("files", [])
@@ -500,11 +500,12 @@ def t_drive_find(query):
                 live = []
             if not live:
                 missed.append(w)
-            elif len(live) <= 3:  # a specific word: these files are the answer
-                hits.extend((w, f) for f in live)
+                continue
+            per[w] = live
+            if len(live) <= 3:  # a specific word: stop here
                 break
-            elif not hits:  # a common word: keep only as a last resort
-                hits.extend((w, f) for f in live[:3])
+        best = min(per, key=lambda w: len(per[w])) if per else None  # the word that matched the fewest files
+        hits = [(best, f) for f in per[best][:4]] if best else []
         if hits:
             seen, res = set(), []
             for w, f in hits:
