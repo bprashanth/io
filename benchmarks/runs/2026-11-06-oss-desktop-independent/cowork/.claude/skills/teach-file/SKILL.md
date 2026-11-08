@@ -21,21 +21,37 @@ look for the real file.
   a changed layout, add what's missing, and bump `version`. A version-1 skill (keys at the top level, no
   `tabs`) still works; convert it to `tabs` when you change it.
 
-## 2. Walk the user through it (always one confirmation round before writing anything)
-Ask in one message, then wait for the reply:
-1. What one row is in each tab ("one row per claim"), and for each tab "Your columns are:" with each
-   header's meaning and type (date in format X, amount, phone, email, category, free text). Ask them to
-   confirm or correct.
-2. Suggested checks: phone or email shape, dates that don't parse or are in the future, amounts that
-   aren't numbers, required fields, a category's allowed values, keys that must exist in another tab.
-3. Suggested clean-ups: spelling variants of one category, amounts written as "Rs. 1,200", mixed date formats.
-4. **The words of this file**: what they add up or count (measures, with names they'd use), which date
-   is "the date", and business rules, e.g. "does 'paid out' mean Approved and Paid?", "leave out
-   Rejected by default?". With several tabs: how they connect (Visits.Officer = Officers.Name).
-5. How you read their question, e.g. "08/26 to 10/26 means 26 Aug to 26 Oct 2026".
+## 2. Walk the user through it, one small step at a time
+People can't weigh five topics in one message. Keep a running list of what you still need (the mainline below),
+ask about **one step at a time**, and come back to the list after every answer or side discussion. Start each
+step with where they are, e.g. "Step 2 of 5: checks". Skip steps that don't apply or are settled in an existing
+skill. Don't write the skill until every step is answered.
 
-Skip anything already settled in an existing skill. Use their answers. If they say "you decide", pick
-the sensible default and say what you chose. Don't write the skill until they've replied.
+Use a card (AskUserQuestion) when the answer is a choice: put your suggestion first as "(Recommended)" and say in
+it what you'd do; the card's "Other…" box is where they write their own. Use plain chat when it needs talking
+through: say "I'd like to discuss <topic>", go back and forth until it's agreed, then say what you settled and
+move on to the next step. A card holds up to 4 questions, shown one at a time, and up to 4 options each.
+
+The mainline:
+1. **What a row is, per tab.** One question per tab (up to 4 per card): "Tab Visits: I think one row is one
+   field visit. Columns: visit_date (date, dd/mm/yyyy), officer (name), amount (rupees), status (Done /
+   Follow-up / Cancelled). Right?" Options "Yes, that's right (Recommended)" and "Not quite". On "Not quite"
+   or a note in Other, talk it through in chat, then carry on.
+2. **Checks.** One card, multiSelect: "Which checks should I add? Tick all you want." Options are your
+   suggestions (phone/email shape, dates that don't parse or are in the future, amounts that aren't numbers,
+   required fields, allowed values, keys that must exist in another tab), at most 4 per question; use a second
+   question in the same card for more. Then ask in one line whether they want to add any of their own; keep
+   taking them, one per message, until they say that's all.
+3. **Clean-ups.** Same shape: a multiSelect card of what you'd tidy (spelling variants of one category, "Rs. 1,200"
+   amounts, mixed date formats, header rows repeated mid-sheet), then "any others?".
+4. **The words of this file.** One card question per decision that has clear options: what they add up or count
+   (measures, with their names for them), which date is "the date", rules like "does 'paid out' mean Approved and
+   Paid?", "leave out Rejected by default?", how tabs connect. Anything open-ended goes to chat.
+5. **How you read their question.** Usually chat: "I'd like to discuss how I read your question: …". Agree it,
+   then confirm in one line.
+
+If they say "you decide" at any point, take your suggestions for that step and every step left, say in a short
+list what you chose, and go on to writing the skill.
 
 ## 3. Write the file skill
 Idli turns the skill into a **form** for the file: per tab, a list of measures, ways to break them
@@ -116,6 +132,6 @@ Write `file-skills/<id>/skill.json`. The `<id>` is a slug of the file's title. I
 - Tell the user in two lines what Idli's form for this file now offers, and that their Idli chat will
   continue.
 - Then ask with a card (AskUserQuestion), header "Idli", question "Teaching is done. Go back to Idli to see
-  your answer?", options "Yes, back to Idli" and "Stay here". If they pick yes, run
-  `.venv/bin/python -m lib.uiswitch agent <caller_agent>` with `caller_agent` from request.json (skip the
-  card if it's empty).
+  your answer?", options "Yes, back to Idli" and "Stay here". If they pick yes, create the empty file
+  `teach/inbox/<id>/go_back` (`touch` it). Idli's watcher outside this chat sees it and switches the app; don't
+  try to switch it yourself (this chat can't reach the app). Then say "Switching you back to Idli."
