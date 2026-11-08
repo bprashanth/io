@@ -93,6 +93,35 @@ def status(agent):
     return a and a["status"]
 
 
+class Screen:
+    """What the person sees: the Start here chat as the app renders it (thoughts and tool details hidden)."""
+
+    def __init__(self):
+        from playwright.sync_api import sync_playwright
+        self.pw = sync_playwright().start()
+        b = self.pw.chromium.connect_over_cdp("http://127.0.0.1:49333")
+        self.pg = next(pg for c in b.contexts for pg in c.pages if pg.url.startswith("paseo://app"))
+
+    def show(self, ws, tab="Start here"):
+        base = self.pg.url.split("/workspace/")[0]
+        self.pg.evaluate(f"location.href = {json.dumps(base + '/workspace/' + ws)}")
+        self.pg.wait_for_timeout(2500)
+        self.pg.evaluate("""(t) => { for (const e of document.querySelectorAll('*')) { const r = e.getBoundingClientRect();
+            if (e.childElementCount === 0 && (e.innerText || '').trim() === t && r.top > 40 && r.top < 66) { e.click(); return true; } } return false; }""", tab)
+        self.pg.wait_for_timeout(1000)
+
+    def text(self):
+        try:
+            return self.pg.evaluate("""() => { const m = [...document.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect();
+                return r.left >= 320 && r.top > 70 && r.height > 300 && e.scrollHeight > 0 && e.childElementCount > 0; });
+                m.sort((a, b) => b.innerText.length - a.innerText.length); return m.length ? m[0].innerText : ''; }""")
+        except Exception:
+            return ""
+
+    def close(self):
+        self.pw.stop()
+
+
 def wait(cond, timeout, step=1.0):
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -107,7 +136,8 @@ def case(a, lap):
     variant = {"text": "idli/START-HERE.md", "card": "idli/START-HERE-card.md"}[a.variant]
     flag = "~/idli-insights/config/drive-index.dryrun"
     lap.run(f"cp {variant} ~/idli-insights/start-here/CLAUDE.md; "
-            + (f"rm -f {flag}; pkill -f 'lib/driveindex.py build'; rm -f ~/idli-insights/config/drive-index.duckdb ~/idli-insights/config/drive-index.json" if a.full else f"touch {flag}"))
+            + (f"rm -f {flag}; pkill -f 'lib/driveindex.py build'; rm -f ~/idli-insights/config/drive-index.duckdb ~/idli-insights/config/drive-index.json" if a.full
+               else f"touch {flag}; cd ~/idli-insights/config && for f in drive-index.json drive-index.duckdb; do [ -f $f ] && mv $f $f.hold; done; cd - >/dev/null"))
     for ag in agents():
         if ag["name"] == "Start here":
             paseo("archive", ag["id"])
@@ -119,11 +149,23 @@ def case(a, lap):
     except (ValueError, KeyError):
         agent = next(ag["id"] for ag in agents() if ag["name"] == "Start here")
     res = {"provider": a.provider, "thinking": a.thinking, "variant": a.variant, "reply": a.reply, "full": a.full}
-    # greeting or card
+    scr = Screen()
+    time.sleep(2)
+    scr.show(START_WS)
+    seen = {}
+
+    def note(txt):
+        for key, pat in (("greeting", r"Hi, I.m Idli"), ("card", r"index your Drive now\?"), ("progress", PROGRESS.pattern),
+                         ("finish", r"Next: go to Idli")):
+            if key not in seen and re.search(pat, txt, re.M):
+                seen[key] = round(time.time() - t0, 1)
+        return txt
+
     def greeted():
+        txt = note(scr.text())
         if a.variant == "card" and pending(agent):
             return "card"
-        if status(agent) == "idle" and "Idli" in visible(log(agent)):
+        if "greeting" in seen and status(agent) == "idle":
             return "text"
         return None
     shown, el = wait(greeted, 180, 2)
@@ -145,19 +187,22 @@ def case(a, lap):
             paseo("permit", "deny", agent, str(req[0].get("id") or req[0].get("requestId")))
             time.sleep(2)
         paseo("send", "--no-wait", agent, a.reply)
-    acted, _ = wait(lambda: "mcp__cowork__drive_index]" in log(agent) or None, 240, 1.5)
+    acted, _ = wait(lambda: (note(scr.text()) and False) or "mcp__cowork__drive_index]" in log(agent) or None, 240, 1.5)
     res["act_s"] = round(time.time() - t1, 1) if acted else None
-    # progress and finish
-    limit = 420 if a.full else 60
+    # progress and finish, as seen on screen
+    limit = 480 if a.full else 90
+    lines = set()
     def finished():
-        v = visible(log(agent))
-        return ("Next: go to Idli" in v or "Done:" in v) and status(agent) == "idle" or None
-    _, el = wait(finished, limit, 3)
-    v = visible(log(agent))
-    res["lines"] = len(PROGRESS.findall(v))
-    res["finish"] = "Next: go to Idli" in v
+        txt = note(scr.text())
+        lines.update(m.group(0) for m in re.finditer(r"^(?:Opening|Listing|Reading|Summarising)[^\n]*$", txt, re.M))
+        return "finish" in seen and status(agent) == "idle" or None
+    wait(finished, limit, 2)
+    res["progress_lines_seen"] = len(lines)
+    res["seen_at_s"] = seen
+    res["finish"] = "finish" in seen
     res["total_s"] = round(time.time() - t1, 1)
-    res["tail"] = v.strip().splitlines()[-4:]
+    res["screen_tail"] = scr.text().strip().splitlines()[-5:]
+    scr.close()
     return res, agent
 
 
@@ -173,7 +218,7 @@ def main():
     try:
         res, agent = case(a, lap)
     finally:
-        lap.run("rm -f ~/idli-insights/config/drive-index.dryrun")
+        lap.run("rm -f ~/idli-insights/config/drive-index.dryrun; cd ~/idli-insights/config && for f in drive-index.json drive-index.duckdb; do [ -f $f.hold ] && mv -f $f.hold $f; done; cd - >/dev/null")
         lap.close()
     print(json.dumps(res, ensure_ascii=False))
     with open(os.path.join(HERE, "results.jsonl"), "a") as f:
