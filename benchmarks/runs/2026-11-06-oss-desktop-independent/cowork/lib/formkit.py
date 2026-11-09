@@ -237,6 +237,15 @@ def form(con, skill, tab, built):
                     sql = {"month": f"strftime(\"{c}\", '%Y-%m')", "quarter": f"strftime(\"{c}\", '%Y') || '-Q' || quarter(\"{c}\")",
                            "year": f"CAST(year(\"{c}\") AS VARCHAR)"}[part]
                     groups.append({"id": gid, "label": f"{k['label']}: {word}", "sql": sql, "auto": True})
+    for c, k in kinds.items():  # whole numbers with few values are codes (transect 1-7, plot 1-6): a breakdown too
+        if k["kind"] == "number" and c not in hidden and c not in have and c not in lookup_kinds(skill, tab, built):
+            try:
+                n, frac = con.execute(f'SELECT count(DISTINCT "{c}"), count(*) FILTER (WHERE "{c}" <> floor("{c}")) '
+                                      f'FROM "{b["table"]}"').fetchone()
+            except Exception:
+                continue
+            if 1 < n <= 40 and not frac:
+                groups.append({"id": c, "label": k["label"], "sql": f'CAST("{c}" AS BIGINT)', "auto": True})
     for c, k in kinds.items():  # text columns (names) can be grouped too, listed last
         if k["kind"] == "text" and c not in hidden and c not in have:
             groups.append({"id": c, "label": k["label"], "sql": f'"{c}"', "auto": True, "many": True})

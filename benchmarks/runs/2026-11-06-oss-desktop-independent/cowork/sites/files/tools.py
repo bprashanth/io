@@ -751,8 +751,9 @@ def t_working_copy_ready(file):
     with open(cs, "w") as f:
         json.dump(csrc, f)
     out = t_file_open(got["file"], show_form=True, goal="analyse")
-    out["say_to_user"] = (f"Checked your working copy again: {out.get('problems', 0)} problems left (it had "
-                          f"{wc.get('problems', '?')}). " + out.get("say_to_user", ""))
+    fixed = (wc.get("problems") or 0) - (out.get("problems") or 0)
+    out["say_to_user"] = (("Checked your working copy again: you fixed " + str(fixed) + ". " if fixed > 0 else
+                           "Checked your working copy again. ") + out.get("say_to_user", ""))
     if out.get("card"):
         out["card"]["questions"][0]["question"] = out["say_to_user"]
     out["then"] = ("From now on use the file '" + got["file"] + "' (the working copy) for every tool. If they asked a "
