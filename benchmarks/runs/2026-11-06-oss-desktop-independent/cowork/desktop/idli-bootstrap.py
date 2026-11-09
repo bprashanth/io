@@ -171,7 +171,7 @@ def main():
     agent = start_chat(ids.get("Start here"))
     start_tabs(agent)
     chat(ids.get("Start here"), LAYOUT[0][1], "What Idli has learned", "learned")
-    chat(ids.get("Idli"), LAYOUT[1][1], "New chat", "start")  # Idli keeps one waiting from then on
+    chat(ids.get("Idli"), LAYOUT[1][1], "New chat", "hi")  # Idli keeps one waiting from then on
     say("done. Heading order: Mission control, Idli, Claude (drag once until Paseo patch P2).")
 
 
