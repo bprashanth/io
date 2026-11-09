@@ -190,7 +190,7 @@ def _new_download(since, title):
     return p if os.path.getsize(p) == size else None
 
 
-def t_file_get(link, wait_seconds=45):
+def t_file_get(link, wait_seconds=45, open_after=True):
     m = LINK.search(link or "")
     fid = m.group(1) if m else (link.strip() if re.fullmatch(r"[\w-]{20,}", (link or "").strip()) else None)
     if not fid:
@@ -254,12 +254,24 @@ def t_file_get(link, wait_seconds=45):
     dest = os.path.join(out_dir, name + os.path.splitext(got)[1])
     if os.path.realpath(got) != os.path.realpath(dest):
         shutil.copy2(got, dest)
+    src = {}
+    try:
+        with open(dest + ".source.json") as f:
+            src = json.load(f)
+    except (OSError, ValueError):
+        pass
+    if src.get("id") != fid:
+        src = {}
+    src.update(id=fid, url=(g.sheets_url(fid, "edit") if sheet else f"https://drive.google.com/file/d/{fid}/view"))
     with open(dest + ".source.json", "w") as f:
-        json.dump({"id": fid, "url": (g.sheets_url(fid, "edit") if sheet else f"https://drive.google.com/file/d/{fid}/view")}, f)
+        json.dump(src, f)
     _last_get.pop(fid, None)
     rel = os.path.relpath(dest, sh.data_dir())
-    return {"downloaded": True, "file": rel, "title": title or name,
-            "then": f"Call file_open(file='{rel}')."}
+    if not open_after:
+        return {"downloaded": True, "file": rel, "title": title or name}
+    out = t_file_open(rel)  # one model turn fewer: the form opens with the download
+    out["downloaded"] = True
+    return out
 
 
 # ---------------------------------------------------------------- the form
@@ -328,14 +340,28 @@ def t_file_open(file, show_form=True):
         out["then"] = ("For a question about this file, call file_ask with a spec built only from these tabs' measures, "
                        "group_by, filters and presets. Ask the user if a value is unclear. If no measure or filter fits "
                        "the question, offer teach_file.")
+        opts = []
         if shown:
-            out["card"] = {"questions": [{"header": "Dashboard", "multiSelect": False,
-                                          "question": f"The dashboard for {meta['title']} is open in a tab. Switch to it?",
-                                          "options": [{"label": "Yes, show it", "description": "Pick what to see with "
-                                                       "tick-boxes and dropdowns; answers show there too"},
-                                                      {"label": "Stay here", "description": "Ask me in the chat"}]}]}
-            out["then"] = ("Call AskUserQuestion with exactly `card` (don't write anything first); on \"Yes, show it\" "
-                           "call show_dashboard. Then: " + out["then"])
+            opts.append({"label": "Show the dashboard", "description": "Pick what to see with tick-boxes and dropdowns; "
+                                                                      "answers show there too"})
+        wc = (files().source(file) or {}).get("working_copy")
+        if real and (files().source(file) or {}).get("id") and not wc:
+            opts.append({"label": "Mark them in a Drive copy", "description": "A copy next to the original: problem cells "
+                         "in red, a comment on each kind of problem. Fix them there, then tell me you're ready"})
+        if opts:
+            opts.append({"label": "Stay here", "description": "Ask me in the chat"})
+            out["card"] = {"questions": [{"header": "Next", "multiSelect": False,
+                                          "question": out["say_to_user"] + " What next?", "options": opts}]}
+            out["then"] = ("Call AskUserQuestion with exactly `card` now (it already says say_to_user; write nothing "
+                           "before it). On \"Show the dashboard\" call show_dashboard; on \"Mark them in a Drive copy\" "
+                           "call working_copy and stop there (the analysis waits until they say they're ready). Then: "
+                           + out["then"])
+        else:
+            out["then"] = "Write say_to_user in your own short words. Then: " + out["then"]
+        if wc:
+            out["working_copy"] = wc
+            out["then"] += (" They have a working copy in Drive (" + wc.get("name", "") + "): if they say they're ready "
+                            "or done fixing, call working_copy_ready.")
     return out
 
 
@@ -508,6 +534,118 @@ def t_show_teach_chat(request_id):
         "shown": False, "say_to_user": "Open the Claude workspace in the left sidebar to answer its questions."}
 
 
+# ---------------------------------------------------------------- a working copy in Drive, problems marked
+def t_working_copy(file, fresh=False):
+    """After the person said yes: put a copy of the file next to the original in their Drive, with the problems
+    marked (lib/workcopy.py), and open it in a tab. The only write Idli makes to Drive, and only a new file."""
+    from lib import uiswitch
+    from lib import workcopy
+    from lib.browser import paseo
+    meta, e = files().meta(file), files().open(file)
+    if not meta["known"]:
+        return {"error": "Idli hasn't been taught this file yet.", "then": "Call teach_file with the user's request."}
+    src = files().source(file) or {}
+    if not src.get("id"):
+        return {"error": "I don't know where this file is in Drive.", "then": "Ask for the file's Google link and "
+                "call file_get with it, then working_copy."}
+    if src.get("working_copy") and not fresh:
+        wc = src["working_copy"]
+        try:
+            paseo("browser_new_tab", url=wc["url"])
+        except Exception:
+            pass
+        return {"exists": True, "working_copy": wc,
+                "say_to_user": f"You already have a working copy: {wc['name']} (opened in a tab). Fix the red cells "
+                               "there and tell me when you're ready.",
+                "then": "Write say_to_user. If they want a new copy instead, call working_copy with fresh=true."}
+    if not e["path"].lower().endswith(".xlsx"):
+        return {"error": "Working copies need an Excel or Google Sheets file."}
+    problems = [p for p in e["problems"]]
+    stamp = time.strftime("%d %b %H%M")
+    name = f"{meta['title']} - Idli working copy {stamp}"
+    out_dir = os.path.join(sh.data_dir(), "drive", "working")
+    os.makedirs(out_dir, exist_ok=True)
+    local = os.path.join(out_dir, name + ".xlsx")
+    made = workcopy.build(e["path"], e["skill"], problems, local)
+    from lib import driveindex as di
+    folder = di.folder_of(src["id"]) or ("my-drive", "My Drive")
+    from sites.google import tools as g
+    folder_url = g.drive_url("my-drive" if folder[0] == "my-drive" else f"folders/{folder[0]}")
+    manual = {"uploaded": False, "local_copy": os.path.relpath(local, sh.data_dir()),
+              "say_to_user": f"I made the working copy but couldn't put it in your Drive. It's saved at {local}: drag "
+                             f"it into the {folder[1]} folder in Drive, open it, and tell me when you're ready."}
+    before = uiswitch.webview_ids()
+    if not before:
+        return manual  # no DevTools port (not our dev launcher): Paseo patch P9
+    try:
+        out = paseo("browser_new_tab", url=folder_url)
+        m = re.search(r"browserId=(\S+)", out) or re.search(r'"browserId"\s*:\s*"([^"]+)"', out)
+        bid = m and m.group(1)
+    except RuntimeError:
+        bid = None
+    uiswitch.show_tab([f"{folder[1]} - Google Drive*", "drive.google.com*"])
+    tid = uiswitch.new_page(before)
+    if not tid:
+        return manual
+    page = uiswitch.Page(tid)
+    try:
+        end = time.time() + 20
+        while time.time() < end and not page.eval("document.readyState === 'complete' && "
+                                                  "!!document.querySelector('[data-id], [role=main]')"):
+            time.sleep(0.5)
+        time.sleep(2)
+        if not page.drop_file(local):
+            return manual
+        fid, end = None, time.time() + 90
+        find = ("(n => { const e = [...document.querySelectorAll('[data-id]')].find(e => (e.innerText || '').includes(n));"
+                " return e ? e.getAttribute('data-id') : null; })(%s)" % json.dumps(name))
+        while time.time() < end and not fid:
+            time.sleep(1.5)
+            fid = page.eval(find)
+    finally:
+        page.close()
+    if not fid:
+        return manual
+    url = g.sheets_url(fid, "edit")
+    if bid:
+        try:
+            paseo("browser_navigate", browserId=bid, url=url)
+        except RuntimeError:
+            pass
+    src["working_copy"] = {"id": fid, "url": url, "name": name, "folder": folder[1], "made": time.strftime("%Y-%m-%d %H:%M"),
+                           "problems": made["cells"]}
+    with open(files().resolve(file) + ".source.json", "w") as f:
+        json.dump(src, f)
+    return {"uploaded": True, "working_copy": src["working_copy"],
+            "say_to_user": f"I put \"{name}\" next to the original in {folder[1]} and opened it in a tab. Red cells are "
+                           "problems and turn white once fixed; each kind of problem has one comment on its first cell "
+                           "(the number on each tab's name), and the last tab, Idli checks, lists them all. The original "
+                           "is unchanged. Fix what you can, then tell me you're ready and I'll analyse the copy.",
+            "then": "Write say_to_user, nothing else. Don't answer questions about the file until they say they're ready "
+                    "(then call working_copy_ready) or ask you to go ahead with the original."}
+
+
+def t_working_copy_ready(file):
+    """The person says they've fixed what they can: download the working copy and open its form."""
+    from lib import workcopy
+    src = files().source(file) or {}
+    wc = src.get("working_copy")
+    if not wc:  # called on the copy itself, or no copy yet
+        return {"error": "No working copy for this file.", "then": "Offer working_copy, or answer from the original."}
+    got = t_file_get(wc["url"], open_after=False)
+    if not got.get("downloaded"):
+        return got
+    workcopy.strip(files().resolve(got["file"]))
+    out = t_file_open(got["file"], show_form=True)
+    out["say_to_user"] = (f"Checked your working copy: {out.get('problems', 0)} problems left (it had "
+                          f"{wc.get('problems', '?')}). " + out.get("say_to_user", ""))
+    if out.get("card"):
+        out["card"]["questions"][0]["question"] = out["say_to_user"] + " What next?"
+    out["then"] = (out.get("then", "") + " From now on use the file '" + got["file"] + "' (the working copy) for "
+                   "file_ask, and answer the question they were waiting on.")
+    return out
+
+
 FILE = {"file": {"type": "string", "description": "Path in the workspace folder, from file_get, gsheet_read's "
                                                   "saved_csv or sheet_list"}}
 SPEC = {"type": "object", "description":
@@ -553,6 +691,12 @@ TOOLS = {
                     "share_labels": {"type": "array", "items": {"type": "string"},
                                      "description": "Label columns the user ticked on the card ([] for none)"}},
                    ["request_id"]),
+    "working_copy": (t_working_copy, "Only after the user said yes (the card, or they asked): put a copy of the file "
+                     "next to the original in their Drive with the problems marked (red cells, one comment per kind of "
+                     "problem, an 'Idli checks' tab) and open it in a tab. The original is never changed.",
+                     {**FILE, "fresh": {"type": "boolean", "description": "Make a new copy even if one exists"}}, ["file"]),
+    "working_copy_ready": (t_working_copy_ready, "When the user says they've fixed the working copy (ready, done): "
+                           "download it, re-check it and open its form.", FILE, ["file"]),
 }
 
 

@@ -498,6 +498,25 @@ def rarity(words):
     return {w: sum(1 for d in docs if any(t == w or (len(w) >= 5 and t.startswith(w)) for t in d)) for w in words}
 
 
+def folder_of(fid):
+    """(folder id for a Drive URL, folder name) of a file in the index: ("my-drive", "My Drive") for the top of My
+    Drive, None when unknown (not indexed, or only in Shared with me)."""
+    try:
+        got = _read("SELECT path FROM files WHERE id = ?", [fid])
+    except Exception:
+        return None
+    if not got or not got[0][0]:
+        return None
+    path = got[0][0]
+    if path == "My Drive":
+        return "my-drive", "My Drive"
+    if " / " not in path:
+        return None
+    up, name = path.rsplit(" / ", 1)
+    row = _read("SELECT id FROM files WHERE name = ? AND path = ? AND kind IN ('Folder', 'Shared folder')", [name, up])
+    return (row[0][0], name) if row else None
+
+
 def progress_line(st=None):
     """One plain line about where the build is, for the chat."""
     st = st or status()
