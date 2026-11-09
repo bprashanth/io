@@ -149,6 +149,24 @@ def chat(ws_id, folder, title, prompt):
     return (out or {}).get("agentId")
 
 
+OPENED = os.path.join(IDLI, "config", "bootstrap-tabs.json")  # tabs opened once: Paseo lists only the tabs of the
+#                                                              workspace on screen, so we can't look for them later
+
+
+def opened(key, value=None):
+    try:
+        with open(OPENED) as f:
+            seen = json.load(f)
+    except (OSError, ValueError):
+        seen = {}
+    if value is None:
+        return seen.get(key)
+    seen[key] = value
+    os.makedirs(os.path.dirname(OPENED), exist_ok=True)
+    with open(OPENED, "w") as f:
+        json.dump(seen, f)
+
+
 def browser_as(agent_id):
     """Paseo's browser tools acting in agent_id's workspace, once the app's browser host is up (else None)."""
     sys.path.insert(0, COWORK)
@@ -183,15 +201,17 @@ def learned_tab(agent_id):
     if not browser:
         say("the app's browser isn't available; open Paseo and rerun to add the What Idli has learned page")
         return
-    old = next((t for t in browser.tabs() if "/skills" in t["url"]), None)
-    if old and old["url"] == url:
+    if opened("learned") == url:
         say("What Idli has learned page is open")
-    elif old:
+        return
+    old = next((t for t in browser.tabs() if "/skills" in t["url"]), None)  # only if that workspace is on screen
+    if old:
         say("point the What Idli has learned page at the current server")
         browser.paseo("browser_navigate", browserId=old["id"], url=url)
     else:
         say("open the What Idli has learned page")
         browser.paseo("browser_new_tab", url=url)
+    opened("learned", url)
 
 
 def start_tabs(agent_id):
@@ -205,9 +225,10 @@ def start_tabs(agent_id):
         return
     have = {urllib.parse.urlparse(t["url"]).hostname for t in browser.tabs()}
     for url in TABS:
-        if urllib.parse.urlparse(url).hostname not in have:
+        if urllib.parse.urlparse(url).hostname not in have and not opened(url):
             say(f"open tab {urllib.parse.urlparse(url).hostname}")
             browser.paseo("browser_new_tab", url=url)
+        opened(url, True)
 
 
 def main():
