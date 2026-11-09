@@ -29,7 +29,8 @@ if HERE not in sys.path:
 IDLI = os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights")
 DB = os.environ.get("IDLI_DRIVE_INDEX") or os.path.join(IDLI, "config", "drive-index.duckdb")
 STATE = os.path.splitext(DB)[0] + ".json"
-MUSE = (os.environ.get("MUSE_URL") or "http://127.0.0.1:8181") + "/v1/chat/completions"
+from lib import muse as _muse  # noqa: E402  (Muse over Cloudflare, or the dev tunnel)
+MUSE = _muse.base_url() + "/v1/chat/completions"
 
 KINDS = ["Google Sheets", "Google Docs", "Google Slides", "Google Forms", "Google Drawings", "Google My Maps",
          "Google Colab", "Google Sites", "Microsoft Excel", "Microsoft Word", "Microsoft PowerPoint", "Shared folder",
@@ -245,7 +246,7 @@ def summarise(batch, timeout=180):
               '{"1": "...", "2": "..."}\n\n' + json.dumps(items, ensure_ascii=False))
     body = {"model": "muse-glimmer-30b", "temperature": 0, "max_tokens": 4000, "response_format": {"type": "json_object"},
             "messages": [{"role": "user", "content": prompt}]}
-    req = urllib.request.Request(MUSE, json.dumps(body).encode(), {"Content-Type": "application/json"})
+    req = urllib.request.Request(MUSE, json.dumps(body).encode(), {"Content-Type": "application/json", **_muse.headers()})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         text = json.load(r)["choices"][0]["message"]["content"] or ""
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
