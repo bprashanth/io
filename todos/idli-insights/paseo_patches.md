@@ -14,6 +14,7 @@ patch file until we decide between upstream PRs and our own build. Running list.
 | P6 | **Cosmetic**: no red `GUEST_VIEW_MANAGER_CALL ... ERR_FAILED (-2)` line when a navigation turns into a download | Looks like an error to people; it's only the page load being replaced by the file | ❌ optional |
 | P8 | **Links in chat open in a Paseo tab** (in this workspace) instead of the system browser, at least for docs.google.com / drive.google.com | "Found tech_reimbursement_form" could be a link to peek at the file. Today Idli asks with a card and opens the tab itself (`file_peek`), which works without a patch | ❌ optional |
 | P9 | **Upload a file into a browser tab** (or a daemon call that drops a local file onto a tab), for Drive uploads | `working_copy` puts a marked-up copy next to the original in Drive by dropping the file on a Drive folder tab. Dev builds do it through the DevTools port (`Input.dispatchDragEvent`, `lib/uiswitch.py` Page.drop_file); a normal install has no way in, so Idli says where the local copy is and the person drags it in | ⚠️ prototype via DevTools; patch to write |
+| P10 | **Delete in the app** (chat and workspace menus), not only Archive | The app only archives; archived chats stay in `~/.paseo` forever and people expect Delete to remove them. The CLI already has `paseo delete` | ❌ optional |
 
 Notes
 - Tab layout (which tabs, their order) is saved per workspace in the app's storage too; Start here's chat ends up
