@@ -562,7 +562,8 @@ def t_working_copy(file, fresh=False):
         return {"error": "Working copies need an Excel or Google Sheets file."}
     problems = [p for p in e["problems"]]
     stamp = time.strftime("%d %b %H%M")
-    name = f"{meta['title']} - Idli working copy {stamp}"
+    stem = re.sub(r"\s*-\s*Idli working copy.*$", "", os.path.splitext(os.path.basename(e["path"]))[0])
+    name = f"{stem} - Idli working copy {stamp}"
     out_dir = os.path.join(sh.data_dir(), "drive", "working")
     os.makedirs(out_dir, exist_ok=True)
     local = os.path.join(out_dir, name + ".xlsx")
