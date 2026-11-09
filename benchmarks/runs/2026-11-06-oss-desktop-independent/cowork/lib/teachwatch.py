@@ -22,7 +22,7 @@ for _ in range(3 * 3600 // 10):
             d = {}
         if d.get("charts"):
             msg = (f"Claude finished: {d.get('summary') or 'new charts'}. Charts made: {', '.join(d['charts'])}. Call "
-                   "chart_show with the file we were working on for each of these chart ids, then carry on.")
+                   f"chart_show once with the file we were working on and charts={json.dumps(d['charts'])}, then carry on.")
         else:
             msg = (f"Teaching finished: {d.get('summary') or 'the file skill is ready'}. "
                    "Open the file again with file_open (same goal as before) and continue with my question.")
