@@ -8,6 +8,24 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-09 (night), DGX: owner's feedback on the journey.**
+  - **No waiting for "hi":** Idli always keeps one chat named "New chat" open on the start card (made by the
+    bootstrap, then by `ensure_spare` in `sites/files/tools.py`). Using it renames it ("Clean: <file>",
+    "Analyse: <file>", "Find: …") and opens the next one in the background (one spare at most, one start per 2 min).
+  - **Mission control:** the first heading is now Mission control, with the workspace Start here holding two
+    chats: "Start here" (setup, indexing) and "What Idli has learned" (tools `skills_list`, `skill_delete` with a
+    confirm card). Bootstrap renames the heading and creates both chats.
+  - **Teach card:** the Labels question has "None (Recommended)" (typing in Other is for a different answer);
+    the fake copy opens in a `fake-copy.localhost` tab ("Fake copy for Claude: <file>") so the person sees exactly
+    what Claude gets.
+  - **A leak found and closed:** the households mock kept the real coordinate range, so Claude worked out the survey
+    was around Pune. Coordinates (columns named lat/lon/…) are now faked around (0, 0) with the same spread, postal
+    codes are random; IDs (PAN, receipt numbers, plot codes) keep their shape and fixed prefixes so checks can be
+    written. The teach skill tells Claude never to put real-world places or extents in chart code.
+  - **Teach skill:** step 0 discusses what they want to find out (the poverty-trap kind of brainstorm); clean-ups are
+    phrased as how Idli reads the real file (Claude never tidies the fake copy); a question typed into Other is
+    answered before the card is asked again.
+  - Laptop: `file-skills/households` holds the owner's re-teach (uncommitted, kept across pulls with a stash).
 - **2026-11-09 (evening), DGX: one journey, scoped.** Field note:
   [narrative/2026-11-09-one-journey-field-note.md](../narrative/2026-11-09-one-journey-field-note.md); test steps:
   [cowork-manual-test.md](cowork-manual-test.md) section "The Idli journey".
