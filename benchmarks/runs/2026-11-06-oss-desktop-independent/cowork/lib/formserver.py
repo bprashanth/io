@@ -7,6 +7,7 @@ every request needs the token written to <data dir>/.idli/form-server.json (mode
 
     python -I -m lib.formserver <data dir>     (started on demand by the files site's file_form tool)
 """
+import datetime as dt
 import json
 import re
 import os
@@ -175,7 +176,11 @@ class Files:
             g["rows"].append({"row": p["row"], "value": p["value"], "cell": p.get("cell"), "key": self.pkey(p),
                               "suggestion": p.get("suggestion"), "decision": dec.get(self.pkey(p))})
         real = [p for p in e["problems"] if not p.get("skipped")]
+        src = self.source(rel) or {}
         return {"file": rel, "title": e["skill"].get("title") or title, "known": True,
+                "working_copy": src.get("working_copy"), "is_copy": bool(src.get("copy_of")),
+                "problem_kinds": len({(p["tab"], p["column"], p["rule"]) for p in real}),
+                "charts": self.charts(rel),
                 "skill": {"id": e["skill"]["id"], "version": e["skill"].get("version", 1)},
                 "contract": e["contract"], "checked_copy": e["checked"], "problem_count": len(real),
                 "source": self.source(rel),
@@ -183,6 +188,36 @@ class Files:
                 "problems": {t: list(v.values()) for t, v in groups.items()},
                 "hidden_cells": e.get("hidden"),
                 "tabs": [dict(fm.public(f), rows=len(e["built"][t]["df"])) for t, f in e["forms"].items()]}
+
+    def charts_dir(self, rel):
+        stem = re.sub(r"[^\w.-]+", "_", os.path.splitext(os.path.basename(rel))[0])
+        return os.path.join(self.data_dir, "charts", stem)
+
+    def charts(self, rel):
+        """Charts drawn for this file (Claude's and quick ones from the chat), newest first."""
+        d = self.charts_dir(rel)
+        if not os.path.isdir(d):
+            return []
+        out = []
+        for f in os.listdir(d):
+            if not f.endswith(".svg"):
+                continue
+            meta = {}
+            try:
+                with open(os.path.join(d, f[:-4] + ".json")) as fh:
+                    meta = json.load(fh)
+            except (OSError, ValueError):
+                pass
+            out.append({"name": f[:-4], "title": meta.get("title") or f[:-4], "kind": meta.get("kind", "quick"),
+                        "mtime": os.path.getmtime(os.path.join(d, f))})
+        return sorted(out, key=lambda x: -x["mtime"])
+
+    def chart(self, rel, name):
+        import base64
+        if not re.fullmatch(r"[\w.-]+", name or ""):
+            raise ValueError("bad chart name")
+        with open(os.path.join(self.charts_dir(rel), name + ".svg"), "rb") as f:
+            return {"data": "data:image/svg+xml;base64," + base64.b64encode(f.read()).decode()}
 
     def run(self, rel, tab, spec):
         e = self.open(rel)
@@ -200,6 +235,38 @@ class Files:
         res["text"] = fm.answer_text(res, f, spec)
         res["tab"] = tab
         return res
+
+
+def skills_list():
+    """What Idli has learned: one skill per file (from the Claude workspace), with its charts."""
+    from lib import chartkit
+    out = []
+    for sk in fk.load_skills():
+        tabs = fm.tabs_of(sk)
+        hist = sk.get("history") or []
+        out.append({"id": sk["id"], "title": sk.get("title") or sk["id"], "version": sk.get("version", 1),
+                    "tabs": list(tabs), "checks": sum(len(t.get("validations") or []) for t in tabs.values()),
+                    "measures": sum(len(t.get("measures") or []) for t in tabs.values()),
+                    "charts": [c["title"] or c["id"] for c in chartkit.charts_of(sk)],
+                    "taught": (hist[-1].get("taught") if hist else "") or "",
+                    "changed": dt.datetime.fromtimestamp(os.path.getmtime(os.path.join(sk["_dir"], "skill.json")))
+                    .strftime("%d %b %Y %H:%M")})
+    return out
+
+
+def skills_delete(sid):
+    """Remove one file's skill (moved to ~/idli-insights/archive/skills, so a mistake can be undone by hand)."""
+    import shutil
+    if not re.fullmatch(r"[\w.-]+", sid or ""):
+        raise ValueError("bad skill id")
+    sk = next((s for s in fk.load_skills() if s["id"] == sid), None)
+    if not sk:
+        raise ValueError(f"No skill '{sid}'.")
+    dest = os.path.join(os.path.expanduser("~/idli-insights/archive/skills"),
+                        f"{sid}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}")
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.move(sk["_dir"], dest)
+    return {"deleted": sid, "kept_at": dest}
 
 
 def make_handler(files, token):
@@ -244,6 +311,13 @@ def make_handler(files, token):
                     return self._send(200, {"status": st, "line": di.progress_line(st)})
                 if u.path == "/api/form":
                     return self._send(200, files.meta(qs["file"][0]))
+                if u.path == "/api/chart":
+                    return self._send(200, files.chart(qs["file"][0], qs["name"][0]))
+                if u.path == "/skills":
+                    with open(os.path.join(HERE, "lib", "skills.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/skills":
+                    return self._send(200, skills_list())
             except (ValueError, KeyError) as e:
                 return self._send(400, {"error": str(e)})
             except Exception as e:  # keep the page alive; the message helps the Teach workspace
@@ -264,6 +338,10 @@ def make_handler(files, token):
                     return self._send(200, files.decide(body["file"], list(body["keys"]), body.get("decision")))
                 if u.path == "/api/fixlist":
                     return self._send(200, files.fixlist(body["file"]))
+                if u.path == "/api/skills/delete":
+                    out = skills_delete(body["id"])
+                    files.cache.clear()
+                    return self._send(200, out)
             except fm.SpecError as e:
                 return self._send(400, {"error": str(e)})
             except (ValueError, KeyError) as e:

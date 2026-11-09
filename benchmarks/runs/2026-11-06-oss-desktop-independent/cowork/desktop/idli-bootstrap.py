@@ -32,7 +32,7 @@ LAYOUT = [  # (heading and workspace name, folder, instructions copied to <folde
     ("Idli", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
     ("Claude", COWORK, None),
 ]
-SITES = "google\nsheets\nfiles\n"
+SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 TABS = ["https://drive.google.com/drive/my-drive"]  # Gmail later; Drive is all the first run needs
 
@@ -81,7 +81,7 @@ def folders():
             if not DRY:
                 shutil.copyfile(instructions, dest)
         sites = os.path.join(path, "cowork.sites")
-        if not os.path.exists(sites):
+        if not os.path.exists(sites) or open(sites).read() != SITES:
             say(f"write {sites}")
             if not DRY:
                 with open(sites, "w") as f:
