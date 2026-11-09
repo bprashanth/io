@@ -8,6 +8,13 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-09 (late night), DGX: "What Idli has learned" is a page again.** The owner preferred the list page to
+  a chat table. Mission control now has two workspaces: Start here (setup chat) and What Idli has learned (the
+  `/skills` page in a browser tab, plus a small chat that only points at it). The page says "Here is a list of files
+  Idli has learned to analyze", refreshes itself every 5 s, and has Delete under each entry (P11 crops the right
+  edge). The form server keeps its token across restarts and the bootstrap starts it, so the tab's link stays good.
+  Found: Paseo's `browser_list_tabs` lists only the tabs of the workspace on screen, so each bootstrap rerun opened
+  Drive and the page again; the bootstrap now remembers what it opened (`~/idli-insights/config/bootstrap-tabs.json`).
 - **2026-11-09 (night), DGX: owner's feedback on the journey.**
   - **No waiting for "hi":** Idli always keeps one chat named "New chat" open on the start card (made by the
     bootstrap, then by `ensure_spare` in `sites/files/tools.py`). Using it renames it ("Clean: <file>",
