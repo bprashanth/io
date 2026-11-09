@@ -34,6 +34,7 @@ LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md
     ("Idli", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
     ("Claude", COWORK, None),
 ]
+FOLDER = {n: f for n, f, _ in LAYOUT}
 HEADING = {"Start here": "Mission control", "What Idli has learned": "Mission control"}  # the sidebar heading (project) when it differs from the workspace
 SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
@@ -120,7 +121,7 @@ def projects_and_workspaces():
 
 
 def start_chat(ws_id):
-    folder = LAYOUT[0][1]
+    folder = FOLDER["Start here"]
     agent = next((a for a in paseo("ls", "--global") if a["name"] == "Start here" and same(a.get("cwd") or "", folder)), None)
     if agent:
         say("Start here chat exists")
@@ -171,7 +172,7 @@ def learned_tab(agent_id):
     py = os.path.join(COWORK, ".venv", "bin", "python")
     r = subprocess.run([py if os.path.exists(py) else sys.executable, "-c",
                         "import sys,json; sys.path.insert(0, sys.argv[1]); from lib import formserver as f; "
-                        "print(json.dumps(f.ensure(sys.argv[2])))", COWORK, LAYOUT[0][1]],
+                        "print(json.dumps(f.ensure(sys.argv[2])))", COWORK, FOLDER["Start here"]],
                        capture_output=True, text=True, timeout=60, env=ENV)
     if r.returncode:
         say("the page server didn't start: " + r.stderr.strip()[-200:])
@@ -214,8 +215,8 @@ def main():
     ids = projects_and_workspaces()
     agent = start_chat(ids.get("Start here"))
     start_tabs(agent)
-    learned_tab(chat(ids.get("What Idli has learned"), LAYOUT[0][1], "What Idli has learned", "learned"))
-    chat(ids.get("Idli"), LAYOUT[1][1], "New chat", "hi")  # Idli keeps one waiting from then on
+    learned_tab(chat(ids.get("What Idli has learned"), FOLDER["What Idli has learned"], "What Idli has learned", "learned"))
+    chat(ids.get("Idli"), FOLDER["Idli"], "New chat", "hi")  # Idli keeps one waiting from then on
     say("done. Heading order: Mission control, Idli, Claude (drag once until Paseo patch P2).")
 
 
