@@ -436,6 +436,11 @@ def t_file_ask(file, spec, tab=None, chart=False):
             spec = json.loads(spec)
         except ValueError:
             return {"error": "spec must be a JSON object."}
+    if isinstance(spec, dict) and "chart" in spec:  # the model often puts the flag inside the spec
+        spec = dict(spec)
+        chart = bool(spec.pop("chart")) or chart
+    if isinstance(chart, str):
+        chart = chart.lower() in ("true", "yes", "1")
     try:
         res = files().run(file, tab, spec or {})
     except fm.SpecError as e:
