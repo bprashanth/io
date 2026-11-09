@@ -482,10 +482,10 @@ def t_file_ask(file, spec, tab=None, chart=False):
         return {"answer": res["text"], "chart_markdown": f"![{res['described']}]({pic})", "form_link": url,
                 "form_updated": shown,
                 "say_to_user": "Write chart_markdown exactly, on its own line, then the answer in one or two short lines "
-                               "(numbers unchanged). Say the dashboard tab shows the chart too." + note,
-                "then": "Then call AskUserQuestion with one question: header \"Chart\", question \"Want Claude to design "
-                        "a fuller chart for this (on fake data), or is this enough?\", options \"This is enough\" and "
-                        "\"Ask Claude\". On \"Ask Claude\" call chart_request with the user's question."}
+                               "(numbers unchanged). Then this line: \"The dashboard tab has it too. For a fuller "
+                               "chart, say 'ask Claude' and I'll send Claude a copy with fake values to design it.\"" + note,
+                "then": "If they then say 'ask Claude' (or want it drawn differently than the form can), call "
+                        "chart_request with what they want the chart to show."}
     if chart and not pic:
         note += (" This answer has no breakdown to draw. If they wanted a picture, call chart_request with their "
                  "question (Claude designs it on fake data).")

@@ -185,8 +185,11 @@ def bar_svg(res, title, out_svg, top=15):
         return None
     total = res.get("total") or {}
     cols = res["columns"]
-    num = [c for c in cols if all(isinstance(r.get(c), (int, float)) or r.get(c) is None for r in rows)
-           and any(isinstance(r.get(c), (int, float)) for r in rows)]
+    if total:  # the total row has exactly the measures; the rest are breakdowns (even numeric ones: transect 1-7)
+        num = [c for c in cols if c in total]
+    else:
+        num = [c for c in cols if all(isinstance(r.get(c), (int, float)) or r.get(c) is None for r in rows)
+               and any(isinstance(r.get(c), (int, float)) for r in rows)]
     groups = [c for c in cols if c not in num]
     if not groups or not num:
         return None
@@ -208,25 +211,35 @@ def bar_svg(res, title, out_svg, top=15):
         ax.bar_label(bars, labels=[_num(v) for v in d[m]], padding=3, fontsize=9)
         ax.set_xlabel(m)
         ax.grid(axis="y", visible=False)
-    else:
+    else:  # two breakdowns: a grid (rows x columns), the value in each cell; works for counts, shares and averages
+        import numpy as np
         g1, g2 = groups[0], groups[1]
         d = df[[g1, g2, m]].copy()
         d[[g1, g2]] = d[[g1, g2]].fillna("(blank)").astype(str)
-        keep2 = d.groupby(g2)[m].sum().sort_values(ascending=False).index[:7]
-        d[g2] = d[g2].where(d[g2].isin(keep2), "Others")
-        p = d.pivot_table(index=g1, columns=g2, values=m, aggfunc="sum", fill_value=0)
-        p = p.loc[p.sum(axis=1).sort_values(ascending=False).index[:top]]
-        order = [c for c in keep2 if c in p.columns] + (["Others"] if "Others" in p.columns else [])
-        p = p[order].iloc[::-1]
-        fig, ax = plt.subplots(figsize=(9, max(3, 0.38 * len(p) + 1.6)))
-        left = None
-        colors = PALETTE + ["#BDBDBD"]
-        for k, c in enumerate(p.columns):
-            ax.barh(p.index, p[c], left=left, label=c, color=colors[k] if c != "Others" else "#BDBDBD")
-            left = p[c] if left is None else left + p[c]
-        ax.legend(title=g2, loc="lower right", fontsize=9)
-        ax.set_xlabel(m)
-        ax.grid(axis="y", visible=False)
+        p = d.pivot_table(index=g1, columns=g2, values=m, aggfunc="sum")
+        def order(ix):
+            try:
+                return sorted(ix, key=lambda x: float(x))
+            except ValueError:
+                return sorted(ix)
+        p = p.loc[order(p.index)[:25], order(p.columns)[:20]]
+        fig, ax = plt.subplots(figsize=(min(11, 2 + 0.8 * len(p.columns)), max(2.6, 0.5 * len(p) + 1.4)))
+        vals = p.values.astype(float)
+        im = ax.imshow(np.ma.masked_invalid(vals), cmap="YlOrRd", aspect="auto")
+        ax.set_xticks(range(len(p.columns)), [str(c) for c in p.columns])
+        ax.set_yticks(range(len(p.index)), [str(i) for i in p.index])
+        ax.set_xlabel(g2)
+        ax.set_ylabel(g1)
+        ax.grid(False)
+        hi = np.nanmax(vals) if np.isfinite(vals).any() else 0
+        for (i, j), v in np.ndenumerate(vals):
+            if np.isfinite(v):
+                ax.text(j, i, _num(v), ha="center", va="center", fontsize=9,
+                        color="white" if hi and v > 0.6 * hi else "#1d1d1b")
+            else:
+                ax.text(j, i, "–", ha="center", va="center", fontsize=9, color="#9a9a9a")
+        cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
+        cb.set_label(m)
     ax.set_title(title)
     if total and m in total and total[m] is not None:
         fig.text(0.01, -0.02, f"All: {_num(total[m])}", fontsize=9, color="#5F6B73")
