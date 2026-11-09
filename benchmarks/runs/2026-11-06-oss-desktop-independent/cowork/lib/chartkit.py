@@ -109,11 +109,36 @@ def render(skill_dir, chart_id, data_path, out_svg, timeout=90):
     env = {k: v for k, v in os.environ.items() if not k.startswith(("PASEO_", "OPENROUTER", "ANTHROPIC"))}
     env["MPLBACKEND"] = "Agg"
     env["MPLCONFIGDIR"] = os.path.join(os.path.dirname(out_svg) or ".", ".mpl")
-    r = subprocess.run([sys.executable, "-I", "-c", RUNNER, HERE, skill_dir, chart_py, data_path, out_svg],
+    cmd = [sys.executable, "-I", "-c", RUNNER, HERE, skill_dir, chart_py, data_path, out_svg]
+    r = subprocess.run(wall(cmd, reads=[HERE, skill_dir, data_path], writes=[os.path.dirname(out_svg)]),
                        capture_output=True, text=True, timeout=timeout, env=env, cwd=HERE)
     if r.returncode or not os.path.exists(out_svg):
         return {"ok": False, "error": (r.stderr or r.stdout).strip()[-600:]}
     return {"ok": True, "svg": out_svg}
+
+
+def wall(cmd, reads=(), writes=()):
+    """Run chart code inside a bubblewrap wall (as io's Codex sandbox did): no network, the whole filesystem
+    read-only, every home folder hidden except the code, the skill and the one data file, and only the output folder
+    writable. Without bwrap (macOS, Windows) the code still runs, after the import/name check above."""
+    import shutil
+    bw = shutil.which("bwrap")
+    if not bw or os.environ.get("IDLI_NO_WALL"):
+        return cmd
+    py = os.path.realpath(sys.executable)
+    keep = [os.path.realpath(p) for p in (*reads, sys.prefix, sys.base_prefix, os.path.dirname(os.path.dirname(py)))]
+    args = [bw, "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp", "--unshare-all",
+            "--die-with-parent", "--new-session"]
+    for home in ("/home", "/root", "/Users"):
+        if os.path.isdir(home):
+            args += ["--tmpfs", home]
+    for p in keep:
+        if os.path.exists(p):
+            args += ["--ro-bind", p, p]
+    for p in writes:
+        os.makedirs(p, exist_ok=True)
+        args += ["--bind", os.path.realpath(p), os.path.realpath(p)]
+    return args + ["--"] + cmd
 
 
 RUNNER = r"""
