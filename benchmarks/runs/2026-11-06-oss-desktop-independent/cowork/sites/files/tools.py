@@ -536,7 +536,7 @@ def t_teach_file(file, question, share_labels=None, missing=None, chart=None):
             "options": [{"label": "None (Recommended)", "description": "Every value stays made up"}]
                        + [{"label": c, "description": "e.g. " + ", ".join(str(x) for x in v[:4])} for c, v in shareable]})
     if _show_mock(req["id"], title):
-        questions[0]["question"] += " (The fake copy is open in the \"Fake copy\" tab if you want to look first.)"
+        questions[0]["question"] += " (To look first: the fake-copy tab at the top.)"
     return {"request_id": req["id"], "updating": req["existing_skill"], "card": {"questions": questions},
             "then": ("Call AskUserQuestion with exactly `card` (don't write anything first). If they pick \"Yes, send "
                      "and switch\", call teach_send with request_id and share_labels = the label columns they ticked "
@@ -573,8 +573,9 @@ def _show_mock(request_id, title):
     try:
         from lib.browser import paseo, tabs
         port, token = _server()
-        url = f"http://dashboard.localhost:{port}/mock?" + urllib.parse.urlencode({"t": token, "id": request_id})
-        old = next((t for t in tabs() if "/mock?" in t["url"] and "dashboard.localhost" in t["url"]), None)
+        # its own name: the tab reads "fake-copy.localhost" until it loads, then "Fake copy for Claude: ..."
+        url = f"http://fake-copy.localhost:{port}/mock?" + urllib.parse.urlencode({"t": token, "id": request_id})
+        old = next((t for t in tabs() if "/mock?" in t["url"]), None)
         if old:
             paseo("browser_navigate", browserId=old["id"], url=url)
         else:

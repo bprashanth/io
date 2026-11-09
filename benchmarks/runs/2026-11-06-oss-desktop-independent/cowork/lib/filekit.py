@@ -268,6 +268,11 @@ def mock_column(series, header, rnd, keep_labels=False, shared=None):
     kind, out = info["kind"], []
     vals = list(series)
     real_variants = _variant_groups(vals) if kind == "category" else {}
+    fixed = {}  # per ID length: positions where every ID has the same character (prefixes such as "T" or "R-2025-")
+    for L in {len(str(v).strip()) for v in vals if _id_like(v)}:
+        same = [str(v).strip() for v in vals if _id_like(v) and len(str(v).strip()) == L]
+        if len(same) >= 3:
+            fixed[L] = {i: c for i, c in enumerate(same[0]) if all(x[i] == c for x in same)}
     if kind == "date":  # fake dates stay inside the real column's range (no invented future dates)
         fmts = [info["format"]] + [f for f in DATE_FORMATS if f != info["format"]]
         ds = [dt.datetime.strptime(v, f).date() for v in vals if v for f in [next((f for f in fmts if _parses(v, f)), None)] if f]
@@ -315,6 +320,10 @@ def mock_column(series, header, rnd, keep_labels=False, shared=None):
                        else num[:rnd.randint(5, 8)])
         elif kind == "category" and keep_labels:
             out.append(v)  # the user agreed these labels (e.g. Approved / Pending) are not private
+        elif kind == "category" and _id_like(v):
+            key = "id:" + v.strip().upper()
+            shared.setdefault(key, _same_shape(v.strip(), rnd, fixed.get(len(v.strip()))))
+            out.append(shared[key])
         elif kind == "category":
             base = real_variants.get(v, v)
             key = re.sub(r"[^a-z0-9]", "", base.lower())
@@ -331,9 +340,27 @@ def mock_column(series, header, rnd, keep_labels=False, shared=None):
         else:
             key = re.sub(r"[^a-z0-9]", "", v.lower())
             if key not in shared:
-                shared[key] = f"{header} {len([x for x in shared.values() if x.startswith(header + ' ')]) + 1}"
-            out.append(_variant(shared[key], v))
+                if _id_like(v):
+                    shared[key] = _same_shape(v.strip(), rnd, fixed.get(len(v.strip())))  # an ID (PAN, receipt no.): same pattern, so checks can be written
+                else:
+                    shared[key] = f"{header} {len([x for x in shared.values() if x.startswith(header + ' ')]) + 1}"
+            out.append(shared[key] if _id_like(v) else _variant(shared[key], v))
     return out, info
+
+
+def _id_like(v):
+    """A code with digits and no spaces: PAN, receipt numbers, plot IDs."""
+    v = str(v).strip()
+    return bool(re.fullmatch(r"[A-Za-z0-9/._-]{4,24}", v) and re.search(r"\d", v) and re.search(r"[A-Za-z]", v))
+
+
+def _same_shape(v, rnd, keep=None):
+    """'ABCDE1234F' -> 'QWRTZ5821K': letters stay letters (same case), digits stay digits, separators stay, and
+    characters every value shares at that position (`keep`) stay as they are."""
+    keep = keep or {}
+    return "".join(keep[i] if i in keep else rnd.choice(string.ascii_uppercase) if c.isupper() else
+                   rnd.choice(string.ascii_lowercase) if c.islower() else rnd.choice(string.digits) if c.isdigit()
+                   else c for i, c in enumerate(v))
 
 
 def _label(k):
