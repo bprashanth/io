@@ -10,7 +10,10 @@ Approved or Paid). From that, every tab gets a **form**:
   date       a date range on a date column  Claim date 26/08/2026 .. 26/10/2026
   presets    named business rules           "Paid out" = Status in [Approved, Paid]
   lookups    columns joined in from another tab (Officer -> Officers tab -> District); "match": "first_name"
-             also joins a bare first name ("Meena") to the one person in the other tab with that first name
+             also joins a bare first name ("Meena") to the one person in the other tab with that first name;
+             "accept": [regex, ...] are the team's own codes ("UKS\\d+"), not reported as missing from the other tab
+  row_checks checks across columns or tabs (`check()`): a SQL condition on one cleaned row (alias t), true when
+             the row is wrong; {{tab:Name}} is another tab's cleaned table. Teacher-written, like measures.
 
 A form state (the *spec*) is plain JSON. `run()` turns it into one DuckDB query; every id and column
 is checked against the skill and every value is quoted, so a spec can never become arbitrary SQL.
@@ -28,11 +31,13 @@ real change (a used column missing, dates no longer parsing) stops and asks for 
 import datetime as dt
 import json
 import re
+import sys
 
 from lib import filekit as fk
 
 TAB_KEYS = ("headers", "columns", "normalize", "validations", "summary", "measures", "group_by", "filters",
-            "presets", "date_columns", "lookups", "row_noun", "hidden")
+            "presets", "date_columns", "lookups", "row_noun", "hidden", "row_checks", "skip_rows",
+            "row_numbers")
 
 
 # ---------------------------------------------------------------- the skill's tabs
@@ -119,6 +124,8 @@ def _clean_view(con, df, spec, name, header_row=None):
             cases = " ".join(f"WHEN lower(trim({expr})) = {fk._lit(str(k).strip().lower())} THEN {fk._lit(v)}"
                              for k, v in n["map"].items())
             expr = f"CASE {cases} ELSE {expr} END"
+        if n.get("case") == "lower":  # codes such as species abbreviations: 'Cesaur ' -> 'cesaur'
+            expr = f"lower(regexp_replace({expr}, '\\s+', ' ', 'g'))"
         if n.get("case") == "title":
             expr = (f"array_to_string(list_transform(string_split(lower(regexp_replace({expr}, '\\s+', ' ', 'g')), "
                     f"' '), lambda x: upper(x[1]) || x[2:]), ' ')")
@@ -764,6 +771,48 @@ def today():
 
 
 # ---------------------------------------------------------------- checks on every tab
+def _row_checks(path, skill, tab, df, header_row, layout, ctx):
+    """A tab's "row_checks": [{"id", "column", "sql", "message", "value"?}]. `sql` is a condition on one cleaned
+    row of the tab (alias t), true when the row has the problem; it may use another tab as {{tab:Name}}, e.g.
+    `t.count <> (SELECT count(*) FROM {{tab:Trees}} r WHERE r.plot = t.plot)`. `value` (optional SQL) is what the
+    problem shows; by default the cell in `column`."""
+    rcs = tabs_of(skill)[tab].get("row_checks") or []
+    if not rcs:
+        return []
+    import duckdb
+    if not ctx:  # the cleaned tables, built once per check()
+        ctx["con"] = duckdb.connect()
+        ctx["built"] = build(ctx["con"], path, skill, "chk")
+    con, built = ctx["con"], ctx["built"]
+    if tab not in built:
+        return []
+    by_slug = {fk.slug(c): c for c in df.columns}
+    idx = {fk.sheet_row(df, i, header_row): i for i in range(len(df)) if i not in layout}
+    out = []
+    for rc in rcs:
+        def tabs_in(sql):
+            return re.sub(r"\{\{tab:([^}]+)\}\}", lambda m: f'"{built[m.group(1).strip()]["table"]}"'
+                          if m.group(1).strip() in built else "(SELECT 1 WHERE false)", sql)
+        cond = tabs_in(rc["sql"])
+        val = tabs_in(rc.get("value") or f't."{rc["column"]}"')
+        try:
+            rows = con.execute(f'SELECT t."_row", CAST(({val}) AS VARCHAR) FROM "{built[tab]["table"]}" t '
+                               f'WHERE COALESCE(({cond}), false) ORDER BY 1').fetchall()
+        except Exception as e:
+            print(f"row check {rc.get('id')} on {tab} failed: {e}", file=sys.stderr)
+            continue
+        col = by_slug.get(rc["column"], rc["column"])
+        for row, v in rows:
+            i = idx.get(row)
+            if i is None:
+                continue
+            out.append({"tab": built[tab]["sheet"], "row": row, "column": col, "value": v or "", "rule": "row_check",
+                        "check": rc.get("id"), "cell": fk.cell_ref(df, i, col, header_row) if col in df.columns else None,
+                        "problem": rc.get("message") or f"{rc.get('id')} check failed",
+                        "suggestion": {"to": None, "why": rc.get("why") or "Check this against the field sheet."}})
+    return out
+
+
 def check(path, skill, out_dir):
     """Run every tab's validations. Writes '<name> - checked.xlsx': each tab with its values, one formula column
     per check, problem cells in red, and a Problems sheet. The original is never touched.
@@ -776,7 +825,7 @@ def check(path, skill, out_dir):
     from lib import fixkit
     sheets, hdr = fk.raw_sheets(path)
     m = map_tabs(skill, sheets)
-    problems = []
+    problems, ctx = [], {}
     wb = Workbook()
     wb.remove(wb.active)
     red = PatternFill("solid", fgColor="F8D7DA")
@@ -841,11 +890,14 @@ def check(path, skill, out_dir):
             if lk.get("match") == "first_name":
                 for x in keys:
                     firsts.setdefault(x.split(" ")[0], set()).add(x)
+            accept = [re.compile(a, re.I) for a in lk.get("accept") or []]  # the team's own codes, e.g. "UKS\d+"
             for i, v in enumerate(df[by_slug[left]]):
                 if i in layout:
                     continue
                 k = re.sub(r"\s+", " ", v).strip().lower()
                 if not v.strip() or k in keys or amap.get(k, "").strip().lower() in keys:
+                    continue
+                if any(a.fullmatch(v.strip()) for a in accept):
                     continue
                 if " " not in k and len(firsts.get(k, ())) == 1:
                     continue
@@ -870,6 +922,10 @@ def check(path, skill, out_dir):
                         p["suggestion"] = {"to": None, "why": f"'{ps[0]['value']}' appears {len(ps)} times but isn't in the "
                                                              f"{other} tab ({ob[right]}). If it's a code your team uses, "
                                                              "add it there; if not, correct these cells."}
+        for p in _row_checks(path, skill, tab, df, hdr[sheet], layout, ctx):  # checks across columns or tabs
+            problems.append(p)
+            bad.add((p["row"], p["column"]))
+            notes[(p["row"], p["column"])] = p
         ws = wb.create_sheet(str(sheet if sheet != "csv" else "Data")[:31])
         headers = list(df.columns)
         ws.append(headers + [f"Check: {by_slug[r['column']]}" for r in rules])
