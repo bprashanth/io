@@ -30,6 +30,7 @@ case "${1:-start}" in
     fi
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then status; exit 0; fi
     L=""; listening 8181 || L="-L 127.0.0.1:8181:127.0.0.1:8185"   # DGX 8185 = Muse via dgx/muse_prefix_proxy.py
+    [ -f "${IDLI_HOME:-$HOME/idli-insights}/config/muse-access.json" ] && L=""  # Muse through Cloudflare (muse-connect.py)
     # shellcheck disable=SC2086
     setsid ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $L \
       -R 127.0.0.1:46767:127.0.0.1:6767 -R 127.0.0.1:49333:127.0.0.1:9333 "$DGX" </dev/null >/dev/null 2>&1 &
