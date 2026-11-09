@@ -237,6 +237,40 @@ class Files:
         return res
 
 
+def mock_page(rid):
+    """The fake copy Claude gets for a teaching request, as plain tables (read only)."""
+    import html
+    import pandas as pd
+    if not re.fullmatch(r"[\w.-]+", rid or ""):
+        raise ValueError("bad request id")
+    path = os.path.join(fk.TEACH_DIR, rid, "mock.xlsx")
+    req = json.load(open(os.path.join(fk.TEACH_DIR, rid, "request.json")))
+    book = pd.read_excel(path, sheet_name=None, dtype=str)
+    e = html.escape
+    parts = []
+    for name, df in book.items():
+        if name == fk.WATERMARK:
+            continue
+        df = df.fillna("")
+        rows = "".join("<tr>" + "".join(f"<td>{e(str(v))}</td>" for v in r) + "</tr>" for r in df.head(80).values)
+        parts.append(f"<h2>{e(name)} <span>{len(df)} rows{' (first 80 shown)' if len(df) > 80 else ''}</span></h2>"
+                     f"<div class=s><table><thead><tr>{''.join(f'<th>{e(str(c))}</th>' for c in df.columns)}</tr>"
+                     f"</thead><tbody>{rows}</tbody></table></div>")
+    shared = req.get("real_labels") or []
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fake copy for Claude: {e(req.get('title', ''))}</title><style>
+:root{{--bg:#f6f5f2;--ink:#1d1d1b;--muted:#6b6a66;--line:#e3e1dc;--panel:#fff;--note:#e4efe9;--noteink:#2f5d50}}
+@media (prefers-color-scheme: dark){{:root:not([data-theme="light"]){{--bg:#161615;--ink:#ecebe7;--muted:#a3a29c;--line:#34332f;--panel:#1f1f1d;--note:#23332d;--noteink:#8cc7b2}}}}
+body{{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,sans-serif}} main{{padding:18px 16px 40px}}
+h1{{font-size:19px;margin:0}} .note{{background:var(--note);color:var(--noteink);border-radius:8px;padding:10px 14px;margin:10px 0 4px}}
+h2{{font-size:14px;margin:20px 0 6px}} h2 span{{color:var(--muted);font-weight:400}} .s{{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}}
+table{{border-collapse:collapse;font-size:12px}} th,td{{padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}} th{{position:sticky;top:0;background:var(--panel)}}
+</style></head><body><main><h1>Fake copy for Claude: {e(req.get('title', ''))}</h1>
+<div class="note">This is what Claude gets: the same tabs, columns, blanks and messiness, with every value made up.
+{('Labels you let Claude see as they are: ' + e(', '.join(shared)) + '.') if shared else 'No real labels are included.'}
+Your question, as sent: "{e(req.get('question') or '')}"</div>{''.join(parts)}</main></body></html>"""
+
+
 def skills_list():
     """What Idli has learned: one skill per file (from the Claude workspace), with its charts."""
     from lib import chartkit
@@ -318,6 +352,8 @@ def make_handler(files, token):
                         return self._send(200, f.read(), "text/html")
                 if u.path == "/api/skills":
                     return self._send(200, skills_list())
+                if u.path == "/mock":
+                    return self._send(200, mock_page(qs["id"][0]), "text/html")
             except (ValueError, KeyError) as e:
                 return self._send(400, {"error": str(e)})
             except Exception as e:  # keep the page alive; the message helps the Teach workspace

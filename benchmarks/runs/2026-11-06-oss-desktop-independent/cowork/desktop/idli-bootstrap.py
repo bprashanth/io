@@ -2,10 +2,10 @@
 """Idli first-run bootstrap: make a Paseo install look the way Idli should on first open.
 Safe to rerun: it only adds what's missing.
 
-  Start here            its own folder (~/idli-insights/start-here): the setup chat (tab 0) with Idli's
-     Start here         greeting, plus a Drive tab and a Gmail tab for signing in
-  Idli         the private folder (~/idli-insights/cowork-real): where the work happens
-     Idli
+  Mission control       its own folder (~/idli-insights/start-here): the setup chat "Start here" (tab 0) with
+     Start here         Idli's greeting, a Drive tab for signing in, and the chat "What Idli has learned"
+  Idli         the private folder (~/idli-insights/cowork-real): where the work happens; a "New chat" is always
+     Idli      waiting there on its first card (clean up a file / analyse a file)
   Claude      this cowork/ folder: Claude teaches Idli a file, from fake data only
      Claude
 
@@ -27,11 +27,12 @@ import urllib.parse
 COWORK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IDLI = os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights")
 DRY = "--dry-run" in sys.argv
-LAYOUT = [  # (heading and workspace name, folder, instructions copied to <folder>/CLAUDE.md)
+LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md)
     ("Start here", os.path.join(IDLI, "start-here"), os.path.join(COWORK, "idli", "START-HERE.md")),
     ("Idli", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
     ("Claude", COWORK, None),
 ]
+HEADING = {"Start here": "Mission control"}  # the sidebar heading (project) when it differs from the workspace
 SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 TABS = ["https://drive.google.com/drive/my-drive"]  # Gmail later; Drive is all the first run needs
@@ -96,9 +97,10 @@ def projects_and_workspaces():
             say(f"register project {path}")
             paseo("project", "create", path, parse=False, change=True)
             proj = next((p for p in (paseo("project", "ls") or []) if same(p["path"], path)), None) if not DRY else None
-        if proj and proj["name"] != name:
-            say(f"name project '{proj['name']}' -> '{name}'")
-            paseo("project", "rename", proj["projectId"], name, parse=False, change=True)
+        heading = HEADING.get(name, name)
+        if proj and proj["name"] != heading:
+            say(f"name project '{proj['name']}' -> '{heading}'")
+            paseo("project", "rename", proj["projectId"], heading, parse=False, change=True)
         wss = [w for w in paseo("workspace", "ls") if same(w["cwd"], path)]
         ws = next((w for w in wss if w["name"] == name), wss[0] if wss else None)
         if not ws and proj:
@@ -126,6 +128,18 @@ def start_chat(ws_id):
                 "--thinking", "low",  # measured: low acts on "yes" in ~5 s vs ~10 s on high, same choices
                 "--title", "Start here", "--no-wait", "hello")
     return (out or {}).get("agentId")
+
+
+def chat(ws_id, folder, title, prompt):
+    """A chat that should always be there (made once; found again by its title)."""
+    if next((a for a in paseo("ls", "--global") if a["name"] == title and same(a.get("cwd") or "", folder)), None):
+        say(f"'{title}' chat exists")
+        return
+    say(f"create the '{title}' chat")
+    if DRY or not ws_id:
+        return
+    paseo("run", "--provider", START_PROVIDER, "--workspace", ws_id, "--mode", "bypassPermissions", "--thinking", "low",
+          "--title", title, "--no-wait", prompt)
 
 
 def start_tabs(agent_id):
@@ -156,7 +170,9 @@ def main():
     ids = projects_and_workspaces()
     agent = start_chat(ids.get("Start here"))
     start_tabs(agent)
-    say("done. Heading order: Start here, Idli, Claude (drag once until Paseo patch P2).")
+    chat(ids.get("Start here"), LAYOUT[0][1], "What Idli has learned", "learned")
+    chat(ids.get("Idli"), LAYOUT[1][1], "New chat", "start")  # Idli keeps one waiting from then on
+    say("done. Heading order: Mission control, Idli, Claude (drag once until Paseo patch P2).")
 
 
 if __name__ == "__main__":

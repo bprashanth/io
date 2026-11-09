@@ -35,12 +35,25 @@ ask about **one step at a time**, and come back to the list after every answer o
 step with where they are, e.g. "Step 2 of 5: checks". Skip steps that don't apply or are settled in an existing
 skill. Don't write the skill until every step is answered.
 
+Say once, early, what the copy is: "This is a copy with fake values; nothing I decide changes it or your file. I'm
+writing rules that Idli applies to your real file on your computer, every time it reads it." Many people assume
+Claude edits the file they see.
+
+If a card comes back with a question instead of an answer (typed in "Other…"), answer it in chat first, plainly,
+then ask again with the card, reworded if the question showed the card was unclear. Never send the same card back
+unanswered.
+
 Use a card (AskUserQuestion) when the answer is a choice: put your suggestion first as "(Recommended)" and say in
 it what you'd do; the card's "Other…" box is where they write their own. Use plain chat when it needs talking
 through: say "I'd like to discuss <topic>", go back and forth until it's agreed, then say what you settled and
 move on to the next step. A card holds up to 4 questions, shown one at a time, and up to 4 options each.
 
 The mainline:
+0. **What they want to find out.** Before the mechanics, in chat: "I'd like to discuss what you want to learn from
+   this file." Offer two or three angles the columns make possible, in their field's words (for a household survey:
+   who is in a poverty trap, debt against income, who borrows from moneylenders; for plot data: where an invasive is
+   densest, whether it's regenerating). Go back and forth; this is where the best measures and charts come from.
+   Note what they say; it shapes steps 2-4 and the charts you suggest. Keep it to a few exchanges.
 1. **What a row is, per tab.** One question per tab (up to 4 per card): "Tab Visits: I think one row is one
    field visit. Columns: visit_date (date, dd/mm/yyyy), officer (name), amount (rupees), status (Done /
    Follow-up / Cancelled). Right?" Options "Yes, that's right (Recommended)" and "Not quite". On "Not quite"
@@ -62,8 +75,10 @@ The mainline:
    the team's own conventions; ask whether to accept them (add to `normalize` maps or the check's list) rather
    than flag every one. Every problem Idli finds gets a suggested fix or a note in the dashboard, which the
    person accepts or rejects; you don't need to write fixes.
-3. **Clean-ups.** Same shape: a multiSelect card of what you'd tidy (spelling variants of one category, "Rs. 1,200"
-   amounts, mixed date formats, header rows repeated mid-sheet), then "any others?".
+3. **Clean-ups: how Idli reads their file.** Say it that way: "When Idli reads your real file, it can treat these as
+   the same / skip these rows. Your file stays as it is." Same shape: a multiSelect card, each option phrased as
+   what Idli will do when reading ("Read 'Rs. 1,200' as 1200", "Treat 'Cesaur' and 'cesaur ' as the same code",
+   "Skip rows that repeat the headings"), then "any others?". Never phrase it as tidying the copy you're looking at.
 4. **The words of this file.** One card question per decision that has clear options: what they add up or count
    (measures, with their names for them), which date is "the date", rules like "does 'paid out' mean Approved and
    Paid?", "leave out Rejected by default?", how tabs connect. Anything open-ended goes to chat.
@@ -163,7 +178,10 @@ the real data on their computer and shows it in their chat and dashboard. Don't 
 needs it (then bump `version` and run the tests as usual).
 1. Load the skill and look at the mock through Idli's own cleaned tables:
    `.venv/bin/python -c "import json; from lib import chartkit; s=json.load(open('file-skills/<skill>/skill.json')); s['_dir']='file-skills/<skill>'; t=chartkit.tables('teach/inbox/<id>/mock.xlsx', s); [print(k, list(v.columns), len(v)) for k, v in t.items()]"`
-2. **Agree what it shows, one card.** For a question: "Here's how I'd draw it: <chart type> of <measure> by
+2. **What are they trying to see?** If the request is broad ("suggest analyses", "help me understand debt"), start
+   in chat: "I'd like to discuss what you're looking for", offer angles from the columns (e.g. poverty traps: high
+   debt, low income, few assets together), and agree the questions before the charts. Then:
+   **Agree what it shows, one card.** For a question: "Here's how I'd draw it: <chart type> of <measure> by
    <breakdown>, <filter>, <sorted/top N>. OK?" options "Yes, draw that (Recommended)" / "Let's discuss". For a
    suggestion request: a multiSelect card of 3-4 analyses that fit this data (what it would show and why it's
    useful, e.g. "Cestrum share of trees per plot: where the invasion is densest"); they tick what they want.
@@ -179,7 +197,10 @@ needs it (then bump `version` and run the tests as usual).
        return fig
    ```
    Only pandas, numpy, matplotlib (and math, re, datetime, collections, textwrap, itertools, statistics) may be
-   imported; no files, no savefig, no network: data comes only from `tables`. Use the column names Idli gives, never
+   imported; no files, no savefig, no network: data comes only from `tables`. Never write real-world facts into the
+   code (place names, a district, map extents, coordinates): the mock's numbers are fake and may be shifted (Idli
+   moves coordinates to around 0, 0), so take every range from the data at run time, and don't tell the person
+   where their data is from. Use the column names Idli gives, never
    values you saw in the mock (they're fake): filter by codes and rules from the skill (presets, `Read me` lookups),
    and handle any number of categories (top N plus "Others"), blanks and empty results (draw "No data" text).
    Aesthetics: one message per chart; horizontal bars for categories, sorted; lines only for time; label axes with
