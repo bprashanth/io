@@ -691,12 +691,22 @@ def t_working_copy(file, fresh=False):
         time.sleep(2)
         if not page.drop_file(local):
             return manual
-        fid, end = None, time.time() + 90
+        fid, end = None, time.time() + 120
         find = ("(n => { const e = [...document.querySelectorAll('[data-id]')].find(e => (e.innerText || '').includes(n));"
                 " return e ? e.getAttribute('data-id') : null; })(%s)" % json.dumps(name))
-        while time.time() < end and not fid:
+        done = "/(\\d+ )?uploads? complete/i.test(document.body.innerText)"
+        while time.time() < end and not fid and not page.eval(done):
             time.sleep(1.5)
             fid = page.eval(find)
+        # a narrow tab lists files without their ids in view: look the new file up by its exact name
+        for _ in range(3):
+            if fid:
+                break
+            page.c.call("Page.navigate", {"url": g.drive_url("search?q=" + urllib.parse.quote(name))})
+            t_end = time.time() + 25
+            while time.time() < t_end and not fid:
+                time.sleep(1.5)
+                fid = page.eval(find)
     finally:
         page.close()
     if not fid:
