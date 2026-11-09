@@ -20,8 +20,12 @@ for _ in range(3 * 3600 // 10):
                 d = json.load(f)
         except (OSError, ValueError):
             d = {}
-        msg = (f"Teaching finished: {d.get('summary') or 'the file skill is ready'}. "
-               "Open the file again with file_open and continue with my question.")
+        if d.get("charts"):
+            msg = (f"Claude finished: {d.get('summary') or 'new charts'}. Charts made: {', '.join(d['charts'])}. Call "
+                   "chart_show with the file we were working on for each of these chart ids, then carry on.")
+        else:
+            msg = (f"Teaching finished: {d.get('summary') or 'the file skill is ready'}. "
+                   "Open the file again with file_open (same goal as before) and continue with my question.")
         subprocess.run([paseo, "send", "--no-wait", agent, msg], timeout=60,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         break

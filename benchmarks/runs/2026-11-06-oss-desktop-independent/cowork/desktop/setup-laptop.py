@@ -8,7 +8,7 @@ Idempotent; prints what it did.
 
 It:
   1. writes cowork.mcp.json with this checkout's absolute paths;
-  2. creates .venv (duckdb, pandas, openpyxl) with uv or python3 -m venv;
+  2. creates .venv (duckdb, pandas, openpyxl, matplotlib) with uv or python3 -m venv;
   3. merges into ~/.paseo/config.json (backup first): daemon.browserTools.enabled, pluginsEnabled,
      providers t4gc-cowork + diy-claude;
   4. creates ~/idli-insights/cowork-real (stand-in "real" workbook + cowork.sites) for the co-work workspace.
@@ -76,10 +76,10 @@ def main():
     if not os.path.exists(py):
         if shutil.which("uv"):
             run(["uv", "venv", "-q", ".venv", "--python", "3.12"], cwd=COWORK)
-            run(["uv", "pip", "install", "-q", "--python", py, "duckdb", "pandas", "openpyxl"], cwd=COWORK)
+            run(["uv", "pip", "install", "-q", "--python", py, "duckdb", "pandas", "openpyxl", "matplotlib"], cwd=COWORK)
         else:
             run([sys.executable, "-m", "venv", ".venv"], cwd=COWORK)
-            run([py, "-m", "pip", "install", "-q", "duckdb", "pandas", "openpyxl"], cwd=COWORK)
+            run([py, "-m", "pip", "install", "-q", "duckdb", "pandas", "openpyxl", "matplotlib"], cwd=COWORK)
     else:
         step(".venv exists")
 

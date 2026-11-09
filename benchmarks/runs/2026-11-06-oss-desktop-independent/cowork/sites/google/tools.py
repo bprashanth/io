@@ -712,8 +712,8 @@ def t_drive_find(query):
         pv = _preview(best)
         if pv:
             r["preview"] = pv
-        r["then"] = (f"If the user asked about what's inside or to analyse it (numbers, totals, who, how many, a "
-                     f"dashboard): call file_get with link '{best['id']}' now. Otherwise (find, open, see, show; any kind "
+        r["then"] = (f"If the user wants to clean it up or analyse it (mistakes, checks, numbers, totals, who, how many, "
+                     f"charts, a dashboard): call file_get with link '{best['id']}' and goal \"clean\" or \"analyse\" now. Otherwise (find, open, see, show; any kind "
                      f"of file): call AskUserQuestion with exactly `card` (don't write anything first); on \"Yes, open it\" "
                      f"call file_peek with id '{best['id']}' and name '{best['name']}'. Don't download.")
         r["card"] = {"questions": [{"header": "File", "multiSelect": False,
@@ -722,7 +722,11 @@ def t_drive_find(query):
                                     "options": [{"label": "Yes, open it", "description": "Read only, in a tab here"},
                                                 {"label": "No", "description": "Leave it closed"}]}]}
     elif r["status"] == "choose":
-        r["say_to_user"] = "Ask which one they mean, listing these (name, kind, folder) in one short message."
+        for x in r["results"]:
+            if "Idli working copy" in x.get("name", ""):
+                x["note"] = "Idli's checked working copy (the cleaned version, problems marked)"
+        r["say_to_user"] = ("Ask which one they mean, listing these (name, kind, folder) in one short message. If one is "
+                            "an Idli working copy, say it's the checked (cleaned) version.")
         r["then"] = "Don't search again unless they give new words."
     else:
         r["say_to_user"] = ("Say nothing in the index matches, and ask for another word from the file's name, its "

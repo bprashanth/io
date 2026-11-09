@@ -1,6 +1,6 @@
 ---
 name: teach-file
-description: Teach Idli (the private model) how to read a spreadsheet and answer a question about it, by writing a file skill from a mock with fake data. Use when a message mentions teach/inbox or an Idli teaching request, when an Excel file has a hidden `_idli_teach` sheet, or when the user shares a mock spreadsheet and asks to "teach Idli" this file.
+description: Teach Idli (the private model) how to read a spreadsheet and answer a question about it, or design a chart for a file Idli knows, by writing a file skill from a mock with fake data. Use when a message mentions teach/inbox or an Idli teaching request, when an Excel file has a hidden `_idli_teach` sheet, or when the user shares a mock spreadsheet and asks to "teach Idli" this file.
 ---
 
 # Teach Idli a file
@@ -155,3 +155,40 @@ Write `file-skills/<id>/skill.json`. The `<id>` is a slug of the file's title. I
   your answer?", options "Yes, back to Idli" and "Stay here". If they pick yes, create the empty file
   `teach/inbox/<id>/go_back` (`touch` it). Idli's watcher outside this chat sees it and switches the app; don't
   try to switch it yourself (this chat can't reach the app). Then say "Switching you back to Idli."
+
+## Chart requests (`request.json` has `chart`)
+Idli already has a form for this file (`existing_skill`). The person wants a picture: `chart` is what they asked
+for, or empty when they want you to **suggest** analyses. You design the chart on the mock; Idli runs your code on
+the real data on their computer and shows it in their chat and dashboard. Don't change the skill unless the chart
+needs it (then bump `version` and run the tests as usual).
+1. Load the skill and look at the mock through Idli's own cleaned tables:
+   `.venv/bin/python -c "import json; from lib import chartkit; s=json.load(open('file-skills/<skill>/skill.json')); s['_dir']='file-skills/<skill>'; t=chartkit.tables('teach/inbox/<id>/mock.xlsx', s); [print(k, list(v.columns), len(v)) for k, v in t.items()]"`
+2. **Agree what it shows, one card.** For a question: "Here's how I'd draw it: <chart type> of <measure> by
+   <breakdown>, <filter>, <sorted/top N>. OK?" options "Yes, draw that (Recommended)" / "Let's discuss". For a
+   suggestion request: a multiSelect card of 3-4 analyses that fit this data (what it would show and why it's
+   useful, e.g. "Cestrum share of trees per plot: where the invasion is densest"); they tick what they want.
+3. **Write each chart** as `file-skills/<skill>/charts/<chart-id>.py`:
+   ```python
+   TITLE = "Cestrum share of trees, by plot"      # says what and in what unit
+   QUESTION = "where is cestrum densest"          # what it answers, in their words
+   def make(tables, plt):
+       df = tables["Raw 10x10m Data"]             # the form's cleaned table: slug columns, skipped rows left out
+       ...
+       fig, ax = plt.subplots(figsize=(9, 5))
+       ...
+       return fig
+   ```
+   Only pandas, numpy, matplotlib (and math, re, datetime, collections, textwrap, itertools, statistics) may be
+   imported; no files, no savefig, no network: data comes only from `tables`. Use the column names Idli gives, never
+   values you saw in the mock (they're fake): filter by codes and rules from the skill (presets, `Read me` lookups),
+   and handle any number of categories (top N plus "Others"), blanks and empty results (draw "No data" text).
+   Aesthetics: one message per chart; horizontal bars for categories, sorted; lines only for time; label axes with
+   units; value labels when there are few bars; no pies, 3D or dual axes; Idli's style (colour-blind-safe palette,
+   no top/right spines) is applied for you, so don't set colours unless they carry meaning.
+4. **Render it on the mock** and show it in this chat: `.venv/bin/python -m lib.chartkit try file-skills/<skill>
+   <chart-id>` prints a markdown image line; write that line so they see the picture (with fake values: say so).
+   Card: "This is the chart on fake data. Looks right?" options "Yes, use it (Recommended)" / "Change something".
+   Iterate on changes (style, colours, labels, what's counted) until they're happy.
+5. **Hand back:** `done.json` with `{"skill": "<skill>", "version": N, "charts": ["<chart-id>", ...], "summary":
+   "<one line: the charts and what they show>"}`, then the same "Go back to Idli?" card as in section 5. Idli
+   draws the charts from the real data when they get back.

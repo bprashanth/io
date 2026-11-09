@@ -190,7 +190,7 @@ def _new_download(since, title):
     return p if os.path.getsize(p) == size else None
 
 
-def t_file_get(link, wait_seconds=45, open_after=True):
+def t_file_get(link, wait_seconds=45, open_after=True, goal=None):
     m = LINK.search(link or "")
     fid = m.group(1) if m else (link.strip() if re.fullmatch(r"[\w-]{20,}", (link or "").strip()) else None)
     if not fid:
@@ -269,7 +269,7 @@ def t_file_get(link, wait_seconds=45, open_after=True):
     rel = os.path.relpath(dest, sh.data_dir())
     if not open_after:
         return {"downloaded": True, "file": rel, "title": title or name}
-    out = t_file_open(rel)  # one model turn fewer: the form opens with the download
+    out = t_file_open(rel, goal=goal)  # one model turn fewer: the form opens with the download
     out["downloaded"] = True
     return out
 
@@ -290,7 +290,7 @@ def _brief(f):
             "date_columns": f["date_columns"]}
 
 
-def t_file_open(file, show_form=True):
+def t_file_open(file, show_form=True, goal=None):
     meta = files().meta(file)
     if not meta["known"]:
         return {"file": file, "known": False,
@@ -331,37 +331,89 @@ def t_file_open(file, show_form=True):
         if c["status"] == "drift":
             bits.append("It has changed a little since I was taught it: " + " ".join(c["messages"]))
         real = [p for p in e["problems"] if not p.get("skipped")]
-        if real:
-            fixable = sum(1 for p in real if (p.get("suggestion") or {}).get("to") is not None
-                          or (p.get("suggestion") or {}).get("action"))
-            bits.append(f"The checks found {len(real)} problem{'s' if len(real) > 1 else ''}; {fixable} have a suggested fix "
-                        "you can accept or reject in the dashboard (the original is unchanged).")
-        out["say_to_user"] = " ".join(bits)
-        out["then"] = ("For a question about this file, call file_ask with a spec built only from these tabs' measures, "
-                       "group_by, filters and presets. Ask the user if a value is unclear. If no measure or filter fits "
-                       "the question, offer teach_file.")
-        opts = []
-        if shown:
-            opts.append({"label": "Show the dashboard", "description": "Pick what to see with tick-boxes and dropdowns; "
-                                                                      "answers show there too"})
-        wc = (files().source(file) or {}).get("working_copy")
-        if real and (files().source(file) or {}).get("id") and not wc:
-            opts.append({"label": "Mark them in a Drive copy", "description": "A copy next to the original: problem cells "
-                         "in red, a comment on each kind of problem. Fix them there, then tell me you're ready"})
-        if opts:
-            opts.append({"label": "Stay here", "description": "Ask me in the chat"})
-            out["card"] = {"questions": [{"header": "Next", "multiSelect": False,
-                                          "question": out["say_to_user"] + " What next?", "options": opts}]}
-            out["then"] = ("Call AskUserQuestion with exactly `card` now (it already says say_to_user; write nothing "
-                           "before it). On \"Show the dashboard\" call show_dashboard; on \"Mark them in a Drive copy\" "
-                           "call working_copy and stop there (the analysis waits until they say they're ready). Then: "
-                           + out["then"])
+        src = files().source(file) or {}
+        wc = src.get("working_copy")
+        is_copy = bool(src.get("copy_of")) or "Idli working copy" in os.path.basename(file)
+        from lib import chartkit
+        out["charts"] = [{"id": x["id"], "title": x["title"]} for x in chartkit.charts_of(e["skill"])]
+        if is_copy:
+            bits.append(f"This is your checked working copy (the cleaned version): {len(real)} problem"
+                        f"{'s' if len(real) != 1 else ''} left.")
+        elif real:
+            bits.append(f"The checks found {len(real)} problem{'s' if len(real) > 1 else ''} in "
+                        f"{len({(p['tab'], p['column'], p['rule']) for p in real})} kinds"
+                        + (f"; you marked them in a working copy on {wc.get('made', '')[:10]}." if wc else
+                           "; the original is unchanged."))
         else:
-            out["then"] = "Write say_to_user in your own short words. Then: " + out["then"]
+            bits.append("The checks found no problems.")
+        out["say_to_user"] = " ".join(bits)
+        ask = ("For a question about this file, call file_ask with a spec built only from these tabs' measures, "
+               "group_by, filters and presets (chart=true when they ask for a graph or picture). Ask the user if a value "
+               "is unclear. If no measure or filter fits the question, call teach_file with `missing`. For a chart the "
+               "form can't draw, call chart_request. Charts already made for this file: chart_show.")
+        start = {"header": "Start", "multiSelect": False, "question": "How would you like to start?",
+                 "options": [{"label": "I have a question", "description": "Ask in the chat; answers come from the form, "
+                                                                           "with a chart when it helps"},
+                             {"label": "Suggest analyses", "description": "Claude looks at a fake copy and suggests "
+                                                                         "what to look at and how to chart it"}]}
+        if out["charts"]:
+            start["options"].append({"label": "Show the saved charts", "description": ", ".join(
+                x["title"] for x in out["charts"][:3])})
+        start_then = ('On "I have a question": ask in one short line what they want to know. On "Suggest analyses": '
+                      "call chart_request with question \"\". On \"Show the saved charts\": call chart_show for each "
+                      "chart in `charts`. ")
+        goal = (goal or "analyse").lower()
+        opts, act = [], []
+        if goal.startswith("clean"):
+            if is_copy:
+                opts = [{"label": "Analyse it now", "description": "Questions and charts from this checked copy"},
+                        {"label": "Stay here", "description": "Keep fixing; tell me when you're ready"}]
+                act.append('On "Analyse it now": call AskUserQuestion with `start_card`. ' + start_then)
+            elif wc:
+                opts = [{"label": "Open my working copy", "description": wc.get("name", "")},
+                        {"label": "Make a fresh copy", "description": "Marks the problems again from the latest original"},
+                        {"label": "Not now", "description": "Nothing changes"}]
+                act.append('On "Open my working copy": call working_copy. On "Make a fresh copy": call working_copy '
+                           "with fresh=true. ")
+            elif real and src.get("id"):
+                opts = [{"label": "Yes, mark them in Drive", "description": "A copy next to the original: problem cells "
+                         "in red, one comment on each kind of problem. You fix them there"},
+                        {"label": "Not now", "description": "Nothing is written to Drive"}]
+                act.append('On "Yes, mark them in Drive": call working_copy and stop there (analysis waits until they '
+                           "say they're ready). ")
+                out["say_to_user"] += " Mark them in a copy in your Drive?"
+            else:
+                opts = [{"label": "Analyse it now", "description": "Questions and charts"},
+                        {"label": "Stay here", "description": ""}]
+                act.append('On "Analyse it now": call AskUserQuestion with `start_card`. ' + start_then)
+        else:
+            if wc and not is_copy:
+                opts = [{"label": "Use the checked copy", "description": f"{wc.get('name', '')} (the cleaned version; "
+                                                                         "Recommended)"},
+                        {"label": "Use the original", "description": "Answers include the problems the checks found"}]
+                act.append('On "Use the checked copy": call working_copy_ready (it downloads the copy; then follow its '
+                           'then). On "Use the original": call AskUserQuestion with `start_card`. ' + start_then)
+                out["say_to_user"] += " You have a checked working copy. Analyse that one?"
+            else:
+                opts = list(start["options"])
+                start_q = start["question"]
+                if real and not is_copy:
+                    out["say_to_user"] += " It hasn't been cleaned yet, so answers include those problems."
+                    if src.get("id") and len(opts) < 4:
+                        opts.append({"label": "Clean it first", "description": "Mark the problems in a copy in your "
+                                                                               "Drive and fix them there"})
+                        act.append('On "Clean it first": call working_copy and stop there. ')
+                out["say_to_user"] += " " + start_q
+                act.append(start_then)
+        out["start_card"] = {"questions": [start]}
+        out["card"] = {"questions": [{"header": "Next", "multiSelect": False, "question": out["say_to_user"],
+                                      "options": opts}]}
+        out["then"] = ("Call AskUserQuestion with exactly `card` now (it already says say_to_user; write nothing before "
+                       "it). " + "".join(act) + "Afterwards: " + ask)
         if wc:
             out["working_copy"] = wc
-            out["then"] += (" They have a working copy in Drive (" + wc.get("name", "") + "): if they say they're ready "
-                            "or done fixing, call working_copy_ready.")
+            out["then"] += (" They have a working copy in Drive (" + wc.get("name", "") + "): when they say they're "
+                            "ready or done fixing, call working_copy_ready.")
     return out
 
 
@@ -378,7 +430,7 @@ def t_show_dashboard(file=None):
     return {"shown": True} if got["ok"] else {"shown": False, "say_to_user": "Click the dashboard tab at the top."}
 
 
-def t_file_ask(file, spec, tab=None):
+def t_file_ask(file, spec, tab=None, chart=False):
     if isinstance(spec, str):
         try:
             spec = json.loads(spec)
@@ -407,6 +459,31 @@ def t_file_ask(file, spec, tab=None):
     if meta["contract"]["status"] == "drift":
         note += " Mention: " + " ".join(meta["contract"]["messages"])
     n_prob = meta.get("problem_count") or 0
+    pic = None
+    if chart:
+        from lib import chartkit
+        import hashlib
+        key = hashlib.sha1(json.dumps([file, res["tab"], spec], sort_keys=True).encode()).hexdigest()[:10]
+        out = os.path.join(_charts_dir(file), f"quick-{key}.svg")
+        try:
+            pic = chartkit.bar_svg(res, res["described"], out)
+        except Exception as e:  # never lose the answer over a picture
+            pic = None
+            note += f" (No chart: {type(e).__name__}.)"
+        if pic:
+            with open(out[:-4] + ".json", "w") as f:
+                json.dump({"title": res["described"], "tab": res["tab"], "spec": spec, "kind": "quick"}, f)
+    if chart and pic:
+        return {"answer": res["text"], "chart_markdown": f"![{res['described']}]({pic})", "form_link": url,
+                "form_updated": shown,
+                "say_to_user": "Write chart_markdown exactly, on its own line, then the answer in one or two short lines "
+                               "(numbers unchanged). Say the dashboard tab shows the chart too." + note,
+                "then": "Then call AskUserQuestion with one question: header \"Chart\", question \"Want Claude to design "
+                        "a fuller chart for this (on fake data), or is this enough?\", options \"This is enough\" and "
+                        "\"Ask Claude\". On \"Ask Claude\" call chart_request with the user's question."}
+    if chart and not pic:
+        note += (" This answer has no breakdown to draw. If they wanted a picture, call chart_request with their "
+                 "question (Claude designs it on fake data).")
     return {"answer": res["text"], "form_link": url, "form_updated": shown,
             "say_to_user": "Give the answer exactly as written (numbers unchanged), in a sentence or a short list. "
                            + ("Say the form tab now shows it." if shown else "Share the form link.")
@@ -416,11 +493,11 @@ def t_file_ask(file, spec, tab=None):
 _teach_src = {}  # request_id -> (path, question), so teach_send can remake the copy with the labels they allowed
 
 
-def t_teach_file(file, question, share_labels=None, missing=None):
+def t_teach_file(file, question, share_labels=None, missing=None, chart=None):
     path = sh.resolve(file)
     req, mock, preview = fk.make_mock(path, question, caller_agent=os.environ.get("PASEO_AGENT_ID"),
-                                      share_labels=share_labels or (), missing=missing)
-    _teach_src[req["id"]] = (path, question, missing)
+                                      share_labels=share_labels or (), missing=missing, chart=chart)
+    _teach_src[req["id"]] = (path, question, missing, chart)
     cols = list(req["columns"][req["main_sheet"]])
     tabs = list(req["columns"])
     labels = {c: v for c, v in fk.label_columns(path).items() if c not in (req.get("real_labels") or [])}
@@ -428,12 +505,20 @@ def t_teach_file(file, question, share_labels=None, missing=None):
     col_text = ", ".join(cols[:12]) + (f" and {len(cols) - 12} more" if len(cols) > 12 else "")
     questions = [{
         "header": "Claude",
-        "question": ((f"The dashboard for {title} can't do this yet: {req['missing']}. Claude can add it" if req.get("missing")
-                      and req["existing_skill"] else f"I haven't seen {title} before. Claude can build its dashboard with you")
+        "question": ((("Claude can suggest analyses and charts for " + title) if chart == "" else
+                      (f"Claude can design this chart for {title} with you") if chart is not None else
+                      f"The dashboard for {title} can't do this yet: {req['missing']}. Claude can add it" if req.get("missing")
+                      and req["existing_skill"] else f"I haven't seen {title} before. Claude can learn it with you (what "
+                      "each column means, the checks for mistakes)")
                      + f" from a copy with fake values: same {'tabs and ' if len(tabs) > 1 else ''}columns ({col_text}), "
-                     f"every value made up, and your question with names removed. Send it and switch to Claude?"),
+                     f"every value made up, and your question with names removed."
+                     + (" Idli then draws it here from your real data." if chart is not None else "")
+                     + " Send it and switch to Claude?"),
         "multiSelect": False,
-        "options": [{"label": "Yes, send and switch", "description": "Claude asks a few questions about the columns there"},
+        "options": [{"label": "Yes, send and switch", "description": ("Agree the chart with Claude there; you'll get a "
+                                                                      "card to come back" if chart is not None else
+                                                                      "Claude asks a few questions there, one at a time; "
+                                                                      "you'll get a card to come back")},
                     {"label": "Not now", "description": "Nothing is sent"}]}]
     shareable = list(labels.items())[:4]
     if shareable:
@@ -451,9 +536,9 @@ def t_teach_file(file, question, share_labels=None, missing=None):
 
 def t_teach_send(request_id, share_labels=None, switch=True):
     if share_labels and request_id in _teach_src:  # remake the copy with the labels they allowed, as one request
-        path, question, missing = _teach_src.pop(request_id)
+        path, question, missing, chart = _teach_src.pop(request_id)
         req, _, _ = fk.make_mock(path, question, caller_agent=os.environ.get("PASEO_AGENT_ID"), share_labels=share_labels,
-                                 missing=missing)
+                                 missing=missing, chart=chart)
         shutil.rmtree(os.path.join(fk.TEACH_DIR, request_id), ignore_errors=True)
         request_id = req["id"]
     out = _teach_send(request_id)
@@ -483,7 +568,16 @@ def _teach_send(request_id):
     rdir = os.path.join(fk.TEACH_DIR, request_id)
     with open(os.path.join(rdir, "request.json")) as f:
         req = json.load(f)
-    prompt = (f"Idli asked to be taught a file. The request is in teach/inbox/{request_id}/ (mock.xlsx with fake data "
+    if req.get("chart") is not None:
+        prompt = (f"Idli asks for {'suggested analyses and charts' if not req['chart'] else 'a chart'} for "
+                  f"{req['title']} (taught as file-skills/{req['existing_skill']}). The request is in "
+                  f"teach/inbox/{request_id}/ (mock.xlsx with fake data, request.json). "
+                  + (f"The chart they asked for: \"{req['chart']}\". " if req["chart"] else
+                     "They want you to suggest what to look at. ")
+                  + "Use the teach-file skill, section 'Chart requests'.")
+    else:
+        prompt = None
+    prompt = prompt or (f"Idli asked to be taught a file. The request is in teach/inbox/{request_id}/ (mock.xlsx with fake data "
               f"and a hidden _idli_teach sheet, plus request.json). Question: \"{req['question']}\". "
               + (f"Idli already has a form for this file; it couldn't do this: \"{req['missing']}\". "
                  if req.get("missing") else "")
@@ -498,7 +592,7 @@ def _teach_send(request_id):
     except (ValueError, StopIteration):
         return {"error": "No Teach workspace found (a Paseo workspace on the co-work plugin folder). Open one, then retry."}
     r = subprocess.run([paseo, "run", "--provider", "diy-claude", "--workspace", wid, "--mode", "auto",
-                        "--title", f"Teach: {req['title']}", "--no-wait", "--json", prompt],
+                        "--title", ("Chart: " if req.get("chart") is not None else "Teach: ") + req["title"], "--no-wait", "--json", prompt],
                        capture_output=True, text=True, timeout=90, env=env)
     if r.returncode:
         return {"error": f"Could not start the Teach chat: {(r.stderr or r.stdout)[-300:]}"}
@@ -518,7 +612,7 @@ def _teach_send(request_id):
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     with open(os.path.join(rdir, "teach_agent.json"), "w") as f:
         json.dump({"agent": agent}, f)
-    return {"started": True, "teach_chat": f"Teach: {req['title']}"}
+    return {"started": True, "teach_chat": ("Chart: " if req.get("chart") is not None else "Teach: ") + req["title"]}
 
 
 def t_show_teach_chat(request_id):
@@ -637,14 +731,104 @@ def t_working_copy_ready(file):
     if not got.get("downloaded"):
         return got
     workcopy.strip(files().resolve(got["file"]))
-    out = t_file_open(got["file"], show_form=True)
-    out["say_to_user"] = (f"Checked your working copy: {out.get('problems', 0)} problems left (it had "
+    cs = files().resolve(got["file"]) + ".source.json"
+    try:
+        with open(cs) as f:
+            csrc = json.load(f)
+    except (OSError, ValueError):
+        csrc = {}
+    csrc.update(copy_of=file, problems_before=wc.get("problems"))
+    with open(cs, "w") as f:
+        json.dump(csrc, f)
+    out = t_file_open(got["file"], show_form=True, goal="analyse")
+    out["say_to_user"] = (f"Checked your working copy again: {out.get('problems', 0)} problems left (it had "
                           f"{wc.get('problems', '?')}). " + out.get("say_to_user", ""))
     if out.get("card"):
-        out["card"]["questions"][0]["question"] = out["say_to_user"] + " What next?"
-    out["then"] = (out.get("then", "") + " From now on use the file '" + got["file"] + "' (the working copy) for "
-                   "file_ask, and answer the question they were waiting on.")
+        out["card"]["questions"][0]["question"] = out["say_to_user"]
+    out["then"] = ("From now on use the file '" + got["file"] + "' (the working copy) for every tool. If they asked a "
+                   "question while fixing, answer it now with file_ask instead of the card. Otherwise: " + out.get("then", ""))
     return out
+
+
+# ---------------------------------------------------------------- charts
+def _charts_dir(file):
+    stem = re.sub(r"[^\w.-]+", "_", os.path.splitext(os.path.basename(file))[0])
+    d = os.path.join(sh.data_dir(), "charts", stem)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def t_chart_request(file, question=""):
+    """Send a fake copy to Claude to design a chart (or suggest analyses when question is empty)."""
+    meta = files().meta(file)
+    if not meta["known"]:
+        return {"error": "Idli hasn't been taught this file yet.",
+                "then": "Call teach_file first (Claude learns the file), then ask for the chart."}
+    out = t_teach_file(file, question or "suggest analyses", chart=question or "")
+    return out
+
+
+def t_chart_show(file, chart):
+    """Draw one of the file's charts (written by Claude on fake data) from the real data, here."""
+    from lib import chartkit
+    e = files().open(file)
+    if not e["skill"]:
+        return {"error": "Idli hasn't been taught this file yet."}
+    ids = {c["id"]: c for c in chartkit.charts_of(e["skill"])}
+    if chart not in ids:
+        return {"error": f"No chart '{chart}'. Charts for this file: {sorted(ids) or 'none yet'}.",
+                "then": "Call chart_request to have Claude design one."}
+    out = os.path.join(_charts_dir(file), chart + ".svg")
+    r = chartkit.render(e["skill"]["_dir"], chart, e["path"], out)
+    if not r["ok"]:
+        return {"error": "The chart didn't draw on the real data: " + r["error"][-300:],
+                "then": "Say the chart failed on the real data and offer chart_request to have Claude fix it."}
+    title = ids[chart]["title"] or chart
+    with open(out[:-4] + ".json", "w") as f:
+        json.dump({"title": title, "chart": chart, "kind": "claude"}, f)
+    return {"chart_markdown": f"![{title}]({out})", "title": title,
+            "say_to_user": "Write chart_markdown exactly, on its own line, then one short line on what it shows "
+                           "(no numbers you didn't get from a tool). Say it's also on the dashboard tab."}
+
+
+def t_show_skills():
+    """Open the page that lists what Idli has learned (one skill per file) and lets the person delete one."""
+    port, token = _server()
+    url = f"http://dashboard.localhost:{port}/skills?t={token}"
+    try:
+        from lib.browser import paseo, tabs
+        old = next((t for t in tabs() if "/skills" in t["url"] and "dashboard.localhost" in t["url"]), None)
+        if old:
+            paseo("browser_navigate", browserId=old["id"], url=url)
+        else:
+            paseo("browser_new_tab", url=url)
+    except Exception:
+        pass
+    from lib import uiswitch
+    uiswitch.show_tab(["What Idli has learned*", "dashboard.localhost"])
+    return {"say_to_user": "The page listing what Idli has learned is open in a tab; delete a file's skill there to "
+                           "teach it again from scratch."}
+
+
+# ---------------------------------------------------------------- the start of an Idli chat
+def t_start():
+    """The first card of an Idli chat: clean up a file, or analyse one."""
+    from lib import driveindex as di
+    st = di.status()
+    if not st.get("phase") and not os.path.exists(di.DB):
+        return {"indexed": False, "say_to_user": "I can't find your files yet: open the Start here chat in the left "
+                                                  "sidebar and index your Drive first (1 to 5 minutes). Then come back."}
+    card = {"questions": [{"header": "Idli", "multiSelect": False,
+                           "question": "Hi, I'm Idli. Everything you show me stays on this computer. What would you like "
+                                       "to do?",
+                           "options": [{"label": "Clean up a file", "description": "Find mistakes in a spreadsheet and "
+                                        "mark them in a copy in your Drive to fix"},
+                                       {"label": "Analyse a file", "description": "Ask questions and get charts, answered "
+                                        "from the file itself"}]}]}
+    return {"indexed": True, "card": card,
+            "then": "Call AskUserQuestion with exactly `card` (write nothing first). Then ask in one short line which "
+                    "file (a few words from its name, or a link). When they answer, find it (drive_find, or file_get "
+                    "straight away for a link) and call file_get with goal \"clean\" or \"analyse\" to match."}
 
 
 FILE = {"file": {"type": "string", "description": "Path in the workspace folder, from file_get, gsheet_read's "
@@ -663,19 +847,24 @@ TOOLS = {
                  "than gsheet_read: Google's quick export hides text in number columns). The browser may show a Save "
                  "dialog; the user clicks Save. Then call file_open.",
                  {"link": {"type": "string", "description": "A docs.google.com/spreadsheets or drive.google.com link, or "
-                                                            "a file id from drive_search"}}, ["link"]),
+                                                            "a file id from drive_search"},
+                  "goal": {"type": "string", "enum": ["clean", "analyse"],
+                           "description": "What the user wants to do with it (default analyse)"}}, ["link"]),
     "file_open": (t_file_open, "Open a spreadsheet's form: says whether Idli has been taught this file, whether its "
                   "layout changed, the problems the checks found, and what the form can answer (measures, group_by, "
                   "filters, presets per tab). Opens the form in a browser tab. Always call this before answering "
                   "anything about a spreadsheet.", {**FILE, "show_form": {"type": "boolean",
-                                                                          "description": "Open the form tab (default true)"}},
+                                                                          "description": "Open the form tab (default true)"},
+                                                     "goal": {"type": "string", "enum": ["clean", "analyse"]}},
                   ["file"]),
     "show_dashboard": (t_show_dashboard, "Bring the file's dashboard (form) tab to the front. Only after the user "
                        "said yes on the card.", {"file": {"type": "string", "description": "The file from file_open"}}, []),
     "file_ask": (t_file_ask, "Answer a question about an opened file by filling its form. The numbers come from the "
                  "data, never from you; the form tab shows the same answer.",
                  {**FILE, "spec": SPEC, "tab": {"type": "string", "description": "Tab name from file_open (default: "
-                                                                                  "the first)"}}, ["file", "spec"]),
+                                                                                  "the first)"},
+                  "chart": {"type": "boolean", "description": "Also draw the answer as a bar chart in the chat (needs "
+                                                              "group_by and a measure)"}}, ["file", "spec"]),
     "teach_file": (t_teach_file, "Prepare a teaching request for a file Idli doesn't know, or whose layout changed, or a "
                    "question the form can't answer: a copy of the file with fake values and the user's question with "
                    "names removed. Shows what would be sent; nothing is sent yet.",
@@ -698,6 +887,18 @@ TOOLS = {
                      {**FILE, "fresh": {"type": "boolean", "description": "Make a new copy even if one exists"}}, ["file"]),
     "working_copy_ready": (t_working_copy_ready, "When the user says they've fixed the working copy (ready, done): "
                            "download it, re-check it and open its form.", FILE, ["file"]),
+    "chart_request": (t_chart_request, "For a chart or analysis the form's quick chart can't draw, or when the user "
+                      "wants Claude to suggest analyses: prepares a copy with fake values for Claude to design the chart "
+                      "on. Shows a card first; nothing is sent until they say yes.",
+                      {**FILE, "question": {"type": "string", "description": "The chart they asked for, in their words; "
+                                                                             "empty = suggest analyses"}}, ["file"]),
+    "chart_show": (t_chart_show, "Draw one of the file's charts (Claude wrote it on fake data) from the real data and "
+                   "return markdown to show it in the chat. Chart ids are in file_open's charts.",
+                   {**FILE, "chart": {"type": "string", "description": "Chart id from file_open"}}, ["file", "chart"]),
+    "show_skills": (t_show_skills, "Open the page listing what Idli has learned (one skill per file), where the user "
+                    "can delete one.", {}, []),
+    "start": (t_start, "The first step of an Idli chat when the user says hi or hasn't said what they want: a card "
+              "asking whether to clean up a file or analyse one.", {}, []),
 }
 
 

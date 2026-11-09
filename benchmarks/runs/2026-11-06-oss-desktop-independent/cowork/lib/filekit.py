@@ -396,7 +396,7 @@ def _name_fakes(sheets, share_labels=()):
     return out
 
 
-def make_mock(path, question, title=None, caller_agent=None, seed=7, share_labels=(), missing=None):
+def make_mock(path, question, title=None, caller_agent=None, seed=7, share_labels=(), missing=None, chart=None):
     """Write teach/inbox/<id>/mock.xlsx (+ request.json). Returns the request dict and a preview."""
     sheets, hdr = raw_sheets(path)
     if not sheets:
@@ -440,6 +440,8 @@ def make_mock(path, question, title=None, caller_agent=None, seed=7, share_label
            "main_sheet": main, "question": clean_q, "existing_skill": skill["id"] if skill else None,
            "missing": scrub(missing, sheets, keep=share_labels, fakes=shared) if missing else None,
            "layout": {t: v for t, v in layouts.items() if v},
+           # a chart request: "" = suggest analyses for this file, text = the chart they asked for
+           "chart": None if chart is None else (scrub(chart, sheets, keep=share_labels, fakes=shared) if chart else ""),
            "existing_version": skill.get("version") if skill else None, "caller_agent": caller_agent,
            "created": dt.datetime.now().isoformat(timespec="seconds"), "columns": kinds,
            "real_labels": sorted(c for df in sheets.values() for c in df.columns if fk_slug_in(c, share_labels))}

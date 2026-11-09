@@ -73,6 +73,21 @@ code { font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; word-break
 .skipnote { font-size: 12px; color: var(--muted); padding: 4px 0 8px; }
 .muted { color: var(--muted); }
 .addbtn { margin-top: 8px; }
+.probbar { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; background: var(--warn-soft); color: var(--warn);
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+.probbar.clean { background: var(--accent-soft); color: var(--accent); }
+.probbar a, .probbar button.link { color: inherit; font-weight: 600; }
+button.link { background: none; border: none; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
+details.card > summary { cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+#viz svg { width: 100%; height: auto; display: block; margin-top: 10px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.gallery figure { margin: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: #fff; cursor: zoom-in; }
+.gallery img { width: 100%; height: auto; display: block; }
+.gallery figcaption { font-size: 12px; color: #444; margin-top: 4px; }
+.gallery .tag { font-size: 11px; color: #777; }
+dialog { max-width: 94vw; max-height: 94vh; border: none; border-radius: 10px; padding: 12px; }
+dialog img { max-width: 90vw; max-height: 82vh; display: block; background: #fff; }
+dialog::backdrop { background: #0008; }
 </style>
 </head>
 <body>
@@ -95,9 +110,12 @@ code { font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; word-break
     </div>
   </section>
   <section>
-    <div class="card"><div class="answer" id="answer"></div><div class="scroll" id="table"></div>
+    <div class="probbar" id="probbar"></div>
+    <div class="card"><div class="answer" id="answer"></div><div id="viz"></div><div class="scroll" id="table"></div>
       <details><summary>How this was worked out</summary><code id="sql"></code></details></div>
-    <div class="card" id="probcard"><h2 id="probhead">Problems</h2><div id="problems"></div></div>
+    <div class="card" id="chartcard" hidden><h2>Charts</h2><div class="gallery" id="charts"></div></div>
+    <details class="card" id="probcard"><summary id="probhead">Problems</summary><div id="problems"></div></details>
+    <dialog id="big"><img id="bigimg" alt=""><form method="dialog"><button>Close</button></form></dialog>
   </section>
 </main>
 <script>
@@ -245,6 +263,7 @@ function run() {
       if (r.total && r.rows.length > 1 && spec.measures && spec.measures.length) h += `<tr class="total">${r.columns.map((c, i) => `<td class="${num(c) ? "num" : ""}">${c in r.total ? esc(indian(r.total[c])) : (i === 0 ? "All" : "")}</td>`).join("")}</tr>`;
       if (r.total && (!spec.measures || !spec.measures.length)) $("answer").textContent = `${Object.values(r.total)[0]} ${form().row_noun} match` + (r.rows.length < Object.values(r.total)[0] ? ` (first ${r.rows.length} shown)` : "") + ".";
       $("table").innerHTML = h + "</tbody></table>";
+      $("viz").innerHTML = bars(r, spec);
       $("sql").textContent = r.sql;
     } catch (e) {
       if (me !== seq) return;
@@ -252,6 +271,45 @@ function run() {
     }
   }, 150);
 }
+
+function bars(r, spec) {
+  // the answer as horizontal bars: first breakdown(s) as labels, first measure as length (top 15)
+  if (!spec.measures || !spec.measures.length || !spec.group_by || !spec.group_by.length || r.rows.length < 2) return "";
+  const nums = r.columns.filter(c => r.rows.some(x => typeof x[c] === "number"));
+  const labs = r.columns.filter(c => !nums.includes(c));
+  if (!nums.length || !labs.length) return "";
+  const m = nums[0];
+  const rows = [...r.rows].sort((a, b) => (b[m] || 0) - (a[m] || 0)).slice(0, 15);
+  const max = Math.max(...rows.map(x => x[m] || 0)) || 1;
+  const W = 640, L = 190, H = 22, top = 24;
+  const lab = x => labs.map(c => x[c] ?? "(blank)").join(" / ");
+  const clip = t => (t = String(t)).length > 28 ? t.slice(0, 27) + "…" : t;
+  let g = `<text x="0" y="14" font-size="12" font-weight="600" fill="currentColor">${esc(m)}${r.rows.length > 15 ? ` · top 15 of ${r.rows.length}` : ""}</text>`;
+  rows.forEach((x, i) => {
+    const y = top + i * H, w = Math.max(1, (W - L - 60) * (x[m] || 0) / max);
+    g += `<text x="${L - 6}" y="${y + 14}" font-size="11" text-anchor="end" fill="currentColor">${esc(clip(lab(x)))}</text>`
+      + `<rect x="${L}" y="${y + 3}" width="${w}" height="${H - 7}" rx="2" fill="#2E6F95"/>`
+      + `<text x="${L + w + 4}" y="${y + 14}" font-size="11" fill="currentColor">${esc(indian(x[m]))}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${top + rows.length * H + 4}" role="img" aria-label="${esc(m)} chart">${g}</svg>`;
+}
+async function loadCharts() {
+  let list = [];
+  try { list = (await api("/api/form?file=" + encodeURIComponent(FILE))).charts || []; } catch (e) { return; }
+  const key = list.map(c => c.name + c.mtime).join("|");
+  if (key === loadCharts.key) return;
+  loadCharts.key = key;
+  $("chartcard").hidden = !list.length;
+  const figs = await Promise.all(list.slice(0, 12).map(async c => {
+    try { const d = await api(`/api/chart?file=${encodeURIComponent(FILE)}&name=${encodeURIComponent(c.name)}`);
+      return `<figure data-src="${d.data}"><img src="${d.data}" alt="${esc(c.title)}"><figcaption>${esc(c.title)} <span class="tag">${c.kind === "claude" ? "designed with Claude" : "from the chat"}</span></figcaption></figure>`; }
+    catch (e) { return ""; }
+  }));
+  $("charts").innerHTML = figs.join("");
+  $("charts").querySelectorAll("figure").forEach(f => f.onclick = () => { $("bigimg").src = f.dataset.src; $("big").showModal(); });
+}
+setInterval(loadCharts, 10000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) loadCharts(); });
 
 function fixLine(r) {
   const sg = r.suggestion || {}, has = sg.action === "skip_row" || (sg.to !== undefined && sg.to !== null);
@@ -262,8 +320,18 @@ function fixLine(r) {
 function renderProblems() {
   const f = form(), groups = (META.problems || {})[f.sheet] || [], skipped = (META.skipped || {})[f.sheet] || [];
   const n = groups.reduce((a, g) => a + g.rows.length, 0);
-  const open = META.source && META.source.url ? ` <a href="${esc(META.source.url)}" target="_blank" rel="noopener">Open the file in Google</a> (tab ${esc(f.sheet)}) to fix a cell.` : "";
-  $("probhead").textContent = n ? `Problems in ${f.tab}: ${n}` : `Problems in ${f.tab}`;
+  const dl = META.is_copy && META.source ? META.source.url : (META.working_copy ? META.working_copy.url : null);
+  const open = dl ? ` <a href="${esc(dl)}" target="_blank" rel="noopener">Open the working copy in Google</a> (tab ${esc(f.sheet)}) to fix a cell.` : "";
+  $("probhead").textContent = n ? `Problems in ${f.tab}: ${n} (details, suggested fixes)` : `Problems in ${f.tab}`;
+  const total = META.problem_count || 0, wc = META.working_copy;
+  const drive = META.is_copy && META.source && META.source.url ? META.source.url : (wc ? wc.url : null);
+  $("probbar").className = "probbar" + (total ? "" : " clean");
+  $("probbar").innerHTML = total
+    ? `<span>${total} problem${total === 1 ? "" : "s"} in ${META.problem_kinds} kind${META.problem_kinds === 1 ? "" : "s"}${META.is_copy ? " left in this checked copy" : ""}. Answers include them.</span>`
+      + (drive ? `<a href="${esc(drive)}" target="_blank" rel="noopener">View problems in Drive</a>` : `<span>Ask Idli to "mark them in a Drive copy" to fix them in Google Sheets.</span>`)
+      + `<button class="link" id="probmore">Details</button>`
+    : `<span>No problems found by the checks.</span>`;
+  if ($("probmore")) $("probmore").onclick = () => { $("probcard").open = true; $("probcard").scrollIntoView({behavior: "smooth"}); };
   const skip = skipped.map(s => `<div class="skipnote">${esc(s.why)} Rows ${s.rows.slice(0, 12).join(", ")}${s.rows.length > 12 ? ` and ${s.rows.length - 12} more` : ""}.</div>`).join("");
   $("problems").innerHTML = skip + (n ? groups.map((g, gi) => {
       const fixable = g.rows.filter(r => r.suggestion && (r.suggestion.action || (r.suggestion.to !== undefined && r.suggestion.to !== null)));
@@ -294,7 +362,7 @@ function renderProblems() {
     } catch (e) { $("fixmsg").textContent = e.message; }
   };
 }
-load();
+load().then(loadCharts);
 </script>
 </body>
 </html>
