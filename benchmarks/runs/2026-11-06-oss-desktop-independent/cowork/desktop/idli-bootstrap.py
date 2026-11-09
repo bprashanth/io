@@ -2,8 +2,9 @@
 """Idli first-run bootstrap: make a Paseo install look the way Idli should on first open.
 Safe to rerun: it only adds what's missing.
 
-  Mission control       its own folder (~/idli-insights/start-here): the setup chat "Start here" (tab 0) with
-     Start here         Idli's greeting, a Drive tab for signing in, and the chat "What Idli has learned"
+  Mission control          its own folder (~/idli-insights/start-here)
+     Start here            the setup chat (tab 0) with Idli's greeting and a Drive tab for signing in
+     What Idli has learned the page listing the files Idli has learned to analyse (grows as Claude teaches it)
   Idli         the private folder (~/idli-insights/cowork-real): where the work happens; a "New chat" is always
      Idli      waiting there on its first card (clean up a file / analyse a file)
   Claude      this cowork/ folder: Claude teaches Idli a file, from fake data only
@@ -29,10 +30,11 @@ IDLI = os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights")
 DRY = "--dry-run" in sys.argv
 LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md)
     ("Start here", os.path.join(IDLI, "start-here"), os.path.join(COWORK, "idli", "START-HERE.md")),
+    ("What Idli has learned", os.path.join(IDLI, "start-here"), None),
     ("Idli", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
     ("Claude", COWORK, None),
 ]
-HEADING = {"Start here": "Mission control"}  # the sidebar heading (project) when it differs from the workspace
+HEADING = {"Start here": "Mission control", "What Idli has learned": "Mission control"}  # the sidebar heading (project) when it differs from the workspace
 SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 TABS = ["https://drive.google.com/drive/my-drive"]  # Gmail later; Drive is all the first run needs
@@ -70,7 +72,7 @@ def same(a, b):
 
 def folders():
     for name, path, instructions in LAYOUT:
-        if path == COWORK:
+        if path == COWORK or not instructions and os.path.isdir(path):
             continue
         if not os.path.isdir(path):
             say(f"create folder {path}")
@@ -102,12 +104,14 @@ def projects_and_workspaces():
             say(f"name project '{proj['name']}' -> '{heading}'")
             paseo("project", "rename", proj["projectId"], heading, parse=False, change=True)
         wss = [w for w in paseo("workspace", "ls") if same(w["cwd"], path)]
-        ws = next((w for w in wss if w["name"] == name), wss[0] if wss else None)
+        names = {n for n, _, _ in LAYOUT}
+        ws = next((w for w in wss if w["name"] == name), None) or next((w for w in wss if w["name"] not in names), None)
         if not ws and proj:
             say(f"create workspace '{name}'")
             paseo("workspace", "create", "--isolation", "local", "--project", proj["projectId"], "--path", path,
                   "--title", name, parse=False, change=True)
-            ws = next((w for w in (paseo("workspace", "ls") or []) if same(w["cwd"], path)), None) if not DRY else None
+            ws = next((w for w in (paseo("workspace", "ls") or []) if same(w["cwd"], path) and w["name"] == name),
+                      None) if not DRY else None
         elif ws and ws["name"] != name:
             say(f"name workspace '{ws['name']}' -> '{name}'")
             paseo("workspace", "rename", ws["workspaceId"], name, parse=False, change=True)
@@ -131,15 +135,62 @@ def start_chat(ws_id):
 
 
 def chat(ws_id, folder, title, prompt):
-    """A chat that should always be there (made once; found again by its title)."""
-    if next((a for a in paseo("ls", "--global") if a["name"] == title and same(a.get("cwd") or "", folder)), None):
+    """A chat that should always be there (made once; found again by its title). Returns its id."""
+    old = next((a for a in paseo("ls", "--global") if a["name"] == title and same(a.get("cwd") or "", folder)), None)
+    if old:
         say(f"'{title}' chat exists")
-        return
+        return old["id"]
     say(f"create the '{title}' chat")
     if DRY or not ws_id:
+        return None
+    out = paseo("run", "--provider", START_PROVIDER, "--workspace", ws_id, "--mode", "bypassPermissions",
+                "--thinking", "low", "--title", title, "--no-wait", prompt)
+    return (out or {}).get("agentId")
+
+
+def browser_as(agent_id):
+    """Paseo's browser tools acting in agent_id's workspace, once the app's browser host is up (else None)."""
+    sys.path.insert(0, COWORK)
+    os.environ["PASEO_AGENT_ID"] = agent_id
+    from lib import browser
+    for attempt in range(20):  # the desktop app's browser host may still be starting
+        try:
+            browser.tabs()
+            return browser
+        except Exception:
+            time.sleep(3)
+    return None
+
+
+def learned_tab(agent_id):
+    """The 'What Idli has learned' page in its workspace, at the form server's current address (the server is
+    started here so the page is live as soon as the app opens)."""
+    if not agent_id or DRY:
+        say("would open the What Idli has learned page")
         return
-    paseo("run", "--provider", START_PROVIDER, "--workspace", ws_id, "--mode", "bypassPermissions", "--thinking", "low",
-          "--title", title, "--no-wait", prompt)
+    py = os.path.join(COWORK, ".venv", "bin", "python")
+    r = subprocess.run([py if os.path.exists(py) else sys.executable, "-c",
+                        "import sys,json; sys.path.insert(0, sys.argv[1]); from lib import formserver as f; "
+                        "print(json.dumps(f.ensure(sys.argv[2])))", COWORK, LAYOUT[0][1]],
+                       capture_output=True, text=True, timeout=60, env=ENV)
+    if r.returncode:
+        say("the page server didn't start: " + r.stderr.strip()[-200:])
+        return
+    port, token = json.loads(r.stdout)
+    url = f"http://dashboard.localhost:{port}/skills?t={token}"
+    browser = browser_as(agent_id)
+    if not browser:
+        say("the app's browser isn't available; open Paseo and rerun to add the What Idli has learned page")
+        return
+    old = next((t for t in browser.tabs() if "/skills" in t["url"]), None)
+    if old and old["url"] == url:
+        say("What Idli has learned page is open")
+    elif old:
+        say("point the What Idli has learned page at the current server")
+        browser.paseo("browser_navigate", browserId=old["id"], url=url)
+    else:
+        say("open the What Idli has learned page")
+        browser.paseo("browser_new_tab", url=url)
 
 
 def start_tabs(agent_id):
@@ -147,18 +198,11 @@ def start_tabs(agent_id):
     if not agent_id or DRY:
         say("would open Drive and Gmail tabs in Start here")
         return
-    sys.path.insert(0, COWORK)
-    os.environ["PASEO_AGENT_ID"] = agent_id
-    from lib import browser
-    for attempt in range(20):  # the desktop app's browser host may still be starting
-        try:
-            have = {urllib.parse.urlparse(t["url"]).hostname for t in browser.tabs()}
-            break
-        except Exception:
-            time.sleep(3)
-    else:
+    browser = browser_as(agent_id)
+    if not browser:
         say("the app's browser isn't available; open Paseo and rerun to add the Drive and Gmail tabs")
         return
+    have = {urllib.parse.urlparse(t["url"]).hostname for t in browser.tabs()}
     for url in TABS:
         if urllib.parse.urlparse(url).hostname not in have:
             say(f"open tab {urllib.parse.urlparse(url).hostname}")
@@ -170,7 +214,7 @@ def main():
     ids = projects_and_workspaces()
     agent = start_chat(ids.get("Start here"))
     start_tabs(agent)
-    chat(ids.get("Start here"), LAYOUT[0][1], "What Idli has learned", "learned")
+    learned_tab(chat(ids.get("What Idli has learned"), LAYOUT[0][1], "What Idli has learned", "learned"))
     chat(ids.get("Idli"), LAYOUT[1][1], "New chat", "hi")  # Idli keeps one waiting from then on
     say("done. Heading order: Mission control, Idli, Claude (drag once until Paseo patch P2).")
 

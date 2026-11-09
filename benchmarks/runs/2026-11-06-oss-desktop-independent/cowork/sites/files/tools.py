@@ -40,48 +40,7 @@ def files():
 # ---------------------------------------------------------------- the form server
 def _server():
     """(port, token) of this workspace's form server, starting it if needed."""
-    sf = formserver.state_file(sh.data_dir())
-    def alive(st):
-        try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{st['port']}/api/form?t={st['token']}&file=_", timeout=2):
-                return True
-        except urllib.error.HTTPError as e:
-            return e.code == 400  # the server answered with our token: it's ours
-        except OSError:
-            return False
-    try:
-        with open(sf) as f:
-            st = json.load(f)
-        if alive(st):
-            return st["port"], st["token"]
-    except (OSError, ValueError, KeyError):
-        pass
-    import socket
-    port = None
-    for p in range(formserver.PORT, formserver.PORT + 20):
-        with socket.socket() as so:
-            if so.connect_ex(("127.0.0.1", p)) != 0:
-                port = p
-                break
-    if port is None:
-        raise RuntimeError("No free port for the form page.")
-    if os.path.exists(sf):
-        os.remove(sf)
-    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
-    subprocess.Popen([sys.executable, "-I", os.path.join(HERE, "lib", "formserver.py"), sh.data_dir(), str(port)],
-                     start_new_session=True, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=open(os.path.join(os.path.dirname(sf) if os.path.isdir(os.path.dirname(sf)) else "/tmp",
-                                              "form-server.log"), "a"))
-    for _ in range(40):
-        time.sleep(0.25)
-        try:
-            with open(sf) as f:
-                st = json.load(f)
-            if alive(st):
-                return st["port"], st["token"]
-        except (OSError, ValueError, KeyError):
-            pass
-    raise RuntimeError("The form page did not start.")
+    return formserver.ensure(sh.data_dir())
 
 
 def form_url(file, tab=None, spec=None):
@@ -857,8 +816,8 @@ def t_show_skills():
         pass
     from lib import uiswitch
     uiswitch.show_tab(["What Idli has learned*", "dashboard.localhost"])
-    return {"say_to_user": "The page listing what Idli has learned is open in a tab; delete a file's skill there to "
-                           "teach it again from scratch."}
+    return {"say_to_user": "The list of files Idli has learned is in the tab next to this chat. It grows as Claude "
+                           "teaches Idli new files; delete one there to teach it again from scratch."}
 
 
 # ---------------------------------------------------------------- the start of an Idli chat

@@ -5,7 +5,7 @@ One page per taught file: a tab per workbook tab, dropdowns built from the file 
 and the contract test's verdict. Nothing leaves the computer: the server listens on 127.0.0.1 only and
 every request needs the token written to <data dir>/.idli/form-server.json (mode 600).
 
-    python -I -m lib.formserver <data dir>     (started on demand by the files site's file_form tool)
+    python -I -m lib.formserver <data dir>     (started on demand by ensure())
 """
 import datetime as dt
 import json
@@ -389,11 +389,68 @@ def make_handler(files, token):
     return H
 
 
+def _alive(st):
+    import urllib.error
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{st['port']}/api/form?t={st['token']}&file=_", timeout=2):
+            return True
+    except urllib.error.HTTPError as e:
+        return e.code == 400  # the server answered with our token: it's ours
+    except OSError:
+        return False
+
+
+def ensure(data_dir, python=None):
+    """(port, token) of the form server for data_dir, starting it if needed. The token survives restarts, so a
+    page left open in a tab (What Idli has learned) works again once the server is back."""
+    import socket
+    import subprocess
+    import time
+    sf = state_file(data_dir)
+    try:
+        with open(sf) as f:
+            st = json.load(f)
+        if _alive(st):
+            return st["port"], st["token"]
+    except (OSError, ValueError, KeyError):
+        pass
+    port = None
+    for p in range(PORT, PORT + 20):
+        with socket.socket() as so:
+            if so.connect_ex(("127.0.0.1", p)) != 0:
+                port = p
+                break
+    if port is None:
+        raise RuntimeError("No free port for the form page.")
+    os.makedirs(os.path.dirname(sf), exist_ok=True)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
+    subprocess.Popen([python or sys.executable, "-I", os.path.join(HERE, "lib", "formserver.py"), data_dir, str(port)],
+                     start_new_session=True, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=open(os.path.join(os.path.dirname(sf), "form-server.log"), "a"))
+    for _ in range(40):
+        time.sleep(0.25)
+        try:
+            with open(sf) as f:
+                st = json.load(f)
+            if st.get("port") == port and _alive(st):
+                return st["port"], st["token"]
+        except (OSError, ValueError, KeyError):
+            pass
+    raise RuntimeError("The form page did not start.")
+
+
 def serve(data_dir, port=PORT):
-    token = secrets.token_urlsafe(18)
+    sf = state_file(data_dir)
+    token = None
+    try:
+        with open(sf) as f:
+            token = json.load(f).get("token")  # keep the last token: links in open tabs stay good
+    except (OSError, ValueError):
+        pass
+    token = token if isinstance(token, str) and len(token) >= 20 else secrets.token_urlsafe(18)
     files = Files(data_dir)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(files, token))
-    sf = state_file(data_dir)
     os.makedirs(os.path.dirname(sf), exist_ok=True)
     fd = os.open(sf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as f:

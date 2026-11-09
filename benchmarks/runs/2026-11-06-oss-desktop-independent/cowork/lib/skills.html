@@ -30,8 +30,7 @@ button.sure { background: var(--bad); color: #fff; }
 <body>
 <main>
   <h1>What Idli has learned</h1>
-  <div class="sub">One entry per file you taught with Claude: what a row is, the checks, the words of the file, and its
-    charts. Delete one to teach that file again from scratch (it's moved to idli-insights/archive/skills).</div>
+  <div class="sub">Here is a list of files Idli has learned to analyze.</div>
   <div id="list">Loading…</div>
 </main>
 <script>
@@ -44,11 +43,16 @@ async function api(path, body) {
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
 }
+let last = null;
 async function load() {
   let skills;
-  try { skills = await api("/api/skills"); } catch (e) { document.getElementById("list").textContent = e.message; return; }
   const el = document.getElementById("list");
-  if (!skills.length) { el.innerHTML = `<div class="empty">Nothing yet. Ask Idli to clean or analyse a file and it'll offer to learn it with Claude.</div>`; return; }
+  try { skills = await api("/api/skills"); }
+  catch (e) { if (last === null) el.textContent = "Idli isn't running yet; this list comes back when it is."; return; }
+  const now = JSON.stringify(skills);
+  if (now === last) return;  // unchanged: keep the page as it is (a half-clicked Delete stays)
+  last = now;
+  if (!skills.length) { el.innerHTML = `<div class="empty">Nothing yet.</div>`; return; }
   el.innerHTML = skills.map(s => `<div class="card" data-id="${esc(s.id)}">
       <h2>${esc(s.title)} <span class="meta">v${esc(s.version)}</span></h2>
       <button class="del">Delete</button>
@@ -70,6 +74,7 @@ async function load() {
   });
 }
 load();
+setInterval(() => { if (!document.hidden) load(); }, 5000);  // it grows as Idli learns files
 </script>
 </body>
 </html>
