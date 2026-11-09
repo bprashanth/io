@@ -250,6 +250,16 @@ def _variant(fake, real):
     return fake
 
 
+def _geo_kind(header, lo, hi):
+    """'lat' / 'lon' for a coordinate column (by its name, within the valid range), else None."""
+    h = re.sub(r"[^a-z]", " ", str(header).lower())
+    if re.search(r"\b(lat|latitude|gps lat)\b", h) and -90 <= lo <= hi <= 90:
+        return "lat"
+    if re.search(r"\b(lon|lng|long|longitude|gps lon)\b", h) and -180 <= lo <= hi <= 180:
+        return "lon"
+    return None
+
+
 def mock_column(series, header, rnd, keep_labels=False, shared=None):
     """`shared` maps a real value to its fake across every column and tab, so a name in Visits and the same
     name in Officers get the same fake, and lookups between tabs still join in the mock."""
@@ -281,6 +291,15 @@ def mock_column(series, header, rnd, keep_labels=False, shared=None):
                 out.append(rnd.choice(["n/a", "-", "approx 500", "pending"]))
                 continue
             lo, hi = info["min"], info["max"]
+            geo = _geo_kind(header, lo, hi)
+            if geo:  # a real range of coordinates says where the people are: same spread, moved to nowhere (0, 0)
+                half = (hi - lo) / 2
+                y = round(rnd.uniform(-half, half), max(4, info["decimals"] or 0))
+                out.append(str(y))
+                continue
+            if re.search(r"(?i)\b(pin|pincode|zip|postal|post code)\b", str(header)):
+                out.append(str(rnd.randint(100000, 999999)))  # a postal code is a place: random, same shape
+                continue
             y = rnd.uniform(lo, hi) if hi > lo else lo
             y = round(y, info["decimals"]) if info["decimals"] else int(round(y))
             s = str(y)

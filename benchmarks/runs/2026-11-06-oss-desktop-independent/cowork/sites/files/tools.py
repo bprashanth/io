@@ -267,6 +267,7 @@ def t_file_get(link, wait_seconds=45, open_after=True, goal=None):
         json.dump(src, f)
     _last_get.pop(fid, None)
     rel = os.path.relpath(dest, sh.data_dir())
+    claim_chat(("Clean: " if (goal or "").startswith("clean") else "Analyse: ") + (title or name))
     if not open_after:
         return {"downloaded": True, "file": rel, "title": title or name}
     out = t_file_open(rel, goal=goal)  # one model turn fewer: the form opens with the download
@@ -525,27 +526,32 @@ def t_teach_file(file, question, share_labels=None, missing=None, chart=None):
                                                                       "Claude asks a few questions there, one at a time; "
                                                                       "you'll get a card to come back")},
                     {"label": "Not now", "description": "Nothing is sent"}]}]
-    shareable = list(labels.items())[:4]
+    shareable = list(labels.items())[:3]
     if shareable:
         questions.append({
             "header": "Labels",
-            "question": "These columns hold labels. Tick any Claude may see as they are (helps it; leave people's and "
-                        "places' names unticked). Untick all to keep every label fake.",
+            "question": "Should Claude see any of these labels as they are? It helps Claude read codes such as species "
+                        "or statuses; never tick people's or places' names. \"None\" keeps the whole copy fake.",
             "multiSelect": True,
-            "options": [{"label": c, "description": "e.g. " + ", ".join(str(x) for x in v[:4])} for c, v in shareable]})
+            "options": [{"label": "None (Recommended)", "description": "Every value stays made up"}]
+                       + [{"label": c, "description": "e.g. " + ", ".join(str(x) for x in v[:4])} for c, v in shareable]})
+    if _show_mock(req["id"], title):
+        questions[0]["question"] += " (The fake copy is open in the \"Fake copy\" tab if you want to look first.)"
     return {"request_id": req["id"], "updating": req["existing_skill"], "card": {"questions": questions},
             "then": ("Call AskUserQuestion with exactly `card` (don't write anything first). If they pick \"Yes, send "
                      "and switch\", call teach_send with request_id and share_labels = the label columns they ticked "
-                     "([] if none). If not, say nothing was sent and offer it again any time.")}
+                     "([] for \"None\" or nothing ticked). If not, say nothing was sent and offer it again any time.")}
 
 
 def t_teach_send(request_id, share_labels=None, switch=True):
+    share_labels = [x for x in (share_labels or []) if not str(x).lower().startswith("none")]
     if share_labels and request_id in _teach_src:  # remake the copy with the labels they allowed, as one request
         path, question, missing, chart = _teach_src.pop(request_id)
         req, _, _ = fk.make_mock(path, question, caller_agent=os.environ.get("PASEO_AGENT_ID"), share_labels=share_labels,
                                  missing=missing, chart=chart)
         shutil.rmtree(os.path.join(fk.TEACH_DIR, request_id), ignore_errors=True)
         request_id = req["id"]
+        _show_mock(request_id, req["title"])
     out = _teach_send(request_id)
     if out.get("started") and switch:
         try:
@@ -560,6 +566,22 @@ def t_teach_send(request_id, share_labels=None, switch=True):
                                    f"; open the Claude workspace (chat '{out['teach_chat']}') to answer its questions.")
                                 + " This chat carries on when teaching is done.")
     return out
+
+
+def _show_mock(request_id, title):
+    """Open (or update) a "Fake copy" tab showing exactly what Claude will get. Best effort."""
+    try:
+        from lib.browser import paseo, tabs
+        port, token = _server()
+        url = f"http://dashboard.localhost:{port}/mock?" + urllib.parse.urlencode({"t": token, "id": request_id})
+        old = next((t for t in tabs() if "/mock?" in t["url"] and "dashboard.localhost" in t["url"]), None)
+        if old:
+            paseo("browser_navigate", browserId=old["id"], url=url)
+        else:
+            paseo("browser_new_tab", url=url)
+        return True
+    except Exception:
+        return False
 
 
 def _paseo():
@@ -846,6 +868,13 @@ def t_start():
     if not st.get("phase") and not os.path.exists(di.DB):
         return {"indexed": False, "say_to_user": "I can't find your files yet: open the Start here chat in the left "
                                                   "sidebar and index your Drive first (1 to 5 minutes). Then come back."}
+    me = os.environ.get("PASEO_AGENT_ID")
+    try:
+        mine = next((a for a in _agents() if a["id"] == me), None)
+        if mine and mine.get("name") != SPARE:
+            ensure_spare()  # a chat the person made themselves: keep a waiting one ready for next time
+    except Exception:
+        pass
     card = {"questions": [{"header": "Idli", "multiSelect": False,
                            "question": "Hi, I'm Idli. Everything you show me stays on this computer. What would you like "
                                        "to do?",
@@ -857,6 +886,103 @@ def t_start():
             "then": "Call AskUserQuestion with exactly `card` (write nothing first). Then ask in one short line which "
                     "file (a few words from its name, or a link). When they answer, find it (drive_find, or file_get "
                     "straight away for a link) and call file_get with goal \"clean\" or \"analyse\" to match."}
+
+
+# ---------------------------------------------------------------- a new chat that is already waiting
+SPARE = "New chat"
+_SPARE_STAMP = os.path.expanduser("~/idli-insights/config/spare-chat.json")
+
+
+def _user_cli(*args, timeout=60):
+    """The paseo CLI as the person (not as this agent, whose CLI calls are limited to its own workspace)."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
+    return subprocess.run([_paseo(), *args], capture_output=True, text=True, timeout=timeout, env=env)
+
+
+def _agents():
+    r = _user_cli("ls", "--global", "--json")
+    return json.loads(r.stdout or "[]")
+
+
+def ensure_spare():
+    """Keep one Idli chat open on the start card ("Clean up a file / Analyse a file"), so a person never waits
+    for the model to greet them. Runs in the background; at most one spare, at most one start per two minutes."""
+    import threading
+
+    def go():
+        try:
+            try:
+                with open(_SPARE_STAMP) as f:
+                    if time.time() - json.load(f).get("ts", 0) < 120:
+                        return
+            except (OSError, ValueError):
+                pass
+            me = os.environ.get("PASEO_AGENT_ID", "")
+            here = os.path.realpath(sh.data_dir())
+            for a in _agents():
+                if a.get("name") == SPARE and a["id"] != me and a.get("status") != "closed" and \
+                        os.path.realpath(os.path.expanduser(a.get("cwd") or "")) == here:
+                    return
+            ws = json.loads(_user_cli("workspace", "ls", "--json").stdout or "[]")
+            wid = next((w["workspaceId"] for w in ws if os.path.realpath(os.path.expanduser(w["cwd"])) == here), None)
+            if not wid:
+                return
+            os.makedirs(os.path.dirname(_SPARE_STAMP), exist_ok=True)
+            with open(_SPARE_STAMP, "w") as f:
+                json.dump({"ts": time.time()}, f)
+            _user_cli("run", "--provider", os.environ.get("IDLI_PROVIDER", "t4gc-cowork"), "--workspace", wid,
+                      "--mode", "bypassPermissions", "--thinking", "low", "--title", SPARE, "--no-wait", "start",
+                      timeout=90)
+        except Exception:
+            pass
+    threading.Thread(target=go, daemon=True).start()
+
+
+def claim_chat(name):
+    """The person started using a waiting "New chat": give it a real name, and open the next spare."""
+    me = os.environ.get("PASEO_AGENT_ID")
+    try:
+        mine = next((a for a in _agents() if a["id"] == me), None)
+        if mine and (mine.get("name") == SPARE or str(mine.get("name", "")).startswith("Find: ")):
+            _user_cli("agent", "update", me, "--name", name[:60])
+    except Exception:
+        pass
+    ensure_spare()
+
+
+# ---------------------------------------------------------------- what Idli has learned, in a chat
+def t_skills_list():
+    """What Idli has learned, as a table for the chat (the Mission control chat "What Idli has learned")."""
+    rows = formserver.skills_list()
+    if not rows:
+        return {"table": "Nothing yet.", "say_to_user": "Write `table`. Then: files you clean or analyse in Idli are "
+                                                         "learned with Claude and appear here."}
+    lines = ["| File | Version | Tabs | Checks | Measures | Charts | Changed |", "|---|---|---|---|---|---|---|"]
+    for r in rows:
+        lines.append(f"| **{r['title']}** | v{r['version']} | {', '.join(r['tabs'])} | {r['checks']} | {r['measures']} | "
+                     f"{len(r['charts'])} | {r['changed']} |")
+    return {"table": "\n".join(lines), "ids": {r["title"]: r["id"] for r in rows},
+            "say_to_user": "Write `table` exactly. Then one line: say \"delete <file>\" to make Idli forget a file "
+                           "(you teach it again from scratch), or \"refresh\" to update this list."}
+
+
+def t_skill_delete(file_title, confirmed=False):
+    rows = formserver.skills_list()
+    hit = next((r for r in rows if r["title"].lower() == str(file_title).lower() or r["id"] == file_title), None) or \
+        next((r for r in rows if str(file_title).lower() in r["title"].lower()), None)
+    if not hit:
+        return {"error": f"Nothing learned called '{file_title}'.", "then": "Call skills_list and show it."}
+    if not confirmed:
+        return {"card": {"questions": [{"header": "Forget", "multiSelect": False,
+                                        "question": f"Forget {hit['title']}? Idli loses its checks, measures and "
+                                                    f"{len(hit['charts'])} chart(s); you'd teach it again with Claude. "
+                                                    "(A copy is kept in idli-insights/archive/skills.)",
+                                        "options": [{"label": "Yes, forget it", "description": hit["title"]},
+                                                    {"label": "Keep it", "description": "Nothing changes"}]}]},
+                "then": f"Call AskUserQuestion with exactly `card` (write nothing first). On \"Yes, forget it\" call "
+                        f"skill_delete with file_title '{hit['id']}' and confirmed=true, then skills_list."}
+    out = formserver.skills_delete(hit["id"])
+    return {"deleted": hit["title"], "say_to_user": f"Done: Idli has forgotten {hit['title']}."}
 
 
 FILE = {"file": {"type": "string", "description": "Path in the workspace folder, from file_get, gsheet_read's "
@@ -929,6 +1055,12 @@ TOOLS = {
                     "can delete one.", {}, []),
     "start": (t_start, "The first step of an Idli chat when the user says hi or hasn't said what they want: a card "
               "asking whether to clean up a file or analyse one.", {}, []),
+    "skills_list": (t_skills_list, "What Idli has learned: one row per file taught with Claude (checks, measures, "
+                    "charts).", {}, []),
+    "skill_delete": (t_skill_delete, "Make Idli forget one file's skill (after a yes on its card).",
+                     {"file_title": {"type": "string", "description": "The file's name from skills_list"},
+                      "confirmed": {"type": "boolean", "description": "True only after the user said yes on the card"}},
+                     ["file_title"]),
 }
 
 

@@ -617,9 +617,8 @@ def t_drive_index_status():
     return {"status": st, "say_to_user": words.get(st.get("phase"), str(st.get("phase")))}
 
 
-NEXT_STEPS = ("Next: go to Idli in the left sidebar and ask about any file, for example \"find the volunteer "
-              "register\" or \"how much did we disburse last quarter\". To refresh this later, come back here and "
-              "say \"rebuild index\".")
+NEXT_STEPS = ("Next: go to Idli in the left sidebar and open the \"New chat\" tab: it asks whether to clean up a "
+              "file or analyse one. To refresh the index later, come back here and say \"rebuild index\".")
 
 
 def t_drive_index_wait(seconds=20):
@@ -649,6 +648,11 @@ def t_drive_index_wait(seconds=20):
 
 def t_drive_find(query):
     from lib import driveindex as di
+    try:
+        from sites.files import tools as ft
+        ft.claim_chat("Find: " + str(query)[:40])
+    except Exception:
+        pass
     t0 = time.time()
     r = di.search(query)
     r["ms"] = int((time.time() - t0) * 1000)

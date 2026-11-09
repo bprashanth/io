@@ -266,6 +266,7 @@ def _main():
         skill_dir, cid = os.path.abspath(sys.argv[2]), sys.argv[3]
         mock = os.path.join(skill_dir, "mock.xlsx")
         out = os.path.join(skill_dir, "charts", f"{cid}.mock.svg")
+        os.environ["IDLI_NO_WALL"] = "1"  # fake data, and Claude's own sandbox can't start another bubblewrap inside
         r = render(skill_dir, cid, mock, out)
         if r["ok"]:
             print(f"OK: rendered on the fake data -> {out}\nShow it in the chat as: ![{cid}]({out})")
