@@ -140,6 +140,41 @@ got = {x["Officer's district"]: x["Number of visits"] for x in r["rows"]}
 ok(got.get("Satara") == 41 and got.get("(blank)") == 3, "first-name lookup: an ambiguous first name stays unmatched")
 probs, _ = fm.check(p, s, tmp)
 ok(sum("shared by several" in x["problem"] for x in probs) == 3, "first-name lookup: ambiguous first name is reported")
+
+# --- lookup "accept" (the team's own codes) and row_checks (across columns and tabs)
+import re  # noqa: E402
+sj = json.load(open(os.path.join(TD, "skills", "field_programme_tracker", "skill.json")))
+p = os.path.join(tmp, "no_wagholi.xlsx")  # Wagholi missing from the Villages tab: its visits are reported...
+frames = pd.read_excel(TRACKER, sheet_name=None, header=None, dtype=object)
+vt = frames["Villages"]
+vt.loc[vt[0].astype(str).str.strip() == "Wagholi", 0] = "Wagholi East"
+with pd.ExcelWriter(p) as w:
+    for k, df in frames.items():
+        df.to_excel(w, sheet_name=k, index=False, header=False)
+probs, _ = fm.check(p, sj, tmp)
+n_wag = sum(x["column"] == "Village" and x["rule"] == "lookup" for x in probs)
+ok(n_wag > 0, f"lookup: villages missing from the Villages tab are reported ({n_wag})")
+vis = next(lk for lk in sj["tabs"]["Visits"]["lookups"] if lk["tab"] == "Villages")
+vis["accept"] = [r"wagh\w+"]  # ...unless the teacher accepted that code
+probs, _ = fm.check(p, sj, tmp)
+ok(not any(x["column"] == "Village" and x["rule"] == "lookup" for x in probs), "lookup accept: an accepted code is not reported")
+vis.pop("accept")
+v = sheets["Visits"]
+amt = pd.to_numeric(v["Amount disbursed"].str.replace(r"(?i)(rs\.?|inr|₹|,|\s)", "", regex=True), errors="coerce")
+hh = pd.to_numeric(v["Households visited"].str.replace(r"(?i)(rs\.?|inr|₹|,|\s)", "", regex=True), errors="coerce")
+want_rows = sorted(int(fk.sheet_row(v, i, 3)) for i in v.index[(amt > hh * 450).fillna(False)])
+vil = {x.strip().lower() for x in fk.raw_sheets(p)[0]["Villages"]["Village"]}
+want_cross = sum(1 for x in v["Village"] if x.strip() and x.strip().lower() not in vil)
+sj["tabs"]["Visits"]["row_checks"] = [
+    {"id": "per_household", "column": "amount_disbursed", "sql": "t.amount_disbursed > t.households_visited * 450",
+     "message": "more than Rs 450 a household"},
+    {"id": "village_tab", "column": "village", "message": "village not in Villages tab",
+     "sql": "t.village IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {{tab:Villages}} w WHERE lower(trim(w.village)) = lower(trim(t.village)))"}]
+probs, out = fm.check(p, sj, tmp)  # the copy with Wagholi missing from Villages
+got_rows = sorted(x["row"] for x in probs if x.get("check") == "per_household")
+ok(got_rows == want_rows and len(want_rows) > 0, f"row check across columns: sheet rows {got_rows[:5]}... match pandas")
+ok(sum(x.get("check") == "village_tab" for x in probs) == want_cross > 0, "row check across tabs ({{tab:Villages}}) matches pandas")
+ok(all(x["cell"] and x["cell"].startswith("E") for x in probs if x.get("check") == "per_household"), "row check cells point at the column")
 fk.SKILLS_DIR = os.path.join(TD, "skills")
 shutil.rmtree(tmp)
 

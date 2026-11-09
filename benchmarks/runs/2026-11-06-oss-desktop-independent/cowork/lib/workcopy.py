@@ -42,6 +42,8 @@ def _group_key(p):
     v = re.sub(r"\s+", " ", str(p.get("value") or "")).strip().lower()
     if p["rule"] == "layout":
         return (p["tab"], "layout", p.get("kind"), bool(p.get("skipped")))
+    if p["rule"] == "row_check":  # a taught check across columns or tabs: one comment per check
+        return (p["tab"], p["column"], "row_check", p.get("check") or p.get("problem"))
     if p["rule"] in ("required",) or not v:
         return (p["tab"], p["column"], p["rule"], "")
     sg = p.get("suggestion") or {}
@@ -142,6 +144,10 @@ def build(path, skill, problems, out_path):
             if right not in ob:
                 continue
             keys = sorted({str(x).strip() for x in sheets[other][ob[right]] if str(x).strip()})
+            accept = [re.compile(a, re.I) for a in lk.get("accept") or []]  # the team's own codes (UKS1, Fern)
+            if accept:
+                keys += sorted({str(v).strip() for v in df[by_slug[left]] if str(v).strip()
+                                and any(a.fullmatch(str(v).strip()) for a in accept)})
             amap = ((spec.get("normalize") or {}).get(left, {}).get("map") or {})
             keys += [str(k).strip() for k in amap if str(k).strip()]  # spellings the skill already maps
             ref = add_list(f"{by_slug[left]} (known in {other})", keys)

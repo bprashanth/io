@@ -495,6 +495,8 @@ def build_tables(con, path, skill, base):
             cases = " ".join(f"WHEN lower(trim({expr})) = {_lit(str(k).strip().lower())} THEN {_lit(v)}"
                              for k, v in n["map"].items())
             expr = f"CASE {cases} ELSE {expr} END"
+        if n.get("case") == "lower":  # codes such as species abbreviations: 'Cesaur ' -> 'cesaur'
+            expr = f"lower(regexp_replace({expr}, '\\s+', ' ', 'g'))"
         if n.get("case") == "title":
             expr = f"array_to_string(list_transform(string_split(lower({expr}), ' '), lambda x: upper(x[1]) || x[2:]), ' ')"
         kind = n.get("type") or spec.get("type")
