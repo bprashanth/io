@@ -931,7 +931,7 @@ def ensure_spare():
             with open(_SPARE_STAMP, "w") as f:
                 json.dump({"ts": time.time()}, f)
             _user_cli("run", "--provider", os.environ.get("IDLI_PROVIDER", "t4gc-cowork"), "--workspace", wid,
-                      "--mode", "bypassPermissions", "--thinking", "low", "--title", SPARE, "--no-wait", "start",
+                      "--mode", "bypassPermissions", "--thinking", "low", "--title", SPARE, "--no-wait", "hi",
                       timeout=90)
         except Exception:
             pass
@@ -961,9 +961,10 @@ def t_skills_list():
     for r in rows:
         lines.append(f"| **{r['title']}** | v{r['version']} | {', '.join(r['tabs'])} | {r['checks']} | {r['measures']} | "
                      f"{len(r['charts'])} | {r['changed']} |")
+    lines += ["", "Say \"delete <file>\" to make Idli forget a file (you'd teach it again with Claude), or \"refresh\" "
+              "to update this list."]
     return {"table": "\n".join(lines), "ids": {r["title"]: r["id"] for r in rows},
-            "say_to_user": "Write `table` exactly. Then one line: say \"delete <file>\" to make Idli forget a file "
-                           "(you teach it again from scratch), or \"refresh\" to update this list."}
+            "say_to_user": "Write `table` exactly as it is (it ends with a line about deleting); nothing else."}
 
 
 def t_skill_delete(file_title, confirmed=False):
