@@ -170,6 +170,50 @@ class QuietDownloads:
         self.conns = []
 
 
+def webview_ids():
+    try:
+        return {t["id"] for t in _targets() if t.get("type") == "webview"}
+    except (OSError, ValueError):
+        return set()
+
+
+class Page:
+    """One browser tab's page through DevTools (dev builds only): run JS in it, drop a file on it."""
+
+    def __init__(self, target_id, timeout=20):
+        t = next(t for t in _targets() if t["id"] == target_id)
+        self.c = Cdp(t["webSocketDebuggerUrl"], timeout)
+
+    def eval(self, js):
+        return ((self.c.call("Runtime.evaluate", {"expression": js, "returnByValue": True}) or {})
+                .get("result", {}).get("value"))
+
+    def drop_file(self, path, x=None, y=None):
+        """Drag a local file onto the page, as a person dropping it from the file manager (Drive uploads it)."""
+        if x is None:
+            x, y = (self.eval("[innerWidth / 2, innerHeight / 2]") or [600, 400])
+        data = {"items": [], "files": [path], "dragOperationsMask": 1}
+        for typ in ("dragEnter", "dragOver", "drop"):
+            if self.c.call("Input.dispatchDragEvent", {"type": typ, "x": x, "y": y, "data": data}) is None:
+                return False
+            time.sleep(0.3)
+        return True
+
+    def close(self):
+        self.c.close()
+
+
+def new_page(before, wait=20):
+    """The DevTools id of a tab opened after `before` (a webview_ids() snapshot), once it exists."""
+    end = time.time() + wait
+    while time.time() < end:
+        new = webview_ids() - before
+        if new:
+            return sorted(new)[0]
+        time.sleep(0.5)
+    return None
+
+
 # Paseo keeps other workspaces' tab rows mounted but hidden: use the row that is on screen. The row also holds an
 # off-screen copy of each label (for measuring): take the one actually on screen. A label matches if it equals, or
 # starts with, one of the candidates (a tab shows its host until it loads, then the page title); the newest wins.
