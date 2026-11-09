@@ -11,7 +11,58 @@ The paths below are short:
 - `cowork/` means `~/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork`.
 - `~/idli-insights/cowork-real` is the "private data" folder. It holds a synthetic stand-in workbook.
 
-## 0. Bring it up (laptop terminal)
+## The Idli journey (current, 2026-11-09)
+
+About 30 minutes, most of it reading Claude's questions. Uses your real cestrum workbook
+(`field_vars_indicators.xlsx`); swap in any multi-tab sheet.
+
+**0. Bring it up (laptop terminal)**
+```sh
+cd ~/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
+git pull                                   # branch oss-desktop-eval
+python3 desktop/setup-laptop.py            # adds matplotlib; idempotent
+python3 desktop/idli-bootstrap.py          # rewrites Idli's CLAUDE.md and cowork.sites (google + files)
+pkill -f lib/formserver.py                 # the form server restarts on Idli's next question
+```
+Start a **new** Idli chat after any pull (a chat keeps the tool code it started with).
+
+**1. To teach from scratch:** in an Idli chat say "show me what you've learned" (or open the skills page), and
+Delete the file's entry. It moves to `~/idli-insights/archive/skills`.
+
+**2. Clean.** New Idli chat, type `hi`.
+- [ ] A card: "Clean up a file / Analyse a file". Pick Clean. It asks which file; type a few words.
+- [ ] If it lists several matches, pick the original. An "Idli working copy" is labelled as the cleaned version.
+- [ ] Unknown file: a card says what goes to Claude (fake values, same columns) with "Yes, send and switch" and a
+      Labels question (tick codes Claude may see as they are, e.g. species codes). The app switches to Claude.
+- [ ] Claude asks one step at a time, on cards: what a row is per tab, checks (tick, add your own in Other),
+      clean-ups, the words of the file, how it read your request. Then "Go back to Idli?". Yes switches back.
+- [ ] Idli says teaching finished and asks "Mark them in a copy in your Drive?". Yes.
+- [ ] Within ~30 s a tab opens on `<file> - Idli working copy <date time>` next to the original in Drive: red
+      cells, an orange corner on the first cell of each kind of problem (hover: the comment), a comment count
+      on each tab, a last tab "Idli checks". Fix a cell: its red goes away.
+- [ ] Say "I'm ready". Idli re-checks the copy, says what you fixed, and asks how to start.
+
+**3. Analyse.** In the same chat (or a new one: "I want to analyse <file>"; it offers the checked copy first).
+- [ ] "I have a question": ask a few in a row, e.g. how many cestrum trees and what share; which plots have
+      the most; compare transect 1 and 7. Each answer in 15-40 s, numbers from the form ("the form tab shows it").
+- [ ] "Show me a graph of cestrum trees per transect": bars in the chat. "Cestrum share for each transect and
+      plot": a grid. Both also in the dashboard's Charts.
+- [ ] "Suggest analyses" (start card) or "ask Claude" after a chart: a card, then Claude suggests charts on fake
+      data, draws the ones you tick in its chat, takes changes, and hands back. In Idli the charts appear drawn
+      from the real data.
+
+**4. Dashboard tab.**
+- [ ] One line on top: "N problems in K kinds … View problems in Drive · Details". The link opens the working
+      copy. Details opens the full list with suggested fixes.
+- [ ] The answer card shows a small bar chart when there is a breakdown; the Charts card shows the file's charts
+      (click one to enlarge).
+- [ ] Known: in a narrow window the right edge can be cut off (Paseo P11); widen the window.
+
+What to note: where you waited and for what, any card that didn't say enough, any answer that looked wrong.
+
+## Older checks (before the journey was scoped)
+
+### 0. Bring it up (laptop terminal)
 
 ```sh
 cd ~/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork

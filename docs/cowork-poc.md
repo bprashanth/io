@@ -8,6 +8,31 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-09 (evening), DGX: one journey, scoped.** Field note:
+  [narrative/2026-11-09-one-journey-field-note.md](../narrative/2026-11-09-one-journey-field-note.md); test steps:
+  [cowork-manual-test.md](cowork-manual-test.md) section "The Idli journey".
+  - **Start:** an Idli chat opens with a card, *Clean up a file* / *Analyse a file* (tool `start`); a first
+    message that already says what it wants skips it. `file_get`/`file_open` take `goal` and show the matching card.
+  - **Clean:** unknown file -> teach card -> Claude (one step at a time, cards) -> back -> "Mark them in Drive"
+    -> working copy next to the original (live red cells, one comment per kind of problem) -> "I'm ready" ->
+    `working_copy_ready` re-checks the copy and moves on to analysis. Analysing a file with a working copy offers
+    "Use the checked copy (Recommended)"; one without says it hasn't been cleaned.
+  - **Analyse:** questions go to `file_ask` (multi-turn); a graph is `file_ask` with `chart` (one breakdown: bars;
+    two: a grid), drawn from the form's answer into the chat and the dashboard. Anything the form can't draw, or
+    "suggest analyses", goes to `chart_request`: a fake copy to Claude, who agrees the chart on cards, writes
+    `file-skills/<id>/charts/<chart>.py`, renders it on the fake data in its chat, and hands back; Idli runs it on
+    the real data (`chart_show`) inside a bubblewrap wall (no network, read-only, home hidden, `lib/chartkit.py`).
+  - **Dashboard:** problems collapsed to one line with **View problems in Drive** (the working copy) and Details;
+    the freed space has a live bar chart of the current answer and a gallery of the file's charts.
+  - **Skills page** (`/skills`, tool `show_skills`): what Idli has learned, one per file, with Delete (moved to
+    `~/idli-insights/archive/skills`). The cestrum skill was removed this way to retest teaching from scratch.
+  - **Engine (from Claude's teaching session):** `row_checks` (taught SQL conditions across columns and tabs),
+    lookup `accept` patterns for a team's own codes, `"case": "lower"`; small whole-number columns (transect,
+    plot) are breakdowns.
+  - **Removed from Idli:** the `sheets` site (free SQL, its own charts), which Muse used to make up a chart
+    query that failed. `cowork.sites` in the Idli folder is now `google` + `files` (bootstrap rewrites it).
+  - **Laptop:** `matplotlib` in the cowork venv; `bwrap` needed (present on Ubuntu/Pop). `__pycache__` is no longer
+    tracked (it blocked pulls).
 - **2026-11-08 (late), DGX: first-run experience (OOBE) played as a new user.** Field note:
   [narrative/2026-11-08-oobe-field-note.md](../narrative/2026-11-08-oobe-field-note.md); runs and numbers:
   `benchmarks/runs/2026-11-08-oobe/` (`oobe_test.py`, `results.jsonl`, `search_eval.py`, `search_chat_test.py`).
@@ -111,15 +136,18 @@ Either agent adds an entry here for every change that needs something done on th
 
 ## The idea in one paragraph
 
-NGO staff do repetitive work on websites and spreadsheets that hold personal data. Two modes:
-- **DIY mode** (Claude Code with the user's own subscription) writes small "site plugins" against **test**
-  accounts and mock files.
-- **Co-work mode** (the private T4GC model Muse, with no shell) uses those plugins on the user's **real**
-  accounts and files.
+Idli is a Drive assistant for NGO staff. It uses Claude and a private model together to ask better questions of
+their own data and to manage the data-entry work around it. Claude, working only on a copy with fake values,
+establishes each file's structure, cleaning and validation rules (a "skill"). The private model runs those rules
+on the real file and flags issues as comments in a working copy in the person's Drive, where they fix them. Once
+the file is clean (or they choose to go ahead), Idli builds a **form** over it, so a small private model (Muse, or
+a 9B) can hold a conversation about the data and answer from the form, never from its own arithmetic. The aim is
+not a dashboard but discovering questions through conversation; the form is the scaffolding that keeps the
+answers true. Charts follow the same pattern: question -> fake data -> Claude writes and agrees the chart code ->
+Idli runs it on the real data locally. Everyone starts in **Start here** (index the Drive, re-index any time),
+then works in **Idli**, one file at a time.
 
-Personal data only reaches the private model. When co-work can't do something, a tool prints a gap
-report. The user removes personal details from it and pastes it into DIY, which builds the missing tool.
-The user then retries co-work in a new chat.
+The earlier framing (DIY site plugins for websites, gap reports) still exists in the code but is not the focus.
 
 ## Read in this order
 
@@ -175,6 +203,11 @@ you control the app:
 | 6 | `report_gap` text written by the model can include personal names; the user must scrub it | `cowork_mcp.py` |
 | 7 | `gsheet_read` can blank out a stray text cell in a mostly numeric column (gviz) | `sites/google/tools.py` |
 | 8 | The bar-chart CSS was changed for narrow windows; the change hasn't been looked at | `sites/sheets/tools.py` `t_sheet_chart` |
+| 9 | In a narrow Paseo window a browser tab can get a viewport wider than the visible pane (1280 px shown in 630), so the right edge of the dashboard and the skills page's Delete buttons are cut off. Widening the window helps | Paseo (patch P11) |
+| 10 | Working copies pile up in Drive (one per "Mark them"); the index only knows the ones built before the last re-index, so `drive_find` can offer an old copy | `sites/files/tools.py` `t_working_copy`, `lib/driveindex.py` |
+| 11 | A chat keeps the tool code it started with; after a `git pull` on the laptop, start a new Idli chat | `cowork_mcp.py` (one process per chat) |
+| 12 | Muse often stops after writing text when a `then` asks for a card afterwards; cards that must happen go first, with the text inside the card | Idli tools' `then` strings |
+| 13 | The form server restarts on the next Idli tool call; an open dashboard tab from before shows "connection refused" until then | `sites/files/tools.py` `_server` |
 
 ## Rules carried over from the owner
 
