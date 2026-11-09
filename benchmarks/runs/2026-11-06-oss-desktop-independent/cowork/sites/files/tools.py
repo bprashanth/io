@@ -360,8 +360,8 @@ def t_file_open(file, show_form=True, goal=None):
             start["options"].append({"label": "Show the saved charts", "description": ", ".join(
                 x["title"] for x in out["charts"][:3])})
         start_then = ('On "I have a question": ask in one short line what they want to know. On "Suggest analyses": '
-                      "call chart_request with question \"\". On \"Show the saved charts\": call chart_show for each "
-                      "chart in `charts`. ")
+                      "call chart_request with question \"\". On \"Show the saved charts\": call chart_show once with every "
+                      "id in `charts`. ")
         goal = (goal or "analyse").lower()
         opts, act = [], []
         if goal.startswith("clean"):
@@ -506,7 +506,7 @@ def t_teach_file(file, question, share_labels=None, missing=None, chart=None):
     cols = list(req["columns"][req["main_sheet"]])
     tabs = list(req["columns"])
     labels = {c: v for c, v in fk.label_columns(path).items() if c not in (req.get("real_labels") or [])}
-    title = req["title"]
+    title = re.sub(r"\s*-\s*Idli working copy.*$", "", req["title"])
     col_text = ", ".join(cols[:12]) + (f" and {len(cols) - 12} more" if len(cols) > 12 else "")
     questions = [{
         "header": "Claude",
@@ -516,7 +516,7 @@ def t_teach_file(file, question, share_labels=None, missing=None, chart=None):
                       and req["existing_skill"] else f"I haven't seen {title} before. Claude can learn it with you (what "
                       "each column means, the checks for mistakes)")
                      + f" from a copy with fake values: same {'tabs and ' if len(tabs) > 1 else ''}columns ({col_text}), "
-                     f"every value made up, and your question with names removed."
+                     f"every value made up" + ("" if chart == "" else ", and your question with names removed") + "."
                      + (" Idli then draws it here from your real data." if chart is not None else "")
                      + " Send it and switch to Claude?"),
         "multiSelect": False,
@@ -784,8 +784,20 @@ def t_chart_request(file, question=""):
     return out
 
 
-def t_chart_show(file, chart):
-    """Draw one of the file's charts (written by Claude on fake data) from the real data, here."""
+def t_chart_show(file, chart=None, charts=None):
+    """Draw the file's charts (written by Claude on fake data) from the real data, here. One id, or several."""
+    want = [c for c in (charts or []) if c] or ([chart] if chart else [])
+    if isinstance(charts, str):
+        want = [x.strip() for x in charts.split(",") if x.strip()]
+    if len(want) > 1:
+        outs = [t_chart_show(file, c) for c in want]
+        ok = [o for o in outs if o.get("chart_markdown")]
+        return {"chart_markdown": "\n\n".join(o["chart_markdown"] for o in ok),
+                "titles": [o["title"] for o in ok], "errors": [o["error"] for o in outs if o.get("error")],
+                "say_to_user": "Write chart_markdown exactly (every image, each on its own line), then one short line "
+                               "per chart on what it shows (no numbers you didn't get from a tool). Say they're also on "
+                               "the dashboard tab."}
+    chart = want[0] if want else None
     from lib import chartkit
     e = files().open(file)
     if not e["skill"]:
@@ -908,9 +920,11 @@ TOOLS = {
                       "on. Shows a card first; nothing is sent until they say yes.",
                       {**FILE, "question": {"type": "string", "description": "The chart they asked for, in their words; "
                                                                              "empty = suggest analyses"}}, ["file"]),
-    "chart_show": (t_chart_show, "Draw one of the file's charts (Claude wrote it on fake data) from the real data and "
-                   "return markdown to show it in the chat. Chart ids are in file_open's charts.",
-                   {**FILE, "chart": {"type": "string", "description": "Chart id from file_open"}}, ["file", "chart"]),
+    "chart_show": (t_chart_show, "Draw the file's charts (Claude wrote them on fake data) from the real data and "
+                   "return markdown to show them in the chat. Pass every chart id at once in `charts`.",
+                   {**FILE, "charts": {"type": "array", "items": {"type": "string"},
+                                       "description": "Chart ids (from file_open's charts, or Claude's message)"},
+                    "chart": {"type": "string", "description": "One chart id"}}, ["file"]),
     "show_skills": (t_show_skills, "Open the page listing what Idli has learned (one skill per file), where the user "
                     "can delete one.", {}, []),
     "start": (t_start, "The first step of an Idli chat when the user says hi or hasn't said what they want: a card "

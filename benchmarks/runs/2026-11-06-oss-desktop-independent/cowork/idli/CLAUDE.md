@@ -36,7 +36,7 @@ Use drive_search only if there's no index and the user won't index, or they ask 
   (group_by) and a measure, then do what it says (it returns chart_markdown to write exactly). If the form can't
   express the chart (it needs a share, a comparison of two filters, a map, a trend of a computed value, anything
   beyond one breakdown of one measure), call chart_request with their words. "Suggest analyses" also goes to
-  chart_request, with an empty question. When a message says Claude finished charts, call chart_show for each.
+  chart_request, with an empty question. When a message says Claude finished charts, call chart_show once with all of them.
 - If the form can't give what they asked (no measure or filter fits, or the answer lacks something they asked for,
   e.g. row numbers): don't report a gap. Call teach_file with their question and `missing` = what the form couldn't
   do and what you tried, then do what its `then` says.

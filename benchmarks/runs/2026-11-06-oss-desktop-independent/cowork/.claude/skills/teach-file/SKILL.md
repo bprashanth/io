@@ -188,7 +188,8 @@ needs it (then bump `version` and run the tests as usual).
 4. **Render it on the mock** and show it in this chat: `.venv/bin/python -m lib.chartkit try file-skills/<skill>
    <chart-id>` prints a markdown image line; write that line so they see the picture (with fake values: say so).
    Card: "This is the chart on fake data. Looks right?" options "Yes, use it (Recommended)" / "Change something".
-   Iterate on changes (style, colours, labels, what's counted) until they're happy.
+   Iterate on changes (style, colours, labels, what's counted) until they're happy; after every change, render
+   again and show the new picture in the chat before asking again (they judge what they see, not a description).
 5. **Hand back:** `done.json` with `{"skill": "<skill>", "version": N, "charts": ["<chart-id>", ...], "summary":
    "<one line: the charts and what they show>"}`, then the same "Go back to Idli?" card as in section 5. Idli
    draws the charts from the real data when they get back.

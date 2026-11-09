@@ -464,12 +464,18 @@ def fk_slug_in(c, cols):
 
 def label_columns(path):
     """Category columns and their labels, so the user can choose which labels may be shared."""
+    from lib import fixkit
     sheets, _ = raw_sheets(path)
     out = {}
     for df in sheets.values():
-        for c in df.columns:
-            if classify(df[c])["kind"] == "category":
-                out[c] = sorted({v for v in df[c] if v})[:12]
+        lay = fixkit.layout_rows(df)  # repeated headings are not labels
+        body = df.drop(index=[i for i in lay if i in df.index])
+        for c in body.columns:
+            vals = [v for v in body[c] if v]
+            if not vals or sum(as_number(v) is not None for v in vals) > 0.6 * len(vals):
+                continue  # numbers (a sparse DBH column) are not labels
+            if classify(body[c])["kind"] == "category":
+                out[c] = sorted(set(vals))[:12]
     return out
 
 
