@@ -1,0 +1,66 @@
+{
+ "note": "Held-out set: checks apply to everything the model does after a step until the next step the user starts. 'ref' = the form spec a correct answer comes from (the scorer runs it on the fixture and looks for its numbers in the reply). Optional picks are skipped when no card shows.",
+ "conversations": [
+  {"id": "q01-household-correction", "segments": ["find", "open", "ask", "chart"], "ref_file": "Household survey 2025",
+   "steps": [
+    {"user": "open Household survey 2025.xlsx for analysis", "check": {"tools_any": ["drive_find", "file_get"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "average debt in ward B pls", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["avg_debt"], "filters": {"ward": ["Ward B"]}}}}},
+    {"user": "no sorry ward E", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["avg_debt"], "filters": {"ward": ["Ward E"]}}}}},
+    {"user": "for that ward show household count by family size as a chart", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["rows"], "group_by": ["members"], "filters": {"ward": ["Ward E"]}}}}}
+   ]},
+  {"id": "q02-tracker-completed", "segments": ["find", "open", "ask", "chart"], "ref_file": "Field programme tracker Q3",
+   "steps": [
+    {"user": "need to analyse Field programme tracker Q3.xlsx", "check": {"tools_any": ["drive_find", "file_get"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "how many households visited in each district, done visits only", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["households"], "group_by": ["village_district"], "preset": ["completed"]}}, "alt_refs": [{"spec": {"measures": ["households"], "group_by": ["village_district"], "filters": {"status": ["Done"]}}}]}},
+    {"user": "same but only district C and split by village", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["households"], "group_by": ["village"], "filters": {"village_district": ["District C"]}, "preset": ["completed"]}}, "alt_refs": [{"spec": {"measures": ["households"], "group_by": ["village"], "filters": {"village_district": ["District C"], "status": ["Done"]}}}]}},
+    {"user": "make that a chart na", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["households"], "group_by": ["village"], "filters": {"village_district": ["District C"]}, "preset": ["completed"]}}, "alt_refs": [{"spec": {"measures": ["households"], "group_by": ["village"], "filters": {"village_district": ["District C"], "status": ["Done"]}}}]}}
+   ]},
+  {"id": "q03-reimbursement-pending", "segments": ["find", "open", "ask"], "ref_file": "Tech reimbursement form (Responses)",
+   "steps": [
+    {"user": "the Tech reimbursement form (Responses).xlsx, want to check claims", "check": {"tools_any": ["drive_find", "file_get"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "which category has the most claim amount?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["amount"], "group_by": ["category"]}}, "alt_refs": [{"spec": {"measures": ["amount"], "group_by": ["category"], "preset": ["not_rejected"]}}, {"spec": {"measures": ["amount"], "group_by": ["category"], "preset": ["paid_out"]}}], "top_only": true}},
+    {"user": "now only pending claims, total amount by employee", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["amount"], "group_by": ["employee"], "filters": {"status": ["Pending"]}}}}},
+    {"user": "and how many claims each in that pending list?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["rows"], "group_by": ["employee"], "filters": {"status": ["Pending"]}}}}}
+   ]},
+  {"id": "q04-volunteer-find-only", "segments": ["find", "peek"], "ref_file": "Volunteer register 2025",
+   "steps": [
+    {"user": "find Volunteer register 2025.xlsx, just need the link", "check": {"tools_any": ["drive_find"], "tools_none": ["file_get", "file_ask"], "card": true}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "thanks leave it there, will open myself", "check": {"tools_none": ["file_get", "file_ask", "file_peek"]}}
+   ]},
+  {"id": "q05-mgnrega-work-mix", "segments": ["find", "open", "ask", "chart"], "ref_file": "MGNREGA works Valparai 2019-2023",
+   "steps": [
+    {"user": "open MGNREGA works Valparai 2019-2023.xlsx to ask something", "check": {"tools_any": ["drive_find", "file_get"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "how many works of each type in Perumpallam?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["works"], "group_by": ["work_type"], "filters": {"village": ["Perumpallam Village"]}}}, "alt_refs": [{"spec": {"measures": ["rows"], "group_by": ["work_type"], "filters": {"village": ["Perumpallam Village"]}}}]}},
+    {"user": "for nursery raising there, households engaged by year chart pls", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["households"], "group_by": ["date:year"], "filters": {"village": ["Perumpallam Village"], "work_type": ["Nursery raising"]}}}}},
+    {"user": "same thing for footpath repair", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["households"], "group_by": ["date:year"], "filters": {"village": ["Perumpallam Village"], "work_type": ["Footpath repair"]}}}}}
+   ]},
+  {"id": "q06-roadkill-season-rate", "segments": ["find", "open", "ask", "chart"], "ref_file": "Road kill survey 2011-12",
+   "steps": [
+    {"user": "analyse Road kill survey 2011-12.xlsx", "check": {"tools_any": ["drive_find", "file_get"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "animals killed per km for each stretch in monsoon pls", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["per_km"], "group_by": ["road_stretch"], "filters": {"season": ["Monsoon"]}}}, "alt_refs": [{"spec": {"measures": ["per_km"], "group_by": ["road_stretch"], "preset": ["monsoon"]}}]}},
+    {"user": "and in summer?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["per_km"], "group_by": ["road_stretch"], "filters": {"season": ["Summer"]}}}}},
+    {"user": "show that summer comparison as chart", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["per_km"], "group_by": ["road_stretch"], "filters": {"season": ["Summer"]}}}}}
+   ]},
+  {"id": "q07-tree-plots-invasion", "segments": ["find", "open", "ask"], "ref_file": "Fragment tree plots 2000-2019",
+   "steps": [
+    {"user": "Fragment tree plots 2000-2019.xlsx, help with invasion patterns", "check": {"tools_any": ["drive_find", "file_get"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "which plot in Korangumudi has the most alien trees?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["alien_trees"], "group_by": ["plot"], "filters": {"fragment": ["Korangumudi"]}}}, "alt_refs": [{"spec": {"measures": ["trees"], "group_by": ["plot"], "filters": {"fragment": ["Korangumudi"]}, "preset": ["alien_only"]}}, {"spec": {"measures": ["trees"], "group_by": ["plot"], "filters": {"fragment": ["Korangumudi"], "native_or_alien": ["Alien"]}}}], "top_only": true}},
+    {"user": "for that fragment compare average girth of native and alien trees", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["avg_girth"], "group_by": ["native_or_alien"], "filters": {"fragment": ["Korangumudi"]}}}, "alt_refs": [{"spec": {"measures": ["avg:girth_cm"], "group_by": ["native_or_alien"], "filters": {"fragment": ["Korangumudi"]}}}]}},
+    {"user": "same comparison in Injipara also", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["avg_girth"], "group_by": ["native_or_alien"], "filters": {"fragment": ["Injipara"]}}}, "alt_refs": [{"spec": {"measures": ["avg:girth_cm"], "group_by": ["native_or_alien"], "filters": {"fragment": ["Injipara"]}}}]}}
+   ]},
+  {"id": "q08-budget-untaught", "segments": ["find", "open", "teach"], "ref_file": "Budget 2025-26",
+   "steps": [
+    {"user": "Budget 2025-26, how much kept for field travel?", "check": {"tools_any": ["teach_file"], "tools_none": ["file_ask"], "no_numbers": true, "card": true}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"pick": "Not now", "check": {"tools_none": ["teach_send", "file_ask"], "no_numbers": true}},
+    {"user": "ok will teach it later, leave this for now", "check": {"tools_none": ["teach_send", "file_ask"], "no_numbers": true}}
+   ]}
+ ]
+}

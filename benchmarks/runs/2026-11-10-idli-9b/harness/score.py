@@ -86,7 +86,8 @@ def ref_ok(ref_text, text, top_only):
     if not vals:
         return False
     if kind == "ids":
-        hit = sum(1 for v in vals if v.lower() in text.lower())
+        flat = re.sub(r"[_\s]+", " ", text.lower())
+        hit = sum(1 for v in vals if re.sub(r"[_\s]+", " ", v.lower()) in flat)
     else:
         tn = set(numbers(text))
         if top_only:
@@ -119,7 +120,18 @@ def score_conv(sc_conv, log, seen_before):
             if t["step"] in sp["steps"]:
                 evs += t["events"]
                 devs += t.get("deviations") or []
-        tools = [e for e in evs if e["type"] in ("tool", "card")]
+        tools = []
+        for e in evs:
+            if e["type"] not in ("tool", "card"):
+                continue
+            tools.append(e)
+            r = e.get("result") if e["type"] == "tool" else None
+            if e.get("name") == "drive_find" and isinstance(r, dict) and r.get("file"):
+                # a goal-aware drive_find opened the file itself: count the file_get it made
+                fnd = r.get("found") or {}
+                tools.append({"type": "tool", "name": "file_get", "result": r, "chained": True,
+                              "args": {"link": fnd.get("id", ""), "goal": fnd.get("opened_with_goal",
+                                                                                   (e.get("args") or {}).get("goal", ""))}})
         names = [("AskUserQuestion" if e["type"] == "card" else e["name"]) for e in tools]
         text = "\n".join(e["text"] for e in evs if e["type"] == "model" and e.get("text"))
         for e in evs:

@@ -8,6 +8,18 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10, DGX (branch idli-9b-bench): can a 9B replace Muse 30B? A standalone benchmark, in progress.**
+  `benchmarks/runs/2026-11-10-idli-9b/`. Idli's real tools on a fake Drive (12 spreadsheets, 6 documents from
+  totalrecall's synthetic livelihoods tables, two public Valparai ecology sets, and the taught-skill mocks; three new
+  skills written as the Teach workspace would). 30 scripted multi-turn conversations in the owner's voice (dev 14,
+  held-out 8, a second held-out 8 written by Codex and checked against the engine) plus the Start here chat. Two
+  harnesses: a lean loop (same prompt for every model) and the real Claude Code CLI through the Agent SDK with
+  cards answered the way Paseo does. Nothing touches `cowork/` or `~/idli-insights` (one leak found and fixed: the
+  harness's skill deletes went to `~/idli-insights/archive`; removed, and `formserver.skills_delete` patched to
+  honour `IDLI_HOME`). First findings: Muse ~98%; raw Qwen3.5-9B 64% (thinking 70%), failing mostly by writing
+  cards as text and misrouting; general guards (a Stop hook that sends the model back once to show a pending card
+  or drop a made-up number, and `drive_find(goal)` opening the spreadsheet itself) bring it to ~88%. Index summaries:
+  the 9B finds files better than Muse (12/15 vs 10/15 top-1). Patches in `patches/`; report in `REPORT.md`.
 - **2026-11-10, DGX: Muse through Cloudflare (silo.idli.cc).** The owner put Muse behind Cloudflare Access at
   `silo.idli.cc` (tunnel → DGX 8185, the prefix proxy → Muse) with a service token. `lib/muse.py` gives the URL and
   the two Access headers from `~/idli-insights/config/muse-access.json`; `desktop/muse-connect.py <token file>`

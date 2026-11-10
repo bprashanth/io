@@ -1,0 +1,54 @@
+--- a/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/sites/google/tools.py
++++ b/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/sites/google/tools.py
+@@ -646,7 +646,35 @@
+     return out
+ 
+ 
+-def t_drive_find(query):
++SHEET_KINDS = ("Microsoft Excel", "Google Sheets", "CSV")
++
++
++def t_drive_find(query, goal="find"):
++    """Find a file; for goal clean/analyse, open the spreadsheet too when it's clear which one (as file_get chains
++    file_open). The model only says what the person wants; the tool decides the next step."""
++    r = _drive_find(query)
++    goal = str(goal or "find").lower()
++    if goal not in ("clean", "analyse", "analyze") or r.get("status") not in ("found", "choose"):
++        return r
++    res = r.get("results") or []
++    sheets = [x for x in res if x.get("kind") in SHEET_KINDS and "Idli working copy" not in x.get("name", "")]
++    pick = None
++    if r["status"] == "found" and res and res[0].get("kind") in SHEET_KINDS:
++        pick = res[0]
++    elif r["status"] == "choose" and len(sheets) == 1:
++        pick = sheets[0]
++    if not pick:
++        if sheets and len(sheets) < len(res):  # a clean/analyse request: offer only the spreadsheets
++            r["results"] = sheets
++        return r
++    from sites.files import tools as ft
++    out = ft.t_file_get(pick["id"], goal="clean" if goal == "clean" else "analyse")
++    out["found"] = {"id": pick["id"], "name": pick["name"], "folder": pick.get("folder"),
++                    "opened_with_goal": "clean" if goal == "clean" else "analyse"}
++    return out
++
++
++def _drive_find(query):
+     from lib import driveindex as di
+     try:
+         from sites.files import tools as ft
+@@ -741,8 +769,12 @@
+ 
+ TOOLS = {
+     "drive_find": (t_drive_find, "Find a file in the user's Drive from their words, using Idli's local index (fast). "
+-                   "Use this first to find any Drive file. Says found / choose / none.",
+-                   {"query": {"type": "string", "description": "The user's words for the file"}}, ["query"]),
++                   "Use this first to find any Drive file. Says found / choose / none. Pass goal: 'find' (they want "
++                   "to find, open or see a file), 'clean' (check it for mistakes) or 'analyse' (numbers, questions, "
++                   "charts). For clean and analyse it opens the spreadsheet too when it's clear which one.",
++                   {"query": {"type": "string", "description": "The user's words for the file"},
++                    "goal": {"type": "string", "enum": ["find", "clean", "analyse"],
++                             "description": "What the user wants to do with the file"}}, ["query"]),
+     "drive_index": (t_drive_index, "Start indexing the user's Drive in the background (1-5 minutes, stays on this "
+                     "computer). Only after the user agrees.", {}, []),
+     "file_peek": (t_file_peek, "Open a Drive file read-only in a tab in this workspace and bring that tab forward, "

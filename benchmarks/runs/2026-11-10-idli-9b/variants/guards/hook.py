@@ -33,7 +33,8 @@ def apply(mcp, tools):
                 r["results"] = sheets
             return r
         out = ft.t_file_get(pick["id"], goal="clean" if goal == "clean" else "analyse")
-        out["found"] = {"name": pick["name"], "folder": pick.get("folder")}
+        out["found"] = {"id": pick["id"], "name": pick["name"], "folder": pick.get("folder"),
+                        "opened_with_goal": "clean" if goal == "clean" else "analyse"}
         return out
 
     mcp.TOOLS["drive_find"] = (drive_find, find0[1] + " Pass goal: 'find' (they want to find, open or see a file), "
