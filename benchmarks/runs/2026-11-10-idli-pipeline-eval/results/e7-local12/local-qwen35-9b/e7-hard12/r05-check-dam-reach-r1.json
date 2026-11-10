@@ -1,0 +1,728 @@
+{
+ "model": "local-qwen35-9b",
+ "variant": "e7-hard12",
+ "scenario": "held3.json",
+ "conv": "r05-check-dam-reach",
+ "segments": [
+  "open",
+  "ask"
+ ],
+ "turns": [
+  {
+   "step": 0,
+   "input": {
+    "user": "MGNREGA works Valparai 2019-2023.xlsx, need check dam details https://docs.google.com/spreadsheets/d/10643ea5bd18da31642e8dedcbf7ce53e/edit",
+    "check": {
+     "tools_any": [
+      "file_get"
+     ],
+     "args": {
+      "file_get": {
+       "link": "10643ea5bd18da31642e8dedcbf7ce53e"
+      }
+     }
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 3.5,
+     "finish": "tool_calls",
+     "provider": null,
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "file_get",
+       "args": "{\"link\":\"https://docs.google.com/spreadsheets/d/10643ea5bd18da31642e8dedcbf7ce53e/edit\",\"goal\":\"clean\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 1868,
+      "completion_tokens": 74
+     }
+    },
+    {
+     "type": "tool",
+     "name": "file_get",
+     "args": {
+      "link": "https://docs.google.com/spreadsheets/d/10643ea5bd18da31642e8dedcbf7ce53e/edit",
+      "goal": "clean"
+     },
+     "secs": 0.16,
+     "result": {
+      "file": "drive/MGNREGA works Valparai 2019-2023.xlsx",
+      "title": "MGNREGA works",
+      "known": true,
+      "today": "2026-11-10",
+      "layout": "ok",
+      "layout_changes": [],
+      "problems": 1,
+      "problem_kinds": [
+       {
+        "tab": "Works",
+        "column": "Persondays",
+        "problem": "persondays is negative or too big",
+        "rows": [
+         7
+        ]
+       }
+      ],
+      "checked_copy": "checked/MGNREGA works Valparai 2019-2023 - checked.xlsx",
+      "form_link": "http://dashboard.localhost:8797/?t=bench&file=drive%2FMGNREGA+works+Valparai+2019-2023.xlsx",
+      "form_opened": true,
+      "tabs": [
+       {
+        "tab": "Works",
+        "row_noun": "works",
+        "summary": "One row per MGNREGA (job work) work in a village: date, type of work, persondays of work created and households engaged.",
+        "measures": {
+         "rows": "Number of works",
+         "works": "Number of works",
+         "persondays": "Total persondays",
+         "households": "Households engaged (total)",
+         "days_per_household": "Persondays per household engaged",
+         "avg:persondays": "Average Persondays",
+         "avg:households_engaged": "Average Households engaged"
+        },
+        "group_by": {
+         "date:month": "Date: month",
+         "date:quarter": "Date: quarter",
+         "date:year": "Date: year",
+         "work_type": "Work type",
+         "village": "Village",
+         "work_id": "Work ID"
+        },
+        "filters": {
+         "work_id": {
+          "label": "Work ID",
+          "kind": "contains",
+          "min": null,
+          "max": null
+         },
+         "date": {
+          "label": "Date",
+          "kind": "date",
+          "min": "2019-01-10",
+          "max": "2024-11-10"
+         },
+         "work_type": {
+          "label": "Work type",
+          "values": [
+           "Check dam construction",
+           "Footpath repair",
+           "Nursery raising",
+           "Water body desilting"
+          ]
+         },
+         "village": {
+          "label": "Village",
+          "values": [
+           "Kadamparai Village",
+           "Perumpallam Village",
+           "Thonimalai Village"
+          ]
+         },
+         "persondays": {
+          "label": "Persondays",
+          "kind": "number",
+          "min": "-40.0",
+          "max": "1443.0"
+         },
+         "households_engaged": {
+          "label": "Households engaged",
+          "kind": "number",
+          "min": "22.0",
+          "max": "160.0"
+         }
+        },
+        "presets": {},
+        "date_columns": [
+         "date"
+        ]
+       }
+      ],
+      "charts": [],
+      "say_to_user": "I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. Mark them in a copy in your Drive?",
+      "start_card": {
+       "questions": [
+        {
+         "header": "Start",
+         "multiSelect": false,
+         "question": "How would you like to start?",
+         "options": [
+          {
+           "label": "I have a question",
+           "description": "Ask in the chat; answers come from the form, with a chart when it helps"
+          },
+          {
+           "label": "Suggest analyses",
+           "description": "Claude looks at a fake copy and suggests what to look at and how to chart it"
+          }
+         ]
+        }
+       ]
+      },
+      "card": {
+       "questions": [
+        {
+         "header": "Next",
+         "multiSelect": false,
+         "question": "I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. Mark them in a copy in your Drive?",
+         "options": [
+          {
+           "label": "Yes, mark them in Drive",
+           "description": "A copy next to the original: problem cells in red, one comment on each kind of problem. You fix them there"
+          },
+          {
+           "label": "Not now",
+           "description": "Nothing is written to Drive"
+          }
+         ]
+        }
+       ]
+      },
+      "then": "Call AskUserQuestion with exactly `card` now (it already says say_to_user; write nothing before it). On \"Yes, mark them in Drive\": call working_copy and stop there (analysis waits until they say they're ready). Afterwards: For a question about this file, call file_ask with a spec built only from these tabs' measures, group_by, filters and presets (chart=true when they ask for a graph or picture). Ask the user if a value is unclear. If no measure or filter fits the question, call teach_file with `missing`. For a chart the form can't draw, call chart_request. Charts already made for this file: chart_show.",
+      "downloaded": true
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 4.7,
+     "finish": "stop",
+     "provider": null,
+     "text": "I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. Mark them in a copy in your Drive?",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 3380,
+      "completion_tokens": 42
+     }
+    },
+    {
+     "type": "guard",
+     "reason": "Idli check: file_get returned a card for the user, but you didn't show it. Call AskUserQuestion now with exactly that `card` (its questions and options as they are). Don't write its options as text."
+    },
+    {
+     "type": "model",
+     "secs": 9.0,
+     "finish": "tool_calls",
+     "provider": null,
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\":[{\"question\": \"I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. Mark them in a copy in your Drive?\", \"header\": \"Next\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, mark them in Drive\", \"description\": \"A copy next to the original: problem cells in red, one comment on each kind of problem. You fix them there\"}, {\"label\": \"Not now\", \"description\": \"Nothing is written to Drive\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 3484,
+      "completion_tokens": 147
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "question": "I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. Mark them in a copy in your Drive?",
+        "header": "Next",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "Yes, mark them in Drive",
+          "description": "A copy next to the original: problem cells in red, one comment on each kind of problem. You fix them there"
+         },
+         {
+          "label": "Not now",
+          "description": "Nothing is written to Drive"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. Mark them in a copy in your Drive?\"=\"average households engaged per check dam work in each village\". You can now continue with the user's answers in mind.",
+     "answered_step": 2
+    }
+   ],
+   "deviations": [
+    "card_where_user_types"
+   ]
+  },
+  {
+   "step": 1,
+   "input": {
+    "pick": "question",
+    "optional": true,
+    "check": {}
+   },
+   "events": [],
+   "deviations": [],
+   "skipped": true
+  },
+  {
+   "step": 2,
+   "input": {
+    "user": "average households engaged per check dam work in each village",
+    "check": {
+     "tools_any": [
+      "file_ask"
+     ],
+     "ref": {
+      "spec": {
+       "measures": [
+        "avg:households_engaged"
+       ],
+       "group_by": [
+        "village"
+       ],
+       "filters": {
+        "work_type": [
+         "Check dam construction"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 5.6,
+     "finish": "tool_calls",
+     "provider": null,
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "file_open",
+       "args": "{\"file\":\"drive/MGNREGA works Valparai 2019-2023.xlsx\",\"goal\":\"analyse\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 3720,
+      "completion_tokens": 56
+     }
+    },
+    {
+     "type": "tool",
+     "name": "file_open",
+     "args": {
+      "file": "drive/MGNREGA works Valparai 2019-2023.xlsx",
+      "goal": "analyse"
+     },
+     "secs": 0.02,
+     "result": {
+      "file": "drive/MGNREGA works Valparai 2019-2023.xlsx",
+      "title": "MGNREGA works",
+      "known": true,
+      "today": "2026-11-10",
+      "layout": "ok",
+      "layout_changes": [],
+      "problems": 1,
+      "problem_kinds": [
+       {
+        "tab": "Works",
+        "column": "Persondays",
+        "problem": "persondays is negative or too big",
+        "rows": [
+         7
+        ]
+       }
+      ],
+      "checked_copy": "checked/MGNREGA works Valparai 2019-2023 - checked.xlsx",
+      "form_link": "http://dashboard.localhost:8797/?t=bench&file=drive%2FMGNREGA+works+Valparai+2019-2023.xlsx",
+      "form_opened": true,
+      "tabs": [
+       {
+        "tab": "Works",
+        "row_noun": "works",
+        "summary": "One row per MGNREGA (job work) work in a village: date, type of work, persondays of work created and households engaged.",
+        "measures": {
+         "rows": "Number of works",
+         "works": "Number of works",
+         "persondays": "Total persondays",
+         "households": "Households engaged (total)",
+         "days_per_household": "Persondays per household engaged",
+         "avg:persondays": "Average Persondays",
+         "avg:households_engaged": "Average Households engaged"
+        },
+        "group_by": {
+         "date:month": "Date: month",
+         "date:quarter": "Date: quarter",
+         "date:year": "Date: year",
+         "work_type": "Work type",
+         "village": "Village",
+         "work_id": "Work ID"
+        },
+        "filters": {
+         "work_id": {
+          "label": "Work ID",
+          "kind": "contains",
+          "min": null,
+          "max": null
+         },
+         "date": {
+          "label": "Date",
+          "kind": "date",
+          "min": "2019-01-10",
+          "max": "2024-11-10"
+         },
+         "work_type": {
+          "label": "Work type",
+          "values": [
+           "Check dam construction",
+           "Footpath repair",
+           "Nursery raising",
+           "Water body desilting"
+          ]
+         },
+         "village": {
+          "label": "Village",
+          "values": [
+           "Kadamparai Village",
+           "Perumpallam Village",
+           "Thonimalai Village"
+          ]
+         },
+         "persondays": {
+          "label": "Persondays",
+          "kind": "number",
+          "min": "-40.0",
+          "max": "1443.0"
+         },
+         "households_engaged": {
+          "label": "Households engaged",
+          "kind": "number",
+          "min": "22.0",
+          "max": "160.0"
+         }
+        },
+        "presets": {},
+        "date_columns": [
+         "date"
+        ]
+       }
+      ],
+      "charts": [],
+      "say_to_user": "I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. It hasn't been cleaned yet, so answers include those problems. How would you like to start?",
+      "start_card": {
+       "questions": [
+        {
+         "header": "Start",
+         "multiSelect": false,
+         "question": "How would you like to start?",
+         "options": [
+          {
+           "label": "I have a question",
+           "description": "Ask in the chat; answers come from the form, with a chart when it helps"
+          },
+          {
+           "label": "Suggest analyses",
+           "description": "Claude looks at a fake copy and suggests what to look at and how to chart it"
+          }
+         ]
+        }
+       ]
+      },
+      "card": {
+       "questions": [
+        {
+         "header": "Next",
+         "multiSelect": false,
+         "question": "I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. It hasn't been cleaned yet, so answers include those problems. How would you like to start?",
+         "options": [
+          {
+           "label": "I have a question",
+           "description": "Ask in the chat; answers come from the form, with a chart when it helps"
+          },
+          {
+           "label": "Suggest analyses",
+           "description": "Claude looks at a fake copy and suggests what to look at and how to chart it"
+          },
+          {
+           "label": "Clean it first",
+           "description": "Mark the problems in a copy in your Drive and fix them there"
+          }
+         ]
+        }
+       ]
+      },
+      "then": "Call AskUserQuestion with exactly `card` now (it already says say_to_user; write nothing before it). On \"Clean it first\": call working_copy and stop there. On \"I have a question\": ask in one short line what they want to know. On \"Suggest analyses\": call chart_request with question \"\". On \"Show the saved charts\": call chart_show once with every id in `charts`. Afterwards: For a question about this file, call file_ask with a spec built only from these tabs' measures, group_by, filters and presets (chart=true when they ask for a graph or picture). Ask the user if a value is unclear. If no measure or filter fits the question, call teach_file with `missing`. For a chart the form can't draw, call chart_request. Charts already made for this file: chart_show."
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 4.3,
+     "finish": "stop",
+     "provider": null,
+     "text": "I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. It hasn't been cleaned yet, so answers include those problems. How would you like to start?",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5828,
+      "completion_tokens": 53
+     }
+    },
+    {
+     "type": "guard",
+     "reason": "Idli check: file_open returned a card for the user, but you didn't show it. Call AskUserQuestion now with exactly that `card` (its questions and options as they are). Don't write its options as text."
+    },
+    {
+     "type": "model",
+     "secs": 10.8,
+     "finish": "tool_calls",
+     "provider": null,
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\":[{\"question\": \"I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. It hasn't been cleaned yet, so answers include those problems. How would you like to start?\", \"header\": \"Next\", \"multiSelect\": false, \"options\": [{\"label\": \"I have a question\", \"description\": \"Ask in the chat; answers come from the form, with a chart when it helps\"}, {\"label\": \"Suggest analyses\", \"description\": \"Claude looks at a fake copy and suggests what to look at and how to chart it\"}, {\"label\": \"Clean it first\", \"description\": \"Mark the problems in a copy in your Drive and fix them there\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5939,
+      "completion_tokens": 188
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "question": "I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. It hasn't been cleaned yet, so answers include those problems. How would you like to start?",
+        "header": "Next",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "I have a question",
+          "description": "Ask in the chat; answers come from the form, with a chart when it helps"
+         },
+         {
+          "label": "Suggest analyses",
+          "description": "Claude looks at a fake copy and suggests what to look at and how to chart it"
+         },
+         {
+          "label": "Clean it first",
+          "description": "Mark the problems in a copy in your Drive and fix them there"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"I've opened the form for MGNREGA works in a new tab. The checks found 1 problem in 1 kinds; the original is unchanged. It hasn't been cleaned yet, so answers include those problems. How would you like to start?\"=\"and for water body desilting instead?\". You can now continue with the user's answers in mind.",
+     "answered_step": 3
+    }
+   ],
+   "deviations": [
+    "card_where_user_types"
+   ],
+   "via_card": true
+  },
+  {
+   "step": 3,
+   "input": {
+    "user": "and for water body desilting instead?",
+    "check": {
+     "tools_any": [
+      "file_ask"
+     ],
+     "ref": {
+      "spec": {
+       "measures": [
+        "avg:households_engaged"
+       ],
+       "group_by": [
+        "village"
+       ],
+       "filters": {
+        "work_type": [
+         "Water body desilting"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 4.0,
+     "finish": "stop",
+     "provider": null,
+     "text": "I see you want to ask about \"average households engaged per check dam work in each village\" but mentioned \"water body desilting instead\". Could you clarify:\n\n1. Do you want the average households engaged per check dam work in each village?\n2. Or do you want this for water body desilting works instead of check dam construction?\n\nPlease confirm so I can get the right answer for you.",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 6225,
+      "completion_tokens": 86
+     }
+    }
+   ],
+   "deviations": [],
+   "via_card": true,
+   "secs": 4.0
+  },
+  {
+   "step": 4,
+   "input": {
+    "user": "show me which of those works are in Thonimalai, list pls",
+    "check": {
+     "tools_any": [
+      "file_ask"
+     ],
+     "ref": {
+      "spec": {
+       "measures": [],
+       "filters": {
+        "work_type": [
+         "Water body desilting"
+        ],
+        "village": [
+         "Thonimalai Village"
+        ]
+       }
+      },
+      "rows": true
+     }
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 8.0,
+     "finish": "tool_calls",
+     "provider": null,
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "file_ask",
+       "args": "{\"file\":\"drive/MGNREGA works Valparai 2019-2023.xlsx\",\"question\":\"show me which works are in Thonimalai Village, list them\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 6331,
+      "completion_tokens": 69
+     }
+    },
+    {
+     "type": "tool",
+     "name": "file_ask",
+     "args": {
+      "file": "drive/MGNREGA works Valparai 2019-2023.xlsx",
+      "question": "show me which works are in Thonimalai Village, list them"
+     },
+     "secs": 4.08,
+     "result": {
+      "answer": "Number of works by Work ID; Village is Thonimalai Village.\n- VIL-01-nursery_raising-2020: 1\n- VIL-01-nursery_raising-2021: 1\n- VIL-01-check_dam-2020: 1\n- VIL-01-water_body_desilting-2023: 1\n- VIL-01-footpath_repair-2020: 1\n- VIL-01-footpath_repair-2024: 1\n- VIL-01-footpath_repair-2021: 1\n- VIL-01-check_dam-2021: 1\n- VIL-01-water_body_desilting-2020: 1\n- VIL-01-footpath_repair-2019: 1\n- VIL-01-water_body_desilting-2019: 1\n- VIL-01-nursery_raising-2024: 1\n- VIL-01-footpath_repair-2022: 1\n- VIL-01-footpath_repair-2023: 1\n- VIL-01-nursery_raising-2022: 1\n- All: 25\n(10 more rows in the form)",
+      "form_link": "http://dashboard.localhost:8797/?t=bench&file=drive%2FMGNREGA+works+Valparai+2019-2023.xlsx&tab=Works&spec=%7B%22measures%22%3A%5B%22works%22%5D%2C%22group_by%22%3A%5B%22work_id%22%5D%2C%22filters%22%3A%7B%22village%22%3A%5B%22Thonimalai+Village%22%5D%7D%7D",
+      "form_updated": true,
+      "say_to_user": "Give the answer exactly as written (numbers unchanged), in a sentence or a short list. Say the form tab now shows it. Rows that failed checks are included.",
+      "spec_model_secs": 4.0
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 24.5,
+     "finish": "stop",
+     "provider": null,
+     "text": "Here are the works in Thonimalai Village:\n\n- VIL-01-nursery_raising-2020: 1\n- VIL-01-nursery_raising-2021: 1\n- VIL-01-check_dam-2020: 1\n- VIL-01-water_body_desilting-2023: 1\n- VIL-01-footpath_repair-2020: 1\n- VIL-01-footpath_repair-2024: 1\n- VIL-01-footpath_repair-2021: 1\n- VIL-01-check_dam-2021: 1\n- VIL-01-water_body_desilting-2020: 1\n- VIL-01-footpath_repair-2019: 1\n- VIL-01-water_body_desilting-2019: 1\n- VIL-01-nursery_raising-2024: 1\n- VIL-01-footpath_repair-2022: 1\n- VIL-01-footpath_repair-2023: 1\n- VIL-01-nursery_raising-2022: 1\n- All: 25\n\n(10 more rows in the form)\n\nThe form tab now shows this list. Note that some works include a problem in row 7 (negative or too large persondays value) which is included in these results. Would you like to see the full list or filter further?",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 6965,
+      "completion_tokens": 367
+     }
+    }
+   ],
+   "deviations": [],
+   "secs": 36.6
+  },
+  {
+   "step": 5,
+   "input": {
+    "user": "average households per work in that list, one line for report",
+    "check": {
+     "tools_any": [
+      "file_ask"
+     ],
+     "ref": {
+      "spec": {
+       "measures": [
+        "avg:households_engaged"
+       ],
+       "filters": {
+        "work_type": [
+         "Water body desilting"
+        ],
+        "village": [
+         "Thonimalai Village"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 6.0,
+     "finish": "tool_calls",
+     "provider": null,
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "file_ask",
+       "args": "{\"file\":\"drive/MGNREGA works Valparai 2019-2023.xlsx\",\"question\":\"average households per work in Thonimalai Village, one line for report\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 7349,
+      "completion_tokens": 70
+     }
+    },
+    {
+     "type": "tool",
+     "name": "file_ask",
+     "args": {
+      "file": "drive/MGNREGA works Valparai 2019-2023.xlsx",
+      "question": "average households per work in Thonimalai Village, one line for report"
+     },
+     "secs": 3.75,
+     "result": {
+      "answer": "Average Households engaged by Work ID; Village is Thonimalai Village.\n- VIL-01-water_body_desilting-2020: 149\n- VIL-01-check_dam-2019: 149\n- VIL-01-nursery_raising-2022: 144\n- VIL-01-water_body_desilting-2021: 141\n- VIL-01-check_dam-2024: 141\n- VIL-01-check_dam-2022: 135\n- VIL-01-footpath_repair-2024: 134\n- VIL-01-nursery_raising-2019: 130\n- VIL-01-water_body_desilting-2023: 125\n- VIL-01-footpath_repair-2020: 122\n- VIL-01-nursery_raising-2021: 117\n- VIL-01-footpath_repair-2023: 93\n- VIL-01-footpath_repair-2022: 91\n- VIL-01-water_body_desilting-2022: 87\n- VIL-01-check_dam-2023: 86\n- All: 95.04\n(10 more rows in the form)",
+      "form_link": "http://dashboard.localhost:8797/?t=bench&file=drive%2FMGNREGA+works+Valparai+2019-2023.xlsx&tab=Works&spec=%7B%22measures%22%3A%5B%22avg%3Ahouseholds_engaged%22%5D%2C%22group_by%22%3A%5B%22work_id%22%5D%2C%22filters%22%3A%7B%22village%22%3A%5B%22Thonimalai+Village%22%5D%7D%7D",
+      "form_updated": true,
+      "say_to_user": "Give the answer exactly as written (numbers unchanged), in a sentence or a short list. Say the form tab now shows it. Rows that failed checks are included.",
+      "spec_model_secs": 3.7
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 19.4,
+     "finish": "stop",
+     "provider": null,
+     "text": "Here's the average households per work in Thonimalai Village:\n\n- VIL-01-water_body_desilting-2020: 149\n- VIL-01-check_dam-2019: 149\n- VIL-01-nursery_raising-2022: 144\n- VIL-01-water_body_desilting-2021: 141\n- VIL-01-check_dam-2024: 141\n- VIL-01-check_dam-2022: 135\n- VIL-01-footpath_repair-2024: 134\n- VIL-01-nursery_raising-2019: 130\n- VIL-01-water_body_desilting-2023: 125\n- VIL-01-footpath_repair-2020: 122\n- VIL-01-nursery_raising-2021: 117\n- VIL-01-footpath_repair-2023: 93\n- VIL-01-footpath_repair-2022: 91\n- VIL-01-water_body_desilting-2022: 87\n- VIL-01-check_dam-2023: 86\n- All: 95.04\n\n(10 more rows in the form)\n\nThe form tab now shows this report. Would you like me to create a chart or filter this further?",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 8019,
+      "completion_tokens": 371
+     }
+    }
+   ],
+   "deviations": [],
+   "secs": 29.1
+  }
+ ],
+ "secs": 107.8,
+ "rep": 1
+}
