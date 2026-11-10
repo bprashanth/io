@@ -1,0 +1,299 @@
+{
+ "id": "field_visits_messy",
+ "title": "Field visits (messy)",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Visits": {
+   "headers": [
+    "amount_disbursed_rs",
+    "field_officer",
+    "households_visited",
+    "notes",
+    "status_done_follow_up_cancelled",
+    "village",
+    "visit_date"
+   ],
+   "summary": "One row per field visit. The Total row at the bottom is skipped. Status must be exactly Done, Follow-up or Cancelled and is NOT auto-corrected: other spellings show up as their own values and are reported as problems. Village and officer names are matched exactly (no trimming or case folding in the checks). Cancelled visits should have zero amount and zero households. Visit dates after 31 March 2024 (the reporting cutoff) are reported.",
+   "row_noun": "visits",
+   "skip_rows": [
+    "total"
+   ],
+   "columns": {
+    "visit_date": {
+     "type": "date",
+     "formats": [
+      "%d/%m/%Y"
+     ],
+     "label": "Visit date"
+    },
+    "village": {
+     "type": "category",
+     "label": "Village"
+    },
+    "field_officer": {
+     "type": "category",
+     "label": "Field officer"
+    },
+    "households_visited": {
+     "type": "number",
+     "label": "Households visited"
+    },
+    "amount_disbursed_rs": {
+     "type": "number",
+     "label": "Amount disbursed (Rs)"
+    },
+    "status_done_follow_up_cancelled": {
+     "type": "category",
+     "label": "Status",
+     "values": [
+      "Done",
+      "Follow-up",
+      "Cancelled"
+     ]
+    },
+    "notes": {
+     "type": "text",
+     "label": "Notes"
+    }
+   },
+   "normalize": {
+    "amount_disbursed_rs": {
+     "type": "number"
+    },
+    "households_visited": {
+     "type": "number"
+    }
+   },
+   "validations": [
+    {
+     "column": "visit_date",
+     "rule": "required",
+     "message": "visit date is missing"
+    },
+    {
+     "column": "visit_date",
+     "rule": "date",
+     "arg": [
+      "%d/%m/%Y"
+     ],
+     "message": "visit date is not a valid dd/mm/yyyy date"
+    },
+    {
+     "column": "village",
+     "rule": "required",
+     "message": "village is missing"
+    },
+    {
+     "column": "village",
+     "rule": "regex",
+     "arg": "\\S(.*\\S)?",
+     "message": "village has spaces before or after it"
+    },
+    {
+     "column": "field_officer",
+     "rule": "required",
+     "message": "field officer is missing"
+    },
+    {
+     "column": "field_officer",
+     "rule": "regex",
+     "arg": "\\S(.*\\S)?",
+     "message": "officer name has spaces before or after it"
+    },
+    {
+     "column": "status_done_follow_up_cancelled",
+     "rule": "required",
+     "message": "status is missing"
+    },
+    {
+     "column": "status_done_follow_up_cancelled",
+     "rule": "regex",
+     "arg": "Done|Follow-up|Cancelled",
+     "message": "status must be exactly Done, Follow-up or Cancelled"
+    },
+    {
+     "column": "amount_disbursed_rs",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000000000.0
+     ],
+     "message": "amount is not a number, or is negative"
+    },
+    {
+     "column": "households_visited",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000000000.0
+     ],
+     "message": "households is not a number, or is negative"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "after_cutoff",
+     "column": "visit_date",
+     "sql": "t.visit_date > DATE '2024-03-31'",
+     "message": "visit date is after the 31 March 2024 reporting cutoff",
+     "why": "Dates after the cutoff cannot be right for this register; check the date."
+    },
+    {
+     "id": "cancelled_zero",
+     "column": "amount_disbursed_rs",
+     "sql": "lower(t.status_done_follow_up_cancelled) = 'cancelled' AND (COALESCE(t.amount_disbursed_rs,0) <> 0 OR COALESCE(t.households_visited,0) <> 0)",
+     "message": "cancelled visit must have zero amount and zero households",
+     "why": "Either the status or the amount/households is wrong."
+    },
+    {
+     "id": "officer_exact",
+     "column": "field_officer",
+     "sql": "EXISTS (SELECT 1 FROM {{raw:Visits}} r WHERE r._row = t._row AND COALESCE(r.field_officer,'') <> '' AND NOT EXISTS (SELECT 1 FROM {{raw:Officers}} o WHERE o.name = r.field_officer))",
+     "message": "officer name does not exactly match a name in the Officers tab (spelling, spaces or capitals)",
+     "value": "(SELECT r.field_officer FROM {{raw:Visits}} r WHERE r._row = t._row)",
+     "why": "Names must match the Officers tab exactly."
+    },
+    {
+     "id": "village_exact",
+     "column": "village",
+     "sql": "EXISTS (SELECT 1 FROM {{raw:Visits}} r WHERE r._row = t._row AND COALESCE(r.village,'') <> '' AND r.village <> (SELECT mode(r2.village) FROM {{raw:Visits}} r2 WHERE lower(trim(r2.village)) = lower(trim(r.village))))",
+     "message": "village is spelt differently from the same village elsewhere (capitals or spaces)",
+     "value": "(SELECT r.village FROM {{raw:Visits}} r WHERE r._row = t._row)",
+     "why": "Use one spelling for each village."
+    }
+   ],
+   "measures": [
+    {
+     "id": "disbursed",
+     "label": "Amount disbursed (Rs)",
+     "sql": "sum(amount_disbursed_rs)",
+     "format": "inr"
+    },
+    {
+     "id": "households",
+     "label": "Households visited",
+     "sql": "sum(households_visited)",
+     "format": "count"
+    },
+    {
+     "id": "per_household",
+     "label": "Amount per household (Rs)",
+     "sql": "sum(amount_disbursed_rs) / NULLIF(sum(households_visited), 0)",
+     "format": "inr"
+    },
+    {
+     "id": "done",
+     "label": "Visits Done",
+     "sql": "count(*) FILTER (WHERE status_done_follow_up_cancelled = 'Done')",
+     "format": "count"
+    },
+    {
+     "id": "followup",
+     "label": "Visits needing follow-up",
+     "sql": "count(*) FILTER (WHERE status_done_follow_up_cancelled = 'Follow-up')",
+     "format": "count"
+    },
+    {
+     "id": "cancelled",
+     "label": "Visits Cancelled",
+     "sql": "count(*) FILTER (WHERE status_done_follow_up_cancelled = 'Cancelled')",
+     "format": "count"
+    },
+    {
+     "id": "done_share",
+     "label": "Share of visits Done (%)",
+     "sql": "100.0 * count(*) FILTER (WHERE status_done_follow_up_cancelled = 'Done') / NULLIF(count(*), 0)",
+     "format": "percent"
+    }
+   ],
+   "presets": [
+    {
+     "id": "completed",
+     "label": "Completed visits",
+     "filters": {
+      "status_done_follow_up_cancelled": [
+       "Done"
+      ]
+     }
+    },
+    {
+     "id": "not_cancelled",
+     "label": "Leave out cancelled",
+     "filters": {
+      "status_done_follow_up_cancelled": {
+       "not": [
+        "Cancelled"
+       ]
+      }
+     }
+    },
+    {
+     "id": "needs_followup",
+     "label": "Needs follow-up",
+     "filters": {
+      "status_done_follow_up_cancelled": [
+       "Follow-up"
+      ]
+     }
+    }
+   ],
+   "date_columns": [
+    "visit_date"
+   ],
+   "lookups": [
+    {
+     "tab": "Officers",
+     "on": {
+      "field_officer": "name"
+     },
+     "columns": [
+      "district"
+     ],
+     "prefix": "officer_",
+     "labels": {
+      "district": "Officer's district"
+     }
+    }
+   ],
+   "hidden": [
+    "notes"
+   ]
+  },
+  "Officers": {
+   "headers": [
+    "district",
+    "email",
+    "name",
+    "phone"
+   ],
+   "summary": "One row per field officer.",
+   "row_noun": "officers",
+   "validations": [
+    {
+     "column": "phone",
+     "rule": "regex",
+     "arg": "\\d{10}",
+     "message": "phone is not exactly 10 digits"
+    },
+    {
+     "column": "email",
+     "rule": "required",
+     "message": "email is missing"
+    },
+    {
+     "column": "email",
+     "rule": "regex",
+     "arg": "[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+",
+     "message": "not a valid email (one @, a name before it, a dotted domain)"
+    }
+   ]
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "money, reach and follow-through measures; exact-match checks for status, officer, village; cutoff date; Total row skipped"
+  }
+ ]
+}

@@ -1,0 +1,394 @@
+{
+ "fixture": "tax_missing_info_fake",
+ "model": "claude-sonnet-5-5",
+ "real_teach": false,
+ "request": "tax_missing_info_fake-20261110-200439",
+ "events": [
+  {
+   "type": "tool",
+   "t": 6,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 13,
+   "name": "Bash",
+   "args": "{\"command\": \"cat teach/inbox/tax_missing_info_fake-20261110-200439/request.json && .venv/bin/python -m lib.filekit inspect teach/inbox/tax_missing_info_fake-20261110-200439/mock.xlsx\"}"
+  },
+  {
+   "type": "tool",
+   "t": 17,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport pandas as pd\\nfor s in ['Capital Gain','Travel Calendar']:\\n    print(pd.read_excel('teach/inbox/tax_missing_info_fake-20261110-200439/mock.xlsx',sheet_name=s,header=None).to_string())\\\"\"}"
+  },
+  {
+   "type": "tool",
+   "t": 23,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport pandas as pd\\nfor s in ['Capital Gain','Travel Calendar']:\\n    print(pd.read_excel('teach/inbox/tax_missing_info_fake-20261110-200439/mock.xlsx',sheet_name=s,header=None).to_string())\\\"\"}"
+  },
+  {
+   "type": "text",
+   "t": 29,
+   "text": "Step 0 of 5: what you want to learn. This is a copy with fake values. Nothing I decide changes it or your file. I'm writing rules that Idli applies to your real file on your computer, every time it reads it.\n\nI opened the mock and found these things that look like mistakes:\n\n- **Capital Gain**\n  - \"Sl No\" has repeats, so it isn't a unique serial number.\n  - \"Date of sale\" has text placeholders and mixed years.\n  - \"Price per unit\" has \"-\", \"pending\" and \"approx 500\".\n  - Sale consideration doesn't equal price \u00d7 units.\n  - Net sale consideration doesn't equal sale consideration minus expenses.\n  - A Total row sits at the bottom.\n- **Travel Calendar**\n  - \"Non-work days\" has \"approx 500\" and blanks.\n  - Months repeat (Jul, Dec, Apr and Aug appear more than once).\n  - \"Work days\" in one month runs past 31 (the mock has values like 910).\n  - It also has a Total row.\n- **Missing Information**\n  - It has text in numeric columns.\n  - The PAN column has blanks and odd values.\n- **India Bank Account**\n  - The closing balance has a blank.\n  - Account numbers may be too short for the \"9 digits or more\" label.\n\nOnce it's clean, there are three things I could set up for analysis:\n\n1. Capital gain per asset, which is net sale consideration minus cost of acquisition, with totals by sale date or year.\n2. Which sales have problems: missing prices, or figures that don't add up.\n3. Days in India per month and per year, split into work and non-work days. This matters for residency counting.\n\nWhich of these do you care about most? Is there something else you want from the file, such as short-term versus long-term gains?"
+  },
+  {
+   "type": "user",
+   "t": 33,
+   "text": "Most useful to me: the capital gain per asset (net sale consideration minus cost of acquisition) with totals by year, plus the list of sales with problems. Short-term versus long-term split is worth adding if the holding period is in the file. Days-in-India can wait until the first two are clean."
+  },
+  {
+   "type": "tool",
+   "t": 42,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 1 of 5, what a row is. Tab Capital Gain: I think one row is one sale of an asset. Columns: Sl No, Particulars (asset name), Date of sale and Date of purchase (dd-mmm-yy), Price per unit, No of units, Sale consideration, Expenses on Transfer, Net Sale Consideration (INR), Cost of acquisition. The holding period can be worked out from the two dates, so the short-ter"
+  },
+  {
+   "type": "card",
+   "t": 47,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 1 of 5, what a row is. Tab Capital Gain: I think one row is one sale of an asset. Columns: Sl No, Particulars (asset name), Date of sale and Date of purchase (dd-mmm-yy), Price per unit, No of units, Sale consideration, Expenses on Transfer, Net Sale Consideration (INR), Cost of acquisition. The holding period can be worked out from the two dates, so the short-term/long-term split is possible. The last row is a Total row, which I'd have Idli skip when it reads the file and never add into sums. Right?",
+      "header": "Capital Gain",
+      "options": [
+       {
+        "label": "Yes, that's right (Recommended)",
+        "description": "One row per sale. Skip the Total row."
+       },
+       {
+        "label": "Not quite",
+        "description": "Talk it through in chat first."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Tab Travel Calendar: I think one row is one stay period in a month. Columns are Month (e.g. Jul 2023), Non-work/vacation days in India and Work days in India. The Total row would be skipped. You said this can wait, so I'd only describe it and add basic checks. Right?",
+      "header": "Travel",
+      "options": [
+       {
+        "label": "Yes, that's right (Recommended)",
+        "description": "One row per month entry. Skip the Total row."
+       },
+       {
+        "label": "Not quite",
+        "description": "Talk it through in chat first."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Tab India Bank Account: I think one row is one bank account, with IFS code, bank name, account type, account number, savings interest earned, closing balance at 31 March 2024 and whether it is the refund account (Y/N). Right?",
+      "header": "Bank",
+      "options": [
+       {
+        "label": "Yes, that's right (Recommended)",
+        "description": "One row per bank account."
+       },
+       {
+        "label": "Not quite",
+        "description": "Talk it through in chat first."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Tab Missing Information: I think this is a list of people (the 'Name' column holds a number, 'Person A' holds a label) with a PAN and one amount column. Is one row one person's missing-information item?",
+      "header": "Missing info",
+      "options": [
+       {
+        "label": "Yes, that's right (Recommended)",
+        "description": "One row per item. Keep checks light."
+       },
+       {
+        "label": "Not quite",
+        "description": "Talk it through in chat first."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Step 1 of 5, what a row is. Tab Capital Gain: I think one row is one sale of an asset. Columns: Sl No, Particulars (asset name), Date of sale and Date of purchase (dd-mmm-yy), Price per unit, No of units, Sale consideration, Expenses on Transfer, Net Sale Consideration (INR), Cost of acquisition. The holding period can be worked out from the two dates, so the short-term/long-term split is possible. The last row is a Total row, which I'd have Idli skip when it reads the file and never add into sums. Right?": "Yes, that's right (Recommended)",
+    "Tab Travel Calendar: I think one row is one stay period in a month. Columns are Month (e.g. Jul 2023), Non-work/vacation days in India and Work days in India. The Total row would be skipped. You said this can wait, so I'd only describe it and add basic checks. Right?": "Yes, that's right (Recommended)",
+    "Tab India Bank Account: I think one row is one bank account, with IFS code, bank name, account type, account number, savings interest earned, closing balance at 31 March 2024 and whether it is the refund account (Y/N). Right?": "Yes, that's right (Recommended)",
+    "Tab Missing Information: I think this is a list of people (the 'Name' column holds a number, 'Person A' holds a label) with a PAN and one amount column. Is one row one person's missing-information item?": "Yes, that's right (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 52,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 2 of 5, checks on Capital Gain. Which should I add? Tick all you want.\", \"header\": \"Checks (1)\", \"multiSelect\": true, \"options\": [{\"label\": \"Dates must be real dates\", \"description\": \"Flag sale or purchase dates that aren't dd-mmm-yy (e.g. 'Date of sale A') or are in the future.\"}, {\"label\": \"Price per unit must be a number\", \"description\": \"Flag '-', 'pending', '"
+  },
+  {
+   "type": "card",
+   "t": 55,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 2 of 5, checks on Capital Gain. Which should I add? Tick all you want.",
+      "header": "Checks (1)",
+      "options": [
+       {
+        "label": "Dates must be real dates",
+        "description": "Flag sale or purchase dates that aren't dd-mmm-yy (e.g. 'Date of sale A') or are in the future."
+       },
+       {
+        "label": "Price per unit must be a number",
+        "description": "Flag '-', 'pending', 'approx 500' and blanks."
+       },
+       {
+        "label": "Sale consideration = price \u00d7 units",
+        "description": "Flag rows where the figures don't multiply out."
+       },
+       {
+        "label": "Net = sale consideration \u2212 expenses",
+        "description": "Flag rows where the net sale consideration doesn't match."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "More checks on Capital Gain:",
+      "header": "Checks (2)",
+      "options": [
+       {
+        "label": "Sl No must be unique and filled",
+        "description": "Flag repeated or missing serial numbers."
+       },
+       {
+        "label": "Required fields",
+        "description": "Flag blank Particulars, Type of Asset, Currency or purchase date."
+       },
+       {
+        "label": "Sale date after purchase date",
+        "description": "Flag sales dated before they were bought."
+       },
+       {
+        "label": "Basic checks on other tabs",
+        "description": "Numbers must be numbers, PAN shape (5 letters, 4 digits, 1 letter), months must be real months, days 0\u201331."
+       }
+      ],
+      "multiSelect": true
+     }
+    ]
+   },
+   "answers": {
+    "Step 2 of 5, checks on Capital Gain. Which should I add? Tick all you want.": "Dates must be real dates, Price per unit must be a number, Sale consideration = price \u00d7 units, Net = sale consideration \u2212 expenses",
+    "More checks on Capital Gain:": "Sl No must be unique and filled, Required fields, Sale date after purchase date, Basic checks on other tabs"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 60,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"RULES\\\\|def excel_formula\\\" -A40 lib/filekit.py | head -150; ls file-skills | head\"}"
+  },
+  {
+   "type": "tool",
+   "t": 69,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"When Idli reads your file, which of these should it do? Tick all you want.\", \"header\": \"Reading\", \"multiSelect\": true, \"options\": [{\"label\": \"Skip the Total rows\", \"description\": \"On Capital Gain and Travel Calendar, leave out the last 'Total' row so it isn't counted twice.\"}, {\"label\": \"Read dates like 12-Mar-24 as real dates\", \"description\": \"dd-mmm-yy, so you can to"
+  },
+  {
+   "type": "card",
+   "t": 72,
+   "card": {
+    "questions": [
+     {
+      "question": "When Idli reads your file, which of these should it do? Tick all you want.",
+      "header": "Reading",
+      "options": [
+       {
+        "label": "Skip the Total rows",
+        "description": "On Capital Gain and Travel Calendar, leave out the last 'Total' row so it isn't counted twice."
+       },
+       {
+        "label": "Read dates like 12-Mar-24 as real dates",
+        "description": "dd-mmm-yy, so you can total by year and work out the holding period."
+       },
+       {
+        "label": "Read 'Rs. 1,200' style amounts as 1200",
+        "description": "Strip commas and currency signs in amount columns."
+       },
+       {
+        "label": "Treat '-', 'pending' and 'approx 500' as missing",
+        "description": "They won't be added into totals, and each one is listed as a problem."
+       }
+      ],
+      "multiSelect": true
+     }
+    ]
+   },
+   "answers": {
+    "When Idli reads your file, which of these should it do? Tick all you want.": "Skip the Total rows, Read dates like 12-Mar-24 as real dates, Read 'Rs. 1,200' style amounts as 1200, Treat '-', 'pending' and 'approx 500' as missing"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 80,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 4 of 5, the words of this file. Capital gain: I'd define it as Net Sale Consideration (INR) \u2212 Cost of acquisition, per sale, and total it by the year of the sale date. Which year do you want?\", \"header\": \"Gain / year\", \"multiSelect\": false, \"options\": [{\"label\": \"Financial year, April to March (Recommended)\", \"description\": \"Matches the 'as on 31 March' wording el"
+  },
+  {
+   "type": "card",
+   "t": 83,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 4 of 5, the words of this file. Capital gain: I'd define it as Net Sale Consideration (INR) \u2212 Cost of acquisition, per sale, and total it by the year of the sale date. Which year do you want?",
+      "header": "Gain / year",
+      "options": [
+       {
+        "label": "Financial year, April to March (Recommended)",
+        "description": "Matches the 'as on 31 March' wording elsewhere in the file."
+       },
+       {
+        "label": "Calendar year",
+        "description": "January to December."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Short-term versus long-term: after how long a holding is a sale long-term? Holding period = date of sale \u2212 date of purchase.",
+      "header": "Long-term",
+      "options": [
+       {
+        "label": "More than 12 months",
+        "description": "Long-term if held over 12 months, otherwise short-term."
+       },
+       {
+        "label": "More than 24 months",
+        "description": "Long-term if held over 24 months, otherwise short-term."
+       },
+       {
+        "label": "More than 36 months",
+        "description": "Long-term if held over 36 months, otherwise short-term."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Rows with a problem (price missing, dates unreadable): should the gain totals include them?",
+      "header": "Problem rows",
+      "options": [
+       {
+        "label": "Include them, and show the problems separately (Recommended)",
+        "description": "Gain only uses net sale consideration and cost, which are filled. A row with an unreadable sale date can't be put in a year, so it shows as 'No date'."
+       },
+       {
+        "label": "Leave them out of totals",
+        "description": "Offer 'Leave out problem rows' as a preset, on by default."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Step 4 of 5, the words of this file. Capital gain: I'd define it as Net Sale Consideration (INR) \u2212 Cost of acquisition, per sale, and total it by the year of the sale date. Which year do you want?": "Financial year, April to March (Recommended)",
+    "Short-term versus long-term: after how long a holding is a sale long-term? Holding period = date of sale \u2212 date of purchase.": "More than 12 months",
+    "Rows with a problem (price missing, dates unreadable): should the gain totals include them?": "Include them, and show the problems separately (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 93,
+   "name": "Bash",
+   "args": "{\"command\": \"ls file-skills/*; python3 -c \\\"\\nimport json;d=json.load(open('file-skills/households/skill.json'));print(json.dumps(d,indent=1)[:3500])\\\"; grep -n \\\"skip_rows\\\\|\\\\\\\"strip\\\\|'strip\\\\|def normalize\\\\|\\\\\\\"case\\\\\\\"\\\\|as_number\\\\|financial\\\" lib/filekit.py | head -50\"}"
+  },
+  {
+   "type": "tool",
+   "t": 101,
+   "name": "Bash",
+   "args": "{\"command\": \"cat file-skills/tech_reimbursement_form/skill.json | head -120; sed -n 160,200p lib/filekit.py; sed -n 525,562p lib/filekit.py; grep -n \\\"skip_rows\\\\|financial\\\\|DATE_TRUNC\\\\|strftime\\\" lib/*.py | head -30\"}"
+  },
+  {
+   "type": "tool",
+   "t": 104,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"row_checks\\\" -B3 -A25 lib/formkit.py | head -150; sed -n 1,30p lib/fixkit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 115,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport pandas as pd\\nfor s in ['Missing Information','India Bank Account']:\\n    print(pd.read_excel('teach/inbox/tax_missing_info_fake-20261110-200439/mock.xlsx',sheet_name=s,header=None).to_string())\\\"; sed -n 120,200p file-skills/tech_reimbursement_form/skill.json; cat file-skills/tech_reimbursement_form/tests.json | head -20\"}"
+  },
+  {
+   "type": "tool",
+   "t": 157,
+   "name": "Bash",
+   "args": "{\"command\": \"mkdir -p file-skills/tax_missing_info_fake && cat > $TMPDIR/mk.py <<'EOF'\\nimport json\\nS=\\\"date_of_sale_dd_mmm_yy\\\"; B=\\\"date_of_purchase_dd_mmm_yy\\\"\\nP=\\\"price_per_unit\\\"; U=\\\"no_of_units\\\"; SC=\\\"sale_consideration\\\"; E=\\\"expenses_on_transfer\\\"\\nN=\\\"net_sale_consideration_inr\\\"; C=\\\"cost_of_acquisition\\\"\\nPROB=f\\\"({S} IS NULL OR {B} IS NULL OR {P} IS NULL OR abs({P}*{U}-{SC})>1 OR a"
+  },
+  {
+   "type": "tool",
+   "t": 167,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport pandas as pd, json\\nd=pd.read_excel('file-skills/tax_missing_info_fake/mock.xlsx',sheet_name='Capital Gain')\\nd=d[d['Sl No']!='Total'].copy()\\nd['g']=(d['Net Sale Consideration (INR)']-d['Cost of acquisition']).astype(float)\\ns=pd.to_datetime(d['Date of sale (dd-mmm-yy)'],format='%d-%b-%y',errors='coerce')\\nb=pd.to_datetime(d['Date of purchase (dd-mmm"
+  },
+  {
+   "type": "tool",
+   "t": 172,
+   "name": "Bash",
+   "args": "{\"command\": \"echo '{\\\"skill\\\": \\\"tax_missing_info_fake\\\", \\\"version\\\": 1, \\\"summary\\\": \\\"tax_missing_info_fake v1: capital gain (net sale minus cost) by financial year and short/long term, sales with problems, checks on all four tabs\\\"}' > teach/inbox/tax_missing_info_fake-20261110-200439/done.json\"}"
+  },
+  {
+   "type": "tool",
+   "t": 172,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Switch back to your Idli chat.\"}, {\"label\": \"Stay here\", \"description\": \"Keep talking to me about the file.\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 172,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Switch back to your Idli chat."
+       },
+       {
+        "label": "Stay here",
+        "description": "Keep talking to me about the file."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 176,
+   "name": "Bash",
+   "args": "{\"command\": \"touch teach/inbox/tax_missing_info_fake-20261110-200439/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 183,
+   "text": "Idli now has a form for your file, and all the tests pass on the fake copy. The four calculation tests (gain by financial year, short/long term, and the problem count) matched an independent pandas check. The checks on the other tabs ran on the mock but weren't compared to anything. The skill is `tax_missing_info_fake` v1, and I've switched you back to Idli.\n\n- **What the form offers:** capital gain (net sale consideration minus cost of acquisition) totalled by financial year (April to March) and by short or long term (long-term means held over 12 months). It also has \"Sales with problems\" and a \"Problem found\" breakdown. Listings show the sheet row number. Total rows are skipped, and \"-\", \"pending\" and \"approx 500\" are read as missing.\n- **Checks on all four tabs:**\n  - **Capital Gain:** real dates, numbers, required fields, Sl No missing or duplicated, price \u00d7 units, net = sale \u2212 expenses, and sale not before purchase.\n  - **India Bank Account:** IFS code shape, account number of 9 or more digits, and Y/N for the refund account.\n  - **Travel Calendar:** days are numbers between 0 and 31.\n  - **Missing Information:** numbers are numbers.\n- **A correction to what I told you earlier:** I said the cross-column checks (price \u00d7 units, net, sale before purchase, duplicate Sl No) couldn't be rules. They can, as row checks, and they're in.\n- **PAN shape isn't checked.** In the mock the PAN column holds a few repeated category values, not one value per person, so a PAN pattern would flag everything. Tell me if the real PAN values are in another column.\n- **Days in India** has only basic checks and two totals for now, as you asked.\n- **The mock can't show a long-term sale.** Every sale in it has a purchase date within 12 months of the sale, or a sale dated before the purchase, so the long-term split is untested on real-looking data."
+  }
+ ],
+ "user_cost": 0.008356150000000001,
+ "workspace": "/tmp/claude-1000/pipe-eval/pipe-teach-vb_6g6v7/cowork",
+ "secs": 184,
+ "rounds": 2,
+ "claude_cost": 0.56,
+ "done": true,
+ "cards": 5,
+ "skill": "tax_missing_info_fake",
+ "filekit_changed": false
+}

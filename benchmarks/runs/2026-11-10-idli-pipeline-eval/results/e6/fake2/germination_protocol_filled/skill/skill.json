@@ -1,0 +1,224 @@
+{
+ "id": "germination_protocol_filled",
+ "title": "Germination protocol",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Germination": {
+   "headers": [
+    "no",
+    "scientific_name_botanical",
+    "local_common_name_s",
+    "time_of_year_for_seed_collection",
+    "processing_of_fruits_seeds",
+    "seed_storage",
+    "seed_treatment",
+    "seed_sowing_media",
+    "container_germination",
+    "seed_depth",
+    "germination_facilities_nursery_care",
+    "duration_until_germination",
+    "germination_success",
+    "growing_media",
+    "container",
+    "watering_technique"
+   ],
+   "summary": "One row per plant species: seed collection, storage, treatment, sowing, nursery care and germination results.",
+   "row_noun": "species",
+   "columns": {
+    "time_of_year_for_seed_collection": {
+     "type": "category",
+     "label": "Time of year for seed collection"
+    },
+    "processing_of_fruits_seeds": {
+     "type": "category",
+     "label": "Processing of fruits seeds"
+    },
+    "seed_storage": {
+     "type": "category",
+     "label": "Seed storage"
+    },
+    "seed_treatment": {
+     "type": "category",
+     "label": "Seed treatment"
+    },
+    "seed_sowing_media": {
+     "type": "category",
+     "label": "Seed sowing media"
+    },
+    "container_germination": {
+     "type": "category",
+     "label": "Container germination"
+    },
+    "germination_facilities_nursery_care": {
+     "type": "category",
+     "label": "Germination facilities nursery care"
+    },
+    "growing_media": {
+     "type": "category",
+     "label": "Growing media"
+    },
+    "container": {
+     "type": "category",
+     "label": "Container"
+    },
+    "watering_technique": {
+     "type": "category",
+     "label": "Watering technique"
+    },
+    "no": {
+     "type": "number",
+     "label": "No. (species number)"
+    },
+    "seed_depth": {
+     "type": "number",
+     "label": "Seed depth (cm)"
+    },
+    "duration_until_germination": {
+     "type": "number",
+     "label": "Days to germinate"
+    },
+    "germination_success": {
+     "type": "number",
+     "label": "% Germination success"
+    }
+   },
+   "normalize": {
+    "time_of_year_for_seed_collection": {
+     "case": "title"
+    },
+    "processing_of_fruits_seeds": {
+     "case": "title"
+    },
+    "seed_storage": {
+     "case": "title"
+    },
+    "seed_treatment": {
+     "case": "title"
+    },
+    "seed_sowing_media": {
+     "case": "title"
+    },
+    "container_germination": {
+     "case": "title"
+    },
+    "germination_facilities_nursery_care": {
+     "case": "title"
+    },
+    "growing_media": {
+     "case": "title"
+    },
+    "container": {
+     "case": "title"
+    },
+    "watering_technique": {
+     "case": "title"
+    }
+   },
+   "validations": [
+    {
+     "column": "germination_success",
+     "rule": "number",
+     "message": "% success is not a number"
+    },
+    {
+     "column": "germination_success",
+     "rule": "range",
+     "arg": [
+      0,
+      100
+     ],
+     "message": "% success must be between 0 and 100"
+    },
+    {
+     "column": "duration_until_germination",
+     "rule": "number",
+     "message": "duration is not a number of days"
+    },
+    {
+     "column": "seed_depth",
+     "rule": "number",
+     "message": "seed depth is not a number (cm)"
+    },
+    {
+     "column": "scientific_name_botanical",
+     "rule": "required",
+     "message": "scientific name is blank"
+    },
+    {
+     "column": "scientific_name_botanical",
+     "rule": "unique",
+     "message": "scientific name appears more than once"
+    },
+    {
+     "column": "no",
+     "rule": "regex",
+     "arg": "\\d+",
+     "message": "No. is not a whole number"
+    },
+    {
+     "column": "no",
+     "rule": "unique",
+     "message": "No. appears more than once"
+    },
+    {
+     "column": "seed_treatment",
+     "rule": "required",
+     "message": "seed treatment is blank"
+    },
+    {
+     "column": "processing_of_fruits_seeds",
+     "rule": "required",
+     "message": "processing is blank"
+    }
+   ],
+   "measures": [
+    {
+     "id": "avg_success",
+     "label": "Average germination success (%)",
+     "sql": "avg(germination_success) FILTER (WHERE germination_success BETWEEN 0 AND 100)",
+     "format": "number"
+    },
+    {
+     "id": "avg_days",
+     "label": "Average days to germinate",
+     "sql": "avg(duration_until_germination)",
+     "format": "number"
+    },
+    {
+     "id": "species",
+     "label": "Number of species",
+     "sql": "count(DISTINCT lower(trim(scientific_name_botanical)))",
+     "format": "count"
+    }
+   ],
+   "presets": [
+    {
+     "id": "valid_success",
+     "label": "Valid success % only (0-100)",
+     "filters": {
+      "germination_success": {
+       "min": 0,
+       "max": 100
+      }
+     }
+    },
+    {
+     "id": "has_treatment",
+     "label": "Has a treatment recorded",
+     "filters": {
+      "seed_treatment": {
+       "blank": false
+      }
+     }
+    }
+   ]
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "checks on % success, days, depth, names and No.; success rate by species; days by treatment"
+  }
+ ]
+}

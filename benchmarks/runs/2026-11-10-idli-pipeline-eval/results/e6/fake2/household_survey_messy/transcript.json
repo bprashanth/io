@@ -1,0 +1,432 @@
+{
+ "fixture": "household_survey_messy",
+ "model": "claude-sonnet-5-5",
+ "real_teach": false,
+ "request": "household_survey_messy-20261110-200439",
+ "events": [
+  {
+   "type": "tool",
+   "t": 3,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 13,
+   "name": "Bash",
+   "args": "{\"command\": \"cat teach/inbox/household_survey_messy-20261110-200439/request.json && .venv/bin/python -m lib.filekit inspect teach/inbox/household_survey_messy-20261110-200439/mock.xlsx\"}"
+  },
+  {
+   "type": "text",
+   "t": 23,
+   "text": "Before I write anything, one thing about the copy I'm looking at. **It's a copy with fake values. Nothing I decide changes it or your file.** I'm writing rules that Idli applies to your real file on your computer, every time it reads it.\n\n**Step 0 of 5: what you want to learn**\n\nI'd like to discuss what you want to learn from this file. You said you want to check it for mistakes first, then analyse it. The mock has two tabs. Households has village, ward, members, income, debts, savings, land and survey date. Members has age, sex and whether each person works. I can already see some things worth checking:\n\n- **Phone numbers:** a few aren't 10 digits.\n- **Survey dates:** a few don't parse.\n- **Income and debts:** a few values aren't numbers, and one debt is blank.\n- **Household size:** Members runs from 0 to 20, and 0 looks wrong.\n- **Ages:** the maximum is 140.\n- **Household IDs:** the Households tab has fewer distinct IDs than rows, so some look duplicated. The Members tab also has IDs that may not exist in Households.\n\nFor the analysis afterwards, here are some angles this data allows:\n\n1. **Poverty trap:** low income, high debt and little land or savings together, by village.\n2. **Debt against income:** which villages or household sizes carry the most debt per rupee earned.\n3. **Who works:** the share of working-age members in work, by sex and village (this joins Members to Households).\n\nWhich of these matter most to you? Is there another angle I've missed? Once we've agreed that, I'll go through what one row means on each tab, then the checks."
+  },
+  {
+   "type": "user",
+   "t": 162,
+   "text": "Yes, that's the right order. Start with the checks: the phone, date, number and household-size rules from my notes are what matter most, and the poverty trap and debt-vs-income angles can come after. Go ahead and walk me through what one row means on each tab."
+  },
+  {
+   "type": "tool",
+   "t": 166,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Tab Households: I think one row is one surveyed household. Columns: household_id (text), village (7 villages), ward (1-6), head_of_household (name), phone (10-digit), members (count), monthly_income_inr, debts_inr, savings_inr (rupees), land_acres, survey_date (dd/mm/yyyy). Right?\", \"header\": \"Households\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, that's right "
+  },
+  {
+   "type": "card",
+   "t": 169,
+   "card": {
+    "questions": [
+     {
+      "question": "Tab Households: I think one row is one surveyed household. Columns: household_id (text), village (7 villages), ward (1-6), head_of_household (name), phone (10-digit), members (count), monthly_income_inr, debts_inr, savings_inr (rupees), land_acres, survey_date (dd/mm/yyyy). Right?",
+      "header": "Households",
+      "options": [
+       {
+        "label": "Yes, that's right (Recommended)",
+        "description": "One row = one household, identified by Household ID."
+       },
+       {
+        "label": "Not quite",
+        "description": "We'll talk it through in chat."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Tab Members: I think one row is one person in a household. Columns: household_id (links to Households), name, age (years), sex (2 values), works (Y/N). Right?",
+      "header": "Members",
+      "options": [
+       {
+        "label": "Yes, that's right (Recommended)",
+        "description": "One row = one household member, linked to Households by Household ID."
+       },
+       {
+        "label": "Not quite",
+        "description": "We'll talk it through in chat."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Tab Households: I think one row is one surveyed household. Columns: household_id (text), village (7 villages), ward (1-6), head_of_household (name), phone (10-digit), members (count), monthly_income_inr, debts_inr, savings_inr (rupees), land_acres, survey_date (dd/mm/yyyy). Right?": "Yes, that's right (Recommended)",
+    "Tab Members: I think one row is one person in a household. Columns: household_id (links to Households), name, age (years), sex (2 values), works (Y/N). Right?": "Yes, that's right (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 176,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 2 of 5: checks on Households. Which checks should I add? Tick all you want.\", \"header\": \"Households\", \"multiSelect\": true, \"options\": [{\"label\": \"Phone is 10 digits (Recommended)\", \"description\": \"Flag phone numbers that aren't a 10-digit number.\"}, {\"label\": \"Survey date valid, not future (Recommended)\", \"description\": \"Flag dates that don't parse as dd/mm/yyyy o"
+  },
+  {
+   "type": "card",
+   "t": 186,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 2 of 5: checks on Households. Which checks should I add? Tick all you want.",
+      "header": "Households",
+      "options": [
+       {
+        "label": "Phone is 10 digits (Recommended)",
+        "description": "Flag phone numbers that aren't a 10-digit number."
+       },
+       {
+        "label": "Survey date valid, not future (Recommended)",
+        "description": "Flag dates that don't parse as dd/mm/yyyy or are in the future."
+       },
+       {
+        "label": "Income, debts, savings, land are numbers (Recommended)",
+        "description": "Flag values in these columns that aren't numbers."
+       },
+       {
+        "label": "Household size 1 to 20 (Recommended)",
+        "description": "Flag Members of 0 or above 20."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "More checks on Households?",
+      "header": "Households 2",
+      "options": [
+       {
+        "label": "Household ID required (Recommended)",
+        "description": "Flag blank Household IDs."
+       },
+       {
+        "label": "Ward between 1 and 6",
+        "description": "Flag wards outside 1-6."
+       },
+       {
+        "label": "Debts not blank",
+        "description": "Flag households with no debt value."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "Checks on Members?",
+      "header": "Members",
+      "options": [
+       {
+        "label": "Household ID exists in Households (Recommended)",
+        "description": "Flag members whose household isn't on the Households tab."
+       },
+       {
+        "label": "Age 0 to 110 (Recommended)",
+        "description": "Flag ages like 140."
+       },
+       {
+        "label": "Works is Y or N",
+        "description": "Flag any other value."
+       }
+      ],
+      "multiSelect": true
+     }
+    ]
+   },
+   "answers": {
+    "Step 2 of 5: checks on Households. Which checks should I add? Tick all you want.": "Phone is 10 digits; Survey date is a valid dd/mm/yyyy date no later than 31 March 2024; Income, debts, savings, land are nonnegative numbers; Household size is a positive integer that equals the number of Members records for that Household ID",
+    "More checks on Households?": "Household ID required; Debts not blank; Ward is a positive number (no 1-6 cap in my notes)",
+    "Checks on Members?": "Household ID exists in Households; Age 0 to 110; Works is Y or N"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 190,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"RULES\\\\|def excel_formula\\\\|not_future\\\\|\\\\\\\"range\\\\\\\"\\\\|lookups\\\" lib/filekit.py | head -60; ls file-skills | head\"}"
+  },
+  {
+   "type": "tool",
+   "t": 196,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 220,245p lib/filekit.py; sed -n 555,700p lib/filekit.py; ls file-skills/households; head -c 1500 file-skills/households/skill.json\"}"
+  },
+  {
+   "type": "text",
+   "t": 208,
+   "text": "Thanks, I've noted all of those. Two of them don't fit the built-in rules, so here is how I'll handle them:\n\n- **Survey date no later than 31 March 2024:** I'll add a small generic rule, \"date not after a fixed date\". It sits next to the existing \"not in the future\" rule and is available to every file skill. It doesn't change how the existing rules behave. It will also flag any survey dated after that day.\n- **Household size equals the number of Members records:** the built-in checks work on one tab at a time and can't count rows in another tab. I'll write this as a taught query that lists the households whose Members value doesn't match their count of Members rows. The positive-integer part is a normal per-row check.\n\nEverything else uses the standard rules:\n- phone has 10 digits\n- income, debts, savings and land are numbers of 0 or more\n- Household ID is required\n- debts are not blank\n- ward is positive\n- Members.Household ID exists in Households\n- age is 0 to 110\n- Works is Y or N\n\nDo you want to add any checks of your own? If so, tell me one per message. If not, say \"that's all\" and we'll move to step 3, how Idli reads your file, such as treating \"Rs. 1,200\" as 1200 and ignoring case and stray spaces in village names."
+  },
+  {
+   "type": "user",
+   "t": 211,
+   "text": "That's all. Your rules sound right: the date rule (no later than 31 March 2024) and the household-size-vs-Members-count query are both fine as you've described them. Go ahead to step 3, how Idli reads the file."
+  },
+  {
+   "type": "tool",
+   "t": 218,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 3 of 5: clean-ups. When Idli reads your real file, which of these should it do? Your file stays as it is.\", \"header\": \"Clean-ups\", \"multiSelect\": true, \"options\": [{\"label\": \"Read 'Rs. 1,200' as 1200 (Recommended)\", \"description\": \"Money and number columns: ignore Rs., INR, \u20b9, commas and spaces.\"}, {\"label\": \"Treat village spellings as the same (Recommended)\", \"de"
+  },
+  {
+   "type": "card",
+   "t": 225,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 3 of 5: clean-ups. When Idli reads your real file, which of these should it do? Your file stays as it is.",
+      "header": "Clean-ups",
+      "options": [
+       {
+        "label": "Read 'Rs. 1,200' as 1200 (Recommended)",
+        "description": "Money and number columns: ignore Rs., INR, \u20b9, commas and spaces."
+       },
+       {
+        "label": "Treat village spellings as the same (Recommended)",
+        "description": "'Cesaur' and 'cesaur ' count as one village (ignore case and stray spaces)."
+       },
+       {
+        "label": "Treat Y/y/Yes and N/n/No as the same",
+        "description": "Read Works (Y/N) and Sex values ignoring case and spaces, so 'y ' counts as Y."
+       },
+       {
+        "label": "Ignore case and spaces in Household ID",
+        "description": "'hh001 ' and 'HH001' match when linking Members to Households."
+       }
+      ],
+      "multiSelect": true
+     }
+    ]
+   },
+   "answers": {
+    "Step 3 of 5: clean-ups. When Idli reads your real file, which of these should it do? Your file stays as it is.": "Read 'Rs. 1,200' as 1200 (Recommended); Treat village spellings as the same (Recommended); Treat Y/y/Yes and N/n/No as the same. Household ID: exact match only, do not ignore case or spaces, because my notes only allow that leeway for village names."
+   }
+  },
+  {
+   "type": "tool",
+   "t": 229,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport pandas as pd\\nx=pd.read_excel('teach/inbox/household_survey_messy-20261110-200439/mock.xlsx',sheet_name=None,dtype=str)\\nh=x['Households'];m=x['Members']\\nprint(h.Village.value_counts(dropna=False));print(m['Sex'].value_counts());print(m['Works (Y/N)'].value_counts())\\nprint(h.head(5).to_string());print(h['Survey date'].sort_values().iloc[[0,-1]])\\\"\"}"
+  },
+  {
+   "type": "tool",
+   "t": 237,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 4 of 5: the words of this file. Households measures: which should the form offer (besides Total and Average of each number)?\", \"header\": \"Measures\", \"multiSelect\": true, \"options\": [{\"label\": \"Households (count) (Recommended)\", \"description\": \"Number of household rows.\"}, {\"label\": \"Debt-to-income ratio (Recommended)\", \"description\": \"Total debts / total monthly i"
+  },
+  {
+   "type": "card",
+   "t": 243,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 4 of 5: the words of this file. Households measures: which should the form offer (besides Total and Average of each number)?",
+      "header": "Measures",
+      "options": [
+       {
+        "label": "Households (count) (Recommended)",
+        "description": "Number of household rows."
+       },
+       {
+        "label": "Debt-to-income ratio (Recommended)",
+        "description": "Total debts / total monthly income, as a ratio for any breakdown (village, ward)."
+       },
+       {
+        "label": "Households in debt (Recommended)",
+        "description": "Count of households with debts above 0."
+       },
+       {
+        "label": "Income per member",
+        "description": "Total monthly income / total members."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "Poverty-trap rule: how should I define a household in a poverty trap, as a ready-made filter?",
+      "header": "Poverty trap",
+      "options": [
+       {
+        "label": "Debts above income, low savings (Recommended)",
+        "description": "Debts greater than monthly income AND savings below the average savings. Added as a group-by 'Poverty trap: Yes/No' you can break down by village."
+       },
+       {
+        "label": "Skip for now",
+        "description": "Leave poverty trap for later; you can define it when you analyse."
+       },
+       {
+        "label": "Let's discuss",
+        "description": "Talk through the definition in chat."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Members tab: how should 'works' and age be read?",
+      "header": "Members",
+      "options": [
+       {
+        "label": "Add 'Working (Y)' count and share (Recommended)",
+        "description": "Measures: members working, and share of members working."
+       },
+       {
+        "label": "Age bands 0-14, 15-59, 60+ (Recommended)",
+        "description": "A breakdown by age group."
+       }
+      ],
+      "multiSelect": true
+     }
+    ]
+   },
+   "answers": {
+    "Step 4 of 5: the words of this file. Households measures: which should the form offer (besides Total and Average of each number)?": "Households (count) (Recommended), Debt-to-income ratio (Recommended), Households in debt (Recommended), Income per member",
+    "Poverty-trap rule: how should I define a household in a poverty trap, as a ready-made filter?": "Debts above income, low savings (Recommended)",
+    "Members tab: how should 'works' and age be read?": "Add 'Working (Y)' count and share (Recommended), Age bands 0-14, 15-59, 60+ (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 253,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -rn \\\"not_future\\\" --include=*.py --include=*.md --include=*.json . 2>/dev/null | grep -v \\\"^./file-skills\\\" | head -20; ls tests lib 2>/dev/null; grep -n \\\"def as_number\\\" -A12 lib/filekit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 255,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 140,215p lib/fixkit.py; grep -n \\\"not_future\\\" -B3 -A10 lib/test_fixkit.py | head -40\"}"
+  },
+  {
+   "type": "tool",
+   "t": 269,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'E'\\np='lib/filekit.py'\\ns=open(p).read()\\ns=s.replace('''# ---------------------------------------------------------------- mocks\\nWORDS''','''def _not_after(v, a):\\n    \\\"\\\"\\\"True unless v parses (in one of the formats in a[1:]) to a date after the ISO date a[0].\\\"\\\"\\\"\\n    cutoff = dt.date.fromisoformat(a[0])\\n    for f in a[1:] or [\\\"%d/%m/%Y\\\"]:\\n        t"
+  },
+  {
+   "type": "tool",
+   "t": 274,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 740,860p lib/filekit.py; grep -rn '\\\"questions\\\"' -A12 file-skills/*/skill.json | head -50\"}"
+  },
+  {
+   "type": "tool",
+   "t": 278,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"^def \\\\|{{table\\\\|\\\\\\\"table\\\\\\\"\\\" lib/formkit.py | head -80\"}"
+  },
+  {
+   "type": "tool",
+   "t": 281,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 100,110p lib/formkit.py; sed -n 783,900p lib/formkit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 289,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 109,141p lib/formkit.py; sed -n 205,282p lib/formkit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 299,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n '\\\"inr\\\"\\\\|\\\"pct\\\"\\\\|percent\\\\|\\\"count\\\"' lib/formkit.py lib/formserver.py lib/form.html | head; .venv/bin/python -I -c \\\"\\nimport pandas as pd\\nm=pd.read_excel('teach/inbox/household_survey_messy-20261110-200439/mock.xlsx',sheet_name='Members',dtype=str)\\nprint(m.head(3).to_string())\\\"\"}"
+  },
+  {
+   "type": "tool",
+   "t": 317,
+   "name": "Bash",
+   "args": "{\"command\": \"d=file-skills/household_survey_messy && mkdir -p $d && cp teach/inbox/household_survey_messy-20261110-200439/mock.xlsx $d/mock.xlsx && .venv/bin/python -I - <<'E'\\nimport json\\nd=\\\"file-skills/household_survey_messy\\\"\\nH=[\\\"household_id\\\",\\\"village\\\",\\\"ward\\\",\\\"head_of_household\\\",\\\"phone\\\",\\\"members\\\",\\\"monthly_income_inr\\\",\\\"debts_inr\\\",\\\"savings_inr\\\",\\\"land_acres\\\",\\\"survey_date\\\""
+  },
+  {
+   "type": "tool",
+   "t": 327,
+   "name": "Bash",
+   "args": "{\"command\": \"d=file-skills/household_survey_messy && sed -i 's/\\\"case\\\": \\\"upper\\\",//' $d/skill.json && .venv/bin/python -I - <<'E'\\nimport pandas as pd, json, re\\nd=\\\"file-skills/household_survey_messy\\\"\\nx=pd.read_excel(d+\\\"/mock.xlsx\\\",sheet_name=None,dtype=str)\\nh=x[\\\"Households\\\"].copy(); m=x[\\\"Members\\\"].copy()\\ndef n(s): return pd.to_numeric(s.str.replace(r\\\"(?i)(rs\\\\.?|inr|\u20b9|,|\\\\s)\\\",\\\"\\\","
+  },
+  {
+   "type": "tool",
+   "t": 334,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport json,collections\\nfrom lib import formkit as fm\\ns=json.load(open('file-skills/household_survey_messy/skill.json'))\\np,_=fm.check('file-skills/household_survey_messy/mock.xlsx',s,'/tmp/claude-1000/chk')\\nprint(collections.Counter((x['tab'],x['column'],x['problem']) for x in p))\\\" 2>&1 | tail -5; ls /tmp/claude-1000 >/dev/null\"}"
+  },
+  {
+   "type": "tool",
+   "t": 338,
+   "name": "Bash",
+   "args": "{\"command\": \"PYTHONPATH=. .venv/bin/python -c \\\"\\nimport json,collections,os\\nfrom lib import formkit as fm\\ns=json.load(open('file-skills/household_survey_messy/skill.json'))\\np,_=fm.check('file-skills/household_survey_messy/mock.xlsx',s,os.environ['TMPDIR']+'/chk')\\nfor k,v in collections.Counter((x['tab'],x['column'],x['problem']) for x in p).items(): print(v,k)\\\" 2>&1 | tail -30\"}"
+  },
+  {
+   "type": "tool",
+   "t": 344,
+   "name": "Bash",
+   "args": "{\"command\": \"echo '{\\\"skill\\\": \\\"household_survey_messy\\\", \\\"version\\\": 1, \\\"summary\\\": \\\"Household survey v1: checks (phone, dates up to 31 Mar 2024, numbers, household size vs Members, IDs, age, works), debt-to-income, households in debt, income per member, poverty-trap and age-band breakdowns, share working\\\"}' > teach/inbox/household_survey_messy-20261110-200439/done.json\"}"
+  },
+  {
+   "type": "tool",
+   "t": 344,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Idli's chat continues with the mistakes found in your real file.\"}, {\"label\": \"Stay here\", \"description\": \"Keep talking here first.\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 344,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Idli's chat continues with the mistakes found in your real file."
+       },
+       {
+        "label": "Stay here",
+        "description": "Keep talking here first."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 346,
+   "name": "Bash",
+   "args": "{\"command\": \"touch teach/inbox/household_survey_messy-20261110-200439/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 352,
+   "text": "Switching you back to Idli.\n\nI wrote the file skill and the tests passed. Idli's form for your survey now offers:\n- **Checks:**\n  - Households: phone, survey date, income/debts/savings/land, ward, household size, and a household size that differs from its Members count.\n  - Members: age, Works, and Household IDs not found on Households.\n- **Measures:** households, debt-to-income, households in debt, income per member, share of members working.\n- **Breakdowns:** poverty trap, age bands, and village (with spellings merged).\n\nFour things differ from what we agreed, or you should know:\n- **Poverty trap:** I couldn't use \"below the average savings\". The form can't compute an average inside a breakdown. I used \"debts above monthly income and savings under one month's income\" instead. Tell me if you want a different definition.\n- **Household ID spaces:** matching is exact on case, but Idli always trims leading and trailing spaces when it reads a cell. I couldn't switch that off.\n- **Double flags:** a non-numeric income, debt, savings or land value is also flagged as negative. It's the same cell flagged twice.\n- **Mock results:** the fake mock has junk in the Works column and dates after 2024. The mock therefore shows hundreds of problems that your real file won't. The poverty-trap and Works measures also couldn't be checked against real values.\n\nI also added a generic \"date not after a fixed date\" rule to `lib/filekit.py` and `lib/fixkit.py`. It's available to every file skill, and the existing rules are unchanged. I haven't added tests for it beyond this skill's.\n\nYour Household IDs look duplicated in the mock (251 distinct values across 300 rows). I didn't add a duplicate check because you didn't ask for one, but I can add it."
+  }
+ ],
+ "user_cost": 0.010709200000000002,
+ "workspace": "/tmp/claude-1000/pipe-eval/pipe-teach-vqfxxf2c/cowork",
+ "secs": 353,
+ "rounds": 3,
+ "claude_cost": 0.708,
+ "done": true,
+ "cards": 5,
+ "skill": "household_survey_messy",
+ "filekit_changed": true
+}

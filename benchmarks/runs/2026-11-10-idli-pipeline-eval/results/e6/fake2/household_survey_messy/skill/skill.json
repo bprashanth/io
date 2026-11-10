@@ -1,0 +1,340 @@
+{
+ "id": "household_survey_messy",
+ "title": "Household survey",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Households": {
+   "headers": [
+    "debts_inr",
+    "head_of_household",
+    "household_id",
+    "land_acres",
+    "members",
+    "monthly_income_inr",
+    "phone",
+    "savings_inr",
+    "survey_date",
+    "village",
+    "ward"
+   ],
+   "summary": "One row per surveyed household: village, ward, head, phone, number of members, monthly income, debts and savings (rupees), land (acres) and survey date.",
+   "row_noun": "households",
+   "columns": {
+    "household_id": {
+     "type": "text",
+     "label": "Household ID"
+    },
+    "village": {
+     "type": "category",
+     "label": "Village"
+    },
+    "ward": {
+     "type": "number",
+     "label": "Ward"
+    },
+    "head_of_household": {
+     "type": "text",
+     "label": "Head of household"
+    },
+    "phone": {
+     "type": "text",
+     "label": "Phone"
+    },
+    "members": {
+     "type": "number",
+     "label": "Members"
+    },
+    "monthly_income_inr": {
+     "type": "number",
+     "label": "Monthly income (Rs)"
+    },
+    "debts_inr": {
+     "type": "number",
+     "label": "Debts (Rs)"
+    },
+    "savings_inr": {
+     "type": "number",
+     "label": "Savings (Rs)"
+    },
+    "land_acres": {
+     "type": "number",
+     "label": "Land (acres)"
+    },
+    "survey_date": {
+     "type": "date",
+     "formats": [
+      "%d/%m/%Y"
+     ],
+     "label": "Survey date"
+    }
+   },
+   "normalize": {
+    "village": {
+     "case": "title"
+    }
+   },
+   "validations": [
+    {
+     "column": "household_id",
+     "rule": "required",
+     "message": "Household ID is missing"
+    },
+    {
+     "column": "phone",
+     "rule": "phone",
+     "message": "not a 10-digit phone"
+    },
+    {
+     "column": "survey_date",
+     "rule": "date",
+     "arg": [
+      "%d/%m/%Y"
+     ],
+     "message": "not a valid dd/mm/yyyy date"
+    },
+    {
+     "column": "survey_date",
+     "rule": "not_after",
+     "arg": [
+      "2024-03-31",
+      "%d/%m/%Y"
+     ],
+     "message": "survey date is after 31 March 2024"
+    },
+    {
+     "column": "monthly_income_inr",
+     "rule": "number",
+     "message": "income is not a number"
+    },
+    {
+     "column": "monthly_income_inr",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000000
+     ],
+     "message": "income is negative"
+    },
+    {
+     "column": "debts_inr",
+     "rule": "number",
+     "message": "debts is not a number"
+    },
+    {
+     "column": "debts_inr",
+     "rule": "required",
+     "message": "debts is blank"
+    },
+    {
+     "column": "debts_inr",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000000
+     ],
+     "message": "debts is negative"
+    },
+    {
+     "column": "savings_inr",
+     "rule": "number",
+     "message": "savings is not a number"
+    },
+    {
+     "column": "savings_inr",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000000
+     ],
+     "message": "savings is negative"
+    },
+    {
+     "column": "land_acres",
+     "rule": "number",
+     "message": "land is not a number"
+    },
+    {
+     "column": "land_acres",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000000
+     ],
+     "message": "land is negative"
+    },
+    {
+     "column": "ward",
+     "rule": "range",
+     "arg": [
+      1,
+      1000000000
+     ],
+     "message": "ward is not a positive number"
+    },
+    {
+     "column": "members",
+     "rule": "range",
+     "arg": [
+      1,
+      1000000000
+     ],
+     "message": "household size is not a positive number"
+    },
+    {
+     "column": "members",
+     "rule": "regex",
+     "arg": "\\d+(\\.0+)?",
+     "message": "household size is not a whole number"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "size_vs_members",
+     "column": "members",
+     "sql": "t.members IS NOT NULL AND t.members <> (SELECT count(*) FROM {{tab:Members}} m WHERE m.household_id = t.household_id)",
+     "message": "household size differs from the number of Members records for this Household ID",
+     "why": "Compare with the Members tab: either a person is missing there or the size is wrong."
+    }
+   ],
+   "measures": [
+    {
+     "id": "households",
+     "label": "Households",
+     "sql": "count(*)",
+     "format": "count"
+    },
+    {
+     "id": "debt_to_income",
+     "label": "Debt-to-income ratio (total debts / total monthly income)",
+     "sql": "sum(debts_inr) / nullif(sum(monthly_income_inr), 0)",
+     "format": "number"
+    },
+    {
+     "id": "in_debt",
+     "label": "Households in debt",
+     "sql": "count(*) FILTER (WHERE debts_inr > 0)",
+     "format": "count"
+    },
+    {
+     "id": "income_per_member",
+     "label": "Income per member (Rs)",
+     "sql": "sum(monthly_income_inr) / nullif(sum(members), 0)",
+     "format": "inr"
+    }
+   ],
+   "group_by": [
+    {
+     "id": "poverty_trap",
+     "label": "Poverty trap (debts above income, savings under one month's income)",
+     "sql": "CASE WHEN debts_inr > monthly_income_inr AND savings_inr < monthly_income_inr THEN 'Poverty trap' ELSE 'Not' END"
+    }
+   ],
+   "date_columns": [
+    "survey_date"
+   ]
+  },
+  "Members": {
+   "headers": [
+    "age",
+    "household_id",
+    "name",
+    "sex",
+    "works_y_n"
+   ],
+   "summary": "One row per person in a surveyed household: name, age, sex and whether they work.",
+   "row_noun": "members",
+   "columns": {
+    "household_id": {
+     "type": "text",
+     "label": "Household ID"
+    },
+    "name": {
+     "type": "text",
+     "label": "Name"
+    },
+    "age": {
+     "type": "number",
+     "label": "Age"
+    },
+    "sex": {
+     "type": "category",
+     "label": "Sex"
+    },
+    "works_y_n": {
+     "type": "category",
+     "label": "Works (Y/N)"
+    }
+   },
+   "normalize": {
+    "works_y_n": {
+     
+     "map": {
+      "yes": "Y",
+      "no": "N",
+      "y": "Y",
+      "n": "N"
+     }
+    }
+   },
+   "validations": [
+    {
+     "column": "age",
+     "rule": "range",
+     "arg": [
+      0,
+      110
+     ],
+     "message": "age outside 0 to 110"
+    },
+    {
+     "column": "works_y_n",
+     "rule": "in_list",
+     "arg": [
+      "Y",
+      "N",
+      "Yes",
+      "No"
+     ],
+     "message": "Works is not Y or N"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "household_exists",
+     "column": "household_id",
+     "sql": "NOT EXISTS (SELECT 1 FROM {{tab:Households}} h WHERE h.household_id = t.household_id)",
+     "message": "Household ID is not on the Households tab",
+     "why": "Check the ID against the Households tab (matched exactly)."
+    }
+   ],
+   "measures": [
+    {
+     "id": "working",
+     "label": "Members working",
+     "sql": "count(*) FILTER (WHERE works_y_n = 'Y')",
+     "format": "count"
+    },
+    {
+     "id": "working_share",
+     "label": "Share of members working (%)",
+     "sql": "100.0 * count(*) FILTER (WHERE works_y_n = 'Y') / nullif(count(*), 0)",
+     "format": "percent"
+    }
+   ],
+   "group_by": [
+    {
+     "id": "age_band",
+     "label": "Age band",
+     "sql": "CASE WHEN age < 15 THEN '0-14' WHEN age < 60 THEN '15-59' ELSE '60+' END"
+    }
+   ]
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "checks (phone, dates to 31 Mar 2024, numbers, household size vs Members, IDs, age, works), village/Rs/Yes-No clean-ups, debt-to-income, in debt, income per member, poverty trap, working share, age bands"
+  }
+ ]
+}
