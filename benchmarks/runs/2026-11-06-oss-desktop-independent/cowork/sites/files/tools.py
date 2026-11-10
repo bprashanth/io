@@ -153,7 +153,9 @@ def t_file_get(link, wait_seconds=45, open_after=True, goal=None):
     m = LINK.search(link or "")
     fid = m.group(1) if m else (link.strip() if re.fullmatch(r"[\w-]{20,}", (link or "").strip()) else None)
     if not fid:
-        return {"error": "That doesn't look like a Google Sheets or Drive link. Use drive_search to find the file."}
+        return {"error": "That doesn't look like a Google Sheets or Drive link.",
+                "then": "Ask the user for the file's link: open the file in Google Drive or Sheets and copy the "
+                        "address from the top of the tab."}
     from lib.browser import paseo, tab_for
     from sites.google import tools as g
     sheet = "/spreadsheets/" in link or "/file/" not in link
@@ -823,11 +825,6 @@ def t_show_skills():
 # ---------------------------------------------------------------- the start of an Idli chat
 def t_start():
     """The first card of an Idli chat: clean up a file, or analyse one."""
-    from lib import driveindex as di
-    st = di.status()
-    if not st.get("phase") and not os.path.exists(di.DB):
-        return {"indexed": False, "say_to_user": "I can't find your files yet: open the Start here chat in the left "
-                                                  "sidebar and index your Drive first (1 to 5 minutes). Then come back."}
     me = os.environ.get("PASEO_AGENT_ID")
     try:
         mine = next((a for a in _agents() if a["id"] == me), None)
@@ -842,10 +839,10 @@ def t_start():
                                         "mark them in a copy in your Drive to fix"},
                                        {"label": "Analyse a file", "description": "Ask questions and get charts, answered "
                                         "from the file itself"}]}]}
-    return {"indexed": True, "card": card,
-            "then": "Call AskUserQuestion with exactly `card` (write nothing first). Then ask in one short line which "
-                    "file (a few words from its name, or a link). When they answer, find it (drive_find, or file_get "
-                    "straight away for a link) and call file_get with goal \"clean\" or \"analyse\" to match."}
+    return {"card": card,
+            "then": "Call AskUserQuestion with exactly `card` (write nothing first). Then ask in one short line for "
+                    "the file's link (open it in Google Drive or Sheets and copy the address). When they paste it, "
+                    "call file_get with it and goal \"clean\" or \"analyse\" to match."}
 
 
 # ---------------------------------------------------------------- a new chat that is already waiting
@@ -958,11 +955,10 @@ SPEC = {"type": "object", "description":
         "measures [] lists the matching rows: use it for who/which questions. Example: {\"measures\": [\"amount\"], \"group_by\": [\"employee\"], "
         "\"filters\": {\"category\": [\"Hardware\"]}, \"date\": {\"period\": \"this_year\"}}"}
 TOOLS = {
-    "file_get": (t_file_get, "Download the real spreadsheet from a Google Sheets or Drive link into this folder (better "
-                 "than gsheet_read: Google's quick export hides text in number columns). The browser may show a Save "
+    "file_get": (t_file_get, "Download the real spreadsheet from a Google Sheets or Drive link into this folder. The browser may show a Save "
                  "dialog; the user clicks Save. Then call file_open.",
-                 {"link": {"type": "string", "description": "A docs.google.com/spreadsheets or drive.google.com link, or "
-                                                            "a file id from drive_search"},
+                 {"link": {"type": "string", "description": "A docs.google.com/spreadsheets or drive.google.com link "
+                                                            "the user pasted"},
                   "goal": {"type": "string", "enum": ["clean", "analyse"],
                            "description": "What the user wants to do with it (default analyse)"}}, ["link"]),
     "file_open": (t_file_open, "Open a spreadsheet's form: says whether Idli has been taught this file, whether its "
