@@ -25,8 +25,8 @@ PASEO_ASSET = {  # (os, arch) -> release asset
     ("linux", "x64"): "Paseo-{v}-x64.tar.gz",
     ("mac", "arm64"): "Paseo-{v}-arm64.zip",
     ("mac", "x64"): "Paseo-{v}-x64.zip",
-    ("win", "x64"): "Paseo-Setup-{v}-x64.exe",
-    ("win", "arm64"): "Paseo-Setup-{v}-arm64.exe",
+    ("win", "x64"): "Paseo-Setup-{v}-x64.zip",     # the portable app (its NSIS installer crashes when run silently)
+    ("win", "arm64"): "Paseo-Setup-{v}-arm64.zip",
 }
 
 
@@ -99,6 +99,10 @@ def paseo(out, plat, arch, tag):
         top = next(os.path.join(dl, d) for d in os.listdir(dl) if os.path.isdir(os.path.join(dl, d)))
         shutil.rmtree(dest)
         shutil.move(top, dest)
+    elif plat == "win":
+        import zipfile
+        with zipfile.ZipFile(src) as z:
+            z.extractall(dest)
     else:
         shutil.move(src, os.path.join(dest, asset))
     shutil.rmtree(dl, ignore_errors=True)

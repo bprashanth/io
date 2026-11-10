@@ -19,7 +19,7 @@ import idli_app as a  # noqa: E402
 out = sys.argv[1]
 a.write_private(a.STATE, {"done": True, "skip_claude": True, "at": time.time()})
 t = time.time()
-r = subprocess.run([sys.executable, os.path.join(HERE, "idli_app.py")], capture_output=True, text=True, timeout=900)
+r = subprocess.run([sys.executable, os.path.join(HERE, "idli_app.py")], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
 rep = {"open_s": round(time.time() - t, 1), "exit": r.returncode, "tail": (r.stdout + r.stderr)[-3000:]}
 _, cli = a.paseo_app_paths()
 ws = json.loads(a.paseo(cli, "workspace", "ls", "--json").stdout or "[]")

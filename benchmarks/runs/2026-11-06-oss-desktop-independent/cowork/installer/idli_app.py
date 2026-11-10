@@ -115,9 +115,9 @@ def sync_cowork():
 def paseo_app_paths():
     """(GUI executable, CLI) of an installed Paseo, or (None, None)."""
     la = os.environ.get("LOCALAPPDATA") or os.path.join(HOME, "AppData", "Local")
-    if WIN:
-        roots = [os.path.join(la, "Programs", "Paseo"), os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"),
-                                                                     "Paseo")]
+    if WIN:  # Idli carries Paseo unpacked (its portable zip); a separately installed Paseo works too
+        roots = [os.path.join(APP, "paseo"), os.path.join(la, "Programs", "Paseo"),
+                 os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Paseo")]
         for r in roots:
             if os.path.exists(os.path.join(r, "Paseo.exe")):
                 return os.path.join(r, "Paseo.exe"), os.path.join(r, "resources", "bin", "paseo.cmd")
@@ -173,13 +173,15 @@ def ensure_paseo():
 
 def paseo(cli, *args, timeout=60):
     env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_") or k == "PASEO_HOME"}
-    return subprocess.run([cli, *args], capture_output=True, text=True, timeout=timeout, env=env,
+    return subprocess.run([cli, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, env=env,
                           creationflags=NO_WINDOW)
 
 
 def daemon_up(cli):
+    """`paseo status` exits 0 even when no daemon runs; a running one reports its serverId."""
     try:
-        return paseo(cli, "status", "--json", timeout=20).returncode == 0
+        r = paseo(cli, "status", "--json", timeout=20)
+        return r.returncode == 0 and "DAEMON_NOT_RUNNING" not in r.stdout and "serverId" in r.stdout
     except (OSError, subprocess.SubprocessError):
         return False
 
@@ -219,7 +221,7 @@ def install_claude():
                "irm https://claude.ai/install.ps1 | iex"]
     else:
         cmd = ["/bin/bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash"]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=900, creationflags=NO_WINDOW)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, creationflags=NO_WINDOW)
     log("claude installer exit", r.returncode, (r.stdout + r.stderr)[-400:].replace("\n", " | "))
     return claude_path()
 
@@ -228,7 +230,7 @@ def claude_signed_in(claude):
     if not claude:
         return False
     try:
-        r = subprocess.run([claude, "auth", "status"], capture_output=True, text=True, timeout=30,
+        r = subprocess.run([claude, "auth", "status"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
                            creationflags=NO_WINDOW)
         return r.returncode == 0 and json.loads(r.stdout or "{}").get("loggedIn") is True
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -370,7 +372,7 @@ class Setup:
             return
         self.busy, self.error, self.login_url = "signing in", None, None
         self.login = subprocess.Popen([self.claude, "auth", "login"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                      stderr=subprocess.STDOUT, text=True, creationflags=NO_WINDOW)
+                                      stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
 
         def read():
             for line in self.login.stdout:
@@ -475,7 +477,7 @@ def bootstrap():
     r = subprocess.run([sys.executable if not sys.executable.lower().endswith("pythonw.exe")
                         else sys.executable[:-len("pythonw.exe")] + "python.exe",
                         os.path.join(COWORK, "desktop", "idli-bootstrap.py")],
-                       capture_output=True, text=True, timeout=900, creationflags=NO_WINDOW)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, creationflags=NO_WINDOW)
     log("bootstrap:", (r.stdout + r.stderr)[-1500:].replace("\n", " | "))
     return r.returncode == 0
 
@@ -495,8 +497,8 @@ def main():
         log("no Muse code: opening Paseo without Idli's chats")
         start_paseo(exe, cli)
         return
-    if start_paseo(exe, cli):
-        bootstrap()
+    if not start_paseo(exe, cli) or not bootstrap():
+        raise RuntimeError(f"Idli didn't finish opening; see {LOG}")
 
 
 # ---------------------------------------------------------------- CI self-test
@@ -527,7 +529,7 @@ def smoke(out):
 
     def mcp():
         p = subprocess.Popen([sys.executable, "-I", os.path.join(COWORK, "cowork_mcp.py")], stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=IDLI,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", cwd=IDLI,
                              env={**os.environ, "COWORK_SITES": "google,files"}, creationflags=NO_WINDOW)
         msgs = [{"jsonrpc": "2.0", "id": 1, "method": "initialize",
                  "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "smoke"}}},
@@ -646,7 +648,7 @@ def smoke(out):
 
     def bootstrap_dry():
         r = subprocess.run([sys.executable, os.path.join(COWORK, "desktop", "idli-bootstrap.py"), "--dry-run"],
-                           capture_output=True, text=True, timeout=300, creationflags=NO_WINDOW,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, creationflags=NO_WINDOW,
                            env={**os.environ, "IDLI_PASEO_BIN": paseo_app_paths()[1]})
         assert r.returncode == 0, (r.stdout + r.stderr)[-800:]
         return (r.stdout + r.stderr)[-800:]
