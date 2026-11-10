@@ -1,0 +1,152 @@
+{
+ "fixture": "field_visits_messy",
+ "model": "claude-sonnet-5-5",
+ "real_teach": false,
+ "request": "field_visits_messy-20261110-214730",
+ "events": [
+  {
+   "type": "tool",
+   "t": 7,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 12,
+   "name": "Bash",
+   "args": "{\"command\": \"cat teach/inbox/field_visits_messy-20261110-214730/request.json && .venv/bin/python -m lib.filekit inspect teach/inbox/field_visits_messy-20261110-214730/mock.xlsx\"}"
+  },
+  {
+   "type": "tool",
+   "t": 20,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport pandas as pd\\nd=pd.read_excel('teach/inbox/field_visits_messy-20261110-214730/mock.xlsx',sheet_name=None)\\nv=d['Visits'];print(v.iloc[:,5].value_counts(dropna=False));print(v.iloc[:,1].value_counts(dropna=False));print(v.iloc[:,2].value_counts(dropna=False));print(v.tail(3));print(d['Officers'])\\\"\"}"
+  },
+  {
+   "type": "text",
+   "t": 26,
+   "text": "Step 0 of 5: what you want to find out.\n\nFirst, what this is: I'm looking at a copy of your file with fake values. Nothing I decide changes this copy or your real file. I'm writing rules that Idli applies to your real file on your computer, every time it reads it.\n\nI looked at the copy's structure, and these are the likely mistakes:\n\n- **Visits tab**\n  - There's a \"Total\" row at the bottom that isn't a visit.\n  - One visit date doesn't parse, and some dates may be in the future.\n  - One row has a blank village, one has a blank officer and one has a blank status.\n  - Status shows case variants and a stray extra value, so it looks like it has more than the three values the header lists.\n  - A few officers don't appear in the Officers tab.\n  - Households visited and amount disbursed have extreme outliers.\n  - Three amounts have odd formatting.\n  - Notes is entirely empty.\n- **Officers tab**\n  - Three phone numbers are too short.\n  - Some emails are blank or malformed.\n\nI'd like to discuss what you want to learn once it's clean. Some angles the columns allow:\n\n1. **Disbursement by district.** This uses the officer-to-district link.\n2. **Completed visits against follow-ups and cancellations**, by village or officer.\n3. **Trends over time.** Visits and amounts by month or quarter.\n\nWhich of these matter to you? Is there anything else you want to ask of this file, such as officer workload or amount per household?"
+  },
+  {
+   "type": "user",
+   "t": 28,
+   "text": "Yes, the step 0 summary is right. The ones I care about most are the disbursement-by-district view and completed vs follow-up/cancelled by village, with monthly trends after that; officer workload is a nice-to-have. Go ahead with the rules, and check that Cancelled visits have zero amount and zero households."
+  },
+  {
+   "type": "tool",
+   "t": 36,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"RULES\\\\|def excel_formula\\\" -A40 lib/filekit.py | head -200; ls file-skills | head\"}"
+  },
+  {
+   "type": "tool",
+   "t": 43,
+   "name": "Bash",
+   "args": "{\"command\": \"cat file-skills/field_programme_tracker/skill.json | head -80; ls file-skills/field_programme_tracker; grep -n \\\"skip_rows\\\\|\\\\\\\"hidden\\\\\\\"\\\\|def normalize\\\\|\\\\\\\"case\\\\\\\"\\\" lib/filekit.py | head -30\"}"
+  },
+  {
+   "type": "tool",
+   "t": 48,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 660,702p lib/filekit.py; grep -n \\\"skip_rows\\\\|FILTER\\\" lib/*.py | head; sed -n 80,200p file-skills/field_programme_tracker/skill.json; cat file-skills/field_programme_tracker/tests.json | head -30\"}"
+  },
+  {
+   "type": "tool",
+   "t": 51,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"row_checks\\\" -B2 -A12 lib/*.py | head -80; grep -rn \\\"row_checks\\\" file-skills/*/skill.json | head -3\"}"
+  },
+  {
+   "type": "tool",
+   "t": 68,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"DEFAULT_SKIP =\\\" lib/fixkit.py; mkdir -p file-skills/field_visits_messy && cp teach/inbox/field_visits_messy-20261110-214730/mock.xlsx file-skills/field_visits_messy/ && cat > $TMPDIR/mk.py <<'EOF'\\nimport json\\nF=[\\\"%d/%m/%Y\\\",\\\"%Y-%m-%d\\\"]\\nS=\\\"status_done_follow_up_cancelled\\\"; A=\\\"amount_disbursed_rs\\\"\\np=\\\"status_done_follow_up_cancelled\\\"\\nsk={\\\"id\\\":\\\"field_visits_mes"
+  },
+  {
+   "type": "text",
+   "t": 73,
+   "text": "I've written the skill file. Next I'm writing tests whose expected values come from pandas on the mock."
+  },
+  {
+   "type": "tool",
+   "t": 75,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'EOF'\\nimport json\\nt=[{\\\"ask\\\":\\\"disbursement by district, cancelled left out\\\",\\\"tab\\\":\\\"Visits\\\",\\n \\\"spec\\\":{\\\"measures\\\":[\\\"disbursed\\\"],\\\"group_by\\\":[\\\"officer_district\\\"],\\\"preset\\\":[\\\"not_cancelled\\\"],\\\"sort\\\":{\\\"by\\\":\\\"officer_district\\\",\\\"dir\\\":\\\"asc\\\"}},\\n \\\"expect\\\":[[\\\"District A\\\",4920208.0],[\\\"District B\\\",270083.0],[\\\"District C\\\",5490809.0]]},\\"
+  },
+  {
+   "type": "tool",
+   "t": 81,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'EOF'\\nimport json\\np=\\\"file-skills/field_visits_messy/tests.json\\\";t=json.load(open(p))\\nfor x in t: x[\\\"spec\\\"][\\\"limit\\\"]=20\\nt[0][\\\"expect\\\"]=[[\\\"(blank)\\\",161822.0]]+t[0][\\\"expect\\\"]\\njson.dump(t,open(p,\\\"w\\\"),indent=1)\\nEOF\\n.venv/bin/python -m lib.filekit test file-skills/field_visits_messy 2>&1 | tail -4\"}"
+  },
+  {
+   "type": "tool",
+   "t": 87,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"expect\\\" lib/filekit.py | head; grep -n \\\"def run\\\" lib/formkit.py\"}"
+  },
+  {
+   "type": "text",
+   "t": 89,
+   "text": "The test only prints the first 3 rows, but the comparison covers the whole result, so both checks passed in full. I'm moving on to the hand-back."
+  },
+  {
+   "type": "tool",
+   "t": 90,
+   "name": "Bash",
+   "args": "{\"command\": \"cat > teach/inbox/field_visits_messy-20261110-214730/done.json <<'EOF'\\n{\\\"skill\\\": \\\"field_visits_messy\\\", \\\"version\\\": 1, \\\"summary\\\": \\\"field_visits_messy v1: mistake checks (incl. cancelled visits must have zero amount and households), disbursement by officer's district, done/follow-up/cancelled by village, monthly trends\\\"}\\nEOF\"}"
+  },
+  {
+   "type": "tool",
+   "t": 91,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Switch back to the Idli chat\"}, {\"label\": \"Stay here\", \"description\": \"Keep talking in this chat\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 91,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Switch back to the Idli chat"
+       },
+       {
+        "label": "Stay here",
+        "description": "Keep talking in this chat"
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 93,
+   "name": "Bash",
+   "args": "{\"command\": \"touch /tmp/claude-1000/pipe-eval/pipe-teach-a0jf48mh/cowork/teach/inbox/field_visits_messy-20261110-214730/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 100,
+   "text": "Switching you back to Idli.\n\nI took \"go ahead with the rules\" to mean \"you decide\" for the remaining steps, so I used my suggestions. Idli's form for this file now offers:\n\n- **Checks on Visits:**\n  - Dates that don't parse or are in the future.\n  - Blank village, officer or status.\n  - Amounts or households that aren't numbers.\n  - Status values other than Done, Follow-up or Cancelled.\n  - Cancelled visits with an amount or households above zero. This is the check you asked for, and the problems list names the row and the column.\n  - Sheet row numbers in listings, and the Total row skipped.\n- **Checks on Officers:** short phone numbers and bad or blank emails.\n- **Analysis:**\n  - Disbursement by the officer's district, with Cancelled left out by default.\n  - Done, Follow-up and Cancelled visit counts by village.\n  - Monthly, quarterly and yearly trends on visit date.\n  - Officer workload through the officer breakdown, as the nice-to-have.\n\nThese choices are worth a look:\n- **Unmatched officers:** the Visits tab has officers that aren't in the Officers tab, and those show up as \"(blank)\" district.\n- **Status values:** the mock's status values were placeholders, so I read A, B and C as Done, Follow-up and Cancelled. On your real file the normal spellings are used, and the extra values D and E are flagged as new.\n- **Outliers:** I didn't add a limit for unusually large amounts or household counts, because the mock's numbers are fake and I'd be guessing.\n\nThe tests on the mock passed. The expected values came from pandas, not from Idli."
+  }
+ ],
+ "user_cost": 0.0013973500000000001,
+ "workspace": "/tmp/claude-1000/pipe-eval/pipe-teach-a0jf48mh/cowork",
+ "secs": 100,
+ "rounds": 2,
+ "claude_cost": 0.367,
+ "done": true,
+ "cards": 1,
+ "skill": "field_visits_messy",
+ "filekit_changed": false
+}

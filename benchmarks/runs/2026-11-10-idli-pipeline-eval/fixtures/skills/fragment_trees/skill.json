@@ -1,0 +1,148 @@
+{
+ "id": "fragment_trees",
+ "title": "Fragment tree plots",
+ "version": 1,
+ "sheet": "Trees",
+ "headers": [
+  "year",
+  "fragment",
+  "plot",
+  "tree_no",
+  "species",
+  "native_or_alien",
+  "girth_cm",
+  "height_m"
+ ],
+ "summary": "One row per tree measured in a rainforest fragment plot: survey year, fragment, plot, tree number, species, whether it is native or alien, girth (cm) and height (m).",
+ "row_noun": "trees",
+ "columns": {
+  "year": {
+   "type": "number",
+   "meaning": "survey year (2000, 2002, 2005, 2019)",
+   "label": "Year"
+  },
+  "fragment": {
+   "type": "category",
+   "meaning": "rainforest fragment",
+   "label": "Fragment"
+  },
+  "plot": {
+   "type": "category",
+   "meaning": "plot code within the fragment",
+   "label": "Plot"
+  },
+  "tree_no": {
+   "type": "text",
+   "meaning": "tree number in the plot",
+   "label": "Tree no"
+  },
+  "species": {
+   "type": "category",
+   "meaning": "scientific name",
+   "label": "Species"
+  },
+  "native_or_alien": {
+   "type": "category",
+   "meaning": "Native or Alien species",
+   "label": "Native or alien"
+  },
+  "girth_cm": {
+   "type": "number",
+   "meaning": "girth at breast height in cm",
+   "label": "Girth (cm)"
+  },
+  "height_m": {
+   "type": "number",
+   "meaning": "tree height in metres (2019 only)",
+   "label": "Height (m)"
+  }
+ },
+ "normalize": {
+  "native_or_alien": {
+   "case": "title"
+  },
+  "girth_cm": {
+   "type": "number"
+  },
+  "height_m": {
+   "type": "number"
+  }
+ },
+ "validations": [
+  {
+   "column": "species",
+   "rule": "required",
+   "message": "species is missing"
+  },
+  {
+   "column": "native_or_alien",
+   "rule": "in_list",
+   "arg": [
+    "Native",
+    "Alien"
+   ],
+   "message": "native or alien is not Native or Alien"
+  },
+  {
+   "column": "girth_cm",
+   "rule": "range",
+   "arg": [
+    10,
+    1500
+   ],
+   "message": "girth is not between 10 and 1500 cm"
+  }
+ ],
+ "hidden": [
+  "tree_no"
+ ],
+ "measures": [
+  {
+   "id": "trees",
+   "label": "Number of trees",
+   "sql": "count(*)",
+   "format": "count"
+  },
+  {
+   "id": "alien_trees",
+   "label": "Alien trees",
+   "sql": "count(*) FILTER (WHERE native_or_alien = 'Alien')",
+   "format": "count"
+  },
+  {
+   "id": "alien_share",
+   "label": "Share of trees that are alien %",
+   "sql": "round(100.0 * count(*) FILTER (WHERE native_or_alien = 'Alien') / nullif(count(*), 0), 1)",
+   "format": "percent"
+  },
+  {
+   "id": "species_count",
+   "label": "Number of species",
+   "sql": "count(DISTINCT species)",
+   "format": "count"
+  },
+  {
+   "id": "avg_girth",
+   "label": "Average girth (cm)",
+   "sql": "round(avg(girth_cm), 1)",
+   "format": "number"
+  }
+ ],
+ "presets": [
+  {
+   "id": "alien_only",
+   "label": "Alien trees only",
+   "filters": {
+    "native_or_alien": [
+     "Alien"
+    ]
+   }
+  }
+ ],
+ "history": [
+  {
+   "version": 1,
+   "note": "benchmark fixture"
+  }
+ ]
+}

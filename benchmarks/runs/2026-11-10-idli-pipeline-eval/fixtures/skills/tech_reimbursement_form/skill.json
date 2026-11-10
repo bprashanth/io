@@ -1,0 +1,238 @@
+{
+ "id": "tech_reimbursement_form",
+ "title": "Tech reimbursement form",
+ "version": 3,
+ "headers": [
+  "amount_inr",
+  "category",
+  "claim_date",
+  "employee",
+  "item",
+  "status"
+ ],
+ "sheet": "csv",
+ "summary": "Tech reimbursement claims: one row per claim with claim date, employee, item, category, amount in rupees and status.",
+ "columns": {
+  "claim_date": {
+   "type": "date",
+   "format": "%d/%m/%Y",
+   "meaning": "date the claim was made (DD/MM/YYYY)",
+   "label": "Claim date"
+  },
+  "employee": {
+   "type": "text",
+   "meaning": "employee who made the claim",
+   "label": "Employee"
+  },
+  "item": {
+   "type": "text",
+   "meaning": "item being reimbursed",
+   "label": "Item"
+  },
+  "category": {
+   "type": "category",
+   "meaning": "kind of expense: Connectivity, Hardware, Software or Supplies",
+   "label": "Category",
+   "values": [
+    "Connectivity",
+    "Hardware",
+    "Software",
+    "Supplies"
+   ]
+  },
+  "amount_inr": {
+   "type": "number",
+   "meaning": "claimed amount in rupees",
+   "label": "Amount (Rs)"
+  },
+  "status": {
+   "type": "category",
+   "meaning": "claim status: Approved, Paid, Pending or Rejected",
+   "label": "Status",
+   "values": [
+    "Approved",
+    "Paid",
+    "Pending",
+    "Rejected"
+   ]
+  }
+ },
+ "normalize": {
+  "claim_date": {
+   "type": "date",
+   "formats": [
+    "%d/%m/%Y",
+    "%Y-%m-%d",
+    "%d-%m-%Y"
+   ]
+  },
+  "status": {
+   "case": "title"
+  },
+  "category": {
+   "case": "title"
+  }
+ },
+ "validations": [
+  {
+   "column": "claim_date",
+   "rule": "required",
+   "message": "claim date is missing"
+  },
+  {
+   "column": "claim_date",
+   "rule": "date",
+   "arg": [
+    "%d/%m/%Y"
+   ],
+   "message": "claim date is not DD/MM/YYYY"
+  },
+  {
+   "column": "employee",
+   "rule": "required",
+   "message": "employee is missing"
+  },
+  {
+   "column": "amount_inr",
+   "rule": "required",
+   "message": "amount is missing"
+  },
+  {
+   "column": "amount_inr",
+   "rule": "number",
+   "message": "amount is not a number"
+  },
+  {
+   "column": "amount_inr",
+   "rule": "range",
+   "arg": [
+    0,
+    1000000
+   ],
+   "message": "amount is negative or implausibly large"
+  },
+  {
+   "column": "status",
+   "rule": "in_list",
+   "arg": [
+    "Approved",
+    "Paid",
+    "Pending",
+    "Rejected"
+   ],
+   "message": "unknown status"
+  },
+  {
+   "column": "category",
+   "rule": "in_list",
+   "arg": [
+    "Connectivity",
+    "Hardware",
+    "Software",
+    "Supplies"
+   ],
+   "message": "unknown category"
+  }
+ ],
+ "questions": [
+  {
+   "id": "total_between_dates_for_statuses",
+   "ask": "Total Amount (INR) and number of claims with claim date between two dates (inclusive), for one or two statuses, with a per-status breakdown",
+   "params": {
+    "start": {
+     "type": "date",
+     "description": "first claim date, inclusive"
+    },
+    "end": {
+     "type": "date",
+     "description": "last claim date, inclusive"
+    },
+    "status_1": {
+     "type": "text",
+     "description": "a status, e.g. Approved"
+    },
+    "status_2": {
+     "type": "text",
+     "optional": true,
+     "description": "a second status, e.g. Paid (leave empty for one status)"
+    }
+   },
+   "sql": "SELECT coalesce(status, 'TOTAL') AS status, count(*) AS claims, coalesce(sum(amount_inr), 0) AS total_inr FROM {{table}} WHERE claim_date BETWEEN {{start}} AND {{end}} AND (lower(status) = lower({{status_1}}) OR lower(status) = lower({{status_2}})) GROUP BY ROLLUP(status) ORDER BY status NULLS LAST"
+  },
+  {
+   "id": "top_claimants_for_category",
+   "ask": "Which employees claimed the most Amount (INR) in one category (e.g. Hardware) with claim date between two dates (inclusive), ranked highest first with claim count; Rejected claims are left out",
+   "params": {
+    "category": {
+     "type": "text",
+     "description": "a category, e.g. Hardware"
+    },
+    "start": {
+     "type": "date",
+     "description": "first claim date, inclusive (for 'this year', 1 Jan of the current year)"
+    },
+    "end": {
+     "type": "date",
+     "description": "last claim date, inclusive (for 'this year', today)"
+    }
+   },
+   "sql": "SELECT employee, count(*) AS claims, sum(amount_inr) AS total_inr FROM {{table}} WHERE lower(category) = lower({{category}}) AND claim_date BETWEEN {{start}} AND {{end}} AND lower(coalesce(status, '')) <> 'rejected' GROUP BY employee ORDER BY total_inr DESC, employee"
+  }
+ ],
+ "history": [
+  {
+   "version": 1,
+   "taught": "total Amount (INR) between two claim dates for one or two statuses"
+  },
+  {
+   "version": 2,
+   "taught": "rank employees by Amount (INR) claimed in a category between two dates, excluding Rejected"
+  },
+  {
+   "version": 3,
+   "taught": "form fields: labels, measures, business rules (DGX migration to the form format)"
+  }
+ ],
+ "row_noun": "claims",
+ "measures": [
+  {
+   "id": "amount",
+   "label": "Amount (Rs)",
+   "sql": "sum(amount_inr)",
+   "format": "inr"
+  },
+  {
+   "id": "average_claim",
+   "label": "Average claim (Rs)",
+   "sql": "avg(amount_inr)",
+   "format": "inr"
+  }
+ ],
+ "presets": [
+  {
+   "id": "paid_out",
+   "label": "Paid out or approved",
+   "filters": {
+    "status": [
+     "Approved",
+     "Paid"
+    ]
+   }
+  },
+  {
+   "id": "not_rejected",
+   "label": "Leave out rejected claims",
+   "filters": {
+    "status": {
+     "not": [
+      "Rejected"
+     ]
+    }
+   }
+  }
+ ],
+ "date_columns": [
+  "claim_date"
+ ],
+ "hidden": []
+}

@@ -1,0 +1,457 @@
+{
+ "fixture": "household_survey_messy",
+ "model": "claude-sonnet-5-5",
+ "real_teach": false,
+ "request": "household_survey_messy-20261110-214225",
+ "events": [
+  {
+   "type": "tool",
+   "t": 6,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 9,
+   "name": "Bash",
+   "args": "{\"command\": \"cat teach/inbox/household_survey_messy-20261110-214225/request.json && .venv/bin/python -m lib.filekit inspect teach/inbox/household_survey_messy-20261110-214225/mock.xlsx\"}"
+  },
+  {
+   "type": "text",
+   "t": 20,
+   "text": "Before the questions, here is what this copy is. It has fake values. Nothing I decide changes it or your file. I'm writing rules that Idli applies to your real file on your computer, every time it reads it.\n\n**Step 0 of 5: what you want to learn from this file**\n\nI'd like to discuss what you want to learn. The file has two tabs. **Households** has 300 rows with village, ward, members, income, debts, savings, land and survey date. **Members** has 300 rows with age, sex and whether each person works. I can see these mistakes in the copy, and your real file probably has the same kinds:\n\n- **Households:** 3 phone numbers that aren't valid, 3 survey dates that don't parse, 1 income and 2 debts that aren't numbers, and 1 blank debt. One Household ID appears twice. Some \"Members\" counts are negative (the minimum is -2).\n- **Members:** ages up to 138, and household IDs that may not exist in the Households tab.\n\nOnce it's clean, these are the angles the columns make possible:\n\n1. **Debt against income and savings.** Which households owe more than they earn, or have debt and almost no savings.\n2. **Who is vulnerable.** Households with low income per member, little land, and few working members. This needs the Members tab linked to Households.\n3. **Village and ward comparison.** Average income, debt and land by village or ward, and how that changes by survey month.\n\nWhich of these matter to you? Is there something else you want to find out, such as a poverty-trap definition you already use? Your answer shapes the checks, the measures and the charts I suggest. After that I'll move on to Step 1, what one row means in each tab."
+  },
+  {
+   "type": "user",
+   "t": 23,
+   "text": "Good breakdown. The checks that matter most to me are the Households and Members rules: unique Household IDs, Members counts matching the Members rows, valid 10-digit phone numbers, valid dates on or before 31 March 2024, and ages 0\u2013110. For analysis, debt against income and savings (angle 1) and vulnerability (angle 2) matter most, so please link Members to Households. Angle 3 is useful later, but do the first two first."
+  },
+  {
+   "type": "tool",
+   "t": 31,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 1 of 5, tab Households: I think one row is one household. Columns: Household ID (text), Village (category), Ward (number), Head of household (name), Phone (10-digit), Members (count), Monthly income (INR), Debts (INR), Savings (INR), Land (acres), Survey date (dd/mm/yyyy). Right?\", \"header\": \"Households\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, that's ri"
+  },
+  {
+   "type": "card",
+   "t": 34,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 1 of 5, tab Households: I think one row is one household. Columns: Household ID (text), Village (category), Ward (number), Head of household (name), Phone (10-digit), Members (count), Monthly income (INR), Debts (INR), Savings (INR), Land (acres), Survey date (dd/mm/yyyy). Right?",
+      "header": "Households",
+      "options": [
+       {
+        "label": "Yes, that's right (Recommended)",
+        "description": "One row per household, Household ID is its key."
+       },
+       {
+        "label": "Not quite",
+        "description": "We'll talk it through in chat."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Step 1 of 5, tab Members: I think one row is one person in a household. Columns: Household ID (links to Households), Name, Age, Sex, Works (Y/N). Right?",
+      "header": "Members",
+      "options": [
+       {
+        "label": "Yes, that's right (Recommended)",
+        "description": "One row per person; Household ID links each to a household."
+       },
+       {
+        "label": "Not quite",
+        "description": "We'll talk it through in chat."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Step 1 of 5, tab Households: I think one row is one household. Columns: Household ID (text), Village (category), Ward (number), Head of household (name), Phone (10-digit), Members (count), Monthly income (INR), Debts (INR), Savings (INR), Land (acres), Survey date (dd/mm/yyyy). Right?": "Yes, that's right (Recommended)",
+    "Step 1 of 5, tab Members: I think one row is one person in a household. Columns: Household ID (links to Households), Name, Age, Sex, Works (Y/N). Right?": "Yes, that's right (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 38,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"RULES\\\\|def excel_formula\\\\|\\\\\\\"unique\\\\|'unique\\\\|lookup\\\" lib/filekit.py | head -50; ls file-skills | head\"}"
+  },
+  {
+   "type": "tool",
+   "t": 40,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 690,830p lib/filekit.py; cat file-skills/households/skill.json | head -80\"}"
+  },
+  {
+   "type": "tool",
+   "t": 47,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 2 of 5, checks on Households. You asked for these. Which should I add? Tick all you want.\", \"header\": \"Households\", \"multiSelect\": true, \"options\": [{\"label\": \"Household ID is unique (Recommended)\", \"description\": \"Flags IDs that appear on more than one row. Needs a new generic 'unique' rule in Idli's shared code, so it affects every file skill.\"}, {\"label\": \"Phon"
+  },
+  {
+   "type": "card",
+   "t": 54,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 2 of 5, checks on Households. You asked for these. Which should I add? Tick all you want.",
+      "header": "Households",
+      "options": [
+       {
+        "label": "Household ID is unique (Recommended)",
+        "description": "Flags IDs that appear on more than one row. Needs a new generic 'unique' rule in Idli's shared code, so it affects every file skill."
+       },
+       {
+        "label": "Phone is a valid 10-digit number (Recommended)",
+        "description": "Flags the phones that aren't 10 digits."
+       },
+       {
+        "label": "Survey date is a real date, on or before 31 March 2024 (Recommended)",
+        "description": "Flags dates that don't parse (dd/mm/yyyy) or come after 31/03/2024. Needs a small generic 'not_after' rule in shared code."
+       },
+       {
+        "label": "Members count matches the Members tab rows (Recommended)",
+        "description": "Compares each household's Members number with its row count in the Members tab. Needs a new generic cross-tab count rule in shared code. Negative counts are flagged too."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "Step 2 of 5, more checks. Tick any you also want.",
+      "header": "Also",
+      "options": [
+       {
+        "label": "Age is 0 to 110 (Recommended)",
+        "description": "Members tab: flags ages outside 0-110 (the copy has up to 138)."
+       },
+       {
+        "label": "Income and debts are numbers (Recommended)",
+        "description": "Flags income or debt values that aren't numbers; Households tab."
+       },
+       {
+        "label": "Members' Household ID exists in Households (Recommended)",
+        "description": "Flags people whose household isn't in the Households tab (reported automatically through the link)."
+       },
+       {
+        "label": "Sex and Works are in the allowed lists",
+        "description": "Flags unexpected values in Sex and Works (Y/N); I'd learn the allowed values from the data."
+       }
+      ],
+      "multiSelect": true
+     }
+    ]
+   },
+   "answers": {
+    "Step 2 of 5, checks on Households. You asked for these. Which should I add? Tick all you want.": "Household ID is unique (Recommended), Phone is a valid 10-digit number (Recommended), Survey date is a real date, on or before 31 March 2024 (Recommended), Members count matches the Members tab rows (Recommended)",
+    "Step 2 of 5, more checks. Tick any you also want.": "Age is 0 to 110 (Recommended), Income and debts are numbers (Recommended), Members' Household ID exists in Households (Recommended), Sex and Works are in the allowed lists"
+   }
+  },
+  {
+   "type": "text",
+   "t": 56,
+   "text": "Ticked all eight. Do you want to add any checks of your own? If not, say \"that's all\" and I'll go on to Step 3, how Idli reads your file."
+  },
+  {
+   "type": "user",
+   "t": 59,
+   "text": "That's all. Go ahead to Step 3, and keep the checks you've ticked as they are."
+  },
+  {
+   "type": "tool",
+   "t": 64,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'E'\\nimport pandas as pd\\np='teach/inbox/household_survey_messy-20261110-214225/mock.xlsx'\\nx=pd.read_excel(p,sheet_name=None,dtype=str)\\nh=x['Households'];m=x['Members']\\nprint(h.village.value_counts().to_dict());print(m.sex.value_counts().to_dict(),m['Works (Y/N)'].value_counts().to_dict())\\nfor c in ['Monthly income (INR)','Debts (INR)','Phone','Survey date'"
+  },
+  {
+   "type": "tool",
+   "t": 71,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'E'\\nimport pandas as pd\\np='teach/inbox/household_survey_messy-20261110-214225/mock.xlsx'\\nx=pd.read_excel(p,sheet_name=None,dtype=str)\\nh=x['Households'];m=x['Members']\\nprint(h.Village.value_counts().to_dict());print(m.Sex.value_counts().to_dict(),m['Works (Y/N)'].value_counts().to_dict())\\nfor c in ['Monthly income (INR)','Debts (INR)','Phone','Survey date'"
+  },
+  {
+   "type": "tool",
+   "t": 76,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 3 of 5, how Idli reads your real file (your file stays as it is). When Idli reads it, it can treat these as the same. Which do you want? Tick all.\", \"header\": \"Read as\", \"multiSelect\": true, \"options\": [{\"label\": \"Same village despite case (Recommended)\", \"description\": \"Treat 'Village B', 'village b' and 'VILLAGE B' as one village.\"}, {\"label\": \"Read 'Rs. 1,200' "
+  },
+  {
+   "type": "card",
+   "t": 89,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 3 of 5, how Idli reads your real file (your file stays as it is). When Idli reads it, it can treat these as the same. Which do you want? Tick all.",
+      "header": "Read as",
+      "options": [
+       {
+        "label": "Same village despite case (Recommended)",
+        "description": "Treat 'Village B', 'village b' and 'VILLAGE B' as one village."
+       },
+       {
+        "label": "Read 'Rs. 1,200' as 1200 (Recommended)",
+        "description": "Money columns (income, debts, savings) accept Rs., INR, \u20b9 and commas, and count as numbers."
+       },
+       {
+        "label": "Ignore spaces and case in IDs (Recommended)",
+        "description": "Match Household IDs between the two tabs even if one has stray spaces or different case."
+       },
+       {
+        "label": "Read phones with spaces, dashes or +91 as 10 digits (Recommended)",
+        "description": "'+91 99753-03790' counts as a valid 10-digit phone."
+       }
+      ],
+      "multiSelect": true
+     }
+    ]
+   },
+   "answers": {
+    "Step 3 of 5, how Idli reads your real file (your file stays as it is). When Idli reads it, it can treat these as the same. Which do you want? Tick all.": "Same village despite case (Recommended); Read 'Rs. 1,200' as 1200 (Recommended); Own words: for Household IDs, trim surrounding spaces only and do not ignore case, since IDs must be unique as written; for phones, accept spaces and dashes as separators, but do not strip +91, because the phone must be exactly ten digits"
+   }
+  },
+  {
+   "type": "text",
+   "t": 98,
+   "text": "Noted. For Household IDs, Idli will trim surrounding spaces and keep case, so `HH0526` and `hh0526` count as different IDs. For phones, spaces and dashes are accepted as separators, and `+91` is not stripped, so the number must be exactly ten digits.\n\nTwo things I'll check when I write the rules, and I'll tell you what I find:\n- The shared phone rule may currently accept `+91`. If it does, I'll use a stricter regex for this file only, so other file skills aren't affected.\n- Linking Members to Households matches IDs ignoring case. I'll look for a way to make that exact.\n\nDo you have any other clean-ups, for example skipping blank rows or reading \"N/A\" as empty? If not, say \"that's all\" and I'll go on to Step 4, the words of this file."
+  },
+  {
+   "type": "user",
+   "t": 101,
+   "text": "That's all. Go ahead to Step 4. Please keep the phone rule strict (exactly ten digits, no +91), and tell me what you find on the `+91` and case-sensitive ID-matching checks when you're done."
+  },
+  {
+   "type": "tool",
+   "t": 111,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 4 of 5, measures for debt against income and savings (Households tab). Which should I add as named measures? Tick all you want.\", \"header\": \"Measures\", \"multiSelect\": true, \"options\": [{\"label\": \"Debt-to-income ratio (Recommended)\", \"description\": \"Total debts divided by total monthly income, shown as a ratio (e.g. 0.4 = debts are 40% of one month's income).\"}, {\""
+  },
+  {
+   "type": "card",
+   "t": 119,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 4 of 5, measures for debt against income and savings (Households tab). Which should I add as named measures? Tick all you want.",
+      "header": "Measures",
+      "options": [
+       {
+        "label": "Debt-to-income ratio (Recommended)",
+        "description": "Total debts divided by total monthly income, shown as a ratio (e.g. 0.4 = debts are 40% of one month's income)."
+       },
+       {
+        "label": "Households in debt (Recommended)",
+        "description": "Count of households with debts above 0."
+       },
+       {
+        "label": "Households with debt above savings (Recommended)",
+        "description": "Count where debts are greater than savings."
+       },
+       {
+        "label": "Income per member (Recommended)",
+        "description": "Total monthly income divided by total members, in Rs per person per month."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "Step 4 of 5, vulnerability: how should I define a 'vulnerable household' as a ready-made filter? (You can change the thresholds later.)",
+      "header": "Vulnerable",
+      "options": [
+       {
+        "label": "Debt above savings AND income per member in the lowest third (Recommended)",
+        "description": "Idli works out the cut-off from your real data each time, so no number is baked in."
+       },
+       {
+        "label": "Debt above savings AND no working member",
+        "description": "Uses the Members tab link: a household with nobody marked as working."
+       },
+       {
+        "label": "Let's discuss",
+        "description": "Talk through your own definition in chat."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Step 4 of 5, how Members links to Households: for vulnerability I'd add these per-household figures from the Members tab: number of people, number working, number aged under 15 or over 60 (dependants). Add them?",
+      "header": "Link",
+      "options": [
+       {
+        "label": "Yes, add them (Recommended)",
+        "description": "Households gets 'people listed', 'working members' and 'dependants'; Members gets the household's village, income and debts."
+       },
+       {
+        "label": "Only people listed and working",
+        "description": "Skip the dependants figure."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Step 4 of 5, survey date is the only date, and your cut-off is 31 March 2024. Should 'Survey date' filters and the month/quarter/year breakdowns leave out rows whose date is after that or invalid by default?",
+      "header": "Dates",
+      "options": [
+       {
+        "label": "No, keep them, only flag them (Recommended)",
+        "description": "The check reports them; analysis still counts those households."
+       },
+       {
+        "label": "Yes, leave them out by default",
+        "description": "A preset 'Valid survey dates only' is on unless switched off."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Step 4 of 5, measures for debt against income and savings (Households tab). Which should I add as named measures? Tick all you want.": "Debt-to-income ratio (Recommended), Households in debt (Recommended), Households with debt above savings (Recommended), Income per member (Recommended)",
+    "Step 4 of 5, vulnerability: how should I define a 'vulnerable household' as a ready-made filter? (You can change the thresholds later.)": "Debt above savings AND income per member in the lowest third (Recommended)",
+    "Step 4 of 5, how Members links to Households: for vulnerability I'd add these per-household figures from the Members tab: number of people, number working, number aged under 15 or over 60 (dependants). Add them?": "Yes, add them (Recommended)",
+    "Step 4 of 5, survey date is the only date, and your cut-off is 31 March 2024. Should 'Survey date' filters and the month/quarter/year breakdowns leave out rows whose date is after that or invalid by default?": "No, keep them, only flag them (Recommended)"
+   }
+  },
+  {
+   "type": "text",
+   "t": 123,
+   "text": "**Step 5 of 5: how I read your question**\n\n\"Check this file for mistakes so we can clean it, then I'll want to analyse it\" means two things to me:\n\n1. **Check:** Idli runs the eight checks you ticked and lists every problem with its sheet row. You accept or reject the suggested fix for each. Your file is never changed.\n2. **Analyse:** the form offers debt-to-income, households in debt, households with debt above savings, income per member, and a \"vulnerable household\" filter. You can break these down by village or ward, with per-household counts taken from the Members tab. Angle 3 (village and ward comparisons) works with the same form, so nothing extra is needed for it later.\n\nIs that how you meant it? If so, say \"yes\" and I'll write the skill, test it, and tell you what I found on the `+91` and case-sensitive ID-matching questions. If not, tell me what to change."
+  },
+  {
+   "type": "user",
+   "t": 132,
+   "text": "Yes, that's right. Go ahead and write the skill, test it, and tell me what you find on the `+91` and case-sensitive ID-matching checks."
+  },
+  {
+   "type": "tool",
+   "t": 135,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"^PHONE\\\\|^EMAIL\\\\|def _parses\\\\|def _not_future\\\" -A6 lib/filekit.py | head -50; grep -n \\\"lookup\\\" lib/*.py | head -30; ls file-skills/volunteer_register; grep -n \\\"lookups\\\" -B2 -A6 file-skills/*/skill.json | head -40; ls tests 2>/dev/null\"}"
+  },
+  {
+   "type": "tool",
+   "t": 140,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 1,60p lib/formkit.py; sed -n 140,185p lib/formkit.py; sed -n 860,1010p lib/formkit.py; grep -n \\\"row_checks\\\" -A12 file-skills/field_programme_tracker/skill.json | head -40\"}"
+  },
+  {
+   "type": "tool",
+   "t": 181,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"def _row_checks\\\" -A45 lib/formkit.py; grep -n \\\"tab:\\\" lib/formkit.py | head -20; grep -n \\\"def run\\\\b\\\" -A5 lib/formkit.py; grep -rn \\\"row_checks\\\" -A8 file-skills/*/skill.json | head -30; grep -n \\\"def _clean_view\\\" -A25 lib/formkit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 190,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"def compile_spec\\\" -A80 lib/formkit.py | head -150; grep -n \\\"def table_name\\\" -A6 lib/formkit.py; grep -n \\\"def _safe\\\\|forbid\\\\|FORBID\\\\|def check_sql\\\" -A8 lib/formkit.py | head -40\"}"
+  },
+  {
+   "type": "tool",
+   "t": 199,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"{{table}}\\\\|_sql_ok\\\\|def _agg\\\\|disallow\\\\|only one aggregate\\\\|not allowed\\\" lib/formkit.py | head -20; grep -n \\\"def form_for\\\\|\\\\\\\"sql\\\\\\\"\\\" lib/formkit.py | head -30\"}"
+  },
+  {
+   "type": "tool",
+   "t": 206,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"{{\\\" lib/*.py | grep -v \\\"^lib/test\\\" | head -20; grep -n \\\"questions\\\" file-skills/*/skill.json | head\"}"
+  },
+  {
+   "type": "tool",
+   "t": 222,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 175,230p file-skills/households/skill.json; cat file-skills/households/tests.json | head -30; sed -n 900,935p lib/filekit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 246,
+   "name": "Bash",
+   "args": "{\"command\": \"D=file-skills/household_survey_messy && mkdir -p $D && cp teach/inbox/household_survey_messy-20261110-214225/mock.xlsx $D/mock.xlsx && .venv/bin/python -I - <<'E'\\nimport json\\nD=\\\"file-skills/household_survey_messy\\\"\\nnum=lambda l:{\\\"type\\\":\\\"number\\\",\\\"label\\\":l}\\nhh={\\n \\\"headers\\\":[\\\"household_id\\\",\\\"village\\\",\\\"ward\\\",\\\"head_of_household\\\",\\\"phone\\\",\\\"members\\\",\\\"monthly_income_i"
+  },
+  {
+   "type": "tool",
+   "t": 268,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'E'\\nimport pandas as pd, json\\nD='file-skills/household_survey_messy'\\np=D+'/mock.xlsx'\\nx=pd.read_excel(p,sheet_name=None,dtype=str)\\nh,m=x['Households'],x['Members']\\nn=lambda s:pd.to_numeric(s.str.replace(r'(?i)(rs\\\\.?|inr|\u20b9|,|\\\\s)','',regex=True),errors='coerce')\\nh['inc']=n(h['Monthly income (INR)']);h['d']=n(h['Debts (INR)']);h['s']=n(h['Savings (INR)'])"
+  },
+  {
+   "type": "tool",
+   "t": 275,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'E'\\nimport json,collections\\nfrom lib import formkit as fm\\ns=json.load(open('file-skills/household_survey_messy/skill.json'))\\nP,_=fm.check('file-skills/household_survey_messy/mock.xlsx',s,'/tmp/claude-1000/chk')\\nc=collections.Counter((p['tab'],p['column'],p['problem']) for p in P)\\nfor k,v in c.items():print(v,k)\\nfor p in P:\\n    if p['column']=='Phone':pr"
+  },
+  {
+   "type": "text",
+   "t": 283,
+   "text": "Phone regex behaves as you asked: spaces and dashes pass, `+91` fails. I'm now running the checks on the mock to see which ones fire."
+  },
+  {
+   "type": "tool",
+   "t": 283,
+   "name": "Bash",
+   "args": "{\"command\": \"PYTHONPATH=. .venv/bin/python - <<'E'\\nimport json,collections\\nfrom lib import formkit as fm\\ns=json.load(open('file-skills/household_survey_messy/skill.json'))\\nP,_=fm.check('file-skills/household_survey_messy/mock.xlsx',s,'./.check_tmp')\\nc=collections.Counter((p['tab'],p['column'],p['problem']) for p in P)\\nfor k,v in c.items():print(v,k)\\nprint([p['value'] for p in P if p['column"
+  },
+  {
+   "type": "tool",
+   "t": 288,
+   "name": "Bash",
+   "args": "{\"command\": \"echo '{\\\"skill\\\": \\\"household_survey_messy\\\", \\\"version\\\": 1, \\\"summary\\\": \\\"Household survey v1: 8 checks (unique IDs, member counts vs Members tab, 10-digit phones, dates valid and by 31/03/2024, ages 0-110, numbers, Members to Households link, Sex/Works lists); debt-to-income, households in debt, debt above savings, income per member, dependants; Members linked to Households; vulne"
+  },
+  {
+   "type": "tool",
+   "t": 289,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Switch you back to Idli; your chat continues there.\"}, {\"label\": \"Stay here\", \"description\": \"Stay in this chat to adjust anything first.\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 289,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Switch you back to Idli; your chat continues there."
+       },
+       {
+        "label": "Stay here",
+        "description": "Stay in this chat to adjust anything first."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 294,
+   "name": "Bash",
+   "args": "{\"command\": \"touch teach/inbox/household_survey_messy-20261110-214225/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 304,
+   "text": "Switching you back to Idli.\n\nThe skill is written as `household_survey_messy` v1, and the tests print ALL PASSED. They compare debt-to-income, the counts, dependants and vulnerable households against my own pandas numbers on the fake copy.\n\n**Your two questions**\n- **`+91`:** the shared phone rule accepts a `91` or `+91` prefix, so it would have let `+91 99753 03790` through. I left it alone, because other file skills use it. For this file I used a stricter rule instead. Spaces and dashes are allowed, and the number must be exactly ten digits, so `+91\u2026` and `91\u2026` are flagged. In the copy it flags 3 phones.\n- **Case-sensitive IDs:** linking Members to Households always ignores case, and I can't change that without touching shared code. So the link still joins `hh0526` to `HH0526`, which is what lets Members carry household village, income and debts. I added a separate check on the Members tab that flags any Household ID matching a household only when case is ignored. IDs not found at all are flagged by the automatic link check. Duplicate Household IDs are checked case-sensitively too. The copy has no case-mismatched IDs, so that new check was not exercised.\n\n**What Idli's form now offers**\n- **Checks:** all eight you ticked.\n  - Household ID is unique.\n  - Members count matches the Members rows (this also flags negative counts).\n  - Phones are exactly ten digits.\n  - Survey dates are valid and on or before 31 March 2024.\n  - Ages are 0\u2013110.\n  - Income and debts are numbers.\n  - Members IDs exist in Households.\n  - Sex and Works are in their allowed lists.\n- **Analysis:**\n  - Debt-to-income ratio, households in debt, households with debt above savings, and income per member.\n  - Members counts people, people who work and dependants, broken down by household village.\n  - A question \"vulnerable households by village\" (debt above savings and income per member in the lowest third).\n\n**Two limits you should know about**\n- **Per-household counts:** I said earlier that Households would get \"people listed\", \"working members\" and \"dependants\" columns. The form can't do that. The Members tab shows those counts instead, grouped by the household's village.\n- **Sex and Works lists:** the copy's values are junk, so I guessed the allowed values (M/F/Male/Female and Y/N/Yes/No). If your real file uses other words, those two checks will flag every row. Tell me the real words and I'll fix the lists.\n\nYour Idli chat will continue from here."
+  }
+ ],
+ "user_cost": 0.013371000000000001,
+ "workspace": "/tmp/claude-1000/pipe-eval/pipe-teach-f98xzl0w/cowork",
+ "secs": 305,
+ "rounds": 5,
+ "claude_cost": 1.173,
+ "done": true,
+ "cards": 5,
+ "skill": "household_survey_messy",
+ "filekit_changed": false
+}

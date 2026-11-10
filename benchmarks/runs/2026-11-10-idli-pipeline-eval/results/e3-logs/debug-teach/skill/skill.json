@@ -1,0 +1,89 @@
+{
+ "id": "tree_plots_transects", "title": "Tree plots and transects", "version": 1, "format": 2,
+ "tabs": {
+  "Raw 10x10m Data": {
+   "headers": ["transect","plot","tree_no","species_code","dbh_1_cm","dbh_2_cm","dbh_3_cm","height_m","canopy_y_n","notes","date_dd_mm_yyyy","recorder"],
+   "summary": "One row per tree measured in a 10x10m plot, with species, DBH, height, canopy, date and recorder.",
+   "row_noun": "trees",
+   "skip_rows": ["repeated_header", "subheading"],
+   "columns": {
+    "transect": {"type": "category", "label": "Transect"},
+    "plot": {"type": "number", "label": "Plot"},
+    "tree_no": {"type": "number", "label": "Tree no"},
+    "species_code": {"type": "category", "label": "Species code"},
+    "dbh_1_cm": {"type": "number", "label": "DBH 1 (cm)"},
+    "dbh_2_cm": {"type": "number", "label": "DBH 2 (cm)"},
+    "height_m": {"type": "number", "label": "Height (m)"},
+    "canopy_y_n": {"type": "category", "label": "Canopy (Y/N)"},
+    "date_dd_mm_yyyy": {"type": "date", "formats": ["%d/%m/%Y"], "label": "Date"},
+    "recorder": {"type": "category", "label": "Recorder"}
+   },
+   "validations": [
+    {"column": "transect", "rule": "required", "message": "transect is missing"},
+    {"column": "plot", "rule": "required", "message": "plot is missing"},
+    {"column": "tree_no", "rule": "required", "message": "tree number is missing"},
+    {"column": "species_code", "rule": "required", "message": "species code is missing"},
+    {"column": "plot", "rule": "number", "message": "plot is not a number"},
+    {"column": "tree_no", "rule": "number", "message": "tree number is not a number"},
+    {"column": "dbh_1_cm", "rule": "number", "message": "DBH 1 is not a number"},
+    {"column": "dbh_2_cm", "rule": "number", "message": "DBH 2 is not a number"},
+    {"column": "height_m", "rule": "number", "message": "height is not a number"},
+    {"column": "dbh_1_cm", "rule": "range", "arg": [0, 250], "message": "DBH 1 outside 0-250 cm"},
+    {"column": "dbh_2_cm", "rule": "range", "arg": [0, 250], "message": "DBH 2 outside 0-250 cm"},
+    {"column": "height_m", "rule": "range", "arg": [0, 60], "message": "height outside 0-60 m"},
+    {"column": "canopy_y_n", "rule": "in_list", "arg": ["Y", "N"], "message": "canopy should be Y or N"},
+    {"column": "date_dd_mm_yyyy", "rule": "date", "arg": ["%d/%m/%Y"], "message": "date is not dd/mm/yyyy"}
+   ],
+   "row_checks": [
+    {"id": "date_after_cutoff", "column": "date_dd_mm_yyyy", "sql": "t.date_dd_mm_yyyy > DATE '2024-03-31'",
+     "message": "date is after 31 March 2024", "why": "Dates should be no later than 31 March 2024."}
+   ],
+   "lookups": [{"tab": "Species key", "on": {"species_code": "code"}, "columns": ["common_name", "native_alien"], "prefix": "sp_",
+                "labels": {"common_name": "Common name", "native_alien": "Native/Alien"}}],
+   "measures": [
+    {"id": "trees", "label": "Number of trees", "sql": "count(*)", "format": "count"},
+    {"id": "avg_dbh", "label": "Average DBH 1 (cm)", "sql": "avg(dbh_1_cm)", "format": "number"},
+    {"id": "avg_height", "label": "Average height (m)", "sql": "avg(height_m)", "format": "number"}
+   ],
+   "date_columns": ["date_dd_mm_yyyy"],
+   "hidden": ["dbh_3_cm", "notes"]
+  },
+  "Density": {
+   "headers": ["transect","plot","no_of_trees","no_of_cestrum"],
+   "summary": "One row per transect and plot with the number of trees and the number of Cestrum.",
+   "row_noun": "plots",
+   "columns": {"no_of_trees": {"type": "number", "label": "No. of trees"}, "no_of_cestrum": {"type": "number", "label": "No. of Cestrum"}},
+   "validations": [
+    {"column": "no_of_trees", "rule": "number", "message": "tree count is not a number"},
+    {"column": "no_of_cestrum", "rule": "number", "message": "Cestrum count is not a number"}
+   ],
+   "row_checks": [
+    {"id": "cestrum_over_trees", "column": "no_of_cestrum", "sql": "t.no_of_cestrum > t.no_of_trees",
+     "message": "more Cestrum than trees", "why": "Cestrum is counted among the trees, so it can't be larger."},
+    {"id": "plot_in_raw", "column": "plot", "sql": "NOT EXISTS (SELECT 1 FROM {{tab:Raw 10x10m Data}} r WHERE lower(trim(r.transect)) = lower(trim(t.transect)) AND r.plot = t.plot)",
+     "message": "transect + plot not found in the tree data", "why": "No trees are recorded for this transect and plot in the Raw data tab."}
+   ],
+   "measures": [
+    {"id": "trees_total", "label": "Trees (from Density)", "sql": "sum(no_of_trees)", "format": "count"},
+    {"id": "cestrum_total", "label": "Cestrum count", "sql": "sum(no_of_cestrum)", "format": "count"},
+    {"id": "cestrum_share", "label": "Cestrum share of trees (%)", "sql": "100.0 * sum(no_of_cestrum) / nullif(sum(no_of_trees), 0)", "format": "number"}
+   ]
+  },
+  "Seedlings": {
+   "headers": ["transect","plot","species_code","count","height_class"],
+   "summary": "Seedling counts by transect, plot, species and height class.",
+   "row_noun": "seedling records",
+   "columns": {"count": {"type": "number", "label": "Count"}},
+   "validations": [{"column": "count", "rule": "number", "message": "count is not a number"}],
+   "row_checks": [
+    {"id": "plot_in_raw", "column": "plot", "sql": "NOT EXISTS (SELECT 1 FROM {{tab:Raw 10x10m Data}} r WHERE lower(trim(r.transect)) = lower(trim(t.transect)) AND r.plot = t.plot)",
+     "message": "transect + plot not found in the tree data", "why": "No trees are recorded for this transect and plot in the Raw data tab."}
+   ],
+   "lookups": [{"tab": "Species key", "on": {"species_code": "code"}, "columns": ["common_name"], "prefix": "sp_", "labels": {"common_name": "Common name"}}],
+   "measures": [{"id": "seedlings", "label": "Seedling count", "sql": "sum(count)", "format": "count"}]
+  },
+  "Species key": {"headers": ["code","scientific_name","common_name","native_alien"], "row_noun": "species",
+   "summary": "List of species codes with scientific and common names and Native/Alien."}
+ },
+ "history": [{"version": 1, "taught": "workbook checks across all tabs; trees, DBH, height, Cestrum share, seedlings"}]
+}

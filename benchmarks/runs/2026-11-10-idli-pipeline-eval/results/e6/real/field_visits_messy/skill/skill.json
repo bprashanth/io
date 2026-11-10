@@ -1,0 +1,56 @@
+{
+ "id": "field_visits_messy", "title": "field_visits_messy", "version": 1, "format": 2,
+ "tabs": {
+  "Visits": {
+   "headers": ["visit_date","village","field_officer","households_visited","amount_disbursed_rs","status_done_follow_up_cancelled","notes"],
+   "summary": "One row per field visit, with the village, officer, households visited, rupees disbursed and status.",
+   "row_noun": "visits",
+   "skip_rows": ["repeated_header", "subheading", "total"],
+   "columns": {
+    "visit_date": {"type": "date", "formats": ["%d/%m/%Y"], "label": "Visit date"},
+    "village": {"type": "category", "label": "Village"},
+    "field_officer": {"type": "category", "label": "Field officer"},
+    "households_visited": {"type": "number", "label": "Households visited"},
+    "amount_disbursed_rs": {"type": "number", "label": "Amount disbursed (Rs)"},
+    "status_done_follow_up_cancelled": {"type": "category", "label": "Status", "values": ["Done", "Follow-up", "Cancelled"]}
+   },
+   "normalize": {
+    "status_done_follow_up_cancelled": {"case": "title", "map": {"done": "Done", "completed": "Done", "complete": "Done", "cancel": "Cancelled", "cancelled": "Cancelled", "follow-up": "Follow-up", "follow up": "Follow-up"}},
+    "village": {"case": "title"},
+    "field_officer": {"case": "title"}
+   },
+   "validations": [
+    {"column": "visit_date", "rule": "required", "message": "visit date is blank"},
+    {"column": "visit_date", "rule": "date", "arg": ["%d/%m/%Y"], "message": "not a valid dd/mm/yyyy date"},
+    {"column": "visit_date", "rule": "regex", "arg": "(\\d{2}/\\d{2}/(19\\d\\d|20(0\\d|1\\d|2[0-3]))|\\d{2}/0[1-3]/2024)", "message": "date after the 31 Mar 2024 cutoff"},
+    {"column": "village", "rule": "required", "message": "village is blank"},
+    {"column": "field_officer", "rule": "required", "message": "field officer is blank"},
+    {"column": "households_visited", "rule": "number", "message": "households is not a number"},
+    {"column": "amount_disbursed_rs", "rule": "number", "message": "amount is not a number"},
+    {"column": "status_done_follow_up_cancelled", "rule": "required", "message": "status is blank"},
+    {"column": "status_done_follow_up_cancelled", "rule": "in_list", "arg": ["Done", "Follow-up", "Cancelled"], "message": "status is not Done / Follow-up / Cancelled"}
+   ],
+   "measures": [
+    {"id": "disbursed", "label": "Amount disbursed (Rs)", "sql": "sum(amount_disbursed_rs)", "format": "inr"},
+    {"id": "households", "label": "Households visited", "sql": "sum(households_visited)", "format": "count"},
+    {"id": "visits", "label": "Number of visits", "sql": "count(*)", "format": "count"}
+   ],
+   "presets": [
+    {"id": "done", "label": "Done visits only", "filters": {"status_done_follow_up_cancelled": ["Done"]}},
+    {"id": "not_cancelled", "label": "Leave out cancelled", "filters": {"status_done_follow_up_cancelled": {"not": ["Cancelled"]}}}
+   ],
+   "date_columns": ["visit_date"],
+   "lookups": [{"tab": "Officers", "on": {"field_officer": "name"}, "columns": ["district"], "prefix": "officer_", "labels": {"district": "Officer's district"}}],
+   "hidden": ["notes"]
+  },
+  "Officers": {
+   "headers": ["name","district","phone","email"], "row_noun": "officers",
+   "summary": "One row per field officer with district and contact details.",
+   "validations": [
+    {"column": "phone", "rule": "phone", "message": "not a 10-digit phone"},
+    {"column": "email", "rule": "email", "message": "not a valid email"}
+   ]
+  }
+ },
+ "history": [{"version": 1, "taught": "disbursement by village, status clean-up, date cutoff 31 Mar 2024, officer match to Officers tab"}]
+}

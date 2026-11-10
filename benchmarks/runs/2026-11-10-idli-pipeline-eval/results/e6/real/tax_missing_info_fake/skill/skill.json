@@ -1,0 +1,492 @@
+{
+ "id": "tax_missing_info_fake",
+ "title": "tax_missing_info_fake",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Missing Information": {
+   "headers": [
+    "name",
+    "person_a",
+    "column_3",
+    "pan",
+    "aaaaa9999a"
+   ],
+   "summary": "Tax-return query list: one row per question (Sl No, Topic, Our understanding, Your response, Amount in INR). Above the list is a small block (Name, Period, Financial Year, Assessment Year) that Idli reads as the column headings, so here 'Name' is the Sl No, 'Person A' the Topic, 'PAN' the Your response column and 'AAAAA9999A' the Amount (INR). Checks only; do not analyse this tab.",
+   "row_noun": "questions",
+   "columns": {
+    "name": {
+     "type": "text",
+     "label": "Sl No"
+    },
+    "person_a": {
+     "type": "text",
+     "label": "Topic"
+    },
+    "column_3": {
+     "type": "text",
+     "label": "Our understanding"
+    },
+    "pan": {
+     "type": "text",
+     "label": "Your response"
+    },
+    "aaaaa9999a": {
+     "type": "number",
+     "label": "Amount (INR)"
+    }
+   },
+   "normalize": {
+    "aaaaa9999a": {
+     "type": "number"
+    }
+   },
+   "validations": [
+    {
+     "column": "aaaaa9999a",
+     "rule": "number",
+     "message": "amount is not a number"
+    },
+    {
+     "column": "pan",
+     "rule": "required",
+     "message": "response is missing"
+    }
+   ],
+   "hidden": [
+    "name",
+    "column_3"
+   ]
+  },
+  "India Bank Account": {
+   "headers": [
+    "ifs_code",
+    "name_of_the_bank",
+    "type_of_account",
+    "account_number_9_digits_or_more",
+    "savings_account_interest_earned",
+    "closing_balance_as_on_31_march_2024",
+    "refund_account_y_n"
+   ],
+   "summary": "One row per bank account held in India: IFS code, bank, interest earned (rupees), closing balance on 31 March 2024 and whether it is the refund account (Y/N).",
+   "row_noun": "bank accounts",
+   "columns": {
+    "ifs_code": {
+     "type": "text",
+     "label": "IFS code"
+    },
+    "name_of_the_bank": {
+     "type": "category",
+     "label": "Bank"
+    },
+    "savings_account_interest_earned": {
+     "type": "number",
+     "label": "Interest earned (Rs)"
+    },
+    "closing_balance_as_on_31_march_2024": {
+     "type": "text",
+     "label": "Closing balance 31 Mar 2024 (Rs)"
+    },
+    "refund_account_y_n": {
+     "type": "category",
+     "label": "Refund account",
+     "values": [
+      "Y",
+      "N"
+     ]
+    }
+   },
+   "normalize": {
+    "savings_account_interest_earned": {
+     "type": "number"
+    },
+    "refund_account_y_n": {
+     "map": {
+      "y": "Y",
+      "yes": "Y",
+      "n": "N",
+      "no": "N"
+     }
+    }
+   },
+   "validations": [
+    {
+     "column": "savings_account_interest_earned",
+     "rule": "number",
+     "message": "interest earned is not a number"
+    },
+    {
+     "column": "refund_account_y_n",
+     "rule": "in_list",
+     "arg": [
+      "Y",
+      "N"
+     ],
+     "message": "refund account is not Y or N"
+    },
+    {
+     "column": "ifs_code",
+     "rule": "regex",
+     "arg": "^[A-Za-z]{4}0[A-Za-z0-9]{6}$",
+     "message": "IFS code is not 4 letters, 0, then 6 characters"
+    }
+   ],
+   "measures": [
+    {
+     "id": "interest",
+     "label": "Interest earned (Rs)",
+     "sql": "sum(savings_account_interest_earned)",
+     "format": "inr"
+    },
+    {
+     "id": "refund_accounts",
+     "label": "Refund accounts",
+     "sql": "count(*) FILTER (WHERE refund_account_y_n = 'Y')",
+     "format": "count"
+    }
+   ]
+  },
+  "Capital Gain": {
+   "headers": [
+    "sl_no",
+    "particulars",
+    "type_of_asset",
+    "date_of_sale_dd_mmm_yy",
+    "price_per_unit",
+    "currency",
+    "no_of_units",
+    "sale_consideration",
+    "expenses_on_transfer",
+    "net_sale_consideration_inr",
+    "date_of_purchase_dd_mmm_yy",
+    "purchase_price_per_unit",
+    "cost_of_acquisition"
+   ],
+   "summary": "One row per sale of an asset. 'Capital gain' is Net Sale Consideration (INR) minus Cost of acquisition (no holding-period or tax rules). The date is the Date of sale, read day first. A sale is flagged when its net sale differs from Sale consideration minus Expenses on Transfer, or when it is dated before its purchase. By default use the 'Capital gain (unflagged sales)' measure so flagged sales are left out; 'Capital gain (all sales)' includes them. Total rows are skipped.",
+   "row_noun": "sales",
+   "skip_rows": [
+    "repeated_header",
+    "subheading",
+    "total"
+   ],
+   "columns": {
+    "sl_no": {
+     "type": "number",
+     "label": "Sl No"
+    },
+    "particulars": {
+     "type": "text",
+     "label": "Particulars"
+    },
+    "type_of_asset": {
+     "type": "category",
+     "label": "Type of asset"
+    },
+    "date_of_sale_dd_mmm_yy": {
+     "type": "date",
+     "formats": [
+      "%d-%b-%y",
+      "%Y-%m-%d",
+      "%d/%m/%Y",
+      "%d %B %Y"
+     ],
+     "label": "Date of sale"
+    },
+    "price_per_unit": {
+     "type": "number",
+     "label": "Price per unit"
+    },
+    "currency": {
+     "type": "category",
+     "label": "Currency"
+    },
+    "no_of_units": {
+     "type": "number",
+     "label": "No of units"
+    },
+    "sale_consideration": {
+     "type": "number",
+     "label": "Sale consideration"
+    },
+    "expenses_on_transfer": {
+     "type": "number",
+     "label": "Expenses on transfer"
+    },
+    "net_sale_consideration_inr": {
+     "type": "number",
+     "label": "Net sale consideration (INR)"
+    },
+    "date_of_purchase_dd_mmm_yy": {
+     "type": "date",
+     "formats": [
+      "%d-%b-%y",
+      "%Y-%m-%d",
+      "%d/%m/%Y",
+      "%d %B %Y"
+     ],
+     "label": "Date of purchase"
+    },
+    "purchase_price_per_unit": {
+     "type": "number",
+     "label": "Purchase price per unit"
+    },
+    "cost_of_acquisition": {
+     "type": "number",
+     "label": "Cost of acquisition"
+    }
+   },
+   "normalize": {
+    "sl_no": {
+     "type": "number"
+    },
+    "price_per_unit": {
+     "type": "number"
+    },
+    "no_of_units": {
+     "type": "number"
+    },
+    "sale_consideration": {
+     "type": "number"
+    },
+    "expenses_on_transfer": {
+     "type": "number"
+    },
+    "net_sale_consideration_inr": {
+     "type": "number"
+    },
+    "purchase_price_per_unit": {
+     "type": "number"
+    },
+    "cost_of_acquisition": {
+     "type": "number"
+    }
+   },
+   "validations": [
+    {
+     "column": "particulars",
+     "rule": "required",
+     "message": "particulars is missing"
+    },
+    {
+     "column": "date_of_sale_dd_mmm_yy",
+     "rule": "required",
+     "message": "date of sale is missing"
+    },
+    {
+     "column": "date_of_sale_dd_mmm_yy",
+     "rule": "date",
+     "arg": [
+      "%d-%b-%y",
+      "%Y-%m-%d",
+      "%d/%m/%Y",
+      "%d %B %Y"
+     ],
+     "message": "date of sale is not a date"
+    },
+    {
+     "column": "date_of_sale_dd_mmm_yy",
+     "rule": "not_future",
+     "arg": [
+      "%d-%b-%y",
+      "%Y-%m-%d",
+      "%d/%m/%Y",
+      "%d %B %Y"
+     ],
+     "message": "date of sale is in the future"
+    },
+    {
+     "column": "date_of_purchase_dd_mmm_yy",
+     "rule": "date",
+     "arg": [
+      "%d-%b-%y",
+      "%Y-%m-%d",
+      "%d/%m/%Y",
+      "%d %B %Y"
+     ],
+     "message": "date of purchase is not a date"
+    },
+    {
+     "column": "date_of_purchase_dd_mmm_yy",
+     "rule": "not_future",
+     "arg": [
+      "%d-%b-%y",
+      "%Y-%m-%d",
+      "%d/%m/%Y",
+      "%d %B %Y"
+     ],
+     "message": "date of purchase is in the future"
+    },
+    {
+     "column": "price_per_unit",
+     "rule": "number",
+     "message": "price per unit is not a number"
+    },
+    {
+     "column": "sale_consideration",
+     "rule": "number",
+     "message": "sale consideration is not a number"
+    },
+    {
+     "column": "expenses_on_transfer",
+     "rule": "number",
+     "message": "expenses on transfer is not a number"
+    },
+    {
+     "column": "net_sale_consideration_inr",
+     "rule": "number",
+     "message": "net sale consideration is not a number"
+    },
+    {
+     "column": "cost_of_acquisition",
+     "rule": "number",
+     "message": "cost of acquisition is not a number"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "net_sale_mismatch",
+     "column": "net_sale_consideration_inr",
+     "message": "net sale is not sale consideration minus expenses on transfer",
+     "sql": "abs(t.net_sale_consideration_inr - (t.sale_consideration - t.expenses_on_transfer)) > 0",
+     "why": "Net sale should equal sale consideration minus expenses on transfer; correct the net figure or the inputs."
+    },
+    {
+     "id": "sale_before_purchase",
+     "column": "date_of_sale_dd_mmm_yy",
+     "message": "sale is dated before its purchase",
+     "sql": "t.date_of_sale_dd_mmm_yy < t.date_of_purchase_dd_mmm_yy",
+     "why": "Check whether the sale and purchase dates are swapped or mistyped."
+    }
+   ],
+   "measures": [
+    {
+     "id": "gain_clean",
+     "label": "Capital gain (unflagged sales)",
+     "format": "inr",
+     "sql": "sum(net_sale_consideration_inr - cost_of_acquisition) FILTER (WHERE NOT (abs(net_sale_consideration_inr - (sale_consideration - expenses_on_transfer)) > 0 OR date_of_sale_dd_mmm_yy < date_of_purchase_dd_mmm_yy))"
+    },
+    {
+     "id": "gain_all",
+     "label": "Capital gain (all sales)",
+     "format": "inr",
+     "sql": "sum(net_sale_consideration_inr - cost_of_acquisition)"
+    },
+    {
+     "id": "net_mismatch",
+     "label": "Sales where net sale does not match",
+     "format": "count",
+     "sql": "count(*) FILTER (WHERE abs(net_sale_consideration_inr - (sale_consideration - expenses_on_transfer)) > 0)"
+    },
+    {
+     "id": "sale_before_purchase",
+     "label": "Sales dated before purchase",
+     "format": "count",
+     "sql": "count(*) FILTER (WHERE date_of_sale_dd_mmm_yy < date_of_purchase_dd_mmm_yy)"
+    },
+    {
+     "id": "flagged",
+     "label": "Flagged sales (either problem)",
+     "format": "count",
+     "sql": "count(*) FILTER (WHERE abs(net_sale_consideration_inr - (sale_consideration - expenses_on_transfer)) > 0 OR date_of_sale_dd_mmm_yy < date_of_purchase_dd_mmm_yy)"
+    }
+   ],
+   "group_by": [
+    {
+     "id": "sale_flag",
+     "label": "Sale check",
+     "sql": "CASE WHEN abs(net_sale_consideration_inr - (sale_consideration - expenses_on_transfer)) > 0 AND date_of_sale_dd_mmm_yy < date_of_purchase_dd_mmm_yy THEN 'Both problems' WHEN abs(net_sale_consideration_inr - (sale_consideration - expenses_on_transfer)) > 0 THEN 'Net sale mismatch' WHEN date_of_sale_dd_mmm_yy < date_of_purchase_dd_mmm_yy THEN 'Sold before purchase' ELSE 'OK' END"
+    }
+   ],
+   "date_columns": [
+    "date_of_sale_dd_mmm_yy",
+    "date_of_purchase_dd_mmm_yy"
+   ]
+  },
+  "Travel Calendar": {
+   "headers": [
+    "month",
+    "non_work_vacation_days_in_india",
+    "work_days_in_india"
+   ],
+   "summary": "One row per month: work days and non-work/vacation days spent in India. The Total row is skipped.",
+   "row_noun": "months",
+   "skip_rows": [
+    "repeated_header",
+    "subheading",
+    "total"
+   ],
+   "columns": {
+    "month": {
+     "type": "date",
+     "formats": [
+      "%b %Y"
+     ],
+     "label": "Month"
+    },
+    "non_work_vacation_days_in_india": {
+     "type": "number",
+     "label": "Non-work/vacation days in India"
+    },
+    "work_days_in_india": {
+     "type": "number",
+     "label": "Work days in India"
+    }
+   },
+   "normalize": {
+    "non_work_vacation_days_in_india": {
+     "type": "number"
+    },
+    "work_days_in_india": {
+     "type": "number"
+    }
+   },
+   "validations": [
+    {
+     "column": "month",
+     "rule": "date",
+     "arg": [
+      "%b %Y"
+     ],
+     "message": "month is not a month like Apr 2023"
+    },
+    {
+     "column": "work_days_in_india",
+     "rule": "number",
+     "message": "work days is not a number"
+    },
+    {
+     "column": "non_work_vacation_days_in_india",
+     "rule": "number",
+     "message": "non-work days is not a number"
+    },
+    {
+     "column": "work_days_in_india",
+     "rule": "range",
+     "arg": [
+      0,
+      31
+     ],
+     "message": "work days is not between 0 and 31"
+    },
+    {
+     "column": "non_work_vacation_days_in_india",
+     "rule": "range",
+     "arg": [
+      0,
+      31
+     ],
+     "message": "non-work days is not between 0 and 31"
+    }
+   ],
+   "date_columns": [
+    "month"
+   ]
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "checks for all four tabs, capital gain per sale with net-sale and sale-before-purchase flags, bank interest and refund accounts, days in India by month; Total rows skipped"
+  }
+ ]
+}

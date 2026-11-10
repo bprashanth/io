@@ -1,0 +1,258 @@
+{
+ "id": "field_visits_messy",
+ "title": "field_visits_messy",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Visits": {
+   "headers": [
+    "visit_date",
+    "village",
+    "field_officer",
+    "households_visited",
+    "amount_disbursed_rs",
+    "status_done_follow_up_cancelled",
+    "notes"
+   ],
+   "summary": "One row per field visit. Disbursed is the total of Amount disbursed. A visit's district is the officer's district (Officers tab). Cancelled visits are left out of money and household totals by default (preset 'not_cancelled'); 'completed' means Done only.",
+   "row_noun": "visits",
+   "skip_rows": [
+    "repeated_header",
+    "subheading",
+    "total"
+   ],
+   "row_numbers": true,
+   "columns": {
+    "visit_date": {
+     "type": "date",
+     "formats": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "label": "Visit date"
+    },
+    "village": {
+     "type": "category",
+     "label": "Village"
+    },
+    "field_officer": {
+     "type": "category",
+     "label": "Field officer"
+    },
+    "households_visited": {
+     "type": "number",
+     "label": "Households visited"
+    },
+    "amount_disbursed_rs": {
+     "type": "number",
+     "label": "Amount disbursed (Rs)"
+    },
+    "status_done_follow_up_cancelled": {
+     "type": "category",
+     "label": "Status",
+     "values": [
+      "Done",
+      "Follow-up",
+      "Cancelled"
+     ]
+    },
+    "notes": {
+     "type": "text",
+     "label": "Notes"
+    }
+   },
+   "normalize": {
+    "village": {
+     "case": "title"
+    },
+    "field_officer": {
+     "case": "title"
+    },
+    "status_done_follow_up_cancelled": {
+     "map": {
+      "done": "Done",
+      "follow-up": "Follow-up",
+      "follow up": "Follow-up",
+      "cancelled": "Cancelled",
+      "canceled": "Cancelled",
+      "status (done / follow-up / cancelled) a": "Done",
+      "status (done / follow-up / cancelled) b": "Follow-up",
+      "status (done / follow-up / cancelled) c": "Cancelled"
+     }
+    }
+   },
+   "validations": [
+    {
+     "column": "visit_date",
+     "rule": "date",
+     "arg": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "message": "visit date is not a date"
+    },
+    {
+     "column": "visit_date",
+     "rule": "not_future",
+     "arg": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "message": "visit date in the future"
+    },
+    {
+     "column": "village",
+     "rule": "required",
+     "message": "village missing"
+    },
+    {
+     "column": "field_officer",
+     "rule": "required",
+     "message": "field officer missing"
+    },
+    {
+     "column": "households_visited",
+     "rule": "number",
+     "message": "households visited is not a number"
+    },
+    {
+     "column": "amount_disbursed_rs",
+     "rule": "number",
+     "message": "amount is not a number"
+    },
+    {
+     "column": "status_done_follow_up_cancelled",
+     "rule": "required",
+     "message": "status missing"
+    },
+    {
+     "column": "status_done_follow_up_cancelled",
+     "rule": "in_list",
+     "arg": [
+      "Done",
+      "Follow-up",
+      "Cancelled"
+     ],
+     "message": "status is not Done, Follow-up or Cancelled"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "cancelled_amount",
+     "column": "amount_disbursed_rs",
+     "sql": "t.status_done_follow_up_cancelled = 'Cancelled' AND COALESCE(t.amount_disbursed_rs,0) <> 0",
+     "message": "cancelled visit has an amount"
+    },
+    {
+     "id": "cancelled_households",
+     "column": "households_visited",
+     "sql": "t.status_done_follow_up_cancelled = 'Cancelled' AND COALESCE(t.households_visited,0) <> 0",
+     "message": "cancelled visit has households"
+    }
+   ],
+   "measures": [
+    {
+     "id": "disbursed",
+     "label": "Amount disbursed (Rs)",
+     "sql": "sum(amount_disbursed_rs)",
+     "format": "inr"
+    },
+    {
+     "id": "households",
+     "label": "Households visited",
+     "sql": "sum(households_visited)",
+     "format": "count"
+    },
+    {
+     "id": "visits_done",
+     "label": "Done visits",
+     "sql": "count(*) FILTER (WHERE status_done_follow_up_cancelled = 'Done')",
+     "format": "count"
+    },
+    {
+     "id": "visits_followup",
+     "label": "Follow-up visits",
+     "sql": "count(*) FILTER (WHERE status_done_follow_up_cancelled = 'Follow-up')",
+     "format": "count"
+    },
+    {
+     "id": "visits_cancelled",
+     "label": "Cancelled visits",
+     "sql": "count(*) FILTER (WHERE status_done_follow_up_cancelled = 'Cancelled')",
+     "format": "count"
+    }
+   ],
+   "presets": [
+    {
+     "id": "not_cancelled",
+     "label": "Leave out cancelled - the usual rule",
+     "filters": {
+      "status_done_follow_up_cancelled": {
+       "not": [
+        "Cancelled"
+       ]
+      }
+     }
+    },
+    {
+     "id": "completed",
+     "label": "Done visits only",
+     "filters": {
+      "status_done_follow_up_cancelled": [
+       "Done"
+      ]
+     }
+    }
+   ],
+   "date_columns": [
+    "visit_date"
+   ],
+   "lookups": [
+    {
+     "tab": "Officers",
+     "on": {
+      "field_officer": "name"
+     },
+     "columns": [
+      "district"
+     ],
+     "prefix": "officer_",
+     "labels": {
+      "district": "Officer's district"
+     }
+    }
+   ],
+   "hidden": [
+    "notes"
+   ]
+  },
+  "Officers": {
+   "headers": [
+    "name",
+    "district",
+    "phone",
+    "email"
+   ],
+   "row_noun": "officers",
+   "summary": "One row per field officer.",
+   "validations": [
+    {
+     "column": "phone",
+     "rule": "phone",
+     "message": "not a 10-digit phone"
+    },
+    {
+     "column": "email",
+     "rule": "email",
+     "message": "email is not valid"
+    }
+   ]
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "checks (dates, blanks, status values, officers, cancelled visits must have zero amount/households, phones, emails); disbursement by officer's district; done/follow-up/cancelled by village; monthly trends"
+  }
+ ]
+}

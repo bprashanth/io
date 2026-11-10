@@ -1,0 +1,426 @@
+{
+ "id": "tree_plots_transects",
+ "title": "Tree plots and transects",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Raw 10x10m Data": {
+   "headers": [
+    "transect",
+    "plot",
+    "tree_no",
+    "species_code",
+    "dbh_1_cm",
+    "dbh_2_cm",
+    "dbh_3_cm",
+    "height_m",
+    "canopy_y_n",
+    "notes",
+    "date_dd_mm_yyyy",
+    "recorder"
+   ],
+   "summary": "One row per tree measured in a 10x10 m plot (Transect T1-T8, Plot 1-5). Rows that repeat the headings, sub-headings like 'Transect 2' and field notes are skipped. Species code is matched to the Species key (alien or native). Cestrum is species code 'cesaur'.",
+   "row_noun": "trees",
+   "skip_rows": [
+    "repeated_header",
+    "subheading",
+    "total"
+   ],
+   "columns": {
+    "transect": {
+     "type": "category",
+     "label": "Transect"
+    },
+    "plot": {
+     "type": "number",
+     "label": "Plot"
+    },
+    "tree_no": {
+     "type": "number",
+     "label": "Tree no"
+    },
+    "species_code": {
+     "type": "category",
+     "label": "Species code"
+    },
+    "dbh_1_cm": {
+     "type": "number",
+     "label": "DBH 1 (cm)"
+    },
+    "dbh_2_cm": {
+     "type": "number",
+     "label": "DBH 2 (cm)"
+    },
+    "dbh_3_cm": {
+     "type": "number",
+     "label": "DBH 3 (cm)"
+    },
+    "height_m": {
+     "type": "number",
+     "label": "Height (m)"
+    },
+    "canopy_y_n": {
+     "type": "category",
+     "label": "Canopy (Y/N)",
+     "values": [
+      "Y",
+      "N"
+     ]
+    },
+    "notes": {
+     "type": "text",
+     "label": "Notes"
+    },
+    "date_dd_mm_yyyy": {
+     "type": "date",
+     "formats": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "label": "Date"
+    },
+    "recorder": {
+     "type": "category",
+     "label": "Recorder"
+    }
+   },
+   "normalize": {
+    "species_code": {
+     "case": "lower"
+    }
+   },
+   "validations": [
+    {
+     "column": "date_dd_mm_yyyy",
+     "rule": "date",
+     "arg": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "message": "date is not a valid date"
+    },
+    {
+     "column": "dbh_1_cm",
+     "rule": "range",
+     "arg": [
+      0,
+      250
+     ],
+     "message": "DBH 1 outside 0-250 cm"
+    },
+    {
+     "column": "dbh_2_cm",
+     "rule": "range",
+     "arg": [
+      0,
+      250
+     ],
+     "message": "DBH 2 outside 0-250 cm"
+    },
+    {
+     "column": "dbh_3_cm",
+     "rule": "range",
+     "arg": [
+      0,
+      250
+     ],
+     "message": "DBH 3 outside 0-250 cm"
+    },
+    {
+     "column": "height_m",
+     "rule": "range",
+     "arg": [
+      0,
+      60
+     ],
+     "message": "height outside 0-60 m"
+    },
+    {
+     "column": "plot",
+     "rule": "required",
+     "message": "plot missing"
+    },
+    {
+     "column": "tree_no",
+     "rule": "required",
+     "message": "tree number missing"
+    },
+    {
+     "column": "species_code",
+     "rule": "required",
+     "message": "species code missing"
+    },
+    {
+     "column": "dbh_1_cm",
+     "rule": "required",
+     "message": "DBH 1 missing"
+    },
+    {
+     "column": "canopy_y_n",
+     "rule": "in_list",
+     "arg": [
+      "Y",
+      "N"
+     ],
+     "message": "canopy is not Y or N"
+    },
+    {
+     "column": "plot",
+     "rule": "range",
+     "arg": [
+      1,
+      5
+     ],
+     "message": "plot is not 1-5"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "after_cutoff",
+     "column": "date_dd_mm_yyyy",
+     "sql": "t.date_dd_mm_yyyy > DATE '2024-03-31'",
+     "message": "date after 31 March 2024"
+    },
+    {
+     "id": "no_density_row",
+     "column": "plot",
+     "sql": "t.plot IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {{tab:Density}} d WHERE upper(trim(d.transect)) = upper(trim(t.transect)) AND d.plot = t.plot)",
+     "message": "transect and plot not in the Density tab"
+    }
+   ],
+   "measures": [
+    {
+     "id": "cesaur_trees",
+     "label": "Cestrum trees (from tree rows)",
+     "sql": "count(*) FILTER (WHERE species_code = 'cesaur')",
+     "format": "count"
+    }
+   ],
+   "date_columns": [
+    "date_dd_mm_yyyy"
+   ],
+   "lookups": [
+    {
+     "tab": "Species key",
+     "on": {
+      "species_code": "code"
+     },
+     "columns": [
+      "common_name",
+      "native_alien"
+     ],
+     "prefix": "species_",
+     "accept": [
+      "UKS\\d+",
+      "Fern"
+     ],
+     "labels": {
+      "common_name": "Species",
+      "native_alien": "Native or alien"
+     }
+    }
+   ],
+   "hidden": [
+    "dbh_3_cm",
+    "notes"
+   ]
+  },
+  "Density": {
+   "headers": [
+    "transect",
+    "plot",
+    "no_of_trees",
+    "no_of_cestrum"
+   ],
+   "summary": "One row per plot (Transect x Plot): total trees and number of Cestrum. 'Cestrum density' = Cestrum share of trees (%), grouped by Transect and/or Plot, as total Cestrum / total trees, not an average of shares.",
+   "row_noun": "plots",
+   "columns": {
+    "transect": {
+     "type": "category",
+     "label": "Transect"
+    },
+    "plot": {
+     "type": "number",
+     "label": "Plot"
+    },
+    "no_of_trees": {
+     "type": "number",
+     "label": "No. of trees"
+    },
+    "no_of_cestrum": {
+     "type": "number",
+     "label": "No. of Cestrum"
+    }
+   },
+   "validations": [
+    {
+     "column": "plot",
+     "rule": "range",
+     "arg": [
+      1,
+      5
+     ],
+     "message": "plot is not 1-5"
+    },
+    {
+     "column": "no_of_trees",
+     "rule": "number",
+     "message": "No. of trees is not a number"
+    },
+    {
+     "column": "no_of_cestrum",
+     "rule": "number",
+     "message": "No. of Cestrum is not a number"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "cestrum_over_trees",
+     "column": "no_of_cestrum",
+     "sql": "t.no_of_cestrum > t.no_of_trees",
+     "message": "more Cestrum than trees"
+    },
+    {
+     "id": "trees_vs_rows",
+     "column": "no_of_trees",
+     "sql": "t.no_of_trees <> (SELECT count(*) FROM {{tab:Raw 10x10m Data}} r WHERE upper(trim(r.transect)) = upper(trim(t.transect)) AND r.plot = t.plot)",
+     "message": "No. of trees differs from the tree rows for this plot"
+    },
+    {
+     "id": "cestrum_vs_rows",
+     "column": "no_of_cestrum",
+     "sql": "t.no_of_cestrum <> (SELECT count(*) FROM {{tab:Raw 10x10m Data}} r WHERE upper(trim(r.transect)) = upper(trim(t.transect)) AND r.plot = t.plot AND r.species_code = 'cesaur')",
+     "message": "No. of Cestrum differs from the cesaur tree rows for this plot"
+    }
+   ],
+   "measures": [
+    {
+     "id": "trees",
+     "label": "Trees",
+     "sql": "sum(no_of_trees)",
+     "format": "count"
+    },
+    {
+     "id": "cestrum",
+     "label": "Cestrum trees",
+     "sql": "sum(no_of_cestrum)",
+     "format": "count"
+    },
+    {
+     "id": "cestrum_share",
+     "label": "Cestrum share of trees (%)",
+     "sql": "100.0 * sum(no_of_cestrum) / NULLIF(sum(no_of_trees), 0)",
+     "format": "percent"
+    }
+   ]
+  },
+  "Seedlings": {
+   "headers": [
+    "transect",
+    "plot",
+    "species_code",
+    "count",
+    "height_class"
+   ],
+   "summary": "One row per plot, species and height class: number of seedlings.",
+   "row_noun": "seedling counts",
+   "columns": {
+    "transect": {
+     "type": "category",
+     "label": "Transect"
+    },
+    "plot": {
+     "type": "number",
+     "label": "Plot"
+    },
+    "species_code": {
+     "type": "category",
+     "label": "Species code"
+    },
+    "count": {
+     "type": "number",
+     "label": "Seedlings"
+    },
+    "height_class": {
+     "type": "category",
+     "label": "Height class",
+     "values": [
+      "<10cm",
+      "10-50cm"
+     ]
+    }
+   },
+   "normalize": {
+    "species_code": {
+     "case": "lower"
+    }
+   },
+   "validations": [
+    {
+     "column": "plot",
+     "rule": "range",
+     "arg": [
+      1,
+      5
+     ],
+     "message": "plot is not 1-5"
+    },
+    {
+     "column": "count",
+     "rule": "number",
+     "message": "count is not a number"
+    }
+   ],
+   "measures": [
+    {
+     "id": "seedlings",
+     "label": "Seedlings",
+     "sql": "sum(count)",
+     "format": "count"
+    }
+   ],
+   "lookups": [
+    {
+     "tab": "Species key",
+     "on": {
+      "species_code": "code"
+     },
+     "columns": [
+      "common_name",
+      "native_alien"
+     ],
+     "prefix": "species_",
+     "accept": [
+      "UKS\\d+",
+      "Fern"
+     ],
+     "labels": {
+      "common_name": "Species",
+      "native_alien": "Native or alien"
+     }
+    }
+   ]
+  },
+  "Species key": {
+   "headers": [
+    "code",
+    "scientific_name",
+    "common_name",
+    "native_alien"
+   ],
+   "summary": "One row per species code.",
+   "row_noun": "species",
+   "normalize": {
+    "code": {
+     "case": "lower"
+    }
+   }
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "Cestrum share of trees by transect and plot; checks on dates, DBH, height, species codes and Density vs tree rows"
+  }
+ ]
+}

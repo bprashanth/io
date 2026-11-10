@@ -50,6 +50,30 @@ def make_request(ws, fixture, real_teach):
     return out["id"], out["mock"]
 
 
+def load_existing_request(ws, request_dir):
+    """Reuse an inbox request already created by Idli."""
+    rdir = os.path.abspath(request_dir)
+    req = json.load(open(os.path.join(rdir, "request.json")))
+    rid = req["id"]
+    dest = os.path.join(ws, "teach", "inbox", rid)
+    if os.path.exists(dest):
+        shutil.rmtree(dest)
+    shutil.copytree(rdir, dest)
+    return rid, os.path.join(dest, "mock.xlsx"), req
+
+
+def restore_existing_skill(ws, request_dir, req):
+    skill = req.get("existing_skill")
+    if not skill:
+        return
+    src_home = os.path.dirname(os.path.dirname(os.path.abspath(request_dir)))
+    src = os.path.join(src_home, "file-skills", skill)
+    dst = os.path.join(ws, "file-skills", skill)
+    if os.path.isdir(src):
+        shutil.rmtree(dst, ignore_errors=True)
+        shutil.copytree(src, dst)
+
+
 def scripted_user(doc, history, ask):
     """One reply from the person, as JSON. `ask` is a card (dict) or Claude's chat text (str)."""
     if isinstance(ask, dict):
@@ -83,17 +107,32 @@ def scripted_user(doc, history, ask):
         return {"reply": "You decide."}, cost
 
 
-async def teach(fixture, out_dir, model, real_teach):
+async def teach(fixture, out_dir, model, real_teach, request_dir=None):
     from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, PermissionResultAllow,
                                   ResultMessage, TextBlock, ToolUseBlock)
-    stem = os.path.splitext(os.path.basename(fixture))[0]
-    doc = open(os.path.splitext(fixture)[0] + ".doc.md").read()
     ws = workspace()
-    rid, mock = make_request(ws, os.path.abspath(fixture), real_teach)
-    rdir = os.path.join(ws, "teach", "inbox", rid)
-    req = json.load(open(os.path.join(rdir, "request.json")))
+    src_request_dir = os.path.abspath(request_dir) if request_dir else None
+    if request_dir:
+        rid, mock, req = load_existing_request(ws, request_dir)
+        rdir = os.path.join(ws, "teach", "inbox", rid)
+        stem = req["id"].split("-", 1)[0]
+        restore_existing_skill(ws, request_dir, req)
+        doc = open(os.path.join(EVAL, "fixtures", stem + ".doc.md")).read()
+    else:
+        stem = os.path.splitext(os.path.basename(fixture))[0]
+        doc = open(os.path.splitext(fixture)[0] + ".doc.md").read()
+        rid, mock = make_request(ws, os.path.abspath(fixture), real_teach)
+        rdir = os.path.join(ws, "teach", "inbox", rid)
+        req = json.load(open(os.path.join(rdir, "request.json")))
     prompt = (f"Idli asked to be taught a file. The request is in teach/inbox/{rid}/ (mock.xlsx with fake data "
               f"and a hidden _idli_teach sheet, plus request.json). Question: \"{req['question']}\". Use the teach-file skill.")
+    if req.get("chart") is not None:
+        prompt = (f"Idli asks for {'suggested analyses and charts' if not req['chart'] else 'a chart'} for "
+                  f"{req['title']} (taught as file-skills/{req['existing_skill']}). The request is in "
+                  f"teach/inbox/{rid}/ (mock.xlsx with fake data, request.json). "
+                  + (f"The chart they asked for: \"{req['chart']}\". " if req["chart"] else
+                     "They want you to suggest what to look at. ")
+                  + "Use the teach-file skill, section 'Chart requests'.")
     log = {"fixture": stem, "model": model, "real_teach": real_teach, "request": rid, "events": [], "user_cost": 0.0,
            "workspace": ws}
     history = []
@@ -165,6 +204,11 @@ async def teach(fixture, out_dir, model, real_teach):
     shutil.copy(mock, os.path.join(out_dir, "mock.xlsx"))
     with open(os.path.join(out_dir, "transcript.json"), "w") as f:
         json.dump(log, f, indent=1, default=str)
+    if src_request_dir:
+        for name in ("done.json", "teach_agent.json", "go_back"):
+            sp = os.path.join(rdir, name)
+            if os.path.exists(sp):
+                shutil.copy2(sp, os.path.join(src_request_dir, name))
     print(json.dumps({k: log[k] for k in ("fixture", "secs", "rounds", "cards", "claude_cost", "user_cost", "done",
                                           "skill", "filekit_changed")}))
 
@@ -175,5 +219,6 @@ if __name__ == "__main__":
     ap.add_argument("out_dir")
     ap.add_argument("--model", default="claude-sonnet-5-5")
     ap.add_argument("--real-teach", action="store_true")
+    ap.add_argument("--request-dir")
     a = ap.parse_args()
-    asyncio.run(teach(a.fixture, a.out_dir, a.model, a.real_teach))
+    asyncio.run(teach(a.fixture, a.out_dir, a.model, a.real_teach, a.request_dir))

@@ -1,0 +1,245 @@
+{
+ "id": "germination_protocol_filled",
+ "title": "Germination protocol",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Germination": {
+   "headers": [
+    "container",
+    "container_germination",
+    "duration_until_germination",
+    "germination_facilities_nursery_care",
+    "germination_success",
+    "growing_media",
+    "local_common_name_s",
+    "no",
+    "processing_of_fruits_seeds",
+    "scientific_name_botanical",
+    "seed_depth",
+    "seed_sowing_media",
+    "seed_storage",
+    "seed_treatment",
+    "time_of_year_for_seed_collection",
+    "watering_technique"
+   ],
+   "summary": "One row per species: how its seeds are collected, processed, stored, treated and sown, and how well and how fast they germinate.",
+   "row_noun": "species",
+   "columns": {
+    "no": {
+     "type": "number",
+     "label": "No."
+    },
+    "scientific_name_botanical": {
+     "type": "text",
+     "label": "Scientific name"
+    },
+    "local_common_name_s": {
+     "type": "text",
+     "label": "Local / common name"
+    },
+    "seed_depth": {
+     "type": "number",
+     "label": "Seed depth (cm)"
+    },
+    "duration_until_germination": {
+     "type": "number",
+     "label": "Days until germination"
+    },
+    "germination_success": {
+     "type": "number",
+     "label": "Germination success (%)"
+    },
+    "time_of_year_for_seed_collection": {
+     "type": "category",
+     "label": "Collection time"
+    },
+    "processing_of_fruits_seeds": {
+     "type": "category",
+     "label": "Fruit/seed processing"
+    },
+    "seed_storage": {
+     "type": "category",
+     "label": "Seed storage"
+    },
+    "seed_treatment": {
+     "type": "category",
+     "label": "Seed treatment"
+    },
+    "seed_sowing_media": {
+     "type": "category",
+     "label": "Sowing media"
+    },
+    "container_germination": {
+     "type": "category",
+     "label": "Germination container"
+    },
+    "germination_facilities_nursery_care": {
+     "type": "category",
+     "label": "Nursery care"
+    },
+    "growing_media": {
+     "type": "category",
+     "label": "Growing media"
+    },
+    "container": {
+     "type": "category",
+     "label": "Container"
+    },
+    "watering_technique": {
+     "type": "category",
+     "label": "Watering technique"
+    }
+   },
+   "normalize": {
+    "no": {
+     "type": "number",
+     "units": true
+    },
+    "seed_depth": {
+     "type": "number",
+     "units": true
+    },
+    "duration_until_germination": {
+     "type": "number",
+     "units": true
+    },
+    "germination_success": {
+     "type": "number",
+     "units": true
+    },
+    "seed_storage": {
+     "case": "title"
+    }
+   },
+   "validations": [
+    {
+     "column": "no",
+     "rule": "number",
+     "message": "No. is not a number"
+    },
+    {
+     "column": "seed_depth",
+     "rule": "number",
+     "message": "seed depth is not a plain number"
+    },
+    {
+     "column": "duration_until_germination",
+     "rule": "number",
+     "message": "duration is not a plain number of days"
+    },
+    {
+     "column": "germination_success",
+     "rule": "number",
+     "message": "success is not a number"
+    },
+    {
+     "column": "germination_success",
+     "rule": "range",
+     "arg": [
+      0,
+      100
+     ],
+     "message": "success must be between 0 and 100"
+    },
+    {
+     "column": "scientific_name_botanical",
+     "rule": "required",
+     "message": "scientific name is blank (gap)"
+    },
+    {
+     "column": "processing_of_fruits_seeds",
+     "rule": "required",
+     "message": "processing is blank (gap)"
+    },
+    {
+     "column": "seed_treatment",
+     "rule": "required",
+     "message": "seed treatment is blank (gap)"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "storage_spelling",
+     "column": "seed_storage",
+     "message": "seed storage is spelt in more than one way (capitals or spaces)",
+     "why": "Pick one spelling; Idli already reads them as the same when analysing.",
+     "sql": "EXISTS (SELECT 1 FROM chk_raw a WHERE a._row = t._row AND EXISTS (SELECT 1 FROM chk_raw b WHERE lower(trim(b.seed_storage)) = lower(trim(a.seed_storage)) AND trim(b.seed_storage) <> trim(a.seed_storage)))"
+    },
+    {
+     "id": "repeated_species",
+     "column": "scientific_name_botanical",
+     "message": "this scientific name appears more than once",
+     "why": "Check whether the species was entered twice.",
+     "sql": "t.scientific_name_botanical IS NOT NULL AND (SELECT count(*) FROM {{tab:Germination}} r WHERE lower(trim(r.scientific_name_botanical)) = lower(trim(t.scientific_name_botanical))) > 1"
+    }
+   ],
+   "skip_rows": [
+    "repeated_header",
+    "instruction"
+   ],
+   "measures": [
+    {
+     "id": "avg_success",
+     "label": "Average germination success (%)",
+     "sql": "avg(germination_success) FILTER (WHERE germination_success BETWEEN 0 AND 100)",
+     "format": "number"
+    },
+    {
+     "id": "avg_days",
+     "label": "Average days to germinate",
+     "sql": "avg(duration_until_germination)",
+     "format": "number"
+    },
+    {
+     "id": "gaps",
+     "label": "Species with a gap",
+     "sql": "count(*) FILTER (WHERE scientific_name_botanical IS NULL OR processing_of_fruits_seeds IS NULL OR seed_treatment IS NULL)",
+     "format": "number"
+    }
+   ],
+   "presets": [
+    {
+     "id": "unreliable",
+     "label": "Unreliable: success under 50%",
+     "filters": {
+      "germination_success": {
+       "min": 0,
+       "max": 49.999
+      }
+     }
+    },
+    {
+     "id": "slow",
+     "label": "Slow: over 25 days",
+     "filters": {
+      "duration_until_germination": {
+       "min": 25.001
+      }
+     }
+    },
+    {
+     "id": "complete",
+     "label": "Complete protocols only",
+     "filters": {
+      "scientific_name_botanical": {
+       "blank": false
+      },
+      "processing_of_fruits_seeds": {
+       "blank": false
+      },
+      "seed_treatment": {
+       "blank": false
+      }
+     }
+    }
+   ]
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "mistake checks (ranges, numbers, gaps, storage spelling, repeats); average success and days by treatment; unreliable/slow/complete rules; template row skipped"
+  }
+ ]
+}

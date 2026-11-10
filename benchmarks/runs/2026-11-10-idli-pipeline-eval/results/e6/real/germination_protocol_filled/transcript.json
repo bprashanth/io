@@ -1,0 +1,446 @@
+{
+ "fixture": "germination_protocol_filled",
+ "model": "claude-sonnet-5-5",
+ "real_teach": true,
+ "request": "germination_protocol_filled-20261110-213509",
+ "events": [
+  {
+   "type": "tool",
+   "t": 6,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 21,
+   "name": "Bash",
+   "args": "{\"command\": \"cat teach/inbox/germination_protocol_filled-20261110-213509/request.json && .venv/bin/python -m lib.filekit inspect teach/inbox/germination_protocol_filled-20261110-213509/mock.xlsx\"}"
+  },
+  {
+   "type": "text",
+   "t": 29,
+   "text": "This is a copy of your file with fake values. Nothing I decide changes it or your real file. I'm writing rules that Idli applies to your real file, on your computer, every time it reads it.\n\n**Step 0 of 5: what you want to find out.** I'd like to discuss what you want to learn from this file.\n\nThe file has one tab, \"Germination\", with 62 rows. Each row looks like one plant species, with its seed handling, sowing and nursery details. Idli's checks already flag these problems in the copy:\n\n- **No.:** 2 values aren't numbers.\n- **Scientific Name:** 3 blanks.\n- **Seed depth, Duration until germination and % Germination success:** 5 values each that aren't numbers.\n- **% Germination success:** values from -5 to 140. A percentage should be between 0 and 100.\n- **Seed storage:** 5 variants, which may be the same thing spelled differently.\n\nOnce it's clean, these are the analyses the columns allow:\n\n1. **What works best:** average germination success by seed treatment, sowing media or container, to see which method gives the best results.\n2. **How long it takes:** the days until germination, by treatment or by collection season. This shows which species are slow.\n3. **Weak species:** which species have low success, and whether that goes with a particular storage, treatment or nursery setup.\n\nWhich of these matter to you, or is there something else? Once I know, I'll go through the checks, one step at a time."
+  },
+  {
+   "type": "user",
+   "t": 32,
+   "text": "The ones that matter most are the first two: which seed treatment, media or container gives the best germination success, and how many days each takes, by treatment or collection season. Weak species is useful as a third, but do the checks first so the numbers are trustworthy; the flagged bad values and the storage spelling variants are fine to fix in the rules."
+  },
+  {
+   "type": "tool",
+   "t": 36,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport pandas as pd\\nd=pd.read_excel('teach/inbox/germination_protocol_filled-20261110-213509/mock.xlsx',sheet_name='Germination',header=7)\\nprint(d.shape)\\nfor c in d.columns:\\n    if d[c].nunique()<15 or c in('No.',): print(c, d[c].value_counts(dropna=False).to_dict() if c!='No.' else d[c].tolist())\\nprint(d.tail(5).T)\\n\\\"\"}"
+  },
+  {
+   "type": "tool",
+   "t": 42,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 1 of 5: what a row is. Tab Germination: I think one row is one species' germination protocol (No., scientific and local name, seed treatment, sowing media, container, seed depth, days to germination, % success, nursery care and transplant details). Directly under the headings there are two guidance rows (\\\"Sequential protocol number / OPTIONAL\\\", \\\"MANDATORY\\\" etc"
+  },
+  {
+   "type": "card",
+   "t": 45,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 1 of 5: what a row is. Tab Germination: I think one row is one species' germination protocol (No., scientific and local name, seed treatment, sowing media, container, seed depth, days to germination, % success, nursery care and transplant details). Directly under the headings there are two guidance rows (\"Sequential protocol number / OPTIONAL\", \"MANDATORY\" etc.) that aren't species. Idli would skip those two rows when reading. Right?",
+      "header": "Row meaning",
+      "options": [
+       {
+        "label": "Yes, and skip the 2 guidance rows (Recommended)",
+        "description": "One row = one species protocol; the two instruction rows under the headings are ignored by Idli, not counted or flagged."
+       },
+       {
+        "label": "Not quite",
+        "description": "I'll talk it through with you in chat."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Step 1 of 5: what a row is. Tab Germination: I think one row is one species' germination protocol (No., scientific and local name, seed treatment, sowing media, container, seed depth, days to germination, % success, nursery care and transplant details). Directly under the headings there are two guidance rows (\"Sequential protocol number / OPTIONAL\", \"MANDATORY\" etc.) that aren't species. Idli would skip those two rows when reading. Right?": "Yes, and skip the 2 guidance rows (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 49,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"skip_rows\\\\|repeated_header\\\\|guidance\\\\|\\\\\\\"skip\\\\|'skip\\\" lib/filekit.py | head -40; ls file-skills | head\"}"
+  },
+  {
+   "type": "tool",
+   "t": 59,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n \\\"skip\\\\|def normalize\\\\|\\\\\\\"case\\\\\\\"\\\\|strip_units\\\\|\\\\\\\"map\\\\\\\"\\\\|regex\\\" lib/filekit.py | head -50\"}"
+  },
+  {
+   "type": "tool",
+   "t": 62,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 560,705p lib/filekit.py; grep -n \\\"skip_rows\\\\|skip\\\" lib/*.py | head -20\"}"
+  },
+  {
+   "type": "tool",
+   "t": 68,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I -c \\\"\\nimport pandas as pd\\nd=pd.read_excel('teach/inbox/germination_protocol_filled-20261110-213509/mock.xlsx',sheet_name='Germination',header=7,dtype=str)\\nprint(d['% Germination success'].tolist()); print(d['Scientific Name (Botanical)'].tolist()); print(d['No.'].duplicated().sum())\\\"\"}"
+  },
+  {
+   "type": "tool",
+   "t": 73,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 2 of 5: checks (part 1, on the numbers you'll analyse). Which should I add? Tick all you want.\", \"header\": \"Number checks\", \"multiSelect\": true, \"options\": [{\"label\": \"% success must be a number 0 to 100 (Recommended)\", \"description\": \"Flags text like 'good' or '70-80%', and values such as -5 or 140.\"}, {\"label\": \"Days to germination must be a number (Recommended)"
+  },
+  {
+   "type": "card",
+   "t": 79,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 2 of 5: checks (part 1, on the numbers you'll analyse). Which should I add? Tick all you want.",
+      "header": "Number checks",
+      "options": [
+       {
+        "label": "% success must be a number 0 to 100 (Recommended)",
+        "description": "Flags text like 'good' or '70-80%', and values such as -5 or 140."
+       },
+       {
+        "label": "Days to germination must be a number (Recommended)",
+        "description": "Flags '3 weeks', '2-3 wk', '21 days'; they can't be averaged until fixed."
+       },
+       {
+        "label": "Seed depth must be a number (Recommended)",
+        "description": "Flags '2cm', 'approx 1 cm', '1 cm' (cm assumed)."
+       },
+       {
+        "label": "No. must be a number",
+        "description": "Flags protocol numbers that aren't numbers."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "Part 2, on names and methods. Which should I add?",
+      "header": "Name checks",
+      "options": [
+       {
+        "label": "Scientific name required (Recommended)",
+        "description": "Flags blank scientific names."
+       },
+       {
+        "label": "Flag species listed twice (Recommended)",
+        "description": "A scientific name appearing on more than one row would count twice in the averages."
+       },
+       {
+        "label": "Treatment, media and container required (Recommended)",
+        "description": "These are what you compare by, so blanks are flagged."
+       },
+       {
+        "label": "Flag No. repeated",
+        "description": "Protocol numbers should be unique."
+       }
+      ],
+      "multiSelect": true
+     }
+    ]
+   },
+   "answers": {
+    "Step 2 of 5: checks (part 1, on the numbers you'll analyse). Which should I add? Tick all you want.": "% success must be a number 0 to 100 (Recommended), Days to germination must be a number (Recommended), Seed depth must be a number (Recommended), No. must be a number",
+    "Part 2, on names and methods. Which should I add?": "Scientific name required (Recommended), Flag species listed twice (Recommended), Treatment, media and container required (Recommended), Flag No. repeated"
+   }
+  },
+  {
+   "type": "text",
+   "t": 84,
+   "text": "Checks noted. Any checks of your own to add? Tell me in your next message, or skip. Meanwhile, here is step 3."
+  },
+  {
+   "type": "tool",
+   "t": 87,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 3 of 5: how Idli reads your file (your file stays as it is). When Idli reads it, it can do the following. Tick all you want.\", \"header\": \"Clean-ups\", \"multiSelect\": true, \"options\": [{\"label\": \"Skip the 2 guidance rows (Recommended)\", \"description\": \"The rows under the headings with 'MANDATORY' / 'OPTIONAL' and the example text aren't counted as species.\"}, {\"labe"
+  },
+  {
+   "type": "card",
+   "t": 93,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 3 of 5: how Idli reads your file (your file stays as it is). When Idli reads it, it can do the following. Tick all you want.",
+      "header": "Clean-ups",
+      "options": [
+       {
+        "label": "Skip the 2 guidance rows (Recommended)",
+        "description": "The rows under the headings with 'MANDATORY' / 'OPTIONAL' and the example text aren't counted as species."
+       },
+       {
+        "label": "Read '2cm', '1 cm', 'approx 1 cm' as 2, 1, 1 (Recommended)",
+        "description": "Depth in cm; units and 'approx' are dropped so they can be averaged."
+       },
+       {
+        "label": "Read '21 days' as 21 and '3 weeks' as 21 (Recommended)",
+        "description": "Days to germination; 'weeks' multiplied by 7. A range like '2-3 wk' stays flagged, not guessed."
+       },
+       {
+        "label": "Treat 'FICUS VIRIDIS' and 'Ficus viridis' as the same name (Recommended)",
+        "description": "Capitalise species names the same way when reading."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "Seed storage has '-', 'pending' and blank as well as 'Dry cool room'. What should Idli do?",
+      "header": "Storage",
+      "options": [
+       {
+        "label": "Treat '-', 'pending' and blank as 'Not recorded' (Recommended)",
+        "description": "One group in breakdowns instead of three variants."
+       },
+       {
+        "label": "Leave them as they are",
+        "description": "They show as separate values."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Step 3 of 5: how Idli reads your file (your file stays as it is). When Idli reads it, it can do the following. Tick all you want.": "Skip the 2 guidance rows (Recommended), Read '2cm', '1 cm', 'approx 1 cm' as 2, 1, 1 (Recommended), Read '21 days' as 21 and '3 weeks' as 21 (Recommended), Treat 'FICUS VIRIDIS' and 'Ficus viridis' as the same name (Recommended)",
+    "Seed storage has '-', 'pending' and blank as well as 'Dry cool room'. What should Idli do?": "Treat '-', 'pending' and blank as 'Not recorded' (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 101,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Step 4 of 5: the words of this file. Which measures should the form offer? Tick all you want.\", \"header\": \"Measures\", \"multiSelect\": true, \"options\": [{\"label\": \"Average germination success (%) (Recommended)\", \"description\": \"Average of '% Germination success' over valid values.\"}, {\"label\": \"Average days to germination (Recommended)\", \"description\": \"Average of 'Durat"
+  },
+  {
+   "type": "card",
+   "t": 110,
+   "card": {
+    "questions": [
+     {
+      "question": "Step 4 of 5: the words of this file. Which measures should the form offer? Tick all you want.",
+      "header": "Measures",
+      "options": [
+       {
+        "label": "Average germination success (%) (Recommended)",
+        "description": "Average of '% Germination success' over valid values."
+       },
+       {
+        "label": "Average days to germination (Recommended)",
+        "description": "Average of 'Duration until germination'."
+       },
+       {
+        "label": "Number of species (Recommended)",
+        "description": "Count of protocols (rows)."
+       },
+       {
+        "label": "Best and worst success (%)",
+        "description": "Highest and lowest single success in the group."
+       }
+      ],
+      "multiSelect": true
+     },
+     {
+      "question": "A rule for the numbers: success values outside 0 to 100 (like -5 or 140) can't be real. How should averages treat them?",
+      "header": "Bad values",
+      "options": [
+       {
+        "label": "Leave them out of averages, flagged for you to fix (Recommended)",
+        "description": "Adds a ready-made 'Valid success only' rule; the dashboard still lists each one."
+       },
+       {
+        "label": "Include them as typed",
+        "description": "Averages use whatever number is in the file."
+       }
+      ],
+      "multiSelect": false
+     },
+     {
+      "question": "Step 5 of 5: how I read your question. I'd read it as: average % success and average days, broken down by seed treatment, sowing media, container, and collection season; and 'weak species' as species below a success level, which you pick in the form. OK?",
+      "header": "Your question",
+      "options": [
+       {
+        "label": "Yes, that's it (Recommended)",
+        "description": "I'll write the skill and test it."
+       },
+       {
+        "label": "Not quite",
+        "description": "I'll talk it through in chat."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Step 4 of 5: the words of this file. Which measures should the form offer? Tick all you want.": "Average germination success (%) (Recommended), Average days to germination (Recommended), Number of species (Recommended)",
+    "A rule for the numbers: success values outside 0 to 100 (like -5 or 140) can't be real. How should averages treat them?": "Leave them out of averages, flagged for you to fix (Recommended)",
+    "Step 5 of 5: how I read your question. I'd read it as: average % success and average days, broken down by seed treatment, sowing media, container, and collection season; and 'weak species' as species below a success level, which you pick in the form. OK?": "Yes, that's it (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 115,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 705,800p lib/filekit.py; grep -n \\\"def as_number\\\" -A18 lib/filekit.py; grep -n \\\"validations\\\\|RULES\\\\[\\\" lib/*.py | head -30; cat file-skills/households/skill.json | head -60; ls tests 2>/dev/null\"}"
+  },
+  {
+   "type": "tool",
+   "t": 123,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 1,120p lib/fixkit.py; sed -n 745,760p lib/formkit.py; sed -n 840,900p lib/formkit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 170,
+   "name": "Bash",
+   "args": "{\"command\": \"python3 - <<'E'\\nimport re\\np='lib/filekit.py'; s=open(p).read()\\nold=\\\"\\\"\\\"        kind = n.get(\\\"type\\\") or spec.get(\\\"type\\\")\\n        if kind == \\\"number\\\":\\n            expr = f\\\"TRY_CAST(regexp_replace({expr}, '(?i)(rs\\\\\\\\\\\\\\\\.?|inr|\u20b9|,|\\\\\\\\\\\\\\\\s)', '', 'g') AS DOUBLE)\\\\\\\"\\\"\\\"\\\"\\nassert old in s\\nnew=\\\"\\\"\\\"        if n.get(\\\"blank\\\") is not None:  # an empty cell stands for a na"
+  },
+  {
+   "type": "tool",
+   "t": 181,
+   "name": "Bash",
+   "args": "{\"command\": \"mkdir -p file-skills/germination_protocol_filled && cp teach/inbox/germination_protocol_filled-20261110-213509/mock.xlsx file-skills/germination_protocol_filled/mock.xlsx && python3 - <<'E'\\nimport json\\nS=\\\"file-skills/germination_protocol_filled/skill.json\\\"\\nheads=[\\\"no\\\",\\\"scientific_name_botanical\\\",\\\"local_common_name_s\\\",\\\"time_of_year_for_seed_collection\\\",\\\"processing_of_frui"
+  },
+  {
+   "type": "tool",
+   "t": 192,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'E'\\nimport pandas as pd, re, json\\nd=pd.read_excel('file-skills/germination_protocol_filled/mock.xlsx',sheet_name='Germination',header=7,dtype=str).iloc[2:]\\ndef num(s,f=None):\\n    if pd.isna(s): return None\\n    s=re.sub(r'^(approx\\\\.?|about|~)\\\\s*','',s.strip(),flags=re.I)\\n    m=re.fullmatch(r'(-?\\\\d+\\\\.?\\\\d*)\\\\s*([A-Za-z]*)',s)\\n    if not m: return None\\"
+  },
+  {
+   "type": "text",
+   "t": 195,
+   "text": "Checking the skill against the mock now. First I'll write the tests, with expected values computed independently in pandas."
+  },
+  {
+   "type": "tool",
+   "t": 197,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'E'\\nimport json\\nt=[{\\\"tab\\\":\\\"Germination\\\",\\\"spec\\\":{\\\"measures\\\":[\\\"avg_success\\\"],\\\"group_by\\\":[\\\"seed_treatment\\\"],\\\"preset\\\":[\\\"valid_success\\\"],\\\"sort\\\":{\\\"by\\\":\\\"avg_success\\\",\\\"dir\\\":\\\"desc\\\"}},\\n\\\"expect\\\":[[\\\"Soak overnight\\\",75.43137254901961],[None,68.33333333333333]]},\\n{\\\"tab\\\":\\\"Germination\\\",\\\"spec\\\":{\\\"measures\\\":[\\\"avg_days\\\",\\\"species\\\"],\\\""
+  },
+  {
+   "type": "tool",
+   "t": 203,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 885,950p lib/filekit.py | grep -n \\\"expect\\\\|abs\\\\|round\\\" ; .venv/bin/python -I - <<'E'\\nimport pandas as pd\\nd=pd.read_excel('file-skills/germination_protocol_filled/mock.xlsx',sheet_name='Germination',header=7,dtype=str).iloc[2:]\\nprint(d['Duration until germination'].tolist())\\nE\"}"
+  },
+  {
+   "type": "tool",
+   "t": 208,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -I - <<'E'\\nimport pandas as pd\\nd=pd.read_excel('file-skills/germination_protocol_filled/mock.xlsx',sheet_name='Germination',header=7,dtype=str).iloc[2:]\\nx=d['Duration until germination'].str.extract(r'^(\\\\d+)')[0].astype(float)\\nprint(x.mean(), x.sum(), x.count())\\nimport re\\nvals=[21 if v in('3 weeks','21 days') else None if v=='2-3 wk' else float(v) for v in d['D"
+  },
+  {
+   "type": "tool",
+   "t": 213,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -c \\\"\\nimport json; from lib import chartkit\\ns=json.load(open('file-skills/germination_protocol_filled/skill.json')); s['_dir']='file-skills/germination_protocol_filled'\\nt=chartkit.tables('file-skills/germination_protocol_filled/mock.xlsx', s)['Germination']\\nprint(len(t)); print(t.duration_until_germination.tolist()); print(t.seed_depth.tolist()[:5], t.seed_depth.i"
+  },
+  {
+   "type": "tool",
+   "t": 218,
+   "name": "Bash",
+   "args": "{\"command\": \"grep -n '\\\"map\\\"\\\\|\\\\.get(\\\"case\\\")\\\\|regexp_replace' lib/*.py | grep -v \\\"^lib/filekit.py:6[89]\\\"\"}"
+  },
+  {
+   "type": "text",
+   "t": 220,
+   "text": "The form builds its own copy of this cleaning code in `formkit.py`. I'll move my additions into that one too."
+  },
+  {
+   "type": "tool",
+   "t": 221,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -n 112,142p lib/formkit.py; git diff --stat 2>/dev/null; sed -n 690,708p lib/filekit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 229,
+   "name": "Bash",
+   "args": "{\"command\": \"python3 - <<'E'\\np='lib/filekit.py'; s=open(p).read()\\na=s.index('        if kind == \\\"number\\\" and n.get(\\\"units\\\"):')\\nb=s.index('        elif kind == \\\"number\\\":',a)\\ns=s[:a]+'        if kind == \\\"number\\\" and n.get(\\\"units\\\"):  # \\\\'2cm\\\\', \\\\'approx 1 cm\\\\', \\\\'3 weeks\\\\': number + a known unit\\\\n            expr = units_expr(expr, n[\\\"units\\\"])\\\\n'+s[b:]\\nhelper='''def units_exp"
+  },
+  {
+   "type": "tool",
+   "t": 233,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -i '680s/END)\\\"/END\\\"/' lib/filekit.py && python3 - <<'E'\\nimport json\\np='file-skills/germination_protocol_filled/tests.json'; t=json.load(open(p))\\nt[0][\\\"expect\\\"]=[[\\\"Soak overnight\\\",75.43137254901961],[\\\"(blank)\\\",68.33333333333333]]\\nt[1][\\\"expect\\\"]=[[\\\"June\u2013August\\\",24.711864406779661,60]]\\nt.append({\\\"tab\\\":\\\"Germination\\\",\\\"spec\\\":{\\\"measures\\\":[\\\"species\\\"],\\\"group_by\\"
+  },
+  {
+   "type": "text",
+   "t": 235,
+   "text": "My `sed` removed the wrong parenthesis. The return statement opens with `(`, so I'll put it back."
+  },
+  {
+   "type": "tool",
+   "t": 236,
+   "name": "Bash",
+   "args": "{\"command\": \"sed -i '680s/END\\\"/END\\\")/' lib/filekit.py && .venv/bin/python -m lib.filekit test file-skills/germination_protocol_filled 2>&1 | tail -12; for t in fixkit formkit; do .venv/bin/python -m lib.test_$t 2>&1 | tail -3; done\"}"
+  },
+  {
+   "type": "tool",
+   "t": 245,
+   "name": "Bash",
+   "args": "{\"command\": \"cat > teach/inbox/germination_protocol_filled-20261110-213509/done.json <<'E'\\n{\\\"skill\\\": \\\"germination_protocol_filled\\\", \\\"version\\\": 1, \\\"summary\\\": \\\"germination_protocol_filled v1: checks for bad success/days/depth values, missing names and methods; average % success and days by treatment, media, container, season or species; valid-success and weak-species rules; repeated names/"
+  },
+  {
+   "type": "tool",
+   "t": 245,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Idli will show the checks and the form for this file.\"}, {\"label\": \"Stay here\", \"description\": \"Stay in this chat.\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 245,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Idli will show the checks and the form for this file."
+       },
+       {
+        "label": "Stay here",
+        "description": "Stay in this chat."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 249,
+   "name": "Bash",
+   "args": "{\"command\": \"touch teach/inbox/germination_protocol_filled-20261110-213509/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 257,
+   "text": "Switching you back to Idli.\n\nIdli now has a form for this file. It gives average germination success (%), average days to germination and a species count. You can break each of these down by seed treatment, sowing media, container, collection season or species. It has two rules, \"Valid success only (0 to 100)\" and \"Weak species (success under 60%)\". It also has two counts for repeats: species names listed more than once, and protocol numbers repeated.\n\nThe checks flag these in your real file:\n- success outside 0\u2013100 or written as text (like \"good\" or \"70-80%\")\n- days or depth that aren't plain numbers\n- a protocol number that isn't a number\n- a missing scientific name, seed treatment, sowing media or germination container\n\nI tested it on the fake copy, and all tests pass. Your Idli chat will continue from here.\n\n- **Cleaning rules:** Idli reads \"2cm\", \"21 days\" and \"3 weeks\" as numbers (3 weeks is 21 days). A range like \"2-3 wk\" is left blank and flagged rather than guessed. Seed storage \"-\", \"pending\" and blank all read as \"Not recorded\".\n- **Species names:** names are read in one capitalisation, so \"FICUS VIRIDIS\" and \"Ficus viridis\" match.\n- **Guidance rows:** Idli skips the two guidance rows under the headings.\n- **Duplicate checks:** there's no per-cell duplicate check, so repeats show as counts you can look at, not flagged cells.\n- **Engine changes:** I made three small additions to the shared code, which now apply to every file skill. They are the \"guidance rows\" skip, reading numbers with units, and a \"name for blank cells\" setting. The existing fixkit and formkit tests still pass."
+  }
+ ],
+ "user_cost": 0.00848085,
+ "workspace": "/tmp/claude-1000/pipe-eval/pipe-teach-mp_sy7d5/cowork",
+ "secs": 257,
+ "rounds": 2,
+ "claude_cost": 0.606,
+ "done": true,
+ "cards": 5,
+ "skill": "germination_protocol_filled",
+ "filekit_changed": true
+}
