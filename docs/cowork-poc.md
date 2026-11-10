@@ -8,6 +8,19 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10 (night), DGX: no index, no file search; each chat gets only the tools it needs.** Handoff page:
+  [idli-handoff.md](idli-handoff.md).
+  - **Idli** asks for the file's link instead of searching Drive.
+  - **Start here** has its own folder (`~/idli-insights/setup`) and heading. It only checks sign-ins (Google
+    through the Drive tab, Claude through `claude auth status`, Muse through `/v1/models`) with a new
+    `setup_check` tool.
+  - **Mission control** holds only What Idli has learned (`idli/LEARNED.md`).
+  - **Tool lists:** a per-folder `cowork.tools` file, written by the bootstrap, keeps each chat's tools to its
+    job. Idli has 12 (it had 34), Start here 1, Mission control 3.
+  - **Migration:** the bootstrap archives the old Start here workspace.
+  - **Verified on the DGX:** the tool lists, the Claude and Muse checks, and the formkit and fixkit tests.
+  - **Laptop:** run `git pull dgx oss-desktop-eval`, then the bootstrap.
+  - **Known gap:** a working copy now lands in My Drive (the folder came from the index).
 - **2026-11-10 (evening), DGX: one file at a time; an eval of the whole pipeline is planned.** The owner
   dropped the upfront Drive index from the journey. Idli works from one link or upload at a time, and each learned
   file leaves a context card. Those cards become the index and, later, a graph like idlisseus's site-pack graph

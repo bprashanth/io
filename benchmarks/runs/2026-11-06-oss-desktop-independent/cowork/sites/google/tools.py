@@ -739,7 +739,67 @@ def t_drive_find(query):
     return r
 
 
+# ---------------------------------------------------------------- Start here: is everything signed in?
+def _check_google():
+    try:
+        tab = tab_for("drive.google.com", "docs.google.com", open_url=drive_url())
+        for _ in range(10):
+            time.sleep(1)
+            url = next((t["url"] for t in tabs() if t["id"] == tab), "")
+            if "accounts.google.com" in url or "ServiceLogin" in url or "workspace.google.com" in url:
+                return False, "not signed in: sign in to Google in the Drive tab at the top"
+            if "drive.google.com/drive" in url:
+                return True, "signed in"
+        return False, "the Drive tab didn't open: open drive.google.com in a tab at the top and sign in"
+    except Exception as e:
+        return False, f"couldn't check ({type(e).__name__})"
+
+
+def _check_claude():
+    import shutil
+    import subprocess
+    exe = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
+    if not os.path.exists(exe):
+        return False, "Claude Code isn't installed"
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_CONFIG_DIR", "ANTHROPIC_BASE_URL",
+                                                             "ANTHROPIC_CUSTOM_HEADERS", "ANTHROPIC_AUTH_TOKEN")}
+    try:
+        r = subprocess.run([exe, "auth", "status"], capture_output=True, text=True, timeout=30, env=env)
+        ok = bool(json.loads(r.stdout or "{}").get("loggedIn"))
+    except Exception:
+        ok = False
+    return ok, "signed in" if ok else "not signed in: open the Claude workspace (left sidebar) and sign in there"
+
+
+def _check_muse():
+    import urllib.request
+    from lib import muse
+    try:
+        req = urllib.request.Request(muse.base_url() + "/v1/models", headers=muse.headers())
+        with urllib.request.urlopen(req, timeout=10) as r:
+            ok = r.status == 200
+    except Exception:
+        ok = False
+    return ok, "reachable" if ok else ("not reachable: the Idli code you were given may be missing or expired"
+                                       if muse.access() else "not set up: Idli needs its access code")
+
+
+def t_setup_check():
+    """The Start here checklist: Google (Drive tab), Claude (teaching), Idli's private model (Muse)."""
+    checks = {"Google Drive": _check_google(), "Claude (teaches Idli new files)": _check_claude(),
+              "Idli's private model": _check_muse()}
+    lines = [f"{'✓' if ok else '✗'} {name}: {why}" for name, (ok, why) in checks.items()]
+    all_ok = all(ok for ok, _ in checks.values())
+    return {"all_ok": all_ok, "checklist": lines,
+            "say_to_user": "\n".join(lines) + "\n\n" + (
+                "All set. Go to Idli in the left sidebar, open the \"New chat\" tab, and paste a link to a "
+                "spreadsheet from your Drive." if all_ok else
+                "Fix the ✗ items, then say \"check again\".")}
+
+
 TOOLS = {
+    "setup_check": (t_setup_check, "Check that everything Idli needs is signed in: Google (the Drive tab), Claude, "
+                    "and Idli's private model. Returns a checklist to show the user as is.", {}, []),
     "drive_find": (t_drive_find, "Find a file in the user's Drive from their words, using Idli's local index (fast). "
                    "Use this first to find any Drive file. Says found / choose / none.",
                    {"query": {"type": "string", "description": "The user's words for the file"}}, ["query"]),

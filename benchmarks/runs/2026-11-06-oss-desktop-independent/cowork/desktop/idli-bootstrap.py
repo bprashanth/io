@@ -29,14 +29,22 @@ COWORK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IDLI = os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights")
 DRY = "--dry-run" in sys.argv
 LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md)
-    ("Start here", os.path.join(IDLI, "start-here"), os.path.join(COWORK, "idli", "START-HERE.md")),
-    ("What Idli has learned", os.path.join(IDLI, "start-here"), None),
+    ("Start here", os.path.join(IDLI, "setup"), os.path.join(COWORK, "idli", "START-HERE.md")),
+    ("What Idli has learned", os.path.join(IDLI, "start-here"), os.path.join(COWORK, "idli", "LEARNED.md")),
     ("Idli", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
     ("Claude", COWORK, None),
 ]
 FOLDER = {n: f for n, f, _ in LAYOUT}
-HEADING = {"Start here": "Mission control", "What Idli has learned": "Mission control"}  # the sidebar heading (project) when it differs from the workspace
+HEADING = {"What Idli has learned": "Mission control"}  # the sidebar heading (project) when it differs from the workspace
 SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
+# Each chat sees only the tools its job needs (a `cowork.tools` allow-list per folder; a small model chooses better
+# from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
+TOOLSETS = {
+    "Start here": ["setup_check"],
+    "What Idli has learned": ["show_skills", "skills_list", "skill_delete"],
+    "Idli": ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "teach_file", "teach_send",
+             "working_copy", "working_copy_ready", "chart_request", "chart_show"],
+}
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 TABS = ["https://drive.google.com/drive/my-drive"]  # Gmail later; Drive is all the first run needs
 
@@ -84,6 +92,13 @@ def folders():
             say(f"write {dest}")
             if not DRY:
                 shutil.copyfile(instructions, dest)
+        tools = os.path.join(path, "cowork.tools")
+        want = "\n".join(TOOLSETS.get(name, [])) + "\n"
+        if name in TOOLSETS and (not os.path.exists(tools) or open(tools).read() != want):
+            say(f"write {tools}")
+            if not DRY:
+                with open(tools, "w") as f:
+                    f.write(want)
         sites = os.path.join(path, "cowork.sites")
         if not os.path.exists(sites) or open(sites).read() != SITES:
             say(f"write {sites}")
@@ -190,7 +205,7 @@ def learned_tab(agent_id):
     py = os.path.join(COWORK, ".venv", "bin", "python")
     r = subprocess.run([py if os.path.exists(py) else sys.executable, "-c",
                         "import sys,json; sys.path.insert(0, sys.argv[1]); from lib import formserver as f; "
-                        "print(json.dumps(f.ensure(sys.argv[2])))", COWORK, FOLDER["Start here"]],
+                        "print(json.dumps(f.ensure(sys.argv[2])))", COWORK, FOLDER["What Idli has learned"]],
                        capture_output=True, text=True, timeout=60, env=ENV)
     if r.returncode:
         say("the page server didn't start: " + r.stderr.strip()[-200:])
@@ -225,20 +240,31 @@ def start_tabs(agent_id):
         return
     have = {urllib.parse.urlparse(t["url"]).hostname for t in browser.tabs()}
     for url in TABS:
-        if urllib.parse.urlparse(url).hostname not in have and not opened(url):
+        key = url + "@" + FOLDER["Start here"]  # Start here moved folders (2026-11-10): open its tabs again there
+        if urllib.parse.urlparse(url).hostname not in have and not opened(key):
             say(f"open tab {urllib.parse.urlparse(url).hostname}")
             browser.paseo("browser_new_tab", url=url)
-        opened(url, True)
+        opened(key, True)
+
+
+def retire_old_start_here():
+    """Until 2026-11-10 Start here shared Mission control's folder (and indexed the Drive). It has its own folder
+    and heading now and only checks sign-ins: archive the old workspace (and its chat)."""
+    for w in paseo("workspace", "ls") or []:
+        if w["name"] == "Start here" and not same(w["cwd"], FOLDER["Start here"]):
+            say(f"archive the old Start here workspace in {w['cwd']}")
+            paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
 
 
 def main():
     folders()
     ids = projects_and_workspaces()
+    retire_old_start_here()
     agent = start_chat(ids.get("Start here"))
     start_tabs(agent)
     learned_tab(chat(ids.get("What Idli has learned"), FOLDER["What Idli has learned"], "What Idli has learned", "learned"))
     chat(ids.get("Idli"), FOLDER["Idli"], "New chat", "hi")  # Idli keeps one waiting from then on
-    say("done. Heading order: Mission control, Idli, Claude (drag once until Paseo patch P2).")
+    say("done. Heading order: Start here, Mission control, Idli, Claude (drag once until Paseo patch P2).")
 
 
 if __name__ == "__main__":

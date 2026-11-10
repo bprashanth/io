@@ -96,6 +96,22 @@ TOOLS["report_gap"] = (t_report_gap,
                         "site": {"type": "string"}}, ["wanted"])
 
 
+def enabled_tools():
+    """Optional allow-list for this workspace: a `cowork.tools` file (one tool per line) next to `cowork.sites`.
+    A small model chooses better from fewer tools, so each chat gets only what its job needs."""
+    try:
+        with open(os.path.join(os.environ.get("COWORK_DATA_DIR") or os.getcwd(), "cowork.tools")) as f:
+            return {l.split("#")[0].strip() for l in f} - {""}
+    except OSError:
+        return None
+
+
+_ALLOWED = enabled_tools()
+if _ALLOWED is not None:
+    for _n in [n for n in TOOLS if n not in _ALLOWED]:
+        del TOOLS[_n]
+
+
 def call(name, args):
     try:
         return TOOLS[name][0](**args), False
