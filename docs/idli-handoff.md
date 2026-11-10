@@ -1,6 +1,6 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-10 (evening), DGX. Overwrite this page whenever the state changes, and keep the chronology
+Last updated 2026-11-10 (~20:30 IST), DGX. Overwrite this page whenever the state changes, and keep the chronology
 (`docs/cowork-poc.md`, "What changed") and the latest field note in step with it.
 
 ## What we are building now
@@ -109,21 +109,86 @@ Everything lives under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowor
 - `desktop/setup-laptop.py`: Paseo providers.
 - `desktop/muse-connect.py`: points Idli at silo.
 
-## State right now (2026-11-10 evening)
-- **Product (on `oss-desktop-eval`):**
-  - No Drive index and no file search. Idli asks for a link.
-  - Start here has its own folder (`~/idli-insights/setup`) and only checks Google, Claude and Muse.
-  - Mission control holds only What Idli has learned.
-  - The Idli chat gets 12 tools instead of 34.
-  - Verified on the DGX: the tool lists, the Claude and Muse checks, the unit tests.
-  - Still to verify on the laptop: the pull, the bootstrap, the screenshot, and one run from a link.
-  - Known gap: without the index, a working copy lands in My Drive instead of the original's folder
-    (`working_copy` used the index to find the folder).
-- **Evals:** a background agent is running E6 (cleaning output on files with planted mess) and E7 (fewer tools
-  by phase) on branch `idli-pipeline-eval`, and stops for a report before E1-E5. E8 (file search) and E10
-  (redaction) are skipped on the owner's word. Messy example files include the two hollow templates the owner
-  attached: a germination protocol, and a tax questionnaire that is private, so only its structure is used.
-- **Demo:** the installers work but lack our Paseo patches (P1, P3, P12). See D1-D11.
+## State right now (2026-11-10, ~20:30 IST): read this to resume
+If the session that wrote this hung, everything below is in git or on disk. Nothing needs it to be alive.
+
+### 1. Product change: done, almost verified
+- **Commits on `oss-desktop-eval`** (DGX; not pushed to GitHub):
+  - `94570b4`: no Drive index or file search (link first). Start here only checks sign-ins (`setup_check`) in
+    its own folder `~/idli-insights/setup`. Mission control is only What Idli has learned (`idli/LEARNED.md`).
+    Tool lists per chat (`cowork.tools`: Idli 12 tools, Start here 1, Mission control 3).
+  - `2da8988`: `setup_check` waits for Muse longer and says busy, refused or not set up. Google errors carry
+    their message.
+- **Laptop:** pulled to `2da8988` (`git pull dgx oss-desktop-eval`). The bootstrap was run, which:
+  - archived the old Start here workspace;
+  - made a new "Start here" chat (in `~/idli-insights/setup`);
+  - replaced the stale "New chat" (it had the old 34 tools) with a fresh one.
+- **Verified:**
+  - On the DGX: tool lists (`COWORK_DATA_DIR=<folder> .venv/bin/python cowork_mcp.py --list`), the Claude and
+    Muse checks, and the formkit and fixkit tests (`PYTHONPATH=. .venv/bin/python lib/test_formkit.py`).
+  - On the laptop: Start here's first check said Claude ✓, Muse ✗ and Google ✗ ("couldn't check
+    (RuntimeError)"). From a laptop shell, Muse answered 200 through silo. The check took 44 s, so Muse was
+    likely slow or busy. `2da8988` makes the reason visible.
+- **Still to do:**
+  1. In Start here, send "check again". The chat must be reloaded or new to load the new code
+     (`paseo agent reload <id>`, then `paseo agent send <id> "check again"`). If Google still fails, read the
+     message it now gives. The cause is likely the browser tools from a workspace that isn't on screen.
+  2. Screenshot the sidebar (`python3 desktop/drive.py shot sidebar`). Expect Start here, Mission control (What
+     Idli has learned), Idli and Claude.
+  3. Run one journey from a pasted link in the new "New chat": start card, Analyse, paste the cestrum file's
+     link, then one question.
+  4. Known gap: a working copy now lands in My Drive (it used the index to find the original's folder).
+     Fix: have `file_get` record the parent folder.
+- **Driving the laptop from the DGX:**
+  - CLI: `cowork/desktop/paseo-remote.sh` (tunnel port 46767).
+  - Laptop terminal: `paseo-remote.sh terminal create --workspace <full Claude workspace id>`, then
+    `terminal send-keys <id> "<cmd>" Enter` and `terminal capture -S <id>`. Use `-S`: without it, capture can
+    come back empty.
+  - The daemon sometimes times out ("Liveness check timed out"). Retry, or ask the owner to rerun
+    `desktop/laptop-up.sh`.
+
+### 2. Evals: running in a background agent
+- **Plan:** `benchmarks/runs/2026-11-10-idli-pipeline-eval/PLAN.md`.
+- **Scope:**
+  - Run order: E6 (cleaning output on planted-mess files), E7 (fewer tools by phase), then stop for a report.
+    After that: E1 (fake copy fidelity), E2 (teaching from the fake copy, judged on the real file), E3 (bounce to
+    Claude), E4 (answer wording), E5 (charts).
+  - Skipped by the owner: E8 (file search) and E10 (redaction). E9 (constrained dial setting) runs only if E7
+    leaves dial errors.
+  - The subject is the 9B (the free tier). Muse 30B is only the baseline.
+- **Where it works:**
+  - Branch `idli-pipeline-eval`, in worktree `.claude/worktrees/agent-aaf212a4b5f290bbe`. It is not pushed. Push
+    only with declaude.
+  - It merged `origin/idli-9b-bench`, which carries the harness and fixtures, and `oss-desktop-eval` (`687b8c2`).
+- **Done so far:**
+
+| Commit | What |
+|---|---|
+| `c0d92d9` | Planted-mess generator with manifests: 5 files, 209 known problems, written with Codex. Includes fake-filled versions of the owner's two templates: the germination protocol, and the tax questionnaire under a neutral name (private, structure only). Also: headless teach runner (Claude Code with the teach-file skill on Idli's fake copy, Haiku as the file owner), the E6 scorer, link-first chats, the E7 phase variants and a `list_changed` probe. Harness fixes: totals scored separately, a guard against Idli's own card where the user should type, card clicks as steps. |
+| `dcd5e17` | Partial E7 results (runs cut short) |
+| `bea46f4` | E7 variants from the merged product: e7-product = the 12 shipped tools; e7-p12 = the 12 tools plus the separate dial-setting call. The partial runs from before the merge are set aside. |
+
+- **Models:**
+  - Local 9B: container `idli9b-raw` on the DGX. It showed "unhealthy" once, so check it.
+  - OpenRouter: 9B + Ling.
+  - Muse: as a client only. Don't stop it.
+- **If the agent hangs:** it stalled once already (10 minutes with no output; the system stops a background agent
+  after that).
+  1. Check for runs still going with a `/proc` scan for `run.py` (no `pkill -f`), and look at
+     `git -C <worktree> log` and `git status`.
+  2. Commit any results.
+  3. Restart it, or start a new agent with: "continue the pipeline eval from PLAN.md and the commits on
+     idli-pipeline-eval; E6 and E7 first, then report".
+- **Results go to:** `benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md` on that branch, with one line per
+  finding in `docs/cowork-poc.md`.
+
+### 3. Demo installers (not active)
+Branch `idli-installers`. It works but lacks our Paseo patches P1, P3 and P12. Gaps D1-D11 are in
+`todos/idli-insights/p1/deployment_strategy.md`.
+
+### 4. Session settings
+`~/.claude/settings.json` now sets `API_TIMEOUT_MS=1800000` and `CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS=1200000`,
+because very long sessions were hitting "No response from API".
 
 ## Rules that always hold
 - Read only, except the working copy in Drive after a yes. Claude gets fake data only. Real data stays on the
