@@ -56,7 +56,7 @@ def visible(log):
 
 
 def export(run, models, variants, reps):
-    out_dir = os.path.join(run, "ux")
+    out_dir = os.path.join(run, "ux" + os.environ.get("UX_TAG", ""))
     os.makedirs(out_dir, exist_ok=True)
     convs = []
     for m in models:
@@ -84,7 +84,7 @@ def export(run, models, variants, reps):
 
 
 def judge(run):
-    out_dir = os.path.join(run, "ux")
+    out_dir = os.path.join(run, "ux" + os.environ.get("UX_TAG", ""))
     for p in sorted(glob.glob(os.path.join(out_dir, "batch*.txt"))):
         outp = p[:-4] + ".out.json"
         if os.path.exists(outp):
@@ -94,7 +94,7 @@ def judge(run):
                "Read the file " + os.path.basename(p) + " in this folder and do exactly what it says. Reply with the "
                "JSON only."]
         cmd.insert(2, "--skip-" + "git-repo-check")
-        subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
+        subprocess.run(cmd, capture_output=True, text=True, timeout=1200, stdin=subprocess.DEVNULL)
         try:
             txt = open(last).read()
             got = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
@@ -106,7 +106,7 @@ def judge(run):
 
 
 def table(run):
-    out_dir = os.path.join(run, "ux")
+    out_dir = os.path.join(run, "ux" + os.environ.get("UX_TAG", ""))
     keys = json.load(open(os.path.join(out_dir, "keys.json")))
     agg = {}
     for p in glob.glob(os.path.join(out_dir, "*.out.json")):

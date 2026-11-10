@@ -8,6 +8,15 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10 (later), DGX (branch idli-9b-bench): 9B benchmark results.** Per-span pass rates, lean harness:
+  dev+held+held2 Muse 85%, Qwen3.5-9B raw 65%, **9B + guards 86%** (local Q5 + guards 85%), LoRA 9B-004d 51% / 60%
+  with guards (the algebra adapter doesn't carry over). Fresh held-out set (held3, long follow-ups, never tuned on):
+  Muse 83%, 9B 65-73% depending on variant, Qwen3.5-35B-A3B (3B active) + stateful form 83%. Real Claude Code CLI:
+  Muse 78% (partial), 9B + guards 76%. Index summaries: 9B 12/15 vs Muse 10/15. Start here chat: 9B 100%. Spec
+  building alone: 9B 73%, 35B-A3B 89%. UX (blind rubric, Codex first pass): Muse 3.2/5, 9B + guards 2.7 (repeats
+  from the card guard, unneeded questions). Verdict: a guarded 9B can take start, find, open, clean, teach-switch,
+  skills, Start here and index summaries now; follow-up question-to-spec on long chats stays ~10-15 points behind:
+  give that one step to a stronger model (35B-A3B class) or a stateful spec builder. Patches in `patches/`.
 - **2026-11-10, DGX (branch idli-9b-bench): can a 9B replace Muse 30B? A standalone benchmark, in progress.**
   `benchmarks/runs/2026-11-10-idli-9b/`. Idli's real tools on a fake Drive (12 spreadsheets, 6 documents from
   totalrecall's synthetic livelihoods tables, two public Valparai ecology sets, and the taught-skill mocks; three new
