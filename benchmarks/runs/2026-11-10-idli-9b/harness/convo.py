@@ -78,11 +78,48 @@ def system_prompt(variant):
             "show with AskUserQuestion. Today is 2026-11-10.\n\nInstructions from the workspace (CLAUDE.md):\n\n" + text)
 
 
+def _questions(card):
+    """A card's questions, tolerating the shapes small models produce (a string, options as plain strings)."""
+    qs = card.get("questions") if isinstance(card, dict) else None
+    if isinstance(qs, str):
+        try:
+            qs = json.loads(qs)
+        except ValueError:
+            qs = [{"question": qs}]
+    if isinstance(qs, dict):
+        qs = [qs]
+    out = []
+    for q in qs or []:
+        if not isinstance(q, dict):
+            q = {"question": str(q)}
+        opts = q.get("options") or []
+        if isinstance(opts, str):
+            opts = [opts]
+        q = dict(q, options=[o if isinstance(o, dict) else {"label": str(o)} for o in opts])
+        out.append(q)
+    return out
+
+
+def valid_card(card):
+    qs = card.get("questions") if isinstance(card, dict) else None
+    if not isinstance(qs, list) or not 1 <= len(qs) <= 4:
+        return False
+    for q in qs:
+        if not isinstance(q, dict) or not isinstance(q.get("question"), str):
+            return False
+        opts = q.get("options")
+        if not isinstance(opts, list) or not 2 <= len(opts) <= 4:
+            return False
+        if not all(isinstance(o, dict) and isinstance(o.get("label"), str) for o in opts):
+            return False
+    return True
+
+
 def card_answer(card, pick):
     """Claude Code's AskUserQuestion result text for a click (or typed Other)."""
     parts = []
-    for q in (card.get("questions") or []):
-        opts = [o.get("label", "") for o in (q.get("options") or [])]
+    for q in _questions(card):
+        opts = [str(o.get("label", "")) for o in q["options"]]
         if pick.get("pick"):
             rx = re.compile(pick["pick"], re.I)
             chosen = [o for o in opts if rx.search(o)]
@@ -102,7 +139,46 @@ def matched(card, pick):
     if not pick.get("pick"):
         return False
     rx = re.compile(pick["pick"], re.I)
-    return any(rx.search(o.get("label", "")) for q in (card.get("questions") or []) for o in (q.get("options") or []))
+    return any(rx.search(str(o.get("label", ""))) for q in _questions(card) for o in q["options"])
+
+
+def apply_variant(mcp, variant):
+    """A variant's hook.py changes tools (as a patch to sites/*/tools.py would) before the model sees them."""
+    hook = os.path.join(BENCH, "variants", variant, "hook.py")
+    if variant != "base" and os.path.exists(hook):
+        import importlib.util
+        m = importlib.util.spec_from_file_location("variant_hook", hook)
+        mod = importlib.util.module_from_spec(m)
+        m.loader.exec_module(mod)
+        mod.apply(mcp, None)
+
+
+def guard_reason(guards, turn_events, text, allowed, nudged):
+    """What a Claude Code Stop hook would say to send the model back for one more step, or None.
+    card: a tool in this turn returned a card the model was told to show, and no card was shown after it.
+    numbers: the reply has numbers no tool, card or user gave (the model worked them out)."""
+    if guards.get("card"):
+        last_card, shown_after = None, False
+        for e in turn_events:
+            if e["type"] == "tool" and isinstance(e.get("result"), dict) and isinstance(e["result"].get("card"), dict) \
+                    and "AskUserQuestion" in str(e["result"].get("then", "")):
+                last_card, shown_after = e, False
+            if e["type"] == "card" and last_card is not None:
+                shown_after = True
+        if last_card is not None and not shown_after and ("card", id(last_card)) not in nudged:
+            nudged.add(("card", id(last_card)))
+            return (f"Idli check: {last_card['name']} returned a card for the user, but you didn't show it. Call "
+                    "AskUserQuestion now with exactly that `card` (its questions and options as they are). Don't write "
+                    "its options as text.")
+    if guards.get("numbers"):
+        from score import numbers
+        bad = [n for n in numbers(text) if n not in allowed and not re.fullmatch(r"[0-9]", n)]
+        if bad and ("numbers", text) not in nudged:
+            nudged.add(("numbers", text))
+            return ("Idli check: these numbers in your reply didn't come from a tool: " + ", ".join(bad[:5]) +
+                    ". Idli never works out numbers itself. Write the reply again with only numbers from tool answers "
+                    "(call file_ask if you need another one).")
+    return None
 
 
 def run(model_id, scenario_file, conv_id, out_path, variant="base"):
@@ -118,20 +194,16 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
     if variant != "base" and os.path.exists(vtools):
         with open(vtools) as f:
             only = set(json.load(f))
+    apply_variant(mcp, variant)
     tools = idli.schemas(mcp, only)
-    if variant != "base":
-        hook = os.path.join(BENCH, "variants", variant, "hook.py")
-        if os.path.exists(hook):
-            import importlib.util
-            m = importlib.util.spec_from_file_location("variant_hook", hook)
-            mod = importlib.util.module_from_spec(m)
-            m.loader.exec_module(mod)
-            mod.apply(mcp, tools)
+    gpath = os.path.join(BENCH, "variants", variant, "guards.json")
+    guards = json.load(open(gpath)) if variant != "base" and os.path.exists(gpath) else {}
     messages = [{"role": "system", "content": system_prompt(variant)}]
     steps = list(conv["steps"])
     log = {"model": model_id, "variant": variant, "scenario": os.path.basename(scenario_file), "conv": conv_id,
            "segments": conv.get("segments", []), "turns": []}
     i = 0
+    nudged = set()
     t_conv = time.time()
     while i < len(steps):
         step = steps[i]
@@ -181,6 +253,21 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
                                     for j, c in enumerate(tcs)]
             messages.append(am)
             if not tcs:
+                if guards:
+                    from score import numbers
+                    allowed = set()
+                    for mm in messages:
+                        if mm["role"] in ("user", "tool") and isinstance(mm.get("content"), str) \
+                                and not mm["content"].startswith("<system-reminder>Idli check"):
+                            allowed.update(numbers(mm["content"]))
+                    for mm in messages:  # numbers in cards the model showed and in its own tool arguments
+                        for tc in mm.get("tool_calls") or []:
+                            allowed.update(numbers(tc["function"]["arguments"] or ""))
+                    why = guard_reason(guards, turn["events"], content, allowed, nudged)
+                    if why:
+                        turn["events"].append({"type": "guard", "reason": why})
+                        messages.append({"role": "user", "content": "<system-reminder>" + why + "</system-reminder>"})
+                        continue
                 break
             for c in am["tool_calls"]:
                 name, raw = c["function"]["name"], c["function"]["arguments"]
@@ -193,6 +280,12 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
                 if args is None:
                     result = {"error": "The arguments were not valid JSON. Call the tool again with a JSON object."}
                     turn["events"].append({"type": "tool", "name": name, "args": raw, "error": "bad_json"})
+                elif name == "AskUserQuestion" and not valid_card(args):
+                    # Claude Code checks the card against its schema and returns the error to the model
+                    result = ("<tool_use_error>InputValidationError: AskUserQuestion needs questions: a list of "
+                              "{question, header, multiSelect, options: [{label, description}]} (2-4 options)."
+                              "</tool_use_error>")
+                    turn["events"].append({"type": "tool", "name": name, "args": args, "error": "bad_card"})
                 elif name == "AskUserQuestion":
                     while i < len(steps) and steps[i].get("optional") and not matched(args, steps[i]):
                         log["turns"].append({"step": i, "input": steps[i], "events": [], "deviations": [],

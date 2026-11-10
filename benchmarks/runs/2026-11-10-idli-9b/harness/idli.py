@@ -172,6 +172,17 @@ def _patch(mcp, home, data):
             return {"error": "No file with that id in Drive."}
         return {"opened": True, "say_to_user": f"Opened {f['name']} in a tab here (read only)."}
 
+    from lib import formserver
+
+    def skills_delete(sid):  # formserver's own archives to a hard-coded ~/idli-insights (ignores IDLI_HOME)
+        sk = next((s for s in ft.fk.load_skills() if s["id"] == sid), None)
+        if not sk:
+            raise ValueError(f"No skill '{sid}'.")
+        dest = os.path.join(home, "archive", "skills", f"{sid}-{time.strftime('%Y%m%d-%H%M%S')}")
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.move(sk["_dir"], dest)
+        return {"deleted": sid, "kept_at": dest}
+    formserver.skills_delete = skills_delete
     ft.t_file_get = t_file_get
     g.t_file_peek = t_file_peek
     ft.t_working_copy = t_working_copy

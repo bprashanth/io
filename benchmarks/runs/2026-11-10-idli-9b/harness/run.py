@@ -35,9 +35,10 @@ def main():
     for sname in a.scenarios.split(","):
         sfile = os.path.join(BENCH, "scenarios", sname + ".json")
         with open(sfile) as f:
-            convs = [c["id"] for c in json.load(f)["conversations"]]
+            sdata = json.load(f)
+        convs = [c["id"] for c in sdata["conversations"]]
         for m in a.models.split(","):
-            for v in a.variants.split(","):
+            for v in ([sdata["variant"]] if sdata.get("variant") else a.variants.split(",")):
                 for c in convs:
                     if a.only and not any(c.startswith(o) for o in a.only.split(",")):
                         continue

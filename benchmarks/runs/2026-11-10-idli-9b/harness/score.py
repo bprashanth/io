@@ -56,7 +56,7 @@ def ref_answer(ref_file, spec, tab=None):
 
 def segment_of(checks):
     keys = json.dumps(checks)
-    for seg, pat in (("start", '"first_tool": "start"'), ("clean", "working_copy"), ("teach", "teach_"),
+    for seg, pat in (("starthere", "drive_index|show_progress"), ("start", '"first_tool": "start"'), ("clean", "working_copy"), ("teach", "teach_"),
                      ("chart", "chart_relayed|chart_request"), ("ask", '"ref"'), ("skills", "skill"),
                      ("find", "drive_find|file_peek|asks_which_file|lists_choices|asks_more"),
                      ("open", '"file_get"|"file_ask"|"card"')):
@@ -65,16 +65,33 @@ def segment_of(checks):
     return "other"
 
 
+def ref_vals(ref_text):
+    """What a correct reply must carry: ("ids", [row names]) for a row listing, else ("nums", [values]) with the
+    top row's value first."""
+    lines = [l for l in ref_text.splitlines() if l.startswith("- ")]
+    if lines and all(re.match(r"- [^:]+: [^,]+, ", l) for l in lines):
+        return "ids", [re.match(r"- [^:]+: ([^,]+),", l).group(1).strip() for l in lines]
+    vals = []
+    for l in lines:
+        got = numbers(l.split(":", 1)[1]) if ":" in l else []
+        if got:
+            vals.append(got[0])
+    if vals:
+        return "nums", vals
+    return "nums", numbers(ref_text)[-1:]  # a single answer: "People; ... from 7. 7."
+
+
 def ref_ok(ref_text, text, top_only):
-    rn = [n for n in numbers(ref_text) if n not in ("1", "2")] or numbers(ref_text)
-    # the label lines ("Ward D: Rs 4,92,652") give the values; the first value is the top row
-    vals = [norm(m) for m in re.findall(r":\s*(?:Rs\s*)?(-?[\d,]+(?:\.\d+)?)", ref_text)] or rn
-    tn = set(numbers(text))
+    kind, vals = ref_vals(ref_text)
     if not vals:
         return False
-    if top_only:
-        return vals[0] in tn
-    hit = sum(1 for v in vals if v in tn)
+    if kind == "ids":
+        hit = sum(1 for v in vals if v.lower() in text.lower())
+    else:
+        tn = set(numbers(text))
+        if top_only:
+            return vals[0] in tn
+        hit = sum(1 for v in vals if v in tn)
     return hit / len(vals) >= 0.8 if len(vals) > 1 else hit == 1
 
 
@@ -93,8 +110,10 @@ def score_conv(sc_conv, log, seen_before):
     for t in turns:
         inp = t.get("input") or {}
         allowed.update(numbers(inp.get("user", "")))
-    out = []
+    out, prior = [], []
     for sp in spans:
+        if out:
+            prior += out[-1].pop("_tools")
         evs, devs = [], []
         for t in turns:
             if t["step"] in sp["steps"]:
@@ -148,7 +167,8 @@ def score_conv(sc_conv, log, seen_before):
             c[f"max_calls:{tool}"] = names.count(tool) <= n
         if "ref" in merged:
             refs = [merged["ref"]] + list(merged.get("alt_refs") or [])
-            asks = [e for e in tools if e["type"] == "tool" and e["name"] == "file_ask" and not e.get("error")
+            # answers from earlier in the chat count too: repeating an answer already on screen needs no new query
+            asks = [e for e in prior + tools if e["type"] == "tool" and e["name"] == "file_ask" and not e.get("error")
                     and isinstance(e.get("result"), dict) and e["result"].get("answer")]
             spec_ok = relay_ok = False
             for r in refs:
@@ -163,11 +183,15 @@ def score_conv(sc_conv, log, seen_before):
                         relay_ok = True
             c["spec"] = spec_ok
             c["relay"] = relay_ok
+            if spec_ok and relay_ok and merged.get("tools_any") == ["file_ask"]:
+                c["tools_any"] = True
         if merged.get("chart_relayed"):
             c["chart_relayed"] = bool(re.search(r"!\[[^\]]*\]\([^)]+\.svg\)", text))
         if merged.get("lists_choices"):
             c["lists_choices"] = len(re.findall(r"(?i)household survey (2025|2024|questionnaire)", text)) >= 2
-        if merged.get("asks_which_file") or merged.get("asks_more"):
+        if merged.get("say_any"):
+            c["say_any"] = any(re.search(rx, text) for rx in merged["say_any"])
+        if merged.get("asks_which_file") or merged.get("asks_more") or merged.get("asks"):
             c["asks"] = "?" in text
         invented = [n for n in numbers(text) if n not in allowed and not re.fullmatch(r"[0-9]", n)]
         res["invented"] = invented[:10]
@@ -176,7 +200,10 @@ def score_conv(sc_conv, log, seen_before):
         fatal = bool(set(devs) & FATAL) or res["api_error"]
         res["pass"] = all(c.values()) and not fatal and not invented
         res["fatal"] = fatal
+        res["_tools"] = tools
         out.append(res)
+    if out:
+        out[-1].pop("_tools")
     return out
 
 

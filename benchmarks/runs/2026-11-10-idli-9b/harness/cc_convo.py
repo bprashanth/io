@@ -105,11 +105,35 @@ async def run(model_id, scenario_file, conv_id, out_path, variant="base"):
         state["t_last"] = time.time()
         return PermissionResultAllow(updated_input={**inp, "answers": answers})
 
+    gpath = os.path.join(BENCH, "variants", variant, "guards.json")
+    guards = json.load(open(gpath)) if variant != "base" and os.path.exists(gpath) else {}
+    nudged = set()
+
+    async def stop_hook(inp, tool_use_id, ctx):
+        """Claude Code Stop hook: send the model back once when a card wasn't shown or a number was made up."""
+        evs = state["turn"]["events"] if state["turn"] else []
+        text = next((e["text"] for e in reversed(evs) if e["type"] == "model" and e.get("text")), "")
+        from score import numbers
+        allowed = set()
+        for t in log["turns"]:
+            allowed.update(numbers((t.get("input") or {}).get("user", "")))
+            for e in t["events"]:
+                if e["type"] in ("tool", "card"):
+                    allowed.update(numbers(json.dumps(e, ensure_ascii=False, default=str)))
+        why = convo.guard_reason(guards, evs, text, allowed, nudged)
+        if why:
+            state["turn"]["events"].append({"type": "guard", "reason": why})
+            return {"decision": "block", "reason": why}
+        return {}
+
+    from claude_agent_sdk import HookMatcher
     opts = ClaudeAgentOptions(
         cwd=data, model=model, permission_mode="default", can_use_tool=can_use_tool, setting_sources=["project"],
         disallowed_tools=DISALLOWED, env=env, max_turns=24,
-        mcp_servers={"cowork": {"type": "stdio", "command": py, "args": ["-I", os.path.join(HERE, "mcp_server.py"), home]}},
-        allowed_tools=["mcp__cowork__*"])
+        mcp_servers={"cowork": {"type": "stdio", "command": py,
+                                "args": ["-I", os.path.join(HERE, "mcp_server.py"), home, variant]}},
+        allowed_tools=["mcp__cowork__*"],
+        hooks={"Stop": [HookMatcher(hooks=[stop_hook])]} if guards else None)
     t_conv = time.time()
     pending = {}
     async with ClaudeSDKClient(options=opts) as client:
