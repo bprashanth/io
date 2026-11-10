@@ -54,6 +54,27 @@ Claude      <- heading 3: Claude teaches Idli a file, from fake data only
 | 17 | Paseo's remote-debugging port | only for driving from the DGX during development | ✅ the installed app starts Paseo without it (`lib/uiswitch.py` tab switching then does nothing: needs P7) |
 | 24 | One-click installers | `installer/` + `.github/workflows/idli-installers.yml`: .deb, .dmg (arm64), Inno Setup .exe, unsigned; CI installs and smokes each, then a first open | ✅ CI green on all three; ❌ a teammate's real install; Intel Mac and Linux arm64 not built (Paseo ships no Linux arm64 build) |
 
+## Before the demo: gaps in the installers (2026-11-10)
+
+The CI installers (item 24) carry **official Paseo 0.15.4, unmodified**. None of our Paseo fixes are in them, so a
+tester sees things the dev laptop doesn't. In order of what a demo would trip on:
+
+| # | Gap | What the tester sees | To do |
+|---|---|---|---|
+| D1 | **No patched Paseo build** | everything below | build our Paseo fork (P1, P3, P12 at least; P2, P7, P9 next) in CI for mac/win/linux and ship it instead of the official release |
+| D2 | P12: Paseo's own Welcome box | covers Idli on first open; tester must click "Skip setup" | write P12 (skip onboarding from config) |
+| D3 | P3: Auto mode on new chats | Idli chats can't use their tools until the person switches the mode to Bypass | write P3 (default mode per provider), or have the bootstrap set it per chat |
+| D4 | P1: silent downloads | opening a Drive file pops a system Save dialog with a long Google URL, often behind the app; `xdotool` raise is Linux-only | build P1 (patch written, `desktop/paseo-browser-downloads.patch`) |
+| D5 | No DevTools port in a shipped build (by design) | tab switching (`uiswitch.show_tab`) quietly does nothing; the working copy can't be dropped into Drive (P9), so Idli says where the local copy is and the person drags it | P7 (show a tab by link), P9 (drop a file onto a tab) |
+| D6 | P2: heading order | Mission control / Idli / Claude may appear in any order | write P2 |
+| D7 | Browser tabs on first open | on the CI runners the Drive tab and the What Idli has learned page did not open (Paseo's browser didn't answer); the bootstrap skips and logs it | check on a real Mac/Windows install; reruns open them once the app's browser is up |
+| D8 | Chart wall | bubblewrap is Linux-only; Mac/Windows run chart code after the import check only (item 21) | fine for 3 testers; Pyodide before anyone else |
+| D9 | Real installs | nobody has installed on a real Mac or Windows laptop; Claude sign-in on a desktop and a real Idli code against silo untested | one teammate each, ~20 min, with a code made by `desktop/muse-code.py` from their own Cloudflare token |
+| D10 | Not built | Intel Macs; Linux arm64 (Paseo ships no Linux arm64 build) | only if a tester needs it |
+| D11 | Unsigned | "unknown developer" warnings (steps in `installer/TESTERS.md`) | fine for the POC |
+
+Minimum for the demo: D1 with P12, P3 and P1, plus D9 on one Mac and one Windows laptop.
+
 ## First-run order of operations (target)
 
 1. Package installs Paseo (patched) + the Idli tools + runtime.
