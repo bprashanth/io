@@ -25,6 +25,9 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.dirname(HERE)
+VARIANTS = os.environ.get("IDLI9B_VARIANTS") or os.path.join(BENCH, "variants")  # another eval's variants
+SCENARIOS = os.environ.get("IDLI9B_SCENARIOS") or os.path.join(BENCH, "scenarios")
+RESULTS = os.environ.get("IDLI9B_RESULTS") or os.path.join(BENCH, "results")
 sys.path.insert(0, HERE)
 
 MAX_STEPS = 12      # model calls per user turn
@@ -69,7 +72,7 @@ def chat(spec, messages, tools, timeout=240):
 
 
 def system_prompt(variant):
-    vdir = os.path.join(BENCH, "variants", variant)
+    vdir = os.path.join(VARIANTS, variant)
     path = os.path.join(vdir, "CLAUDE.md") if variant != "base" else os.path.join(
         os.path.dirname(os.path.dirname(BENCH)), "runs", "2026-11-06-oss-desktop-independent", "cowork", "idli", "CLAUDE.md")
     with open(path) as f:
@@ -154,7 +157,7 @@ def matched(card, pick):
 
 def apply_variant(mcp, variant):
     """A variant's hook.py changes tools (as a patch to sites/*/tools.py would) before the model sees them."""
-    hook = os.path.join(BENCH, "variants", variant, "hook.py")
+    hook = os.path.join(VARIANTS, variant, "hook.py")
     if variant != "base" and os.path.exists(hook):
         import importlib.util
         m = importlib.util.spec_from_file_location("variant_hook", hook)
@@ -200,13 +203,13 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
     home = tempfile.mkdtemp(prefix=f"idli9b-{model_id}-{conv_id}-", dir=os.environ.get("IDLI9B_TMP") or None)
     mcp = idli.setup(home)
     only = None
-    vtools = os.path.join(BENCH, "variants", variant, "tools.json")
+    vtools = os.path.join(VARIANTS, variant, "tools.json")
     if variant != "base" and os.path.exists(vtools):
         with open(vtools) as f:
             only = set(json.load(f))
     apply_variant(mcp, variant)
     tools = idli.schemas(mcp, only)
-    gpath = os.path.join(BENCH, "variants", variant, "guards.json")
+    gpath = os.path.join(VARIANTS, variant, "guards.json")
     guards = json.load(open(gpath)) if variant != "base" and os.path.exists(gpath) else {}
     messages = [{"role": "system", "content": system_prompt(variant)}]
     steps = list(conv["steps"])
@@ -238,7 +241,9 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
                 break
             t1 = time.time()
             try:
-                resp = chat(spec, messages, tools)
+                # a variant may change the tool list as the chat moves on (E7 hard phases)
+                cur = idli.schemas(mcp, mcp.phase_tools()) if hasattr(mcp, "phase_tools") else tools
+                resp = chat(spec, messages, cur)
             except Exception as e:
                 turn["events"].append({"type": "api_error", "error": str(e)[:400]})
                 break
@@ -297,6 +302,13 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
                               "{question, header, multiSelect, options: [{label, description}]} (2-4 options)."
                               "</tool_use_error>")
                     turn["events"].append({"type": "tool", "name": name, "args": args, "error": "bad_card"})
+                elif name == "AskUserQuestion" and guards.get("tool_cards_only") and not any(
+                        e["type"] == "tool" and isinstance(e.get("result"), dict) and e["result"].get("card")
+                        for e in turn["events"]):
+                    # E6 fix: a card only when a tool handed one over; otherwise ask in plain text
+                    result = ("<tool_use_error>Idli check: no tool gave you a card to show. Ask in one plain line "
+                              "instead (the person types their answer).</tool_use_error>")
+                    turn["events"].append({"type": "tool", "name": name, "args": args, "error": "own_card_blocked"})
                 elif name == "AskUserQuestion":
                     while i < len(steps) and steps[i].get("optional") and not matched(args, steps[i]):
                         log["turns"].append({"step": i, "input": steps[i], "events": [], "deviations": [],
@@ -320,6 +332,13 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
                         i += 1
                         log["turns"].append(turn := {"step": i - 1, "input": nxt, "events": [], "deviations": [],
                                                      "via_card": True})
+                        if hasattr(mcp, "on_card"):  # E7: a click runs the step itself (send to Claude, working copy)
+                            did = mcp.on_card(args, result)
+                            if did:
+                                turn["events"].append({"type": "tool", "name": did["name"], "args": did["args"],
+                                                       "result": did["result"], "error": False, "by_card": True})
+                                result += ("\n\nIdli did this after the click: " + did["name"] + " -> " +
+                                           json.dumps(did["result"], ensure_ascii=False, default=str)[:3000])
                         t0 = time.time()
                         calls_seen = {}
                 else:

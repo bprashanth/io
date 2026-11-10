@@ -21,6 +21,9 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.dirname(HERE)
+VARIANTS = os.environ.get("IDLI9B_VARIANTS") or os.path.join(BENCH, "variants")  # another eval's variants
+SCENARIOS = os.environ.get("IDLI9B_SCENARIOS") or os.path.join(BENCH, "scenarios")
+RESULTS = os.environ.get("IDLI9B_RESULTS") or os.path.join(BENCH, "results")
 sys.path.insert(0, HERE)
 import convo  # noqa: E402  (card_answer, matched, system_prompt paths)
 
@@ -54,7 +57,7 @@ async def run(model_id, scenario_file, conv_id, out_path, variant="base"):
     home = tempfile.mkdtemp(prefix=f"idli9b-cc-{model_id}-{conv_id}-", dir=os.environ.get("IDLI9B_TMP") or None)
     data = os.path.join(home, "cowork-real")
     os.makedirs(data, exist_ok=True)
-    src = os.path.join(BENCH, "variants", variant, "CLAUDE.md") if variant != "base" else os.path.join(COWORK, "idli", "CLAUDE.md")
+    src = os.path.join(VARIANTS, variant, "CLAUDE.md") if variant != "base" else os.path.join(COWORK, "idli", "CLAUDE.md")
     shutil.copy(src, os.path.join(data, "CLAUDE.md"))
     cfg = os.path.join(home, "claude-config")
     os.makedirs(cfg, exist_ok=True)
@@ -112,7 +115,7 @@ async def run(model_id, scenario_file, conv_id, out_path, variant="base"):
         state["t_last"] = time.time()
         return PermissionResultAllow(updated_input={**inp, "answers": answers})
 
-    gpath = os.path.join(BENCH, "variants", variant, "guards.json")
+    gpath = os.path.join(VARIANTS, variant, "guards.json")
     guards = json.load(open(gpath)) if variant != "base" and os.path.exists(gpath) else {}
     nudged = set()
 

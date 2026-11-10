@@ -15,6 +15,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.dirname(HERE)
+VARIANTS = os.environ.get("IDLI9B_VARIANTS") or os.path.join(BENCH, "variants")  # another eval's variants
+SCENARIOS = os.environ.get("IDLI9B_SCENARIOS") or os.path.join(BENCH, "scenarios")
+RESULTS = os.environ.get("IDLI9B_RESULTS") or os.path.join(BENCH, "results")
 SDK_PY = os.environ.get("IDLI9B_SDK_PY", "/tmp/claude-1000/b9/sdkvenv/bin/python")
 
 
@@ -33,7 +36,7 @@ def main():
         models = json.load(f)
     jobs = []
     for sname in a.scenarios.split(","):
-        sfile = os.path.join(BENCH, "scenarios", sname + ".json")
+        sfile = os.path.join(SCENARIOS, sname + ".json")
         with open(sfile) as f:
             sdata = json.load(f)
         convs = [c["id"] for c in sdata["conversations"]]
@@ -43,7 +46,7 @@ def main():
                     if a.only and not any(c.startswith(o) for o in a.only.split(",")):
                         continue
                     for r in range(a.reps):
-                        out = os.path.join(BENCH, "results", a.run, m, v, f"{c}-r{r}.json")
+                        out = os.path.join(RESULTS, a.run, m, v, f"{c}-r{r}.json")
                         if not os.path.exists(out):
                             jobs.append((m, v, sfile, c, r, out))
     by_model = {}
@@ -77,7 +80,7 @@ def main():
 
     with ThreadPoolExecutor(len(by_model) or 1) as ex:
         list(ex.map(run_model, list(by_model)))
-    subprocess.run([sys.executable, os.path.join(HERE, "score.py"), os.path.join(BENCH, "results", a.run)])
+    subprocess.run([sys.executable, os.path.join(HERE, "score.py"), os.path.join(RESULTS, a.run)])
 
 
 if __name__ == "__main__":

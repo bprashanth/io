@@ -1,0 +1,435 @@
+{
+ "id": "tree_plots_transects",
+ "title": "Tree plots and transects",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Raw 10x10m Data": {
+   "headers": [
+    "transect",
+    "plot",
+    "tree_no",
+    "species_code",
+    "dbh_1_cm",
+    "dbh_2_cm",
+    "dbh_3_cm",
+    "height_m",
+    "canopy_y_n",
+    "notes",
+    "date_dd_mm_yyyy",
+    "recorder"
+   ],
+   "summary": "One row per tree measured in a 10x10 m plot on a transect. 'Trees' counts rows. DBH means DBH 1 (first stem); DBH 2/3 are extra stems. Native/alien comes from the Species key (sp_native_alien); the team's own codes (UKS<number>, Fern) are not in the key and show blank. Size class is Small (under 10 cm DBH 1), Medium (10 to 30 cm) or Large (over 30 cm).",
+   "row_noun": "trees",
+   "skip_rows": [
+    "repeated_header",
+    "subheading",
+    "total"
+   ],
+   "columns": {
+    "transect": {
+     "type": "category",
+     "label": "Transect"
+    },
+    "plot": {
+     "type": "number",
+     "label": "Plot"
+    },
+    "tree_no": {
+     "type": "number",
+     "label": "Tree no"
+    },
+    "species_code": {
+     "type": "category",
+     "label": "Species code"
+    },
+    "dbh_1_cm": {
+     "type": "number",
+     "label": "DBH 1 (cm)"
+    },
+    "dbh_2_cm": {
+     "type": "number",
+     "label": "DBH 2 (cm)"
+    },
+    "height_m": {
+     "type": "number",
+     "label": "Height (m)"
+    },
+    "canopy_y_n": {
+     "type": "category",
+     "label": "Canopy (Y/N)",
+     "values": [
+      "Y",
+      "N"
+     ]
+    },
+    "date_dd_mm_yyyy": {
+     "type": "date",
+     "formats": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ],
+     "label": "Date"
+    },
+    "recorder": {
+     "type": "category",
+     "label": "Recorder"
+    }
+   },
+   "normalize": {
+    "transect": {
+     "case": "title"
+    },
+    "recorder": {
+     "case": "title"
+    },
+    "species_code": {
+     "case": "lower"
+    },
+    "canopy_y_n": {
+     "map": {
+      "y": "Y",
+      "yes": "Y",
+      "n": "N",
+      "no": "N"
+     }
+    }
+   },
+   "validations": [
+    {
+     "column": "date_dd_mm_yyyy",
+     "rule": "date",
+     "message": "date is not a real date",
+     "arg": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ]
+    },
+    {
+     "column": "date_dd_mm_yyyy",
+     "rule": "not_future",
+     "message": "date is in the future",
+     "arg": [
+      "%d/%m/%Y",
+      "%Y-%m-%d"
+     ]
+    },
+    {
+     "column": "plot",
+     "rule": "number",
+     "message": "plot is not a number"
+    },
+    {
+     "column": "tree_no",
+     "rule": "number",
+     "message": "tree no is not a number"
+    },
+    {
+     "column": "dbh_1_cm",
+     "rule": "number",
+     "message": "DBH 1 is not a number"
+    },
+    {
+     "column": "dbh_2_cm",
+     "rule": "number",
+     "message": "DBH 2 is not a number"
+    },
+    {
+     "column": "height_m",
+     "rule": "number",
+     "message": "height is not a number"
+    },
+    {
+     "column": "dbh_1_cm",
+     "rule": "range",
+     "message": "DBH 1 outside 0 to 250 cm",
+     "arg": [
+      0,
+      250
+     ]
+    },
+    {
+     "column": "height_m",
+     "rule": "range",
+     "message": "height outside 0 to 60 m",
+     "arg": [
+      0,
+      60
+     ]
+    },
+    {
+     "column": "transect",
+     "rule": "required",
+     "message": "transect missing"
+    },
+    {
+     "column": "plot",
+     "rule": "required",
+     "message": "plot missing"
+    },
+    {
+     "column": "tree_no",
+     "rule": "required",
+     "message": "tree no missing"
+    },
+    {
+     "column": "species_code",
+     "rule": "required",
+     "message": "species code missing"
+    },
+    {
+     "column": "canopy_y_n",
+     "rule": "in_list",
+     "message": "canopy is not Y or N",
+     "arg": [
+      "Y",
+      "N",
+      "yes",
+      "no"
+     ]
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "after_cutoff",
+     "column": "date_dd_mm_yyyy",
+     "sql": "t.date_dd_mm_yyyy > DATE '2024-03-31'",
+     "message": "date is after 31 March 2024"
+    },
+    {
+     "id": "duplicate_tree",
+     "column": "tree_no",
+     "sql": "t.tree_no IS NOT NULL AND (SELECT count(*) FROM {{tab:Raw 10x10m Data}} r WHERE r.transect = t.transect AND r.plot = t.plot AND r.tree_no = t.tree_no) > 1",
+     "message": "same transect, plot and tree no appears more than once"
+    }
+   ],
+   "measures": [
+    {
+     "id": "avg_dbh",
+     "label": "Average DBH 1 (cm)",
+     "sql": "avg(dbh_1_cm)",
+     "format": "number"
+    },
+    {
+     "id": "avg_height",
+     "label": "Average height (m)",
+     "sql": "avg(height_m)",
+     "format": "number"
+    },
+    {
+     "id": "canopy_trees",
+     "label": "Canopy trees",
+     "sql": "count(*) FILTER (WHERE canopy_y_n = 'Y')",
+     "format": "count"
+    }
+   ],
+   "group_by": [
+    {
+     "id": "size_class",
+     "label": "Size class (DBH 1)",
+     "sql": "CASE WHEN dbh_1_cm IS NULL THEN NULL WHEN dbh_1_cm < 10 THEN 'Small' WHEN dbh_1_cm <= 30 THEN 'Medium' ELSE 'Large' END"
+    }
+   ],
+   "date_columns": [
+    "date_dd_mm_yyyy"
+   ],
+   "lookups": [
+    {
+     "tab": "Species key",
+     "on": {
+      "species_code": "code"
+     },
+     "columns": [
+      "native_alien"
+     ],
+     "prefix": "sp_",
+     "labels": {
+      "native_alien": "Native/Alien"
+     },
+     "accept": [
+      "UKS\\d+",
+      "Fern"
+     ]
+    }
+   ],
+   "hidden": [
+    "notes",
+    "dbh_3_cm"
+   ]
+  },
+  "Density": {
+   "headers": [
+    "transect",
+    "plot",
+    "no_of_trees",
+    "no_of_cestrum"
+   ],
+   "summary": "One row per plot: trees counted and Cestrum (the invasive) counted. Cestrum share is Cestrum divided by trees, in per cent, so use it by transect or plot rather than averaging rows.",
+   "row_noun": "plots",
+   "columns": {
+    "plot": {
+     "type": "number",
+     "label": "Plot"
+    },
+    "no_of_trees": {
+     "type": "number",
+     "label": "No. of trees"
+    },
+    "no_of_cestrum": {
+     "type": "number",
+     "label": "No. of Cestrum"
+    }
+   },
+   "normalize": {
+    "transect": {
+     "case": "title"
+    }
+   },
+   "validations": [
+    {
+     "column": "no_of_trees",
+     "rule": "number",
+     "message": "not a number"
+    },
+    {
+     "column": "no_of_cestrum",
+     "rule": "number",
+     "message": "not a number"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "plot_not_in_trees",
+     "column": "plot",
+     "sql": "NOT EXISTS (SELECT 1 FROM {{tab:Raw 10x10m Data}} r WHERE r.transect = t.transect AND r.plot = t.plot)",
+     "message": "this transect and plot has no tree rows in the tree sheet"
+    },
+    {
+     "id": "cestrum_over_trees",
+     "column": "no_of_cestrum",
+     "sql": "t.no_of_cestrum > t.no_of_trees",
+     "message": "more Cestrum than trees"
+    }
+   ],
+   "measures": [
+    {
+     "id": "trees",
+     "label": "Trees",
+     "sql": "sum(no_of_trees)",
+     "format": "count"
+    },
+    {
+     "id": "cestrum",
+     "label": "Cestrum",
+     "sql": "sum(no_of_cestrum)",
+     "format": "count"
+    },
+    {
+     "id": "cestrum_share",
+     "label": "Cestrum share of all trees (%)",
+     "sql": "100.0 * sum(no_of_cestrum) / NULLIF(sum(no_of_trees), 0)",
+     "format": "percent"
+    }
+   ]
+  },
+  "Seedlings": {
+   "headers": [
+    "transect",
+    "plot",
+    "species_code",
+    "count",
+    "height_class"
+   ],
+   "summary": "One row per species and height class of seedlings counted in a plot. Seedlings is the total of Count.",
+   "row_noun": "seedling counts",
+   "columns": {
+    "plot": {
+     "type": "number",
+     "label": "Plot"
+    },
+    "count": {
+     "type": "number",
+     "label": "Count"
+    }
+   },
+   "normalize": {
+    "transect": {
+     "case": "title"
+    },
+    "species_code": {
+     "case": "lower"
+    }
+   },
+   "validations": [
+    {
+     "column": "count",
+     "rule": "number",
+     "message": "count is not a number"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "plot_not_in_trees",
+     "column": "plot",
+     "sql": "NOT EXISTS (SELECT 1 FROM {{tab:Raw 10x10m Data}} r WHERE r.transect = t.transect AND r.plot = t.plot)",
+     "message": "this transect and plot has no tree rows in the tree sheet"
+    }
+   ],
+   "measures": [
+    {
+     "id": "seedlings",
+     "label": "Seedlings",
+     "sql": "sum(count)",
+     "format": "count"
+    }
+   ],
+   "lookups": [
+    {
+     "tab": "Species key",
+     "on": {
+      "species_code": "code"
+     },
+     "columns": [
+      "native_alien"
+     ],
+     "prefix": "sp_",
+     "labels": {
+      "native_alien": "Native/Alien"
+     },
+     "accept": [
+      "UKS\\d+",
+      "Fern"
+     ]
+    }
+   ]
+  },
+  "Species key": {
+   "headers": [
+    "code",
+    "scientific_name",
+    "common_name",
+    "native_alien"
+   ],
+   "summary": "One row per species code.",
+   "row_noun": "species",
+   "normalize": {
+    "code": {
+     "case": "lower"
+    }
+   },
+   "validations": [
+    {
+     "column": "code",
+     "rule": "required",
+     "message": "code missing"
+    }
+   ]
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "checks (dates up to 31 Mar 2024, numbers, sizes, required, species vs key, canopy Y/N, duplicates, plot agreement); Cestrum share by transect/plot; native vs alien by size class and canopy; seedlings"
+  }
+ ]
+}

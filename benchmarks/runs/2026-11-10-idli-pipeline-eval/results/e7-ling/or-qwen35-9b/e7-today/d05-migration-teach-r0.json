@@ -1,0 +1,272 @@
+{
+ "model": "or-qwen35-9b",
+ "variant": "e7-today",
+ "scenario": "dev.json",
+ "conv": "d05-migration-teach",
+ "segments": [
+  "open",
+  "teach"
+ ],
+ "turns": [
+  {
+   "step": 0,
+   "input": {
+    "user": "from the out-migration records, how many people left for Kerala? https://docs.google.com/spreadsheets/d/1d5f1ede31577c127234a54dc72a03b3a/edit",
+    "check": {
+     "tools_any": [
+      "teach_file"
+     ],
+     "no_numbers": true,
+     "card": true
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 4.9,
+     "finish": "tool_calls",
+     "provider": "Together",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "file_get",
+       "args": "{\"link\": \"https://docs.google.com/spreadsheets/d/1d5f1ede31577c127234a54dc72a03b3a/edit\", \"goal\": \"analyse\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 4756,
+      "completion_tokens": 78
+     }
+    },
+    {
+     "type": "tool",
+     "name": "file_get",
+     "args": {
+      "link": "https://docs.google.com/spreadsheets/d/1d5f1ede31577c127234a54dc72a03b3a/edit",
+      "goal": "analyse"
+     },
+     "secs": 0.05,
+     "result": {
+      "file": "drive/Out-migration records.xlsx",
+      "known": false,
+      "then": "Idli hasn't been taught this file. Call teach_file now with the user's request as the question (it only prepares a copy with fake values; nothing is sent until they say yes on its card). Don't work out numbers from this file yourself.",
+      "downloaded": true
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 6.0,
+     "finish": "tool_calls",
+     "provider": "PrimeIntellect",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "teach_file",
+       "args": "{\"file\": \"drive/Out-migration records.xlsx\", \"question\": \"from the out-migration records, how many people left for Kerala?\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 4908,
+      "completion_tokens": 58
+     }
+    },
+    {
+     "type": "tool",
+     "name": "teach_file",
+     "args": {
+      "file": "drive/Out-migration records.xlsx",
+      "question": "from the out-migration records, how many people left for Kerala?"
+     },
+     "secs": 0.07,
+     "result": {
+      "request_id": "out_migration_records-20261110-191447",
+      "updating": null,
+      "card": {
+       "questions": [
+        {
+         "header": "Claude",
+         "question": "I haven't seen Out-migration records before. Claude can learn it with you (what each column means, the checks for mistakes) from a copy with fake values: same columns (Record, Date, Occupation, Village, People who left, Went to), every value made up, and your question with names removed. Send it and switch to Claude?",
+         "multiSelect": false,
+         "options": [
+          {
+           "label": "Yes, send and switch",
+           "description": "Claude asks a few questions there, one at a time; you'll get a card to come back"
+          },
+          {
+           "label": "Not now",
+           "description": "Nothing is sent"
+          }
+         ]
+        },
+        {
+         "header": "Labels",
+         "question": "Should Claude see any of these labels as they are? It helps Claude read codes such as species or statuses; never tick people's or places' names. \"None\" keeps the whole copy fake.",
+         "multiSelect": true,
+         "options": [
+          {
+           "label": "None (Recommended)",
+           "description": "Every value stays made up"
+          },
+          {
+           "label": "Occupation",
+           "description": "e.g. Construction labour, Hotel and homestay staff, Tea plucker, Transport driver"
+          },
+          {
+           "label": "Village",
+           "description": "e.g. Kadamparai Village, Perumpallam Village, Thonimalai Village"
+          },
+          {
+           "label": "Went to",
+           "description": "e.g. Coimbatore, Kerala, Pollachi, Tiruppur"
+          }
+         ]
+        }
+       ]
+      },
+      "then": "Call AskUserQuestion with exactly `card` (don't write anything first). If they pick \"Yes, send and switch\", call teach_send with request_id and share_labels = the label columns they ticked ([] for \"None\" or nothing ticked). If not, say nothing was sent and offer it again any time."
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 10.6,
+     "finish": "tool_calls",
+     "provider": "PrimeIntellect",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\": [{\"header\": \"Claude\", \"question\": \"I haven't seen Out-migration records before. Claude can learn it with you (what each column means, the checks for mistakes) from a copy with fake values: same columns (Record, Date, Occupation, Village, People who left, Went to), every value made up, and your question with names removed. Send it and switch to Claude?\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, send and switch\", \"description\": \"Claude asks a few questions there, one at a time; you'll get a card to come back\"}, {\"label\": \"Not now\", \"description\": \"Nothing is sent\"}]}, {\"header\": \"Labels\", \"question\": \"Should Claude see any of these labels as they are? It helps Claude read codes such as species or statuses; never tick people's or places' names. \\\"None\\\" keeps the whole copy fake.\", \"multiSelect\": true, \"options\": [{\"label\": \"None (Recommended)\", \"description\": \"Every value stays made up\"}, {\"label\": \"Occupation\", \"description\": \"e.g. Construction labour, Hotel and homestay staff, Tea plucker, Transport driver\"}, {\"label\": \"Village\", \"description\": \"e.g. Kadamparai Village, Perumpallam Village, Thonimalai Village\"}, {\"label\": \"Went to\", \"description\": \"e.g. Coimbatore, Kerala, Pollachi, Tiruppur\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5509,
+      "completion_tokens": 339
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "header": "Claude",
+        "question": "I haven't seen Out-migration records before. Claude can learn it with you (what each column means, the checks for mistakes) from a copy with fake values: same columns (Record, Date, Occupation, Village, People who left, Went to), every value made up, and your question with names removed. Send it and switch to Claude?",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "Yes, send and switch",
+          "description": "Claude asks a few questions there, one at a time; you'll get a card to come back"
+         },
+         {
+          "label": "Not now",
+          "description": "Nothing is sent"
+         }
+        ]
+       },
+       {
+        "header": "Labels",
+        "question": "Should Claude see any of these labels as they are? It helps Claude read codes such as species or statuses; never tick people's or places' names. \"None\" keeps the whole copy fake.",
+        "multiSelect": true,
+        "options": [
+         {
+          "label": "None (Recommended)",
+          "description": "Every value stays made up"
+         },
+         {
+          "label": "Occupation",
+          "description": "e.g. Construction labour, Hotel and homestay staff, Tea plucker, Transport driver"
+         },
+         {
+          "label": "Village",
+          "description": "e.g. Kadamparai Village, Perumpallam Village, Thonimalai Village"
+         },
+         {
+          "label": "Went to",
+          "description": "e.g. Coimbatore, Kerala, Pollachi, Tiruppur"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"I haven't seen Out-migration records before. Claude can learn it with you (what each column means, the checks for mistakes) from a copy with fake values: same columns (Record, Date, Occupation, Village, People who left, Went to), every value made up, and your question with names removed. Send it and switch to Claude?\"=\"Yes, send and switch\", \"Should Claude see any of these labels as they are? It helps Claude read codes such as species or statuses; never tick people's or places' names. \"None\" keeps the whole copy fake.\"=\"None (Recommended)\". You can now continue with the user's answers in mind.",
+     "answered_step": 1
+    }
+   ],
+   "deviations": []
+  },
+  {
+   "step": 1,
+   "input": {
+    "pick": "Yes, send|None",
+    "check": {
+     "tools_any": [
+      "teach_send"
+     ],
+     "args": {
+      "teach_send": {
+       "share_labels": "^\\[\\]$|^null$|None"
+      }
+     }
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 4.0,
+     "finish": "tool_calls",
+     "provider": "PrimeIntellect",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "teach_send",
+       "args": "{\"request_id\": \"out_migration_records-20261110-191447\", \"share_labels\": []}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 6008,
+      "completion_tokens": 59
+     }
+    },
+    {
+     "type": "tool",
+     "name": "teach_send",
+     "args": {
+      "request_id": "out_migration_records-20261110-191447",
+      "share_labels": []
+     },
+     "secs": 0.0,
+     "result": {
+      "started": true,
+      "teach_chat": "Teach: Out-migration records",
+      "switched": true,
+      "tell_the_user": "Say in one line: sent a copy with fake values to Claude, and switched there to answer its questions. This chat carries on when teaching is done."
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 1.8,
+     "finish": "stop",
+     "provider": "PrimeIntellect",
+     "text": "Sent a copy with fake values to Claude, and switched there to answer its questions.",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 6153,
+      "completion_tokens": 18
+     }
+    }
+   ],
+   "deviations": [],
+   "via_card": true,
+   "secs": 5.8
+  }
+ ],
+ "secs": 27.4,
+ "rep": 0
+}

@@ -16,6 +16,9 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.dirname(HERE)
+VARIANTS = os.environ.get("IDLI9B_VARIANTS") or os.path.join(BENCH, "variants")  # another eval's variants
+SCENARIOS = os.environ.get("IDLI9B_SCENARIOS") or os.path.join(BENCH, "scenarios")
+RESULTS = os.environ.get("IDLI9B_RESULTS") or os.path.join(BENCH, "results")
 sys.path.insert(0, HERE)
 
 NUM = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?")
@@ -69,6 +72,8 @@ def ref_vals(ref_text):
     """What a correct reply must carry: ("ids", [row names]) for a row listing, else ("nums", [values]) with the
     top row's value first."""
     lines = [l for l in ref_text.splitlines() if l.startswith("- ")]
+    if os.environ.get("IDLI9B_TOTAL_SEPARATE"):  # E6 fix: the "All" total is scored on its own
+        lines = [l for l in lines if not l.startswith("- All:")] or lines
     if lines and all(re.match(r"- [^:]+: [^,]+, ", l) for l in lines):
         return "ids", [re.match(r"- [^:]+: ([^,]+),", l).group(1).strip() for l in lines]
     vals = []
@@ -224,7 +229,7 @@ def score_conv(sc_conv, log, seen_before):
 def main(run_dir):
     run_dir = os.path.abspath(run_dir)  # idli.setup changes the working folder
     scen = {}
-    for p in glob.glob(os.path.join(BENCH, "scenarios", "*.json")):
+    for p in glob.glob(os.path.join(SCENARIOS, "*.json")):
         with open(p) as f:
             for c in json.load(f)["conversations"]:
                 scen[(os.path.basename(p), c["id"])] = c
