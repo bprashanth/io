@@ -1,0 +1,1026 @@
+{
+ "note": "Held-out set: checks apply to everything the model does after a step until the next step the user starts. 'ref' = the form spec a correct answer comes from (the scorer runs it on the fixture and looks for its numbers in the reply). Optional picks are skipped when no card shows.",
+ "conversations": [
+  {
+   "id": "r01-family-vulnerability",
+   "segments": [
+    "find",
+    "open",
+    "ask"
+   ],
+   "ref_file": "Household survey 2025",
+   "steps": [
+    {
+     "user": "open Household survey 2025.xlsx na",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "average vulnerability score by family size pls",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg_vulnerability"
+        ],
+        "group_by": [
+         "members"
+        ]
+       }
+      }
+     }
+    },
+    {
+     "user": "same thing but only ward C",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg_vulnerability"
+        ],
+        "group_by": [
+         "members"
+        ],
+        "filters": {
+         "ward": [
+          "Ward C"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "no I meant ward A, keep the family size split",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg_vulnerability"
+        ],
+        "group_by": [
+         "members"
+        ],
+        "filters": {
+         "ward": [
+          "Ward A"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "how many people altogether in that ward?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "people"
+        ],
+        "filters": {
+         "ward": [
+          "Ward A"
+         ]
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "r02-village-population",
+   "segments": [
+    "find",
+    "open",
+    "ask",
+    "chart"
+   ],
+   "ref_file": "Field programme tracker Q3",
+   "steps": [
+    {
+     "user": "Field programme tracker Q3.xlsx, need the villages tab",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "total village population by district, show a chart",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "sum:population"
+        ],
+        "group_by": [
+         "district"
+        ]
+       },
+       "tab": "Villages"
+      },
+      "chart_relayed": true
+     }
+    },
+    {
+     "user": "which district has the most population in that?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "sum:population"
+        ],
+        "group_by": [
+         "district"
+        ]
+       },
+       "tab": "Villages"
+      },
+      "top_only": true
+     }
+    },
+    {
+     "user": "show me which villages are in district B, just the list",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [],
+        "filters": {
+         "district": [
+          "District B"
+         ]
+        }
+       },
+       "rows": true,
+       "tab": "Villages"
+      }
+     }
+    },
+    {
+     "user": "and their average population there?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg:population"
+        ],
+        "filters": {
+         "district": [
+          "District B"
+         ]
+        }
+       },
+       "tab": "Villages"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "r03-claim-size",
+   "segments": [
+    "find",
+    "open",
+    "ask"
+   ],
+   "ref_file": "Tech reimbursement form (Responses)",
+   "steps": [
+    {
+     "user": "the Tech reimbursement form (Responses).xlsx, want to see claim sizes",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "average claim for each item pls",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "average_claim"
+        ],
+        "group_by": [
+         "item"
+        ]
+       }
+      },
+      "alt_refs": [
+       {
+        "spec": {
+         "measures": [
+          "average_claim"
+         ],
+         "group_by": [
+          "item"
+         ],
+         "preset": [
+          "not_rejected"
+         ]
+        }
+       },
+       {
+        "spec": {
+         "measures": [
+          "average_claim"
+         ],
+         "group_by": [
+          "item"
+         ],
+         "preset": [
+          "paid_out"
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "user": "same thing only for paid claims",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "average_claim"
+        ],
+        "group_by": [
+         "item"
+        ],
+        "filters": {
+         "status": [
+          "Paid"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "show me which ones are paid hardware claims, just list them",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [],
+        "filters": {
+         "status": [
+          "Paid"
+         ],
+         "category": [
+          "Hardware"
+         ]
+        }
+       },
+       "rows": true
+      }
+     }
+    },
+    {
+     "user": "whats the average claim in that list?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "average_claim"
+        ],
+        "filters": {
+         "status": [
+          "Paid"
+         ],
+         "category": [
+          "Hardware"
+         ]
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "r04-volunteer-hours",
+   "segments": [
+    "find",
+    "open",
+    "ask"
+   ],
+   "ref_file": "Volunteer register 2025",
+   "steps": [
+    {
+     "user": "open Volunteer register 2025.xlsx for me",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "average september hours by joining month pls",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg:hours_sep"
+        ],
+        "group_by": [
+         "joined_on:month"
+        ]
+       }
+      }
+     }
+    },
+    {
+     "user": "same for district D only",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg:hours_sep"
+        ],
+        "group_by": [
+         "joined_on:month"
+        ],
+        "filters": {
+         "district": [
+          "District D"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "show me which volunteers are there, names list please",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [],
+        "filters": {
+         "district": [
+          "District D"
+         ]
+        }
+       },
+       "rows": true
+      }
+     }
+    },
+    {
+     "user": "how many september hours did those volunteers do altogether?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "hours"
+        ],
+        "filters": {
+         "district": [
+          "District D"
+         ]
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "r05-check-dam-reach",
+   "segments": [
+    "find",
+    "open",
+    "ask"
+   ],
+   "ref_file": "MGNREGA works Valparai 2019-2023",
+   "steps": [
+    {
+     "user": "MGNREGA works Valparai 2019-2023.xlsx, need check dam details",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "average households engaged per check dam work in each village",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg:households_engaged"
+        ],
+        "group_by": [
+         "village"
+        ],
+        "filters": {
+         "work_type": [
+          "Check dam construction"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "and for water body desilting instead?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg:households_engaged"
+        ],
+        "group_by": [
+         "village"
+        ],
+        "filters": {
+         "work_type": [
+          "Water body desilting"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "show me which of those works are in Thonimalai, list pls",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [],
+        "filters": {
+         "work_type": [
+          "Water body desilting"
+         ],
+         "village": [
+          "Thonimalai Village"
+         ]
+        }
+       },
+       "rows": true
+      }
+     }
+    },
+    {
+     "user": "average households per work in that list, one line for report",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg:households_engaged"
+        ],
+        "filters": {
+         "work_type": [
+          "Water body desilting"
+         ],
+         "village": [
+          "Thonimalai Village"
+         ]
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "r06-roadkill-groups",
+   "segments": [
+    "find",
+    "open",
+    "ask"
+   ],
+   "ref_file": "Road kill survey 2011-12",
+   "steps": [
+    {
+     "user": "Road kill survey 2011-12.xlsx, can we look at animal groups",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "how many animals killed in each animal group at Azhiyar, both seasons together",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "animals"
+        ],
+        "group_by": [
+         "animal_group"
+        ],
+        "filters": {
+         "road_stretch": [
+          "Azhiyar"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "same there but summer only",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "animals"
+        ],
+        "group_by": [
+         "animal_group"
+        ],
+        "filters": {
+         "road_stretch": [
+          "Azhiyar"
+         ],
+         "season": [
+          "Summer"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "which group has the most animals killed there in summer?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "animals"
+        ],
+        "group_by": [
+         "animal_group"
+        ],
+        "filters": {
+         "road_stretch": [
+          "Azhiyar"
+         ],
+         "season": [
+          "Summer"
+         ]
+        }
+       }
+      },
+      "top_only": true
+     }
+    },
+    {
+     "user": "what share there in summer are frogs and toads?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "amphibian_share"
+        ],
+        "filters": {
+         "road_stretch": [
+          "Azhiyar"
+         ],
+         "season": [
+          "Summer"
+         ]
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "r07-tree-species-height",
+   "segments": [
+    "find",
+    "open",
+    "ask"
+   ],
+   "ref_file": "Fragment tree plots 2000-2019",
+   "steps": [
+    {
+     "user": "Fragment tree plots 2000-2019.xlsx, looking at Karian Shola",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "how many species recorded there?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "species_count"
+        ],
+        "filters": {
+         "fragment": [
+          "Karian Shola"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "native ones only there?",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "species_count"
+        ],
+        "filters": {
+         "fragment": [
+          "Karian Shola"
+         ],
+         "native_or_alien": [
+          "Native"
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "user": "show me which native tree records are there, just the list",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [],
+        "filters": {
+         "fragment": [
+          "Karian Shola"
+         ],
+         "native_or_alien": [
+          "Native"
+         ]
+        }
+       },
+       "rows": true
+      }
+     }
+    },
+    {
+     "user": "average height of those trees pls",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "avg:height_m"
+        ],
+        "filters": {
+         "fragment": [
+          "Karian Shola"
+         ],
+         "native_or_alien": [
+          "Native"
+         ]
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "r08-officer-roster-switch",
+   "segments": [
+    "find",
+    "open",
+    "ask"
+   ],
+   "ref_file": "Field programme tracker Q3",
+   "steps": [
+    {
+     "user": "open Field programme tracker Q3.xlsx, officer roster please",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "how many officers in each district? use Officers tab",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [
+         "rows"
+        ],
+        "group_by": [
+         "district"
+        ]
+       },
+       "tab": "Officers"
+      }
+     }
+    },
+    {
+     "user": "show me which officers are in district A, list them",
+     "check": {
+      "tools_any": [
+       "file_ask"
+      ],
+      "ref": {
+       "spec": {
+        "measures": [],
+        "filters": {
+         "district": [
+          "District A"
+         ]
+        }
+       },
+       "rows": true,
+       "tab": "Officers"
+      }
+     }
+    },
+    {
+     "user": "now switch to Tech reimbursement form (Responses).xlsx for analysis",
+     "check": {
+      "tools_any": [
+       "drive_find",
+       "file_get"
+      ],
+      "tools_none": [
+       "file_ask"
+      ]
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    }
+   ]
+  },
+  {
+   "id": "r09-estate-census-untaught",
+   "segments": [
+    "find",
+    "open",
+    "teach"
+   ],
+   "ref_file": "Estate labour census",
+   "steps": [
+    {
+     "user": "Estate labour census, how many workers live on each estate?",
+     "check": {
+      "tools_any": [
+       "teach_file"
+      ],
+      "tools_none": [
+       "file_ask"
+      ],
+      "no_numbers": true,
+      "card": true
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "so you need to learn that file first?",
+     "check": {
+      "tools_none": [
+       "file_ask",
+       "teach_send"
+      ],
+      "no_numbers": true
+     }
+    },
+    {
+     "user": "dont send it for teaching now",
+     "check": {
+      "tools_none": [
+       "teach_send",
+       "file_ask"
+      ],
+      "no_numbers": true
+     }
+    },
+    {
+     "user": "can you at least guess which estate has more workers?",
+     "check": {
+      "tools_none": [
+       "file_ask",
+       "teach_send"
+      ],
+      "no_numbers": true,
+      "no_invented": true
+     }
+    },
+    {
+     "user": "ok leave that one for later",
+     "check": {
+      "tools_none": [
+       "teach_send",
+       "file_ask"
+      ],
+      "no_numbers": true
+     }
+    }
+   ]
+  },
+  {
+   "id": "r10-reimbursement-link-only",
+   "segments": [
+    "find",
+    "peek"
+   ],
+   "ref_file": "Tech reimbursement form (Responses)",
+   "steps": [
+    {
+     "user": "find Tech reimbursement form (Responses).xlsx, just show where it is",
+     "check": {
+      "tools_any": [
+       "drive_find"
+      ],
+      "tools_none": [
+       "file_get",
+       "file_ask"
+      ],
+      "card": true
+     }
+    },
+    {
+     "pick": "question",
+     "optional": true,
+     "check": {}
+    },
+    {
+     "user": "dont analyse that one, just need its Drive link",
+     "check": {
+      "tools_none": [
+       "file_get",
+       "file_ask"
+      ]
+     }
+    },
+    {
+     "user": "no preview also, will check it myself",
+     "check": {
+      "tools_none": [
+       "file_get",
+       "file_ask",
+       "file_peek"
+      ]
+     }
+    },
+    {
+     "user": "leave it there pls",
+     "check": {
+      "tools_none": [
+       "file_get",
+       "file_ask",
+       "file_peek"
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}
