@@ -1,0 +1,79 @@
+{
+ "id": "household_survey_messy", "title": "Household survey (messy)", "version": 1, "format": 2,
+ "tabs": {
+  "Households": {
+   "headers": ["debts_inr","head_of_household","household_id","land_acres","members","monthly_income_inr","phone","savings_inr","survey_date","village","ward"],
+   "summary": "One row per household: village, ward, head, phone, members, monthly income, debts, savings (rupees), land (acres) and survey date.",
+   "row_noun": "households",
+   "columns": {
+    "household_id": {"type": "text", "label": "Household ID"},
+    "village": {"type": "category", "label": "Village"},
+    "ward": {"type": "category", "label": "Ward"},
+    "members": {"type": "number", "label": "Members (as recorded)"},
+    "monthly_income_inr": {"type": "number", "label": "Monthly income (Rs)"},
+    "debts_inr": {"type": "number", "label": "Debts (Rs)"},
+    "savings_inr": {"type": "number", "label": "Savings (Rs)"},
+    "land_acres": {"type": "number", "label": "Land (acres)"},
+    "survey_date": {"type": "date", "formats": ["%d/%m/%Y"], "label": "Survey date"}
+   },
+   "normalize": {"village": {"case": "title"}},
+   "validations": [
+    {"column": "household_id", "rule": "required", "message": "Household ID is missing"},
+    {"column": "phone", "rule": "phone", "message": "not a 10-digit phone"},
+    {"column": "survey_date", "rule": "date", "arg": ["%d/%m/%Y"], "message": "survey date is not a date (dd/mm/yyyy)"},
+    {"column": "survey_date", "rule": "not_future", "arg": ["%d/%m/%Y"], "message": "survey date is in the future"},
+    {"column": "monthly_income_inr", "rule": "number", "message": "income is not a number"},
+    {"column": "debts_inr", "rule": "number", "message": "debt is not a number"},
+    {"column": "savings_inr", "rule": "number", "message": "savings is not a number"},
+    {"column": "members", "rule": "range", "arg": [1, 20], "message": "household members should be at least 1"}
+   ],
+   "row_checks": [
+    {"id": "dup_household", "column": "household_id",
+     "sql": "(SELECT count(*) FROM {{tab:Households}} o WHERE lower(trim(o.household_id)) = lower(trim(t.household_id))) > 1",
+     "message": "Household ID is used by more than one household"},
+    {"id": "members_match", "column": "members",
+     "sql": "t.members IS NOT NULL AND t.members <> (SELECT count(*) FROM {{tab:Members}} m WHERE lower(trim(m.household_id)) = lower(trim(t.household_id)))",
+     "message": "Members does not match the number of people listed for this household in the Members tab",
+     "value": "CAST(t.members AS VARCHAR) || ' recorded, ' || CAST((SELECT count(*) FROM {{tab:Members}} m WHERE lower(trim(m.household_id)) = lower(trim(t.household_id))) AS VARCHAR) || ' listed'"},
+    {"id": "after_cutoff", "column": "survey_date",
+     "sql": "t.survey_date > DATE '2024-03-31'",
+     "message": "survey date is after the 31 March 2024 cutoff"}
+   ],
+   "measures": [
+    {"id": "households", "label": "Households", "sql": "count(*)", "format": "count"},
+    {"id": "total_debt", "label": "Total debts (Rs)", "sql": "sum(debts_inr)", "format": "inr"},
+    {"id": "total_income", "label": "Total monthly income (Rs)", "sql": "sum(monthly_income_inr)", "format": "inr"},
+    {"id": "debt_to_income", "label": "Debt as months of income", "sql": "sum(debts_inr) / nullif(sum(monthly_income_inr), 0)", "format": "number"}
+   ],
+   "presets": [
+    {"id": "up_to_cutoff", "label": "Surveyed up to 31 March 2024", "filters": {"survey_date": {"max": "2024-03-31"}}}
+   ],
+   "date_columns": ["survey_date"]
+  },
+  "Members": {
+   "headers": ["age","household_id","name","sex","works_y_n"],
+   "summary": "One row per person in a household, with age, sex and whether they work.",
+   "row_noun": "people",
+   "columns": {
+    "household_id": {"type": "text", "label": "Household ID"},
+    "age": {"type": "number", "label": "Age"},
+    "sex": {"type": "category", "label": "Sex"},
+    "works_y_n": {"type": "category", "label": "Works (Y/N)"}
+   },
+   "validations": [
+    {"column": "age", "rule": "range", "arg": [0, 110], "message": "age outside 0-110"},
+    {"column": "household_id", "rule": "required", "message": "Household ID is missing"}
+   ],
+   "row_checks": [
+    {"id": "orphan_member", "column": "household_id",
+     "sql": "NOT EXISTS (SELECT 1 FROM {{tab:Households}} h WHERE lower(trim(h.household_id)) = lower(trim(t.household_id)))",
+     "message": "no household with this ID in the Households tab"}
+   ],
+   "measures": [
+    {"id": "people", "label": "People", "sql": "count(*)", "format": "count"},
+    {"id": "working", "label": "People who work", "sql": "count(*) FILTER (WHERE upper(works_y_n) LIKE 'Y%')", "format": "count"}
+   ]
+  }
+ },
+ "history": [{"version": 1, "taught": "checks: unique household IDs, members match, orphan members, phones, dates, cutoff 31 Mar 2024; debt and income measures"}]
+}

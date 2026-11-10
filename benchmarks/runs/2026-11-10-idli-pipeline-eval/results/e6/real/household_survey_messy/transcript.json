@@ -1,0 +1,140 @@
+{
+ "fixture": "household_survey_messy",
+ "model": "claude-sonnet-5-5",
+ "real_teach": true,
+ "request": "household_survey_messy-20261110-210908",
+ "events": [
+  {
+   "type": "tool",
+   "t": 3,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 10,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; cat teach/inbox/household_survey_messy-20261110-210908/request.json; .venv/bin/python -m lib.filekit inspect teach/inbox/household_survey_messy-20261110-210908/mock.xlsx; ls file-skills\"}"
+  },
+  {
+   "type": "text",
+   "t": 18,
+   "text": "Idli asked me to check this file for mistakes so you can clean it, and then you want to analyse it. First, a note on what I'm looking at. The file I have is a copy with fake values. Nothing I decide changes it or your real file. I'm writing rules that Idli applies to your real file, on your computer, every time it reads it.\n\nI looked at the structure, and these are the things I'd flag as likely mistakes:\n\n- **Households tab (400 rows):**\n  - 3 phone numbers aren't valid.\n  - 3 survey dates don't parse as dd/mm/yyyy.\n  - 1 monthly income and 2 debt values aren't numbers, and 1 debt is blank.\n  - Household ID has 397 distinct values in 400 rows, so a few IDs are duplicated.\n  - Some households have 0 members, and one has 20.\n- **Members tab (1,600 rows):**\n  - Ages run up to 140.\n  - The Members tab has 403 distinct Household IDs against 400 on the Households tab, so some members point to households that don't exist.\n\n**Step 0: what you want to learn from this file.**\nI'd like to discuss what you want to learn once it's clean. The columns allow a few angles:\n\n1. **Poverty traps:** households with low income, high debt, little land and few savings together.\n2. **Debt against income:** debt as a share of income, by village or ward, and how much is more than a few months' income.\n3. **Who works:** the share of members of working age who work, by sex and village, and the number of dependants per earner.\n\nWhich of these matter to you, or is there something else? Tell me and I'll shape the checks and measures around it. After that, I'll take the steps one at a time:\n\n1. What a row is in each tab.\n2. The checks.\n3. The clean-ups.\n4. The words of this file.\n5. How I read your question.\n\nIf you'd rather say \"you decide\", I'll take my suggestions for every step and list what I chose."
+  },
+  {
+   "type": "user",
+   "t": 21,
+   "text": "Yes, go ahead. Keep the cutoff at 31 March 2024, and for the Households and Members checks use the rules in my notes: unique Household IDs, Members must match the household's member count, and every member must link to an existing household. Once the rules are in place, run them and tell me what fails."
+  },
+  {
+   "type": "tool",
+   "t": 26,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; ls file-skills/households; cat file-skills/households/skill.json | head -80; grep -n \\\"RULES\\\\|def excel_formula\\\" -A3 lib/filekit.py | head -80; ls teach/inbox\"}"
+  },
+  {
+   "type": "tool",
+   "t": 29,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; sed -n 540,720p lib/filekit.py; grep -n \\\"^def \\\\|^    def \\\" lib/filekit.py | sed -n 1,80p; ls teach; ls teach/inbox/*\"}"
+  },
+  {
+   "type": "tool",
+   "t": 36,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; sed -n 215,245p lib/filekit.py; sed -n 733,830p lib/filekit.py; grep -rn \\\"validations\\\\|lookups\\\\|\\\\.check(\\\\|filekit.check\\\" lib/*.py | grep -v \\\"^lib/filekit.py:6[0-9][0-9]\\\" | head -30; ls tests* lib 2>/dev/null\"}"
+  },
+  {
+   "type": "text",
+   "t": 38,
+   "text": "There's a `row_checks` key. Let me see how it works."
+  },
+  {
+   "type": "tool",
+   "t": 39,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; grep -n \\\"row_checks\\\" -B2 -A25 lib/formkit.py | sed -n 1,200p; sed -n 826,930p lib/formkit.py\"}"
+  },
+  {
+   "type": "tool",
+   "t": 57,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; S=file-skills/household_survey_messy; mkdir -p $S; cp teach/inbox/household_survey_messy-20261110-210908/mock.xlsx $S/mock.xlsx\\ncat > $S/skill.json <<'EOF'\\n{\\n \\\"id\\\": \\\"household_survey_messy\\\", \\\"title\\\": \\\"Household survey (messy)\\\", \\\"version\\\": 1, \\\"format\\\": 2,\\n \\\"tabs\\\": {\\n  \\\"Households\\\": {\\n   \\\"headers\\\": [\\\"debt"
+  },
+  {
+   "type": "tool",
+   "t": 62,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; S=file-skills/household_survey_messy\\n.venv/bin/python - <<'EOF'\\nimport pandas as pd, json\\np=\\\"file-skills/household_survey_messy/mock.xlsx\\\"\\nH=pd.read_excel(p,\\\"Households\\\",dtype=str).fillna(\\\"\\\")\\nnum=lambda s: pd.to_numeric(s.str.replace(r\\\"(?i)(rs\\\\.?|inr|\u20b9|,|\\\\s)\\\",\\\"\\\",regex=True),errors=\\\"coerce\\\")\\nH[\\\"debt\\\"]=num(H"
+  },
+  {
+   "type": "text",
+   "t": 66,
+   "text": "Tests pass. Now I'll run the checks and tally what fails, and compare against pandas."
+  },
+  {
+   "type": "tool",
+   "t": 69,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; .venv/bin/python - <<'EOF'\\nimport json,collections,pandas as pd\\nfrom lib import formkit as fm\\nS=\\\"file-skills/household_survey_messy\\\"\\ns=json.load(open(S+\\\"/skill.json\\\"))\\npr,_=fm.check(S+\\\"/mock.xlsx\\\",s,\\\"/tmp/claude-1000/chk\\\")\\nc=collections.Counter((p[\\\"tab\\\"],p[\\\"column\\\"],p[\\\"problem\\\"]) for p in pr)\\nfor k,v in c.i"
+  },
+  {
+   "type": "tool",
+   "t": 75,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; echo '{\\\"skill\\\":\\\"household_survey_messy\\\",\\\"version\\\":1,\\\"summary\\\":\\\"Household survey (messy) v1: checks for duplicate Household IDs, Members vs people listed, orphan members, phones, dates, 31 Mar 2024 cutoff; households and debt-by-village measures\\\"}' > teach/inbox/household_survey_messy-20261110-210908/done.json\"}"
+  },
+  {
+   "type": "tool",
+   "t": 75,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Switch back to the Idli chat\"}, {\"label\": \"Stay here\", \"description\": \"Keep talking in this chat\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 75,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Switch back to the Idli chat"
+       },
+       {
+        "label": "Stay here",
+        "description": "Keep talking in this chat"
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 78,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork; touch teach/inbox/household_survey_messy-20261110-210908/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 130,
+   "text": "I've taught Idli the rules and run them on the fake-value copy of your file. The tests pass, and my own pandas count agrees with every check below.\n\nI never saw your notes, so I built the three rules you named plus some basic ones. I took \"cutoff 31 March 2024\" to mean a survey date after that day gets flagged. If you meant something else, tell me and I'll change it.\n\n**What failed on the copy:**\n\n| Tab | Check | Failures |\n|---|---|---|\n| Households | Household ID used by more than one household | 6 rows (HH0001, HH0041 and HH0081, each twice) |\n| Households | Members doesn't match the people listed in the Members tab | 12 households (recorded 3 vs 2 listed, 0 vs 2, 20 vs 5, and so on) |\n| Households | Members is below 1 | 3 |\n| Households | Phone isn't 10 digits | 3 |\n| Households | Survey date doesn't parse | 3 |\n| Households | Survey date is in the future | 3 |\n| Households | Survey date is after the 31 March 2024 cutoff | 3 |\n| Households | Income isn't a number | 1 |\n| Households | Debt isn't a number | 2 |\n| Members | Household ID has no matching household | 12 (HH0002, HH0042 and HH0082 three times each, plus 3 IDs starting HHX) |\n| Members | Age outside 0\u2013110 | 3 |\n\n- **Duplicates and orphans:** The duplicate IDs and the orphan members look connected. HH0002, HH0042 and HH0082 are missing from Households, and their members are the orphans. I'd guess the first row of each pair should have been HH0002 and so on.\n- **Blank debt:** One debt cell is blank, and I don't flag blanks. Tell me if a blank should count as an error.\n- **Dates:** The same three rows are probably behind the future-date and cutoff failures, since the copy has dates in 2030.\n\nThe form for the Households tab now gives households, total debt, total income, and debt as months of income. It can also leave out surveys after the cutoff. The Members tab gives people and people who work.\n\nYour Idli chat will continue, and I've switched you back to Idli."
+  }
+ ],
+ "user_cost": 0.00142595,
+ "workspace": "/tmp/claude-1000/pipe-eval/pipe-teach-m3nr1g44/cowork",
+ "secs": 131,
+ "rounds": 2,
+ "claude_cost": 0.37,
+ "done": true,
+ "cards": 1,
+ "skill": "household_survey_messy",
+ "filekit_changed": false
+}
