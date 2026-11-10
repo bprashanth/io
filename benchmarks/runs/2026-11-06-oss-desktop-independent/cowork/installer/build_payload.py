@@ -43,7 +43,15 @@ def python(out, plat, arch):
     shutil.move(inner, dest)
     shutil.rmtree(tmp, ignore_errors=True)
     exe = os.path.join(dest, "python.exe") if plat == "win" else os.path.join(dest, "bin", "python3")
-    run(["uv", "pip", "install", "--python", exe, "--break-system-packages", "--no-cache", *LIBS])
+    if not os.path.exists(exe):
+        print("python layout:", sorted(os.listdir(dest))[:40], flush=True)
+        raise SystemExit(f"no {exe} in the uv-installed Python")
+    subprocess.run([exe, "-c", "import sys; print(sys.version)"], check=True)
+    exe = os.path.abspath(exe)
+    # the interpreter's own pip (uv pip can't always find a moved standalone Python on Windows)
+    subprocess.run([exe, "-m", "ensurepip", "--upgrade"], check=False, capture_output=True)
+    run([exe, "-m", "pip", "install", "--quiet", "--no-cache-dir", "--break-system-packages",
+         "--disable-pip-version-check", *LIBS])
     for root, dirs, _ in os.walk(dest):  # tests and caches the app never runs
         for d in list(dirs):
             if d in ("__pycache__", "tests", "test") and "site-packages" in root:
