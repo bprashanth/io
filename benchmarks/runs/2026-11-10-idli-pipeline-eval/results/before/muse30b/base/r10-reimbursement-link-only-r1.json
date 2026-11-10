@@ -1,0 +1,236 @@
+{
+ "model": "muse30b",
+ "variant": "base",
+ "scenario": "held3.json",
+ "conv": "r10-reimbursement-link-only",
+ "segments": [
+  "find",
+  "peek"
+ ],
+ "turns": [
+  {
+   "step": 0,
+   "input": {
+    "user": "find Tech reimbursement form (Responses).xlsx, just show where it is",
+    "check": {
+     "tools_any": [
+      "drive_find"
+     ],
+     "tools_none": [
+      "file_get",
+      "file_ask"
+     ],
+     "card": true
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 35.4,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "drive_find",
+       "args": "{\"query\":\"Tech reimbursement form (Responses).xlsx\"}"
+      }
+     ],
+     "reasoning_chars": 1022,
+     "usage": {
+      "prompt_tokens": 4994,
+      "completion_tokens": 296
+     }
+    },
+    {
+     "type": "tool",
+     "name": "drive_find",
+     "args": {
+      "query": "Tech reimbursement form (Responses).xlsx"
+     },
+     "secs": 0.04,
+     "result": {
+      "status": "found",
+      "results": [
+       {
+        "id": "1397c5dc798168e8bb5461cd7fbccf198",
+        "name": "Tech reimbursement form (Responses).xlsx",
+        "kind": "Microsoft Excel",
+        "folder": "My Drive / Finance",
+        "about": "Form responses: staff claims for phones, laptops and internet, amounts, status, approver.",
+        "why": "'tech' in name, 'reimbursement' in name, 'responses' in name",
+        "modified": "2025-10-28",
+        "score": 1.0
+       }
+      ],
+      "ms": 37,
+      "then": "If the user wants to clean it up or analyse it (mistakes, checks, numbers, totals, who, how many, charts, a dashboard): call file_get with link '1397c5dc798168e8bb5461cd7fbccf198' and goal \"clean\" or \"analyse\" now. Otherwise (find, open, see, show; any kind of file): call AskUserQuestion with exactly `card` (don't write anything first); on \"Yes, open it\" call file_peek with id '1397c5dc798168e8bb5461cd7fbccf198' and name 'Tech reimbursement form (Responses).xlsx'. Don't download.",
+      "card": {
+       "questions": [
+        {
+         "header": "File",
+         "multiSelect": false,
+         "question": "Found Tech reimbursement form (Responses).xlsx in My Drive / Finance. Open it here to take a look?",
+         "options": [
+          {
+           "label": "Yes, open it",
+           "description": "Read only, in a tab here"
+          },
+          {
+           "label": "No",
+           "description": "Leave it closed"
+          }
+         ]
+        }
+       ]
+      }
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 54.9,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\":[{\"question\": \"Found Tech reimbursement form (Responses).xlsx in My Drive / Finance. Open it here to take a look?\", \"header\": \"File\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, open it\", \"description\": \"Read only, in a tab here\"}, {\"label\": \"No\", \"description\": \"Leave it closed\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 2176,
+     "usage": {
+      "prompt_tokens": 5469,
+      "completion_tokens": 649
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "question": "Found Tech reimbursement form (Responses).xlsx in My Drive / Finance. Open it here to take a look?",
+        "header": "File",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "Yes, open it",
+          "description": "Read only, in a tab here"
+         },
+         {
+          "label": "No",
+          "description": "Leave it closed"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"Found Tech reimbursement form (Responses).xlsx in My Drive / Finance. Open it here to take a look?\"=\"dont analyse that one, just need its Drive link\". You can now continue with the user's answers in mind.",
+     "answered_step": 2
+    }
+   ],
+   "deviations": [
+    "card_where_user_types"
+   ]
+  },
+  {
+   "step": 1,
+   "input": {
+    "pick": "question",
+    "optional": true,
+    "check": {}
+   },
+   "events": [],
+   "deviations": [],
+   "skipped": true
+  },
+  {
+   "step": 2,
+   "input": {
+    "user": "dont analyse that one, just need its Drive link",
+    "check": {
+     "tools_none": [
+      "file_get",
+      "file_ask"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 38.6,
+     "finish": "stop",
+     "text": "Found it.\n\n**Tech reimbursement form (Responses).xlsx**\n- Location: My Drive / Finance\n- File ID: 1397c5dc798168e8bb5461cd7fbccf198\n- Modified: 2025-10-28\n\nDrive link: https://drive.google.com/open?id=1397c5dc798168e8bb5461cd7fbccf198\n\nWant me to open it read-only, or leave it closed?",
+     "tool_calls": [],
+     "reasoning_chars": 1074,
+     "usage": {
+      "prompt_tokens": 5665,
+      "completion_tokens": 362
+     }
+    }
+   ],
+   "deviations": [],
+   "via_card": true,
+   "secs": 38.6
+  },
+  {
+   "step": 3,
+   "input": {
+    "user": "no preview also, will check it myself",
+    "check": {
+     "tools_none": [
+      "file_get",
+      "file_ask",
+      "file_peek"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 10.4,
+     "finish": "stop",
+     "text": "Got it \u2014 no preview, you\u2019ll check it yourself.\n\nThe file stays closed. Let me know if you want to clean it, analyse it, or find something else.",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5781,
+      "completion_tokens": 39
+     }
+    }
+   ],
+   "deviations": [],
+   "secs": 10.4
+  },
+  {
+   "step": 4,
+   "input": {
+    "user": "leave it there pls",
+    "check": {
+     "tools_none": [
+      "file_get",
+      "file_ask",
+      "file_peek"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 10.1,
+     "finish": "stop",
+     "text": "Understood. I\u2019ll leave it where it is.\n\nIf you need the link again, it\u2019s in My Drive / Finance:\nTech reimbursement form (Responses).xlsx\nhttps://drive.google.com/open?id=1397c5dc798168e8bb5461cd7fbccf198",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5830,
+      "completion_tokens": 64
+     }
+    }
+   ],
+   "deviations": [],
+   "secs": 10.1
+  }
+ ],
+ "secs": 149.4,
+ "rep": 1
+}

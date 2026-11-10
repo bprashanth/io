@@ -1,0 +1,165 @@
+{
+ "model": "local-qwen35-9b",
+ "variant": "split-l9bself",
+ "scenario": "dev.json",
+ "conv": "d09-find-annual-report",
+ "segments": [
+  "find",
+  "peek"
+ ],
+ "turns": [
+  {
+   "step": 0,
+   "input": {
+    "user": "where is our annual report?",
+    "check": {
+     "tools_any": [
+      "drive_find"
+     ],
+     "tools_none": [
+      "file_get"
+     ],
+     "card": true
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 1.9,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "drive_find",
+       "args": "{\"query\":\"annual report\",\"goal\":\"find\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 4562,
+      "completion_tokens": 39
+     }
+    },
+    {
+     "type": "tool",
+     "name": "drive_find",
+     "args": {
+      "query": "annual report",
+      "goal": "find"
+     },
+     "secs": 0.04,
+     "result": {
+      "status": "found",
+      "results": [
+       {
+        "id": "1eebb5e5159653b74bf9f60b6bd85d396",
+        "name": "Annual report 2024.pdf",
+        "kind": "PDF",
+        "folder": "My Drive / Reports",
+        "about": "Annual report 2024: programmes, reach, finances.",
+        "why": "'annual' in name, 'report' in name",
+        "modified": "2025-04-02",
+        "score": 1.0
+       }
+      ],
+      "ms": 39,
+      "then": "If the user wants to clean it up or analyse it (mistakes, checks, numbers, totals, who, how many, charts, a dashboard): call file_get with link '1eebb5e5159653b74bf9f60b6bd85d396' and goal \"clean\" or \"analyse\" now. Otherwise (find, open, see, show; any kind of file): call AskUserQuestion with exactly `card` (don't write anything first); on \"Yes, open it\" call file_peek with id '1eebb5e5159653b74bf9f60b6bd85d396' and name 'Annual report 2024.pdf'. Don't download.",
+      "card": {
+       "questions": [
+        {
+         "header": "File",
+         "multiSelect": false,
+         "question": "Found Annual report 2024.pdf in My Drive / Reports. Open it here to take a look?",
+         "options": [
+          {
+           "label": "Yes, open it",
+           "description": "Read only, in a tab here"
+          },
+          {
+           "label": "No",
+           "description": "Leave it closed"
+          }
+         ]
+        }
+       ]
+      }
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 4.0,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\":[{\"question\": \"Found Annual report 2024.pdf in My Drive / Reports. Open it here to take a look?\", \"header\": \"File\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, open it\", \"description\": \"Read only, in a tab here\"}, {\"label\": \"No\", \"description\": \"Leave it closed\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5087,
+      "completion_tokens": 107
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "question": "Found Annual report 2024.pdf in My Drive / Reports. Open it here to take a look?",
+        "header": "File",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "Yes, open it",
+          "description": "Read only, in a tab here"
+         },
+         {
+          "label": "No",
+          "description": "Leave it closed"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"Found Annual report 2024.pdf in My Drive / Reports. Open it here to take a look?\"=\"No\". You can now continue with the user's answers in mind.",
+     "answered_step": 1
+    }
+   ],
+   "deviations": []
+  },
+  {
+   "step": 1,
+   "input": {
+    "pick": "No",
+    "check": {
+     "tools_none": [
+      "file_peek",
+      "file_get"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 2.2,
+     "finish": "stop",
+     "text": "I found \"Annual report 2024.pdf\" in your Reports folder. Would you like me to open it here to take a look, or is there something specific you'd like to do with it (check for mistakes, analyse numbers, create a chart)?",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5256,
+      "completion_tokens": 55
+     }
+    }
+   ],
+   "deviations": [],
+   "via_card": true,
+   "secs": 2.2
+  }
+ ],
+ "secs": 8.2,
+ "rep": 0
+}

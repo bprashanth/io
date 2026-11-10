@@ -1,0 +1,237 @@
+{
+ "model": "local-qwen35-9b",
+ "variant": "split-l9bself",
+ "scenario": "held3.json",
+ "conv": "r10-reimbursement-link-only",
+ "segments": [
+  "find",
+  "peek"
+ ],
+ "turns": [
+  {
+   "step": 0,
+   "input": {
+    "user": "find Tech reimbursement form (Responses).xlsx, just show where it is",
+    "check": {
+     "tools_any": [
+      "drive_find"
+     ],
+     "tools_none": [
+      "file_get",
+      "file_ask"
+     ],
+     "card": true
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 2.3,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "drive_find",
+       "args": "{\"query\":\"Tech reimbursement form (Responses).xlsx\",\"goal\":\"find\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 4570,
+      "completion_tokens": 44
+     }
+    },
+    {
+     "type": "tool",
+     "name": "drive_find",
+     "args": {
+      "query": "Tech reimbursement form (Responses).xlsx",
+      "goal": "find"
+     },
+     "secs": 0.03,
+     "result": {
+      "status": "found",
+      "results": [
+       {
+        "id": "1397c5dc798168e8bb5461cd7fbccf198",
+        "name": "Tech reimbursement form (Responses).xlsx",
+        "kind": "Microsoft Excel",
+        "folder": "My Drive / Finance",
+        "about": "Form responses: staff claims for phones, laptops and internet, amounts, status, approver.",
+        "why": "'tech' in name, 'reimbursement' in name, 'responses' in name",
+        "modified": "2025-10-28",
+        "score": 1.0
+       }
+      ],
+      "ms": 26,
+      "then": "If the user wants to clean it up or analyse it (mistakes, checks, numbers, totals, who, how many, charts, a dashboard): call file_get with link '1397c5dc798168e8bb5461cd7fbccf198' and goal \"clean\" or \"analyse\" now. Otherwise (find, open, see, show; any kind of file): call AskUserQuestion with exactly `card` (don't write anything first); on \"Yes, open it\" call file_peek with id '1397c5dc798168e8bb5461cd7fbccf198' and name 'Tech reimbursement form (Responses).xlsx'. Don't download.",
+      "card": {
+       "questions": [
+        {
+         "header": "File",
+         "multiSelect": false,
+         "question": "Found Tech reimbursement form (Responses).xlsx in My Drive / Finance. Open it here to take a look?",
+         "options": [
+          {
+           "label": "Yes, open it",
+           "description": "Read only, in a tab here"
+          },
+          {
+           "label": "No",
+           "description": "Leave it closed"
+          }
+         ]
+        }
+       ]
+      }
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 4.6,
+     "finish": "tool_calls",
+     "text": "Found Tech reimbursement form (Responses).xlsx in My Drive / Finance. Open it here to take a look?",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\":[{\"question\": \"Open it here to take a look?\", \"header\": \"File\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, open it\", \"description\": \"Read only, in a tab here\"}, {\"label\": \"No\", \"description\": \"Leave it closed\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5108,
+      "completion_tokens": 115
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "question": "Open it here to take a look?",
+        "header": "File",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "Yes, open it",
+          "description": "Read only, in a tab here"
+         },
+         {
+          "label": "No",
+          "description": "Leave it closed"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"Open it here to take a look?\"=\"dont analyse that one, just need its Drive link\". You can now continue with the user's answers in mind.",
+     "answered_step": 2
+    }
+   ],
+   "deviations": [
+    "card_where_user_types"
+   ]
+  },
+  {
+   "step": 1,
+   "input": {
+    "pick": "question",
+    "optional": true,
+    "check": {}
+   },
+   "events": [],
+   "deviations": [],
+   "skipped": true
+  },
+  {
+   "step": 2,
+   "input": {
+    "user": "dont analyse that one, just need its Drive link",
+    "check": {
+     "tools_none": [
+      "file_get",
+      "file_ask"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 2.4,
+     "finish": "stop",
+     "text": "Got it. Here's the Drive link: https://drive.google.com/file/d/1397c5dc798168e8bb5461cd7fbccf198/view\n\nIt's in My Drive / Finance. Let me know if you need anything else!",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5279,
+      "completion_tokens": 65
+     }
+    }
+   ],
+   "deviations": [],
+   "via_card": true,
+   "secs": 2.4
+  },
+  {
+   "step": 3,
+   "input": {
+    "user": "no preview also, will check it myself",
+    "check": {
+     "tools_none": [
+      "file_get",
+      "file_ask",
+      "file_peek"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 2.6,
+     "finish": "stop",
+     "text": "Understood. No preview or download\u2014just the link to the file in your Drive. If you need anything else, feel free to ask!",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5353,
+      "completion_tokens": 30
+     }
+    }
+   ],
+   "deviations": [],
+   "secs": 2.6
+  },
+  {
+   "step": 4,
+   "input": {
+    "user": "leave it there pls",
+    "check": {
+     "tools_none": [
+      "file_get",
+      "file_ask",
+      "file_peek"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 1.1,
+     "finish": "stop",
+     "text": "Got it. The file is left in your Drive as is. If you need anything else, just let me know!",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5396,
+      "completion_tokens": 25
+     }
+    }
+   ],
+   "deviations": [],
+   "secs": 1.1
+  }
+ ],
+ "secs": 13.0,
+ "rep": 0
+}

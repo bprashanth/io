@@ -13,7 +13,7 @@ run() {  # name model spec variants scenarios par reps
 # Ling-3.0-flash and the OpenRouter 9B were dropped (not free-tier options): results/ling-not-free-tier.
 # The local 9B serves 4 slots (harness/serve9b.sh); its own dial-setting call shares them.
 case "$1" in
-  local) run e7-local local-qwen35-9b local-qwen35-9b e7-product,e7-p12,e7-soft,e7-hard held3,held2 4 2 ;;
-  local2) run e7-local local-qwen35-9b local-qwen35-9b e7-product,e7-p12,e7-soft,e7-hard dev,held 4 1 ;;
-  muse)  run e7-muse muse30b muse30b e7-product,e7-p12 held3 2 ;;
+  # the owner's narrowed E7: local 9B + split on the 12 shipped tools, soft and hard phases, 2 repeats
+  local12) run e7-local12 local-qwen35-9b local-qwen35-9b e7-soft12,e7-hard12 held3,held2,dev,held 4 2 ;;
+  muse)  run e7-muse muse30b muse30b e7-product held3 2 ;;
 esac

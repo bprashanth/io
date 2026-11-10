@@ -1,0 +1,440 @@
+{
+ "model": "local-qwen35-9b",
+ "variant": "split-l9bself",
+ "scenario": "dev.json",
+ "conv": "d13-old-survey",
+ "segments": [
+  "find",
+  "open",
+  "ask"
+ ],
+ "turns": [
+  {
+   "step": 0,
+   "input": {
+    "user": "analyse the household survey",
+    "check": {
+     "tools_any": [
+      "drive_find"
+     ],
+     "tools_none": [
+      "file_get"
+     ],
+     "lists_choices": true
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 1.8,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "drive_find",
+       "args": "{\"query\":\"household survey\",\"goal\":\"analyse\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 4560,
+      "completion_tokens": 40
+     }
+    },
+    {
+     "type": "tool",
+     "name": "drive_find",
+     "args": {
+      "query": "household survey",
+      "goal": "analyse"
+     },
+     "secs": 0.04,
+     "result": {
+      "status": "choose",
+      "results": [
+       {
+        "id": "1ec59b09dfc4ed7f9bc4b4ce7497bbc39",
+        "name": "Household survey 2025.xlsx",
+        "kind": "Microsoft Excel",
+        "folder": "My Drive / Livelihoods",
+        "about": "Household survey: head of household, ward, members, monthly income, savings, debts, vulnerability score.",
+        "why": "'household' in name, 'survey' in name",
+        "modified": "2025-10-02",
+        "score": 1.0
+       },
+       {
+        "id": "102445cfc710298936fc2f578144c6400",
+        "name": "Household survey 2024 (old).xlsx",
+        "kind": "Microsoft Excel",
+        "folder": "My Drive / Livelihoods / Archive",
+        "about": "Last year's household survey: wards, income, savings, debts per household.",
+        "why": "'household' in name, 'survey' in name",
+        "modified": "2024-09-14",
+        "score": 1.0
+       },
+       {
+        "id": "1b3bb900684554db98dee01e1babb57c7",
+        "name": "Road kill survey 2011-12.xlsx",
+        "kind": "Microsoft Excel",
+        "folder": "My Drive / Ecology / Roads",
+        "about": "Animals found killed on roads: road stretch, season, date, animal, group, count.",
+        "why": "'survey' in name",
+        "modified": "2024-11-30",
+        "score": 0.5
+       }
+      ],
+      "ms": 41,
+      "say_to_user": "Ask which one they mean, listing these (name, kind, folder) in one short message. If one is an Idli working copy, say it's the checked (cleaned) version.",
+      "then": "Don't search again unless they give new words."
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 4.2,
+     "finish": "stop",
+     "text": "I found a couple of household survey files. Which one do you want to analyse?\n\n- **Household survey 2025.xlsx** (Microsoft Excel, My Drive / Livelihoods) - most recent, with head of household, ward, members, monthly income, savings, debts, vulnerability score\n- **Household survey 2024 (old).xlsx** (Microsoft Excel, My Drive / Livelihoods / Archive) - last year's data",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5150,
+      "completion_tokens": 98
+     }
+    }
+   ],
+   "deviations": [],
+   "secs": 6.1
+  },
+  {
+   "step": 1,
+   "input": {
+    "user": "the old one from last year",
+    "check": {
+     "tools_any": [
+      "file_get"
+     ],
+     "args": {
+      "file_get": {
+       "link": "102445cfc710298936fc2f578144c6400"
+      }
+     }
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 3.8,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "file_get",
+       "args": "{\"link\":\"102445cfc710298936fc2f578144c6400\",\"goal\":\"analyse\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5259,
+      "completion_tokens": 68
+     }
+    },
+    {
+     "type": "tool",
+     "name": "file_get",
+     "args": {
+      "link": "102445cfc710298936fc2f578144c6400",
+      "goal": "analyse"
+     },
+     "secs": 0.19,
+     "result": {
+      "file": "drive/Household survey 2024 (old).xlsx",
+      "title": "Households",
+      "known": true,
+      "today": "2026-11-10",
+      "layout": "ok",
+      "layout_changes": [],
+      "problems": 0,
+      "problem_kinds": [],
+      "checked_copy": "checked/Household survey 2024 (old) - checked.xlsx",
+      "form_link": "http://dashboard.localhost:8797/?t=bench&file=drive%2FHousehold+survey+2024+%28old%29.xlsx",
+      "form_opened": true,
+      "tabs": [
+       {
+        "tab": "Households",
+        "row_noun": "households",
+        "summary": "Household survey: one row per household with the head's name, ward, number of members, monthly income, savings and debts (rupees), a 1-10 vulnerability score and its location (lat/lon).",
+        "measures": {
+         "rows": "Number of households",
+         "debt": "Total debt (Rs)",
+         "savings": "Total savings (Rs)",
+         "income": "Total monthly income (Rs)",
+         "avg_debt": "Average debt per household (Rs)",
+         "avg_vulnerability": "Average vulnerability score",
+         "people": "People",
+         "avg:members": "Average Members",
+         "avg:monthly_income_inr": "Average Monthly income (Rs)",
+         "avg:savings_inr": "Average Savings (Rs)",
+         "sum:vulnerability_score_1to10": "Total Vulnerability score (1-10)"
+        },
+        "group_by": {
+         "ward": "Ward",
+         "members": "Members",
+         "monthly_income_inr": "Monthly income (Rs)",
+         "savings_inr": "Savings (Rs)",
+         "debts_inr": "Debts (Rs)",
+         "vulnerability_score_1to10": "Vulnerability score (1-10)",
+         "household_head": "Household head"
+        },
+        "filters": {
+         "household_head": {
+          "label": "Household head",
+          "values": [
+           "household_head 1",
+           "household_head 10",
+           "household_head 11",
+           "household_head 12",
+           "household_head 13",
+           "household_head 14",
+           "household_head 15",
+           "household_head 16",
+           "household_head 17",
+           "household_head 18",
+           "household_head 19",
+           "household_head 2",
+           "household_head 20",
+           "household_head 21",
+           "household_head 22",
+           "... 15 more"
+          ]
+         },
+         "ward": {
+          "label": "Ward",
+          "values": [
+           "Ward A",
+           "Ward B",
+           "Ward C",
+           "Ward D",
+           "Ward E"
+          ]
+         },
+         "members": {
+          "label": "Members",
+          "kind": "number",
+          "min": "2.0",
+          "max": "8.0"
+         },
+         "monthly_income_inr": {
+          "label": "Monthly income (Rs)",
+          "kind": "number",
+          "min": "7765.0",
+          "max": "26113.0"
+         },
+         "savings_inr": {
+          "label": "Savings (Rs)",
+          "kind": "number",
+          "min": "1015.0",
+          "max": "44689.0"
+         },
+         "debts_inr": {
+          "label": "Debts (Rs)",
+          "kind": "number",
+          "min": "5454.0",
+          "max": "111308.0"
+         },
+         "vulnerability_score_1to10": {
+          "label": "Vulnerability score (1-10)",
+          "kind": "number",
+          "min": "1.0",
+          "max": "9.0"
+         }
+        },
+        "presets": {},
+        "date_columns": []
+       }
+      ],
+      "charts": [],
+      "say_to_user": "I've opened the form for Households in a new tab. The checks found no problems. How would you like to start?",
+      "start_card": {
+       "questions": [
+        {
+         "header": "Start",
+         "multiSelect": false,
+         "question": "How would you like to start?",
+         "options": [
+          {
+           "label": "I have a question",
+           "description": "Ask in the chat; answers come from the form, with a chart when it helps"
+          },
+          {
+           "label": "Suggest analyses",
+           "description": "Claude looks at a fake copy and suggests what to look at and how to chart it"
+          }
+         ]
+        }
+       ]
+      },
+      "card": {
+       "questions": [
+        {
+         "header": "Next",
+         "multiSelect": false,
+         "question": "I've opened the form for Households in a new tab. The checks found no problems. How would you like to start?",
+         "options": [
+          {
+           "label": "I have a question",
+           "description": "Ask in the chat; answers come from the form, with a chart when it helps"
+          },
+          {
+           "label": "Suggest analyses",
+           "description": "Claude looks at a fake copy and suggests what to look at and how to chart it"
+          }
+         ]
+        }
+       ]
+      },
+      "then": "Call AskUserQuestion with exactly `card` now (it already says say_to_user; write nothing before it). On \"I have a question\": ask in one short line what they want to know. On \"Suggest analyses\": call chart_request with question \"\". On \"Show the saved charts\": call chart_show once with every id in `charts`. Afterwards: For a question about this file, call file_ask with a spec built only from these tabs' measures, group_by, filters and presets (chart=true when they ask for a graph or picture). Ask the user if a value is unclear. If no measure or filter fits the question, call teach_file with `missing`. For a chart the form can't draw, call chart_request. Charts already made for this file: chart_show.",
+      "downloaded": true
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 5.8,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\":[{\"question\": \"How would you like to start?\", \"header\": \"Next\", \"multiSelect\": false, \"options\": [{\"label\": \"I have a question\", \"description\": \"Ask in the chat; answers come from the form, with a chart when it helps\"}, {\"label\": \"Suggest analyses\", \"description\": \"Claude looks at a fake copy and suggests what to look at and how to chart it\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 6916,
+      "completion_tokens": 117
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "question": "How would you like to start?",
+        "header": "Next",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "I have a question",
+          "description": "Ask in the chat; answers come from the form, with a chart when it helps"
+         },
+         {
+          "label": "Suggest analyses",
+          "description": "Claude looks at a fake copy and suggests what to look at and how to chart it"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"How would you like to start?\"=\"I have a question\". You can now continue with the user's answers in mind.",
+     "answered_step": 2
+    }
+   ],
+   "deviations": []
+  },
+  {
+   "step": 2,
+   "input": {
+    "pick": "question",
+    "optional": true,
+    "check": {}
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 0.8,
+     "finish": "stop",
+     "text": "What would you like to know about the 2024 household survey?",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 7082,
+      "completion_tokens": 17
+     }
+    }
+   ],
+   "deviations": [],
+   "via_card": true,
+   "secs": 0.8
+  },
+  {
+   "step": 3,
+   "input": {
+    "user": "what's the total savings across all households?",
+    "check": {
+     "tools_any": [
+      "file_ask"
+     ],
+     "ref": {
+      "spec": {
+       "measures": [
+        "savings"
+       ]
+      }
+     }
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 3.9,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "file_ask",
+       "args": "{\"file\":\"drive/Household survey 2024 (old).xlsx\",\"question\":\"what's the total savings across all households?\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 7109,
+      "completion_tokens": 58
+     }
+    },
+    {
+     "type": "tool",
+     "name": "file_ask",
+     "args": {
+      "file": "drive/Household survey 2024 (old).xlsx",
+      "question": "what's the total savings across all households?"
+     },
+     "secs": 1.7,
+     "result": {
+      "answer": "Total savings (Rs). Rs 6,64,511.",
+      "form_link": "http://dashboard.localhost:8797/?t=bench&file=drive%2FHousehold+survey+2024+%28old%29.xlsx&tab=Households&spec=%7B%22measures%22%3A%5B%22savings%22%5D%2C%22group_by%22%3A%5B%5D%7D",
+      "form_updated": true,
+      "say_to_user": "Give the answer exactly as written (numbers unchanged), in a sentence or a short list. Say the form tab now shows it.",
+      "spec_model_secs": 1.7
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 2.6,
+     "finish": "stop",
+     "text": "The total savings across all households is **Rs 6,64,511**. The form tab now shows this.",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 7361,
+      "completion_tokens": 27
+     }
+    }
+   ],
+   "deviations": [],
+   "secs": 8.2
+  }
+ ],
+ "secs": 24.8,
+ "rep": 0
+}

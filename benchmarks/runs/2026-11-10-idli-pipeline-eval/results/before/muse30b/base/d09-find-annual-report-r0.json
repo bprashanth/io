@@ -1,0 +1,164 @@
+{
+ "model": "muse30b",
+ "variant": "base",
+ "scenario": "dev.json",
+ "conv": "d09-find-annual-report",
+ "segments": [
+  "find",
+  "peek"
+ ],
+ "turns": [
+  {
+   "step": 0,
+   "input": {
+    "user": "where is our annual report?",
+    "check": {
+     "tools_any": [
+      "drive_find"
+     ],
+     "tools_none": [
+      "file_get"
+     ],
+     "card": true
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 20.0,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "drive_find",
+       "args": "{\"query\":\"annual report\"}"
+      }
+     ],
+     "reasoning_chars": 496,
+     "usage": {
+      "prompt_tokens": 4986,
+      "completion_tokens": 158
+     }
+    },
+    {
+     "type": "tool",
+     "name": "drive_find",
+     "args": {
+      "query": "annual report"
+     },
+     "secs": 0.04,
+     "result": {
+      "status": "found",
+      "results": [
+       {
+        "id": "1eebb5e5159653b74bf9f60b6bd85d396",
+        "name": "Annual report 2024.pdf",
+        "kind": "PDF",
+        "folder": "My Drive / Reports",
+        "about": "Annual report 2024: programmes, reach, finances.",
+        "why": "'annual' in name, 'report' in name",
+        "modified": "2025-04-02",
+        "score": 1.0
+       }
+      ],
+      "ms": 35,
+      "then": "If the user wants to clean it up or analyse it (mistakes, checks, numbers, totals, who, how many, charts, a dashboard): call file_get with link '1eebb5e5159653b74bf9f60b6bd85d396' and goal \"clean\" or \"analyse\" now. Otherwise (find, open, see, show; any kind of file): call AskUserQuestion with exactly `card` (don't write anything first); on \"Yes, open it\" call file_peek with id '1eebb5e5159653b74bf9f60b6bd85d396' and name 'Annual report 2024.pdf'. Don't download.",
+      "card": {
+       "questions": [
+        {
+         "header": "File",
+         "multiSelect": false,
+         "question": "Found Annual report 2024.pdf in My Drive / Reports. Open it here to take a look?",
+         "options": [
+          {
+           "label": "Yes, open it",
+           "description": "Read only, in a tab here"
+          },
+          {
+           "label": "No",
+           "description": "Leave it closed"
+          }
+         ]
+        }
+       ]
+      }
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 35.2,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\":[{\"question\": \"Found Annual report 2024.pdf in My Drive / Reports. Open it here to take a look?\", \"header\": \"File\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, open it\", \"description\": \"Read only, in a tab here\"}, {\"label\": \"No\", \"description\": \"Leave it closed\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 937,
+     "usage": {
+      "prompt_tokens": 5444,
+      "completion_tokens": 343
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "question": "Found Annual report 2024.pdf in My Drive / Reports. Open it here to take a look?",
+        "header": "File",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "Yes, open it",
+          "description": "Read only, in a tab here"
+         },
+         {
+          "label": "No",
+          "description": "Leave it closed"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"Found Annual report 2024.pdf in My Drive / Reports. Open it here to take a look?\"=\"No\". You can now continue with the user's answers in mind.",
+     "answered_step": 1
+    }
+   ],
+   "deviations": []
+  },
+  {
+   "step": 1,
+   "input": {
+    "pick": "No",
+    "check": {
+     "tools_none": [
+      "file_peek",
+      "file_get"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 20.4,
+     "finish": "stop",
+     "text": "Annual report 2024.pdf is in My Drive / Reports.\n\nWant me to open it, or were you looking for a different year/version?",
+     "tool_calls": [],
+     "reasoning_chars": 486,
+     "usage": {
+      "prompt_tokens": 5629,
+      "completion_tokens": 151
+     }
+    }
+   ],
+   "deviations": [],
+   "via_card": true,
+   "secs": 20.4
+  }
+ ],
+ "secs": 75.6,
+ "rep": 0
+}

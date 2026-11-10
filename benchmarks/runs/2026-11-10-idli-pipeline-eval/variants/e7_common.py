@@ -30,7 +30,83 @@ def _split():
     return m
 
 
+TWELVE = ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "teach_file", "teach_send",
+          "working_copy", "working_copy_ready", "chart_request", "chart_show"]  # the shipped Idli list (94570b4)
+PHASES12 = {
+    "get": ["start", "file_get", "file_open", "gsheet_read"],
+    "learn": ["teach_file", "teach_send", "file_get", "file_open"],
+    "clean": ["working_copy", "working_copy_ready", "show_dashboard", "file_get", "file_open"],
+    "analyse": ["file_ask", "chart_request", "chart_show", "teach_file", "teach_send", "show_dashboard", "file_get",
+                "file_open"],
+}
+
+
+def apply12(mcp, mode):
+    """The owner's E7 (narrowed): the 12 shipped tools + the split. soft12: all 12 listed, wrong-phase calls answered
+    "not now". hard12: only the current phase's tools listed (file_get/file_open are the way out of every phase).
+    No card-click shortcuts: the model still calls teach_send / working_copy itself, as shipped."""
+    _split().apply(mcp, os.environ.get("PIPE_SPEC_MODEL") or "local-qwen35-9b")
+    T = mcp.TOOLS
+    for n in list(T):
+        if n not in TWELVE:
+            del T[n]
+    state = {"phase": "get", "file": None, "goal": None}
+
+    def wrap(name, after=None, gate=None):
+        fn, d, p, r = T[name]
+
+        def w(*a, **k):
+            if gate:
+                no = gate()
+                if no:
+                    return {"error": "Not now: " + no}
+            out = fn(*a, **k)
+            if after:
+                try:
+                    after(out, *a, **k)
+                except Exception:  # noqa: BLE001
+                    pass
+            return out
+        T[name] = (w, d, p, r)
+
+    def opened(out, *a, **k):
+        if not isinstance(out, dict) or out.get("error"):
+            return
+        state["file"] = out.get("file") or state["file"]
+        state["goal"] = k.get("goal") or state["goal"]
+        then = str(out.get("then", ""))
+        if "teach_file" in then and "file_ask" not in then:
+            state["phase"] = "learn"
+        else:
+            state["phase"] = "clean" if state["goal"] == "clean" else "analyse"
+
+    def to(phase):
+        return lambda *a, **k: state.__setitem__("phase", phase)
+
+    no_file = lambda: None if state["file"] else "no file is open. Ask for the file's Google link in one line."  # noqa: E731
+    wrap("file_get", opened)
+    wrap("file_open", opened)
+    wrap("teach_file", to("learn"))
+    wrap("working_copy_ready", to("analyse"))
+    wrap("file_ask", gate=no_file)
+    wrap("working_copy", gate=no_file)
+
+    def on_card(card, answer):  # bookkeeping only: a click doesn't run anything here
+        a = answer.lower()
+        if ("not now" in a and state["phase"] == "clean") or "analyse it now" in a or "use the checked copy" in a \
+                or "use the original" in a or "i have a question" in a:
+            state["phase"] = "analyse" if state["file"] else state["phase"]
+        return None
+
+    mcp.on_card = on_card
+    if mode == "hard12":
+        mcp.phase_tools = lambda: set(PHASES12[state["phase"]])
+    mcp.e7_state = state
+
+
 def apply(mcp, mode):
+    if mode in ("soft12", "hard12"):
+        return apply12(mcp, mode)
     _split().apply(mcp, os.environ.get("PIPE_SPEC_MODEL") or "or-qwen35-9b")
     if mode == "today":
         return
