@@ -8,6 +8,16 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10 (evening), DGX: one file at a time; an eval of the whole pipeline is planned.** The owner
+  dropped the upfront Drive index from the journey. Idli works from one link or upload at a time, and each learned
+  file leaves a context card. Those cards become the index and, later, a graph like idlisseus's site-pack graph
+  ([todo](../todos/idli-insights/p1/file_by_file_index.md)). Todos are now sorted into `todos/idli-insights/p1..p3`.
+  The 9B benchmark (branch `idli-9b-bench`) found that a separate call to set the form's dials, inside
+  `file_ask`, makes a 9B nearly as good as Muse on fresh chats (9B alone 79-81% vs Muse 83%). It tested only
+  forms that already existed. The new [pipeline eval plan](../benchmarks/runs/2026-11-10-idli-pipeline-eval/PLAN.md)
+  tests the rest on planted-mess files: the cleaning output (E6), fewer tools by phase (E7, 29 → about 9), how
+  realistic the fake copy is (E1), teaching from the fake copy judged on the real file (E2), the bounce to Claude
+  and back (E3), the wording of answers (E4), and charts (E5). Not started: waiting for the owner's go.
 - **2026-11-10, DGX: Muse through Cloudflare (silo.idli.cc).** The owner put Muse behind Cloudflare Access at
   `silo.idli.cc` (tunnel → DGX 8185, the prefix proxy → Muse) with a service token. `lib/muse.py` gives the URL and
   the two Access headers from `~/idli-insights/config/muse-access.json`; `desktop/muse-connect.py <token file>`

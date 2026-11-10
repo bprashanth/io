@@ -11,7 +11,7 @@ Safe to rerun: it only adds what's missing.
      Claude
 
 Runs on the machine with Paseo, after the daemon is up (desktop/idli-launch.sh does that). The heading order
-needs Paseo patch P2 (todos/idli-insights/paseo_patches.md); until then the person drags them once.
+needs Paseo patch P2 (todos/idli-insights/p1/paseo_patches.md); until then the person drags them once.
 Providers (Idli 30B, Idli 9B, Teacher) come from desktop/setup-laptop.py.
 
   python3 desktop/idli-bootstrap.py            do it
