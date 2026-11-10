@@ -8,6 +8,19 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10 (late night), DGX: E6 and E7 results** ([report](https://github.com/bprashanth/io/blob/idli-pipeline-eval/benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md),
+  branch `idli-pipeline-eval`).
+  - **E6 (cleaning on files with planted mess):** Claude learned each file from its fake copy, with no person in
+    the loop and Haiku as the owner. Its checks found 73% and 71% of 161 planted mistakes in two runs, with 20 and
+    17 false alarms in 3,378 rows, and skipped 38 of 42 layout rows.
+    - **Misses:** values the reader quietly fixes (units, casing, "n/a"); checks Claude didn't write (counts across
+      tabs, totals, duplicate IDs); and the fake copy turning a template's instruction rows into junk.
+  - **E7 (local 9B with the split, 12 tools):** soft phases scored 86% on held3, the same as Muse, and 78% vs 85%
+    on question steps, at about twice Muse's speed. Hard phases (only the current step's tools) scored 79%: a wrong
+    guess between clean and analyse loses the question. Claude Code does re-read a changed tool list mid-chat.
+  - **The capacity todo** moved to p2 (test the 9B only).
+  - **Owner decisions pending:** mark or quietly read units, casing and "n/a"; keep instruction rows in the fake
+    copy; read info blocks above a table; ship soft phases.
 - **2026-11-10 (night), DGX: no index, no file search; each chat gets only the tools it needs.** Handoff page:
   [idli-handoff.md](idli-handoff.md).
   - **Idli** asks for the file's link instead of searching Drive.

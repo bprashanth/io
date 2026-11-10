@@ -1,6 +1,10 @@
 # Free tier capacity: how many people can one DGX serve? (E11)
 
-Added 2026-11-10. Decide after the current evals (E6, E7):
+**Moved to p2 on 2026-11-10:** E7 held up. On fresh chats (held3) the local 9B with the split, on the 12 shipped
+tools with soft phases, scored 86%, the same as Muse, and 78% vs 85% on question steps. So the capacity test runs
+with the 9B only.
+
+The rule that was set when this was added:
 - **If E7 shows the local 9B with the split (a separate dial-setting call to itself) holds up near Muse,** move
   this to p2 and run the capacity test with the 9B only.
 - **If it doesn't,** keep this at p1 and test a challenger as well (below).

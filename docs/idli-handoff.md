@@ -147,7 +147,15 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
   - The daemon sometimes times out ("Liveness check timed out"). Retry, or ask the owner to rerun
     `desktop/laptop-up.sh`.
 
-### 2. Evals: running in a background agent
+### 2. Evals: E6 and E7 done (report: `benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md` on branch `idli-pipeline-eval`, pushed at a16edeb0)
+**Result:** the local 9B with the split, on the 12 shipped tools with soft phases, scored 86% on held3, the same as
+Muse (question steps 78% vs 85%). Hard phases scored 79%. E6: 72% of planted mistakes found, few false alarms.
+**Next:** E1-E3, then E4 and E5. Waiting on the owner's four decisions (listed in the report). The background
+agent has finished. To continue, start a new agent on branch `idli-pipeline-eval` (worktree
+`.claude/worktrees/agent-aaf212a4b5f290bbe`), or SendMessage the old one. Restart the local 9B with
+`harness/serve9b.sh up`.
+
+Details from when it was running:
 - **Plan:** `benchmarks/runs/2026-11-10-idli-pipeline-eval/PLAN.md`.
 - **Scope:**
   - Run order: E6 (cleaning output on planted-mess files), E7 (fewer tools by phase), then stop for a report.
