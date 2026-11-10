@@ -168,10 +168,11 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
 | `dcd5e17` | Partial E7 results (runs cut short) |
 | `bea46f4` | E7 variants from the merged product: e7-product = the 12 shipped tools; e7-p12 = the 12 tools plus the separate dial-setting call. The partial runs from before the merge are set aside. |
 
-- **Models:**
-  - Local 9B: container `idli9b-raw` on the DGX. It showed "unhealthy" once, so check it.
-  - OpenRouter: 9B + Ling.
-  - Muse: as a client only. Don't stop it.
+- **Models:** only what fits the free tier.
+  - The local 9B alone, and the local 9B with a separate dial-setting call to itself (container `idli9b-raw` on
+    the DGX; it showed "unhealthy" once, so check it).
+  - Muse, as the baseline only and as a client. Don't stop it.
+  - Ling-3.0-flash was dropped on the owner's word: at 124B total it doesn't fit beside Muse.
 - **If the agent hangs:** it stalled once already (10 minutes with no output; the system stops a background agent
   after that).
   1. Check for runs still going with a `/proc` scan for `run.py` (no `pkill -f`), and look at
