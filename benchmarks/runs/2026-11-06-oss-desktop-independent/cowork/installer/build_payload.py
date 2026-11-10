@@ -38,7 +38,9 @@ def run(cmd, **kw):
 def python(out, plat, arch):
     tmp = os.path.join(out, "_py")
     run(["uv", "python", "install", "3.12", "--install-dir", tmp, "--no-bin"])
-    inner = next(os.path.join(tmp, d) for d in os.listdir(tmp) if d.startswith("cpython-3.12"))
+    # uv adds a "cpython-3.12-..." link (a junction on Windows) next to the real "cpython-3.12.N-..." folder
+    inner = os.path.realpath(next(os.path.join(tmp, d) for d in sorted(os.listdir(tmp), key=len, reverse=True)
+                                  if d.startswith("cpython-3.12")))
     dest = os.path.join(out, "python")
     shutil.move(inner, dest)
     shutil.rmtree(tmp, ignore_errors=True)

@@ -96,12 +96,26 @@ jobs:
         run: |
           "$IDLI_PY" "$IDLI_APP" --smoke "$RUNNER_TEMP/smoke.json"
 
+      # Open Idli as a person would after setup: Paseo's window starts (a virtual display on Linux), its daemon
+      # comes up, and the bootstrap builds Mission control, Idli and Claude with their chats.
+      - name: first open (Paseo window + bootstrap)
+        shell: bash
+        run: |
+          CHECK="$(dirname "$IDLI_APP")/first_open_check.py"
+          if [ "${{ matrix.plat }}" = linux ]; then
+            sudo apt-get install -y -qq xvfb >/dev/null
+            xvfb-run -a "$IDLI_PY" "$CHECK" "$RUNNER_TEMP/first-open.json"
+          else
+            "$IDLI_PY" "$CHECK" "$RUNNER_TEMP/first-open.json"
+          fi
+
       - name: what the smoke saw
         if: always()
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/report"
-          cp "$RUNNER_TEMP/smoke.json" "$RUNNER_TEMP/report/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/smoke.json" "$RUNNER_TEMP/first-open.json" "$RUNNER_TEMP/report/" 2>/dev/null || true
+          cp ~/idli-insights/config/cowork.log "$RUNNER_TEMP/report/" 2>/dev/null || true
           cp ~/idli-insights/config/idli-app.log "$RUNNER_TEMP/report/" 2>/dev/null || true
           cp "$RUNNER_TEMP/inno.log" "$RUNNER_TEMP/report/" 2>/dev/null || true
           ls -l "$RUNNER_TEMP"/dist/ | tee "$RUNNER_TEMP/report/artifacts.txt"
