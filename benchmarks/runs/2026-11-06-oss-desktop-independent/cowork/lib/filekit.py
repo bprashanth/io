@@ -20,6 +20,7 @@ CLI (for the Teach workspace):
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import random
 import re
@@ -39,12 +40,12 @@ def slug(s):
 
 
 # ---------------------------------------------------------------- reading
-def raw_sheets(path):
+def raw_sheets(path, preserve_na=False):
     """{sheet: DataFrame of strings, header row applied}, plus {sheet: header_row_number (1-based)}."""
     if path.lower().endswith(".csv"):
         frames = {"csv": pd.read_csv(path, header=None, dtype=str, keep_default_na=False)}
     else:
-        frames = pd.read_excel(path, sheet_name=None, header=None, dtype=object)
+        frames = pd.read_excel(path, sheet_name=None, header=None, dtype=object, keep_default_na=not preserve_na)
     out, hdr = {}, {}
     for name, df in frames.items():
         if name == WATERMARK:
@@ -293,7 +294,16 @@ def mock_column(series, header, rnd, keep_labels=False, shared=None):
         elif kind == "number":
             x = as_number(v)
             if x is None:
-                out.append(rnd.choice(["n/a", "-", "approx 500", "pending"]))
+                # V2 keeps placeholder/approx/unit quirks while replacing their numeric payload.
+                if os.environ.get("IDLI_MOCK_V2") == "1":
+                    if v.lower() in {"n/a", "na", "-", "--", "pending", "tbd", "none"}:
+                        out.append(v)
+                    elif re.fullmatch(r"(?i)(?:approx\.?\s*|~\s*)?-?\d+(?:\.\d+)?\s*(?:cm|mm|m|kg|g|weeks?|days?|%)?", v):
+                        out.append(re.sub(r"-?\d+(?:\.\d+)?", str(rnd.randint(1, 50)), v))
+                    else:
+                        out.append("unknown quantity")
+                else:
+                    out.append(rnd.choice(["n/a", "-", "approx 500", "pending"]))
                 continue
             lo, hi = info["min"], info["max"]
             geo = _geo_kind(header, lo, hi)
@@ -442,9 +452,135 @@ def _name_fakes(sheets, share_labels=()):
     return out
 
 
+def _instruction_row(row):
+    """Only public template instructions; reject contact details and short names."""
+    vals = [str(v).strip() for v in row if str(v).strip()]
+    def instruction(v):
+        if (re.search(r"[@\d]", v) or NAMEISH.fullmatch(v)
+                or re.search(r"\b[A-Z][a-z]+\b", v.partition(" ")[2])):
+            return False
+        return v.upper() in {"MANDATORY", "OPTIONAL", "REQUIRED"} or (
+            len(v.split()) >= 5 and re.match(
+                r"(?i)^(if|describe|enter|list|mention|e\.g\.|select|provide|write|specify|choose|record|include)(?:\s|$)", v))
+    return bool(vals) and all(instruction(v) for v in vals)
+
+
+def _mock_v2(sheets, mocks):
+    """Repair cheap structural relationships without copying private values."""
+    from collections import Counter
+    from itertools import combinations
+    from lib import fixkit
+
+    layout = {t: fixkit.layout_rows(df) for t, df in sheets.items()}
+    instructions = {t: {i for i, row in df.iterrows() if _instruction_row(row)} for t, df in sheets.items()}
+    records = {t: [i for i in df.index if i not in layout[t] and i not in instructions[t]]
+               for t, df in sheets.items()}
+    def number(v):
+        x = as_number(v)
+        return x if x is not None and math.isfinite(x) else None
+    def put(t, i, c, x):
+        if i in mocks[t].index:
+            mocks[t].at[i, c] = str(round(x, 8)).removesuffix('.0')
+    def key(df, i, cols):
+        return tuple(df.at[i, c] for c in cols)
+
+    # Template rows contain only instructions, never names, contacts or numeric values.
+    for t, indices in instructions.items():
+        for i in indices & set(mocks[t].index):
+            mocks[t].loc[i] = sheets[t].loc[i]
+
+    # Blank masks already survive per cell in mock_column; never fill a blank here.
+    # Infer count joins from real data, then align fake keys before counting retained rows.
+    for t, df in sheets.items():
+        for other, child in sheets.items():
+            if t == other:
+                continue
+            common = [c for c in df if c in child]
+            for c in df:
+                if c in common:
+                    continue
+                values = [(i, number(df.at[i, c])) for i in records[t]]
+                values = [(i, v) for i, v in values if v is not None]
+                if len(values) < 3:
+                    continue
+                found = None
+                for size in range(1, min(3, len(common)) + 1):
+                    for keys in combinations(common, size):
+                        counts = Counter(key(child, i, keys) for i in records[other]
+                                         if all(child.at[i, k] for k in keys))
+                        usable = [(i, v, counts[key(df, i, keys)]) for i, v in values
+                                  if all(df.at[i, k] for k in keys)]
+                        if (len(usable) >= .8 * len(values) and usable
+                                and sum(n > 0 for _, _, n in usable) >= .8 * len(usable)
+                                and sum(abs(v - n) < 1e-8 for _, v, n in usable) >= .8 * len(usable)):
+                            found = keys, usable
+                            break
+                    if found:
+                        break
+                if not found:
+                    continue
+                keys, usable = found
+                for k in keys:
+                    # A bijection keeps distinct real keys distinct, including numeric IDs.
+                    real_keys = list(dict.fromkeys(v for v in df[k] if v))
+                    mapping, used = {}, set()
+                    numeric = classify(df[k])["kind"] == "number"
+                    for j, v in enumerate(real_keys):
+                        ix = next(i for i in df.index if df.at[i, k] == v)
+                        fake = str(j + 1001) if numeric else str(mocks[t].at[ix, k]) if ix in mocks[t].index else f"Code {j + 1}"
+                        while fake in used:
+                            fake += "X"
+                        mapping[v] = fake
+                        used.add(fake)
+                    for tab in (t, other):
+                        for i in records[tab]:
+                            v = sheets[tab].at[i, k]
+                            if v in mapping and i in mocks[tab].index:
+                                mocks[tab].at[i, k] = mapping[v]
+                counts = Counter(key(mocks[other], i, keys) for i in records[other] if i in mocks[other].index
+                                 and all(mocks[other].at[i, k] for k in keys))
+                for i, value, old_count in usable:
+                    if i in mocks[t].index:
+                        put(t, i, c, counts[key(mocks[t], i, keys)] + value - old_count)
+
+    # Additive total columns preserve each row's real residual, including planted errors.
+    for t, df in sheets.items():
+        for total in [c for c in df if re.search(r"(?i)\btotal\b", c)]:
+            others = [c for c in df if c != total and classify(df[c])["kind"] == "number"][:10]
+            found = None
+            for size in range(2, min(4, len(others)) + 1):
+                for cols in combinations(others, size):
+                    rows = [(i, number(df.at[i, total]), [number(df.at[i, c]) for c in cols]) for i in records[t]]
+                    rows = [(i, v, ns) for i, v, ns in rows if v is not None and all(n is not None for n in ns)]
+                    if len(rows) >= 3 and sum(abs(v - sum(ns)) < 1e-8 for _, v, ns in rows) >= .8 * len(rows):
+                        found = cols, rows
+                        break
+                if found:
+                    break
+            if found:
+                cols, rows = found
+                for i, v, ns in rows:
+                    if i in mocks[t].index:
+                        fake = [number(mocks[t].at[i, c]) for c in cols]
+                        if all(n is not None for n in fake):
+                            put(t, i, total, sum(fake) + v - sum(ns))
+        # A labelled totals row sums retained fake records, with the original error offset.
+        for i, kind in layout[t].items():
+            if kind != "total":
+                continue
+            for c in df:
+                value = number(df.at[i, c])
+                if value is not None:
+                    real_sum = sum(number(df.at[j, c]) or 0 for j in records[t] if j < i)
+                    fake_sum = sum(number(mocks[t].at[j, c]) or 0 for j in records[t]
+                                   if j < i and j in mocks[t].index)
+                    put(t, i, c, fake_sum + value - real_sum)
+
+
 def make_mock(path, question, title=None, caller_agent=None, seed=7, share_labels=(), missing=None, chart=None):
     """Write teach/inbox/<id>/mock.xlsx (+ request.json). Returns the request dict and a preview."""
-    sheets, hdr = raw_sheets(path)
+    # V2 reads literal NA tokens as text, so numeric placeholders can survive faking.
+    sheets, hdr = raw_sheets(path, preserve_na=os.environ.get("IDLI_MOCK_V2") == "1")
     if not sheets:
         raise ValueError("The file has no data.")
     rnd = random.Random(seed)
@@ -481,6 +617,8 @@ def make_mock(path, question, title=None, caller_agent=None, seed=7, share_label
         layouts[name] = {kd: n for kd, n in __import__("collections").Counter(lay.values()).items()}
         mocks[name] = mock.head(300)
         kinds[name] = k
+    if os.environ.get("IDLI_MOCK_V2") == "1":
+        _mock_v2(sheets, mocks)
     clean_q = scrub(question, sheets, keep=share_labels, fakes=shared)  # real values -> the mock's own fakes
     req = {"kind": "idli-teach-request", "version": 1, "id": rid, "title": title, "fingerprint": fp,
            "main_sheet": main, "question": clean_q, "existing_skill": skill["id"] if skill else None,
