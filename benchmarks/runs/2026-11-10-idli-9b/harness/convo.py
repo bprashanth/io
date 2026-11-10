@@ -115,6 +115,16 @@ def valid_card(card):
     return True
 
 
+def obvious_pick(card, conv):
+    """The option a person would click without thinking: the one naming the file this conversation is about."""
+    want = (conv.get("ref_file") or "").lower()
+    if not want or not valid_card(card) or len(card["questions"]) != 1:
+        return None
+    hits = [o["label"] for o in card["questions"][0]["options"] if want in o["label"].lower()
+            or want in str(o.get("description", "")).lower()]
+    return hits[0] if len(hits) == 1 else None
+
+
 def card_answer(card, pick):
     """Claude Code's AskUserQuestion result text for a click (or typed Other)."""
     parts = []
@@ -292,9 +302,13 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
                                              "skipped": True})
                         i += 1
                     nxt = steps[i] if i < len(steps) else None
+                    obvious = obvious_pick(args, conv) if nxt is not None and not nxt.get("pick") else None
                     if nxt is None:
                         result = "The user closed the card without answering."
                         turn["events"].append({"type": "card", "card": args, "answer": None})
+                    elif obvious:  # a "which file?" card: the person clicks the file they mean, then types on
+                        result = card_answer(args, {"pick": "^" + re.escape(obvious) + "$"})
+                        turn["events"].append({"type": "card", "card": args, "answer": result, "obvious_click": True})
                     else:
                         if nxt.get("pick") and not matched(args, nxt):
                             turn["deviations"].append("card_without_expected_option")

@@ -91,6 +91,13 @@ async def run(model_id, scenario_file, conv_id, out_path, variant="base"):
             state["turn"]["events"].append({"type": "card", "card": inp, "answer": None})
             state["i"] = i
             return PermissionResultAllow(updated_input={**inp, "answers": {}})
+        obvious = convo.obvious_pick(inp, conv) if not nxt.get("pick") else None
+        if obvious:  # a "which file?" card: the person clicks the file they mean, then types on
+            q = inp["questions"][0]
+            state["turn"]["events"].append({"type": "card", "card": inp, "obvious_click": True,
+                                            "answer": convo.card_answer(inp, {"pick": "^" + re.escape(obvious) + "$"})})
+            state["i"] = i
+            return PermissionResultAllow(updated_input={**inp, "answers": {q.get("question", ""): obvious}})
         if nxt.get("pick") and not convo.matched(inp, nxt):
             state["turn"]["deviations"].append("card_without_expected_option")
         if not nxt.get("pick"):

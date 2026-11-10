@@ -200,7 +200,9 @@ def score_conv(sc_conv, log, seen_before):
         if merged.get("chart_relayed"):
             c["chart_relayed"] = bool(re.search(r"!\[[^\]]*\]\([^)]+\.svg\)", text))
         if merged.get("lists_choices"):
-            c["lists_choices"] = len(re.findall(r"(?i)household survey (2025|2024|questionnaire)", text)) >= 2
+            shown = text + " " + " ".join(json.dumps(e.get("card"), ensure_ascii=False) for e in tools
+                                          if e["type"] == "card")  # choices as a card count too
+            c["lists_choices"] = len(set(re.findall(r"(?i)household survey (2025|2024|questionnaire)", shown))) >= 2
         if merged.get("say_any"):
             c["say_any"] = any(re.search(rx, text) for rx in merged["say_any"])
         if merged.get("asks_which_file") or merged.get("asks_more") or merged.get("asks"):
