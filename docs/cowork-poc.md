@@ -8,6 +8,26 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10, DGX: one-click installers for Linux, macOS and Windows (branch `idli-installers`).** Each
+  installer carries the official Paseo 0.15.4 (unmodified), a standalone Python 3.12 with duckdb, pandas, openpyxl
+  and matplotlib, and Idli's tools; nothing to run in a terminal. `installer/idli_app.py` is the app: it copies the
+  tools to `~/idli-insights/app/cowork` (writable, taught files kept across updates), finds or installs Paseo and
+  Anthropic's Claude Code CLI (Idli 30B runs through it too; signing in is optional), writes the providers, shows a
+  setup page in the browser the first time (paste the one-line Idli code `idli1.…` made by
+  `desktop/muse-code.py` from a person's Access token, checked against `/v1/models`; Install / Sign in to Claude or
+  skip), then starts Paseo without a debugging port and runs the bootstrap. Wrappers (`installer/package.py`):
+  `.deb` (Paseo unpacked in `/opt/idli`, its sandbox helper made setuid like Paseo's own .deb), an ad-hoc-signed
+  `Idli.app` in a `.dmg` (Apple silicon), an Inno Setup per-user `.exe` (Paseo's portable app: its NSIS installer
+  crashes when run silently). CI (`.github/workflows/idli-installers.yml`) builds, installs on a clean runner and
+  smokes all three: libraries, 29 tools listed by the tool server, the Idli code (bad, unreachable, wrong secret,
+  right secret against a stand-in Muse: no real token in CI), the setup page (token-gated), Paseo's daemon with
+  Idli's providers, the bootstrap, Claude Code installed but not signed in; then a first open builds Mission control
+  (Start here, What Idli has learned), Idli and Claude with their chats (~155 s on runners). Sizes: deb 192 MB,
+  dmg 299 MB, exe 240 MB. Not proven in CI: Paseo's browser tabs (Drive, the learned page): on the runners the
+  app's browser doesn't answer, so the bootstrap skips them. Found: `paseo status --json` exits 0 when no daemon
+  runs (a running one reports `serverId`); uv's Python folder has a version link next to the real folder.
+  Testers: `installer/TESTERS.md`. Still untested: a real install on a teammate's Mac and Windows, the Claude
+  sign-in, a real Muse code.
 - **2026-11-10, DGX: Muse through Cloudflare (silo.idli.cc).** The owner put Muse behind Cloudflare Access at
   `silo.idli.cc` (tunnel → DGX 8185, the prefix proxy → Muse) with a service token. `lib/muse.py` gives the URL and
   the two Access headers from `~/idli-insights/config/muse-access.json`; `desktop/muse-connect.py <token file>`
