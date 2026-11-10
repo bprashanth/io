@@ -20,7 +20,7 @@ import time
 BENCH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(BENCH)))
 COWORK = os.path.join(REPO, "benchmarks", "runs", "2026-11-06-oss-desktop-independent", "cowork")
-FIXTURES = os.path.join(BENCH, "fixtures")
+FIXTURES = os.environ.get("IDLI9B_FIXTURES") or os.path.join(BENCH, "fixtures")
 DISALLOWED = {"gmail_draft_reply", "sheet_query", "sheet_profile"}  # as in desktop/setup-laptop.py
 
 
