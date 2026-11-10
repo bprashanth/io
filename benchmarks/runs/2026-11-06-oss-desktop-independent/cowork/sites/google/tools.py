@@ -752,7 +752,7 @@ def _check_google():
                 return True, "signed in"
         return False, "the Drive tab didn't open: open drive.google.com in a tab at the top and sign in"
     except Exception as e:
-        return False, f"couldn't check ({type(e).__name__})"
+        return False, f"couldn't check ({type(e).__name__}: {str(e)[:160]})"
 
 
 def _check_claude():
@@ -774,14 +774,22 @@ def _check_claude():
 def _check_muse():
     import urllib.request
     from lib import muse
-    try:
-        req = urllib.request.Request(muse.base_url() + "/v1/models", headers=muse.headers())
-        with urllib.request.urlopen(req, timeout=10) as r:
-            ok = r.status == 200
-    except Exception:
-        ok = False
-    return ok, "reachable" if ok else ("not reachable: the Idli code you were given may be missing or expired"
-                                       if muse.access() else "not set up: Idli needs its access code")
+    import urllib.error
+    last = None
+    for _ in range(2):
+        try:
+            req = urllib.request.Request(muse.base_url() + "/v1/models", headers=muse.headers())
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.status == 200, "reachable"
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                return False, "the access code was refused: it may be wrong or expired"
+            last = f"HTTP {e.code}"
+        except Exception as e:
+            last = type(e).__name__
+    if not muse.access() and not os.environ.get("MUSE_URL"):
+        return False, "not set up: Idli needs its access code"
+    return False, f"didn't answer ({last}): it may be busy or down; say \"check again\" in a minute"
 
 
 def t_setup_check():
