@@ -1,0 +1,56 @@
+{
+ "note": "Held-out set: never used to tune scaffolding. Different files, phrasings and turns from dev.",
+ "conversations": [
+  {"id": "h01-roadkill-groups", "segments": ["start", "find", "open", "ask"], "ref_file": "Road kill survey 2011-12",
+   "steps": [
+    {"user": "hello", "check": {"first_tool": "start", "card": true}},
+    {"pick": "Analyse", "check": {"tools_none": ["file_get", "file_ask"], "asks_which_file": true}},
+    {"user": "road kill survey", "check": {"tools_any": ["drive_find"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "which group of animals gets killed the most on our roads?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["animals"], "group_by": ["animal_group"]}}, "alt_refs": [{"spec": {"measures": ["rows"], "group_by": ["animal_group"]}}], "top_only": true}},
+    {"user": "same thing but only summer", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["animals"], "group_by": ["animal_group"], "filters": {"season": ["Summer"]}}}, "alt_refs": [{"spec": {"measures": ["rows"], "group_by": ["animal_group"], "filters": {"season": ["Summer"]}}}], "top_only": true}},
+    {"user": "put that in a bar chart", "check": {"tools_any": ["file_ask"], "chart_relayed": true}}
+   ]},
+  {"id": "h02-tracker-clean-notnow", "segments": ["find", "open", "clean", "ask"], "ref_file": "Field programme tracker",
+   "steps": [
+    {"user": "find mistakes in the field programme tracker", "check": {"tools_any": ["file_get"], "args": {"file_get": {"goal": "clean"}}, "card": true}},
+    {"pick": "Not now", "check": {"tools_none": ["working_copy"]}},
+    {"user": "fine, then just tell me how many households we visited in total, without the cancelled visits", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["households"], "preset": ["not_cancelled"]}}, "alt_refs": [{"spec": {"measures": ["households"], "filters": {"status": {"not": ["Cancelled"]}}}}]}}
+   ]},
+  {"id": "h03-reimb-paid-hardware", "segments": ["find", "open", "ask"], "ref_file": "Tech reimbursement",
+   "steps": [
+    {"user": "how much have we paid out for hardware claims in the tech reimbursement form?", "check": {"tools_any": ["file_get"]}},
+    {"pick": "question", "optional": true, "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["amount"], "preset": ["paid_out"], "filters": {"category": ["Hardware"]}}}}},
+    {"user": "and who claimed the most?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["amount"], "group_by": ["employee"], "preset": ["paid_out"], "filters": {"category": ["Hardware"]}}}, "alt_refs": [{"spec": {"measures": ["amount"], "group_by": ["employee"]}}, {"spec": {"measures": ["amount"], "group_by": ["employee"], "filters": {"category": ["Hardware"]}}}], "top_only": true}}
+   ]},
+  {"id": "h04-estates-teach", "segments": ["find", "open", "teach"], "ref_file": "Estate labour",
+   "steps": [
+    {"user": "which estate has the most women workers? it's in the estate labour census", "check": {"tools_any": ["teach_file"], "no_numbers": true, "card": true}},
+    {"pick": "Not now", "check": {"tools_none": ["teach_send"], "no_invented": true}}
+   ]},
+  {"id": "h05-trees-species", "segments": ["find", "open", "ask", "chart"], "ref_file": "Fragment tree plots",
+   "steps": [
+    {"user": "how many tree species are there in Korangumudi? from the tree plots spreadsheet", "check": {"tools_any": ["drive_find", "file_get"]}},
+    {"pick": "question", "optional": true, "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["species_count"], "filters": {"fragment": ["Korangumudi"]}}}}},
+    {"user": "and how many of the trees there are alien?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["alien_trees"], "filters": {"fragment": ["Korangumudi"]}}}}},
+    {"user": "show the number of alien trees for all fragments as a chart", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["alien_trees"], "group_by": ["fragment"]}}}}
+   ]},
+  {"id": "h06-budget-teach", "segments": ["find", "open", "teach"], "ref_file": "Budget",
+   "steps": [
+    {"user": "how much of our budget have we spent so far this year?", "check": {"tools_any": ["drive_find"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"pick": "Yes, send|None", "optional": true, "check": {"tools_any": ["teach_file"], "no_invented": true}}
+   ]},
+  {"id": "h07-volunteers-district", "segments": ["find", "open", "ask"], "ref_file": "Volunteer register",
+   "steps": [
+    {"user": "which district has the most volunteers in the volunteer register? and how much stipend did they get?", "check": {"tools_any": ["file_get"]}},
+    {"pick": "question", "optional": true, "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["rows", "stipend"], "group_by": ["district"]}}, "alt_refs": [{"spec": {"measures": ["rows"], "group_by": ["district"]}}], "top_only": true}},
+    {"user": "give me one line I can put in our monthly report about this", "check": {"no_invented": true, "tools_none": ["teach_file", "chart_request"]}}
+   ]},
+  {"id": "h08-methods-doc", "segments": ["find", "peek"],
+   "steps": [
+    {"user": "I need the road kill methods document", "check": {"tools_any": ["drive_find"], "tools_none": ["file_get"], "card": true}},
+    {"pick": "Yes", "check": {"tools_any": ["file_peek"], "args": {"file_peek": {"id": "1a44b3ae491ec8f6eb1cb6cf85afef9ea"}}}}
+   ]}
+ ]
+}

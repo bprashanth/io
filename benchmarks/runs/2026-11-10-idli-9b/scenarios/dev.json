@@ -1,0 +1,102 @@
+{
+ "note": "Dev set: scaffolding fixes may be tuned on these. Checks apply to everything the model does after a step until the next step the user starts. 'ref' = the form spec a correct answer comes from (the scorer runs it on the fixture and looks for its numbers in the reply). Optional picks are skipped when no card shows.",
+ "conversations": [
+  {"id": "d01-start-households", "segments": ["start", "find", "open", "ask", "chart"], "ref_file": "Household survey 2025",
+   "steps": [
+    {"user": "hi", "check": {"first_tool": "start", "card": true}},
+    {"pick": "Analyse", "check": {"tools_none": ["file_get", "file_ask"], "asks_which_file": true}},
+    {"user": "the household survey", "check": {"tools_any": ["drive_find"], "tools_none": ["file_get"], "lists_choices": true}},
+    {"user": "the 2025 one", "check": {"tools_any": ["file_get"], "args": {"file_get": {"link": "1ec59b09dfc4ed7f9bc4b4ce7497bbc39"}}, "card": true}},
+    {"pick": "question", "check": {"tools_none": ["file_ask"]}},
+    {"user": "which ward has the most debt?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["debt"], "group_by": ["ward"]}}, "top_only": true}},
+    {"user": "and how many households are there in ward D?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["rows"], "filters": {"ward": ["Ward D"]}}}}},
+    {"user": "show me average income by ward as a chart", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["avg:monthly_income_inr"], "group_by": ["ward"]}}}}
+   ]},
+  {"id": "d02-poverty-trap", "segments": ["find", "open", "ask"], "ref_file": "Household survey 2025",
+   "steps": [
+    {"user": "in the 2025 household survey, which households have debts above 50000 and savings below 10000? I'm looking for families stuck in a debt trap", "check": {"tools_any": ["drive_find", "file_get"]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "just the list of those households please", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": [], "filters": {"debts_inr": {"min": 50000}, "savings_inr": {"max": 10000}}}, "rows": true}}},
+    {"user": "ok and which of those have a vulnerability score of 7 or more?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": [], "filters": {"debts_inr": {"min": 50000}, "savings_inr": {"max": 10000}, "vulnerability_score_1to10": {"min": 7}}}, "rows": true}}},
+    {"user": "how many people live in those households in total?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["people"], "filters": {"debts_inr": {"min": 50000}, "savings_inr": {"max": 10000}, "vulnerability_score_1to10": {"min": 7}}}}}}
+   ]},
+  {"id": "d03-tracker-officers", "segments": ["find", "peek", "open", "ask", "chart"], "ref_file": "Field programme tracker",
+   "steps": [
+    {"user": "can you open the field programme tracker for me", "check": {"tools_any": ["drive_find"], "tools_none": ["file_get"], "card": true}},
+    {"pick": "Yes", "check": {"tools_any": ["file_peek"], "tools_none": ["file_get"]}},
+    {"user": "how much money did each officer disburse? leave out the cancelled visits", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["disbursed"], "group_by": ["officer_name"], "preset": ["not_cancelled"]}}, "alt_refs": [{"spec": {"measures": ["disbursed"], "group_by": ["field_officer"], "preset": ["not_cancelled"]}}, {"spec": {"measures": ["disbursed"], "group_by": ["officer_name"], "filters": {"status": {"not": ["Cancelled"]}}}}]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "which village got the most visits?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["rows"], "group_by": ["village"]}}, "alt_refs": [{"spec": {"measures": ["rows"], "group_by": ["village"], "preset": ["not_cancelled"]}}], "top_only": true}},
+    {"user": "show me visits per month as a chart", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["rows"], "group_by": ["visit_date:month"]}}, "alt_refs": [{"spec": {"measures": ["rows"], "group_by": ["visit_date:month"], "preset": ["not_cancelled"]}}]}}
+   ]},
+  {"id": "d04-volunteers-clean", "segments": ["find", "open", "clean", "ask"], "ref_file": "Volunteer register",
+   "steps": [
+    {"user": "can you check our volunteer register for mistakes?", "check": {"tools_any": ["file_get"], "args": {"file_get": {"goal": "clean"}}, "card": true}},
+    {"pick": "Yes, mark", "check": {"tools_any": ["working_copy"], "tools_none": ["working_copy_ready", "file_ask"]}},
+    {"user": "ok I fixed what I could, ready", "check": {"tools_any": ["working_copy_ready"], "card": true}},
+    {"pick": "Analyse", "check": {"card": true}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "how many volunteers do we have in each district?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["rows"], "group_by": ["district"]}}}}
+   ]},
+  {"id": "d05-migration-teach", "segments": ["find", "open", "teach"], "ref_file": "Out-migration",
+   "steps": [
+    {"user": "from the out-migration records, how many people left for Kerala?", "check": {"tools_any": ["teach_file"], "no_numbers": true, "card": true}},
+    {"pick": "Yes, send|None", "check": {"tools_any": ["teach_send"], "args": {"teach_send": {"share_labels": "^\\[\\]$|^null$|None"}}}}
+   ]},
+  {"id": "d06-roadkill-gap", "segments": ["find", "open", "ask", "teach"], "ref_file": "Road kill survey 2011-12",
+   "steps": [
+    {"user": "in the road kill survey, which road stretch has the most frogs killed in the monsoon?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["animals"], "group_by": ["road_stretch"], "filters": {"animal": ["Frog"], "season": ["Monsoon"]}}}, "alt_refs": [{"spec": {"measures": ["animals"], "group_by": ["road_stretch"], "filters": {"animal": ["Frog"]}, "preset": ["monsoon"]}}, {"spec": {"measures": ["rows"], "group_by": ["road_stretch"], "filters": {"animal": ["Frog"], "season": ["Monsoon"]}}}], "top_only": true}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "what share of all the frogs killed was on that stretch?", "check": {"no_invented": true, "tools_any": ["file_ask", "teach_file"]}}
+   ]},
+  {"id": "d07-trees-charts", "segments": ["find", "open", "ask", "chart"], "ref_file": "Fragment tree plots",
+   "steps": [
+    {"user": "from the fragment tree plots, show me the share of alien trees in each fragment as a chart", "check": {"tools_any": ["file_ask"], "chart_relayed": true, "ref": {"spec": {"measures": ["alien_share"], "group_by": ["fragment"]}}}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "now compare 2000 and 2019 for each fragment", "check": {"tools_any": ["file_ask", "chart_request"]}},
+    {"user": "can you ask Claude to make a nicer chart of how alien share changed over the years?", "check": {"tools_any": ["chart_request"], "card": true}},
+    {"pick": "Not now", "check": {"tools_none": ["teach_send"]}}
+   ]},
+  {"id": "d08-mgnrega-suggest", "segments": ["find", "open", "chart"], "ref_file": "MGNREGA",
+   "steps": [
+    {"user": "I want to understand the MGNREGA works data. what should I look at?", "check": {"tools_any": ["file_get", "chart_request"]}},
+    {"pick": "Suggest", "optional": true, "check": {"tools_any": ["chart_request"]}},
+    {"pick": "Yes, send", "check": {"tools_any": ["teach_send"]}}
+   ]},
+  {"id": "d09-find-annual-report", "segments": ["find", "peek"],
+   "steps": [
+    {"user": "where is our annual report?", "check": {"tools_any": ["drive_find"], "tools_none": ["file_get"], "card": true}},
+    {"pick": "No", "check": {"tools_none": ["file_peek", "file_get"]}}
+   ]},
+  {"id": "d10-find-none", "segments": ["find"],
+   "steps": [
+    {"user": "find the solar pump survey", "check": {"tools_any": ["drive_find"], "tools_none": ["file_get"], "max_calls": {"drive_find": 2}, "asks_more": true}},
+    {"user": "it has pump readings for each village", "check": {"max_calls": {"drive_find": 2}, "tools_none": ["file_get"]}}
+   ]},
+  {"id": "d11-learned", "segments": ["skills"],
+   "steps": [
+    {"user": "what files have you learned so far?", "check": {"tools_any": ["show_skills", "skills_list"]}},
+    {"user": "forget the volunteer register, I'll teach it again", "check": {"tools_any": ["skill_delete"], "card": true}},
+    {"pick": "Yes|Delete|Forget", "check": {"tools_any": ["skill_delete"], "args": {"skill_delete": {"confirmed": "true"}}}}
+   ]},
+  {"id": "d12-link-roadkill", "segments": ["open", "ask"], "ref_file": "Road kill survey 2011-12",
+   "steps": [
+    {"user": "https://docs.google.com/spreadsheets/d/1b3bb900684554db98dee01e1babb57c7/edit how many animals were killed in total in summer?", "check": {"tools_any": ["file_get"], "tools_none": ["drive_find"]}},
+    {"pick": "question", "optional": true, "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["animals"], "filters": {"season": ["Summer"]}}}}}
+   ]},
+  {"id": "d13-old-survey", "segments": ["find", "open", "ask"], "ref_file": "Household survey 2024",
+   "steps": [
+    {"user": "analyse the household survey", "check": {"tools_any": ["drive_find"], "tools_none": ["file_get"], "lists_choices": true}},
+    {"user": "the old one from last year", "check": {"tools_any": ["file_get"], "args": {"file_get": {"link": "102445cfc710298936fc2f578144c6400"}}}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "what's the total savings across all households?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["savings"]}}}}
+   ]},
+  {"id": "d14-mgnrega-compare", "segments": ["find", "open", "ask"], "ref_file": "MGNREGA",
+   "steps": [
+    {"user": "compare the persondays in Thonimalai and Kadamparai villages from the MGNREGA works sheet", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["persondays"], "group_by": ["village"], "filters": {"village": ["Thonimalai Village", "Kadamparai Village"]}}}, "alt_refs": [{"spec": {"measures": ["persondays"], "group_by": ["village"]}}]}},
+    {"pick": "question", "optional": true, "check": {}},
+    {"user": "which type of work created the most persondays in Kadamparai?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["persondays"], "group_by": ["work_type"], "filters": {"village": ["Kadamparai Village"]}}}, "top_only": true}},
+    {"user": "and per household?", "check": {"tools_any": ["file_ask"], "ref": {"spec": {"measures": ["days_per_household"], "group_by": ["work_type"], "filters": {"village": ["Kadamparai Village"]}}}, "top_only": true}}
+   ]}
+ ]
+}
