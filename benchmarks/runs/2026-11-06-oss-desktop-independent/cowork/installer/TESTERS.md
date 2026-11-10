@@ -24,8 +24,9 @@ A setup page opens in your browser:
 2. **Connect Claude (optional)**: Install, then Sign in (your own Anthropic account). Skip it if you like: Idli
    still finds and checks files and answers questions about files it already knows; only teaching it a new kind
    of file needs Claude.
-3. Click **Open Idli**. Idli (built on Paseo) opens; in **Start here**, sign in to Google in the Drive tab and say
-   yes to indexing.
+3. Click **Open Idli**. Idli (built on Paseo) opens. The first time, Paseo shows its own "Welcome to Paseo" box:
+   click **Skip setup** (Idli has already set everything up). Then, in **Start here** (left sidebar, under Mission
+   control), sign in to Google in the Drive tab and say yes to indexing.
 
 To change the code or connect Claude later, open **Idli setup** (Start menu / apps; on Mac run
 `Idli setup.command` from the disk image). Logs: `idli-insights/config/idli-app.log` in your home folder.

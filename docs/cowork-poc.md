@@ -23,7 +23,7 @@ Either agent adds an entry here for every change that needs something done on th
   right secret against a stand-in Muse: no real token in CI), the setup page (token-gated), Paseo's daemon with
   Idli's providers, the bootstrap, Claude Code installed but not signed in; then a first open builds Mission control
   (Start here, What Idli has learned), Idli and Claude with their chats (~155 s on runners). Sizes: deb 192 MB,
-  dmg 299 MB, exe 240 MB. Not proven in CI: Paseo's browser tabs (Drive, the learned page): on the runners the
+  dmg 299 MB, exe 240 MB. Screenshots of the first open (macOS, Windows) show Paseo's window with Mission control, Idli and Claude behind Paseo's own "Welcome to Paseo" box, which nothing outside the app can skip yet (P12; testers click Skip setup). Not proven in CI: Paseo's browser tabs (Drive, the learned page): on the runners the
   app's browser doesn't answer, so the bootstrap skips them. Found: `paseo status --json` exits 0 when no daemon
   runs (a running one reports `serverId`); uv's Python folder has a version link next to the real folder.
   Testers: `installer/TESTERS.md`. Still untested: a real install on a teammate's Mac and Windows, the Claude
