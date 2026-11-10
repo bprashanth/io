@@ -1,0 +1,130 @@
+name: idli-installers
+
+# One-click Idli installers (Paseo + standalone Python + Idli's tools) for Linux, macOS and Windows, each
+# installed on a clean runner and smoked: bundled libraries import, Idli's tool server lists its tools, the Muse
+# code is checked (bad and good, against a stand-in Muse: no real token in CI), the setup page serves, Paseo
+# installs and its daemon starts with Idli's providers, the first-run bootstrap runs (dry run), Claude Code
+# installs through Anthropic's installer (not signed in). Unsigned: for a handful of testers.
+
+on:
+  push:
+    branches: [idli-installers]
+    paths:
+      - 'benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/**'
+      - '.github/workflows/idli-installers.yml'
+  workflow_dispatch:
+
+env:
+  COWORK: benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
+  PASEO_TAG: v0.15.4
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, label: linux-x64, plat: linux, arch: x64 }
+          - { os: macos-14, label: mac-arm64, plat: mac, arch: arm64 }
+          - { os: windows-latest, label: win-x64, plat: win, arch: x64 }
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: 0.1.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - name: payload (python, tools, Paseo ${{ env.PASEO_TAG }})
+        shell: bash
+        working-directory: ${{ env.COWORK }}
+        run: python installer/build_payload.py --os ${{ matrix.plat }} --arch ${{ matrix.arch }} --out "$RUNNER_TEMP/payload" --paseo "$PASEO_TAG" --version "$VERSION"
+
+      - name: Inno Setup (windows)
+        if: matrix.plat == 'win'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: package
+        shell: bash
+        working-directory: ${{ env.COWORK }}
+        run: python installer/package.py ${{ matrix.plat }} "$RUNNER_TEMP/payload" "$VERSION" "$RUNNER_TEMP/dist"
+
+      - name: install (linux)
+        if: matrix.plat == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y "$RUNNER_TEMP"/dist/idli_*_amd64.deb
+          ls -l /opt/idli /usr/bin/idli /usr/share/applications/idli.desktop
+          stat -c '%A %U' /opt/idli/paseo/chrome-sandbox
+          echo "IDLI_PY=/opt/idli/python/bin/python3" >> "$GITHUB_ENV"
+          echo "IDLI_APP=/opt/idli/cowork/installer/idli_app.py" >> "$GITHUB_ENV"
+
+      - name: install (mac)
+        if: matrix.plat == 'mac'
+        shell: bash
+        run: |
+          hdiutil attach "$RUNNER_TEMP"/dist/Idli-*.dmg -mountpoint /Volumes/Idli -nobrowse
+          ls -la /Volumes/Idli
+          cp -R /Volumes/Idli/Idli.app /Applications/
+          hdiutil detach /Volumes/Idli
+          codesign --verify --deep /Applications/Idli.app && echo "ad-hoc signature ok"
+          echo "IDLI_PY=/Applications/Idli.app/Contents/Resources/python/bin/python3" >> "$GITHUB_ENV"
+          echo "IDLI_APP=/Applications/Idli.app/Contents/Resources/cowork/installer/idli_app.py" >> "$GITHUB_ENV"
+
+      - name: install (windows)
+        if: matrix.plat == 'win'
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "$env:RUNNER_TEMP\dist\Idli-Setup-*.exe" | Select-Object -First 1
+          $log = "/LOG=$env:RUNNER_TEMP\inno.log"
+          Start-Process -Wait -FilePath $exe.FullName -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', $log)
+          $app = "$env:LOCALAPPDATA\Programs\Idli"
+          Get-ChildItem $app | Format-Table Name
+          Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Idli.lnk"
+          "IDLI_PY=$app\python\python.exe" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "IDLI_APP=$app\cowork\installer\idli_app.py" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: smoke (cold, as the person)
+        shell: bash
+        run: |
+          "$IDLI_PY" "$IDLI_APP" --smoke "$RUNNER_TEMP/smoke.json"
+
+      - name: what the smoke saw
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          cp "$RUNNER_TEMP/smoke.json" "$RUNNER_TEMP/report/" 2>/dev/null || true
+          cp ~/idli-insights/config/idli-app.log "$RUNNER_TEMP/report/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/inno.log" "$RUNNER_TEMP/report/" 2>/dev/null || true
+          ls -l "$RUNNER_TEMP"/dist/ | tee "$RUNNER_TEMP/report/artifacts.txt"
+          python - "$RUNNER_TEMP/smoke.json" <<'PY' || true
+          import json, sys
+          r = json.load(open(sys.argv[1]))
+          for k, v in r.items():
+              print(("OK  " if v.get("ok") else "FAIL"), k, str(v.get("detail"))[:300])
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.label }}
+          path: ${{ runner.temp }}/report
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: idli-${{ matrix.label }}
+          path: |
+            ${{ runner.temp }}/dist/*.deb
+            ${{ runner.temp }}/dist/*.dmg
+            ${{ runner.temp }}/dist/Idli-Setup-*.exe
+          retention-days: 14
+          compression-level: 0

@@ -545,9 +545,10 @@ def _show_mock(request_id, title):
 
 
 def _paseo():
-    for p in (shutil.which("paseo"), os.path.expanduser("~/.local/bin/paseo"), "/usr/local/bin/paseo", "/usr/bin/paseo"):
-        if p and os.path.exists(p):
-            return p
+    from lib import paseobin
+    p = paseobin.find()
+    if p:
+        return p
     raise RuntimeError("The paseo command was not found on this computer.")
 
 

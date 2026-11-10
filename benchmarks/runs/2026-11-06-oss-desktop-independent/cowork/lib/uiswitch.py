@@ -31,7 +31,8 @@ def _env():
 
 
 def _cli():
-    return shutil.which("paseo") or os.path.expanduser("~/.local/bin/paseo")
+    from lib import paseobin
+    return paseobin.find() or shutil.which("paseo") or os.path.expanduser("~/.local/bin/paseo")
 
 
 def server_id():

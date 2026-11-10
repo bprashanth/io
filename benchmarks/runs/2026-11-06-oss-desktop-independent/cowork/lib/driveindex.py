@@ -260,8 +260,8 @@ def notify(text):
     import shutil
     import subprocess
     agent = os.environ.get("IDLI_NOTIFY_AGENT")
-    exe = next((p for p in (shutil.which("paseo"), os.path.expanduser("~/.local/bin/paseo"), "/usr/bin/paseo")
-                if p and os.path.exists(p)), None)
+    from lib import paseobin
+    exe = paseobin.find()
     if not agent or not exe:
         return
     env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}

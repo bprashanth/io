@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up Idli</title>
+<style>
+:root { --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e3e1dc; --accent: #2f5d50;
+  --good: #2f6b3a; --bad: #9b2c2c; --chip: #f0eee9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #161615; --panel: #1f1f1d;
+  --ink: #ecebe7; --muted: #a3a29c; --line: #34332f; --accent: #8cc7b2; --good: #9fd4a8; --bad: #f0a3a3;
+  --chip: #2a2a27; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 640px; margin: 0 auto; padding: 28px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin-bottom: 18px; }
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-top: 12px; }
+.step h2 { font-size: 16px; margin: 0 0 6px; display: flex; gap: 8px; align-items: center; }
+.n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--chip);
+  font-size: 13px; }
+.done .n { background: var(--good); color: #fff; }
+p { margin: 6px 0; }
+.muted { color: var(--muted); font-size: 14px; }
+textarea, input { width: 100%; font: 13px ui-monospace, monospace; padding: 8px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+textarea { height: 64px; resize: vertical; }
+button { font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--accent);
+  background: var(--accent); color: #fff; cursor: pointer; margin: 8px 8px 0 0; }
+button.plain { background: transparent; color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+.ok { color: var(--good); }
+.err { color: var(--bad); }
+a { color: var(--accent); word-break: break-all; }
+#finish { font-size: 16px; padding: 10px 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Set up Idli</h1>
+  <div class="sub">Two steps, once. Then Idli opens.</div>
+
+  <section class="step" id="s-muse">
+    <h2><span class="n">1</span> Connect to Idli's model</h2>
+    <p class="muted">Paste the code you were sent. It starts with <code>idli1.</code></p>
+    <div id="muse-done" class="ok" hidden></div>
+    <div id="muse-form">
+      <textarea id="code" placeholder="idli1.…" spellcheck="false" autocomplete="off"></textarea>
+      <button id="muse-btn">Connect</button>
+      <div id="muse-msg"></div>
+    </div>
+  </section>
+
+  <section class="step" id="s-claude">
+    <h2><span class="n">2</span> Connect Claude <span class="muted">(optional)</span></h2>
+    <p class="muted">Claude teaches Idli new kinds of files, using made-up copies only. Without it, Idli still finds,
+      checks and answers questions about files it already knows.</p>
+    <div id="claude-body"></div>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">3</span> Google</h2>
+    <p class="muted">When Idli opens, sign in to Google in its Drive tab, then say yes to indexing your Drive.</p>
+  </section>
+
+  <button id="finish" disabled>Open Idli</button>
+  <div id="finish-msg" class="muted"></div>
+</main>
+<script>
+const T = new URLSearchParams(location.search).get("t");
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function api(path, body) {
+  const r = await fetch(path + "?t=" + encodeURIComponent(T),
+    body !== undefined ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+let st = null;
+function render() {
+  if (!st) return;
+  const m = st.muse, c = st.claude;
+  $("s-muse").classList.toggle("done", m.ok);
+  $("muse-done").hidden = !m.ok;
+  $("muse-done").textContent = m.ok ? `Connected to ${m.url}.` : "";
+  $("muse-form").hidden = m.ok;
+  $("s-claude").classList.toggle("done", c.signed_in);
+  let h = "";
+  if (c.signed_in) h = `<p class="ok">Claude is signed in.</p>`;
+  else if (c.busy === "installing") h = `<p>Installing Claude Code… (a minute or two)</p>`;
+  else if (c.busy === "signing in") {
+    h = `<p>A browser window opened for the Anthropic sign-in. Finish it there.</p>`;
+    if (c.login_url) h += `<p class="muted">No window? <a href="${esc(c.login_url)}" target="_blank" rel="noopener">Open the sign-in page</a>.
+      If it shows a code, paste it here:</p><input id="lcode" placeholder="code from the sign-in page">
+      <button id="lcode-btn" class="plain">Send code</button>`;
+  } else if (!c.installed) h = `<button id="c-install">Install Claude Code</button>`;
+  else h = `<button id="c-login">Sign in to Claude</button>`;
+  if (!c.signed_in) h += ` <span class="muted">or just open Idli without it.</span>`;
+  if (c.error) h += `<p class="err">${esc(c.error)}</p>`;
+  $("claude-body").innerHTML = h;
+  if ($("c-install")) $("c-install").onclick = () => api("/api/claude/install", {}).then(poll);
+  if ($("c-login")) $("c-login").onclick = () => api("/api/claude/login", {}).then(poll);
+  if ($("lcode-btn")) $("lcode-btn").onclick = () => api("/api/claude/code", {code: $("lcode").value});
+  $("finish").disabled = !m.ok;
+  $("finish-msg").textContent = m.ok ? "" : "Connect to Idli's model first (step 1).";
+}
+let last = "";
+async function poll() {
+  try {
+    st = await api("/api/state");
+    const now = JSON.stringify(st);
+    if (now !== last) { last = now; render(); }  // unchanged: keep what the person is typing
+  } catch (e) { $("finish-msg").textContent = e.message; }
+}
+$("muse-btn").onclick = async () => {
+  $("muse-btn").disabled = true;
+  $("muse-msg").innerHTML = `<span class="muted">Checking…</span>`;
+  try { await api("/api/muse", {code: $("code").value}); $("muse-msg").textContent = ""; }
+  catch (e) { $("muse-msg").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  $("muse-btn").disabled = false;
+  poll();
+};
+$("finish").onclick = async () => {
+  $("finish").disabled = true;
+  await api("/api/finish", {skip_claude: !(st && st.claude.signed_in)});
+  document.querySelector("main").innerHTML = `<h1>Opening Idli…</h1><p class="muted">You can close this tab.
+    Idli's first chat says hello in about a minute. To change these settings later, open "Idli setup".</p>`;
+};
+poll();
+setInterval(() => { if (!document.hidden && $("claude-body")) poll(); }, 2000);
+</script>
+</body>
+</html>

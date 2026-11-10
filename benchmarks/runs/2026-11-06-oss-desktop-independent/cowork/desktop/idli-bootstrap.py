@@ -46,10 +46,9 @@ def say(msg):
 
 
 def paseo_bin():
-    for p in (shutil.which("paseo"), os.path.expanduser("~/.local/bin/paseo"), "/usr/local/bin/paseo", "/usr/bin/paseo"):
-        if p and os.path.exists(p):
-            return p
-    sys.exit("The paseo command was not found.")
+    sys.path.insert(0, COWORK)
+    from lib import paseobin
+    return paseobin.find() or sys.exit("The paseo command was not found.")
 
 
 ENV = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}  # act as the user, not as an agent
