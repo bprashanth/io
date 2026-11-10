@@ -168,11 +168,16 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
 | `dcd5e17` | Partial E7 results (runs cut short) |
 | `bea46f4` | E7 variants from the merged product: e7-product = the 12 shipped tools; e7-p12 = the 12 tools plus the separate dial-setting call. The partial runs from before the merge are set aside. |
 
-- **Models:** only what fits the free tier.
-  - The local 9B alone, and the local 9B with a separate dial-setting call to itself (container `idli9b-raw` on
-    the DGX; it showed "unhealthy" once, so check it).
-  - Muse, as the baseline only and as a client. Don't stop it.
-  - Ling-3.0-flash was dropped on the owner's word: at 124B total it doesn't fit beside Muse.
+- **E7 runs only the meaningful setups** (owner, 2026-11-10):
+  - **The local 9B (Q5) with the split** (a separate dial-setting call to itself inside `file_ask`), on the 12
+    shipped tools: (a) hard phases and (b) soft phases, two repeats each. The container is `idli9b-raw` on the
+    DGX; it showed "unhealthy" once, so check it.
+  - **Muse,** as the baseline only and as a client. Don't stop it.
+  - **"Before" (29 tools):** last round's local 9B split runs, rescored with the fixed scorer. Not rerun.
+  - **Why only these:** last round, the local 9B with the split scored 81% on held3 and 80% on the other chats,
+    against Muse's 83% and 85%. Bigger dial-setters (Ling, gpt-oss, 122B, 35B-A3B) moved results only by noise.
+  - **Dropped:** those bigger dial-setters (they don't fit beside Muse, and Ling only fits with Muse stopped),
+    the 9B with no split, and OpenRouter 9B runs.
 - **If the agent hangs:** it stalled once already (10 minutes with no output; the system stops a background agent
   after that).
   1. Check for runs still going with a `/proc` scan for `run.py` (no `pkill -f`), and look at
