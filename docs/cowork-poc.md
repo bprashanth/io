@@ -8,6 +8,15 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10 (late night), DGX: owner's decisions after E6/E7.**
+  - Readable-but-inconsistent values are flagged only when they would confuse the 9B; a strict mode comes later
+    (p3).
+  - Template instruction rows stay unchanged in the fake copy.
+  - Every table on a tab must be read, subtables and info blocks included. This is new work (p1). Where a layout
+    would confuse the 9B, Claude suggests a simpler one.
+  - Soft phases ship.
+  - The handoff page gained a guide for running experiments in parallel: worktree plus branch per experiment, an
+    own benchmark folder, product changes behind a switch, merge into `oss-desktop-eval`, then one PR to `main`.
 - **2026-11-10 (late night), DGX: E6 and E7 results** ([report](https://github.com/bprashanth/io/blob/idli-pipeline-eval/benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md),
   branch `idli-pipeline-eval`).
   - **E6 (cleaning on files with planted mess):** Claude learned each file from its fake copy, with no person in

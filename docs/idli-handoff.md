@@ -208,6 +208,60 @@ Branch `idli-installers`. It works but lacks our Paseo patches P1, P3 and P12. G
 `~/.claude/settings.json` now sets `API_TIMEOUT_MS=1800000` and `CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS=1200000`,
 because very long sessions were hitting "No response from API".
 
+## Owner decisions (2026-11-10, after E6/E7)
+1. **Inconsistent but readable values** ("Rs. 1,200", "approx 12", casing, "n/a"): Idli reads them quietly and
+   flags them only when they would confuse the 9B, for example two spellings that split a count. Fewer flags are
+   less intimidating. A strict mode that flags everything comes later
+   ([p3 todo](../todos/idli-insights/p3/strict_mode.md)).
+2. **Template instruction rows** (descriptions, MANDATORY/OPTIONAL) stay unchanged in the fake copy.
+3. **Every table on a tab** must be read: subtables and info blocks. Today Idli reads one table per tab, so
+   this is new work ([p1 todo](../todos/idli-insights/p1/subtables.md)). When a layout would confuse the 9B,
+   Claude suggests a simpler one while teaching, and the working copy carries a comment.
+4. **Tools:** soft phases. All 12 tools are always listed, and the server says "not now" when one is used too
+   early. This is how it ships.
+
+## Running experiments in parallel (any agent: Claude, Codex, cursor-agent)
+Do the simplest thing: **one git worktree and one branch per experiment, one benchmark folder of its own, and
+no changes to shared code unless they're behind a switch.** At the end everything merges into
+`oss-desktop-eval`, which goes to `main` as a PR.
+
+1. **Start** from the main checkout (`~/src/github.com/bprashanth/io`, branch `oss-desktop-eval`):
+   ```sh
+   git worktree add ../io-<name> -b exp/<name> oss-desktop-eval
+   cd ../io-<name>
+   ```
+   This gives a full copy of the repo on its own branch, sharing git history. Don't work in the main checkout,
+   and don't copy the folder by hand.
+2. **Your results** go only in `benchmarks/runs/<date>-<name>/`: PLAN.md, scripts, results, REPORT.md. Reuse
+   other harnesses by importing them or copying them into your folder; don't edit them in place.
+3. **Changing product code** (`cowork/lib`, `cowork/sites`, `idli/*.md`): only behind an environment switch that
+   is off by default (like `IDLI_MOCK_V2=1`), and in its own small commit, so it merges cleanly and is easy to
+   review or revert. Never change behaviour that another experiment relies on.
+4. **Machine state:**
+   - **Idli's data:** never use the real `~/idli-insights`. Set `IDLI_HOME` (and `COWORK_DATA_DIR`) to a folder
+     inside your benchmark directory.
+   - **GPU:** follow `../GPU_COORDINATION.md`. Use a memory cap, check free memory first, and stop your own
+     servers when done.
+   - **Muse:** a client only. Never stop or restart it.
+   - **Ports:** pick unused ones. Name containers `exp-<name>-*` and remove only your own.
+   - **Processes:** no `pkill -f`; use a `/proc` scan.
+   - **The laptop:** it's shared, so drive it only if the owner says so.
+5. **Shared files** (`docs/cowork-poc.md`, this page, `todos/`, `narrative/`): don't edit them on your branch.
+   They conflict. Put the one-line chronology entry, and any todo changes, at the end of your REPORT.md under
+   "For the integrator".
+6. **Commit** often. Commits end with the attribution lines. **Push** your branch only after
+   `bash -ic 'declaude origin/main'` and a check that 0 `Co-Authored-By`/`Claude-Session` lines remain:
+   `git push --force-with-lease origin exp/<name>`.
+7. **Report back:** a REPORT.md in your folder, in plain language, with tables, surprises, what wasn't
+   measured, cost and time, and decisions for the owner. Then tell the owner the branch and commit.
+8. **Merging** (the integrating agent, in the main checkout):
+   ```sh
+   git merge exp/<name>
+   ```
+   Then copy the "For the integrator" lines into the chronology and todos, update "State right now" above,
+   commit, and remove the worktree (`git worktree remove ../io-<name>`). Once everything is merged,
+   `declaude`, push `oss-desktop-eval`, and open the PR against `main`.
+
 ## Rules that always hold
 - Read only, except the working copy in Drive after a yes. Claude gets fake data only. Real data stays on the
   DGX or the laptop.
