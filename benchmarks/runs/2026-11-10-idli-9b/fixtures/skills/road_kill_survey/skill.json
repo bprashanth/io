@@ -1,0 +1,139 @@
+{
+ "id": "road_kill_survey",
+ "title": "Road kill survey",
+ "version": 1,
+ "sheet": "Roadkill",
+ "headers": [
+  "s_no",
+  "season",
+  "road_stretch",
+  "stretch_length_km",
+  "date",
+  "animal",
+  "animal_group",
+  "count"
+ ],
+ "summary": "One row per road kill found on a survey walk: road stretch (and its length), season, date, the animal, its group (frogs are Amphibia, snakes Reptilia ...) and how many.",
+ "row_noun": "road kill records",
+ "columns": {
+  "s_no": {
+   "type": "text",
+   "meaning": "serial number",
+   "label": "S.No"
+  },
+  "season": {
+   "type": "category",
+   "meaning": "Monsoon or Summer",
+   "label": "Season"
+  },
+  "road_stretch": {
+   "type": "category",
+   "meaning": "the surveyed stretch of road",
+   "label": "Road stretch"
+  },
+  "stretch_length_km": {
+   "type": "number",
+   "meaning": "length of that stretch in km",
+   "label": "Stretch length (km)"
+  },
+  "date": {
+   "type": "date",
+   "format": "%Y-%m-%d",
+   "meaning": "survey date",
+   "label": "Date"
+  },
+  "animal": {
+   "type": "category",
+   "meaning": "common name of the animal",
+   "label": "Animal"
+  },
+  "animal_group": {
+   "type": "category",
+   "meaning": "animal class: Amphibia, Reptilia, Mammalia, ...",
+   "label": "Animal group"
+  },
+  "count": {
+   "type": "number",
+   "meaning": "number of animals in this record",
+   "label": "Count"
+  }
+ },
+ "normalize": {
+  "road_stretch": {
+   "case": "title"
+  },
+  "count": {
+   "type": "number"
+  },
+  "stretch_length_km": {
+   "type": "number"
+  }
+ },
+ "validations": [
+  {
+   "column": "count",
+   "rule": "required",
+   "message": "count is missing"
+  },
+  {
+   "column": "count",
+   "rule": "range",
+   "arg": [
+    1,
+    50
+   ],
+   "message": "count is not between 1 and 50"
+  },
+  {
+   "column": "road_stretch",
+   "rule": "required",
+   "message": "road stretch is missing"
+  }
+ ],
+ "hidden": [
+  "s_no"
+ ],
+ "measures": [
+  {
+   "id": "animals",
+   "label": "Animals killed",
+   "sql": "sum(\"count\")",
+   "format": "count"
+  },
+  {
+   "id": "records",
+   "label": "Road kill records",
+   "sql": "count(*)",
+   "format": "count"
+  },
+  {
+   "id": "per_km",
+   "label": "Animals killed per km of road",
+   "sql": "round(sum(\"count\") / nullif(max(stretch_length_km), 0), 1)",
+   "format": "number"
+  },
+  {
+   "id": "amphibian_share",
+   "label": "Share that are frogs and toads (Amphibia) %",
+   "sql": "round(100.0 * sum(CASE WHEN animal_group = 'Amphibia' THEN \"count\" ELSE 0 END) / nullif(sum(\"count\"), 0), 1)",
+   "format": "percent"
+  }
+ ],
+ "presets": [
+  {
+   "id": "monsoon",
+   "label": "Monsoon only",
+   "filters": {
+    "season": [
+     "Monsoon"
+    ]
+   }
+  }
+ ],
+ "history": [
+  {
+   "version": 1,
+   "note": "benchmark fixture"
+  }
+ ]
+}

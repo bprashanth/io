@@ -18,6 +18,35 @@ Either agent adds an entry here for every change that needs something done on th
   tests the rest on planted-mess files: the cleaning output (E6), fewer tools by phase (E7, 29 → about 9), how
   realistic the fake copy is (E1), teaching from the fake copy judged on the real file (E2), the bounce to Claude
   and back (E3), the wording of answers (E4), and charts (E5). Not started: waiting for the owner's go.
+- **2026-11-10 (evening), DGX (branch idli-9b-bench): free-tier split.** Spec building moved out of the chat model
+  into a single-purpose sub-call inside `file_ask` (the 9B passes the person's words; no new tools). Fresh held3:
+  9B + Qwen3.5-35B-A3B 83%, 9B building its own specs 83%, Muse 83%; fully local on the DGX 79-81% (Muse stopped
+  13:02-13:18 IST for that run, restarted and checked through 8185). OpenRouter runs pinned per provider and
+  quantization. Other spec builders within the bar: gpt-oss-120b, Ling-3.0-flash, Qwen3.5-122B-A10B. Under the real
+  Claude Code CLI the split is 8-14 points under Muse on held3 (the 9B paraphrases answers: render answers and
+  cards in the host). Claude planning from GLiNER-redacted questions: 75-77% (shape-only backtrack +10; GLiNER
+  over-redacts). Muse-Glimmer-30B is a dense 28B with a Llama-4 tokenizer, not a Qwen. REPORT.md updated.
+- **2026-11-10 (later), DGX (branch idli-9b-bench): 9B benchmark results.** Per-span pass rates, lean harness:
+  dev+held+held2 Muse 85%, Qwen3.5-9B raw 65%, **9B + guards 86%** (local Q5 + guards 85%), LoRA 9B-004d 51% / 60%
+  with guards (the algebra adapter doesn't carry over). Fresh held-out set (held3, long follow-ups, never tuned on):
+  Muse 83%, 9B 65-73% depending on variant, Qwen3.5-35B-A3B (3B active) + stateful form 83%. Real Claude Code CLI:
+  Muse 78% (partial), 9B + guards 76%. Index summaries: 9B 12/15 vs Muse 10/15. Start here chat: 9B 100%. Spec
+  building alone: 9B 73%, 35B-A3B 89%. UX (blind rubric, Codex first pass): Muse 3.2/5, 9B + guards 2.7 (repeats
+  from the card guard, unneeded questions). Verdict: a guarded 9B can take start, find, open, clean, teach-switch,
+  skills, Start here and index summaries now; follow-up question-to-spec on long chats stays ~10-15 points behind:
+  give that one step to a stronger model (35B-A3B class) or a stateful spec builder. Patches in `patches/`.
+- **2026-11-10, DGX (branch idli-9b-bench): can a 9B replace Muse 30B? A standalone benchmark, in progress.**
+  `benchmarks/runs/2026-11-10-idli-9b/`. Idli's real tools on a fake Drive (12 spreadsheets, 6 documents from
+  totalrecall's synthetic livelihoods tables, two public Valparai ecology sets, and the taught-skill mocks; three new
+  skills written as the Teach workspace would). 30 scripted multi-turn conversations in the owner's voice (dev 14,
+  held-out 8, a second held-out 8 written by Codex and checked against the engine) plus the Start here chat. Two
+  harnesses: a lean loop (same prompt for every model) and the real Claude Code CLI through the Agent SDK with
+  cards answered the way Paseo does. Nothing touches `cowork/` or `~/idli-insights` (one leak found and fixed: the
+  harness's skill deletes went to `~/idli-insights/archive`; removed, and `formserver.skills_delete` patched to
+  honour `IDLI_HOME`). First findings: Muse ~98%; raw Qwen3.5-9B 64% (thinking 70%), failing mostly by writing
+  cards as text and misrouting; general guards (a Stop hook that sends the model back once to show a pending card
+  or drop a made-up number, and `drive_find(goal)` opening the spreadsheet itself) bring it to ~88%. Index summaries:
+  the 9B finds files better than Muse (12/15 vs 10/15 top-1). Patches in `patches/`; report in `REPORT.md`.
 - **2026-11-10, DGX: Muse through Cloudflare (silo.idli.cc).** The owner put Muse behind Cloudflare Access at
   `silo.idli.cc` (tunnel → DGX 8185, the prefix proxy → Muse) with a service token. `lib/muse.py` gives the URL and
   the two Access headers from `~/idli-insights/config/muse-access.json`; `desktop/muse-connect.py <token file>`

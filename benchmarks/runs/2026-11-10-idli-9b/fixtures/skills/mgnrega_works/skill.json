@@ -1,0 +1,122 @@
+{
+ "id": "mgnrega_works",
+ "title": "MGNREGA works",
+ "version": 1,
+ "sheet": "Works",
+ "headers": [
+  "work_id",
+  "date",
+  "work_type",
+  "village",
+  "persondays",
+  "households_engaged"
+ ],
+ "summary": "One row per MGNREGA (job work) work in a village: date, type of work, persondays of work created and households engaged.",
+ "row_noun": "works",
+ "columns": {
+  "work_id": {
+   "type": "text",
+   "meaning": "id of the work",
+   "label": "Work ID"
+  },
+  "date": {
+   "type": "date",
+   "format": "%Y-%m-%d",
+   "meaning": "date the work was recorded",
+   "label": "Date"
+  },
+  "work_type": {
+   "type": "category",
+   "meaning": "kind of work (desilting, footpath repair, ...)",
+   "label": "Work type"
+  },
+  "village": {
+   "type": "category",
+   "meaning": "village where the work happened",
+   "label": "Village"
+  },
+  "persondays": {
+   "type": "number",
+   "meaning": "days of work created (people x days)",
+   "label": "Persondays"
+  },
+  "households_engaged": {
+   "type": "number",
+   "meaning": "households that got work",
+   "label": "Households engaged"
+  }
+ },
+ "normalize": {
+  "village": {
+   "case": "title"
+  },
+  "persondays": {
+   "type": "number"
+  },
+  "households_engaged": {
+   "type": "number"
+  }
+ },
+ "validations": [
+  {
+   "column": "work_id",
+   "rule": "required",
+   "message": "work id is missing"
+  },
+  {
+   "column": "village",
+   "rule": "required",
+   "message": "village is missing"
+  },
+  {
+   "column": "persondays",
+   "rule": "range",
+   "arg": [
+    0,
+    100000
+   ],
+   "message": "persondays is negative or too big"
+  },
+  {
+   "column": "households_engaged",
+   "rule": "range",
+   "arg": [
+    0,
+    5000
+   ],
+   "message": "households engaged is negative or too big"
+  }
+ ],
+ "measures": [
+  {
+   "id": "works",
+   "label": "Number of works",
+   "sql": "count(*)",
+   "format": "count"
+  },
+  {
+   "id": "persondays",
+   "label": "Total persondays",
+   "sql": "sum(persondays)",
+   "format": "count"
+  },
+  {
+   "id": "households",
+   "label": "Households engaged (total)",
+   "sql": "sum(households_engaged)",
+   "format": "count"
+  },
+  {
+   "id": "days_per_household",
+   "label": "Persondays per household engaged",
+   "sql": "round(sum(persondays) / nullif(sum(households_engaged), 0), 1)",
+   "format": "number"
+  }
+ ],
+ "history": [
+  {
+   "version": 1,
+   "note": "benchmark fixture"
+  }
+ ]
+}

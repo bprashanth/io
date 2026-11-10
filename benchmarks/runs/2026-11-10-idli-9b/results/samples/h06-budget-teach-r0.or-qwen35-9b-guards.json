@@ -1,0 +1,264 @@
+{
+ "model": "or-qwen35-9b",
+ "variant": "guards",
+ "scenario": "held.json",
+ "conv": "h06-budget-teach",
+ "segments": [
+  "find",
+  "open",
+  "teach"
+ ],
+ "turns": [
+  {
+   "step": 0,
+   "input": {
+    "user": "how much of our budget have we spent so far this year?",
+    "check": {
+     "tools_any": [
+      "drive_find"
+     ]
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 1.3,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "drive_find",
+       "args": "{\"query\": \"budget\", \"goal\": \"analyse\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 4989,
+      "completion_tokens": 38
+     }
+    },
+    {
+     "type": "tool",
+     "name": "drive_find",
+     "args": {
+      "query": "budget",
+      "goal": "analyse"
+     },
+     "secs": 0.08,
+     "result": {
+      "file": "drive/Budget 2025-26.xlsx",
+      "known": false,
+      "then": "Idli hasn't been taught this file. Call teach_file now with the user's request as the question (it only prepares a copy with fake values; nothing is sent until they say yes on its card). Don't work out numbers from this file yourself.",
+      "downloaded": true,
+      "found": {
+       "id": "1d43114592dae796bcd39279d2771a37f",
+       "name": "Budget 2025-26.xlsx",
+       "folder": "My Drive / Finance",
+       "opened_with_goal": "analyse"
+      }
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 1.8,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "teach_file",
+       "args": "{\"file\": \"drive/Budget 2025-26.xlsx\", \"question\": \"how much of our budget have we spent so far this year?\"}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5216,
+      "completion_tokens": 62
+     }
+    },
+    {
+     "type": "tool",
+     "name": "teach_file",
+     "args": {
+      "file": "drive/Budget 2025-26.xlsx",
+      "question": "how much of our budget have we spent so far this year?"
+     },
+     "secs": 0.03,
+     "result": {
+      "request_id": "budget_2025_26-20261110-081508",
+      "updating": null,
+      "card": {
+       "questions": [
+        {
+         "header": "Claude",
+         "question": "I haven't seen Budget 2025-26 before. Claude can learn it with you (what each column means, the checks for mistakes) from a copy with fake values: same columns (Line item, Budget 2025-26 (Rs), Spent to Sep (Rs)), every value made up, and your question with names removed. Send it and switch to Claude?",
+         "multiSelect": false,
+         "options": [
+          {
+           "label": "Yes, send and switch",
+           "description": "Claude asks a few questions there, one at a time; you'll get a card to come back"
+          },
+          {
+           "label": "Not now",
+           "description": "Nothing is sent"
+          }
+         ]
+        },
+        {
+         "header": "Labels",
+         "question": "Should Claude see any of these labels as they are? It helps Claude read codes such as species or statuses; never tick people's or places' names. \"None\" keeps the whole copy fake.",
+         "multiSelect": true,
+         "options": [
+          {
+           "label": "None (Recommended)",
+           "description": "Every value stays made up"
+          },
+          {
+           "label": "Line item",
+           "description": "e.g. Admin, Field staff, Monitoring, Seedlings"
+          }
+         ]
+        }
+       ]
+      },
+      "then": "Call AskUserQuestion with exactly `card` (don't write anything first). If they pick \"Yes, send and switch\", call teach_send with request_id and share_labels = the label columns they ticked ([] for \"None\" or nothing ticked). If not, say nothing was sent and offer it again any time."
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 5.8,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "AskUserQuestion",
+       "args": "{\"questions\": [{\"header\": \"Claude\", \"question\": \"I haven't seen Budget 2025-26 before. Claude can learn it with you (what each column means, the checks for mistakes) from a copy with fake values: same columns (Line item, Budget 2025-26 (Rs), Spent to Sep (Rs)), every value made up, and your question with names removed. Send it and switch to Claude?\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, send and switch\", \"description\": \"Claude asks a few questions there, one at a time; you'll get a card to come back\"}, {\"label\": \"Not now\", \"description\": \"Nothing is sent\"}]}, {\"header\": \"Labels\", \"question\": \"Should Claude see any of these labels as they are? It helps Claude read codes such as species or statuses; never tick people's or places' names. \\\"None\\\" keeps the whole copy fake.\", \"multiSelect\": true, \"options\": [{\"label\": \"None (Recommended)\", \"description\": \"Every value stays made up\"}, {\"label\": \"Line item\", \"description\": \"e.g. Admin, Field staff, Monitoring, Seedlings\"}]}]}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 5752,
+      "completion_tokens": 284
+     }
+    },
+    {
+     "type": "card",
+     "card": {
+      "questions": [
+       {
+        "header": "Claude",
+        "question": "I haven't seen Budget 2025-26 before. Claude can learn it with you (what each column means, the checks for mistakes) from a copy with fake values: same columns (Line item, Budget 2025-26 (Rs), Spent to Sep (Rs)), every value made up, and your question with names removed. Send it and switch to Claude?",
+        "multiSelect": false,
+        "options": [
+         {
+          "label": "Yes, send and switch",
+          "description": "Claude asks a few questions there, one at a time; you'll get a card to come back"
+         },
+         {
+          "label": "Not now",
+          "description": "Nothing is sent"
+         }
+        ]
+       },
+       {
+        "header": "Labels",
+        "question": "Should Claude see any of these labels as they are? It helps Claude read codes such as species or statuses; never tick people's or places' names. \"None\" keeps the whole copy fake.",
+        "multiSelect": true,
+        "options": [
+         {
+          "label": "None (Recommended)",
+          "description": "Every value stays made up"
+         },
+         {
+          "label": "Line item",
+          "description": "e.g. Admin, Field staff, Monitoring, Seedlings"
+         }
+        ]
+       }
+      ]
+     },
+     "answer": "User has answered your questions: \"I haven't seen Budget 2025-26 before. Claude can learn it with you (what each column means, the checks for mistakes) from a copy with fake values: same columns (Line item, Budget 2025-26 (Rs), Spent to Sep (Rs)), every value made up, and your question with names removed. Send it and switch to Claude?\"=\"Yes, send and switch\", \"Should Claude see any of these labels as they are? It helps Claude read codes such as species or statuses; never tick people's or places' names. \"None\" keeps the whole copy fake.\"=\"None (Recommended)\". You can now continue with the user's answers in mind.",
+     "answered_step": 2
+    }
+   ],
+   "deviations": []
+  },
+  {
+   "step": 1,
+   "input": {
+    "pick": "question",
+    "optional": true,
+    "check": {}
+   },
+   "events": [],
+   "deviations": [],
+   "skipped": true
+  },
+  {
+   "step": 2,
+   "input": {
+    "pick": "Yes, send|None",
+    "optional": true,
+    "check": {
+     "tools_any": [
+      "teach_file"
+     ],
+     "no_invented": true
+    }
+   },
+   "events": [
+    {
+     "type": "model",
+     "secs": 3.4,
+     "finish": "tool_calls",
+     "text": "",
+     "tool_calls": [
+      {
+       "name": "teach_send",
+       "args": "{\"request_id\": \"budget_2025_26-20261110-081508\", \"share_labels\": []}"
+      }
+     ],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 6208,
+      "completion_tokens": 65
+     }
+    },
+    {
+     "type": "tool",
+     "name": "teach_send",
+     "args": {
+      "request_id": "budget_2025_26-20261110-081508",
+      "share_labels": []
+     },
+     "secs": 0.0,
+     "result": {
+      "started": true,
+      "teach_chat": "Teach: Budget 2025-26",
+      "switched": true,
+      "tell_the_user": "Say in one line: sent a copy with fake values to Claude, and switched there to answer its questions. This chat carries on when teaching is done."
+     },
+     "error": false
+    },
+    {
+     "type": "model",
+     "secs": 1.2,
+     "finish": "stop",
+     "text": "Sent a copy with fake values to Claude, and switched there to answer its questions.",
+     "tool_calls": [],
+     "reasoning_chars": 0,
+     "usage": {
+      "prompt_tokens": 6364,
+      "completion_tokens": 18
+     }
+    }
+   ],
+   "deviations": [],
+   "via_card": true,
+   "secs": 4.6
+  }
+ ],
+ "secs": 13.7,
+ "rep": 0
+}

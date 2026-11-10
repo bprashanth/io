@@ -1,0 +1,22 @@
+--- a/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/sites/files/tools.py
++++ b/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/sites/files/tools.py
+@@ -927,13 +927,19 @@
+             "say_to_user": "Write `table` exactly as it is (it ends with a line about deleting); nothing else."}
+ 
+ 
++_delete_card_shown = set()  # skill ids whose "Forget ...?" card was returned in this chat
++
++
+ def t_skill_delete(file_title, confirmed=False):
+     rows = formserver.skills_list()
+     hit = next((r for r in rows if r["title"].lower() == str(file_title).lower() or r["id"] == file_title), None) or \
+         next((r for r in rows if str(file_title).lower() in r["title"].lower()), None)
+     if not hit:
+         return {"error": f"Nothing learned called '{file_title}'.", "then": "Call skills_list and show it."}
++    if confirmed and hit["id"] not in _delete_card_shown:
++        confirmed = False  # the person hasn't seen the card yet: a small model sometimes skips it
+     if not confirmed:
++        _delete_card_shown.add(hit["id"])
+         return {"card": {"questions": [{"header": "Forget", "multiSelect": False,
+                                         "question": f"Forget {hit['title']}? Idli loses its checks, measures and "
+                                                     f"{len(hit['charts'])} chart(s); you'd teach it again with Claude. "
