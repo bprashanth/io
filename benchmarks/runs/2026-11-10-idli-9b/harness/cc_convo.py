@@ -140,7 +140,11 @@ async def run(model_id, scenario_file, conv_id, out_path, variant="base"):
         mcp_servers={"cowork": {"type": "stdio", "command": py,
                                 "args": ["-I", os.path.join(HERE, "mcp_server.py"), home, variant]}},
         allowed_tools=["mcp__cowork__*"],
-        hooks={"Stop": [HookMatcher(hooks=[stop_hook])]} if guards else None)
+        hooks={"Stop": [HookMatcher(hooks=[stop_hook])]} if guards else None,
+        # IDLI9B_CC_LEAN=1: replace Claude Code's own system prompt with the lean one (Paseo's provider can do the same)
+        **({"system_prompt": convo.system_prompt(variant)} if os.environ.get("IDLI9B_CC_LEAN") else {}))
+    if os.environ.get("IDLI9B_CC_LEAN"):
+        log["harness"] = "claude-code-lean-prompt"
     t_conv = time.time()
     pending = {}
     async with ClaudeSDKClient(options=opts) as client:

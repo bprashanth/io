@@ -8,6 +8,14 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10 (evening), DGX (branch idli-9b-bench): free-tier split.** Spec building moved out of the chat model
+  into a single-purpose sub-call inside `file_ask` (the 9B passes the person's words; no new tools). Fresh held3:
+  9B + Qwen3.5-35B-A3B 83%, 9B building its own specs 83%, Muse 83%; fully local on the DGX 79-81% (Muse stopped
+  13:02-13:18 IST for that run, restarted and checked through 8185). OpenRouter runs pinned per provider and
+  quantization. Other spec builders within the bar: gpt-oss-120b, Ling-3.0-flash, Qwen3.5-122B-A10B. Under the real
+  Claude Code CLI the split is 8-14 points under Muse on held3 (the 9B paraphrases answers: render answers and
+  cards in the host). Claude planning from GLiNER-redacted questions: 75-77% (shape-only backtrack +10; GLiNER
+  over-redacts). Muse-Glimmer-30B is a dense 28B with a Llama-4 tokenizer, not a Qwen. REPORT.md updated.
 - **2026-11-10 (later), DGX (branch idli-9b-bench): 9B benchmark results.** Per-span pass rates, lean harness:
   dev+held+held2 Muse 85%, Qwen3.5-9B raw 65%, **9B + guards 86%** (local Q5 + guards 85%), LoRA 9B-004d 51% / 60%
   with guards (the algebra adapter doesn't carry over). Fresh held-out set (held3, long follow-ups, never tuned on):

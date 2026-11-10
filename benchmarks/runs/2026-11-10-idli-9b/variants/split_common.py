@@ -75,7 +75,11 @@ def apply(mcp, ask_model_id, prompt=None):
                                       "Authorization": "Bearer " + convo.api_key(spec_m)})
         t0 = time.time()
         with urllib.request.urlopen(req, timeout=240) as r:
-            text = json.load(r)["choices"][0]["message"]["content"] or ""
+            resp = json.load(r)
+        text = resp["choices"][0]["message"]["content"] or ""
+        with open(os.path.join(os.environ.get("IDLI_HOME", "/tmp"), "spec_calls.jsonl"), "a") as f:
+            f.write(json.dumps({"model": spec_m["model"], "provider": resp.get("provider"),
+                                "pinned": spec_m.get("pinned"), "secs": round(time.time() - t0, 1)}) + "\n")
         text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
         m = re.search(r"\{.*\}", text, re.S)
         return (json.loads(m.group(0)) if m else {"cannot": "no spec"}), round(time.time() - t0, 1)

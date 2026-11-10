@@ -251,6 +251,7 @@ def run(model_id, scenario_file, conv_id, out_path, variant="base"):
             content = re.sub(r"<think>.*?</think>", "", content, flags=re.S).strip()
             tcs = msg.get("tool_calls") or []
             turn["events"].append({"type": "model", "secs": round(time.time() - t1, 1), "finish": fin,
+                                   "provider": resp.get("provider"),
                                    "text": content, "tool_calls": [{"name": c["function"]["name"],
                                                                    "args": c["function"].get("arguments")} for c in tcs],
                                    "reasoning_chars": len(msg.get("reasoning_content") or msg.get("reasoning") or ""),
