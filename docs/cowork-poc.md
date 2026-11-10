@@ -8,6 +8,16 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-10, DGX: Muse through Cloudflare (silo.idli.cc).** The owner put Muse behind Cloudflare Access at
+  `silo.idli.cc` (tunnel → DGX 8185, the prefix proxy → Muse) with a service token. `lib/muse.py` gives the URL and
+  the two Access headers from `~/idli-insights/config/muse-access.json`; `desktop/muse-connect.py <token file>`
+  checks the token and points the Idli 30B provider at silo through `ANTHROPIC_CUSTOM_HEADERS` (Claude Code sends
+  them on every call). End to end on the laptop with nothing listening on 8181: start card, Analyse, "the cestrum
+  field vars file" (16 s, two matches), the original (54 s with the download), checked copy (48 s), "how many
+  cestrum trees, what share" (17 s: 317, 17.34%), chart of share by transect (12 s, bars in the chat). On the DGX
+  the only client of 8185 during the run was `cloudflared`. Running chats keep the settings they started with:
+  the bootstrap's spare was replaced and Start here reloaded. Copying the token needs the laptop's ssh to the DGX,
+  which Tailscale gates with a browser check.
 - **2026-11-09 (late night), DGX: "What Idli has learned" is a page again.** The owner preferred the list page to
   a chat table. Mission control now has two workspaces: Start here (setup chat) and What Idli has learned (the
   `/skills` page in a browser tab, plus a small chat that only points at it). The page says "Here is a list of files
