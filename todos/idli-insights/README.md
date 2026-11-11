@@ -3,8 +3,8 @@
 - **p1/**: for the demo, and the work that decides the architecture.
   - [Pipeline evals](../../benchmarks/runs/2026-11-10-idli-pipeline-eval/PLAN.md): E6, E7, E1-E3 done (report on
     branch `idli-pipeline-eval`); E4 (answer wording) and E5 (charts) next.
-  - [Chart code reads the file as the form does, and never drops rows](p1/chart_code_reading.md): E3's main
-    finding (12 of 24 trips exactly right).
+  - [Charts on real data: what's left](p1/chart_code_reading.md): no silent row drops shipped 2026-11-11; next:
+    teaching merges readable variants (`normalize`), units in number cells, then rerun E3.
   - [One file at a time: index and graph built as files are learned](p1/file_by_file_index.md)
   - [Read every table on a tab (subtables, info blocks)](p1/subtables.md): the owner's decision; today Idli reads
     one table per tab.

@@ -1,6 +1,6 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-11 (~12:00 IST), DGX. Overwrite this page whenever the state changes, and keep the chronology
+Last updated 2026-11-11 (~14:00 IST), DGX. Overwrite this page whenever the state changes, and keep the chronology
 (`docs/cowork-poc.md`, "What changed") and the latest field note in step with it.
 
 ## What we are building now
@@ -294,7 +294,7 @@ Everything lives under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowor
 - `desktop/setup-laptop.py`: Paseo providers.
 - `desktop/muse-connect.py`: points Idli at silo.
 
-## State right now (checkpoint 2026-11-11 ~12:00 IST): read this to resume
+## State right now (checkpoint 2026-11-11 ~14:00 IST): read this to resume
 If the session that wrote this hung, everything below is in git or on disk. Nothing needs it to be alive.
 
 ### 1. Product change: done, almost verified
@@ -331,6 +331,18 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
     come back empty.
   - The daemon sometimes times out ("Liveness check timed out"). Retry, or ask the owner to rerun
     `desktop/laptop-up.sh`.
+
+### 1b. Charts never drop rows silently (2026-11-11 afternoon): shipped, waiting for the owner
+- **Read:** the chronology entry "2026-11-11 (afternoon), DGX: charts never drop rows silently" in
+  `docs/cowork-poc.md`. It has the change, how it was verified, the owner's decisions 1-4, and a correction to the
+  E3 report.
+- **Commit:** `51392d9d` on `oss-desktop-eval` (lib/chartkit.py, sites/files/tools.py `chart_show`, the
+  teach-file skill). The laptop has pulled it.
+- **Other agents (e.g. `exp/answer-mock`):** merge `oss-desktop-eval` before touching `chart_show` or
+  `chartkit.tables`. `chart_show` has a new `messy` argument, and its first call may return a card instead of a
+  chart.
+- **Waiting for the owner before:** rerunning E3, E4/E5, or showing the card in the app (it needs a file with
+  problems and a chart Claude wrote).
 
 ### 2. Evals (checkpoint 2026-11-11 ~12:00 IST): E6, E7, E1, E2, E3 done and reported
 - **Where:** branch `idli-pipeline-eval`, pushed at `4dbc4c22` (declauded, 0 trailers); worktree

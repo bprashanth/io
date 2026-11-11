@@ -8,6 +8,34 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-11 (afternoon), DGX: charts never drop rows silently** (commit `51392d9d`; laptop pulled).
+  - **Why:** in E3, Claude's chart code removed rows with a repeated ID before counting, without telling anyone.
+  - **Owner's decision:** don't let code drop rows. Ask the person "skip or fix".
+  - **`chart_show`** now checks whether rows the chart reads have open problems (the tabs its code reads, the
+    columns it mentions, plus whole-row problems). If so, it hands Idli a card first: "N rows this chart uses
+    have problems (e.g. Status 'cancel'). Skip those rows, or fix them first?"
+    - **Skip them (Recommended):** the chart is drawn without those rows (`chartkit.tables(..., skip=)`), and Idli
+      says how many were left out.
+    - **Fix them first:** Idli opens the checked copy in Drive (or offers to make one) and says to fix the red
+      cells, then ask again or say "fixed" (→ `working_copy_ready`, then the chart again).
+    - New tool argument: `chart_show(messy="skip"|"fix")`, only after the card.
+  - **Teach-file skill (charts):** no `drop_duplicates` or own row filters. Values that should count as one
+    ("cancel"/"Cancelled") go in the skill's `normalize` map, so the form and charts agree.
+  - **Correction to the E3 report:** chart code already reads exactly what the form reads (`chartkit.tables()`
+    calls `formkit.build`). The split spellings came from teaching (no `normalize` map), not from a second reader.
+  - **Verified:**
+    - DGX, field-visits fixture with Claude's E3 status chart: the card lists 3 rows; skip draws from 247 of 250
+      rows; fix offers the checked copy; formkit and fixkit tests pass.
+    - Laptop, the real households file (0 open problems): no card, and the chart draws as before. The card
+      itself hasn't been seen in the app yet.
+  - **Owner decisions (2026-11-11):**
+    1. Use the form's reading in charts: yes (already true; the remaining work is teaching `normalize` maps).
+    2. No silent drops: skip or fix (done above).
+    3. Hold `IDLI_MOCK_V2` for one more E2 run.
+    4. "Measures": undecided. A measure is a named calculation in the file's form ("Number of visits",
+       "Total amount (Rs)") that the 9B can pick to answer in words. In E3 every new question went to Claude as a
+       chart; the alternative is Claude adding a measure such as "Share of visits cancelled".
+  - **Next:** [todo](../todos/idli-insights/p1/chart_code_reading.md). Rerunning E3 waits for the owner.
 - **2026-11-11, DGX: E1-E3 results** ([report](https://github.com/bprashanth/io/blob/idli-pipeline-eval/benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md),
   branch `idli-pipeline-eval` at `4dbc4c22`).
   - **E1 (fake copy):** keeps 43 of 62 kinds of planted mistake; 47 with Codex's fixes behind `IDLI_MOCK_V2=1`
