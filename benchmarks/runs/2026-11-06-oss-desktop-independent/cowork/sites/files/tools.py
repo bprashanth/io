@@ -302,6 +302,12 @@ def t_file_open(file, show_form=True, goal=None):
         ver = e["skill"].get("version", 1)
         stale = bool(wc) and wc.get("skill_version") is not None and wc.get("skill_version") != ver
         offer_upload = bool(real) and not is_copy and bool(src.get("id")) and (not wc or stale)
+        # Ask once per chat per skill version: after "No, analyse the original", reopening the file (e.g. when
+        # Claude finishes teaching) mustn't ask again. A new chat, or a re-teach, asks again.
+        if offer_upload and not goal_is_clean(goal) and (file, ver) in _upload_offered:
+            offer_upload = False
+        if offer_upload:
+            _upload_offered.add((file, ver))
         from lib import chartkit
         out["charts"] = [{"id": x["id"], "title": x["title"]} for x in chartkit.charts_of(e["skill"])]
         if is_copy:
@@ -457,6 +463,13 @@ def t_file_ask(file, spec, tab=None, chart=False):
             "say_to_user": "Give the answer exactly as written (numbers unchanged), in a sentence or a short list. "
                            + ("Say the form tab now shows it." if shown else "Share the form link.")
                            + (" Rows that failed checks are included." if n_prob else "") + note}
+
+
+_upload_offered = set()  # (file, skill version) whose "Upload a checked copy?" card this chat has shown
+
+
+def goal_is_clean(goal):
+    return (goal or "").lower().startswith("clean")
 
 
 _teach_src = {}  # request_id -> (path, question), so teach_send can remake the copy with the labels they allowed
