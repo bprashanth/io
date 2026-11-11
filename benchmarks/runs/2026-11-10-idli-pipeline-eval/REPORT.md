@@ -230,8 +230,9 @@ The r03 steps 3-4 are left out of every row, so all rows count the same steps.
   - Claude took 18 minutes and the chat turn timed out.
 - **Why the numbers were wrong (the same with the 9B and Muse, because Claude writes the code):**
   1. **Readable values split.** "cancel" and "Cancelled" are drawn as separate bars (0.4% and 33.2%). The
-     owner's decision is to read them as one: 33.6%. The chart reads Idli's cleaned tables, and the skill has no
-     rule merging status spellings. The form's own lookups do this; chart code doesn't get them.
+     owner's decision is to read them as one: 33.6%. *Correction (2026-11-11 afternoon):* chart code reads exactly
+     what the form reads, so the form splits them too. The cause is teaching: Claude never added a `normalize`
+     map for the status column. It is not a second reader.
   2. **Rows deleted.** In 4 of 6 household charts, Claude's code removed rows with a repeated ID before counting,
      which changed the ward and village shares. Nobody asked for that, and the person isn't told.
   3. **Wrong shape.** In one run Claude drew canopy by plot when the question was the overall share.
@@ -297,21 +298,21 @@ The local 9B server is stopped; `harness/serve9b.sh up` restarts it.
 4. **Phases:** ship soft phases? Recommended: yes.
 
 ## For the owner to decide (E1-E3)
-1. **Should Claude's chart code use Idli's reading of the file?** That means the same merged spellings,
-   units and lookups as the form. Recommended: yes. It's the biggest cause of wrong numbers in E3.
-2. **Should chart code be allowed to drop rows** (repeated IDs, outliers)? Recommended: no, unless the person agreed
-   on a card. The chart then says how many rows it used.
+1. **Should Claude's chart code use Idli's reading of the file?** Recommended: yes. *Owner: yes. It already does
+   (see the correction under E3); what's left is teaching `normalize` maps and reading units.*
+2. **Should chart code be allowed to drop rows** (repeated IDs, outliers)? *Owner: no. Idli asks "skip them or
+   fix them first". Shipped on `oss-desktop-eval` in `51392d9d`.*
 3. **Ship the fixed fake copy (`IDLI_MOCK_V2=1`)?** It found the most mistakes (90%) but had twice the false
-   alarms in one run. Recommended: not yet; one more run of E2 on it first.
+   alarms in one run. Recommended: not yet; one more run of E2 on it first. *Owner: agreed.*
 4. **When a share question can't be answered,** should Claude add a measure to the form (answers in words, reusable
-   by the 9B) instead of a chart? Today the models always ask for a chart.
+   by the 9B) instead of a chart? Today the models always ask for a chart. *Owner: open.*
 
 ## Answers to PLAN.md's four questions
 1. **Where to invest:**
    - Not in better fake data first: learning from it is as good as learning from the real file today (E2).
    - The cheap fixes worth keeping are date order and dd-mmm-yy dates (E1).
-   - Invest in **how Claude's code reads the real file:** chart code should use the form's reading of values, and
-     must not drop rows on its own (E3).
+   - Invest in **how Claude's code handles the real file:** no rows dropped on its own (now fixed: skip-or-fix
+     card), and teaching that merges readable spellings for the form and charts alike (E3).
    - Then in **teaching:** a last step that ticks off every rule the owner stated (E6/E2 misses: counts across
      tabs, totals).
    - Not in a model for setting dials or wording yet (E7 and E4 decide that).
