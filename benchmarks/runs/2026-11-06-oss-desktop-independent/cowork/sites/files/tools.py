@@ -296,11 +296,31 @@ def t_file_open(file, show_form=True, goal=None):
         src = files().source(file) or {}
         wc = src.get("working_copy")
         is_copy = bool(src.get("copy_of")) or "Idli working copy" in os.path.basename(file)
+        # Owner, 2026-11-11: whenever a file is newly taught (or re-taught: a new skill version), the checked copy is
+        # made in Drive without asking (red cells, a comment per kind of problem). The person scans it and fixes what
+        # matters, or carries on. Charts and answers then point at this same copy.
+        auto_made = None
+        ver = e["skill"].get("version", 1)
+        stale = bool(wc) and wc.get("skill_version") is not None and wc.get("skill_version") != ver
+        if real and not is_copy and src.get("id") and (not wc or stale):
+            try:
+                auto_made = t_working_copy(file, fresh=stale)
+            except Exception as x:  # never lose the file over the copy
+                auto_made = {"error": type(x).__name__}
+            wc = auto_made.get("working_copy") or wc
         from lib import chartkit
         out["charts"] = [{"id": x["id"], "title": x["title"]} for x in chartkit.charts_of(e["skill"])]
         if is_copy:
             bits.append(f"This is your checked working copy (the cleaned version): {len(real)} problem"
                         f"{'s' if len(real) != 1 else ''} left.")
+        elif real and auto_made and auto_made.get("working_copy"):
+            bits.append(f"The checks found {len(real)} problem{'s' if len(real) > 1 else ''} in "
+                        f"{len({(p['tab'], p['column'], p['rule']) for p in real})} kinds. I've marked them in a copy "
+                        f"next to the original, {wc.get('name', '')} ({wc.get('url', '')}, open in a tab): red cells, "
+                        "one comment on each kind of problem; the original is unchanged. Fix what you think matters "
+                        "and say \"fixed\", or carry on with the original (answers then include those problems).")
+        elif real and auto_made and auto_made.get("local_copy"):
+            bits.append(str(auto_made.get("say_to_user", "")))
         elif real:
             bits.append(f"The checks found {len(real)} problem{'s' if len(real) > 1 else ''} in "
                         f"{len({(p['tab'], p['column'], p['rule']) for p in real})} kinds"
@@ -331,6 +351,11 @@ def t_file_open(file, show_form=True, goal=None):
                 opts = [{"label": "Analyse it now", "description": "Questions and charts from this checked copy"},
                         {"label": "Stay here", "description": "Keep fixing; tell me when you're ready"}]
                 act.append('On "Analyse it now": call AskUserQuestion with `start_card`. ' + start_then)
+            elif wc and auto_made:
+                opts = [{"label": "I've fixed it, go on", "description": "Check the copy again and analyse it"},
+                        {"label": "Analyse the original now", "description": "Answers include the problems"}]
+                act.append('On "I\'ve fixed it, go on": call working_copy_ready. On "Analyse the original now": call '
+                           "AskUserQuestion with `start_card`. " + start_then)
             elif wc:
                 opts = [{"label": "Open my working copy", "description": wc.get("name", "")},
                         {"label": "Make a fresh copy", "description": "Marks the problems again from the latest original"},
@@ -349,7 +374,7 @@ def t_file_open(file, show_form=True, goal=None):
                         {"label": "Stay here", "description": ""}]
                 act.append('On "Analyse it now": call AskUserQuestion with `start_card`. ' + start_then)
         else:
-            if wc and not is_copy:
+            if wc and not is_copy and not auto_made:
                 opts = [{"label": "Use the checked copy", "description": f"{wc.get('name', '')} (the cleaned version; "
                                                                          "Recommended)"},
                         {"label": "Use the original", "description": "Answers include the problems the checks found"}]
@@ -359,7 +384,9 @@ def t_file_open(file, show_form=True, goal=None):
             else:
                 opts = list(start["options"])
                 start_q = start["question"]
-                if real and not is_copy:
+                if auto_made and wc:
+                    act.append('When they say "fixed" (or done/ready): call working_copy_ready. ')
+                elif real and not is_copy:
                     out["say_to_user"] += " It hasn't been cleaned yet, so answers include those problems."
                     if src.get("id") and len(opts) < 4:
                         opts.append({"label": "Clean it first", "description": "Mark the problems in a copy in your "
@@ -707,7 +734,7 @@ def t_working_copy(file, fresh=False):
         except RuntimeError:
             pass
     src["working_copy"] = {"id": fid, "url": url, "name": name, "folder": folder[1], "made": time.strftime("%Y-%m-%d %H:%M"),
-                           "problems": made["cells"]}
+                           "problems": made["cells"], "skill_version": e["skill"].get("version", 1)}
     with open(files().resolve(file) + ".source.json", "w") as f:
         json.dump(src, f)
     return {"uploaded": True, "working_copy": src["working_copy"],
