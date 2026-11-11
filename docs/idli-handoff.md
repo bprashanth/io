@@ -74,6 +74,44 @@ gap reports pasted by hand) unless the owner asks.
    - Branch `idli-installers`: one-click installers for Mac, Windows and Linux (official Paseo plus bundled
      tools). The demo gaps D1-D11 are in `todos/idli-insights/p1/deployment_strategy.md`.
 
+## Cards: how the person steers, and how work bounces between Idli and Claude
+A **card** is a clickable question in the chat (Claude Code's `AskUserQuestion`). Cards are the backbone of the
+product. Design rules, all learned the hard way:
+- **Tools hand the model the card.** A tool returns `card` (the exact questions and options) and `then` (what to
+  do next). The model's job is to show that card as is, with nothing written before it.
+  - A small model follows a card it's handed. It skips one it was told to ask *after* writing text.
+  - So a card that must happen comes first and carries the text. Optional follow-ups are one line in the chat,
+    not a card.
+- **Only show a card a tool provided.** The 9B's main failure in E7 was putting up its own card where the person
+  should just type. A guard now allows a card only when a tool handed one over. Questions about the data get
+  typed answers, not cards.
+- **One question at a time,** with a recommended option first. "None (Recommended)" on the labels question means
+  the person can click through. Typing in "Other" is answered, and then the card is asked again.
+- **Every switch between Idli and Claude goes through a card with a yes.** It says where they're going, what goes
+  with them (always the fake copy, shown first in a "Fake copy for Claude" tab), and that a card brings them back.
+  Nothing is sent before the yes.
+- **The bounce, step by step:**
+  1. Idli (the private model) hits something the form can't do: `teach_file`, with `missing` for a question, or
+     `chart_request` for a chart.
+  2. A card asks: send the fake copy to Claude?
+  3. On yes (`teach_send`), the Claude chat opens with the request.
+  4. Claude teaches through its own card sequence (the teach-file skill): what a row is, checks (multi-select),
+     clean-ups, the file's words, how it read the request. Each step is a card the person answers.
+  5. Claude's last card asks "Go back to Idli?".
+  6. A small watcher outside Claude's sandbox (`lib/teachwatch.py`) sees the yes, switches the app back, and
+     tells Idli that teaching finished.
+  7. Idli reruns the question or shows the chart.
+
+  E3 measures this trip. The person is always the one who says go.
+- **The start of a chat is a card too:** "Clean up a file" or "Analyse a file", then the link. A first message
+  that already says what it wants skips the card.
+- **Cleaning uses cards at its two decision points:** "Mark them in a Drive copy?" (the only write) and "I've
+  fixed it, go on".
+- **Soft phases:** all 12 tools are always listed, so a wrong guess about which step the chat is in costs
+  nothing. Hard phases lost questions in E7.
+- **Why it matters for privacy:** the person sees and approves every hand-off. Real data stays with the private
+  model, and Claude only gets what the card said it would.
+
 ## How Idli reaches Google: "UI as API" (an important pattern)
 Idli has **no Google OAuth and no Google API keys.** It works through the person's own signed-in browser tabs
 inside Paseo.
@@ -337,6 +375,28 @@ Branch `idli-installers`. It works but lacks our Paseo patches P1, P3 and P12. G
 ### 4. Session settings
 `~/.claude/settings.json` now sets `API_TIMEOUT_MS=1800000` and `CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS=1200000`,
 because very long sessions were hitting "No response from API".
+
+## todos/ and proposals/: how work is queued and how agents agree on designs
+- **`todos/idli-insights/`** is the work queue, by priority:
+  - `p1/`: the demo and the architecture evals;
+  - `p2/`: measured, worth doing next;
+  - `p3/`: later.
+  
+  Each todo is one file saying the decision behind it, what to build and how to test it. The `README.md` there is
+  the index. When something ships, record it in the chronology and **delete** the todo. When results change a
+  priority, move the file and say why, as the capacity todo did when it moved from p1 to p2. Raise and demote
+  freely, but leave a line in the file saying why.
+- **`proposals/`** is for designs not yet built and decisions that aren't an agent's to make (see
+  `docs/agent-handoff.md`).
+  - **Writing one:** write the options with a recommendation as `proposals/<topic>.md`, and stop. Don't build it
+    until the owner decides.
+  - **Syncing between agents** (Claude on the DGX, the laptop agent, Codex, cursor-agent): a proposal is the
+    shared place to agree on a design. One agent writes it, others add their notes under a dated heading with
+    their name ("codex, 2026-11-11: ..."), and the owner's decision goes at the top. Then the work becomes a todo.
+  - **Idli-related proposals so far:** `demo_and_flow.md`, `pii_idli.md`, `hive_mind.md`,
+    `idli_astronaught.md`, `oss-desktop-open-private-agent-handoff.md`, `model-training.md`. Read the relevant
+    one before designing something nearby.
+- **Field notes and the chronology are history; todos and proposals are the future.** Keep them apart.
 
 ## Owner decisions (2026-11-10, after E6/E7)
 1. **Inconsistent but readable values** ("Rs. 1,200", "approx 12", casing, "n/a"): Idli reads them quietly and
