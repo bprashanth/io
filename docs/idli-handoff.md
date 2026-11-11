@@ -36,6 +36,27 @@ The app:
 - The sidebar shows **Start here** (a check that everything is signed in), **Mission control** (What Idli has
   learned), **Idli** (the work; a "New chat" is always waiting on the start card) and **Claude** (teaching).
 
+### The core design: Claude learns from stand-ins, writes code, and the private model runs it on the real thing
+Claude (the frontier model) never touches the person's real accounts or real data. It learns from two kinds of
+stand-in, and what it hands back is always **code**, which runs locally with the private model.
+
+| To learn... | Claude works on... | It writes back... | Which then runs on... |
+|---|---|---|---|
+| **A new app or website** (Gmail, Drive, Sheets, a portal) | **Test accounts** signed in to Paseo's browser (`~/idli-insights/config/accounts.json`), in the Claude (DIY) workspace | A **site plugin**: narrow tools that read the page like an API (`cowork/sites/<site>/tools.py`), with tests, via the `add-site` skill | the person's real, signed-in account, used by the private model |
+| **A new file** (a spreadsheet's layout, words, checks) | **A fake copy** of the file (same shape, fake values; `lib/filekit.py`), made locally | A **file skill**: the form (measures, breakdowns, filters), checks and clean-ups, via the `teach-file` skill | the real file on the person's machine, through the form engine |
+| **A chart or analysis** the form can't do | **A fresh fake copy** plus the person's question | **Chart or analysis code** (pandas, numpy, matplotlib only) | the real data, inside the sandbox (bubblewrap: no network, read-only) |
+
+So:
+- **Test accounts teach Claude the app. Fake data teaches Claude the data.** Neither carries the person's
+  information.
+- **Claude's output is code** (plugins, skills, chart code), never answers about real data. The private model
+  (Muse, or the 9B for the free tier) only uses that code and relays what it computes. It never adds up numbers
+  itself.
+- **The weak points are the stand-ins themselves.** A fake copy that loses the file's mess means Claude writes
+  weaker checks (measured in E1 and E2). A test account that differs from the real one breaks a plugin (caught by
+  each plugin's tests).
+- Everything below (the cards, UI as API, the bounce, the evals) serves this split.
+
 ### This is a big turn from the rest of the repo
 `io` started as an event experience for local-first models (the stage ladder, sheltered mode with GLiNER
 redaction, the Antigravity comparisons, io-codex, sandboxing). Read `README.md` and `docs/stages/` only as
