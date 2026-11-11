@@ -109,7 +109,7 @@ Everything lives under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowor
 - `desktop/setup-laptop.py`: Paseo providers.
 - `desktop/muse-connect.py`: points Idli at silo.
 
-## State right now (2026-11-10, ~20:30 IST): read this to resume
+## State right now (checkpoint 2026-11-11 ~08:40 IST): read this to resume
 If the session that wrote this hung, everything below is in git or on disk. Nothing needs it to be alive.
 
 ### 1. Product change: done, almost verified
@@ -147,58 +147,62 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
   - The daemon sometimes times out ("Liveness check timed out"). Retry, or ask the owner to rerun
     `desktop/laptop-up.sh`.
 
-### 2. Evals: E6 and E7 done (report: `benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md` on branch `idli-pipeline-eval`, pushed at a16edeb0)
-**Result:** the local 9B with the split, on the 12 shipped tools with soft phases, scored 86% on held3, the same as
-Muse (question steps 78% vs 85%). Hard phases scored 79%. E6: 72% of planted mistakes found, few false alarms.
-**Now running (started 2026-11-10 late night):** E1-E3 in a new background agent, same worktree and branch, from
-a16edeb0. It uses defaults until the owner answers: soft phases; E1 measures template instruction rows both kept
-and made fake; marking and info blocks unchanged. It hands generator and script writing to Codex and
-cursor-agent. If it hangs, check the branch's commits and running jobs (`/proc` scan), then restart it with:
-"continue E1-E3 from PLAN.md and REPORT.md on idli-pipeline-eval". **After that:** E4 and E5. Waiting on the owner's four decisions (listed in the report). The background
-agent has finished. To continue, start a new agent on branch `idli-pipeline-eval` (worktree
-`.claude/worktrees/agent-aaf212a4b5f290bbe`), or SendMessage the old one. Restart the local 9B with
-`harness/serve9b.sh up`.
+### 2. Evals (checkpoint 2026-11-11 ~08:40 IST): E6, E7, E1, E2 done; E3 needs one bug fixed
+- **Where:**
+  - branch `idli-pipeline-eval`, pushed at `848d7c7f` (declauded, 0 trailers);
+  - worktree `.claude/worktrees/agent-aaf212a4b5f290bbe`;
+  - folder `benchmarks/runs/2026-11-10-idli-pipeline-eval/` (E). `E/PLAN.md` is the plan.
+  - `E/REPORT.md` covers E6 and E7 only: E1-E3 still have to be added to it.
+- **E6 and E7:** see `E/REPORT.md`. The local 9B with the split, 12 tools, soft phases: 86% on held3, the same as
+  Muse.
+- **E1 (done, `E/results/e1/`):**
+  - 43 of 62 kinds of mistake survive today's fake copy; 47 of 62 with Codex's fixes, which sit in
+    `cowork/lib/filekit.py` behind `IDLI_MOCK_V2=1`, off by default.
+  - Still lost: spacer and notes rows, merged headers, and info blocks.
+  - The tax "end before start" result was random luck, not a regression (`E/results/e1/tax_end_before_start.md`).
+    It exposed two real gaps: "12-Mar-22" dates aren't recognised, and the order between start and end date
+    columns isn't kept.
+- **E2 (done, `E/results/e2-logs/table.txt`):** mistakes found, counting per the owner's decisions:
 
-Details from when it was running:
-- **Plan:** `benchmarks/runs/2026-11-10-idli-pipeline-eval/PLAN.md`.
-- **Scope:**
-  - Run order: E6 (cleaning output on planted-mess files), E7 (fewer tools by phase), then stop for a report.
-    After that: E1 (fake copy fidelity), E2 (teaching from the fake copy, judged on the real file), E3 (bounce to
-    Claude), E4 (answer wording), E5 (charts).
-  - Skipped by the owner: E8 (file search) and E10 (redaction). E9 (constrained dial setting) runs only if E7
-    leaves dial errors.
-  - The subject is the 9B (the free tier). Muse 30B is only the baseline.
-- **Where it works:**
-  - Branch `idli-pipeline-eval`, in worktree `.claude/worktrees/agent-aaf212a4b5f290bbe`. It is not pushed. Push
-    only with declaude.
-  - It merged `origin/idli-9b-bench`, which carries the harness and fixtures, and `oss-desktop-eval` (`687b8c2`).
-- **Done so far:**
+  | Claude learned from | Mistakes found | False alarms |
+  |---|---|---|
+  | today's fake copy (2 runs) | 88% / 85% | 20 / 17 |
+  | the fixed fake copy | 90% | 35 |
+  | the real (synthetic) file | 81% | 16 |
 
-| Commit | What |
-|---|---|
-| `c0d92d9` | Planted-mess generator with manifests: 5 files, 209 known problems, written with Codex. Includes fake-filled versions of the owner's two templates: the germination protocol, and the tax questionnaire under a neutral name (private, structure only). Also: headless teach runner (Claude Code with the teach-file skill on Idli's fake copy, Haiku as the file owner), the E6 scorer, link-first chats, the E7 phase variants and a `list_changed` probe. Harness fixes: totals scored separately, a guard against Idli's own card where the user should type, card clicks as steps. |
-| `dcd5e17` | Partial E7 results (runs cut short) |
-| `bea46f4` | E7 variants from the merged product: e7-product = the 12 shipped tools; e7-p12 = the 12 tools plus the separate dial-setting call. The partial runs from before the merge are set aside. |
-
-- **E7 runs only the meaningful setups** (owner, 2026-11-10):
-  - **The local 9B (Q5) with the split** (a separate dial-setting call to itself inside `file_ask`), on the 12
-    shipped tools: (a) hard phases and (b) soft phases, two repeats each. The container is `idli9b-raw` on the
-    DGX; it showed "unhealthy" once, so check it.
-  - **Muse,** as the baseline only and as a client. Don't stop it.
-  - **"Before" (29 tools):** last round's local 9B split runs, rescored with the fixed scorer. Not rerun.
-  - **Why only these:** last round, the local 9B with the split scored 81% on held3 and 80% on the other chats,
-    against Muse's 83% and 85%. Bigger dial-setters (Ling, gpt-oss, 122B, 35B-A3B) moved results only by noise.
-  - **Dropped:** those bigger dial-setters (they don't fit beside Muse, and Ling only fits with Muse stopped),
-    the 9B with no split, and OpenRouter 9B runs.
-- **If the agent hangs:** it stalled once already (10 minutes with no output; the system stops a background agent
-  after that).
-  1. Check for runs still going with a `/proc` scan for `run.py` (no `pkill -f`), and look at
-     `git -C <worktree> log` and `git status`.
-  2. Commit any results.
-  3. Restart it, or start a new agent with: "continue the pipeline eval from PLAN.md and the commits on
-     idli-pipeline-eval; E6 and E7 first, then report".
-- **Results go to:** `benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md` on that branch, with one line per
-  finding in `docs/cowork-poc.md`.
+  - Of the 35 false alarms with the fixed copy, 14 are in the tax file.
+  - Info blocks: 0 of 6 found ("not readable yet").
+  - So, with one repeat each, learning from the fake copy is not worse than from the real file. The differences
+    are about the size of run-to-run noise (2-4 mistakes per file).
+- **E3 (the trip to Claude and back): needs one fix.**
+  - Built by cursor-agent:
+    - 9 chats in `E/scenarios/e3.json`;
+    - the runner `E/harness/e3_bounce.py` (args: `--model --scenario scenarios/e3.json --conv <id> --out <file.json>`);
+    - the table `E/harness/e3_table.py`;
+    - the spec `E/generators/E3_SPEC.md`.
+  - My batch script `E/harness/e3_all.sh` ran all 27 chats (the 9B twice, Muse once) on 2026-11-11, 07:06-08:01.
+  - **The bounces happened**: Claude's teaching folders are in `E/results/e3-logs/<model>/<chat>/teach/`.
+  - **Bug:** apart from the first chat (`E/results/e3/local-qwen35-9b-r0/`), **no per-chat result JSON was
+    written**, and the logs are empty (exit code 0).
+    - A single rerun reproduced it: `--out results/e3/dbg/x.json` wrote nothing, with exit 0.
+    - So `run()` in e3_bounce.py, or `convo.run` in `../2026-11-10-idli-9b/harness/convo.py`, returns or exits
+      before `json.dump`. Debug it with prints, or `python -X faulthandler`.
+  - **Next:** fix the bug, delete `E/results/e3-logs/*-r0`, `*-r1` and `E/results/e3/*-r*`, rerun
+    `nohup E/harness/e3_all.sh > E/results/e3-logs/all.log &` (about an hour), then
+    `E/harness/e3_table.py`. The local 9B server is on port 8291 (`E/harness/serve9b.sh`). Stop it when done.
+- **Then:**
+  - Add E1, E2 and E3 to `E/REPORT.md`, ending with a "For the integrator" section and answers to PLAN.md's four
+    questions (where to invest; whether it works end to end; more models where; newer designs).
+  - Put the chronology line in `docs/cowork-poc.md`.
+  - E4 (answer wording) and E5 (charts) come after.
+- **New todos to add:** keep start-before-end order in the fake copy; parse "12-Mar-22" dates; a last teaching
+  step where Claude ticks off each rule the owner stated (E6 misses: counts across tabs, totals, duplicate IDs).
+- **Lessons on running this:**
+  - Background agents kept stalling: the system stops one after 10 minutes with no output, and it happened even
+    before any work.
+  - It's more reliable to run the batch scripts directly (`nohup ... &`, then check the log) and use Codex or
+    cursor-agent for code changes.
+  - Very long sessions got slow; start fresh from this page.
 
 ### 3. Demo installers (not active)
 Branch `idli-installers`. It works but lacks our Paseo patches P1, P3 and P12. Gaps D1-D11 are in
