@@ -8,6 +8,23 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-11, DGX: E1-E3 results** ([report](https://github.com/bprashanth/io/blob/idli-pipeline-eval/benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md),
+  branch `idli-pipeline-eval` at `4dbc4c22`).
+  - **E1 (fake copy):** keeps 43 of 62 kinds of planted mistake; 47 with Codex's fixes behind `IDLI_MOCK_V2=1`
+    (off). Still lost: spacer and notes rows, merged headers, info blocks; "12-Mar-22" dates and start-before-end
+    order (p2 todo).
+  - **E2 (teaching from the fake copy vs the real file):** 88%/85% of mistakes found from today's fake copy, 90%
+    from the fixed one (but 35 false alarms vs 20), 81% from the real file. Noise-level: better fake data is not
+    the next investment.
+  - **E3 (the trip to Claude and back, 9B x2 and Muse):**
+    - The trip works: 0 wrong bounces in 27 chats; sent 23/24, back 22/23; about a minute and $0.15 a trip.
+    - Every share question went as a chart, never as a form gap.
+    - Claude's chart code gave exactly right numbers on the real file in 12 of 24 trips, the same for both chat
+      models. It split readable spellings ("cancel"/"Cancelled") and dropped repeated-ID rows without being
+      asked (p1 todo `chart_code_reading.md`).
+    - 6 of the 9 expected answers had to be corrected first (Codex's `refcheck.md`).
+  - **Harness bugs fixed:** the E3 runner wrote nothing because `idli.setup()` changes into a temp folder; a
+    stalled Claude API call waited 30 min (headless teaching now caps calls at 5 min).
 - **2026-11-10 (late night), DGX: owner's decisions after E6/E7.**
   - Readable-but-inconsistent values are flagged only when they would confuse the 9B; a strict mode comes later
     (p3).

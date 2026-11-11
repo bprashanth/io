@@ -1,6 +1,6 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-10 (~20:30 IST), DGX. Overwrite this page whenever the state changes, and keep the chronology
+Last updated 2026-11-11 (~12:00 IST), DGX. Overwrite this page whenever the state changes, and keep the chronology
 (`docs/cowork-poc.md`, "What changed") and the latest field note in step with it.
 
 ## What we are building now
@@ -294,7 +294,7 @@ Everything lives under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowor
 - `desktop/setup-laptop.py`: Paseo providers.
 - `desktop/muse-connect.py`: points Idli at silo.
 
-## State right now (checkpoint 2026-11-11 ~09:55 IST): read this to resume
+## State right now (checkpoint 2026-11-11 ~12:00 IST): read this to resume
 If the session that wrote this hung, everything below is in git or on disk. Nothing needs it to be alive.
 
 ### 1. Product change: done, almost verified
@@ -332,57 +332,31 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
   - The daemon sometimes times out ("Liveness check timed out"). Retry, or ask the owner to rerun
     `desktop/laptop-up.sh`.
 
-### 2. Evals (checkpoint 2026-11-11 ~09:55 IST): E6, E7, E1, E2 done; E3 fixed and rerunning
-- **Where:**
-  - branch `idli-pipeline-eval`, pushed at `848d7c7f` (declauded, 0 trailers);
-  - worktree `.claude/worktrees/agent-aaf212a4b5f290bbe`;
-  - folder `benchmarks/runs/2026-11-10-idli-pipeline-eval/` (E). `E/PLAN.md` is the plan.
-  - `E/REPORT.md` covers E6 and E7 only: E1-E3 still have to be added to it.
-- **E6 and E7:** see `E/REPORT.md`. The local 9B with the split, 12 tools, soft phases: 86% on held3, the same as
-  Muse.
-- **E1 (done, `E/results/e1/`):**
-  - 43 of 62 kinds of mistake survive today's fake copy; 47 of 62 with Codex's fixes, which sit in
-    `cowork/lib/filekit.py` behind `IDLI_MOCK_V2=1`, off by default.
-  - Still lost: spacer and notes rows, merged headers, and info blocks.
-  - The tax "end before start" result was random luck, not a regression (`E/results/e1/tax_end_before_start.md`).
-    It exposed two real gaps: "12-Mar-22" dates aren't recognised, and the order between start and end date
-    columns isn't kept.
-- **E2 (done, `E/results/e2-logs/table.txt`):** mistakes found, counting per the owner's decisions:
-
-  | Claude learned from | Mistakes found | False alarms |
-  |---|---|---|
-  | today's fake copy (2 runs) | 88% / 85% | 20 / 17 |
-  | the fixed fake copy | 90% | 35 |
-  | the real (synthetic) file | 81% | 16 |
-
-  - Of the 35 false alarms with the fixed copy, 14 are in the tax file.
-  - Info blocks: 0 of 6 found ("not readable yet").
-  - So, with one repeat each, learning from the fake copy is not worse than from the real file. The differences
-    are about the size of run-to-run noise (2-4 mistakes per file).
-- **E3 (the trip to Claude and back): bug fixed, rerunning (2026-11-11 ~09:55 IST).**
-  - Built by cursor-agent: 9 chats in `E/scenarios/e3.json`; the runner `E/harness/e3_bounce.py`; the table
-    `E/harness/e3_table.py`; the spec `E/generators/E3_SPEC.md`. Batch: `E/harness/e3_all.sh` (the 9B twice, Muse
-    once, 27 chats, about an hour).
-  - **The bug (fixed in `c0562b77` on `idli-pipeline-eval`):** `idli.setup()` in the 9B harness does
-    `os.chdir` into a temp home, so the relative `--out` path was written under
-    `/tmp/idli9b-*/cowork-real/results/e3/`, and the batch also passed a folder as `--out`. The runner now makes
-    `--out` absolute first, and a folder means `<folder>/<chat>.json`. Teaching logs are now kept per run
-    (`E/results/e3-logs/<model>-<rep>/<chat>/teach/`). The first try is in `E/results/dropped/e3-first-try/`.
-  - **Running now:** `nohup E/harness/e3_all.sh > E/results/e3-logs/all.log &`, started ~09:55. When it ends,
-    run `E/harness/e3_table.py` and stop the 9B (`E/harness/serve9b.sh down`, port 8291).
-- **Then:**
-  - Add E1, E2 and E3 to `E/REPORT.md`, ending with a "For the integrator" section and answers to PLAN.md's four
-    questions (where to invest; whether it works end to end; more models where; newer designs).
-  - Put the chronology line in `docs/cowork-poc.md`.
-  - E4 (answer wording) and E5 (charts) come after.
-- **New todos to add:** keep start-before-end order in the fake copy; parse "12-Mar-22" dates; a last teaching
-  step where Claude ticks off each rule the owner stated (E6 misses: counts across tabs, totals, duplicate IDs).
+### 2. Evals (checkpoint 2026-11-11 ~12:00 IST): E6, E7, E1, E2, E3 done and reported
+- **Where:** branch `idli-pipeline-eval`, pushed at `4dbc4c22` (declauded, 0 trailers); worktree
+  `.claude/worktrees/agent-aaf212a4b5f290bbe`; folder `benchmarks/runs/2026-11-10-idli-pipeline-eval/` (E).
+  `E/REPORT.md` covers E6, E7, E1, E2, E3, the owner decisions, answers to PLAN.md's four questions, and
+  "For the integrator". The branch is not merged into `oss-desktop-eval` yet.
+- **E1/E2:** the fake copy keeps 43/62 kinds of mistake (47 with `IDLI_MOCK_V2=1`). Teaching from it finds 85-90% vs
+  81% from the real file: noise-level, so better fake data isn't the next investment.
+- **E3:** the trip to Claude and back works (0 wrong bounces in 27 chats, sent 23/24, back 22/23, about a minute and
+  $0.15 a trip). But Claude's chart code was exactly right on the real file in only 12 of 24 trips: it splits
+  readable spellings and drops repeated-ID rows (p1 todo `chart_code_reading.md`).
+  - The expected answers were checked by Codex: 6 of 9 corrected (`E/results/e3/refcheck.md`).
+  - Scoring: `E/harness/e3_rescore.py` reruns chart code on the real fixture.
+  - Harness fixes: `--out` made absolute (`idli.setup()` chdirs); headless teaching caps API calls at 5 min.
+- **Machine state:** the local 9B is stopped (`E/harness/serve9b.sh up` restarts it). Muse untouched.
+- **Owner decisions pending (E1-E3, in `E/REPORT.md`):**
+  1. chart code uses the form's reading (recommended);
+  2. no silent row drops (recommended);
+  3. hold `IDLI_MOCK_V2` for one more E2 run;
+  4. share questions as form measures instead of charts?
+- **Next, one of:** E4 (answer wording) and E5 (charts; E3 already covers much of it); the chart-code fix
+  (p1); subtables (p1); the laptop check of Start here (section 1 above).
 - **Lessons on running this:**
-  - Background agents kept stalling: the system stops one after 10 minutes with no output, and it happened even
-    before any work.
-  - It's more reliable to run the batch scripts directly (`nohup ... &`, then check the log) and use Codex or
-    cursor-agent for code changes.
-  - Very long sessions got slow; start fresh from this page.
+  - Run batch scripts directly (`nohup ... &`) and wait with a background `until` loop; hand code and log reading
+    to Codex (`codex exec`), which did the rescorer and the reference check well.
+  - Check expected answers before trusting a score: most of E3's were wrong.
 
 ### 3. Demo installers (not active)
 Branch `idli-installers`. It works but lacks our Paseo patches P1, P3 and P12. Gaps D1-D11 are in
