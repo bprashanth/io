@@ -751,9 +751,24 @@ def t_working_copy_ready(file):
     with open(cs, "w") as f:
         json.dump(csrc, f)
     out = t_file_open(got["file"], show_form=True, goal="analyse")
-    fixed = (wc.get("problems") or 0) - (out.get("problems") or 0)
-    out["say_to_user"] = (("Checked your working copy again: you fixed " + str(fixed) + ". " if fixed > 0 else
-                           "Checked your working copy again. ") + out.get("say_to_user", ""))
+    # What changed since the copy was made: compare the problems in the copy as uploaded (drive/working/<name>)
+    # with the copy as downloaded now. A fix can also create a problem (e.g. a species filled in changes a count
+    # on another tab), so say both, not just the difference in totals.
+    def keys(rel):
+        return {(p["tab"], p["row"], p["column"], p["problem"]) for p in files().open(rel)["problems"]
+                if not p.get("skipped")}
+    said = "Checked your working copy again. "
+    up = os.path.join(sh.data_dir(), "drive", "working", wc.get("name", "") + ".xlsx")
+    try:
+        if os.path.exists(up):
+            before, now = keys(os.path.relpath(up, sh.data_dir())), keys(got["file"])
+            gone, new = before - now, sorted(now - before)
+            said = (f"Checked your working copy again: you fixed {len(gone)} problem{'s' if len(gone) != 1 else ''}"
+                    + (f"; {len(new)} new one{'s' if len(new) != 1 else ''} appeared (e.g. {new[0][0]} row {new[0][1]}, "
+                       f"{new[0][2]}: {new[0][3]})" if new else "") + ". ")
+    except Exception:
+        pass
+    out["say_to_user"] = said + out.get("say_to_user", "")
     if out.get("card"):
         out["card"]["questions"][0]["question"] = out["say_to_user"]
     out["then"] = ("From now on use the file '" + got["file"] + "' (the working copy) for every tool. If they asked a "
