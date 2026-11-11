@@ -1,6 +1,6 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-11 (~14:00 IST), DGX. Overwrite this page whenever the state changes, and keep the chronology
+Last updated 2026-11-11 (~23:30 IST), DGX. Overwrite this page whenever the state changes, and keep the chronology
 (`docs/cowork-poc.md`, "What changed") and the latest field note in step with it.
 
 ## What we are building now
@@ -294,91 +294,91 @@ Everything lives under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowor
 - `desktop/setup-laptop.py`: Paseo providers.
 - `desktop/muse-connect.py`: points Idli at silo.
 
-## State right now (checkpoint 2026-11-11 ~14:00 IST): read this to resume
-If the session that wrote this hung, everything below is in git or on disk. Nothing needs it to be alive.
+## State right now (checkpoint 2026-11-11 ~23:30 IST): read this to resume
+Everything below is in git or on disk; nothing depends on a live session. Branch `oss-desktop-eval` (DGX, not
+pushed to GitHub), last commit is the one that updated this page.
 
-### 1. Product change: done, almost verified
-- **Commits on `oss-desktop-eval`** (DGX; not pushed to GitHub):
-  - `94570b4`: no Drive index or file search (link first). Start here only checks sign-ins (`setup_check`) in
-    its own folder `~/idli-insights/setup`. Mission control is only What Idli has learned (`idli/LEARNED.md`).
-    Tool lists per chat (`cowork.tools`: Idli 12 tools, Start here 1, Mission control 3).
-  - `2da8988`: `setup_check` waits for Muse longer and says busy, refused or not set up. Google errors carry
-    their message.
-- **Laptop:** pulled to `2da8988` (`git pull dgx oss-desktop-eval`). The bootstrap was run, which:
-  - archived the old Start here workspace;
-  - made a new "Start here" chat (in `~/idli-insights/setup`);
-  - replaced the stale "New chat" (it had the old 34 tools) with a fresh one.
-- **Verified:**
-  - On the DGX: tool lists (`COWORK_DATA_DIR=<folder> .venv/bin/python cowork_mcp.py --list`), the Claude and
-    Muse checks, and the formkit and fixkit tests (`PYTHONPATH=. .venv/bin/python lib/test_formkit.py`).
-  - On the laptop: Start here's first check said Claude ✓, Muse ✗ and Google ✗ ("couldn't check
-    (RuntimeError)"). From a laptop shell, Muse answered 200 through silo. The check took 44 s, so Muse was
-    likely slow or busy. `2da8988` makes the reason visible.
-- **Still to do:**
-  1. In Start here, send "check again". The chat must be reloaded or new to load the new code
-     (`paseo agent reload <id>`, then `paseo agent send <id> "check again"`). If Google still fails, read the
-     message it now gives. The cause is likely the browser tools from a workspace that isn't on screen.
-  2. Screenshot the sidebar (`python3 desktop/drive.py shot sidebar`). Expect Start here, Mission control (What
-     Idli has learned), Idli and Claude.
-  3. Run one journey from a pasted link in the new "New chat": start card, Analyse, paste the cestrum file's
-     link, then one question.
-  4. Known gap: a working copy now lands in My Drive (it used the index to find the original's folder).
-     Fix: have `file_get` record the parent folder.
-- **Driving the laptop from the DGX:**
-  - CLI: `cowork/desktop/paseo-remote.sh` (tunnel port 46767).
-  - Laptop terminal: `paseo-remote.sh terminal create --workspace <full Claude workspace id>`, then
-    `terminal send-keys <id> "<cmd>" Enter` and `terminal capture -S <id>`. Use `-S`: without it, capture can
-    come back empty.
-  - The daemon sometimes times out ("Liveness check timed out"). Retry, or ask the owner to rerun
-    `desktop/laptop-up.sh`.
-
-### 1b. Cards at every step into analysis; charts never drop rows (2026-11-11 night): verified in the app
-- **Read:** the chronology entry "2026-11-11 (night), DGX: cards back at every step into analysis" in
-  `docs/cowork-poc.md` (it supersedes the two afternoon entries below it).
-- **The flow:** "Upload a checked copy?" card → `working_copy` → "Continue with analysis?" card → `working_copy_ready`,
-  which reads the copy from Drive again and says what was fixed and what's new. Charts draw messy rows as they are
-  and point at the copy.
-- **Commits** on `oss-desktop-eval`: `51392d9d`, `dabfad55`, `8a117e7f`, `05ea479d`, `dd54e801`. The laptop is on
+### 1. The product: the clean → analyse flow, verified in the app on the laptop
+- **How a file goes from checks to analysis** (chronology: "2026-11-11 (night), DGX: cards back at every step into
+  analysis"):
+  1. `file_get` (a pasted link) → `file_open`. If the file has problems and no checked copy for its skill
+     version, a card: "Upload a checked copy to your Drive so you can fix them?" → "Yes, upload a checked copy
+     (Recommended)" / "No, analyse the original".
+  2. On yes, `working_copy` puts the copy next to the original in Drive: red cells, a comment per kind of problem,
+     counts on tab names, an "Idli checks" tab. Then a card: "Continue with analysis?" → "Continue with analysis" /
+     "Not yet".
+  3. On Continue, `working_copy_ready` downloads the copy from Drive again (the person's fixes) and says what was
+     fixed and what's new ("you fixed 1; 1 new one appeared (Density row 3, …)").
+  4. A file that already has a copy: "Use the checked copy (Recommended)" / "Use the original". A file re-taught
+     since its copy: the upload is offered again (copies record `skill_version`).
+- **Charts never drop or merge rows** (owner): chart code may not `drop_duplicates`, remove outliers or merge
+  spellings (teach-file skill). `chart_show` draws rows with problems as they are and points at the checked copy.
+- **Messy values** ("cancel" vs "Cancelled", "12 cm" in a number column) are flagged by the checks and fixed by the
+  person in the copy. No special-casing in code (owner).
+- **Commits** (newest last): `51392d9d`, `dabfad55`, `8a117e7f`, `05ea479d`, `dd54e801`. The laptop is on
   `dd54e801`.
-- **Other agents (e.g. `exp/answer-mock`):** merge `oss-desktop-eval` before touching `file_open`,
-  `working_copy`, `working_copy_ready` or `chart_show`.
+- **Verified on the laptop:**
+  - the cestrum original by link;
+  - upload card → copy in Drive → Continue card;
+  - a cell fixed in Drive was read back on Continue.
+  - Screenshots and steps are in the chronology entry.
+- **Known gaps:**
+  - A copy lands in My Drive unless the original's folder is known (`file_get` doesn't record the parent
+    folder).
+  - Answers (`file_ask`) only say "rows that failed checks are included"; they don't point at the copy.
+  - The new "fixed / new" wording hasn't been seen in the app yet.
+- **Left on the laptop's test account:**
+  - three cestrum working copies in Drive (9 Nov, 11 Nov 2248, 11 Nov 2257; D5 edited in the last);
+  - old copy records backed up as `drive/field_vars_indicators.xlsx.source.json.bak-2026-11-11{,b}`.
 - **The laptop's Google account is a test account** (owner): dev agents may read Idli's logs and Drive tabs there.
-- **Waiting for the owner before:** rerunning E3 (needs a scripted "Continue" step), E4/E5.
-- **Experiments handed to Codex:** `docs/codex-experiments-handoff.md` (E3b, E2b, E4, optional E5).
+- **Other agents:** merge `oss-desktop-eval` before touching `file_open`, `working_copy`, `working_copy_ready`
+  or `chart_show`.
 
-### 2. Evals (checkpoint 2026-11-11 ~12:00 IST): E6, E7, E1, E2, E3 done and reported
-- **Where:** branch `idli-pipeline-eval`, pushed at `4dbc4c22` (declauded, 0 trailers); worktree
+### 2. Evals: E6, E7, E1, E2, E3 done and reported
+- **Where:** branch `idli-pipeline-eval`, pushed at `b4e4361f` (declauded); worktree
   `.claude/worktrees/agent-aaf212a4b5f290bbe`; folder `benchmarks/runs/2026-11-10-idli-pipeline-eval/` (E).
-  `E/REPORT.md` covers E6, E7, E1, E2, E3, the owner decisions, answers to PLAN.md's four questions, and
-  "For the integrator". The branch is not merged into `oss-desktop-eval` yet.
+  `E/REPORT.md` has every result, the owner decisions and "For the integrator". Not merged into
+  `oss-desktop-eval` yet.
 - **E1/E2:** the fake copy keeps 43/62 kinds of mistake (47 with `IDLI_MOCK_V2=1`). Teaching from it finds 85-90% vs
-  81% from the real file: noise-level, so better fake data isn't the next investment.
-- **E3:** the trip to Claude and back works (0 wrong bounces in 27 chats, sent 23/24, back 22/23, about a minute and
-  $0.15 a trip). But Claude's chart code was exactly right on the real file in only 12 of 24 trips: it splits
-  readable spellings and drops repeated-ID rows (p1 todo `chart_code_reading.md`).
-  - The expected answers were checked by Codex: 6 of 9 corrected (`E/results/e3/refcheck.md`).
-  - Scoring: `E/harness/e3_rescore.py` reruns chart code on the real fixture.
-  - Harness fixes: `--out` made absolute (`idli.setup()` chdirs); headless teaching caps API calls at 5 min.
-- **Machine state:** the local 9B is stopped (`E/harness/serve9b.sh up` restarts it). Muse untouched.
-- **Owner decisions pending (E1-E3, in `E/REPORT.md`):**
-  1. chart code uses the form's reading (recommended);
-  2. no silent row drops (recommended);
-  3. hold `IDLI_MOCK_V2` for one more E2 run;
-  4. share questions as form measures instead of charts?
-- **Next, one of:** E4 (answer wording) and E5 (charts; E3 already covers much of it); the chart-code fix
-  (p1); subtables (p1); the laptop check of Start here (section 1 above).
-- **Lessons on running this:**
-  - Run batch scripts directly (`nohup ... &`) and wait with a background `until` loop; hand code and log reading
-    to Codex (`codex exec`), which did the rescorer and the reference check well.
-  - Check expected answers before trusting a score: most of E3's were wrong.
+  81% from the real file: noise-level.
+- **E3** (the trip to Claude and back):
+  - It works: 0 wrong bounces in 27 chats; sent 23/24, back 22/23; about a minute and $0.15 a trip.
+  - Chart code was exactly right on the real file in 12/24 trips, mostly because of split spellings and dropped
+    repeated-ID rows. The no-drop rule above addresses the drops; the spellings are now flagged problems.
+  - 6 of 9 expected answers were wrong and were corrected (`E/results/e3/refcheck.md`).
+- **The local 9B is stopped** (`E/harness/serve9b.sh up` restarts it).
+- **Owner decisions:**
+  1. Charts use the form's reading: already true.
+  2. No silent row drops: done.
+  3. Hold `IDLI_MOCK_V2` for one more E2 run.
+  4. Measures vs charts: open. Should Claude add a form measure for a number question, rather than a chart?
+- **Not yet run (waiting for the owner):**
+  - E3 rerun on today's flow (its harness needs the upload and Continue cards scripted);
+  - the E2 rerun with `IDLI_MOCK_V2`;
+  - E4 (wording) and E5 (charts).
+- **Lessons:**
+  - Run batches with `nohup` and wait with a background loop; hand code and log reading to Codex.
+  - Check expected answers before trusting a score.
+  - The 9B harness's `idli.setup()` chdirs into a temp home, so use absolute output paths.
 
-### 3. Demo installers (not active)
-Branch `idli-installers`. It works but lacks our Paseo patches P1, P3 and P12. Gaps D1-D11 are in
+### 3. Driving the laptop from the DGX (when the owner has the tunnel up)
+- **CLI:** `cowork/desktop/paseo-remote.sh` (`ls`, `agent reload|send|logs <id>`, `workspace ls`).
+- **A new chat runs new code;** an open one needs `agent reload <id>`.
+- **Laptop terminal:** `terminal create --workspace <id>`, `terminal send-keys <id> "<cmd>" Enter`,
+  `terminal capture -S <id>`.
+- **The app window:** `desktop/drive.py shot|click|clickxy` (system `python3`). Click coordinates are CSS pixels,
+  half the screenshot's. Chat tabs are titled "Analyse: <file>"; `drive.py click "<title>"` switches to one.
+- **Drive/Sheets tabs:** screenshot or click them over DevTools with node, using the tab's `webSocketDebuggerUrl`
+  from `http://127.0.0.1:49333/json/list`: `Page.captureScreenshot`, and `Input.dispatchMouseEvent` /
+  `dispatchKeyEvent` to type.
+
+### 4. Demo installers (not active)
+Branch `idli-installers`. It works, but lacks our Paseo patches P1, P3 and P12. Gaps D1-D11 are in
 `todos/idli-insights/p1/deployment_strategy.md`.
 
-### 4. Session settings
-`~/.claude/settings.json` now sets `API_TIMEOUT_MS=1800000` and `CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS=1200000`,
-because very long sessions were hitting "No response from API".
+### 5. Session settings
+`~/.claude/settings.json` sets `API_TIMEOUT_MS=1800000` and `CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS=1200000`.
+Headless teaching overrides it to 5 minutes per call.
 
 ## todos/ and proposals/: how work is queued and how agents agree on designs
 - **`todos/idli-insights/`** is the work queue, by priority:
