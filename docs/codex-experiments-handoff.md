@@ -63,7 +63,7 @@ not by editing the product.
     integrator" at the end of your REPORT.md.
 - **Machine:**
   - Use `IDLI_HOME`/`COWORK_DATA_DIR` folders inside your benchmark dir, never `~/idli-insights`.
-  - **GPU:** follow `benchmarks/runs/GPU_COORDINATION.md`. The local 9B starts with
+  - **GPU:** follow `~/src/github.com/bprashanth/GPU_COORDINATION.md`. The local 9B starts with
     `benchmarks/runs/2026-11-10-idli-pipeline-eval/harness/serve9b.sh up` (port 8291; it refuses below 40 GB
     free). Stop it when you're done (`serve9b.sh down`).
   - **Muse** (container `idli-muse`) is shared: you're a client only. Never stop or restart it. Run its chats one at
@@ -139,7 +139,7 @@ not by editing the product.
   - (C) a friendlier code template.
 - Score: numbers lost, numbers invented, a UX grade.
 - **Note:** `../io-answer-mock` (branch `exp/answer-mock`) has already benchmarked "trusted answer rendering".
-  Read its report first and build on it rather than repeat it.
+  Read its `ANSWER_REPORT.md` first (in `benchmarks/runs/2026-11-10-answer-mock/`) and build on it rather than repeat it.
 
 ### E5: charts from fake to real (optional; E3b covers much of it)
 - Only if E3b leaves chart failures that aren't about messy rows.
