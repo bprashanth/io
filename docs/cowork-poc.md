@@ -8,6 +8,23 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-11 (late afternoon), DGX: the checked copy is made after every teach, without asking** (commit
+  `8a117e7f`; laptop pulled).
+  - **Owner:** whenever Claude teaches a file (new or re-taught), Idli makes the checked copy in Drive (red cells,
+    a comment per kind of problem) and gives the link. No "Mark them in Drive?" card any more.
+  - **How:** `file_open` makes it when the file has problems, came from a Drive link (`file_get` recorded its id)
+    and has no copy for the current skill version. Copies now record `skill_version`, so a re-teach makes a fresh
+    copy. Idli says: "The checks found N problems in K kinds. I've marked them in a copy next to the original
+    (<link>, open in a tab) ... Fix what you think matters and say "fixed", or carry on with the original."
+  - **Cards:**
+    - Clean goal: "I've fixed it, go on" / "Analyse the original now".
+    - Analyse goal: the usual start card; "fixed" → `working_copy_ready`.
+  - **Charts** (entry below) reuse this copy; they make one only if none exists, e.g. a file taught before this
+    change.
+  - **Verified on the DGX** with the Drive upload stubbed: first open makes the copy; reopening doesn't; a new
+    skill version makes a fresh one; a chart reuses it. The formkit tests pass.
+  - **Not verified in the app:** every file on the laptop came from the old search flow and has no Drive id
+    recorded, so a test needs a file opened by its link.
 - **2026-11-11 (afternoon), DGX: charts never drop rows; messy rows go to the checked copy** (commits `51392d9d`,
   then `dabfad55`, which replaces its card).
   - **Why:** in E3, Claude's chart code removed rows with a repeated ID before counting, without telling anyone.
