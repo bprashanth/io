@@ -294,7 +294,7 @@ Everything lives under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowor
 - `desktop/setup-laptop.py`: Paseo providers.
 - `desktop/muse-connect.py`: points Idli at silo.
 
-## State right now (checkpoint 2026-11-11 ~08:40 IST): read this to resume
+## State right now (checkpoint 2026-11-11 ~09:55 IST): read this to resume
 If the session that wrote this hung, everything below is in git or on disk. Nothing needs it to be alive.
 
 ### 1. Product change: done, almost verified
@@ -332,7 +332,7 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
   - The daemon sometimes times out ("Liveness check timed out"). Retry, or ask the owner to rerun
     `desktop/laptop-up.sh`.
 
-### 2. Evals (checkpoint 2026-11-11 ~08:40 IST): E6, E7, E1, E2 done; E3 needs one bug fixed
+### 2. Evals (checkpoint 2026-11-11 ~09:55 IST): E6, E7, E1, E2 done; E3 fixed and rerunning
 - **Where:**
   - branch `idli-pipeline-eval`, pushed at `848d7c7f` (declauded, 0 trailers);
   - worktree `.claude/worktrees/agent-aaf212a4b5f290bbe`;
@@ -359,22 +359,17 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
   - Info blocks: 0 of 6 found ("not readable yet").
   - So, with one repeat each, learning from the fake copy is not worse than from the real file. The differences
     are about the size of run-to-run noise (2-4 mistakes per file).
-- **E3 (the trip to Claude and back): needs one fix.**
-  - Built by cursor-agent:
-    - 9 chats in `E/scenarios/e3.json`;
-    - the runner `E/harness/e3_bounce.py` (args: `--model --scenario scenarios/e3.json --conv <id> --out <file.json>`);
-    - the table `E/harness/e3_table.py`;
-    - the spec `E/generators/E3_SPEC.md`.
-  - My batch script `E/harness/e3_all.sh` ran all 27 chats (the 9B twice, Muse once) on 2026-11-11, 07:06-08:01.
-  - **The bounces happened**: Claude's teaching folders are in `E/results/e3-logs/<model>/<chat>/teach/`.
-  - **Bug:** apart from the first chat (`E/results/e3/local-qwen35-9b-r0/`), **no per-chat result JSON was
-    written**, and the logs are empty (exit code 0).
-    - A single rerun reproduced it: `--out results/e3/dbg/x.json` wrote nothing, with exit 0.
-    - So `run()` in e3_bounce.py, or `convo.run` in `../2026-11-10-idli-9b/harness/convo.py`, returns or exits
-      before `json.dump`. Debug it with prints, or `python -X faulthandler`.
-  - **Next:** fix the bug, delete `E/results/e3-logs/*-r0`, `*-r1` and `E/results/e3/*-r*`, rerun
-    `nohup E/harness/e3_all.sh > E/results/e3-logs/all.log &` (about an hour), then
-    `E/harness/e3_table.py`. The local 9B server is on port 8291 (`E/harness/serve9b.sh`). Stop it when done.
+- **E3 (the trip to Claude and back): bug fixed, rerunning (2026-11-11 ~09:55 IST).**
+  - Built by cursor-agent: 9 chats in `E/scenarios/e3.json`; the runner `E/harness/e3_bounce.py`; the table
+    `E/harness/e3_table.py`; the spec `E/generators/E3_SPEC.md`. Batch: `E/harness/e3_all.sh` (the 9B twice, Muse
+    once, 27 chats, about an hour).
+  - **The bug (fixed in `c0562b77` on `idli-pipeline-eval`):** `idli.setup()` in the 9B harness does
+    `os.chdir` into a temp home, so the relative `--out` path was written under
+    `/tmp/idli9b-*/cowork-real/results/e3/`, and the batch also passed a folder as `--out`. The runner now makes
+    `--out` absolute first, and a folder means `<folder>/<chat>.json`. Teaching logs are now kept per run
+    (`E/results/e3-logs/<model>-<rep>/<chat>/teach/`). The first try is in `E/results/dropped/e3-first-try/`.
+  - **Running now:** `nohup E/harness/e3_all.sh > E/results/e3-logs/all.log &`, started ~09:55. When it ends,
+    run `E/harness/e3_table.py` and stop the 9B (`E/harness/serve9b.sh down`, port 8291).
 - **Then:**
   - Add E1, E2 and E3 to `E/REPORT.md`, ending with a "For the integrator" section and answers to PLAN.md's four
     questions (where to invest; whether it works end to end; more models where; newer designs).
