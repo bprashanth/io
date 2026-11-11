@@ -1,0 +1,159 @@
+{
+ "fixture": "household_survey_messy",
+ "model": "claude-sonnet-5-5",
+ "real_teach": false,
+ "request": "household_survey_messy-20261111-070721",
+ "events": [
+  {
+   "type": "tool",
+   "t": 3,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 5,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/pipe-teach-_6f80qlr/cowork; cat teach/inbox/household_survey_messy-20261111-070721/request.json; ls file-skills/household_survey_messy; .venv/bin/python -c \\\"import json; from lib import chartkit; s=json.load(open('file-skills/household_survey_messy/skill.json')); s['_dir']='file-skills/household_survey_messy'; t=chartkit.tables('teach/inbox/household_survey_messy-20261111-070"
+  },
+  {
+   "type": "tool",
+   "t": 10,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/pipe-teach-_6f80qlr/cowork; python3 -c \\\"\\nimport json;s=json.load(open('file-skills/household_survey_messy/skill.json'));print(json.dumps(s['tabs']['Households'],indent=1)[:3000])\\\"; .venv/bin/python -c \\\"\\nimport json; from lib import chartkit\\ns=json.load(open('file-skills/household_survey_messy/skill.json')); s['_dir']='file-skills/household_survey_messy'\\nd=chartkit.table"
+  },
+  {
+   "type": "tool",
+   "t": 14,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Here's how I'd draw it: horizontal bars, one per village, of the % of households with debts above 0, sorted highest first, labelled with the % and (n in debt of N). Households whose debts are blank or not a number are left out of that village's count. OK?\", \"header\": \"Chart\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, draw that (Recommended)\", \"description\": \"Sh"
+  },
+  {
+   "type": "card",
+   "t": 17,
+   "card": {
+    "questions": [
+     {
+      "question": "Here's how I'd draw it: horizontal bars, one per village, of the % of households with debts above 0, sorted highest first, labelled with the % and (n in debt of N). Households whose debts are blank or not a number are left out of that village's count. OK?",
+      "header": "Chart",
+      "options": [
+       {
+        "label": "Yes, draw that (Recommended)",
+        "description": "Share in debt = households with Debts > 0 \u00f7 households with a debt figure, per village."
+       },
+       {
+        "label": "Let's discuss",
+        "description": "Change what counts as 'in debt', the chart type, or how blanks are treated."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Here's how I'd draw it: horizontal bars, one per village, of the % of households with debts above 0, sorted highest first, labelled with the % and (n in debt of N). Households whose debts are blank or not a number are left out of that village's count. OK?": "Yes, draw that (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 22,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/pipe-teach-_6f80qlr/cowork; mkdir -p file-skills/household_survey_messy/charts; cat > file-skills/household_survey_messy/charts/debt_share_by_village.py <<'EOF'\\nTITLE = \\\"Share of households in debt, by village (%)\\\"\\nQUESTION = \\\"what share of households in each village are in debt\\\"\\n\\n\\ndef make(tables, plt):\\n    df = tables[\\\"Households\\\"]\\n    fig, ax = plt.subplots(fig"
+  },
+  {
+   "type": "text",
+   "t": 25,
+   "text": "![debt_share_by_village](/tmp/pipe-teach-_6f80qlr/cowork/file-skills/household_survey_messy/charts/debt_share_by_village.mock.svg)\n\nThat's the chart on fake values."
+  },
+  {
+   "type": "tool",
+   "t": 26,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"This is the chart on fake data. Looks right?\", \"header\": \"Chart\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, use it (Recommended)\", \"description\": \"Hand it back to Idli to draw from your real data.\"}, {\"label\": \"Change something\", \"description\": \"Tell me what to change; I'll redraw it.\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 29,
+   "card": {
+    "questions": [
+     {
+      "question": "This is the chart on fake data. Looks right?",
+      "header": "Chart",
+      "options": [
+       {
+        "label": "Yes, use it (Recommended)",
+        "description": "Hand it back to Idli to draw from your real data."
+       },
+       {
+        "label": "Change something",
+        "description": "Tell me what to change; I'll redraw it."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "This is the chart on fake data. Looks right?": "Yes, use it (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 32,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/pipe-teach-_6f80qlr/cowork; echo '{\\\"skill\\\":\\\"household_survey_messy\\\",\\\"version\\\":1,\\\"charts\\\":[\\\"debt_share_by_village\\\"],\\\"summary\\\":\\\"Bar chart of the % of households in debt (debts above 0) in each village, sorted, with counts.\\\"}' > teach/inbox/household_survey_messy-20261111-070721/done.json\"}"
+  },
+  {
+   "type": "tool",
+   "t": 32,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Switch back; Idli draws the chart from your real data.\"}, {\"label\": \"Stay here\", \"description\": \"Remain in this chat.\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 32,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Switch back; Idli draws the chart from your real data."
+       },
+       {
+        "label": "Stay here",
+        "description": "Remain in this chat."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 35,
+   "name": "Bash",
+   "args": "{\"command\": \"cd /tmp/pipe-teach-_6f80qlr/cowork; touch teach/inbox/household_survey_messy-20261111-070721/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 37,
+   "text": "I've written the chart and handed it back to Idli. I only rendered it on the fake mock data, so it hasn't run on your real file. Idli will draw it from the real data when you get back.\n\nThe chart is a sorted horizontal bar for each village. Each bar shows the percentage of households with debts above 0, labelled with the counts (for example \"60% (45 of 75)\"). Households whose debts figure is blank or not a number are left out of both the count and the total for their village.\n\nSwitching you back to Idli."
+  }
+ ],
+ "user_cost": 0.0030592600000000003,
+ "workspace": "/tmp/pipe-teach-_6f80qlr/cowork",
+ "secs": 38,
+ "rounds": 1,
+ "claude_cost": 0.133,
+ "done": true,
+ "cards": 3,
+ "skill": "household_survey_messy",
+ "filekit_changed": false
+}

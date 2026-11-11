@@ -1,0 +1,153 @@
+{
+ "fixture": "household_survey_messy",
+ "model": "claude-sonnet-5-5",
+ "real_teach": false,
+ "request": "household_survey_messy-20261111-074530",
+ "events": [
+  {
+   "type": "tool",
+   "t": 2,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 5,
+   "name": "Bash",
+   "args": "{\"command\": \"cat teach/inbox/household_survey_messy-20261111-074530/request.json && cat file-skills/household_survey_messy/skill.json && .venv/bin/python -c \\\"import json; from lib import chartkit; s=json.load(open('file-skills/household_survey_messy/skill.json')); s['_dir']='file-skills/household_survey_messy'; t=chartkit.tables('teach/inbox/household_survey_messy-20261111-074530/mock.xlsx', s); "
+  },
+  {
+   "type": "tool",
+   "t": 9,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Here's how I'd draw it: horizontal bar chart of the % of households with debt (debts > 0) in each village, sorted highest first, with the household count per village shown. Households with a blank or unreadable debt are left out. OK?\", \"header\": \"Chart\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, draw that (Recommended)\", \"description\": \"Bars per village, % in d"
+  },
+  {
+   "type": "card",
+   "t": 11,
+   "card": {
+    "questions": [
+     {
+      "question": "Here's how I'd draw it: horizontal bar chart of the % of households with debt (debts > 0) in each village, sorted highest first, with the household count per village shown. Households with a blank or unreadable debt are left out. OK?",
+      "header": "Chart",
+      "options": [
+       {
+        "label": "Yes, draw that (Recommended)",
+        "description": "Bars per village, % in debt, value labels, blanks excluded"
+       },
+       {
+        "label": "Let's discuss",
+        "description": "Change what counts as 'in debt' or how it's drawn"
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Here's how I'd draw it: horizontal bar chart of the % of households with debt (debts > 0) in each village, sorted highest first, with the household count per village shown. Households with a blank or unreadable debt are left out. OK?": "Yes, draw that (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 17,
+   "name": "Bash",
+   "args": "{\"command\": \"mkdir -p file-skills/household_survey_messy/charts && cat > file-skills/household_survey_messy/charts/debt_share_by_village.py <<'EOF'\\nTITLE = \\\"Share of households in debt, by village (%)\\\"\\nQUESTION = \\\"what share of households in each village are in debt\\\"\\n\\ndef make(tables, plt):\\n    df = tables[\\\"Households\\\"]\\n    fig, ax = plt.subplots(figsize=(9, 5))\\n    d = df[[\\\"village\\"
+  },
+  {
+   "type": "text",
+   "t": 20,
+   "text": "![debt_share_by_village](/tmp/pipe-teach-oxf_m8aw/cowork/file-skills/household_survey_messy/charts/debt_share_by_village.mock.svg)\n\nThis is the chart on fake data, so the values mean nothing."
+  },
+  {
+   "type": "tool",
+   "t": 21,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"This is the chart on fake data. Looks right?\", \"header\": \"Chart\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, use it (Recommended)\", \"description\": \"Hand it back to Idli\"}, {\"label\": \"Change something\", \"description\": \"Style, labels or what's counted\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 24,
+   "card": {
+    "questions": [
+     {
+      "question": "This is the chart on fake data. Looks right?",
+      "header": "Chart",
+      "options": [
+       {
+        "label": "Yes, use it (Recommended)",
+        "description": "Hand it back to Idli"
+       },
+       {
+        "label": "Change something",
+        "description": "Style, labels or what's counted"
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "This is the chart on fake data. Looks right?": "Yes, draw that (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 27,
+   "name": "Bash",
+   "args": "{\"command\": \"cat > teach/inbox/household_survey_messy-20261111-074530/done.json <<'EOF'\\n{\\\"skill\\\": \\\"household_survey_messy\\\", \\\"version\\\": 1, \\\"charts\\\": [\\\"debt_share_by_village\\\"], \\\"summary\\\": \\\"Bar chart of the share of households in debt (debts > 0) in each village, with counts; blank or unreadable debts left out.\\\"}\\nEOF\"}"
+  },
+  {
+   "type": "tool",
+   "t": 27,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Switch back to Idli\"}, {\"label\": \"Stay here\", \"description\": \"Remain in this chat\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 27,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Switch back to Idli"
+       },
+       {
+        "label": "Stay here",
+        "description": "Remain in this chat"
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 29,
+   "name": "Bash",
+   "args": "{\"command\": \"touch teach/inbox/household_survey_messy-20261111-074530/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 32,
+   "text": "I've written the chart. It's a horizontal bar chart, sorted, of the share of households in each village with debts above 0. Each bar is labelled with the percentage and the count, for example \"62% (40 of 65)\". Households with a blank or unreadable debt are left out. I only rendered it on the fake mock data, so the values in the picture mean nothing.\n\nThe chart is in `file-skills/household_survey_messy/charts/debt_share_by_village.py`. I didn't change the skill itself, so it stays at version 1. I wrote `done.json`, so Idli will draw the chart from the real data when you're back in its chat.\n\nI also created the `go_back` file, so Idli's watcher should switch you back.\n\nYour answer to the \"Looks right?\" card came back as \"Yes, draw that (Recommended)\", which is the option from the earlier card. I took it as a yes to the rendered chart. If you wanted changes, tell me and I'll adjust and re-render."
+  }
+ ],
+ "user_cost": 0.0024902400000000003,
+ "workspace": "/tmp/pipe-teach-oxf_m8aw/cowork",
+ "secs": 33,
+ "rounds": 1,
+ "claude_cost": 0.135,
+ "done": true,
+ "cards": 3,
+ "skill": "household_survey_messy",
+ "filekit_changed": false
+}

@@ -1,0 +1,169 @@
+{
+ "id": "field_visits_messy",
+ "title": "field_visits_messy",
+ "version": 2,
+ "format": 2,
+ "tabs": {
+  "Visits": {
+   "headers": [
+    "visit_date",
+    "village",
+    "field_officer",
+    "households_visited",
+    "amount_disbursed_rs",
+    "status_done_follow_up_cancelled",
+    "notes"
+   ],
+   "summary": "One row per field visit. Totals leave out Cancelled visits by default (use the 'not_cancelled' preset). Break down by Village or by Field officer. A 'Total' row at the bottom is skipped.",
+   "row_noun": "visits",
+   "skip_rows": [
+    "repeated_header",
+    "subheading",
+    "total"
+   ],
+   "columns": {
+    "visit_date": {
+     "type": "date",
+     "formats": [
+      "%d/%m/%Y"
+     ],
+     "label": "Visit date"
+    },
+    "village": {
+     "type": "category",
+     "label": "Village"
+    },
+    "field_officer": {
+     "type": "category",
+     "label": "Field officer"
+    },
+    "households_visited": {
+     "type": "number",
+     "label": "Households visited"
+    },
+    "amount_disbursed_rs": {
+     "type": "number",
+     "label": "Amount disbursed (Rs)"
+    },
+    "status_done_follow_up_cancelled": {
+     "type": "category",
+     "label": "Status",
+     "values": [
+      "Done",
+      "Follow-up",
+      "Cancelled"
+     ]
+    },
+    "notes": {
+     "type": "text",
+     "label": "Notes"
+    }
+   },
+   "validations": [
+    {
+     "column": "visit_date",
+     "rule": "date",
+     "arg": [
+      "%d/%m/%Y"
+     ],
+     "message": "not a valid date (dd/mm/yyyy)"
+    },
+    {
+     "column": "visit_date",
+     "rule": "regex",
+     "arg": "\\d\\d/\\d\\d/(19\\d\\d|20[01]\\d|202[0-3])|\\d\\d/0[1-3]/2024",
+     "message": "date is after 31 March 2024"
+    },
+    {
+     "column": "status_done_follow_up_cancelled",
+     "rule": "regex",
+     "arg": "Done|Follow-up|Cancelled",
+     "message": "status must be exactly Done, Follow-up or Cancelled"
+    }
+   ],
+   "measures": [
+    {
+     "id": "disbursed",
+     "label": "Amount disbursed (Rs)",
+     "sql": "sum(amount_disbursed_rs)",
+     "format": "inr"
+    },
+    {
+     "id": "households",
+     "label": "Households visited",
+     "sql": "sum(households_visited)",
+     "format": "count"
+    },
+    {
+     "id": "visits",
+     "label": "Number of visits",
+     "sql": "count(*)",
+     "format": "count"
+    }
+   ],
+   "presets": [
+    {
+     "id": "not_cancelled",
+     "label": "Leave out cancelled visits",
+     "filters": {
+      "status_done_follow_up_cancelled": {
+       "not": [
+        "Cancelled"
+       ]
+      }
+     }
+    }
+   ],
+   "date_columns": [
+    "visit_date"
+   ],
+   "lookups": [
+    {
+     "tab": "Officers",
+     "on": {
+      "field_officer": "name"
+     },
+     "columns": [
+      "district"
+     ],
+     "prefix": "officer_",
+     "labels": {
+      "district": "Officer's district"
+     }
+    }
+   ]
+  },
+  "Officers": {
+   "headers": [
+    "name",
+    "district",
+    "phone",
+    "email"
+   ],
+   "summary": "One row per field officer.",
+   "row_noun": "officers",
+   "validations": [
+    {
+     "column": "phone",
+     "rule": "phone",
+     "message": "not a 10-digit phone"
+    },
+    {
+     "column": "email",
+     "rule": "email",
+     "message": "not a valid email"
+    }
+   ]
+  }
+ },
+ "history": [
+  {
+   "version": 1,
+   "taught": "checks (dates up to 31 Mar 2024, exact statuses, officer names must be in Officers), disbursed/households/visits by village and officer, cancelled left out"
+  },
+  {
+   "version": 2,
+   "taught": "amount disbursed by officer's district, sorted by district (all visits)"
+  }
+ ]
+}
