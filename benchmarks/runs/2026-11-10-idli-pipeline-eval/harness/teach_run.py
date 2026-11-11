@@ -155,7 +155,7 @@ async def teach(fixture, out_dir, model, real_teach, request_dir=None):
         log["events"].append({"type": "card", "t": round(time.time() - t0), "card": inp, "answers": ans})
         return PermissionResultAllow(updated_input={**inp, "answers": ans})
 
-    env = {"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "DISABLE_AUTOUPDATER": "1"}
+    env = {"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "DISABLE_AUTOUPDATER": "1", "API_TIMEOUT_MS": "300000"}
     opts = ClaudeAgentOptions(cwd=ws, model=model, permission_mode="default", can_use_tool=can_use_tool,
                               setting_sources=["project"], env=env, max_turns=120,
                               disallowed_tools=["WebSearch", "WebFetch", "Agent", "Task"])

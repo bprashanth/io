@@ -53,7 +53,24 @@ def _run_teach(fixture, out_dir, request_dir=None):
     cmd = [PY, TEACH_RUN, fixture, out_dir]
     if request_dir:
         cmd += ["--request-dir", request_dir]
-    p = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+    import time
+    t0 = time.time()
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=1500)
+    except subprocess.TimeoutExpired:
+        # 2026-11-11: teach_run sometimes hangs after Claude has finished (done.json written). The product's watcher
+        # acts on done.json/go_back, so do the same; without done.json it's a real failure.
+        if request_dir and os.path.exists(os.path.join(request_dir, "done.json")):
+            import glob
+            done = json.load(open(os.path.join(request_dir, "done.json")))
+            ws_skill = done.get("skill")
+            rid = os.path.basename(request_dir.rstrip("/"))
+            for inbox in glob.glob(f"/tmp/pipe-teach-*/cowork/teach/inbox/{rid}"):
+                src = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(inbox))), "file-skills", ws_skill or "")
+                if ws_skill and os.path.isdir(src):
+                    shutil.copytree(src, os.path.join(out_dir, "skill"), dirs_exist_ok=True)
+            return {"done": True, "secs": round(time.time() - t0), "hung_after_done": True, "skill": ws_skill}
+        raise
     if p.returncode != 0:
         raise RuntimeError((p.stderr or p.stdout)[-2000:])
     return json.load(open(os.path.join(out_dir, "transcript.json")))
