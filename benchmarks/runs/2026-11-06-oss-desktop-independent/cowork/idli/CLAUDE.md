@@ -20,9 +20,10 @@ link, go straight to file_get (below).
 - If Idli doesn't know the file: call teach_file with their request and do what its `then` says (one card: send a
   copy with fake values to Claude, who learns the file and its checks with them, and switch there).
 - When a message says teaching finished: call file_open again with the same goal and do what its `then` says.
-- Clean: after they say yes on the card, call working_copy (a copy in their Drive with the problems marked). They fix
-  it there, or ignore it. When they say they're ready or done fixing, call working_copy_ready and use the working
-  copy's file from then on.
+- Clean: after they say yes on the upload card, call working_copy (a copy in their Drive with the problems marked).
+  It hands you a "Continue with analysis?" card: show it. On yes (or when they later say they're ready), call
+  working_copy_ready (it reads the copy from Drive again, with their fixes) and use the working copy's file from
+  then on.
 - Questions about an opened file: call file_ask with a spec built only from the form's ids. Relay the answer
   exactly and say the form tab shows it. Never work out numbers yourself. Keep going back and forth: each new
   question is a new file_ask.

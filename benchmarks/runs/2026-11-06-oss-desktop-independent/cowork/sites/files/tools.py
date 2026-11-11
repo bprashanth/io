@@ -296,35 +296,22 @@ def t_file_open(file, show_form=True, goal=None):
         src = files().source(file) or {}
         wc = src.get("working_copy")
         is_copy = bool(src.get("copy_of")) or "Idli working copy" in os.path.basename(file)
-        # Owner, 2026-11-11: whenever a file is newly taught (or re-taught: a new skill version), the checked copy is
-        # made in Drive without asking (red cells, a comment per kind of problem). The person scans it and fixes what
-        # matters, or carries on. Charts and answers then point at this same copy.
-        auto_made = None
+        # Owner, 2026-11-11: every step into analysis is a card. A file with problems and no checked copy for this
+        # skill version (new, or re-taught) gets "Upload a checked copy to Drive?"; after the upload, working_copy's
+        # card asks "Continue with analysis?", and a yes reads the copy from Drive again (the person's fixes).
         ver = e["skill"].get("version", 1)
         stale = bool(wc) and wc.get("skill_version") is not None and wc.get("skill_version") != ver
-        if real and not is_copy and src.get("id") and (not wc or stale):
-            try:
-                auto_made = t_working_copy(file, fresh=stale)
-            except Exception as x:  # never lose the file over the copy
-                auto_made = {"error": type(x).__name__}
-            wc = auto_made.get("working_copy") or wc
+        offer_upload = bool(real) and not is_copy and bool(src.get("id")) and (not wc or stale)
         from lib import chartkit
         out["charts"] = [{"id": x["id"], "title": x["title"]} for x in chartkit.charts_of(e["skill"])]
         if is_copy:
             bits.append(f"This is your checked working copy (the cleaned version): {len(real)} problem"
                         f"{'s' if len(real) != 1 else ''} left.")
-        elif real and auto_made and auto_made.get("working_copy"):
-            bits.append(f"The checks found {len(real)} problem{'s' if len(real) > 1 else ''} in "
-                        f"{len({(p['tab'], p['column'], p['rule']) for p in real})} kinds. I've marked them in a copy "
-                        f"next to the original, {wc.get('name', '')} ({wc.get('url', '')}, open in a tab): red cells, "
-                        "one comment on each kind of problem; the original is unchanged. Fix what you think matters "
-                        "and say \"fixed\", or carry on with the original (answers then include those problems).")
-        elif real and auto_made and auto_made.get("local_copy"):
-            bits.append(str(auto_made.get("say_to_user", "")))
         elif real:
             bits.append(f"The checks found {len(real)} problem{'s' if len(real) > 1 else ''} in "
                         f"{len({(p['tab'], p['column'], p['rule']) for p in real})} kinds"
-                        + (f"; you marked them in a working copy on {wc.get('made', '')[:10]}." if wc else
+                        + ("; the file was re-taught since your checked copy, so the checks changed." if stale else
+                           f"; you marked them in a working copy on {wc.get('made', '')[:10]}." if wc else
                            "; the original is unchanged."))
         else:
             bits.append("The checks found no problems.")
@@ -346,53 +333,41 @@ def t_file_open(file, show_form=True, goal=None):
                       "id in `charts`. ")
         goal = (goal or "analyse").lower()
         opts, act = [], []
-        if goal.startswith("clean"):
+        if offer_upload:
+            opts = [{"label": "Yes, upload a checked copy (Recommended)",
+                     "description": "Next to the original in your Drive: problem cells in red, a comment on each kind of "
+                                    "problem. The original is unchanged"},
+                    {"label": "No, analyse the original", "description": "Answers include the problems"}]
+            act.append('On "Yes, upload a checked copy": call working_copy' + (" with fresh=true" if stale else "")
+                       + " and follow its `then` (it asks whether to continue). On \"No, analyse the original\": call "
+                       "AskUserQuestion with `start_card`. " + start_then)
+            out["say_to_user"] += " Upload a checked copy to your Drive so you can fix them?"
+        elif goal.startswith("clean"):
             if is_copy:
                 opts = [{"label": "Analyse it now", "description": "Questions and charts from this checked copy"},
                         {"label": "Stay here", "description": "Keep fixing; tell me when you're ready"}]
                 act.append('On "Analyse it now": call AskUserQuestion with `start_card`. ' + start_then)
-            elif wc and auto_made:
-                opts = [{"label": "I've fixed it, go on", "description": "Check the copy again and analyse it"},
-                        {"label": "Analyse the original now", "description": "Answers include the problems"}]
-                act.append('On "I\'ve fixed it, go on": call working_copy_ready. On "Analyse the original now": call '
-                           "AskUserQuestion with `start_card`. " + start_then)
             elif wc:
                 opts = [{"label": "Open my working copy", "description": wc.get("name", "")},
                         {"label": "Make a fresh copy", "description": "Marks the problems again from the latest original"},
                         {"label": "Not now", "description": "Nothing changes"}]
                 act.append('On "Open my working copy": call working_copy. On "Make a fresh copy": call working_copy '
                            "with fresh=true. ")
-            elif real and src.get("id"):
-                opts = [{"label": "Yes, mark them in Drive", "description": "A copy next to the original: problem cells "
-                         "in red, one comment on each kind of problem. You fix them there"},
-                        {"label": "Not now", "description": "Nothing is written to Drive"}]
-                act.append('On "Yes, mark them in Drive": call working_copy and stop there (analysis waits until they '
-                           "say they're ready). ")
-                out["say_to_user"] += " Mark them in a copy in your Drive?"
             else:
                 opts = [{"label": "Analyse it now", "description": "Questions and charts"},
                         {"label": "Stay here", "description": ""}]
                 act.append('On "Analyse it now": call AskUserQuestion with `start_card`. ' + start_then)
         else:
-            if wc and not is_copy and not auto_made:
-                opts = [{"label": "Use the checked copy", "description": f"{wc.get('name', '')} (the cleaned version; "
-                                                                         "Recommended)"},
+            if wc and not is_copy:
+                opts = [{"label": "Use the checked copy (Recommended)", "description": f"{wc.get('name', '')}: I read it "
+                                                                         "from Drive again, with your fixes"},
                         {"label": "Use the original", "description": "Answers include the problems the checks found"}]
                 act.append('On "Use the checked copy": call working_copy_ready (it downloads the copy; then follow its '
                            'then). On "Use the original": call AskUserQuestion with `start_card`. ' + start_then)
                 out["say_to_user"] += " You have a checked working copy. Analyse that one?"
             else:
                 opts = list(start["options"])
-                start_q = start["question"]
-                if auto_made and wc:
-                    act.append('When they say "fixed" (or done/ready): call working_copy_ready. ')
-                elif real and not is_copy:
-                    out["say_to_user"] += " It hasn't been cleaned yet, so answers include those problems."
-                    if src.get("id") and len(opts) < 4:
-                        opts.append({"label": "Clean it first", "description": "Mark the problems in a copy in your "
-                                                                               "Drive and fix them there"})
-                        act.append('On "Clean it first": call working_copy and stop there. ')
-                out["say_to_user"] += " " + start_q
+                out["say_to_user"] += " " + start["question"]
                 act.append(start_then)
         out["start_card"] = {"questions": [start]}
         out["card"] = {"questions": [{"header": "Next", "multiSelect": False, "question": out["say_to_user"],
@@ -664,10 +639,8 @@ def t_working_copy(file, fresh=False):
             paseo("browser_new_tab", url=wc["url"])
         except Exception:
             pass
-        return {"exists": True, "working_copy": wc,
-                "say_to_user": f"You already have a working copy: {wc['name']} (opened in a tab). Fix the red cells "
-                               "there and tell me when you're ready.",
-                "then": "Write say_to_user. If they want a new copy instead, call working_copy with fresh=true."}
+        return _continue_card(wc, f"Your checked copy is {wc['name']} (opened in a tab, {wc.get('url', '')}). Fix "
+                                  "the red cells you think matter there.", exists=True)
     if not e["path"].lower().endswith(".xlsx"):
         return {"error": "Working copies need an Excel or Google Sheets file."}
     problems = [p for p in e["problems"]]
@@ -737,13 +710,24 @@ def t_working_copy(file, fresh=False):
                            "problems": made["cells"], "skill_version": e["skill"].get("version", 1)}
     with open(files().resolve(file) + ".source.json", "w") as f:
         json.dump(src, f)
-    return {"uploaded": True, "working_copy": src["working_copy"],
-            "say_to_user": f"I put \"{name}\" next to the original in {folder[1]} and opened it in a tab. Red cells are "
-                           "problems and turn white once fixed; each kind of problem has one comment on its first cell "
-                           "(the number on each tab's name), and the last tab, Idli checks, lists them all. The original "
-                           "is unchanged. Fix what you can, then tell me you're ready and I'll analyse the copy.",
-            "then": "Write say_to_user, nothing else. Don't answer questions about the file until they say they're ready "
-                    "(then call working_copy_ready) or ask you to go ahead with the original."}
+    return _continue_card(src["working_copy"],
+                          f"I've uploaded \"{name}\" to your Drive, next to the original in {folder[1]}, and opened it "
+                          f"in a tab ({url}). Red cells are problems and turn white once fixed; each kind of problem has "
+                          "one comment on its first cell (the number on each tab's name), and the last tab, Idli checks, "
+                          "lists them all. The original is unchanged. Fix what you think matters there.", uploaded=True)
+
+
+def _continue_card(wc, said, **extra):
+    """The one step from fixing into analysis: always a card. A yes reads the copy from Drive again."""
+    q = said + " Continue with analysis?"
+    return {**extra, "working_copy": wc, "say_to_user": q,
+            "card": {"questions": [{"header": "Continue", "multiSelect": False, "question": q, "options": [
+                {"label": "Continue with analysis", "description": "I'll read the copy from Drive again, with your "
+                                                                   "fixes"},
+                {"label": "Not yet", "description": "Keep fixing; say when you're ready"}]}]},
+            "then": "Call AskUserQuestion with exactly `card` now (write nothing before it). On \"Continue with "
+                    "analysis\": call working_copy_ready and follow its then. On \"Not yet\": say one short line that "
+                    "you'll wait; when they say they're ready, call working_copy (it asks again)."}
 
 
 def t_working_copy_ready(file):
@@ -820,9 +804,8 @@ def _messy_rows(e, chart_ids):
 
 
 def _checked_copy_note(file, chart_ids):
-    """Rows these charts read that have problems are drawn as they are (never dropped by code). Owner, 2026-11-11:
-    no card; make the checked copy (red cells, one comment per kind of problem) if there isn't one, and give the link
-    so the person can scan it, fix what matters and say "fixed", or carry on."""
+    """Rows these charts read that have problems are drawn as they are (code never drops or merges rows). The upload
+    of a checked copy is offered by file_open's card; here Idli only says so and points at the copy if there is one."""
     e = files().open(file)
     if not e.get("skill"):
         return None
@@ -834,31 +817,10 @@ def _checked_copy_note(file, chart_ids):
     src = files().source(file) or {}
     wc = src.get("working_copy") or ((files().source(src["copy_of"]) or {}).get("working_copy")
                                      if src.get("copy_of") else None)
-    made = None
-    if not wc and not src.get("copy_of"):
-        try:
-            made = t_working_copy(file)
-        except Exception as x:  # never lose the chart over the copy
-            made = {"error": type(x).__name__}
-        wc = made.get("working_copy")
-    elif wc:
-        try:
-            from lib.browser import paseo
-            paseo("browser_new_tab", url=wc["url"])
-        except Exception:
-            pass
+    say = f" Then say: {n} rows this chart uses have problems{what}; they're drawn as they are."
     if wc:
-        say = (f" Then say: {n} rows this chart uses have problems{what}; they're drawn as they are. They're marked in red, "
-               f"with a comment on each kind of problem, in your checked copy: {wc.get('url')} (open in a tab). Fix "
-               "what you think matters and say \"fixed\" to redraw, or just carry on.")
-    elif made and made.get("local_copy"):
-        say = " Then say: " + str(made.get("say_to_user", ""))
-    else:
-        say = (f" Then say: {n} rows this chart uses have problems{what}; they're drawn as they are. I couldn't make the "
-               "checked copy in Drive" + (f" ({made.get('error')})" if made and made.get("error") else "") + ".")
-    return {"messy_rows": n, "working_copy": wc, "say": say,
-            "then": "If they say fixed (or done/ready): call working_copy_ready, then chart_show again with the same "
-                    "charts on the file it gives you. Otherwise carry on."}
+        say += f" They're marked in your checked copy: {wc.get('url')}."
+    return {"messy_rows": n, "working_copy": wc, "say": say}
 
 
 def t_chart_show(file, chart=None, charts=None):
@@ -874,7 +836,7 @@ def t_chart_show(file, chart=None, charts=None):
             note = None
         if note:
             out["say_to_user"] += note["say"]
-            out.update(messy_rows=note["messy_rows"], working_copy=note["working_copy"], then=note["then"])
+            out.update(messy_rows=note["messy_rows"], working_copy=note["working_copy"])
     return out
 
 
