@@ -84,20 +84,33 @@ def charts_of(skill):
     return [info(os.path.join(d, f)) for f in sorted(os.listdir(d)) if f.endswith(".py")]
 
 
-def tables(path, skill):
-    """{tab: DataFrame} exactly as the form reads the file."""
+def tables(path, skill, skip=None):
+    """{tab: DataFrame} exactly as the form reads the file. `skip` is {sheet or tab: [spreadsheet rows]} to leave out
+    (rows with problems, when the person chose "Skip them" on chart_show's card); chart code never drops rows itself."""
     import duckdb
 
     from lib import filekit as fk
     from lib import formkit as fm
     con = duckdb.connect()
     built = fm.build(con, path, skill, fk.slug(skill["id"]))
-    return {tab: con.execute(f'SELECT * EXCLUDE ("_row") FROM "{b["table"]}"').fetchdf() if "_row" in
-            [r[0] for r in con.execute(f'DESCRIBE "{b["table"]}"').fetchall()] else
-            con.execute(f'SELECT * FROM "{b["table"]}"').fetchdf() for tab, b in built.items()}
+    out = {}
+    for tab, b in built.items():
+        df = con.execute(f'SELECT * FROM "{b["table"]}"').fetchdf()
+        if "_row" in df.columns:
+            gone = {int(r) for r in (skip or {}).get(b.get("sheet", tab), []) or (skip or {}).get(tab, [])}
+            if gone:
+                df = df[~df["_row"].isin(gone)].reset_index(drop=True)
+            df = df.drop(columns=["_row"])
+        out[tab] = df
+    return out
 
 
-def render(skill_dir, chart_id, data_path, out_svg, timeout=90):
+def tabs_used(src):
+    """Tab names a chart's code reads (tables["..."])."""
+    return set(re.findall(r'tables\[\s*["\']([^"\']+)["\']\s*\]', src))
+
+
+def render(skill_dir, chart_id, data_path, out_svg, timeout=90, skip=None):
     """Run one chart on a file (real or mock) in a separate process; returns {"ok", "svg"} or {"ok": False, "error"}."""
     chart_py = os.path.join(skill_dir, "charts", chart_id + ".py")
     if not os.path.exists(chart_py):
@@ -109,7 +122,7 @@ def render(skill_dir, chart_id, data_path, out_svg, timeout=90):
     env = {k: v for k, v in os.environ.items() if not k.startswith(("PASEO_", "OPENROUTER", "ANTHROPIC"))}
     env["MPLBACKEND"] = "Agg"
     env["MPLCONFIGDIR"] = os.path.join(os.path.dirname(out_svg) or ".", ".mpl")
-    cmd = [sys.executable, "-I", "-c", RUNNER, HERE, skill_dir, chart_py, data_path, out_svg]
+    cmd = [sys.executable, "-I", "-c", RUNNER, HERE, skill_dir, chart_py, data_path, out_svg, json.dumps(skip or {})]
     r = subprocess.run(wall(cmd, reads=[HERE, skill_dir, data_path], writes=[os.path.dirname(out_svg)]),
                        capture_output=True, text=True, timeout=timeout, env=env, cwd=HERE)
     if r.returncode or not os.path.exists(out_svg):
@@ -144,6 +157,7 @@ def wall(cmd, reads=(), writes=()):
 RUNNER = r"""
 import json, os, sys
 here, skill_dir, chart_py, data_path, out = sys.argv[1:6]
+skip = json.loads(sys.argv[6]) if len(sys.argv) > 6 else {}
 sys.path.insert(0, here)
 import matplotlib
 matplotlib.use("Agg")
@@ -152,7 +166,7 @@ from lib import chartkit
 from lib import filekit as fk
 skill = json.load(open(os.path.join(skill_dir, "skill.json")))
 skill["_dir"] = skill_dir
-t = chartkit.tables(data_path, skill)
+t = chartkit.tables(data_path, skill, skip)
 chartkit.style(plt)
 ns = {}
 exec(compile(open(chart_py).read(), chart_py, "exec"), ns)
