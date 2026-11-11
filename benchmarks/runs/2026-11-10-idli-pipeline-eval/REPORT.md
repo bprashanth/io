@@ -2,11 +2,17 @@
 
 Plan: [PLAN.md](PLAN.md). The subject is the free tier: a local 9B (Q5 on the DGX) with the split (a separate
 call to itself that sets the form's dials, inside `file_ask`). Muse 30B is the baseline only. E8 and E10 were
-skipped on the owner's word; E1-E5 come next.
+skipped on the owner's word; E4 and E5 come next.
 
 **In one line:** on new messy files, learn → check → working copy worked end to end with no person in the loop
 (about 72% of planted mistakes found, very few false alarms). On fresh chats, the local 9B with the split matched
 Muse with soft phases (86% vs 86%). Hard phases cost 7 points.
+
+**E1-E3 in one line:** learning from the fake copy is as good as learning from the real file (85-90% vs 81% of
+mistakes found, within run-to-run noise), so better fake data is not where the money goes. The trip to Claude and
+back works mechanically (sent 23 of 24 times, back 22 of 23, in about a minute, about $0.15 each, no wrong
+bounces), but Claude's chart code gave exactly the right numbers on the real file only about half the time. The
+misses come from how the chart code reads the data, not from the 9B.
 
 ## E6: cleaning output on messy files
 
@@ -177,18 +183,86 @@ The r03 steps 3-4 are left out of every row, so all rows count the same steps.
 - **Info blocks: 0 of 6 everywhere,** because Idli reads one table per tab (the subtables todo).
 - **Cost:** 2-11 minutes and 3-6 cards per file, as in E6.
 
-<!-- E3 -->
+## E3: the trip to Claude and back
+
+### Setup
+- **Chats:** 9 chats on 4 of the planted-mess files (`scenarios/e3.json`, written by cursor-agent). Each one
+  opens the file by link, asks one question the form can answer (the control), then one it can't (a share, or a
+  chart), says yes to the card, and asks the same question again after Claude is done.
+- **The pipeline:** the shipped tools (soft phases, 12 tools). When Idli sends the request, the harness runs
+  Claude Code (Sonnet) headless with the teach-file skill on Idli's fake copy, Haiku answering the cards from the
+  file's notes (`harness/teach_run.py`). Then it puts the extended skill or chart code back in Idli's folder, as
+  the product's watcher does.
+- **Runs:** the local 9B twice and Muse once: 27 chats.
+- **Strict scoring (`harness/e3_rescore.py`, written by Codex):** for a chart, the harness reruns Claude's chart
+  code on the real file and reads the plotted values off the figure. Then they're compared with the expected
+  answer.
+- **The expected answers were checked one by one (`results/e3/refcheck.md`, Codex).** 6 of the 9 that cursor-agent
+  wrote were wrong for what Idli should say: a "Total" row counted as a visit, casing not merged, wrong size-class
+  edges, and unreadable values in the denominator. They were recomputed from Idli's own cleaned tables. Where a
+  question was truly ambiguous ("clear 70%": ≥ or >), either reading counts.
+- **One chat is left out:** "chart of disbursement by officer district" is something the form *can* draw. Both
+  models drew it from the form, which is right. So it counts only towards wrong bounces.
+
+### Results (8 chats per run that need Claude)
+
+| Hop | 9B run 1 | 9B run 2 | Muse |
+|---|---|---|---|
+| Control question answered from the form, no bounce (9 chats) | 9/9 | 9/9 | 9/9 |
+| Sent to Claude (the 9B called `chart_request`, card yes) | 8/8 | 7/8 | 8/8 |
+| Claude finished teaching | 8/8 | 7/7 | 8/8 |
+| Came back and showed the result | 7/8 | 7/7 | 8/8 |
+| **Right numbers on the real file** | **4/8** | **4/8** | **4/8** |
+| Right numbers, but one readable value shown as its own bar | +1 | +2 | +2 |
+| Minutes in Claude per trip (median) | 0.7 | 0.5 | 0.6 |
+| Claude cost per trip | $0.16 | $0.13 | $0.15 |
+
+- **The trip works.**
+  - Wrong bounces: 0 of 27.
+  - Claude finished every time it was asked.
+  - Most trips took under a minute. One took 18 minutes, and that chat's turn timed out.
+- **Every "can't answer" question went as a chart request.** That includes plain share questions; no chat used
+  `teach_file` with `missing`. The answer then comes back as a chart (with the numbers on the bars), not as a new
+  measure in the form. So the same question goes to the saved chart next time, not to the form.
+- **The 9B's two dropped trips:**
+  - It said in text "I can create a chart, would you like that?" instead of calling `chart_request`, so no card
+    appeared. This is the E7 failure again.
+  - Claude took 18 minutes and the chat turn timed out.
+- **Why the numbers were wrong (the same with the 9B and Muse, because Claude writes the code):**
+  1. **Readable values split.** "cancel" and "Cancelled" are drawn as separate bars (0.4% and 33.2%). The
+     owner's decision is to read them as one: 33.6%. The chart reads Idli's cleaned tables, and the skill has no
+     rule merging status spellings. The form's own lookups do this; chart code doesn't get them.
+  2. **Rows deleted.** In 4 of 6 household charts, Claude's code removed rows with a repeated ID before counting,
+     which changed the ward and village shares. Nobody asked for that, and the person isn't told.
+  3. **Wrong shape.** In one run Claude drew canopy by plot when the question was the overall share.
+  4. Small: "12 cm" in a number column is blank in the chart's tables (the form reads it as 12). That's 0.3
+     points on one bar.
+- **Not measured:** extending the form (no chat took that path); the Claude Code harness (the lean harness was
+  used, as in E7); a person judging whether the charts look right.
+
+### Harness bugs fixed on the way
+- **Results not written:** the runner wrote nothing and exited 0, because the 9B harness's `idli.setup()` changes
+  into a temporary folder and `--out` was relative. Fixed in `harness/e3_bounce.py`.
+- **API stalls:** a stalled Claude API call waited 30 minutes, which timed out 4 chats. Headless teaching now
+  caps each call at 5 minutes, and those 4 chats were rerun.
 
 ## Surprises
 - **Teaching with nobody in the loop** worked first time on all 5 files.
 - **Run-to-run noise:** the same file taught twice gives results 1-4 mistakes apart, and team-code handling
   flipped between runs.
 - **Hard phases lost:** a hard wall turned a wrong guess into a lost question.
+- **The fake copy wasn't the weak point.** Claude found as many mistakes from the fake copy as from the real file
+  (E2). In E3 too, the wrong numbers came from choices in the chart code (merging spellings, dropping repeated
+  IDs), not from anything the fake copy hid.
+- **Most of the expected answers were wrong:** 6 of 9 needed fixing, all in the same ways as the chart code
+  (totals rows, casing, unreadable values). Writing the right answer for messy data is hard even for an agent
+  with the real file.
 
 ## Not measured yet
-- **Claude's side:** E1 (fake-copy fidelity), E2 (including teaching on the real file as the upper bound) and
-  E3 (the bounce to Claude).
-- **Answers and charts:** E4 (wording) and E5 (charts).
+- **Answers and charts:** E4 (wording) and E5 (charts). E3 already says a lot about E5: charts come back and run,
+  but the reading of the data inside them is the weak spot.
+- **Extending the form after a bounce:** no E3 chat took that path.
+- **Repeats:** E2's fixed fake copy and real-file teaching ran once each.
 - **The Claude Code harness:** E7 ran in the lean harness only.
 - **Muse on the other chats:** it ran on held3 only this round. Its other-chats number is last round's run,
   rescored.
@@ -197,19 +271,74 @@ The r03 steps 3-4 are left out of every row, so all rows count the same steps.
 - About 5 hours wall clock, including a session restart.
 - About $6.70 of API-equivalent Claude cost for teaching, plus cents for Haiku. The 9B was local.
 - Muse was lightly used (10 chats). Codex wrote the generator (about 57k tokens).
-
-## For the owner to decide
-1. **Mark or read silently:** mark units in cells, casing and "n/a", or keep reading them quietly as now?
-2. **Instruction rows:** keep a template's instruction rows (descriptions, MANDATORY/OPTIONAL) unchanged in the
-   fake copy, the way repeated headers already are? Recommended: yes.
-3. **Info blocks:** read key/value blocks above a table, such as the contact details?
-4. **Phases:** ship soft phases? Recommended: yes.
+- **E1-E3 (2026-11-11):** E3 about 2.5 hours of wall clock over two attempts; about $3.50 of Claude for the 23
+  trips. Codex wrote the E1 fixes, the E3 rescorer and the expected-answer check (about
+  40k tokens each).
 
 ## Paths
 Everything is under `benchmarks/runs/2026-11-10-idli-pipeline-eval/`:
 - `generators/`, `manifests/`, `fixtures/` (with the files' notes);
 - `harness/`: `teach_run.py`, `e6_score.py`, `e6_table.py`, `linkfirst.py`, `e7_*`, `serve9b.sh`;
 - `variants/e7-*`;
-- `results/e6`, `results/e7-local12`, `results/e7-muse`, `results/before`.
+- `results/e6`, `results/e7-local12`, `results/e7-muse`, `results/before`;
+- E1: `harness/e1_fidelity.py`, `results/e1/` (`today/`, `fixed/` summaries);
+- E2: `results/e2-logs/table.txt`;
+- E3: `scenarios/e3.json`, `harness/e3_bounce.py`, `e3_all.sh`, `e3_rescore.py`, `e3_refcheck.py`;
+  `results/e3/<run>/`, `results/e3/rescore.txt`, `results/e3/refcheck.md`; Claude's teaching per trip in
+  `results/e3-logs/<run>/<chat>/teach/`.
 
 The local 9B server is stopped; `harness/serve9b.sh up` restarts it.
+
+## For the owner to decide (E6/E7: decided 2026-11-10, see the handoff)
+1. **Mark or read silently:** mark units in cells, casing and "n/a", or keep reading them quietly as now?
+2. **Instruction rows:** keep a template's instruction rows (descriptions, MANDATORY/OPTIONAL) unchanged in the
+   fake copy, the way repeated headers already are? Recommended: yes.
+3. **Info blocks:** read key/value blocks above a table, such as the contact details?
+4. **Phases:** ship soft phases? Recommended: yes.
+
+## For the owner to decide (E1-E3)
+1. **Should Claude's chart code use Idli's reading of the file?** That means the same merged spellings,
+   units and lookups as the form. Recommended: yes. It's the biggest cause of wrong numbers in E3.
+2. **Should chart code be allowed to drop rows** (repeated IDs, outliers)? Recommended: no, unless the person agreed
+   on a card. The chart then says how many rows it used.
+3. **Ship the fixed fake copy (`IDLI_MOCK_V2=1`)?** It found the most mistakes (90%) but had twice the false
+   alarms in one run. Recommended: not yet; one more run of E2 on it first.
+4. **When a share question can't be answered,** should Claude add a measure to the form (answers in words, reusable
+   by the 9B) instead of a chart? Today the models always ask for a chart.
+
+## Answers to PLAN.md's four questions
+1. **Where to invest:**
+   - Not in better fake data first: learning from it is as good as learning from the real file today (E2).
+   - The cheap fixes worth keeping are date order and dd-mmm-yy dates (E1).
+   - Invest in **how Claude's code reads the real file:** chart code should use the form's reading of values, and
+     must not drop rows on its own (E3).
+   - Then in **teaching:** a last step that ticks off every rule the owner stated (E6/E2 misses: counts across
+     tabs, totals).
+   - Not in a model for setting dials or wording yet (E7 and E4 decide that).
+2. **Does it work end to end?** Yes, mechanically, with the 9B:
+   - fake copy → Claude learns → checks on the real file → working copy (E6);
+   - questions (E7);
+   - bounce → Claude → back → chart on the real data (E3: 22 of 24 trips came back).
+   The weak links are the correctness of Claude's chart code on real data (about half exactly right) and the
+   9B's occasional question in text where a tool call belonged.
+3. **More models, and where?** Not for the chat: the 9B routed as well as Muse (control 18/18, sent 15/16) and
+   wrong numbers came from Claude's code, not the chat model. Not for fake data. The open one is dial setting
+   (E9), only if E4/E7 leave dial errors.
+4. **Newer designs (Claude planning on a redacted question, without a fake copy per question)?** Not yet. Each
+   trip already costs under a minute and about $0.15 with the fake copy, and the errors weren't caused by the
+   fake copy. A redacted-question design wouldn't fix them.
+
+## For the integrator
+- **Chronology line (`docs/cowork-poc.md`):** 2026-11-11, DGX: E1-E3 results. The fake copy keeps 43 of 62 kinds
+  of mistake (47 with the fixes behind `IDLI_MOCK_V2=1`). Claude taught from it finds 85-90% of mistakes vs 81%
+  from the real file (noise-level). The trip to Claude and back works with the 9B (sent 15/16, back 14/15, 0
+  wrong bounces, about a minute and $0.15 a trip), but the chart code gave exactly right numbers on the real file
+  in 12 of 24 trips. The rest split readable spellings or dropped repeated-ID rows. E3 runner bug fixed (chdir into
+  a temp home swallowed the results).
+- **New todos:**
+  - p1: chart code reads the file as the form does, and never drops rows silently (`chart_code_reading.md`);
+  - p2: fake copy date order and dd-mmm-yy dates (`fake_copy_dates.md`);
+  - p2: teaching ticks off every stated rule (`teach_rule_tickoff.md`);
+  - p3: share questions become form measures rather than charts (in `chart_code_reading.md`, decision 4).
+- **Product code touched on this branch:** only `cowork/lib/filekit.py` behind `IDLI_MOCK_V2=1` (E1, off by
+  default), and the 9B harness's fixtures override (`IDLI9B_FIXTURES`).

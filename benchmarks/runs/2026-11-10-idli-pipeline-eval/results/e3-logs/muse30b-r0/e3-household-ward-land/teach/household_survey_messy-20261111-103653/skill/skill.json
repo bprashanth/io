@@ -1,0 +1,344 @@
+{
+ "id": "household_survey_messy",
+ "title": "Household survey",
+ "version": 1,
+ "format": 2,
+ "tabs": {
+  "Households": {
+   "headers": [
+    "household_id",
+    "village",
+    "ward",
+    "head_of_household",
+    "phone",
+    "members",
+    "monthly_income_inr",
+    "debts_inr",
+    "savings_inr",
+    "land_acres",
+    "survey_date"
+   ],
+   "summary": "One row per household: village, ward, head, phone, members, monthly income, debts, savings (rupees), land (acres) and survey date.",
+   "row_noun": "households",
+   "row_numbers": true,
+   "columns": {
+    "household_id": {
+     "type": "text",
+     "label": "Household ID"
+    },
+    "village": {
+     "type": "category",
+     "label": "Village"
+    },
+    "ward": {
+     "type": "number",
+     "label": "Ward"
+    },
+    "head_of_household": {
+     "type": "text",
+     "label": "Head of household"
+    },
+    "phone": {
+     "type": "text",
+     "label": "Phone"
+    },
+    "members": {
+     "type": "number",
+     "label": "Members"
+    },
+    "monthly_income_inr": {
+     "type": "number",
+     "label": "Monthly income (Rs)"
+    },
+    "debts_inr": {
+     "type": "number",
+     "label": "Debts (Rs)"
+    },
+    "savings_inr": {
+     "type": "number",
+     "label": "Savings (Rs)"
+    },
+    "land_acres": {
+     "type": "number",
+     "label": "Land (acres)"
+    },
+    "survey_date": {
+     "type": "date",
+     "formats": [
+      "%d/%m/%Y"
+     ],
+     "label": "Survey date"
+    }
+   },
+   "normalize": {
+    "village": {
+     "case": "title"
+    },
+    "household_id": {
+     "case": "lower"
+    }
+   },
+   "validations": [
+    {
+     "column": "household_id",
+     "rule": "required",
+     "message": "household ID is missing"
+    },
+    {
+     "column": "village",
+     "rule": "required",
+     "message": "village is missing"
+    },
+    {
+     "column": "village",
+     "rule": "regex",
+     "message": "village is not written like 'Village B' (capital letters or spaces differ)",
+     "arg": "[A-Z][a-z]*( [A-Z0-9][a-z0-9]*)*"
+    },
+    {
+     "column": "ward",
+     "rule": "range",
+     "message": "ward is not a number from 1 to 6",
+     "arg": [
+      1,
+      6
+     ]
+    },
+    {
+     "column": "phone",
+     "rule": "phone",
+     "message": "not a 10-digit phone"
+    },
+    {
+     "column": "members",
+     "rule": "range",
+     "message": "members is 0 or unusually high (expected 1 to 15)",
+     "arg": [
+      1,
+      15
+     ]
+    },
+    {
+     "column": "monthly_income_inr",
+     "rule": "number",
+     "message": "monthly income is not a number"
+    },
+    {
+     "column": "debts_inr",
+     "rule": "required",
+     "message": "debts is blank"
+    },
+    {
+     "column": "debts_inr",
+     "rule": "number",
+     "message": "debts is not a number"
+    },
+    {
+     "column": "savings_inr",
+     "rule": "number",
+     "message": "savings is not a number"
+    },
+    {
+     "column": "survey_date",
+     "rule": "required",
+     "message": "survey date is missing"
+    },
+    {
+     "column": "survey_date",
+     "rule": "date",
+     "message": "survey date is not dd/mm/yyyy",
+     "arg": [
+      "%d/%m/%Y"
+     ]
+    },
+    {
+     "column": "survey_date",
+     "rule": "not_future",
+     "message": "survey date is in the future",
+     "arg": [
+      "%d/%m/%Y"
+     ]
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "duplicate_household",
+     "column": "household_id",
+     "sql": "t.household_id IS NOT NULL AND (SELECT count(*) FROM {{tab:Households}} r WHERE r.household_id = t.household_id) > 1",
+     "message": "household ID appears more than once",
+     "why": "Check whether these are the same household entered twice."
+    },
+    {
+     "id": "members_vs_listed",
+     "column": "members",
+     "sql": "t.members IS NOT NULL AND t.household_id IS NOT NULL AND t.members <> (SELECT count(*) FROM {{tab:Members}} m WHERE m.household_id = t.household_id)",
+     "message": "Members count differs from the people listed for this household in the Members tab",
+     "why": "Compare with the Members tab."
+    }
+   ],
+   "measures": [
+    {
+     "id": "debt_months",
+     "label": "Debt in months of income",
+     "sql": "sum(debts_inr) / NULLIF(sum(monthly_income_inr), 0)",
+     "format": "number"
+    },
+    {
+     "id": "debt",
+     "label": "Total debts (Rs)",
+     "sql": "sum(debts_inr)",
+     "format": "inr"
+    },
+    {
+     "id": "income",
+     "label": "Total monthly income (Rs)",
+     "sql": "sum(monthly_income_inr)",
+     "format": "inr"
+    },
+    {
+     "id": "people",
+     "label": "People (Members column)",
+     "sql": "sum(members)",
+     "format": "count"
+    }
+   ],
+   "presets": [
+    {
+     "id": "readable_values",
+     "label": "Leave out households with an unreadable income or debt",
+     "filters": {
+      "monthly_income_inr": {
+       "min": 0
+      },
+      "debts_inr": {
+       "min": 0
+      }
+     }
+    }
+   ],
+   "date_columns": [
+    "survey_date"
+   ]
+  },
+  "Members": {
+   "headers": [
+    "household_id",
+    "name",
+    "age",
+    "sex",
+    "works_y_n"
+   ],
+   "summary": "One row per person in a household.",
+   "row_noun": "people",
+   "row_numbers": true,
+   "columns": {
+    "household_id": {
+     "type": "text",
+     "label": "Household ID"
+    },
+    "name": {
+     "type": "text",
+     "label": "Name"
+    },
+    "age": {
+     "type": "number",
+     "label": "Age"
+    },
+    "sex": {
+     "type": "category",
+     "label": "Sex"
+    },
+    "works_y_n": {
+     "type": "category",
+     "label": "Works (Y/N)"
+    }
+   },
+   "normalize": {
+    "household_id": {
+     "case": "lower"
+    },
+    "works_y_n": {
+     "case": "title"
+    },
+    "sex": {
+     "case": "title"
+    }
+   },
+   "validations": [
+    {
+     "column": "household_id",
+     "rule": "required",
+     "message": "household ID is missing"
+    },
+    {
+     "column": "age",
+     "rule": "required",
+     "message": "age is missing"
+    },
+    {
+     "column": "age",
+     "rule": "range",
+     "message": "age is outside 0 to 110",
+     "arg": [
+      0,
+      110
+     ]
+    },
+    {
+     "column": "sex",
+     "rule": "in_list",
+     "message": "sex is not Male, Female or Other",
+     "arg": [
+      "Male",
+      "Female",
+      "Other",
+      "M",
+      "F"
+     ]
+    },
+    {
+     "column": "works_y_n",
+     "rule": "in_list",
+     "message": "Works is not Y or N",
+     "arg": [
+      "Y",
+      "N",
+      "Yes",
+      "No"
+     ]
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "unknown_household",
+     "column": "household_id",
+     "sql": "t.household_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {{tab:Households}} h WHERE h.household_id = t.household_id)",
+     "message": "household ID is not in the Households tab",
+     "why": "Check the ID against the Households tab."
+    }
+   ]
+  }
+ },
+ "questions": [
+  {
+   "id": "poverty_trap_by_village",
+   "ask": "Which villages have the most households in a poverty trap (low income, low savings, little land and high debt together): count and share of households per village. Bottom third of income, savings and land and top third of debt, worked out from the file itself",
+   "tab": "Households",
+   "params": {},
+   "sql": "WITH t AS (SELECT * FROM {{table}} WHERE monthly_income_inr IS NOT NULL AND savings_inr IS NOT NULL AND land_acres IS NOT NULL AND debts_inr IS NOT NULL), c AS (SELECT quantile_cont(monthly_income_inr, 1.0/3) AS inc, quantile_cont(savings_inr, 1.0/3) AS sav, quantile_cont(land_acres, 1.0/3) AS land, quantile_cont(debts_inr, 2.0/3) AS debt FROM t), f AS (SELECT t.*, (monthly_income_inr <= inc AND savings_inr <= sav AND land_acres <= land AND debts_inr >= debt) AS trap FROM t, c) SELECT village, count(*) AS households_counted, count(*) FILTER (WHERE trap) AS poverty_trap_households, round(100.0 * count(*) FILTER (WHERE trap) / count(*), 1) AS percent_in_trap FROM f GROUP BY village ORDER BY poverty_trap_households DESC, village"
+  },
+  {
+   "id": "poverty_trap_households",
+   "ask": "List the households in a poverty trap (low income, low savings, little land and high debt together) with their village, income, savings, land and debt",
+   "tab": "Households",
+   "params": {},
+   "sql": "WITH t AS (SELECT * FROM {{table}} WHERE monthly_income_inr IS NOT NULL AND savings_inr IS NOT NULL AND land_acres IS NOT NULL AND debts_inr IS NOT NULL), c AS (SELECT quantile_cont(monthly_income_inr, 1.0/3) AS inc, quantile_cont(savings_inr, 1.0/3) AS sav, quantile_cont(land_acres, 1.0/3) AS land, quantile_cont(debts_inr, 2.0/3) AS debt FROM t), f AS (SELECT t.*, (monthly_income_inr <= inc AND savings_inr <= sav AND land_acres <= land AND debts_inr >= debt) AS trap FROM t, c) SELECT _row AS sheet_row, household_id, village, monthly_income_inr, savings_inr, land_acres, debts_inr FROM f WHERE trap ORDER BY debts_inr DESC LIMIT 200"
+  }
+ ],
+ "history": [
+  {
+   "version": 1,
+   "taught": "checks on both tabs; debt in months of income by village; poverty-trap households (relative thresholds)"
+  }
+ ]
+}

@@ -1,0 +1,127 @@
+{
+ "fixture": "field_visits_messy",
+ "model": "claude-sonnet-5-5",
+ "real_teach": false,
+ "request": "field_visits_messy-20261111-102928",
+ "events": [
+  {
+   "type": "tool",
+   "t": 3,
+   "name": "Skill",
+   "args": "{\"skill\": \"teach-file\"}"
+  },
+  {
+   "type": "tool",
+   "t": 6,
+   "name": "Bash",
+   "args": "{\"command\": \"cat teach/inbox/field_visits_messy-20261111-102928/request.json; .venv/bin/python -c \\\"import json; from lib import chartkit; s=json.load(open('file-skills/field_visits_messy/skill.json')); s['_dir']='file-skills/field_visits_messy'; t=chartkit.tables('teach/inbox/field_visits_messy-20261111-102928/mock.xlsx', s); [print(k, list(v.columns), len(v)) for k, v in t.items()]\\\"; cat file-s"
+  },
+  {
+   "type": "tool",
+   "t": 9,
+   "name": "Bash",
+   "args": "{\"command\": \".venv/bin/python -c \\\"\\nimport json; from lib import chartkit; s=json.load(open('file-skills/field_visits_messy/skill.json')); s['_dir']='file-skills/field_visits_messy'; t=chartkit.tables('teach/inbox/field_visits_messy-20261111-102928/mock.xlsx', s)\\nprint(t['Visits']['status_done_follow_up_cancelled'].value_counts(dropna=False))\\\"; ls file-skills/field_visits_messy\"}"
+  },
+  {
+   "type": "tool",
+   "t": 16,
+   "name": "Bash",
+   "args": "{\"command\": \"mkdir -p file-skills/field_visits_messy/charts && cat > file-skills/field_visits_messy/charts/status_share.py <<'EOF'\\nTITLE = \\\"Share of visits by status (% of all visits)\\\"\\nQUESTION = \\\"what share of visits were in each status, overall\\\"\\n\\ndef make(tables, plt):\\n    df = tables[\\\"Visits\\\"]\\n    col = \\\"status_done_follow_up_cancelled\\\"\\n    fig, ax = plt.subplots(figsize=(9, 5))\\"
+  },
+  {
+   "type": "text",
+   "t": 18,
+   "text": "![status_share](/tmp/pipe-teach-41f22qp9/cowork/file-skills/field_visits_messy/charts/status_share.mock.svg)\n\nThe values in this picture are fake."
+  },
+  {
+   "type": "tool",
+   "t": 19,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"This is the chart on fake data: horizontal bars of each status's share of all visits (%), with counts. The status names in your request were garbled, so I show every status in the file. Looks right?\", \"header\": \"Chart\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, use it (Recommended)\", \"description\": \"Save the chart and hand it back to Idli.\"}, {\"label\": \"Change "
+  },
+  {
+   "type": "card",
+   "t": 22,
+   "card": {
+    "questions": [
+     {
+      "question": "This is the chart on fake data: horizontal bars of each status's share of all visits (%), with counts. The status names in your request were garbled, so I show every status in the file. Looks right?",
+      "header": "Chart",
+      "options": [
+       {
+        "label": "Yes, use it (Recommended)",
+        "description": "Save the chart and hand it back to Idli."
+       },
+       {
+        "label": "Change something",
+        "description": "Tell me what to change (style, labels, which statuses)."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "This is the chart on fake data: horizontal bars of each status's share of all visits (%), with counts. The status names in your request were garbled, so I show every status in the file. Looks right?": "Yes, use it (Recommended)"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 24,
+   "name": "Bash",
+   "args": "{\"command\": \"echo '{\\\"skill\\\": \\\"field_visits_messy\\\", \\\"version\\\": 1, \\\"charts\\\": [\\\"status_share\\\"], \\\"summary\\\": \\\"Share of visits by status overall (bars, % and counts)\\\"}' > teach/inbox/field_visits_messy-20261111-102928/done.json\"}"
+  },
+  {
+   "type": "tool",
+   "t": 25,
+   "name": "AskUserQuestion",
+   "args": "{\"questions\": [{\"question\": \"Teaching is done. Go back to Idli to see your answer?\", \"header\": \"Idli\", \"multiSelect\": false, \"options\": [{\"label\": \"Yes, back to Idli\", \"description\": \"Switch back to Idli.\"}, {\"label\": \"Stay here\", \"description\": \"Remain in this chat.\"}]}]}"
+  },
+  {
+   "type": "card",
+   "t": 25,
+   "card": {
+    "questions": [
+     {
+      "question": "Teaching is done. Go back to Idli to see your answer?",
+      "header": "Idli",
+      "options": [
+       {
+        "label": "Yes, back to Idli",
+        "description": "Switch back to Idli."
+       },
+       {
+        "label": "Stay here",
+        "description": "Remain in this chat."
+       }
+      ],
+      "multiSelect": false
+     }
+    ]
+   },
+   "answers": {
+    "Teaching is done. Go back to Idli to see your answer?": "Yes, back to Idli"
+   }
+  },
+  {
+   "type": "tool",
+   "t": 27,
+   "name": "Bash",
+   "args": "{\"command\": \"touch teach/inbox/field_visits_messy-20261111-102928/go_back\"}"
+  },
+  {
+   "type": "text",
+   "t": 30,
+   "text": "Switching you back to Idli.\n\nI added the chart `status_share`. It shows each status's share of all visits as a percentage, with the visit count beside each bar. It uses the real data on your computer. I didn't change the skill, so it stays at version 1.\n\nYour request text was garbled, with the column name repeated inside the status names, so I couldn't tell which statuses you meant. The chart therefore shows every status in the file. Blank statuses appear as \"(blank)\", and anything beyond the top 8 is grouped as \"Others\".\n\nI only previewed it on the fake mock data, where the status names are junk."
+  }
+ ],
+ "user_cost": 0.00119932,
+ "workspace": "/tmp/pipe-teach-41f22qp9/cowork",
+ "secs": 30,
+ "rounds": 1,
+ "claude_cost": 0.126,
+ "done": true,
+ "cards": 2,
+ "skill": "field_visits_messy",
+ "filekit_changed": false
+}
