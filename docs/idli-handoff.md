@@ -344,6 +344,7 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
   `working_copy`, `working_copy_ready` or `chart_show`.
 - **The laptop's Google account is a test account** (owner): dev agents may read Idli's logs and Drive tabs there.
 - **Waiting for the owner before:** rerunning E3 (needs a scripted "Continue" step), E4/E5.
+- **Experiments handed to Codex:** `docs/codex-experiments-handoff.md` (E3b, E2b, E4, optional E5).
 
 ### 2. Evals (checkpoint 2026-11-11 ~12:00 IST): E6, E7, E1, E2, E3 done and reported
 - **Where:** branch `idli-pipeline-eval`, pushed at `4dbc4c22` (declauded, 0 trailers); worktree
