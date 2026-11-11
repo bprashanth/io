@@ -341,8 +341,8 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
   sites/files/tools.py, `chartkit.tabs_used`, the teach-file skill). The laptop has pulled them.
 - **Other agents (e.g. `exp/answer-mock`):** merge `oss-desktop-eval` before touching `chart_show`. It may now
   call `working_copy` itself and returns `messy_rows`, `working_copy` and `then`.
-- **Waiting for the owner before:** rerunning E3 (which needs a scripted "fixed" step), E4/E5. To try it in the app,
-  open a file by its Drive link in a new Idli chat (older files have no Drive id recorded).
+- **Waiting for the owner before:** rerunning E3 (which needs a scripted "fixed" step), E4/E5. Verified in the app on
+  the cestrum file (chronology has the details and screenshots method).
 
 ### 2. Evals (checkpoint 2026-11-11 ~12:00 IST): E6, E7, E1, E2, E3 done and reported
 - **Where:** branch `idli-pipeline-eval`, pushed at `4dbc4c22` (declauded, 0 trailers); worktree

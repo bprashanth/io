@@ -23,8 +23,21 @@ Either agent adds an entry here for every change that needs something done on th
     change.
   - **Verified on the DGX** with the Drive upload stubbed: first open makes the copy; reopening doesn't; a new
     skill version makes a fresh one; a chart reuses it. The formkit tests pass.
-  - **Not verified in the app:** every file on the laptop came from the old search flow and has no Drive id
-    recorded, so a test needs a file opened by its link.
+  - **Verified in the app (laptop, 2026-11-11 22:48), with the cestrum original opened by its link in a reloaded
+    "New chat":**
+    - **First try:** the file still had its 9 Nov copy on record, so Idli offered "Use the checked copy / Use the
+      original" and made no second copy. That's right.
+    - **Second try:** the copy record was set aside (backup
+      `drive/field_vars_indicators.xlsx.source.json.bak-2026-11-11` on the laptop). Idli made "field_vars_indicators
+      - Idli working copy 11 Nov 2248" next to the original, opened it in a tab, gave the link with the new wording,
+      then showed the start card.
+    - **In the copy:** red cells; a comment on the first cell of each kind ("'neosco' appears 75 times but isn't
+      in the Read me tab ... Same problem in 74 more cells"); counts on the tab names (8, 1, 4); and an "Idli
+      checks" tab listing all 12 kinds with links.
+    - Drive now holds both the 9 Nov and 11 Nov copies.
+    - **Tooling:** screenshots of Drive tabs come from DevTools (`Page.captureScreenshot` over the tab's
+      websocket, in node). `drive.py shot` only sees the app window, whose clicks are in CSS pixels (half the
+      screenshot's).
 - **2026-11-11 (afternoon), DGX: charts never drop rows; messy rows go to the checked copy** (commits `51392d9d`,
   then `dabfad55`, which replaces its card).
   - **Why:** in E3, Claude's chart code removed rows with a repeated ID before counting, without telling anyone.
