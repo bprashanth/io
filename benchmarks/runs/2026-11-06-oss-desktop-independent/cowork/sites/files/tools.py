@@ -792,56 +792,68 @@ def _messy_rows(e, chart_ids):
     return {t: sorted(r) for t, r in rows.items()}, eg
 
 
-def t_chart_show(file, chart=None, charts=None, messy=None):
-    """Draw the file's charts (written by Claude on fake data) from the real data, here. One id, or several.
-    Rows with problems are never dropped silently (owner, 2026-11-11): the first call asks "skip or fix"."""
+def _checked_copy_note(file, chart_ids):
+    """Rows these charts read that have problems are drawn as they are (never dropped by code). Owner, 2026-11-11:
+    no card; make the checked copy (red cells, one comment per kind of problem) if there isn't one, and give the link
+    so the person can scan it, fix what matters and say "fixed", or carry on."""
+    e = files().open(file)
+    if not e.get("skill"):
+        return None
+    rows, eg = _messy_rows(e, chart_ids)
+    n = sum(len(r) for r in rows.values())
+    if not n:
+        return None
+    what = (" (e.g. " + ", ".join(eg) + ")") if eg else ""
+    src = files().source(file) or {}
+    wc = src.get("working_copy") or ((files().source(src["copy_of"]) or {}).get("working_copy")
+                                     if src.get("copy_of") else None)
+    made = None
+    if not wc and not src.get("copy_of"):
+        try:
+            made = t_working_copy(file)
+        except Exception as x:  # never lose the chart over the copy
+            made = {"error": type(x).__name__}
+        wc = made.get("working_copy")
+    elif wc:
+        try:
+            from lib.browser import paseo
+            paseo("browser_new_tab", url=wc["url"])
+        except Exception:
+            pass
+    if wc:
+        say = (f" Then say: {n} rows this chart uses have problems{what}; they're drawn as they are. They're marked in red, "
+               f"with a comment on each kind of problem, in your checked copy: {wc.get('url')} (open in a tab). Fix "
+               "what you think matters and say \"fixed\" to redraw, or just carry on.")
+    elif made and made.get("local_copy"):
+        say = " Then say: " + str(made.get("say_to_user", ""))
+    else:
+        say = (f" Then say: {n} rows this chart uses have problems{what}; they're drawn as they are. I couldn't make the "
+               "checked copy in Drive" + (f" ({made.get('error')})" if made and made.get("error") else "") + ".")
+    return {"messy_rows": n, "working_copy": wc, "say": say,
+            "then": "If they say fixed (or done/ready): call working_copy_ready, then chart_show again with the same "
+                    "charts on the file it gives you. Otherwise carry on."}
+
+
+def t_chart_show(file, chart=None, charts=None):
+    """Draw the file's charts (written by Claude on fake data) from the real data, here. One id, or several."""
     want = [c for c in (charts or []) if c] or ([chart] if chart else [])
     if isinstance(charts, str):
         want = [x.strip() for x in charts.split(",") if x.strip()]
-    messy = (messy or "").strip().lower() or None
-    if messy not in (None, "skip", "fix"):
-        messy = "skip" if "skip" in messy else "fix" if "fix" in messy else None
-    if messy != "skip" and want:
-        e = files().open(file)
-        if e.get("skill"):
-            rows, eg = _messy_rows(e, want)
-            n = sum(len(r) for r in rows.values())
-            if n and messy == "fix":
-                src = files().source(file) or {}
-                wc = src.get("working_copy") or ((files().source(src["copy_of"]) or {}).get("working_copy")
-                                                 if src.get("copy_of") else None)
-                if wc:
-                    try:
-                        from lib.browser import paseo
-                        paseo("browser_new_tab", url=wc["url"])
-                    except Exception:
-                        pass
-                    return {"working_copy": wc,
-                            "say_to_user": f"Here's your checked copy: {wc.get('url')} (open in a tab). The rows with "
-                                           "problems are marked in red. Fix them there, then ask your question again, "
-                                           "or say \"fixed\" when you're done.",
-                            "then": "Write say_to_user. When they say fixed (or done/ready), call working_copy_ready, "
-                                    "then chart_show again with the same charts on the file it gives you."}
-                return {"say_to_user": f"{n} rows this chart uses have problems, and there's no checked copy yet.",
-                        "then": "Call working_copy (it makes the checked copy in their Drive with the problems "
-                                "marked), then tell them to fix the red cells and say \"fixed\" when done; then call "
-                                "working_copy_ready and chart_show again."}
-            if n:
-                what = ("; e.g. " + ", ".join(eg)) if eg else ""
-                q = (f"{n} rows this chart uses have problems{what}. Skip those rows, or fix them first?")
-                return {"messy_rows": n, "say_to_user": q,
-                        "card": {"questions": [{"header": "Messy rows", "multiSelect": False, "question": q,
-                                                "options": [
-                            {"label": "Skip them (Recommended)",
-                             "description": f"Draw it now without those {n} rows; the chart says how many were left out"},
-                            {"label": "Fix them first",
-                             "description": "Open the checked copy in your Drive, fix the red cells, then ask again "
-                                            "or say \"fixed\""}]}]},
-                        "then": "Call AskUserQuestion with exactly `card` now (write nothing before it). On \"Skip "
-                                "them\": call chart_show again with the same charts and messy=\"skip\". On \"Fix them "
-                                "first\": call chart_show with the same charts and messy=\"fix\"."}
+    out = _draw_charts(file, want)
+    if out.get("chart_markdown"):
+        try:
+            note = _checked_copy_note(file, want)
+        except Exception:
+            note = None
+        if note:
+            out["say_to_user"] += note["say"]
+            out.update(messy_rows=note["messy_rows"], working_copy=note["working_copy"], then=note["then"])
+    return out
+
+
+def _draw_charts(file, want):
     if len(want) > 1:
-        outs = [t_chart_show(file, c, messy="skip") for c in want]
+        outs = [_draw_charts(file, [c]) for c in want]
         ok = [o for o in outs if o.get("chart_markdown")]
         return {"chart_markdown": "\n\n".join(o["chart_markdown"] for o in ok),
                 "titles": [o["title"] for o in ok], "errors": [o["error"] for o in outs if o.get("error")],
@@ -858,19 +870,16 @@ def t_chart_show(file, chart=None, charts=None, messy=None):
         return {"error": f"No chart '{chart}'. Charts for this file: {sorted(ids) or 'none yet'}.",
                 "then": "Call chart_request to have Claude design one."}
     out = os.path.join(_charts_dir(file), chart + ".svg")
-    skip, _ = _messy_rows(e, [chart]) if messy == "skip" else ({}, [])
-    left_out = sum(len(r) for r in skip.values())
-    r = chartkit.render(e["skill"]["_dir"], chart, e["path"], out, skip=skip)
+    r = chartkit.render(e["skill"]["_dir"], chart, e["path"], out)
     if not r["ok"]:
         return {"error": "The chart didn't draw on the real data: " + r["error"][-300:],
                 "then": "Say the chart failed on the real data and offer chart_request to have Claude fix it."}
     title = ids[chart]["title"] or chart
     with open(out[:-4] + ".json", "w") as f:
         json.dump({"title": title, "chart": chart, "kind": "claude"}, f)
-    gone = (f" Say that {left_out} rows with problems were left out." if left_out else "")
-    return {"chart_markdown": f"![{title}]({out})", "title": title, "rows_left_out": left_out,
+    return {"chart_markdown": f"![{title}]({out})", "title": title,
             "say_to_user": "Write chart_markdown exactly, on its own line, then one short line on what it shows "
-                           "(no numbers you didn't get from a tool). Say it's also on the dashboard tab." + gone}
+                           "(no numbers you didn't get from a tool). Say it's also on the dashboard tab."}
 
 
 def t_show_skills():
@@ -1077,10 +1086,7 @@ TOOLS = {
                    "return markdown to show them in the chat. Pass every chart id at once in `charts`.",
                    {**FILE, "charts": {"type": "array", "items": {"type": "string"},
                                        "description": "Chart ids (from file_open's charts, or Claude's message)"},
-                    "chart": {"type": "string", "description": "One chart id"},
-                    "messy": {"type": "string", "enum": ["skip", "fix"],
-                              "description": "Only after the Messy rows card: skip = draw without rows that have "
-                                             "problems; fix = open the checked copy to fix them"}}, ["file"]),
+                    "chart": {"type": "string", "description": "One chart id"}}, ["file"]),
     "show_skills": (t_show_skills, "Open the page listing what Idli has learned (one skill per file), where the user "
                     "can delete one.", {}, []),
     "start": (t_start, "The first step of an Idli chat when the user says hi or hasn't said what they want: a card "

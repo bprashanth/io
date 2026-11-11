@@ -205,9 +205,9 @@ needs it (then bump `version` and run the tests as usual).
    and handle any number of categories (top N plus "Others"), blanks and empty results (draw "No data" text).
    **Never drop rows on your own:** no `drop_duplicates`, no removing repeated IDs, outliers or rows that look
    wrong. Filter only for what the question asks (a preset, a category, a date range). Rows with problems are
-   Idli's job: before drawing, it asks the person "skip them or fix them first" and leaves them out of `tables`
-   if they say skip. Values that should count as one ("cancel", "Cancelled"; "done", "Completed") belong in the
-   skill's `normalize` map (bump `version`), not in chart code, so the form and every chart read them the same.
+   Idli's job: it draws them as they are and points the person to the checked copy, where the checks mark them.
+   Don't merge values in chart code either ("cancel" vs "Cancelled", "12 cm"): the checks flag them and the person
+   decides in the checked copy.
    Aesthetics: one message per chart; horizontal bars for categories, sorted; lines only for time; label axes with
    units; value labels when there are few bars; no pies, 3D or dual axes; Idli's style (colour-blind-safe palette,
    no top/right spines) is applied for you, so don't set colours unless they carry meaning.
