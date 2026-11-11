@@ -8,7 +8,37 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
-- **2026-11-11 (late afternoon), DGX: the checked copy is made after every teach, without asking** (commit
+- **2026-11-11 (night), DGX: cards back at every step into analysis; "Continue" re-reads the copy from Drive**
+  (commits `05ea479d`, `dd54e801`; laptop pulled). This replaces the two entries below: no copy is made without
+  asking.
+  - **Owner:** a card is deterministic and less messy than asking for free text ("fixed"). Always ask at a decision
+    point:
+    1. **Upload.** `file_open`, when the file has problems and no checked copy for this skill version (new or
+       re-taught): "The checks found N problems in K kinds... Upload a checked copy to your Drive so you can fix
+       them?" → "Yes, upload a checked copy (Recommended)" / "No, analyse the original".
+    2. **Continue.** `working_copy` then returns its own card: "I've uploaded "<name>" to your Drive, next to the
+       original... Fix what you think matters there. Continue with analysis?" → "Continue with analysis" / "Not
+       yet". The same card comes back when the copy already exists.
+    3. **On Continue:** `working_copy_ready` downloads the copy from Drive again, so the person's corrections are
+       read. It now says what was fixed and what's new ("you fixed 1 problem; 1 new one appeared (Density row 3,
+       ...)"): a fix can create a problem on another tab, which totals alone hide.
+  - **A file with a copy:** "Use the checked copy (Recommended)" (read again from Drive) / "Use the original".
+  - **Re-taught since the copy** (copies record `skill_version`): Idli says the checks changed and offers a fresh
+    upload.
+  - **Charts:** they don't upload. Rows with problems are drawn as they are, and Idli points at the copy if there
+    is one (the 51392d9d/dabfad55 no-drop rule stays).
+  - **`idli/CLAUDE.md`:** the clean steps describe the two cards.
+  - **Verified in the app (laptop, 2026-11-11 22:54-23:00, cestrum original by link, reloaded chat; the laptop's
+    Google account is a test account):**
+    - Upload card → yes → "field_vars_indicators - Idli working copy 11 Nov 2257" in Drive (red cells, comments,
+      tab counts, Idli checks tab) → Continue card.
+    - I typed a species code into D5 in the Drive copy, and its red cleared.
+    - Continue → re-downloaded: D5 = 'cesaur' in the downloaded copy.
+    - The total stayed 195: the D5 fix removed one problem but added a Density count mismatch for that plot. That's
+      why the message now lists both. (D5 is left filled in that test copy.)
+    - Screenshots: Drive tabs over DevTools with node (`Page.captureScreenshot`; key events for typing). App
+      clicks are in CSS pixels: half the screenshot's pixels.
+- **2026-11-11 (late afternoon), DGX: [superseded the same night: cards are back] the checked copy is made after every teach, without asking** (commit
   `8a117e7f`; laptop pulled).
   - **Owner:** whenever Claude teaches a file (new or re-taught), Idli makes the checked copy in Drive (red cells,
     a comment per kind of problem) and gives the link. No "Mark them in Drive?" card any more.
@@ -38,7 +68,7 @@ Either agent adds an entry here for every change that needs something done on th
     - **Tooling:** screenshots of Drive tabs come from DevTools (`Page.captureScreenshot` over the tab's
       websocket, in node). `drive.py shot` only sees the app window, whose clicks are in CSS pixels (half the
       screenshot's).
-- **2026-11-11 (afternoon), DGX: charts never drop rows; messy rows go to the checked copy** (commits `51392d9d`,
+- **2026-11-11 (afternoon), DGX: [the upload part superseded the same night] charts never drop rows; messy rows go to the checked copy** (commits `51392d9d`,
   then `dabfad55`, which replaces its card).
   - **Why:** in E3, Claude's chart code removed rows with a repeated ID before counting, without telling anyone.
   - **Owner's decision:** code never drops or merges rows. No card either. Idli draws the chart from the rows as

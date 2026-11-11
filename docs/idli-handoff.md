@@ -332,17 +332,18 @@ If the session that wrote this hung, everything below is in git or on disk. Noth
   - The daemon sometimes times out ("Liveness check timed out"). Retry, or ask the owner to rerun
     `desktop/laptop-up.sh`.
 
-### 1b. Checked copy after every teach; charts never drop rows (2026-11-11 afternoon): waiting for the owner
-- **Read:** the chronology entries "2026-11-11 (late afternoon), DGX: the checked copy is made after every teach"
-  and "2026-11-11 (afternoon), DGX: charts never drop rows; messy rows go to the checked copy" in
-  `docs/cowork-poc.md`. It has the design, the rule change (the checked copy is now also made without a
-  card), how it was verified, the owner's decisions 1-4, and a correction to the E3 report.
-- **Commits:** `51392d9d`, `dabfad55`, `8a117e7f` on `oss-desktop-eval` (`file_open` and `chart_show` in
-  sites/files/tools.py, `chartkit.tabs_used`, the teach-file skill). The laptop has pulled them.
-- **Other agents (e.g. `exp/answer-mock`):** merge `oss-desktop-eval` before touching `chart_show`. It may now
-  call `working_copy` itself and returns `messy_rows`, `working_copy` and `then`.
-- **Waiting for the owner before:** rerunning E3 (which needs a scripted "fixed" step), E4/E5. Verified in the app on
-  the cestrum file (chronology has the details and screenshots method).
+### 1b. Cards at every step into analysis; charts never drop rows (2026-11-11 night): verified in the app
+- **Read:** the chronology entry "2026-11-11 (night), DGX: cards back at every step into analysis" in
+  `docs/cowork-poc.md` (it supersedes the two afternoon entries below it).
+- **The flow:** "Upload a checked copy?" card → `working_copy` → "Continue with analysis?" card → `working_copy_ready`,
+  which reads the copy from Drive again and says what was fixed and what's new. Charts draw messy rows as they are
+  and point at the copy.
+- **Commits** on `oss-desktop-eval`: `51392d9d`, `dabfad55`, `8a117e7f`, `05ea479d`, `dd54e801`. The laptop is on
+  `dd54e801`.
+- **Other agents (e.g. `exp/answer-mock`):** merge `oss-desktop-eval` before touching `file_open`,
+  `working_copy`, `working_copy_ready` or `chart_show`.
+- **The laptop's Google account is a test account** (owner): dev agents may read Idli's logs and Drive tabs there.
+- **Waiting for the owner before:** rerunning E3 (needs a scripted "Continue" step), E4/E5.
 
 ### 2. Evals (checkpoint 2026-11-11 ~12:00 IST): E6, E7, E1, E2, E3 done and reported
 - **Where:** branch `idli-pipeline-eval`, pushed at `4dbc4c22` (declauded, 0 trailers); worktree
@@ -455,8 +456,8 @@ no changes to shared code unless they're behind a switch.** At the end everythin
    `declaude`, push `oss-desktop-eval`, and open the PR against `main`.
 
 ## Rules that always hold
-- Read only, except the checked working copy in Drive, which Idli makes without asking after each teach (or from
-  `chart_show`): always a new file next to the original, never an edit. Claude gets fake data only. Real data stays on the
+- Read only, except the checked working copy in Drive, made after a yes on the upload card: always a new file next
+  to the original, never an edit. Claude gets fake data only. Real data stays on the
   DGX or the laptop.
 - Never print or commit credentials: the silo token (`~/.config/idlisseus/silo.json`,
   `~/idli-insights/config/muse-access.json`) and the OpenRouter key. Never touch `~/.codex` or `docs/sandbox.md`.
