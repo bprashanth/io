@@ -8,33 +8,41 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
-- **2026-11-11 (afternoon), DGX: charts never drop rows silently** (commit `51392d9d`; laptop pulled).
+- **2026-11-11 (afternoon), DGX: charts never drop rows; messy rows go to the checked copy** (commits `51392d9d`,
+  then `dabfad55`, which replaces its card).
   - **Why:** in E3, Claude's chart code removed rows with a repeated ID before counting, without telling anyone.
-  - **Owner's decision:** don't let code drop rows. Ask the person "skip or fix".
-  - **`chart_show`** now checks whether rows the chart reads have open problems (the tabs its code reads, the
-    columns it mentions, plus whole-row problems). If so, it hands Idli a card first: "N rows this chart uses
-    have problems (e.g. Status 'cancel'). Skip those rows, or fix them first?"
-    - **Skip them (Recommended):** the chart is drawn without those rows (`chartkit.tables(..., skip=)`), and Idli
-      says how many were left out.
-    - **Fix them first:** Idli opens the checked copy in Drive (or offers to make one) and says to fix the red
-      cells, then ask again or say "fixed" (→ `working_copy_ready`, then the chart again).
-    - New tool argument: `chart_show(messy="skip"|"fix")`, only after the card.
-  - **Teach-file skill (charts):** no `drop_duplicates` or own row filters. Values that should count as one
-    ("cancel"/"Cancelled") go in the skill's `normalize` map, so the form and charts agree.
+  - **Owner's decision:** code never drops or merges rows. No card either. Idli draws the chart from the rows as
+    they are and sends the person to the checked copy:
+    - If rows the chart reads have open problems (the tabs its code reads, the columns it mentions, plus
+      whole-row problems), `chart_show` makes the checked copy if there isn't one (`working_copy`: red cells, a
+      comment per kind of problem, next to the original in Drive), or opens the existing one.
+    - Idli then says: "N rows this chart uses have problems (e.g. Status 'cancel'); they're drawn as they are.
+      They're marked in your checked copy: <link>. Fix what you think matters and say "fixed" to redraw, or just
+      carry on."
+    - "fixed" → `working_copy_ready` → the chart again on the copy.
+    - The person scans the colours and comments and decides what's worth fixing.
+  - **Rule change:** the checked copy used to be made only after a yes on a card. It's now also made without asking
+    when a chart uses rows with problems. It's still the only write: a new file, the original untouched.
+  - **Merging values:** no special-casing. "cancel" vs "Cancelled", or "12 cm" in a number column, are flagged by
+    the checks (already: the status rule and the number rule), not read quietly. The teach-file skill now says
+    chart code must not drop rows (`drop_duplicates`, outliers) or merge values.
   - **Correction to the E3 report:** chart code already reads exactly what the form reads (`chartkit.tables()`
-    calls `formkit.build`). The split spellings came from teaching (no `normalize` map), not from a second reader.
-  - **Verified:**
-    - DGX, field-visits fixture with Claude's E3 status chart: the card lists 3 rows; skip draws from 247 of 250
-      rows; fix offers the checked copy; formkit and fixkit tests pass.
-    - Laptop, the real households file (0 open problems): no card, and the chart draws as before. The card
-      itself hasn't been seen in the app yet.
+    calls `formkit.build`). The split spellings are in the form too; they're flagged problems, which the person
+    now sees in the checked copy.
+  - **Verified on the DGX:** field-visits fixture with Claude's E3 status chart.
+    - With no Drive source, the chart draws and Idli says the 3 rows and that it couldn't make the copy.
+    - With an existing copy, the chart draws and Idli gives the link.
+    - The formkit and fixkit tests pass.
+    - **Not yet seen in the app:** the laptop pulled `51392d9d` only; making the Drive copy from a chart needs a
+      file with problems and a chart Claude wrote.
   - **Owner decisions (2026-11-11):**
-    1. Use the form's reading in charts: yes (already true; the remaining work is teaching `normalize` maps).
-    2. No silent drops: skip or fix (done above).
+    1. Charts use the form's reading: already true.
+    2. No silent drops: the checked copy, as above.
     3. Hold `IDLI_MOCK_V2` for one more E2 run.
-    4. "Measures": undecided. A measure is a named calculation in the file's form ("Number of visits",
-       "Total amount (Rs)") that the 9B can pick to answer in words. In E3 every new question went to Claude as a
-       chart; the alternative is Claude adding a measure such as "Share of visits cancelled".
+    4. "Measures": undecided. A measure is a named calculation in the file's form ("Number of visits", "Total amount
+       (Rs)") that the 9B picks to answer in words. In E3 every new question went to Claude as a chart (the chat
+       model chose `chart_request` over `teach_file`); the alternative is Claude adding a measure such as "Share
+       of visits cancelled".
   - **Next:** [todo](../todos/idli-insights/p1/chart_code_reading.md). Rerunning E3 waits for the owner.
 - **2026-11-11, DGX: E1-E3 results** ([report](https://github.com/bprashanth/io/blob/idli-pipeline-eval/benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md),
   branch `idli-pipeline-eval` at `4dbc4c22`).
