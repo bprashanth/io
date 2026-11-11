@@ -217,7 +217,7 @@ def run(model_id, scenario_file, conv_id, out_path, variant="e7-soft12"):
         if stem:
             _copy_skill(home, stem)
             _ensure_learned(mcp, home, stem, link)
-        teach_send = _wrap_teach_send(mcp, home, stem or conv_id, model_id, conv_id)
+        teach_send = _wrap_teach_send(mcp, home, stem or conv_id, os.path.basename(os.path.dirname(out_path)), conv_id)
         mcp.e3_teach_send = teach_send
         return mcp
 
@@ -255,7 +255,12 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--variant", default="e7-soft12")
     a = ap.parse_args()
-    run(a.model, a.scenario, a.conv, a.out, a.variant)
+    # idli.setup() chdirs into a temp home, so a relative --out would land there (the 2026-11-11 bug: exit 0, no
+    # file). Resolve it now; a directory means <dir>/<conv>.json, as e3_all.sh passes it.
+    out = os.path.abspath(a.out)
+    if os.path.isdir(out) or not out.endswith(".json"):
+        out = os.path.join(out, a.conv + ".json")
+    run(a.model, os.path.abspath(a.scenario), a.conv, out, a.variant)
 
 
 if __name__ == "__main__":
