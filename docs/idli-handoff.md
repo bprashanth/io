@@ -74,6 +74,20 @@ gap reports pasted by hand) unless the owner asks.
    - Branch `idli-installers`: one-click installers for Mac, Windows and Linux (official Paseo plus bundled
      tools). The demo gaps D1-D11 are in `todos/idli-insights/p1/deployment_strategy.md`.
 
+## Save your own tokens: delegate the grinding
+The owner's standing instruction: **don't spend your own context on grinding work.** You plan, decide, review and
+report. Hand the rest to:
+- **Codex** (`codex exec "<task>"`) or **cursor-agent** (`agent -p "<task>"`). Use them for writing scripts and
+  generators, bulk edits, fixing a failing harness, data generation, and reading through big logs.
+  - Give each one a short written spec, a file path to put its work, and what "done" looks like.
+  - Never give them real data, credentials or the owner's private files. Never touch `~/.codex`.
+- **A smaller subagent** (Sonnet or Haiku) for searches and routine runs.
+- **Plain background jobs** for anything long: `nohup <script> > <log> 2>&1 &`, then check the log with short
+  commands. Never sit in one long foreground command or a long silent stretch: background agents get stopped
+  after 10 minutes with no output.
+
+Check their work (run it, read the diff) before you commit it. Their results become facts only after that.
+
 ## Filling your own gaps (before saying "that wasn't recorded")
 Most things were recorded somewhere. Look in this order:
 1. **The chronology for this line of work:** `docs/cowork-poc.md`, "What changed", newest first, back to
