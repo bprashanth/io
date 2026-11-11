@@ -1,4 +1,4 @@
-# Idli pipeline eval: report (E6, E7; 2026-11-10)
+# Idli pipeline eval: report (E6, E7, E1, E2, E3; 2026-11-10/11)
 
 Plan: [PLAN.md](PLAN.md). The subject is the free tier: a local 9B (Q5 on the DGX) with the split (a separate
 call to itself that sets the form's dials, inside `file_ask`). Muse 30B is the baseline only. E8 and E10 were
@@ -114,6 +114,70 @@ The r03 steps 3-4 are left out of every row, so all rows count the same steps.
 - **Ling and the OpenRouter 9B:** not free-tier options. They were stopped mid-way, and the 13 chats that
   finished are kept in `results/ling-not-free-tier`.
 - **9B with no split, a 9-tool variant, Muse with the split:** in `results/dropped`.
+
+## E1: how realistic is the fake copy
+
+### Setup
+- **What's compared:** each of the 5 planted-mess files against the fake copy Idli makes of it
+  (`filekit.make_mock`), kind of mistake by kind of mistake (`harness/e1_fidelity.py`, written by Codex).
+- **The question per kind:** does the fake copy still contain that kind of mistake somewhere, so that Claude can
+  see it and write a check for it? (Not the same cell; the fake values are drawn fresh.)
+- **Two versions:** today's fake copy, and a fixed one with small code changes from Codex
+  (`cowork/lib/filekit.py` behind `IDLI_MOCK_V2=1`, off by default). The fixes keep count mismatches between
+  tabs, duplicate IDs, "n/a" placeholders, and template instruction rows (MANDATORY/OPTIONAL).
+
+### Results (a "kind" counts once per file: 62 in all, 27 distinct kinds)
+
+| File | Today | Fixed |
+|---|---|---|
+| Tree plots | 12/17 | 15/17 |
+| Germination protocol | 5/12 | 7/12 |
+| Household survey | 11/11 | 11/11 |
+| Field visits | 7/9 | 7/9 |
+| Tax questionnaire fake | 8/13 | 7/13 |
+| **All** | **43/62 (69%)** | **47/62 (76%)** |
+
+- **Still lost in both:** spacer rows, notes rows, merged headers, and info blocks (the contact block above a
+  table). These are layout, and the fake copy rebuilds a plain table.
+- **The tax "end before start" drop (8 → 7) is luck, not a regression**
+  ([note](results/e1/tax_end_before_start.md)). The sale date ("12-Mar-22") isn't recognised as a date, and the
+  fake copy doesn't keep start before end, so whether the mistake survives is a coin toss in both versions.
+  Those are two real gaps (todos below).
+- The fixed version's code changes pass the formkit, fixkit and new mock tests (`results/e1/*.log`).
+
+## E2: teaching from the fake copy, judged on the real file
+
+### Setup
+- Same pipeline as E6 (Claude Sonnet teaches headless with the teach-file skill, Haiku answers the cards from the
+  file's notes only). Every skill's checks are then run on the real (synthetic) file and scored against the
+  manifest.
+- **Three things Claude learned from:** today's fake copy (the two E6 runs), the fixed fake copy (one run), and
+  the real file itself (one run; allowed only because these files are invented). Real-file teaching is the upper
+  bound: what we'd get if faking cost nothing.
+- **Counting follows the owner's decisions of 2026-11-10:** values Idli reads correctly anyway ("Rs. 1,200",
+  casing, "n/a") and info blocks are counted in their own rows, not as misses.
+
+### Results ([table](results/e2-logs/table.txt))
+
+| Claude learned from | Mistakes found | Read correctly anyway (flag optional) | Info blocks | False alarms (3,378 rows) |
+|---|---|---|---|---|
+| Today's fake copy, run 1 | 91/104 (88%) | 27/51 | 0/6 | 20 |
+| Today's fake copy, run 2 | 88/104 (85%) | 27/51 | 0/6 | 17 |
+| Fixed fake copy | 94/104 (90%) | 23/51 | 0/6 | 35 |
+| The real file | 84/104 (81%) | 18/51 | 0/6 | 16 |
+
+- **Learning from the fake copy is not worse than learning from the real file.** With one or two runs each, the
+  differences (2-4 mistakes per file) are the size of run-to-run noise. The real-file run happened to score lowest.
+- **The fixed fake copy found the most, but doubled the false alarms,** 14 of the 35 in the tax file (Claude
+  wrote stricter checks there). One run only; not enough to ship it on.
+- **By kind:** out of range, codes not in the key, future dates, text in number columns, and keys missing a
+  species are caught every time from every source. Duplicate IDs went from 6/18 (today) to 9/9 (fixed): that
+  fix works. Counts across tabs and totals stay the weak spots in every version, including the real file: those
+  are checks Claude doesn't write, not things the fake copy hides.
+- **Info blocks: 0 of 6 everywhere,** because Idli reads one table per tab (the subtables todo).
+- **Cost:** 2-11 minutes and 3-6 cards per file, as in E6.
+
+<!-- E3 -->
 
 ## Surprises
 - **Teaching with nobody in the loop** worked first time on all 5 files.
