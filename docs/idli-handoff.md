@@ -50,8 +50,11 @@ gap reports pasted by hand) unless the owner asks.
 3. **Field notes** in `narrative/`:
    - `2026-11-07-cowork-ui-as-api-field-note.md`: Paseo as the UI, and a 30B model driving it.
    - `2026-11-09-one-journey-field-note.md`: the journey (clean, then talk to a file) on the real cestrum workbook.
+   - `2026-11-08-oobe-field-note.md`: the first run on a new laptop (setup, indexing, timings).
    - `2026-11-10-one-file-at-a-time-field-note.md`: what a 9B can do, the three-call shape of a question, and the
      decision to drop the up-front index.
+   - On branch `idli-9b-bench` only: `narrative/2026-11-10-idli-9b-field-note.md` (read it with
+     `git show origin/idli-9b-bench:narrative/2026-11-10-idli-9b-field-note.md`).
 4. **How the machines work together:**
    - `docs/laptop-dgx-sync.md` and `docs/driving-desktop.md`: the owner's laptop runs Paseo; the DGX drives it over
      an ssh tunnel (`desktop/paseo-remote.sh`, DevTools on 49333).
@@ -70,6 +73,47 @@ gap reports pasted by hand) unless the owner asks.
      results go to branch `idli-pipeline-eval`.
    - Branch `idli-installers`: one-click installers for Mac, Windows and Linux (official Paseo plus bundled
      tools). The demo gaps D1-D11 are in `todos/idli-insights/p1/deployment_strategy.md`.
+
+## Filling your own gaps (before saying "that wasn't recorded")
+Most things were recorded somewhere. Look in this order:
+1. **The chronology for this line of work:** `docs/cowork-poc.md`, "What changed", newest first, back to
+   2026-11-06. Search it: `grep -n -i "<word>" docs/cowork-poc.md`.
+2. **Older session entries** in `chronology/`, one file per session:
+   - `2026-11-06T2030-dgx-oss-desktop-independent-research.md` (why Paseo);
+   - `2026-11-06T2330-dgx-paseo-aionui-behavioural.md`;
+   - `2026-11-07T1615-laptop-desktop-ux-and-cowork.md`;
+   - `2026-11-07T1750-laptop-cowork-diy-poc.md`;
+   - `2026-11-07T1830-laptop-cowork-handoff-to-dgx.md`;
+   - `2026-11-07T1950-laptop-idli-insights-and-latency.md`;
+   - `2026-11-06-oss-desktop-*.md`.
+3. **Field notes** in `narrative/` (above), which give the lessons, not just the events.
+4. **Benchmark folders,** each with a README, REPORT or PLAN:
+   - `benchmarks/runs/2026-11-06-oss-desktop*/`: the app comparison;
+   - `benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`: the product code itself, with its `README.md`;
+   - `benchmarks/runs/2026-11-07-cowork-event-eval/`;
+   - `benchmarks/runs/2026-11-08-oobe/`;
+   - `benchmarks/runs/2026-11-08-form-fill-eval/`;
+   - `benchmarks/runs/2026-11-10-idli-pipeline-eval/`;
+   - on branches: `git show origin/idli-9b-bench:benchmarks/runs/2026-11-10-idli-9b/REPORT.md`, and
+     `git ls-tree -r --name-only origin/<branch>` to list a branch's files.
+5. **Todos and design notes:** `todos/idli-insights/` (p1-p3, Paseo patches, deployment gaps, optimizations),
+   `docs/distribution.md`, `docs/cowork-manual-test.md`.
+6. **Git history:**
+   - `git log --oneline oss-desktop-eval -- <path>`: why a file changed. Commit messages are detailed.
+   - `git log --all --oneline --grep "<word>"`: search every branch.
+   - Branches: `oss-desktop-eval` (main work), `idli-9b-bench`, `idli-pipeline-eval`, `idli-installers`.
+7. **Agent memory:** `~/.claude/projects/-home-beeps-src-github-com-bprashanth-io/memory/`, one fact per file;
+   `MEMORY.md` is the index.
+8. **The last resort: past session transcripts.**
+   - Files: `~/.claude/projects/-home-beeps-src-github-com-bprashanth-io/*.jsonl`, one per session. They're very
+     large, so never read one whole.
+   - Search: `grep -l "<word>" ~/.claude/projects/-home-beeps-src-github-com-bprashanth-io/*.jsonl`, then
+     `grep -o ".\{200\}<word>.\{300\}" <file> | head`.
+   - The long session behind most of this page is `89b0f21c-c677-4103-ad2f-cc63bbc75af6.jsonl`.
+   - What you find there is a lead, not a fact: check it against the code or results before relying on it.
+   - Then write what you learned into the chronology, so the next agent doesn't have to dig.
+
+If something truly isn't anywhere, say what you searched, and ask the owner.
 
 ## Where the code is
 Everything lives under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`:
