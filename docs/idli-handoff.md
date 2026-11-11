@@ -74,6 +74,74 @@ gap reports pasted by hand) unless the owner asks.
    - Branch `idli-installers`: one-click installers for Mac, Windows and Linux (official Paseo plus bundled
      tools). The demo gaps D1-D11 are in `todos/idli-insights/p1/deployment_strategy.md`.
 
+## How Idli reaches Google: "UI as API" (an important pattern)
+Idli has **no Google OAuth and no Google API keys.** It works through the person's own signed-in browser tabs
+inside Paseo.
+- **The mechanism:** Paseo's built-in browser tools (snapshot, evaluate, navigate). These are wrapped by thin
+  "site plugins", one per site: `cowork/sites/google/tools.py` for Gmail, Drive, Docs and Sheets, and
+  `sites/files` for downloaded spreadsheets. Each plugin treats the page as an API: it knows where Drive's file
+  list or a sheet's cells sit on the page and returns only those, never a whole page. Plugins can't send, edit
+  or delete.
+- **Why:**
+  - Whole pages were 8-11k tokens each, and a model with a shell went browsing the home folder. Narrow tools fixed
+    both: tasks that failed finished in 1-2.5 minutes.
+  - No OAuth app or Google verification is needed, and the person's data never leaves their machine except to
+    the private model.
+- **How the plugins were made:** Claude, in the "Claude" (DIY) workspace, wrote and repaired them with the
+  `add-site` skill (`cowork/.claude/skills/add-site/`). It used Paseo's browser signed in to **test accounts**
+  (`~/idli-insights/config/accounts.json` on the laptop), with tests in `run_tests.py` and each site's
+  `tests.json`. The private model then uses them on the real account. This split is the pattern to reuse for new
+  sites: Claude builds the tool on test accounts, Idli uses it on real ones.
+- **Read:** `narrative/2026-11-07-cowork-ui-as-api-field-note.md`,
+  `chronology/2026-11-07T1750-laptop-cowork-diy-poc.md`, and `cowork/README.md`.
+- **The cost:** a site changing its pages breaks a plugin. The tests catch it, and `add-site` repairs it.
+- **Uploads:** the working copy is dropped into Drive through Paseo's DevTools (P9 in
+  `todos/idli-insights/p1/paseo_patches.md`), not through an API.
+
+## Logins a person needs (what Start here checks with `setup_check`)
+1. **Google:** sign in to Google in Paseo's browser (the Drive tab in Start here). That's all. There's no OAuth
+   screen and no token file.
+2. **Claude**, for teaching: the Claude Code CLI signed in to the person's account (`claude auth status` shows
+   `loggedIn`). If the CLI isn't there, install it: `curl -fsSL https://claude.ai/install.sh | bash` on
+   Mac/Linux (the installers on branch `idli-installers` bundle this), then `claude` and sign in through the
+   browser. The Claude workspace uses this login.
+3. **Idli's private model (Muse today):** a Cloudflare Access service token for `https://silo.idli.cc`. The owner
+   makes one per person and gives them a code (`desktop/muse-code.py` on `idli-installers` makes the `idli1.`
+   code). `desktop/muse-connect.py <token file>` checks it and writes `~/idli-insights/config/muse-access.json`.
+   It also points Idli's Claude Code provider at silo: `ANTHROPIC_BASE_URL` plus the Access headers in
+   `~/idli-insights/config/claude-t4gc/settings.json`. Without it, Idli can't think; Paseo becomes just a browser.
+
+## Where credentials live (never print, paste or commit them)
+| What | Where | Notes |
+|---|---|---|
+| OpenRouter API key | `~/.config/idlisseus/openrouter.json` (DGX) | The benchmarks' `models.json` points at it (`key_file`). OpenRouter isn't private: fake data only. |
+| Silo (Muse) service token, the owner's | `~/.config/idlisseus/silo.json` (DGX) | `client_id` and `client_secret` for Cloudflare Access. |
+| Silo token, on the laptop | `~/idli-insights/config/muse-access.json` | Written by `muse-connect.py`. |
+| Idli's Claude Code provider settings | `~/idli-insights/config/claude-t4gc/settings.json` (laptop) | Holds the Access headers. |
+| Claude CLI login | the CLI's own store (`claude auth status`) | The owner's subscription. Agents use it as is. |
+| Google test accounts, for plugin work | `~/idli-insights/config/accounts.json` (laptop) | The only file under `~/idli-insights` the DIY workspace may read. |
+| Other services (HF, GitHub, eBird, Telegram, ...) | `~/.config/idlisseus/*.json` (DGX) | Not used by Idli. |
+| Codex login | `~/.codex` | **Never touch it**, not even to read. |
+
+## Ops: the laptop tunnel (ask the owner; the DGX can't start it)
+The owner's laptop runs Paseo. The DGX drives it only while the owner has the tunnel up
+(`docs/laptop-dgx-sync.md` has the details).
+1. **On the laptop,** Paseo starts with its DevTools port:
+   `setsid /opt/Paseo/Paseo --remote-debugging-port=9333 >/dev/null 2>&1 &` (or the edited launcher in
+   `docs/driving-desktop.md`).
+2. **On the laptop,** from `.../cowork`: run `desktop/laptop-up.sh`. It also takes `status` and `stop`.
+   - It opens an ssh connection to the DGX (`beeps@gx10-0a47.tail5ef239.ts.net`) that carries the Paseo daemon
+     (`-R 46767`) and DevTools (`-R 49333`). It forwards Muse (`-L 8181`) only when silo isn't set up.
+   - Tailscale SSH sometimes asks for a browser check: the owner runs `ssh beeps@gx10-0a47.tail5ef239.ts.net true`
+     by hand once.
+3. **On the DGX, check it's up:** `cowork/desktop/paseo-remote.sh ls --global --json`. A list means it's up.
+   "Connection refused" or `DAEMON_NOT_RUNNING` means it's down or the laptop is asleep.
+4. **If it's down,** ask the owner: "Please rerun `desktop/laptop-up.sh` on the laptop (and keep it awake)."
+   Don't type secrets through the laptop's terminal, and don't copy tokens over the tunnel. The owner moves
+   tokens themselves.
+5. **When done,** the owner runs `laptop-up.sh stop`. While the tunnel is up, the DGX can read every tab in the
+   workspace browser, including real Gmail and Drive. Use it only for the task at hand.
+
 ## Save your own tokens: delegate the grinding
 The owner's standing instruction: **don't spend your own context on grinding work.** You plan, decide, review and
 report. Hand the rest to:
