@@ -196,6 +196,17 @@ r = fm.run(con, f, b[t]["table"], {"measures": ["rows", "stipend"], "date": {"fr
 ok(r["rows"][0]["Number of volunteers"] == 25 and r["rows"][0]["Stipend paid (Rs)"] == 32100,
    "volunteers since July from the real file: 25 / 32,100")
 ok(fm.indian(3245678.5) == "32,45,678.5", "Indian digit grouping")
+# units come from the measure's taught format, not its label (Codex, exp/clef-form: a count printed as "Rs 16")
+_f = {"_measures": {"n": {"label": "Volunteers with no stipend recorded", "format": "count"},
+                    "p": {"label": "Share paid", "format": "percent"}, "a": {"label": "Amount", "format": "inr"},
+                    "m": {"label": "Average stipend", "format": "number"}}, "_kinds": {}}
+def _one(mid, v):
+    lab = _f["_measures"][mid]["label"]
+    return fm.answer_text({"described": lab, "rows": [{lab: v}], "total": None, "columns": [lab]}, _f, {"measures": [mid]})
+ok(_one("n", 16) == "Volunteers with no stipend recorded. 16.", "a count never gets Rs")
+ok(_one("p", 18.4) == "Share paid. 18.4%.", "a percent gets %")
+ok(_one("a", 1500) == "Amount. Rs 1,500.", "inr gets Rs")
+ok(_one("m", 1500) == "Average stipend. Rs 1,500.", "a 'number' money average keeps the label guess")
 import datetime as _dt  # noqa: E402
 T = _dt.date(2026, 11, 8)
 for words, want in [("last month", ("2026-10-01", "2026-10-31")), ("this FY", ("2026-04-01", "2026-11-08")),

@@ -640,6 +640,12 @@ def indian(v):
 def answer_text(res, f, spec):
     """Plain text with the numbers exactly as computed (the model relays it, never recomputes)."""
     money = re.compile(r"(?i)\(\s*(rs|inr|₹)\s*\)|\b(rs|inr|rupees?|amount|stipend|cost|paid|spend|debts?|savings|income)\b")
+    # A measure's taught format wins over guessing from its label (Codex, exp/clef-form typed_render_fix: a count
+    # labelled "Volunteers with no stipend recorded" printed as "Rs 16", and percent lost its %). "number" or no
+    # format keeps the label guess: auto averages of money columns are declared "number".
+    declared = {f["_measures"][m]["label"]: f["_measures"][m].get("format")
+                for m in ([spec.get("measures")] if isinstance(spec.get("measures"), str) else spec.get("measures") or [])
+                if m in f.get("_measures", {})}
     def name(label):
         return re.sub(r"\s*\(\s*(?:Rs|INR|₹)\s*\)", "", str(label)).strip()
     def fmt(label, v):
@@ -648,6 +654,13 @@ def answer_text(res, f, spec):
         if isinstance(v, float) and v.is_integer():
             v = int(v)
         if isinstance(v, (int, float)):
+            kind = declared.get(label)
+            if kind == "inr":
+                return "Rs " + indian(v)
+            if kind == "percent":
+                return indian(v) + "%"
+            if kind == "count":
+                return indian(v)
             return ("Rs " if money.search(str(label)) else "") + indian(v)
         if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
             return _dmy(v)

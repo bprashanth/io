@@ -400,7 +400,120 @@ def t_show_dashboard(file=None):
     return {"shown": True} if got["ok"] else {"shown": False, "say_to_user": "Click the dashboard tab at the top."}
 
 
-def t_file_ask(file, spec, tab=None, chart=False):
+# ---------------------------------------------------------------- the split: a model only sets the form's dials
+# Used by the 9B and Steam modes (lib/modes.py): file_ask gets the person's words, and one call to the spec model
+# (IDLI_SPEC_MODEL, default idli-9b, reached at Muse's address: the DGX router sends it to the 9B) picks the form's
+# measures, breakdowns and filters. The prompt is the 9B benchmark's split prompt, unchanged (variants/split_common.py
+# on idli-9b-bench; Codex's exp/clef-form F reused it exactly: 19/20 vs 20/20 for the full chat, a third of the calls).
+SPLIT_PROMPT = """You turn a question about a spreadsheet into a form spec. The form answers with code; you only choose.
+Spec keys: measures [ids], group_by [up to 2 ids], filters {column: [values]} | {column: {min, max}} |
+{column: {not: [values]}}, preset [ids], date {column, period|from|to}. measures [] lists matching rows (who/which).
+Use only ids and values from the form below. Follow-ups ("same but ward C", "and in summer?", "those", "there",
+"that one") refine the previous spec in the thread: keep its filters unless the question changes them.
+Reply with JSON only, one of:
+  {"tab": "<tab>", "spec": {...}, "chart": true|false}   (chart true when they ask for a chart/graph/plot/picture
+   and the spec has a breakdown)
+  {"cannot": "<why, in a few words>", "route": "chart_request"}  (a chart the form can't draw: a share of a total,
+   two filters compared side by side, a map, a computed trend)
+  {"cannot": "<why>", "route": "teach_file"}  (the form has no measure or filter for it)"""
+_threads = {}  # file -> [{q, tab, spec, answer}]: this chat's questions on the file, for follow-ups
+SPEC_KEYS = ("measures", "group_by", "filters", "preset", "date", "sort", "limit")
+SPEC_ALIAS = {"presets": "preset", "measure": "measures", "groupby": "group_by", "group": "group_by",
+              "groups": "group_by", "filter": "filters", "where": "filters"}
+
+
+def _spec_call(file, question):
+    from lib import muse
+    forms = files().open(file)["forms"]
+    brief = [_brief(f) for f in forms.values()]
+    thread = _threads.get(file, [])[-6:]
+    msg = (SPLIT_PROMPT + "\n\nThe form:\n" + json.dumps(brief, ensure_ascii=False)
+           + ("\n\nThe thread so far:\n" + "\n".join(json.dumps(t, ensure_ascii=False) for t in thread) if thread else "")
+           + "\n\nQuestion: " + question)
+    body = {"model": os.environ.get("IDLI_SPEC_MODEL", "idli-9b"), "temperature": 0, "max_tokens": 4096,
+            "messages": [{"role": "user", "content": msg}]}
+    req = urllib.request.Request(muse.base_url() + "/v1/chat/completions", json.dumps(body).encode(),
+                                 {"Content-Type": "application/json", "Authorization": "Bearer none", **muse.headers()})
+    t0 = time.time()
+    with urllib.request.urlopen(req, timeout=240) as r:
+        text = json.load(r)["choices"][0]["message"]["content"] or ""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
+    m = re.search(r"\{.*\}", text, re.S)
+    return (json.loads(m.group(0)) if m else {"cannot": "no spec"}), round(time.time() - t0, 1)
+
+
+def _tolerant(file, spec, tab):
+    """The 9B benchmark's guards2: key aliases, labels given for ids. Returns (spec, error)."""
+    spec = {SPEC_ALIAS.get(k, k): v for k, v in spec.items()}
+    bad = [k for k in spec if k not in SPEC_KEYS and k != "chart"]
+    if bad:
+        return spec, f"Unknown spec key(s) {bad}. Allowed: {list(SPEC_KEYS)}."
+    try:
+        forms = files().open(file)["forms"]
+        b = _brief(forms.get(tab) if tab in forms else next(iter(forms.values())))
+    except Exception:
+        return spec, None
+
+    def to_id(v, ids):
+        if v in ids:
+            return v
+        hits = [i for i, lab in ids.items() if str(lab).strip().lower() == str(v).strip().lower()]
+        return hits[0] if len(hits) == 1 else v
+    for k, ids in (("measures", b["measures"]), ("group_by", b["group_by"]), ("preset", b["presets"])):
+        v = spec.get(k)
+        if isinstance(v, str):
+            v = [v]
+        if isinstance(v, list):
+            spec[k] = [to_id(x, ids) for x in v]
+    if isinstance(spec.get("filters"), dict):
+        cols = {c: f.get("label", c) for c, f in b["filters"].items()}
+        spec["filters"] = {to_id(c, cols): v for c, v in spec["filters"].items()}
+    return spec, None
+
+
+def t_file_ask(file, spec=None, tab=None, chart=False, question=None):
+    if not question:
+        if spec is None:
+            return {"error": "Pass spec (or question)."}
+        return _file_ask_spec(file, spec, tab=tab, chart=chart)
+    if isinstance(chart, str):
+        chart = chart.lower() in ("true", "yes", "1")
+    try:
+        got, secs = _spec_call(file, question)
+    except Exception as e:
+        return {"error": f"The spec builder failed: {type(e).__name__}", "then": "Try file_ask again."}
+    if got.get("cannot"):
+        route = got.get("route") if got.get("route") in ("chart_request", "teach_file") else "teach_file"
+        return {"answer": None, "spec_model_secs": secs, "cannot": str(got["cannot"]), "route": route,
+                "then": ("Call chart_request with their words (Claude designs this chart on fake data)."
+                         if route == "chart_request" else
+                         "Call teach_file with their question and missing = '" + str(got["cannot"]) + "'.")}
+    spec = got.get("spec") if isinstance(got.get("spec"), dict) else {}
+    tab = got.get("tab") or tab
+    spec, err = _tolerant(file, spec, tab)
+    if err:
+        return {"error": err, "spec_model_secs": secs, "then": "Ask the question again in other words."}
+    out = _file_ask_spec(file, spec, tab=tab, chart=bool(got.get("chart")) or chart)
+    if not isinstance(out, dict):
+        return out
+    out["spec_model_secs"] = secs
+    out["spec"] = {"tab": tab, **spec}
+    if out.get("answer"):
+        # a count of 15 rows or fewer also says which ones ("which households ..." answered with a count)
+        if spec.get("measures") == ["rows"] and not spec.get("group_by"):
+            m = re.search(r"(\d[\d,]*)\.?\s*$", out["answer"])
+            n = int(m.group(1).replace(",", "")) if m else None
+            if n is not None and 0 < n <= 15:
+                lst = _file_ask_spec(file, dict(spec, measures=[]), tab=tab, chart=False)
+                rows = [x for x in (lst.get("answer") or "").splitlines() if x.startswith("- ")]
+                if rows:
+                    out["answer"] += "\nThey are:\n" + "\n".join(rows)
+        _threads.setdefault(file, []).append({"q": question, "tab": tab, "spec": got.get("spec"),
+                                              "answer": out["answer"].splitlines()[0][:160]})
+    return out
+
+
+def _file_ask_spec(file, spec, tab=None, chart=False):
     if isinstance(spec, str):
         try:
             spec = json.loads(spec)
@@ -1071,7 +1184,11 @@ TOOLS = {
                  {**FILE, "spec": SPEC, "tab": {"type": "string", "description": "Tab name from file_open (default: "
                                                                                   "the first)"},
                   "chart": {"type": "boolean", "description": "Also draw the answer as a bar chart in the chat (needs "
-                                                              "group_by and a measure)"}}, ["file", "spec"]),
+                                                              "group_by and a measure)"},
+                  # the 9B and Steam modes pass the person's words instead of a spec (lib/modes.py hides one or the
+                  # other per mode, so Muse sees today's tool)
+                  "question": {"type": "string", "description": "The person's question in their words, instead of a "
+                                                                "spec: the form's dials are set for you"}}, ["file"]),
     "teach_file": (t_teach_file, "Prepare a teaching request for a file Idli doesn't know, or whose layout changed, or a "
                    "question the form can't answer: a copy of the file with fake values and the user's question with "
                    "names removed. Shows what would be sent; nothing is sent yet.",
