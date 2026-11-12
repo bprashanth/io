@@ -761,7 +761,9 @@ def _teach_send(request_id):
         wid = next(w["workspaceId"] for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(home))
     except (ValueError, StopIteration):
         return {"error": "No Teach workspace found (a Paseo workspace on the co-work plugin folder). Open one, then retry."}
+    me = req.get("caller_agent")
     r = subprocess.run([paseo, "run", "--provider", "idli-teach" if split else "diy-claude", "--workspace", wid,
+                        *(["--label", f"idli.pair={me}"] if split and me else []),  # P15: shown beside this chat
                         "--mode", "auto",
                         "--title", ("Chart: " if req.get("chart") is not None else "Teach: ") + req["title"], "--no-wait", "--json", prompt],
                        capture_output=True, text=True, timeout=90, env=env)

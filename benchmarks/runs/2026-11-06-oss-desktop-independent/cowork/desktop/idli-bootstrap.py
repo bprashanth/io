@@ -47,7 +47,7 @@ TOOLSETS = {
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name Start here)
-TABS = ["https://drive.google.com/drive/my-drive"]  # Gmail later; Drive is all the first run needs
+TABS = []  # the Drive tab opens only when the Logins check finds Google signed out (and closes once signed in)
 
 
 def say(msg):
@@ -111,6 +111,8 @@ def folders():
 def projects_and_workspaces():
     ids = {}
     for name, path, _ in LAYOUT:
+        if name == "Claude" and split_mode():  # beside each Idli chat instead (retire_claude_workspace)
+            continue
         proj = next((p for p in paseo("project", "ls") if same(p["path"], path)), None)
         if not proj:
             say(f"register project {path}")
@@ -246,10 +248,11 @@ def start_tabs(agent_id):
         say("the app's browser isn't available; open Paseo and rerun to add the Drive and Gmail tabs")
         return
     tabs = browser.tabs()
-    for host in {urllib.parse.urlparse(u).hostname for u in TABS}:  # reruns opened duplicates: keep one per site
-        dup = [t for t in tabs if urllib.parse.urlparse(t["url"]).hostname == host][1:]
+    for host in {urllib.parse.urlparse(u).hostname for u in TABS} | {"drive.google.com"}:
+        keep = 1 if any(urllib.parse.urlparse(u).hostname == host for u in TABS) else 0
+        dup = [t for t in tabs if urllib.parse.urlparse(t["url"]).hostname == host][keep:]
         for t in dup:
-            say(f"close a duplicate {host} tab")
+            say(f"close a {host} tab")
             browser.paseo("browser_close_tab", browserId=t["id"])
     have = {urllib.parse.urlparse(t["url"]).hostname for t in browser.tabs()}
     for url in TABS:
@@ -273,6 +276,25 @@ def retire_old_mission_control():
             paseo("project", "delete", p["projectId"], parse=False, change=True)
 
 
+def split_mode():
+    try:
+        with open(os.path.join(IDLI, "config", "ui.json")) as f:
+            return bool(json.load(f).get("split"))
+    except (OSError, ValueError):
+        return False
+
+
+def retire_claude_workspace():
+    """Split mode: every Idli chat has its own Claude chat beside it (Paseo patches P13-P15), so the separate Claude
+    heading goes (website teaching, which needs it, is parked). Its chats stay in Paseo's history."""
+    if not split_mode():
+        return
+    for p in paseo("project", "ls") or []:
+        if same(p["path"], COWORK):
+            say("remove the Claude heading (Claude now opens beside each Idli chat)")
+            paseo("project", "delete", p["projectId"], parse=False, change=True)
+
+
 def retire_old_start_here():
     """Until 2026-11-10 Start here shared Mission control's folder (and indexed the Drive). It has its own folder
     and heading now and only checks sign-ins: archive the old workspace (and its chat)."""
@@ -287,6 +309,7 @@ def main():
     ids = projects_and_workspaces()
     retire_old_start_here()
     retire_old_mission_control()
+    retire_claude_workspace()
     agent = start_chat(ids.get("Start here"))
     learned_tab(agent)  # Mission control: a tab in Start here, next to the chat
     start_tabs(agent)

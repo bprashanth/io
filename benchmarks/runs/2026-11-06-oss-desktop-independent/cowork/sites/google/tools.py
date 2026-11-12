@@ -749,6 +749,10 @@ def _check_google():
             if "accounts.google.com" in url or "ServiceLogin" in url or "workspace.google.com" in url:
                 return False, "not signed in: sign in to Google in the Drive tab at the top"
             if "drive.google.com/drive" in url:
+                try:  # signed in: the tab has done its job (it stays only while Google needs a sign-in)
+                    paseo("browser_close_tab", browserId=tab)
+                except Exception:  # noqa: BLE001
+                    pass
                 return True, "signed in"
         return False, "the Drive tab didn't open: open drive.google.com in a tab at the top and sign in"
     except Exception as e:

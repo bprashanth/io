@@ -41,10 +41,28 @@ index 551e3b60..42e3ac3f 100644
    const handleRetry = useCallback(() => {
      if (resolution.kind === "lookupError") {
 diff --git a/packages/app/src/components/split-container.tsx b/packages/app/src/components/split-container.tsx
-index 27831724..a98ca6a0 100644
+index 27831724..cb5846b7 100644
 --- a/packages/app/src/components/split-container.tsx
 +++ b/packages/app/src/components/split-container.tsx
-@@ -706,7 +706,12 @@ const SplitPaneView = memo(function SplitPaneView({
+@@ -12,7 +12,8 @@ import {
+   type SetStateAction,
+ } from "react";
+ import { useStableEvent } from "@/hooks/use-stable-event";
+-import { View, type LayoutChangeEvent } from "react-native";
++import { Text, View, type LayoutChangeEvent } from "react-native";
++import { isIdliWorkspace, useIdliPairing } from "@/utils/idli-pairing";
+ import Animated, {
+   useAnimatedStyle,
+   useSharedValue,
+@@ -193,6 +194,7 @@ export function SplitContainer({
+     [layout.root, explorerSidebarPaneId],
+   );
+   const workspaceHasMultiplePanes = Boolean(mainRoot && hasMultipleVisiblePanes(mainRoot));
++  useIdliPairing(normalizedServerId, normalizedWorkspaceId, workspaceKey);  // Idli P15
+   useEffect(() => {
+     if (
+       maximizedPaneId &&
+@@ -706,7 +708,12 @@ const SplitPaneView = memo(function SplitPaneView({
        <View
          ref={paneRef}
          collapsable={false}
@@ -58,10 +76,53 @@ index 27831724..a98ca6a0 100644
          testID={`workspace-pane-${pane.id}`}
        >
          <WindowChromeSafeArea placement="inline" style={styles.paneTabs}>
-@@ -854,6 +859,17 @@ const styles = StyleSheet.create((theme) => ({
+@@ -748,6 +755,17 @@ const SplitPaneView = memo(function SplitPaneView({
+         </WindowChromeSafeArea>
+ 
+         <View style={styles.paneContent}>
++          {workspaceHasMultiplePanes && paneTabs.every((t) => t.target.kind === "new_tab") &&
++          isIdliWorkspace(normalizedServerId, normalizedWorkspaceId) ? (
++            // Idli P15: the right side waits for this chat's Claude conversation
++            <View style={styles.idliPlaceholder}>
++              <Text style={styles.idliPlaceholderTitle}>Claude</Text>
++              <Text style={styles.idliPlaceholderText}>
++                When Idli sends Claude a copy with fake values (to design a chart or learn a file), that conversation
++                appears here, next to this chat. Your data stays on the left.
++              </Text>
++            </View>
++          ) : null}
+           <WorkspacePanelHost
+             paneId={pane.id}
+             tabs={paneTabs}
+@@ -854,6 +872,42 @@ const styles = StyleSheet.create((theme) => ({
      backgroundColor: theme.colors.surface0,
      overflow: "hidden",
    },
++  idliPlaceholder: {
++    position: "absolute",
++    zIndex: 5,
++    backgroundColor: theme.colors.surface0,
++    top: 0,
++    left: 0,
++    right: 0,
++    bottom: 0,
++    alignItems: "center",
++    justifyContent: "center",
++    padding: 32,
++    gap: 8,
++  },
++  idliPlaceholderTitle: {
++    color: theme.colors.foreground,
++    fontSize: 16,
++    fontWeight: "600",
++  },
++  idliPlaceholderText: {
++    color: theme.colors.foregroundMuted,
++    fontSize: 13,
++    textAlign: "center",
++    maxWidth: 360,
++    lineHeight: 19,
++  },
 +  paneFocusRing: {
 +    borderWidth: 4,
 +    borderColor: theme.colors.accentBright,
@@ -105,6 +166,156 @@ index f85d09ca..a23dbddb 100644
    });
  
    useEffect(() => {
+diff --git a/packages/app/src/utils/idli-pairing.ts b/packages/app/src/utils/idli-pairing.ts
+new file mode 100644
+index 00000000..443c9233
+--- /dev/null
++++ b/packages/app/src/utils/idli-pairing.ts
+@@ -0,0 +1,144 @@
++// Idli P15: every Idli chat has its own Claude chat beside it. In a workspace whose chats run on the Idli provider,
++// the layout keeps two panes: Idli's chats on the left, and on the right only the Claude chats paired with the Idli
++// chat shown on the left (label idli.pair=<idli agent id>, set by Idli's teach_send). Switching Idli chats swaps the
++// right side; other chats' Claude tabs leave the layout (closed and hidden, never archived) and come back with their
++// chat. An empty right pane shows a placeholder (split-container.tsx).
++import { useEffect } from "react";
++import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
++import { useSessionStore } from "@/stores/session-store";
++import { collectAllPanes, collectAllTabs } from "@/stores/workspace-layout-actions";
++import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
++
++export const IDLI_PROVIDERS = new Set(["t4gc-cowork"]);
++export const PAIR_LABEL = "idli.pair";
++
++interface PairAgent {
++  id: string;
++  provider: string;
++  createdAt: Date;
++  archivedAt?: Date | null;
++  labels: Record<string, string>;
++  workspaceId?: string;
++}
++
++function workspaceAgents(serverId: string, workspaceId: string): PairAgent[] {
++  const session = useSessionStore.getState().sessions[serverId];
++  if (!session) return [];
++  const want = normalizeWorkspaceOpaqueId(workspaceId);
++  return Array.from(session.agents.values()).filter(
++    (a) => !a.archivedAt && normalizeWorkspaceOpaqueId(a.workspaceId) === want,
++  ) as PairAgent[];
++}
++
++export function isIdliWorkspace(serverId: string, workspaceId: string): boolean {
++  return workspaceAgents(serverId, workspaceId).some((a) => IDLI_PROVIDERS.has(String(a.provider)));
++}
++
++let syncing = false;
++
++/** One idempotent pass; each store change triggers another, so it converges step by step. */
++export function syncIdliPair(serverId: string, workspaceId: string, workspaceKey: string): void {
++  if (syncing) return;
++  const agents = workspaceAgents(serverId, workspaceId);
++  if (!agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)))) return;
++  syncing = true;
++  try {
++    const store = useWorkspaceLayoutStore.getState();
++    const layout = store.layoutByWorkspace[workspaceKey];
++    if (!layout) return;
++    const explorerId = store.explorerSidebarPaneIdByWorkspace[workspaceKey] ?? null;
++    const mains = collectAllPanes(layout.root).filter((p) => !p.hidden && p.id !== explorerId);
++    if (mains.length < 2) {
++      store.ensureSidePane(workspaceKey, { focus: false });
++      return;
++    }
++    const left = mains[0];
++    const right = mains[mains.length - 1];
++    if (!left || !right) return;
++    // the pairing works in the background: if the person is on the left, they stay there
++    const keepLeft = layout.focusedPaneId === left.id;
++    const settle = () => {
++      if (keepLeft && useWorkspaceLayoutStore.getState().layoutByWorkspace[workspaceKey]?.focusedPaneId !== left.id) {
++        useWorkspaceLayoutStore.getState().focusPane(workspaceKey, left.id);
++      }
++    };
++    const byId = new Map(agents.map((a) => [a.id, a]));
++    const tabs = collectAllTabs(layout.root);
++    const agentOf = (tabId: string | null | undefined) => {
++      const t = tabs.find((x) => x.tabId === tabId);
++      return t && t.target.kind === "agent" ? byId.get(t.target.agentId) ?? null : null;
++    };
++    const pairOf = (a: PairAgent | null) => (a ? a.labels?.[PAIR_LABEL] ?? null : null);
++
++    // Claude chats never sit on the left
++    for (const tabId of left.tabIds) {
++      if (pairOf(agentOf(tabId))) {
++        store.moveTabToPane(workspaceKey, tabId, right.id);
++        settle();
++        return;
++      }
++    }
++    const idli = agentOf(left.focusedTabId);
++    if (!idli || pairOf(idli)) return;
++    const wanted = agents
++      .filter((a) => pairOf(a) === idli.id)
++      .sort((x, y) => new Date(x.createdAt).getTime() - new Date(y.createdAt).getTime());
++    const wantedIds = new Set(wanted.map((a) => a.id));
++
++    // other chats' Claude tabs leave the right side (hidden, not archived)
++    for (const tabId of right.tabIds) {
++      const a = agentOf(tabId);
++      if (a && pairOf(a) && !wantedIds.has(a.id)) {
++        store.hideAgent(workspaceKey, a.id);
++        store.closeTab(workspaceKey, tabId);
++        settle();
++        return;
++      }
++    }
++    // this chat's Claude chats come (back) on the right
++    for (const a of wanted) {
++      if (!tabs.some((t) => t.target.kind === "agent" && t.target.agentId === a.id)) {
++        store.unhideAgent(workspaceKey, a.id);
++        store.openTab({
++          workspaceKey,
++          target: { kind: "agent", agentId: a.id },
++          intent: "background",
++          placement: { mode: "pane", paneId: right.id },
++        });
++        settle();
++        return;
++      }
++    }
++    const latest = wanted[wanted.length - 1];
++    const shown = agentOf(right.focusedTabId);
++    if (latest && (!shown || !wantedIds.has(shown.id))) {
++      const t = tabs.find((x) => x.target.kind === "agent" && x.target.agentId === latest.id);
++      if (t) store.selectTabInPane(workspaceKey, right.id, t.tabId);
++      settle();
++    }
++  } finally {
++    syncing = false;
++  }
++}
++
++export function useIdliPairing(serverId: string, workspaceId: string, workspaceKey: string): void {
++  useEffect(() => {
++    if (!serverId || !workspaceId || !workspaceKey) return;
++    let queued = false;
++    const kick = () => {
++      if (queued) return;
++      queued = true;
++      setTimeout(() => {
++        queued = false;
++        syncIdliPair(serverId, workspaceId, workspaceKey);
++      }, 50);
++    };
++    kick();
++    const offLayout = useWorkspaceLayoutStore.subscribe(kick);
++    const offSession = useSessionStore.subscribe(kick);
++    return () => {
++      offLayout();
++      offSession();
++    };
++  }, [serverId, workspaceId, workspaceKey]);
++}
 diff --git a/packages/app/src/utils/idli-side-pane.ts b/packages/app/src/utils/idli-side-pane.ts
 new file mode 100644
 index 00000000..c17c6a07
