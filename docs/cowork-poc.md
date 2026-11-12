@@ -8,6 +8,23 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-12 (morning), DGX: round 2 evals on today's flow (E2b, E3b, E4, E5) and the Codex code/cards experiment**
+  (branch `exp/evals-1111` at `0b395e5a`, local only; `benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md`,
+  "Round 2"; Codex: branch `exp/clef-form`, `benchmarks/runs/2026-11-11-clef-form/REPORT.md`).
+  - **E3b (trip to Claude through the upload/Continue cards):** the cards add no failures. Muse on the checked
+    copy got 9/9 right; 36/45 overall vs 21/27 for E3 on the same corrected answers. 39/40 trips came back,
+    about half a minute and $0.15 each. All 40 trips were charts (`chart_request`), never new measures.
+  - **E3b misses, all on the 9B:** 3 wrong bounces (the split called form questions unsupported); on village-chart
+    the 9B offered Claude a turn late after `file_ask(chart=true)` said the form can't draw it.
+  - **E2b (`IDLI_MOCK_V2`):** overall gain is noise (90/78/85% vs 88/85%). Duplicate IDs 33→78% but end-before-start
+    100→33%. Ship only with the date-order fix.
+  - **E4:** from `exp/answer-mock`: 9B rewording drops a number in 13/53 turns; code rendering keeps 74/74.
+  - **E5 (10 charts, fake → real):** 10/10 ran on real data, 0 broke only on real data, 0 dropped rows on their own.
+  - **Codex (code/cards):** 6 card journeys run with 0 model calls. Replacing the form planner fails (A 12/20 vs
+    new 9B prompt 4/20, Clef 9/20); keeping the planner but moving coordination and wording into code (F) gets
+    19/20 vs A 20/20 with a third of the calls and ~5 s instead of ~25 s. Found a units bug: `answer_text` prints
+    a count as "Rs16".
+  - **Not done:** nothing merged into `oss-desktop-eval`; nothing pushed.
 - **2026-11-11 (night), DGX: cards back at every step into analysis; "Continue" re-reads the copy from Drive**
   (commits `05ea479d`, `dd54e801`; laptop pulled). This replaces the two entries below: no copy is made without
   asking.

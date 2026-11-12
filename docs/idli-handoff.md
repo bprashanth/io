@@ -352,10 +352,8 @@ pushed to GitHub), last commit is the one that updated this page.
   2. No silent row drops: done.
   3. Hold `IDLI_MOCK_V2` for one more E2 run.
   4. Measures vs charts: open. Should Claude add a form measure for a number question, rather than a chart?
-- **Not yet run (waiting for the owner):**
-  - E3 rerun on today's flow (its harness needs the upload and Continue cards scripted);
-  - the E2 rerun with `IDLI_MOCK_V2`;
-  - E4 (wording) and E5 (charts).
+- **Round 2 done (2026-11-12):** E2b, E3b, E4, E5 on branch `exp/evals-1111` (local, `0b395e5a`), plus Codex's
+  code/cards experiment on `exp/clef-form`. Results and what to do next: chronology "2026-11-12 (morning)".
 - **Lessons:**
   - Run batches with `nohup` and wait with a background loop; hand code and log reading to Codex.
   - Check expected answers before trusting a score.
