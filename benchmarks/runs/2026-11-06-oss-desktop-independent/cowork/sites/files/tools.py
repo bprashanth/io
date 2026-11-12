@@ -758,7 +758,9 @@ def _teach_send(request_id):
     # workspace's folder as the chat's; the launcher is what keeps Claude out of the private one.
     home = sh.data_dir() if split else HERE
     try:
-        wid = next(w["workspaceId"] for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(home))
+        cands = [w for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(home)]
+        # split mode keeps one workspace on Idli's folder (the bootstrap archives others); prefer the one named Idli
+        wid = next(w for w in sorted(cands, key=lambda w: w.get("name") != "Idli"))["workspaceId"]
     except (ValueError, StopIteration):
         return {"error": "No Teach workspace found (a Paseo workspace on the co-work plugin folder). Open one, then retry."}
     me = req.get("caller_agent")

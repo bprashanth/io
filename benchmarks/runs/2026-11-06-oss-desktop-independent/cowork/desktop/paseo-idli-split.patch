@@ -168,10 +168,10 @@ index f85d09ca..a23dbddb 100644
    useEffect(() => {
 diff --git a/packages/app/src/utils/idli-pairing.ts b/packages/app/src/utils/idli-pairing.ts
 new file mode 100644
-index 00000000..2377703f
+index 00000000..5a496168
 --- /dev/null
 +++ b/packages/app/src/utils/idli-pairing.ts
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,158 @@
 +// Idli P15: every Idli chat has its own Claude chat beside it. In a workspace whose chats run on the Idli provider,
 +// the layout keeps two panes: Idli's chats on the left, and on the right only the Claude chats paired with the Idli
 +// chat shown on the left (label idli.pair=<idli agent id>, set by Idli's teach_send). Switching Idli chats swaps the
@@ -271,10 +271,12 @@ index 00000000..2377703f
 +      .sort((x, y) => new Date(x.createdAt).getTime() - new Date(y.createdAt).getTime());
 +    const wantedIds = new Set(wanted.map((a) => a.id));
 +
-+    // other chats' Claude tabs leave the right side (hidden, not archived)
++    // other chats' Claude tabs leave the right side (hidden, not archived). Only when their Idli chat is in this
++    // workspace: a Claude chat paired with a chat elsewhere stays visible rather than vanish
 +    for (const tabId of right.tabIds) {
 +      const a = agentOf(tabId);
-+      if (a && pairOf(a) && !wantedIds.has(a.id)) {
++      const pair = pairOf(a);
++      if (a && pair && !wantedIds.has(a.id) && byId.has(pair)) {
 +        store.hideAgent(workspaceKey, a.id);
 +        store.closeTab(workspaceKey, tabId);
 +        settle();

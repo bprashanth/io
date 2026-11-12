@@ -286,6 +286,18 @@ def split_mode():
         return False
 
 
+def one_idli_workspace():
+    """Split mode: Idli's folder has one workspace, "Idli". A second one on the same folder (Paseo's "New workspace")
+    leaves teach_send unable to tell which one the chat is in (Paseo doesn't say), so Claude opened in the wrong one and
+    its pairing hid it. Others are archived; their chats stay in History."""
+    if not split_mode():
+        return
+    for w in paseo("workspace", "ls") or []:
+        if same(w["cwd"], FOLDER["Idli"]) and w["name"] != "Idli":
+            say(f"archive the extra workspace '{w['name']}' on Idli's folder (its chats stay in History)")
+            paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
+
+
 def retire_claude_workspace():
     """Split mode: every Idli chat has its own Claude chat beside it (Paseo patches P13-P15), so the separate Claude
     heading goes (website teaching, which needs it, is parked). Its chats stay in Paseo's history."""
@@ -312,6 +324,7 @@ def main():
     retire_old_start_here()
     retire_old_mission_control()
     retire_claude_workspace()
+    one_idli_workspace()
     agent = start_chat(ids.get("Start here"))
     learned_tab(agent)  # Mission control: a tab in Start here, next to the chat
     start_tabs(agent)
