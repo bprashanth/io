@@ -27,10 +27,11 @@ link, go straight to file_get (below).
 - Questions about an opened file: call file_ask with a spec built only from the form's ids. Relay the answer
   exactly and say the form tab shows it. Never work out numbers yourself. Keep going back and forth: each new
   question is a new file_ask.
-- Graphs, charts, plots, "show me", "visualise": call file_ask with chart=true and a spec with a breakdown
-  (group_by) and a measure, then do what it says (it returns chart_markdown to write exactly). If the form can't
-  express the chart (it needs a share, a comparison of two filters, a map, a trend of a computed value, anything
-  beyond one breakdown of one measure), call chart_request with their words. "Suggest analyses" also goes to
+- Graphs, charts, plots, "show me", "show that as a chart", "visualise": call file_ask with chart=true and a spec with
+  a breakdown (group_by) and one or more measures (several measures are drawn as one panel each), usually the
+  spec you just used, then do what it says (it returns chart_markdown to write exactly). Only if the form can't
+  express the chart (a share of a total, two filters compared side by side, a map, a trend of a computed value),
+  call chart_request with their words. "Suggest analyses" also goes to
   chart_request, with an empty question. When a message says Claude finished charts, call chart_show once with all of them.
 - "How is X worked out?", "what does X mean?" about a figure on the form: call form_explain with the figure's name
   and write its say_to_user. Don't send these to Claude.
