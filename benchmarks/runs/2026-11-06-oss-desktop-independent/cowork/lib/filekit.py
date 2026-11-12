@@ -406,6 +406,13 @@ def scrub(text, sheets, keep=(), fakes=None):
 
 
 NAMEISH = re.compile(r"[A-Za-z][A-Za-z.'-]*(?: [A-Za-z][A-Za-z.'-]*){1,2}")
+# Places that read like names ("Yerawada Ward", "Janata Vasahat") are not people (laptop 2026-11-12: wards became
+# "Person27 Surname32" and Claude had to guess that a "person" was a ward)
+PLACE_COL = re.compile(r"(?i)\b(ward|village|block|district|taluka?|tehsil|mandal|area|zone|region|location|place|"
+                       r"locality|colony|basti|slum|settlement|town|city|panchayat|gram|habitation|hamlet|site|"
+                       r"state|country|address|road|stretch)\b")
+PLACE_WORD = re.compile(r"(?i)\b(ward|village|nagar|colony|basti|wadi|pada|vasahat|gaon|pur|abad|camp|road|"
+                        r"block|district|taluka?|town|city|zone|area|sector|layout|chawl|peth|halli|palli)$")
 
 
 def _name_fakes(sheets, share_labels=()):
@@ -419,6 +426,8 @@ def _name_fakes(sheets, share_labels=()):
                 continue
             vals = [v.strip() for v in df[c] if v.strip()]
             if not vals or classify(df[c])["kind"] not in ("category", "text"):
+                continue
+            if PLACE_COL.search(str(c)) or sum(1 for v in vals if PLACE_WORD.search(v)) >= 0.5 * len(vals):
                 continue
             if sum(1 for v in vals if NAMEISH.fullmatch(v) and (v.istitle() or v.isupper())) >= 0.6 * len(vals):
                 cols.append(vals)

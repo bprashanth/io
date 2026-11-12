@@ -513,6 +513,37 @@ def t_file_ask(file, spec=None, tab=None, chart=False, question=None):
     return out
 
 
+def t_form_explain(file, measure=None):
+    """What a figure on the form means and how it is worked out, from the taught skill (code; no model, no Claude)."""
+    try:
+        forms = files().open(file)["forms"]
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
+    out = []
+    want = str(measure or "").strip().lower()
+    for f in forms.values():
+        names = {}
+        for x in f["filters"]:
+            names[x["column"]] = x["label"]
+        for g in f["_groups"].values():
+            names.setdefault(g["id"].split(":")[0], g["label"])
+        for m in f["_measures"].values():
+            if want and want not in (m["id"].lower(), m["label"].lower()) and want not in m["label"].lower():
+                continue
+            how = m.get("sql", "")
+            for col in sorted(names, key=len, reverse=True):
+                how = re.sub(r'(?<![\w"])"?' + re.escape(col) + r'"?(?![\w"])', "[" + names[col] + "]", how)
+            how = (how.replace("count(*)", "the number of " + f["row_noun"]).replace("avg(", "average of (")
+                   .replace("sum(", "total of (").replace("nullif(", "(").replace(", 0)", ")"))
+            out.append({"tab": f["tab"], "figure": m["label"], "worked_out_as": how,
+                        **({"note": m["description"]} if m.get("description") else {}),
+                        "format": m.get("format") or "number"})
+    if not out:
+        return {"error": f"No figure called '{measure}'.", "then": "Call form_explain without a measure to list them."}
+    lines = [f"- {x['figure']}: {x['worked_out_as']}" + (f" ({x['note']})" if x.get("note") else "") for x in out[:12]]
+    return {"figures": out[:12], "say_to_user": "How the form works these out:\n" + "\n".join(lines)}
+
+
 def _file_ask_spec(file, spec, tab=None, chart=False):
     if isinstance(spec, str):
         try:
@@ -602,8 +633,9 @@ def t_teach_file(file, question, share_labels=None, missing=None, chart=None):
         "header": "Claude",
         "question": ((("Claude can suggest analyses and charts for " + title) if chart == "" else
                       (f"Claude can design this chart for {title} with you") if chart is not None else
-                      f"The dashboard for {title} can't do this yet: {req['missing']}. Claude can add it" if req.get("missing")
-                      and req["existing_skill"] else f"I haven't seen {title} before. Claude can learn it with you (what "
+                      (f"The dashboard for {title} can't do this yet: {req['missing']}. Claude can add it" if req.get("missing")
+                       else f"The dashboard for {title} can't answer this yet. Claude can add it") if req["existing_skill"]
+                      else f"I haven't seen {title} before. Claude can learn it with you (what "
                       "each column means, the checks for mistakes)")
                      + f" from a copy with fake values: same {'tabs and ' if len(tabs) > 1 else ''}columns ({col_text}), "
                      f"every value made up" + ("" if chart == "" else ", and your question with names removed") + "."
@@ -1189,6 +1221,10 @@ TOOLS = {
                   # other per mode, so Muse sees today's tool)
                   "question": {"type": "string", "description": "The person's question in their words, instead of a "
                                                                 "spec: the form's dials are set for you"}}, ["file"]),
+    "form_explain": (t_form_explain, "What a figure on the form means and how it is worked out (\"how is X "
+                     "calculated?\", \"what does X mean?\"). Answered from the taught skill, no need for Claude.",
+                     {**FILE, "measure": {"type": "string", "description": "The figure's name as the form shows it "
+                                                                         "(omit to list all)"}}, ["file"]),
     "teach_file": (t_teach_file, "Prepare a teaching request for a file Idli doesn't know, or whose layout changed, or a "
                    "question the form can't answer: a copy of the file with fake values and the user's question with "
                    "names removed. Shows what would be sent; nothing is sent yet.",

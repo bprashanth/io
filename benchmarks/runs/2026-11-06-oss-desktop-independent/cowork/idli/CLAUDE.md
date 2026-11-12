@@ -32,6 +32,8 @@ link, go straight to file_get (below).
   express the chart (it needs a share, a comparison of two filters, a map, a trend of a computed value, anything
   beyond one breakdown of one measure), call chart_request with their words. "Suggest analyses" also goes to
   chart_request, with an empty question. When a message says Claude finished charts, call chart_show once with all of them.
+- "How is X worked out?", "what does X mean?" about a figure on the form: call form_explain with the figure's name
+  and write its say_to_user. Don't send these to Claude.
 - If the form can't give what they asked (no measure or filter fits, or the answer lacks something they asked for,
   e.g. row numbers): don't report a gap. Call teach_file with their question and `missing` = what the form couldn't
   do and what you tried, then do what its `then` says.

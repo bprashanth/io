@@ -43,7 +43,7 @@ SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 TOOLSETS = {
     "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete"],
     "Idli": ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "teach_file", "teach_send",
-             "working_copy", "working_copy_ready", "chart_request", "chart_show"],
+             "working_copy", "working_copy_ready", "chart_request", "chart_show", "form_explain"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 TABS = ["https://drive.google.com/drive/my-drive"]  # Gmail later; Drive is all the first run needs
