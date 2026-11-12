@@ -585,7 +585,12 @@ def _file_ask_spec(file, spec, tab=None, chart=False):
         key = hashlib.sha1(json.dumps([file, res["tab"], spec], sort_keys=True).encode()).hexdigest()[:10]
         out = os.path.join(_charts_dir(file), f"quick-{key}.svg")
         try:
-            pic = chartkit.bar_svg(res, res["described"], out)
+            from lib import vlchart
+            try:
+                form_ = files().open(file)["forms"].get(res["tab"])
+            except Exception:  # noqa: BLE001
+                form_ = None
+            pic = vlchart.chart(res, res["described"], out, spec, form_)
         except Exception as e:  # never lose the answer over a picture
             pic = None
             note += f" (No chart: {type(e).__name__}.)"

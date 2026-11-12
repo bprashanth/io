@@ -29,9 +29,13 @@ link, go straight to file_get (below).
   question is a new file_ask.
 - Graphs, charts, plots, "show me", "show that as a chart", "visualise": call file_ask with chart=true and a spec with
   a breakdown (group_by) and one or more measures (several measures are drawn as one panel each), usually the
-  spec you just used, then do what it says (it returns chart_markdown to write exactly). Only if the form can't
-  express the chart (a share of a total, two filters compared side by side, a map, a trend of a computed value),
-  call chart_request with their words. "Suggest analyses" also goes to
+  spec you just used, then do what it says (it returns chart_markdown to write exactly). A map of the rows (when
+  the form has latitude and longitude columns): file_ask with chart=true and measures [] (and sort by the figure
+  that should size the points). Only if the form can't express the chart (a share of a total, two filters
+  compared side by side, a trend of a computed value), call chart_request with their words.
+- Drilling down ("break Ward D down by household head", "and within that, ..."): a new file_ask with the earlier
+  spec plus a filter for what they picked and the new breakdown; chart=true if the last answer had a chart. The
+  dashboard tab does the same when they click a bar. "Suggest analyses" also goes to
   chart_request, with an empty question. When a message says Claude finished charts, call chart_show once with all of them.
 - "How is X worked out?", "what does X mean?" about a figure on the form: call form_explain with the figure's name
   and write its say_to_user. Don't send these to Claude.

@@ -234,7 +234,15 @@ class Files:
             res = fm.run(e["con"], f, e["built"][tab]["table"], spec)
         res["text"] = fm.answer_text(res, f, spec)
         res["tab"] = tab
+        try:  # the chart the chat shows, as a Vega-Lite spec for the page to draw (interactive)
+            from lib import vlchart
+            res["vl"] = vlchart.spec_for(res, res["described"], spec, f)
+        except Exception:  # noqa: BLE001  (no chart is fine; the table is the answer)
+            res["vl"] = None
         return res
+
+
+VENDOR = {"vega.min.js", "vega-lite.min.js", "vega-interpreter.min.js", "vega-embed.min.js"}
 
 
 def mock_page(rid):
@@ -316,7 +324,7 @@ def make_handler(files, token):
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
-            self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'unsafe-inline'; "
+            self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; "
                              "style-src 'unsafe-inline'; connect-src 'self'; img-src data:")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
@@ -330,6 +338,12 @@ def make_handler(files, token):
             qs = urllib.parse.parse_qs(u.query)
             if u.path == "/health":
                 return self._send(200, {"ok": True})
+            if u.path.startswith("/vendor/"):  # the chart libraries (no data): lib/vendor/<name>.min.js
+                name = os.path.basename(u.path)
+                if name in VENDOR:
+                    with open(os.path.join(HERE, "lib", "vendor", name), "rb") as f:
+                        return self._send(200, f.read(), "application/javascript")
+                return self._send(404, "not found", "text/plain")
             if not self._ok(qs):
                 return self._send(403, "Forbidden: open the form from Idli's chat.", "text/plain")
             try:

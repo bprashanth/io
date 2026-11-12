@@ -118,6 +118,8 @@ dialog::backdrop { background: #0008; }
     <dialog id="big"><img id="bigimg" alt=""><form method="dialog"><button>Close</button></form></dialog>
   </section>
 </main>
+<script src="vendor/vega.min.js"></script><script src="vendor/vega-lite.min.js"></script>
+<script src="vendor/vega-interpreter.min.js"></script><script src="vendor/vega-embed.min.js"></script>
 <script>
 const P = new URLSearchParams(location.search);
 const T = P.get("t"), FILE = P.get("file");
@@ -263,7 +265,7 @@ function run() {
       if (r.total && r.rows.length > 1 && spec.measures && spec.measures.length) h += `<tr class="total">${r.columns.map((c, i) => `<td class="${num(c) ? "num" : ""}">${c in r.total ? esc(indian(r.total[c])) : (i === 0 ? "All" : "")}</td>`).join("")}</tr>`;
       if (r.total && (!spec.measures || !spec.measures.length)) $("answer").textContent = `${Object.values(r.total)[0]} ${form().row_noun} match` + (r.rows.length < Object.values(r.total)[0] ? ` (first ${r.rows.length} shown)` : "") + ".";
       $("table").innerHTML = h + "</tbody></table>";
-      $("viz").innerHTML = bars(r, spec);
+      viz(r, spec);
       $("sql").textContent = r.sql;
     } catch (e) {
       if (me !== seq) return;
@@ -272,6 +274,41 @@ function run() {
   }, 150);
 }
 
+// The same Vega-Lite chart the chat shows (lib/vlchart.py), interactive here: hover for values, click a bar, a cell or
+// a point in time to drill into it (that value becomes a filter and the breakdown moves on to the next one).
+function viz(r, spec) {
+  if (r.vl && window.vegaEmbed && window.vega && vega.expressionInterpreter) {
+    $("viz").innerHTML = "";
+    vegaEmbed("#viz", r.vl, {actions: false, renderer: "svg", ast: true, expr: vega.expressionInterpreter})
+      .then(res => res.view.addEventListener("click", (ev, item) => drill(item && item.datum, spec)))
+      .catch(() => { $("viz").innerHTML = bars(r, spec); });
+    return;
+  }
+  $("viz").innerHTML = bars(r, spec);
+}
+function drill(datum, spec) {
+  if (!datum) return;
+  const f = form();
+  const used = spec.group_by || [];
+  const g = used.map(id => f.group_by.find(x => x.id === id)).find(x => x && x.label in datum);
+  if (!g) return;
+  const value = datum[g.label];
+  if (value === "(blank)") return;
+  const col = g.id.split(":")[0];
+  if (g.id.includes(":")) {          // a month / quarter / year: narrow the dates to it
+    if (!/^\d{4}(-\d{2})?$/.test(value)) return;
+    SPEC.date = {column: col, from: value, to: value};
+  } else if (f.filters.some(x => x.column === col)) {
+    SPEC.filters = SPEC.filters || {};
+    SPEC.filters[col] = [value];
+  } else return;
+  const rest = used.filter(id => id !== g.id);
+  const free = x => !used.includes(x.id) && x.id.split(":")[0] !== col && !x.id.includes(":");
+  const isChoice = x => f.filters.some(fl => fl.column === x.id && fl.kind === "choice");
+  const next = f.group_by.find(x => free(x) && isChoice(x)) || f.group_by.find(free);
+  SPEC.group_by = rest.length ? rest : (next ? [next.id] : []);
+  render();
+}
 function bars(r, spec) {
   // the answer as horizontal bars: first breakdown(s) as labels, first measure as length (top 15)
   if (!spec.measures || !spec.measures.length || !spec.group_by || !spec.group_by.length || r.rows.length < 2) return "";
