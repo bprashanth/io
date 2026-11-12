@@ -334,6 +334,13 @@ pushed to GitHub), last commit is the one that updated this page.
 - **Other agents:** merge `oss-desktop-eval` before touching `file_open`, `working_copy`, `working_copy_ready`
   or `chart_show`.
 
+### 1b. The model switch (2026-11-12): Muse / 9B / Steam powered
+- Paseo's Idli model menu → DGX router (`dgx/muse_prefix_proxy.py`, user service `muse-prefix-proxy`) →
+  `cowork/lib/modes.py`. The 9B: `dgx/idli-9b.sh up|down|status` (container `idli-9b`, port 8291), needed by the 9B
+  and Steam modes. Chronology: "2026-11-12 (morning), DGX: Idli's model switch".
+- **Laptop to do:** `git pull dgx oss-desktop-eval`, then merge the three `models` of `desktop/setup-laptop.py`
+  into `~/.paseo/config.json` (provider t4gc-cowork) and `paseo reload`; then the end-to-end run with screenshots.
+
 ### 2. Evals: E6, E7, E1, E2, E3 done and reported
 - **Where:** branch `idli-pipeline-eval`, pushed at `b4e4361f` (declauded); worktree
   `.claude/worktrees/agent-aaf212a4b5f290bbe`; folder `benchmarks/runs/2026-11-10-idli-pipeline-eval/` (E).

@@ -8,6 +8,30 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-12 (morning), DGX: Idli's model switch: Muse, 9B, Steam powered** (commit `3cc04497`; laptop not yet
+  pulled, tunnel down). The owner asked for the code/cards result behind a switch in Idli's model menu.
+  - **How:** Paseo's Idli provider lists three models; the id goes to the DGX router behind silo
+    (`dgx/muse_prefix_proxy.py`, port 8185), which picks the backend. Logic in `cowork/lib/modes.py`.
+    - **Idli 30B (Muse)** `muse-glimmer-30b`, the default: today's product, unchanged (file_ask keeps spec-only).
+    - **Idli 9B** `idli-9b`: the E7 winner. The 9B (container `idli-9b`, `dgx/idli-9b.sh`, 2 slots of 32k) runs the
+      chat on a lean prompt (`idli/CLAUDE-9b.md`, the 12 Idli tools), file_ask takes the person's words and a second
+      9B call sets the form's dials (the split, now in `sites/files/tools.py`), and the eval's guards (show a tool's
+      card, no made-up numbers, no own cards) run in the router. New: teach_send only right after "Yes, send and
+      switch" (the 9B sent once after "Not now" in testing).
+    - **Steam powered** `idli-steam`: code runs the chat (no model): tool cards are shown as they are, each answer
+      maps to the next tool, typed text goes to file_ask with the person's words (one 9B call for the dials), and
+      answers are shown as code rendered them.
+  - **Codex's fixes:** typed units (`answer_text` uses the measure's format: a count never gets Rs, percent gets
+    %); tests in `lib/test_formkit.py`. The numeric-literal fix is for the Clef adapter only; nothing to port.
+  - **Tested on the DGX** through real Claude Code (the 9B benchmark's `cc_convo.py`, fake Drive, planted-mess tree
+    file): open → upload card → Continue → question → chart → "share" question → Claude card → Not now, in all
+    three modes. Per step: Steam 2-6 s, 9B 16-40 s, Muse 11-30 s. Muse behaves as before; the 9B repeats E7's
+    weak spots (redraws an existing chart through Claude). 16k slots overflowed on the 4th question (16,421
+    tokens), hence 32k.
+  - **Known gaps:** spare "New chat"s open on the default model (switch from the menu); Steam has no clarifying
+    questions (Codex: F's one miss was a scope choice); Steam's own "teach the new layout" card is new wording.
+  - **Pre-existing, not from this change:** `run_tests.py files` fails "teaching request sends fake values only"
+    (last green 11-08).
 - **2026-11-12 (morning), DGX: round 2 evals on today's flow (E2b, E3b, E4, E5) and the Codex code/cards experiment**
   (branch `exp/evals-1111` at `0b395e5a`, local only; `benchmarks/runs/2026-11-10-idli-pipeline-eval/REPORT.md`,
   "Round 2"; Codex: branch `exp/clef-form`, `benchmarks/runs/2026-11-11-clef-form/REPORT.md`).
