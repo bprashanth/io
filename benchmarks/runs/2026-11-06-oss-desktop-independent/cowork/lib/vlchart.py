@@ -128,25 +128,48 @@ def spec_for(res, title, spec=None, form=None):
                 and 1 < len({r.get(c) for r in rows}) <= 12]
         sort_by = ((spec or {}).get("sort") or {}).get("by")
         size = labels.get(sort_by) if labels.get(sort_by) in cols else None
-        values = [dict(r, **{c + " ": _label(c, r.get(c)) for c in cols}) for r in rows
-                  if isinstance(r.get(lat), (int, float)) and isinstance(r.get(lon), (int, float))]
-        if len(values) < 2:
+        pts = [r for r in rows if isinstance(r.get(lat), (int, float)) and isinstance(r.get(lon), (int, float))]
+        if len(pts) < 2:
             return None
+        # rows at the same point (rounded locations) would hide each other: one bubble per point, sized by their
+        # total, with the number of rows on it and in the tooltip
+        groups = {}
+        for r in pts:
+            groups.setdefault((r[lat], r[lon]), []).append(r)
+        values, merged = [], any(len(g) > 1 for g in groups.values())
+        for (la, lo), g in groups.items():
+            v = {lat: la, lon: lo, "Rows here": len(g), "n": str(len(g)) if len(g) > 1 else ""}
+            for c in cats[:1]:
+                vals = sorted({str(x.get(c)) for x in g})
+                v[c] = vals[0] if len(vals) == 1 else "mixed"
+                v[c + " "] = ", ".join(vals)
+            if size:
+                v[size] = sum(x.get(size) or 0 for x in g)
+                v[size + " "] = _label(size, v[size]) + (" in total" if len(g) > 1 else "")
+            for c in cols:
+                if c not in v and c not in (lat, lon) and len(g) == 1:
+                    v[c + " "] = _label(c, g[0].get(c))
+            values.append(v)
         enc = {"x": {"field": lon, "type": "quantitative", "title": "Longitude", "scale": {"zero": False, "nice": False,
                                                                                          "padding": 12}},
                "y": {"field": lat, "type": "quantitative", "title": "Latitude", "scale": {"zero": False, "nice": False,
                                                                                         "padding": 12}},
-               "tooltip": [{"field": c + " ", "title": c} for c in cols if c not in (lat, lon)][:8]}
+               "tooltip": ([{"field": "Rows here"}] if merged else [])
+                          + [{"field": c + " ", "title": c} for c in ([cats[0]] if cats else []) + ([size] if size else [])]
+                          + ([] if merged else [{"field": c + " ", "title": c} for c in cols
+                                                 if c not in (lat, lon) and c not in cats[:1] and c != size][:6])}
         if cats:
             enc["color"] = {"field": cats[0], "type": "nominal"}
         if size:
             enc["size"] = {"field": size, "type": "quantitative", "title": _short(size), "scale": {"range": [30, 600]}}
         return {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "config": CONFIG, "background": "white",
-                "title": title + (f", sized by {_short(size)}" if size else "") + " (one point per row; no base map)",
-                "width": 480, "height": 420, "data": {"values": values},
-                "mark": {"type": "circle", "opacity": 0.75, "stroke": "white", "strokeWidth": 0.5,
-                         **({} if size else {"size": 90})},
-                "encoding": enc}
+                "title": title + (f", sized by {_short(size)}" if size else "")
+                + (" (rows at the same place are one bubble; the number on it says how many)" if merged else ""),
+                "width": 480, "height": 420, "data": {"values": values}, "encoding": enc,
+                "layer": [{"mark": {"type": "circle", "opacity": 0.75, "stroke": "white", "strokeWidth": 0.5,
+                                    **({} if size else {"size": 90})}},
+                          {"mark": {"type": "text", "fontSize": 10, "fontWeight": "bold", "color": "#222"},
+                           "encoding": {"text": {"field": "n"}, "size": {"value": 10}, "color": {"value": "#222"}}}]}
     if not groups or not nums or len(rows) < 2:
         return None
     values = _vals(rows, groups, nums)
