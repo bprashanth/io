@@ -149,13 +149,15 @@ def start_chat(ws_id):
         agent = old
     if agent:
         say(f"{CHAT} chat exists")
+        if (agent.get("labels") or {}).get("idli.role") != "setup":  # Start here never splits (Paseo patch P15)
+            paseo("agent", "update", agent["id"], "--label", "idli.role=setup", parse=False, change=True)
         return agent["id"]
     say(f"create the {CHAT} chat (Idli greets the person)")
     if DRY or not ws_id:
         return None
     out = paseo("run", "--provider", START_PROVIDER, "--workspace", ws_id, "--mode", "bypassPermissions",
                 "--thinking", "low",  # measured: low acts on "yes" in ~5 s vs ~10 s on high, same choices
-                "--title", CHAT, "--no-wait", "hello")
+                "--title", CHAT, "--label", "idli.role=setup", "--no-wait", "hello")
     return (out or {}).get("agentId")
 
 

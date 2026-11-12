@@ -168,10 +168,10 @@ index f85d09ca..a23dbddb 100644
    useEffect(() => {
 diff --git a/packages/app/src/utils/idli-pairing.ts b/packages/app/src/utils/idli-pairing.ts
 new file mode 100644
-index 00000000..443c9233
+index 00000000..2377703f
 --- /dev/null
 +++ b/packages/app/src/utils/idli-pairing.ts
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,156 @@
 +// Idli P15: every Idli chat has its own Claude chat beside it. In a workspace whose chats run on the Idli provider,
 +// the layout keeps two panes: Idli's chats on the left, and on the right only the Claude chats paired with the Idli
 +// chat shown on the left (label idli.pair=<idli agent id>, set by Idli's teach_send). Switching Idli chats swaps the
@@ -185,6 +185,7 @@ index 00000000..443c9233
 +
 +export const IDLI_PROVIDERS = new Set(["t4gc-cowork"]);
 +export const PAIR_LABEL = "idli.pair";
++export const ROLE_LABEL = "idli.role";  // "setup" on Start here's Logins chat: that workspace never splits
 +
 +interface PairAgent {
 +  id: string;
@@ -204,8 +205,13 @@ index 00000000..443c9233
 +  ) as PairAgent[];
 +}
 +
++function isSetup(agents: PairAgent[]): boolean {
++  return agents.some((a) => a.labels?.[ROLE_LABEL] === "setup");
++}
++
 +export function isIdliWorkspace(serverId: string, workspaceId: string): boolean {
-+  return workspaceAgents(serverId, workspaceId).some((a) => IDLI_PROVIDERS.has(String(a.provider)));
++  const agents = workspaceAgents(serverId, workspaceId);
++  return !isSetup(agents) && agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)));
 +}
 +
 +let syncing = false;
@@ -222,6 +228,12 @@ index 00000000..443c9233
 +    if (!layout) return;
 +    const explorerId = store.explorerSidebarPaneIdByWorkspace[workspaceKey] ?? null;
 +    const mains = collectAllPanes(layout.root).filter((p) => !p.hidden && p.id !== explorerId);
++    if (isSetup(agents)) {  // Start here: one pane; drop a side pane left over from before (nothing in it)
++      const side = mains.length >= 2 ? mains[mains.length - 1] : null;
++      const sideTabs = side ? collectAllTabs(layout.root).filter((t) => side.tabIds.includes(t.tabId)) : [];
++      if (side && sideTabs.every((t) => t.target.kind === "new_tab")) store.closePane(workspaceKey, side.id);
++      return;
++    }
 +    if (mains.length < 2) {
 +      store.ensureSidePane(workspaceKey, { focus: false });
 +      return;
