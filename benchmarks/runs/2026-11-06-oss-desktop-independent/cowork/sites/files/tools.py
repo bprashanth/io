@@ -685,6 +685,12 @@ def t_teach_send(request_id, share_labels=None, switch=True):
             with open(os.path.join(fk.TEACH_DIR, request_id, "teach_agent.json")) as f:
                 agent = json.load(f)["agent"]
             from lib import uiswitch
+            me = os.environ.get("PASEO_AGENT_ID")
+            if me and uiswitch.split_enabled():
+                # split: Claude opens on the right; Idli's own chat must stay in front on the left (opening Claude's
+                # tab there first leaves the left pane on whatever tab came before), then focus goes to Claude
+                uiswitch.show_agent(agent, side="right")
+                uiswitch.show_agent(me, side="left")
             out["switched"] = uiswitch.show_agent(agent, side="right")["ok"]
         except (OSError, ValueError, KeyError):
             out["switched"] = False
