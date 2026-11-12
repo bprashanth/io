@@ -8,6 +8,20 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-12 (late night), DGX + laptop: design narrative; sharing what Idli learned, four ways.**
+  - **Design:** [idli-design.md](idli-design.md): a teacher model (Claude) learns from stand-ins and leaves
+    scaffolding (forms, checks, charts, site tools) that a private worker model drives; the app makes the teaching
+    loop easy and keeps the scaffold. History declauded (166 commits; backup branch
+    `backup/oss-desktop-eval-pre-declaude-20261112`); not pushed.
+  - **Sharing** ([idli-sharing.md](idli-sharing.md)): one bundle (`lib/share.py`: the skill, a manifest listing
+    the real words inside, hashes) and four ways: a .idli file (Mission control Share / Add), a Drive link
+    (`skill_import`), a hidden `_idli_skill` tab in the checked copy (a colleague who opens the shared sheet gets a
+    card), and a share code from the Idli server (`/idli/share` on the router). DGX: two Idli homes, A shared and
+    B added by file, by code and from the sheet, then answered straight away. Laptop: code round trip through silo.
+  - **Incident:** resetting the laptop to the rewritten history overwrote the households skill the owner had just
+    taught (git-tracked fixture files; the warning lines were missed). Rebuilt from the Claude Code transcript
+    (v2, 7 measures, its tests pass); the overwritten copy is in `archive/skills`. The extra "Greet and confirm
+    availability" workspace is not archived yet (the owner's teaching chat was using it).
 - **2026-11-12 (night), laptop: Vega-Lite charts and the Idli | Claude split, verified in the app.**
   - **Charts** (`lib/vlchart.py`): code picks the chart from the answer's shape (bars; one panel per figure; a time
     line; a heatmap for two breakdowns; a point map when rows have latitude/longitude, rows at one place merged into a
