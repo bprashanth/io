@@ -207,6 +207,13 @@ ok(_one("n", 16) == "Volunteers with no stipend recorded. 16.", "a count never g
 ok(_one("p", 18.4) == "Share paid. 18.4%.", "a percent gets %")
 ok(_one("a", 1500) == "Amount. Rs 1,500.", "inr gets Rs")
 ok(_one("m", 1500) == "Average stipend. Rs 1,500.", "a 'number' money average keeps the label guess")
+# models' date words: "year" is this_year; a date range written as a filter is read as the date
+_T = _dt.date(2026, 11, 12) if "_dt" in dir() else None
+import datetime as _dt2  # noqa: E402
+ok(fm.period("year", _dt2.date(2026, 11, 12)) == ("2026-01-01", "2026-11-12"), "period 'year' = this year")
+ok(fm.period("this year", _dt2.date(2026, 11, 12)) == ("2026-01-01", "2026-11-12"), "period 'this year'")
+ok(fm.period("FY", _dt2.date(2026, 11, 12)) == ("2026-04-01", "2026-11-12"), "period 'FY'")
+ok(fm.period("september", _dt2.date(2026, 11, 12)) == ("2026-09-01", "2026-09-30"), "period in words: september")
 import datetime as _dt  # noqa: E402
 T = _dt.date(2026, 11, 8)
 for words, want in [("last month", ("2026-10-01", "2026-10-31")), ("this FY", ("2026-04-01", "2026-11-08")),

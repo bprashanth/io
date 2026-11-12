@@ -8,6 +8,19 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-12 (afternoon), DGX: form engine reads two model slips the way they were meant** (all modes).
+  - **Date words:** "this year" came back as `{"period": "year"}`, in `filters` or in `date`; the form refused it,
+    so the question errored and the follow-up had nothing to refer to. `formkit.period` now takes "year", "this
+    year", "FY" and the like, and other words go through `parse_when`. A date range written as a filter is read
+    as the spec's date.
+  - **"Not everything but one":** "which are still pending" came back as Status not Approved, Paid, Rejected
+    (Codex's "Ward D alone" miss is the same slip). When 2 or more known values are excluded and one is left, the
+    spec becomes that value: the answer says "Status is Pending" and leaves out blank or new statuses.
+  - Both in `formkit.normalize_spec` (run before the query and its description). Quick clarify set, today's
+    prompt on the 9B: 23/32 (was 22); the reimbursement conversation now answers both steps.
+  - **Quick clarify experiment** (`benchmarks/runs/2026-11-12-clarify-quick/REPORT.md`): nobody over-asks; today,
+    vague words and names not in the file go to Claude; Muse with clarify/absent replies and code value hints gets
+    29/32 (asks about "poor", says "IAF funder" isn't there), the 9B 24/32. Not in the product yet.
 - **2026-11-12 (morning), DGX: Idli's model switch: Muse, 9B, Steam powered** (commit `3cc04497`; laptop not yet
   pulled, tunnel down). The owner asked for the code/cards result behind a switch in Idli's model menu.
   - **How:** Paseo's Idli provider lists three models; the id goes to the DGX router behind silo

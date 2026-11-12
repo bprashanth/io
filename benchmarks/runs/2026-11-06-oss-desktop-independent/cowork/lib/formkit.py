@@ -361,9 +361,23 @@ PERIODS = ("this_month", "last_month", "this_quarter", "last_quarter", "this_yea
            "this_financial_year", "last_financial_year", "last_7_days", "last_30_days", "last_90_days")
 
 
+PERIOD_ALIASES = {"year": "this_year", "current_year": "this_year", "month": "this_month", "current_month": "this_month",
+                  "quarter": "this_quarter", "current_quarter": "this_quarter", "fy": "this_financial_year",
+                  "this_fy": "this_financial_year", "financial_year": "this_financial_year",
+                  "last_fy": "last_financial_year", "previous_year": "last_year", "previous_month": "last_month",
+                  "previous_quarter": "last_quarter", "ytd": "this_year", "year_to_date": "this_year"}
+
+
 def period(name, today=None):
-    """Named period -> (from, to) as ISO dates. Financial years run April to March (India)."""
+    """Named period -> (from, to) as ISO dates. Financial years run April to March (India). Forgiving: models write
+    "year" or "this year" for this_year; anything else goes through the user's-own-words parser (parse_when)."""
     t = today or dt.date.today()
+    key = re.sub(r"[\s-]+", "_", str(name or "").strip().lower())
+    name = PERIOD_ALIASES.get(key, key)
+    if name not in PERIODS and not (name.startswith("last_") and name.endswith("_days") and name[5:-5].isdigit()):
+        got = parse_when(str(name).replace("_", " "), t)
+        if got:
+            return got[0], got[1] or t.isoformat()
     first = t.replace(day=1)
     if name == "this_month":
         a, b = first, t
@@ -598,7 +612,35 @@ def describe(f, spec, presets):
     return "; ".join(parts)
 
 
+def normalize_spec(f, spec):
+    """Read what a model meant, before the query and its description are built (both use the result):
+    - a date range written as a filter ({"claim_date": {"period": "year"}}) becomes the spec's date;
+    - "not A, B, C" when only D is left among a column's known values becomes D, so the answer says "Status is
+      Pending" and leaves out blanks and new values (Codex exp/clef-form: "Ward D alone" came back as "not Wards A,
+      B, C, E"; the 9B wrote "still pending" as "not Approved, Paid, Rejected"). Only when 2+ are excluded:
+      "not cancelled" keeps blank rows."""
+    if not isinstance(spec, dict) or not isinstance(spec.get("filters"), dict):
+        return spec
+    spec, filt = dict(spec), dict(spec["filters"])
+    by = {x["column"]: x for x in f["filters"]}
+    for c, v in list(filt.items()):
+        x = by.get(c) or {}
+        if x.get("kind") == "date" and isinstance(v, dict) and ("period" in v or "text" in v) and not spec.get("date"):
+            spec["date"] = {"column": c, **{k: v[k] for k in ("period", "text", "from", "to") if k in v}}
+            del filt[c]
+        elif x.get("kind") == "choice" and isinstance(v, dict) and set(v) == {"not"}:
+            known = x.get("values") or []
+            out = [v["not"]] if isinstance(v["not"], str) else list(v["not"] or [])
+            low = {str(o).strip().lower() for o in out}
+            left = [a for a in known if str(a).strip().lower() not in low]
+            if len(out) >= 2 and len(left) == 1 and len(known) == len(left) + len(low & {str(a).strip().lower() for a in known}):
+                filt[c] = left
+    spec["filters"] = filt
+    return spec
+
+
 def run(con, f, table, spec):
+    spec = normalize_spec(f, spec)
     sql, total_sql, presets = compile_spec(f, table, spec)
     df = con.execute(sql).fetchdf()
     total = con.execute(total_sql).fetchdf() if total_sql else None
