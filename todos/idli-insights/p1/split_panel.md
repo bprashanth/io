@@ -20,3 +20,9 @@ Plan:
    lists it).
 3. The focus border: a small Paseo patch (Paseo already tracks the focused pane); switches call the existing
    uiswitch deep link, which focuses the pane holding that chat.
+
+## Built (2026-11-12)
+Paseo patches P13 (agent link `~right`/`~left`) and P14 (focus ring), see `paseo_patches.md`; provider `idli-teach`
+(`cowork/desktop/claude-teach.sh`, no `mcp__paseo` browser tools); `teach_send` starts Claude's chat in Idli's
+workspace and opens it on the right when `config/ui.json` has `"split": true`. Website teaching (test accounts in
+the browser) stays in the Claude workspace. Tested on the DGX in Paseo's web UI; laptop install needs one sudo step.
