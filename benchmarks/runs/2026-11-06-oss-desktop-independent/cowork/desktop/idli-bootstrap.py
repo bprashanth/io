@@ -238,6 +238,12 @@ def start_tabs(agent_id):
     if not browser:
         say("the app's browser isn't available; open Paseo and rerun to add the Drive and Gmail tabs")
         return
+    tabs = browser.tabs()
+    for host in {urllib.parse.urlparse(u).hostname for u in TABS}:  # reruns opened duplicates: keep one per site
+        dup = [t for t in tabs if urllib.parse.urlparse(t["url"]).hostname == host][1:]
+        for t in dup:
+            say(f"close a duplicate {host} tab")
+            browser.paseo("browser_close_tab", browserId=t["id"])
     have = {urllib.parse.urlparse(t["url"]).hostname for t in browser.tabs()}
     for url in TABS:
         key = url + "@" + FOLDER["Start here"]  # Start here moved folders (2026-11-10): open its tabs again there
@@ -254,6 +260,10 @@ def retire_old_mission_control():
         if w["name"] == OLD_MISSION_CONTROL:
             say(f"archive the old Mission control workspace ({w['cwd']})")
             paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
+    for p in paseo("project", "ls") or []:  # and its heading in the sidebar
+        if same(p["path"], os.path.join(IDLI, "start-here")):
+            say("remove the old Mission control heading")
+            paseo("project", "delete", p["projectId"], parse=False, change=True)
 
 
 def retire_old_start_here():
