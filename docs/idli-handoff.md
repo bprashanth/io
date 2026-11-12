@@ -338,8 +338,16 @@ pushed to GitHub), last commit is the one that updated this page.
 - Paseo's Idli model menu → DGX router (`dgx/muse_prefix_proxy.py`, user service `muse-prefix-proxy`) →
   `cowork/lib/modes.py`. The 9B: `dgx/idli-9b.sh up|down|status` (container `idli-9b`, port 8291), needed by the 9B
   and Steam modes. Chronology: "2026-11-12 (morning), DGX: Idli's model switch".
-- **Laptop to do:** `git pull dgx oss-desktop-eval`, then merge the three `models` of `desktop/setup-laptop.py`
-  into `~/.paseo/config.json` (provider t4gc-cowork) and `paseo reload`; then the end-to-end run with screenshots.
+- **Laptop (2026-11-12 ~09:00):** pulled `1eda4efa`; the three models are in `~/.paseo/config.json` (backup
+  `config.json.bak-modes`); Paseo lists them. In the app, cestrum original by link, "Use the checked copy" →
+  start card → "trees per plot" (chart + list) → "share of trees that are cestrum, by transect" (17.4%, with the
+  new %) → "ask Claude" → card:
+  - **Steam powered:** all steps right; 5-7 s per question; "Not now" sent nothing (no new Claude chat).
+  - **Idli 9B:** same answers, ~20 s per question; the "ask Claude" card appeared (3 min, mostly making the fake
+    copy). Stopped there when the laptop closed: chat "9B: cestrum" sits on that card, nothing sent.
+  - **Muse:** not run in the app yet (DGX-tested only).
+  - Steps the product itself takes, in every mode: file_get ~40-60 s (browser download), the fake copy for Claude
+    ~2 min.
 
 ### 2. Evals: E6, E7, E1, E2, E3 done and reported
 - **Where:** branch `idli-pipeline-eval`, pushed at `b4e4361f` (declauded); worktree
