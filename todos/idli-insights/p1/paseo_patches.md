@@ -21,6 +21,9 @@ patch file until we decide between upstream PRs and our own build. Running list.
 | P11 | **Browser tab viewport = visible pane**: when the window is narrow, size the guest page to the pane it is shown in | Seen 2026-11-09: a dashboard tab laid out at 1280 px while the pane was 630 px, cropping its right side; another tab in the same workspace correctly reported 630 | ❌ to investigate (repro: narrow window, open a browser tab, switch tabs) |
 
 Notes
+- **Building the app UI for the desktop**: `cd packages/app && PASEO_WEB_PLATFORM=electron npx expo export --platform web`
+  (as the root `build:desktop` script does). Without `PASEO_WEB_PLATFORM=electron` the app thinks it is a web page
+  and every browser tab says "Browser is desktop-only" (builds idli1-4 had this; idli5 fixed it).
 - **Installing P13/P14 on a laptop**: the desktop shell loads its UI from `/opt/Paseo/resources/app-dist` (plain web
   files; no native code), so only that folder changes: `cowork/desktop/install-paseo-ui.sh` copies the build from the
   DGX into `~/idli-insights/paseo/app-dist`; once, `sudo` points `app-dist` at it (a symlink; `app-dist.orig` kept);
