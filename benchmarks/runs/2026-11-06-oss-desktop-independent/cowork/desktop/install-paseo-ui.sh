@@ -5,7 +5,7 @@
 #   install-paseo-ui.sh [install|off|status]     (DGX=user@host overrides the build host)
 set -e
 DGX=${DGX:-beeps@gx10-0a47.tail5ef239.ts.net}
-BUILD=${BUILD:-paseo-app-dist-0.15.2-idli1}
+BUILD=${BUILD:-paseo-app-dist-0.15.2-idli2}
 RES=/opt/Paseo/resources
 OURS=${IDLI_HOME:-$HOME/idli-insights}/paseo/app-dist
 CFG=${IDLI_HOME:-$HOME/idli-insights}/config/ui.json
