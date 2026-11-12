@@ -255,6 +255,22 @@ def _brief(f):
 def t_file_open(file, show_form=True, goal=None):
     meta = files().meta(file)
     if not meta["known"]:
+        try:
+            from lib import share, workcopy
+            data = workcopy.embedded(files().resolve(file))
+            got = share.inspect(data) if data else None
+        except Exception:  # noqa: BLE001
+            got = None
+        if got and not got["problems"]:  # a shared sheet that carries what a colleague's Idli learned
+            q = ("This file carries what a colleague's Idli learned about it: " + share.describe(got["manifest"])
+                 + " Add it to your Idli, so you can ask questions straight away?")
+            return {"file": file, "known": False, "carries_skill": True, "say_to_user": q,
+                    "card": {"questions": [{"header": "Shared", "multiSelect": False, "question": q, "options": [
+                        {"label": "Yes, add it (Recommended)", "description": "Its form, checks and charts; no data rows"},
+                        {"label": "No, teach Idli myself", "description": "Claude learns it with you from a fake copy"}]}]},
+                    "then": "Call AskUserQuestion with exactly `card` (write nothing first). On \"Yes, add it\": call "
+                            "skill_import with source 'sheet:" + file + "' and confirmed=true, then file_open again. On "
+                            "\"No, teach Idli myself\": call teach_file with their request."}
         return {"file": file, "known": False,
                 "then": "Idli hasn't been taught this file. Call teach_file now with the user's request as the question "
                         "(it only prepares a copy with fake values; nothing is sent until they say yes on its card). "
@@ -542,6 +558,72 @@ def t_form_explain(file, measure=None):
         return {"error": f"No figure called '{measure}'.", "then": "Call form_explain without a measure to list them."}
     lines = [f"- {x['figure']}: {x['worked_out_as']}" + (f" ({x['note']})" if x.get("note") else "") for x in out[:12]]
     return {"figures": out[:12], "say_to_user": "How the form works these out:\n" + "\n".join(lines)}
+
+
+def t_skill_import(source, confirmed=False):
+    """Add what someone else's Idli learned. source: a .idli file path, a share code (IDLI-XXXX-XXXX), a Google
+    Drive link to a .idli file, or 'sheet:<file>' (a shared sheet that carries it). First call: a card saying what
+    it carries; confirmed=true installs."""
+    from lib import share, workcopy, muse
+    src = str(source or "").strip()
+    data = None
+    try:
+        if src.startswith("sheet:"):
+            data = workcopy.embedded(files().resolve(src[6:]))
+        elif re.fullmatch(r"(?i)idli-[2-9a-z]{4}-[2-9a-z]{4}", src):
+            req = urllib.request.Request(muse.base_url() + "/idli/share/" + src.upper(), headers=muse.headers())
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = r.read()
+        elif LINK.search(src):
+            got = t_file_get(src, open_after=False)
+            if not got.get("downloaded"):
+                return got
+            with open(files().resolve(got["file"]), "rb") as f:
+                data = f.read()
+        else:
+            with open(os.path.expanduser(src), "rb") as f:
+                data = f.read()
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"Couldn't get the shared skill: {type(e).__name__}: {str(e)[:160]}"}
+    if not data:
+        return {"error": "Nothing shared there."}
+    got = share.inspect(data)
+    if got["problems"]:
+        return {"error": "That isn't something Idli can add: " + "; ".join(got["problems"])}
+    if not confirmed:
+        q = "Add this to your Idli? " + share.describe(got["manifest"])
+        return {"card": {"questions": [{"header": "Shared", "multiSelect": False, "question": q, "options": [
+                    {"label": "Yes, add it", "description": "Its form, checks and charts"},
+                    {"label": "No", "description": "Nothing changes"}]}]},
+                "then": "Call AskUserQuestion with exactly `card`. On \"Yes, add it\": call skill_import again with the "
+                        "same source and confirmed=true."}
+    out = share.install(data, replace=True)
+    files().cache.clear() if hasattr(files(), "cache") else None
+    out.pop("manifest", None)
+    if out.get("installed"):
+        out["say_to_user"] = (f"Added {out['title']} (version {out['version']}). Any file of this kind now opens with "
+                              "its form, checks and charts.")
+    return out
+
+
+def t_skill_share(file_title, how="code"):
+    """Share what Idli learned about one file with someone who has Idli: how = code (a short code they type into
+    Mission control), file (a .idli file to send any way). The checked copy in Drive carries it too."""
+    from lib import share, muse
+    try:
+        if how == "file":
+            got = share.pack(file_title)
+            return {"path": got["path"], "say_to_user": f"Saved {os.path.basename(got['path'])} in {os.path.dirname(got['path'])}. "
+                    "Send it any way you like; they add it on their Mission control tab. " + share.describe(got["manifest"])}
+        data, man = share.pack_bytes(file_title)
+        req = urllib.request.Request(muse.base_url() + "/idli/share", data,
+                                     {"Content-Type": "application/zip", **muse.headers()})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            code = json.load(r)["code"]
+        return {"code": code, "say_to_user": f"Share code: {code}. They type it on their Mission control tab (Add what "
+                f"someone else's Idli learned). " + share.describe(man)}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {str(e)[:200]}"}
 
 
 def _file_ask_spec(file, spec, tab=None, chart=False):
@@ -1251,6 +1333,15 @@ TOOLS = {
                      "calculated?\", \"what does X mean?\"). Answered from the taught skill, no need for Claude.",
                      {**FILE, "measure": {"type": "string", "description": "The figure's name as the form shows it "
                                                                          "(omit to list all)"}}, ["file"]),
+    "skill_import": (t_skill_import, "Add what someone else's Idli learned (a file's form, checks and charts): source = "
+                     "a .idli file path, a share code IDLI-XXXX-XXXX, a Google Drive link to a .idli file, or "
+                     "'sheet:<file>' for a shared sheet that carries it. Shows a card first; confirmed=true adds it.",
+                     {"source": {"type": "string", "description": "Path, share code, Drive link or sheet:<file>"},
+                      "confirmed": {"type": "boolean", "description": "Only after a yes on its card"}}, ["source"]),
+    "skill_share": (t_skill_share, "Share what Idli learned about one file with someone who has Idli: how='code' gives a "
+                    "short code they type into their Mission control; how='file' saves a .idli file to send.",
+                    {"file_title": {"type": "string", "description": "The skill's id or title (skills_list)"},
+                     "how": {"type": "string", "enum": ["code", "file"]}}, ["file_title"]),
     "teach_file": (t_teach_file, "Prepare a teaching request for a file Idli doesn't know, or whose layout changed, or a "
                    "question the form can't answer: a copy of the file with fake values and the user's question with "
                    "names removed. Shows what would be sent; nothing is sent yet.",

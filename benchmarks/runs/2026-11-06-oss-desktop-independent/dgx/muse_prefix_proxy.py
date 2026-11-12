@@ -8,6 +8,8 @@ The model menu on Idli's Paseo provider picks one (cowork/lib/modes.py has the d
   idli-9b                      → the local 9B (IDLI_9B_URL, default 127.0.0.1:8291) on a lean prompt, with guards.
   idli-steam                   → code runs the chat (no model), except one 9B call per question for the form's dials.
 POST /v1/chat/completions with model idli-9b (file_ask's split, from the MCP server) goes to the 9B as is.
+POST /idli/share (an Idli skill bundle, a zip) -> {"code": "IDLI-XXXX-XXXX"}; GET /idli/share/<code> -> the bundle.
+  Sharing what Idli learned by a short code (cowork/lib/share.py); bundles hold no rows of anyone's data.
 Everything else passes through to Muse unchanged, streamed.
 
 Usage: muse_prefix_proxy.py [LISTEN_PORT=8185] [UPSTREAM=127.0.0.1:8181]   (binds 127.0.0.1 only)
@@ -17,6 +19,7 @@ import http.server
 import importlib.util
 import json
 import os
+import re
 import sys
 import traceback
 import urllib.parse
@@ -31,6 +34,19 @@ _s = importlib.util.spec_from_file_location("idli_modes", _p)
 modes = importlib.util.module_from_spec(_s)
 _s.loader.exec_module(modes)
 NINE = urllib.parse.urlparse(modes.NINE_URL)
+
+
+SHARE_DIR = os.environ.get("IDLI_SHARE_DIR") or os.path.expanduser("~/idli-shares")
+CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"  # no 0/O, 1/I/L, U
+
+
+def _new_code():
+    import secrets
+    while True:
+        c = "IDLI-" + "".join(secrets.choice(CODE_ALPHABET) for _ in range(4)) + "-" + \
+            "".join(secrets.choice(CODE_ALPHABET) for _ in range(4))
+        if not os.path.exists(os.path.join(SHARE_DIR, c + ".idli")):
+            return c
 
 
 def rewrite(body):
@@ -68,10 +84,28 @@ class H(http.server.BaseHTTPRequestHandler):
             return self.reply(200, "text/event-stream", modes.sse(msg))
         return self.reply(200, "application/json", json.dumps(msg, ensure_ascii=False).encode())
 
+    def share(self, path, body):
+        if self.command == "POST" and path == "/idli/share":
+            if not body or len(body) > 20_000_000 or not body.startswith(b"PK"):
+                return self.reply(400, "application/json", b'{"error": "not an Idli bundle"}')
+            os.makedirs(SHARE_DIR, exist_ok=True)
+            code = _new_code()
+            with open(os.path.join(SHARE_DIR, code + ".idli"), "wb") as f:
+                f.write(body)
+            return self.reply(200, "application/json", json.dumps({"code": code}).encode())
+        code = path.rsplit("/", 1)[-1].upper()
+        p = os.path.join(SHARE_DIR, code + ".idli")
+        if self.command != "GET" or not re.fullmatch(r"IDLI-[2-9A-Z]{4}-[2-9A-Z]{4}", code) or not os.path.exists(p):
+            return self.reply(404, "application/json", b'{"error": "no such code"}')
+        with open(p, "rb") as f:
+            return self.reply(200, "application/zip", f.read())
+
     def handle_one(self):
         n = int(self.headers.get("content-length") or 0)
         body = self.rfile.read(n) if n else None
         path = self.path.split("?")[0]
+        if path == "/idli/share" or path.startswith("/idli/share/"):
+            return self.share(path, body)
         host, port = UP_HOST, int(UP_PORT)
         if body is not None and self.command == "POST" and path in ("/v1/messages", "/v1/messages/count_tokens",
                                                                     "/v1/chat/completions"):

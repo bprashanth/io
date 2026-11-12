@@ -17,6 +17,8 @@ link, go straight to file_get (below).
 - Call file_get with the file's id or link and `goal` ("clean" or "analyse") straight away, writing nothing first.
   It opens the form too; do what its `then` says (usually one card that already says everything: don't write
   anything before it).
+- If file_open says the file carries what a colleague's Idli learned (carries_skill), show its card; on yes call
+  skill_import as its `then` says, then file_open again.
 - If Idli doesn't know the file: call teach_file with their request and do what its `then` says (one card: send a
   copy with fake values to Claude, who learns the file and its checks with them, and switch there).
 - When a message says teaching finished: call file_open again with the same goal and do what its `then` says.

@@ -19,6 +19,8 @@ from lib import fixkit
 from lib import formkit as fm
 
 CHECKS_TAB = "Idli checks"
+SKILL_TAB = "_idli_skill"  # hidden: what Idli learned about this file, so a colleague's Idli can use it (lib/share.py)
+CHUNK = 40000  # Google Sheets keeps up to 50,000 characters in a cell
 MAX_REFS = 6
 
 
@@ -204,17 +206,62 @@ def build(path, skill, problems, out_path):
         k += 1
     for col, w in (("A", 22), ("B", 10), ("C", 7), ("D", 90)):
         lists.column_dimensions[col].width = w
+    embed(book, skill)
     book.save(out_path)
     return {"groups": len([g for g in gs if not (g["first"]["rule"] == "layout" and g["first"].get("skipped"))]),
             "cells": sum(g["count"] for g in gs if not g["first"].get("skipped")), "live": len(live), "static": static}
 
 
+def embed(book, skill):
+    """A hidden tab carrying the file's skill (form, checks, charts; no fake copy, no rows of data). Anyone who opens
+    the shared sheet with Idli is offered it instead of teaching from scratch. IDLI_EMBED_SKILL=0 turns it off."""
+    import os
+    if os.environ.get("IDLI_EMBED_SKILL", "1") == "0" or not (skill or {}).get("id"):
+        return False
+    try:
+        from lib import share
+        data, _ = share.pack_bytes(skill["id"], with_mock=False)
+    except Exception:  # noqa: BLE001  (the copy is still useful without it)
+        return False
+    text = share.to_text(data)
+    if SKILL_TAB in book.sheetnames:
+        del book[SKILL_TAB]
+    ws = book.create_sheet(SKILL_TAB)
+    ws.sheet_state = "hidden"
+    ws.cell(1, 1, "What Idli learned about this file, for colleagues who use Idli. Leave this tab as it is.")
+    for i in range(0, len(text), CHUNK):
+        ws.cell(2 + i // CHUNK, 1, text[i:i + CHUNK])
+    return True
+
+
+def embedded(path):
+    """The skill bundle a shared sheet carries (bytes), or None."""
+    from openpyxl import load_workbook
+    try:
+        book = load_workbook(path, read_only=True)
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        if SKILL_TAB not in book.sheetnames:
+            return None
+        rows = [r[0] for r in book[SKILL_TAB].iter_rows(min_row=2, max_col=1, values_only=True) if r and r[0]]
+    finally:
+        book.close()
+    from lib import share
+    try:
+        return share.from_text("".join(str(x) for x in rows))
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def strip(path):
-    """Drop the "Idli checks" tab from a downloaded working copy, so the form reads only the person's tabs."""
+    """Drop Idli's tabs ("Idli checks", the hidden skill) from a downloaded working copy, so the form reads only the
+    person's tabs."""
     from openpyxl import load_workbook
     book = load_workbook(path)
-    if CHECKS_TAB in book.sheetnames:
-        del book[CHECKS_TAB]
+    gone = [t for t in (CHECKS_TAB, SKILL_TAB) if t in book.sheetnames]
+    for t in gone:
+        del book[t]
+    if gone:
         book.save(path)
-        return True
-    return False
+    return bool(gone)

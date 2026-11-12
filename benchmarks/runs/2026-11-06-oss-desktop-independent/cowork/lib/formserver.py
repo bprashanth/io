@@ -14,7 +14,10 @@ import os
 import secrets
 import sys
 import threading
+import urllib.error
 import urllib.parse
+import urllib.request
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import duckdb
@@ -242,6 +245,7 @@ class Files:
         return res
 
 
+STAGED = {}  # previewed bundles waiting for "Add it" (by a one-time id)
 VENDOR = {"vega.min.js", "vega-lite.min.js", "vega-interpreter.min.js", "vega-embed.min.js"}
 
 
@@ -359,6 +363,16 @@ def make_handler(files, token):
                     return self._send(200, {"status": st, "line": di.progress_line(st)})
                 if u.path == "/api/form":
                     return self._send(200, files.meta(qs["file"][0]))
+                if u.path == "/api/skills/bundle":  # the .idli file (a download in the app's browser)
+                    from lib import share
+                    data, man = share.pack_bytes(qs["id"][0])
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/zip")
+                    self.send_header("Content-Disposition", f'attachment; filename="{man["id"]}-v{man["version"]}.idli"')
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
                 if u.path == "/api/chart":
                     return self._send(200, files.chart(qs["file"][0], qs["name"][0]))
                 if u.path == "/skills":
@@ -381,13 +395,57 @@ def make_handler(files, token):
                 return self._send(403, {"error": "forbidden"})
             try:
                 n = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(min(n, 100000)) or b"{}")
+                body = json.loads(self.rfile.read(min(n, 30_000_000 if u.path == "/api/skills/preview" else 100000))
+                                  or b"{}")
                 if u.path == "/api/run":
                     return self._send(200, files.run(body["file"], body.get("tab"), body.get("spec") or {}))
                 if u.path == "/api/decide":
                     return self._send(200, files.decide(body["file"], list(body["keys"]), body.get("decision")))
                 if u.path == "/api/fixlist":
                     return self._send(200, files.fixlist(body["file"]))
+                if u.path == "/api/skills/share":  # what the bundle carries, before it goes anywhere
+                    from lib import share
+                    _, man = share.pack_bytes(body["id"])
+                    return self._send(200, {"describe": share.describe(man), "manifest": man})
+                if u.path == "/api/skills/code":
+                    from lib import share, muse
+                    data, man = share.pack_bytes(body["id"])
+                    req = urllib.request.Request(muse.base_url() + "/idli/share", data,
+                                                 {"Content-Type": "application/zip", **muse.headers()})
+                    with urllib.request.urlopen(req, timeout=60) as r:
+                        return self._send(200, json.load(r))
+                if u.path == "/api/skills/preview":
+                    from lib import share, muse
+                    if body.get("code"):
+                        code = re.sub(r"[^A-Za-z0-9-]", "", body["code"]).upper()
+                        req = urllib.request.Request(muse.base_url() + "/idli/share/" + code, headers=muse.headers())
+                        try:
+                            with urllib.request.urlopen(req, timeout=60) as r:
+                                data = r.read()
+                        except urllib.error.HTTPError as e:
+                            return self._send(404 if e.code == 404 else 502,
+                                              {"error": "No skill with that code." if e.code == 404 else f"code server: {e.code}"})
+                    else:
+                        data = share.from_text(body.get("data") or "")
+                    got = share.inspect(data)
+                    if got["problems"]:
+                        return self._send(200, {"problems": got["problems"]})
+                    sid = uuid.uuid4().hex
+                    STAGED[sid] = data
+                    man = got["manifest"]
+                    have = next((x for x in fk.load_skills() if x["id"] == man["id"]), None)
+                    return self._send(200, {"describe": share.describe(man), "staged": sid, "manifest": man,
+                                            "have": (f"You already have version {have.get('version', 1)}; this one "
+                                                     f"is version {man['version']}.") if have else ""})
+                if u.path == "/api/skills/install":
+                    from lib import share
+                    data = STAGED.pop(body.get("staged") or "", None)
+                    if data is None:
+                        return self._send(400, {"error": "Look at the skill again first."})
+                    out = share.install(data, replace=True)
+                    files.cache.clear()
+                    out.pop("manifest", None)
+                    return self._send(200, out)
                 if u.path == "/api/skills/delete":
                     out = skills_delete(body["id"])
                     files.cache.clear()
