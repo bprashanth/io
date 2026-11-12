@@ -3,7 +3,7 @@
 Safe to rerun: it only adds what's missing.
 
   Start here       its own folder (~/idli-insights/setup), first in the sidebar
-     Start here       the setup chat (sign-in checks; also answers "what has Idli learned")
+     Logins           the setup chat (sign-in checks; also answers "what has Idli learned")
      Mission control  a tab: the page listing the files Idli has learned (grows as Claude teaches it)
      Drive            a tab for signing in to Google
   Idli         the private folder (~/idli-insights/cowork-real): where the work happens; a "New chat" is always
@@ -46,6 +46,7 @@ TOOLSETS = {
              "working_copy", "working_copy_ready", "chart_request", "chart_show", "form_explain"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
+CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name Start here)
 TABS = ["https://drive.google.com/drive/my-drive"]  # Gmail later; Drive is all the first run needs
 
 
@@ -137,16 +138,22 @@ def projects_and_workspaces():
 
 def start_chat(ws_id):
     folder = FOLDER["Start here"]
-    agent = next((a for a in paseo("ls", "--global") if a["name"] == "Start here" and same(a.get("cwd") or "", folder)), None)
+    mine = [a for a in paseo("ls", "--global") if same(a.get("cwd") or "", folder)]
+    agent = next((a for a in mine if a["name"] == CHAT), None)
+    old = next((a for a in mine if a["name"] == "Start here"), None)  # its name until 2026-11-12
+    if not agent and old:
+        say(f"rename the Start here chat to '{CHAT}'")
+        paseo("agent", "update", old["id"], "--name", CHAT, parse=False, change=True)
+        agent = old
     if agent:
-        say("Start here chat exists")
+        say(f"{CHAT} chat exists")
         return agent["id"]
-    say("create the Start here chat (Idli greets the person)")
+    say(f"create the {CHAT} chat (Idli greets the person)")
     if DRY or not ws_id:
         return None
     out = paseo("run", "--provider", START_PROVIDER, "--workspace", ws_id, "--mode", "bypassPermissions",
                 "--thinking", "low",  # measured: low acts on "yes" in ~5 s vs ~10 s on high, same choices
-                "--title", "Start here", "--no-wait", "hello")
+                "--title", CHAT, "--no-wait", "hello")
     return (out or {}).get("agentId")
 
 
