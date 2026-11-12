@@ -8,6 +8,28 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-12 (evening), DGX + laptop: Muse and Claude only; simpler layout; readable answers and charts.**
+  - **Owner, after testing the three modes on the laptop:** Steam's answers were unreadable and it didn't converse;
+    the 9B described a chart it hadn't drawn (the quick chart drew only the first figure: one bar). Muse only.
+    The menu lists Idli 30B alone; the router still serves `idli-9b` / `idli-steam` for experiments; the 9B is
+    stopped (`dgx/idli-9b.sh up` to bring it back).
+  - **Answers:** more than 2 figures read "4 figures by Ward", one line per figure; ratios, months, shares and
+    scores never get Rs. **Charts:** several figures draw one panel each; a single row draws none. Idli's
+    instructions now send "show that as a chart" to the form's chart, Claude only for shares, side-by-side
+    filters, maps and computed trends.
+  - **form_explain** (new tool): "how is X worked out?" answered from the skill in code. Muse had sent that
+    question to Claude, whose card then said "I haven't seen households before" for a known file; that wording is
+    fixed too.
+  - **Fake copy:** places that read like names (wards such as "Yerawada Ward") are no longer faked as people
+    ("Person27 Surname32" confused Claude). teach_file returns `question_for_claude` (names replaced).
+  - **Layout:** Start here holds the Start here chat, a Mission control tab (what Idli has learned) and one Drive
+    tab; the old Mission control heading is deleted. Heading order still needs a drag (Paseo patch P2).
+  - **The terminal in the Claude workspace was the DGX agent's** (for `git pull`); Idli never opens one.
+  - **Verified on the DGX** (real Claude Code + Muse, household survey): figures by ward → panels chart (8 s) →
+    form_explain → share question → Claude card ("can't do this yet") → Not now sends nothing.
+  - **Laptop:** on `69eb3b49`+bootstrap (menu, layout, form_explain); the last commit (`b16323b9`, the chart rule
+    in Idli's CLAUDE.md) needs `git pull` + bootstrap. A terminal tab in Start here may be stuck closing.
+  - **Split panel** (Idli left, Claude right): `todos/idli-insights/p1/split_panel.md`.
 - **2026-11-12 (afternoon), DGX: form engine reads two model slips the way they were meant** (all modes).
   - **Date words:** "this year" came back as `{"period": "year"}`, in `filters` or in `date`; the form refused it,
     so the question errored and the follow-up had nothing to refer to. `formkit.period` now takes "year", "this
