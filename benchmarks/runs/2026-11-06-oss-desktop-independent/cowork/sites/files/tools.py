@@ -659,6 +659,7 @@ def t_teach_file(file, question, share_labels=None, missing=None, chart=None):
     if _show_mock(req["id"], title):
         questions[0]["question"] += " (To look first: the fake-copy tab at the top.)"
     return {"request_id": req["id"], "updating": req["existing_skill"], "card": {"questions": questions},
+            "question_for_claude": req.get("question"),  # with names replaced, exactly as Claude gets it
             "then": ("Call AskUserQuestion with exactly `card` (don't write anything first). If they pick \"Yes, send "
                      "and switch\", call teach_send with request_id and share_labels = the label columns they ticked "
                      "([] for \"None\" or nothing ticked). If not, say nothing was sent and offer it again any time.")}
