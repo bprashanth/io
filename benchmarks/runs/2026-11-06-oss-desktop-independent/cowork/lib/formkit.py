@@ -590,7 +590,8 @@ def describe(f, spec, presets):
     """The spec in words, e.g. 'Total amount by Employee; Category is Hardware; Claim date 2026-08-26 to ...'."""
     ms = [f["_measures"][m]["label"] for m in (spec.get("measures") or []) if m in f["_measures"]]
     gs = [f["_groups"][g]["label"] for g in (spec.get("group_by") or []) if g in f["_groups"]]
-    parts = [(" and ".join(ms) or f"Matching {f['row_noun']}") + (" by " + ", ".join(gs) if gs else "")]
+    head = (f"{len(ms)} figures" if len(ms) > 2 else " and ".join(ms)) or f"Matching {f['row_noun']}"
+    parts = [head + (" by " + ", ".join(gs) if gs else "")]
     labels = {x["column"]: x["label"] for x in f["filters"]}
     parts += [f"rule: {p}" for p in presets]
     for c, v in (spec.get("filters") or {}).items():
@@ -703,7 +704,8 @@ def answer_text(res, f, spec):
                 return indian(v) + "%"
             if kind == "count":
                 return indian(v)
-            return ("Rs " if money.search(str(label)) else "") + indian(v)
+            ratio = re.search(r"(?i)\b(months?|ratio|vs|per|share|score|rate|days?)\b|%", str(label))
+            return ("Rs " if money.search(str(label)) and not ratio else "") + indian(v)
         if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
             return _dmy(v)
         return str(v)
@@ -726,7 +728,13 @@ def answer_text(res, f, spec):
             return fmt(mcols[0], r[mcols[0]])
         return ", ".join(f"{name(c)} {fmt(c, r[c])}" for c in mcols)
     if not gcols:
+        if len(mcols) > 1:  # several figures: one per line, not a run-on sentence
+            return head + "\n" + "\n".join(f"- {name(c)}: {fmt(c, res['rows'][0][c])}" for c in mcols)
         return head + " " + measures(res["rows"][0]) + "."
+    if len(res["rows"]) == 1 and len(mcols) > 1:  # one group (e.g. one ward), several figures: a list
+        r = res["rows"][0]
+        return (head + "\n" + f"{' / '.join(str(r[c]) for c in gcols)}:\n"
+                + "\n".join(f"- {name(c)}: {fmt(c, r[c])}" for c in mcols))
     lines = [f"- {' / '.join(str(r[c]) for c in gcols)}: {measures(r)}" for r in res["rows"][:15]]
     if res["total"] and len(res["rows"]) > 1:
         lines.append(f"- All: {measures(res['total'])}")

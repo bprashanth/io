@@ -178,6 +178,34 @@ def style(plt):
 
 
 # ---------------------------------------------------------------- quick charts from a form answer
+def _panels_svg(rows, g, measures, title, out_svg, top=15):
+    """Several measures by one breakdown: a column of bar panels, one per measure, each with its own axis (income in
+    rupees and a score of 1-10 can't share one)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    df = pd.DataFrame(rows)
+    df[g] = df[g].fillna("(blank)").astype(str)
+    df = df.head(top)
+    style(plt)
+    n = len(measures)
+    fig, axes = plt.subplots(n, 1, figsize=(9, max(2.2, 0.32 * len(df) + 1.0) * n), squeeze=False,
+                             layout="constrained")
+    for ax, m in zip(axes[:, 0], measures):
+        d = df[[g, m]].copy()
+        d[m] = pd.to_numeric(d[m], errors="coerce")
+        d = d.iloc[::-1]
+        bars = ax.barh(d[g], d[m].fillna(0), color=PALETTE[0])
+        ax.bar_label(bars, labels=[_num(v) if pd.notna(v) else "none" for v in d[m]], padding=3, fontsize=9)
+        ax.set_title(m, loc="left", fontsize=10)
+        ax.grid(axis="y", visible=False)
+    fig.suptitle(title, x=0.01, ha="left", fontsize=11)
+    fig.savefig(out_svg, format="svg", bbox_inches="tight")
+    plt.close(fig)
+    return out_svg
+
+
 def bar_svg(res, title, out_svg, top=15):
     """A form answer as a bar chart: one breakdown -> bars; two -> stacked bars (second breakdown as colours).
     res is formkit.run()'s result. Returns out_svg, or None if the answer has no breakdown or measure."""
@@ -198,6 +226,10 @@ def bar_svg(res, title, out_svg, top=15):
     groups = [c for c in cols if c not in num]
     if not groups or not num:
         return None
+    if len(rows) < 2:  # one bar says nothing; the answer's list does
+        return None
+    if len(num) > 1 and len(groups) == 1:  # several figures: one small panel each, sharing the breakdown
+        return _panels_svg(rows, groups[0], num[:6], title, out_svg, top)
     m = num[0]
     df = pd.DataFrame(rows)
     df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)

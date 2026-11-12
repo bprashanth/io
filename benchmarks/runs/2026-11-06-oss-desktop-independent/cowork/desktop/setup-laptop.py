@@ -37,10 +37,9 @@ COWORK_PROVIDER = {
     "label": "Idli - 30B (private, on Muse)",
     "command": [CLAUDE, "--mcp-config", os.path.join(COWORK, "cowork.mcp.json")],
     "env": {"CLAUDE_CONFIG_DIR": T4GC_CLAUDE, "ENABLE_TOOL_SEARCH": "false"},
-    # The model menu is Idli's switch (lib/modes.py; the DGX router behind silo picks the backend by this id)
-    "models": [{"id": "muse-glimmer-30b", "label": "Idli 30B (Muse)", "isDefault": True},
-               {"id": "idli-9b", "label": "Idli 9B (9B chat + 9B form dials)"},
-               {"id": "idli-steam", "label": "Steam powered (code; a 9B sets the form's dials)"}],
+    # Muse only (owner, 2026-11-12: Steam's answers were hard to read and the 9B described charts it hadn't drawn).
+    # The router still serves idli-9b and idli-steam (lib/modes.py) for experiments; add them here to bring them back.
+    "models": [{"id": "muse-glimmer-30b", "label": "Idli 30B", "isDefault": True}],
     "disallowedTools": ["Bash", "BashOutput", "KillShell", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit",
                         "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite", "Skill", "mcp__paseo",
                         # unused built-ins: ~60k chars of tool schema = ~11k prompt tokens on Muse

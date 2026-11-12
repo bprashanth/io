@@ -2,9 +2,10 @@
 """Idli first-run bootstrap: make a Paseo install look the way Idli should on first open.
 Safe to rerun: it only adds what's missing.
 
-  Mission control          its own folder (~/idli-insights/start-here)
-     Start here            the setup chat (tab 0) with Idli's greeting and a Drive tab for signing in
-     What Idli has learned the page listing the files Idli has learned to analyse (grows as Claude teaches it)
+  Start here       its own folder (~/idli-insights/setup), first in the sidebar
+     Start here       the setup chat (sign-in checks; also answers "what has Idli learned")
+     Mission control  a tab: the page listing the files Idli has learned (grows as Claude teaches it)
+     Drive            a tab for signing in to Google
   Idli         the private folder (~/idli-insights/cowork-real): where the work happens; a "New chat" is always
      Idli      waiting there on its first card (clean up a file / analyse a file)
   Claude      this cowork/ folder: Claude teaches Idli a file, from fake data only
@@ -12,7 +13,7 @@ Safe to rerun: it only adds what's missing.
 
 Runs on the machine with Paseo, after the daemon is up (desktop/idli-launch.sh does that). The heading order
 needs Paseo patch P2 (todos/idli-insights/p1/paseo_patches.md); until then the person drags them once.
-Providers (Idli 30B, Idli 9B, Teacher) come from desktop/setup-laptop.py.
+Providers (Idli 30B, Claude) come from desktop/setup-laptop.py.
 
   python3 desktop/idli-bootstrap.py            do it
   python3 desktop/idli-bootstrap.py --dry-run  say what it would do
@@ -30,18 +31,17 @@ IDLI = os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights")
 DRY = "--dry-run" in sys.argv
 LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md)
     ("Start here", os.path.join(IDLI, "setup"), os.path.join(COWORK, "idli", "START-HERE.md")),
-    ("What Idli has learned", os.path.join(IDLI, "start-here"), os.path.join(COWORK, "idli", "LEARNED.md")),
     ("Idli", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
     ("Claude", COWORK, None),
 ]
 FOLDER = {n: f for n, f, _ in LAYOUT}
-HEADING = {"What Idli has learned": "Mission control"}  # the sidebar heading (project) when it differs from the workspace
+HEADING = {}  # the sidebar heading (project) when it differs from the workspace
+OLD_MISSION_CONTROL = "What Idli has learned"  # its own workspace until 2026-11-12; now a tab in Start here
 SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 # Each chat sees only the tools its job needs (a `cowork.tools` allow-list per folder; a small model chooses better
 # from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
 TOOLSETS = {
-    "Start here": ["setup_check"],
-    "What Idli has learned": ["show_skills", "skills_list", "skill_delete"],
+    "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete"],
     "Idli": ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "teach_file", "teach_send",
              "working_copy", "working_copy_ready", "chart_request", "chart_show"],
 }
@@ -197,15 +197,15 @@ def browser_as(agent_id):
 
 
 def learned_tab(agent_id):
-    """The 'What Idli has learned' page in its workspace, at the form server's current address (the server is
+    """The Mission control tab (the page of what Idli has learned) in Start here, at the form server's current address (the server is
     started here so the page is live as soon as the app opens)."""
     if not agent_id or DRY:
-        say("would open the What Idli has learned page")
+        say("would open the Mission control tab")
         return
     py = os.path.join(COWORK, ".venv", "bin", "python")
     r = subprocess.run([py if os.path.exists(py) else sys.executable, "-c",
                         "import sys,json; sys.path.insert(0, sys.argv[1]); from lib import formserver as f; "
-                        "print(json.dumps(f.ensure(sys.argv[2])))", COWORK, FOLDER["What Idli has learned"]],
+                        "print(json.dumps(f.ensure(sys.argv[2])))", COWORK, FOLDER["Start here"]],
                        capture_output=True, text=True, timeout=60, env=ENV)
     if r.returncode:
         say("the page server didn't start: " + r.stderr.strip()[-200:])
@@ -214,19 +214,19 @@ def learned_tab(agent_id):
     url = f"http://dashboard.localhost:{port}/skills?t={token}"
     browser = browser_as(agent_id)
     if not browser:
-        say("the app's browser isn't available; open Paseo and rerun to add the What Idli has learned page")
+        say("the app's browser isn't available; open Paseo and rerun to add the Mission control tab")
         return
-    if opened("learned") == url:
-        say("What Idli has learned page is open")
+    if opened("learned@" + FOLDER["Start here"]) == url:
+        say("Mission control tab is open")
         return
     old = next((t for t in browser.tabs() if "/skills" in t["url"]), None)  # only if that workspace is on screen
     if old:
-        say("point the What Idli has learned page at the current server")
+        say("point the Mission control tab at the current server")
         browser.paseo("browser_navigate", browserId=old["id"], url=url)
     else:
-        say("open the What Idli has learned page")
+        say("open the Mission control tab")
         browser.paseo("browser_new_tab", url=url)
-    opened("learned", url)
+    opened("learned@" + FOLDER["Start here"], url)
 
 
 def start_tabs(agent_id):
@@ -247,6 +247,15 @@ def start_tabs(agent_id):
         opened(key, True)
 
 
+def retire_old_mission_control():
+    """Until 2026-11-12 Mission control was its own heading and workspace ("What Idli has learned"); it is a tab in
+    Start here now. Archive the old workspace (its chat goes with it)."""
+    for w in paseo("workspace", "ls") or []:
+        if w["name"] == OLD_MISSION_CONTROL:
+            say(f"archive the old Mission control workspace ({w['cwd']})")
+            paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
+
+
 def retire_old_start_here():
     """Until 2026-11-10 Start here shared Mission control's folder (and indexed the Drive). It has its own folder
     and heading now and only checks sign-ins: archive the old workspace (and its chat)."""
@@ -260,11 +269,12 @@ def main():
     folders()
     ids = projects_and_workspaces()
     retire_old_start_here()
+    retire_old_mission_control()
     agent = start_chat(ids.get("Start here"))
+    learned_tab(agent)  # Mission control: a tab in Start here, next to the chat
     start_tabs(agent)
-    learned_tab(chat(ids.get("What Idli has learned"), FOLDER["What Idli has learned"], "What Idli has learned", "learned"))
     chat(ids.get("Idli"), FOLDER["Idli"], "New chat", "hi")  # Idli keeps one waiting from then on
-    say("done. Heading order: Start here, Mission control, Idli, Claude (drag once until Paseo patch P2).")
+    say("done. Heading order: Start here, Idli, Claude (drag once until Paseo patch P2).")
 
 
 if __name__ == "__main__":

@@ -1026,7 +1026,7 @@ def t_show_skills():
     except Exception:
         pass
     from lib import uiswitch
-    uiswitch.show_tab(["What Idli has learned*", "dashboard.localhost"])
+    uiswitch.show_tab(["Mission control*", "What Idli has learned*", "dashboard.localhost"])
     return {"say_to_user": "The list of files Idli has learned is in the tab next to this chat. It grows as Claude "
                            "teaches Idli new files; delete one there to teach it again from scratch."}
 
