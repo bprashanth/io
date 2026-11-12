@@ -8,6 +8,21 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-12 (night), laptop: Vega-Lite charts and the Idli | Claude split, verified in the app.**
+  - **Charts** (`lib/vlchart.py`): code picks the chart from the answer's shape (bars; one panel per figure; a time
+    line; a heatmap for two breakdowns; a point map when rows have latitude/longitude, rows at one place merged into a
+    counted bubble). The chat gets an SVG made offline (vl-convert); the dashboard draws the same spec with vendored
+    vega (no eval) and drills on click (the value becomes a filter, the breakdown moves on). Idli's CLAUDE.md sends
+    maps and drill-downs to the form. Claude's own charts (chart_request) are still matplotlib.
+  - **Laptop, Muse, households (test account):** figures by ward as panels (18 s) → "break Yerawada Ward down by
+    household head" (17 s) → map sized by debt (16 s) → "ask Claude: a scatter ..." → Claude opened on the right in
+    Idli's workspace (provider idli-teach), green border → Claude drew it on fake data, "Yes, back to Idli" → border
+    moved left, Idli drew it from the real file.
+  - **Found and fixed after the run (not yet re-seen in the app):** the left pane showed an old tab when Claude opened
+    (teach_send now puts Idli's chat in front, then focuses Claude); map points at the same rounded location hid
+    each other (merged). Dashboard drill tested on the DGX only.
+  - **Install:** `/opt/Paseo/resources/app-dist` → `~/idli-insights/paseo/app-dist` (P13/P14 build); `config/ui.json`
+    split true. Don't take Paseo's 0.15.4 update until the patches are rebuilt on it.
 - **2026-11-12 (evening), DGX + laptop: Muse and Claude only; simpler layout; readable answers and charts.**
   - **Owner, after testing the three modes on the laptop:** Steam's answers were unreadable and it didn't converse;
     the 9B described a chart it hadn't drawn (the quick chart drew only the first figure: one bar). Muse only.
