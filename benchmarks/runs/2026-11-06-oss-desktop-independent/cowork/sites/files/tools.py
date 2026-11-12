@@ -680,11 +680,14 @@ def t_teach_send(request_id, share_labels=None, switch=True):
             with open(os.path.join(fk.TEACH_DIR, request_id, "teach_agent.json")) as f:
                 agent = json.load(f)["agent"]
             from lib import uiswitch
-            out["switched"] = uiswitch.show_agent(agent)["ok"]
+            out["switched"] = uiswitch.show_agent(agent, side="right")["ok"]
         except (OSError, ValueError, KeyError):
             out["switched"] = False
+        from lib import uiswitch as _ui
         out["tell_the_user"] = ("Say in one line: sent a copy with fake values to Claude"
-                                + (", and switched there to answer its questions." if out["switched"] else
+                                + (", which opened on the right; answer its questions there." if out["switched"]
+                                   and _ui.split_enabled() else
+                                   ", and switched there to answer its questions." if out["switched"] else
                                    f"; open the Claude workspace (chat '{out['teach_chat']}') to answer its questions.")
                                 + " This chat carries on when teaching is done.")
     return out
@@ -737,11 +740,18 @@ def _teach_send(request_id):
     # workspace and ignores --cwd. The Teach chat must run in the Teach folder, never in the private one.
     env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
     ws = subprocess.run([paseo, "workspace", "ls", "--json"], capture_output=True, text=True, timeout=60, env=env)
+    from lib import uiswitch
+    split = uiswitch.split_enabled()
+    # Split mode: Claude's chat opens next to Idli, in Idli's workspace, with provider idli-teach, whose launcher
+    # (desktop/claude-teach.sh) runs Claude Code in this fake-data folder and has no browser tools. Paseo reports the
+    # workspace's folder as the chat's; the launcher is what keeps Claude out of the private one.
+    home = sh.data_dir() if split else HERE
     try:
-        wid = next(w["workspaceId"] for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(HERE))
+        wid = next(w["workspaceId"] for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(home))
     except (ValueError, StopIteration):
         return {"error": "No Teach workspace found (a Paseo workspace on the co-work plugin folder). Open one, then retry."}
-    r = subprocess.run([paseo, "run", "--provider", "diy-claude", "--workspace", wid, "--mode", "auto",
+    r = subprocess.run([paseo, "run", "--provider", "idli-teach" if split else "diy-claude", "--workspace", wid,
+                        "--mode", "auto",
                         "--title", ("Chart: " if req.get("chart") is not None else "Teach: ") + req["title"], "--no-wait", "--json", prompt],
                        capture_output=True, text=True, timeout=90, env=env)
     if r.returncode:
@@ -751,7 +761,7 @@ def _teach_send(request_id):
         agent, cwd = info.get("agentId"), info.get("cwd", "")
     except ValueError:
         agent, cwd = None, ""
-    if not agent or os.path.realpath(cwd) != os.path.realpath(HERE):
+    if not agent or os.path.realpath(cwd) != os.path.realpath(home):
         if agent:
             subprocess.run([paseo, "stop", agent], capture_output=True, timeout=60, env=env)
             subprocess.run([paseo, "archive", agent], capture_output=True, timeout=60, env=env)
@@ -773,7 +783,7 @@ def t_show_teach_chat(request_id):
             agent = json.load(f)["agent"]
     except (OSError, ValueError, KeyError):
         return {"shown": False, "say_to_user": "Open the Claude workspace in the left sidebar to answer its questions."}
-    got = uiswitch.show_agent(agent)
+    got = uiswitch.show_agent(agent, side="right")
     return {"shown": got["ok"]} if got["ok"] else {
         "shown": False, "say_to_user": "Open the Claude workspace in the left sidebar to answer its questions."}
 

@@ -47,12 +47,25 @@ def full_agent_id(agent):
     return next((a["id"] for a in json.loads(r.stdout or "[]") if a["id"].startswith(agent)), agent)
 
 
-def show_agent(agent):
-    """Switch Paseo to this chat, in whatever workspace it lives."""
+def split_enabled():
+    """Idli and Claude side by side in one window (Paseo patches P13/P14 installed): ~/idli-insights/config/ui.json
+    {"split": true}, written when the patched app UI is installed. Off, everything works as before (two workspaces)."""
+    try:
+        with open(os.path.join(os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights"), "config",
+                               "ui.json")) as f:
+            return bool(json.load(f).get("split"))
+    except (OSError, ValueError):
+        return False
+
+
+def show_agent(agent, side=None):
+    """Switch Paseo to this chat, in whatever workspace it lives. side ("left"/"right", split mode only): put the
+    chat in that pane of a side-by-side workspace and focus it (P13: the side rides on the agent id, "<id>~right")."""
     if not APP:
         return {"ok": False, "why": "Paseo app not found"}
     try:
-        link = f"paseo://h/{server_id()}/agent/{full_agent_id(agent)}"
+        link = f"paseo://h/{server_id()}/agent/{full_agent_id(agent)}" + (
+            f"~{side}" if side in ("left", "right") and split_enabled() else "")
     except (ValueError, KeyError, OSError, subprocess.SubprocessError) as e:
         return {"ok": False, "why": f"could not read Paseo's server id: {type(e).__name__}"}
     p = subprocess.Popen([APP, link], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

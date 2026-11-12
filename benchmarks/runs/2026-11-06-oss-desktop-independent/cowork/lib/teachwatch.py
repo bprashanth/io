@@ -39,6 +39,6 @@ if os.path.exists(done):
     for _ in range(30 * 60 // 2):
         if os.path.exists(go):
             from lib import uiswitch
-            uiswitch.show_agent(agent)
+            uiswitch.show_agent(agent, side="left")  # split mode: back to Idli's pane, focused
             break
         time.sleep(2)

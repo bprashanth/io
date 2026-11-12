@@ -49,6 +49,11 @@ COWORK_PROVIDER = {
                         "mcp__cowork__gmail_draft_reply", "mcp__cowork__sheet_query", "mcp__cowork__sheet_profile"],
 }
 DIY_PROVIDER = {"extends": "claude", "label": "Claude (teaches Idli; fake data and test accounts only)"}
+# Split mode (Idli left, Claude right in Idli's workspace): teaching chats run through a launcher that keeps Claude in
+# this fake-data folder, and without Paseo's browser tools (Idli's workspace has the person's real Google tabs).
+TEACH_PROVIDER = {"extends": "claude", "label": "Claude (teaching, fake data only)",
+                  "command": [os.path.join(COWORK, "desktop", "claude-teach.sh")],
+                  "disallowedTools": ["mcp__paseo"]}
 
 
 def step(msg):
@@ -92,6 +97,7 @@ def main():
     providers = cfg.setdefault("agents", {}).setdefault("providers", {})
     providers["t4gc-cowork"] = COWORK_PROVIDER
     providers["diy-claude"] = DIY_PROVIDER
+    providers["idli-teach"] = TEACH_PROVIDER
     step(f"merge providers t4gc-cowork, diy-claude, browserTools, pluginsEnabled into {CONFIG}")
     if not DRY:
         shutil.copy(CONFIG, f"{CONFIG}.bak-{int(time.time())}")

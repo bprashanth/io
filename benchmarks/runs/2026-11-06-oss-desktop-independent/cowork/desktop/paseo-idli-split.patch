@@ -1,0 +1,182 @@
+diff --git a/packages/app/src/app/h/[serverId]/agent/[agentId].tsx b/packages/app/src/app/h/[serverId]/agent/[agentId].tsx
+index 551e3b60..42e3ac3f 100644
+--- a/packages/app/src/app/h/[serverId]/agent/[agentId].tsx
++++ b/packages/app/src/app/h/[serverId]/agent/[agentId].tsx
+@@ -12,6 +12,7 @@ import { getHostRuntimeStore, useHostRuntimeSnapshot, useHosts } from "@/runtime
+ import { buildHostRootRoute, buildSettingsHostRoute } from "@/utils/host-routes";
+ import { toErrorMessage } from "@/utils/error-messages";
+ import { navigateToAgent } from "@/utils/navigate-to-agent";
++import { parseIdliSide, placeAgentOnSideSoon, splitIdliAgentId } from "@/utils/idli-side-pane";
+ 
+ export default function HostAgentReadyRoute() {
+   return (
+@@ -26,10 +27,13 @@ function HostAgentReadyRouteContent() {
+   const params = useLocalSearchParams<{
+     serverId?: string;
+     agentId?: string;
++    side?: string;
+   }>();
+   const handledNavigationRef = useRef<string | null>(null);
+   const serverId = typeof params.serverId === "string" ? params.serverId : "";
+-  const agentId = typeof params.agentId === "string" ? params.agentId : "";
++  const rawAgent = splitIdliAgentId(typeof params.agentId === "string" ? params.agentId : "");
++  const agentId = rawAgent.agentId;
++  const side = parseIdliSide(params.side) ?? rawAgent.side;
+   const hosts = useHosts();
+   const runtimeSnapshot = useHostRuntimeSnapshot(serverId);
+   const client = runtimeSnapshot?.client ?? null;
+@@ -115,10 +119,13 @@ function HostAgentReadyRouteContent() {
+ 
+     if (resolution.kind === "resolved") {
+       navigateToAgent({ serverId, agentId, workspaceId: resolution.workspaceId, pin: true });
++      if (side) {
++        placeAgentOnSideSoon({ serverId, agentId, workspaceId: resolution.workspaceId, side });
++      }
+       return;
+     }
+     router.replace(resolution.kind === "invalid" ? ("/" as Href) : buildHostRootRoute(serverId));
+-  }, [agentId, resolution, router, serverId]);
++  }, [agentId, resolution, router, serverId, side]);
+ 
+   const handleRetry = useCallback(() => {
+     if (resolution.kind === "lookupError") {
+diff --git a/packages/app/src/components/split-container.tsx b/packages/app/src/components/split-container.tsx
+index 27831724..b9521675 100644
+--- a/packages/app/src/components/split-container.tsx
++++ b/packages/app/src/components/split-container.tsx
+@@ -706,7 +706,12 @@ const SplitPaneView = memo(function SplitPaneView({
+       <View
+         ref={paneRef}
+         collapsable={false}
+-        style={styles.pane}
++        style={[
++          styles.pane,
++          // Idli P14: with two or more panes, the pane in control carries a clear border (an accent ring), so
++          // switching between Idli and Claude reads as "focus moved", not as a different screen
++          workspaceHasMultiplePanes && (isFocused ? styles.paneFocusRing : styles.paneFocusRingIdle),
++        ]}
+         testID={`workspace-pane-${pane.id}`}
+       >
+         <WindowChromeSafeArea placement="inline" style={styles.paneTabs}>
+@@ -854,6 +859,16 @@ const styles = StyleSheet.create((theme) => ({
+     backgroundColor: theme.colors.surface0,
+     overflow: "hidden",
+   },
++  paneFocusRing: {
++    borderWidth: 2,
++    borderColor: theme.colors.accent,
++    borderRadius: 6,
++  },
++  paneFocusRingIdle: {
++    borderWidth: 2,
++    borderColor: "transparent",
++    borderRadius: 6,
++  },
+   paneTabs: {
+     position: "relative",
+     minWidth: 0,
+diff --git a/packages/app/src/desktop/agent-navigation.tsx b/packages/app/src/desktop/agent-navigation.tsx
+index f85d09ca..a23dbddb 100644
+--- a/packages/app/src/desktop/agent-navigation.tsx
++++ b/packages/app/src/desktop/agent-navigation.tsx
+@@ -3,6 +3,7 @@ import { listenToDesktopEvent } from "@/desktop/electron/events";
+ import { getDesktopHost } from "@/desktop/host";
+ import { useStableEvent } from "@/hooks/use-stable-event";
+ import { navigateToAgent } from "@/utils/navigate-to-agent";
++import { placeAgentOnSideSoon, splitIdliAgentId } from "@/utils/idli-side-pane";
+ 
+ interface OpenAgentEventPayload {
+   serverId?: unknown;
+@@ -12,11 +13,15 @@ interface OpenAgentEventPayload {
+ export function AgentNavigationListener() {
+   const openAgent = useStableEvent((payload: OpenAgentEventPayload | null) => {
+     const serverId = typeof payload?.serverId === "string" ? payload.serverId.trim() : "";
+-    const agentId = typeof payload?.agentId === "string" ? payload.agentId.trim() : "";
++    const raw = typeof payload?.agentId === "string" ? payload.agentId.trim() : "";
++    const { agentId, side } = splitIdliAgentId(raw);  // Idli P13: "<id>~right" opens the chat in the right pane
+     if (!serverId || !agentId) {
+       return;
+     }
+     navigateToAgent({ serverId, agentId });
++    if (side) {
++      placeAgentOnSideSoon({ serverId, agentId, side });
++    }
+   });
+ 
+   useEffect(() => {
+diff --git a/packages/app/src/utils/idli-side-pane.ts b/packages/app/src/utils/idli-side-pane.ts
+new file mode 100644
+index 00000000..c17c6a07
+--- /dev/null
++++ b/packages/app/src/utils/idli-side-pane.ts
+@@ -0,0 +1,70 @@
++// Idli P13: place a chat on one side of a two-pane workspace and give it focus, from the agent deep link
++// (paseo://h/<server>/agent/<id>~right or ~left: the desktop shell drops a link's query string, and rewriting the
++// shell means rebuilding app.asar, so the side rides on the agent id; the app strips it). Idli opens Claude's teaching chat on the right and comes back to
++// its own chat on the left; the pane in control carries the focus ring (P14), so a switch reads as "focus moved".
++import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
++import { useSessionStore } from "@/stores/session-store";
++import { collectAllPanes, collectAllTabs, findPaneContainingTab } from "@/stores/workspace-layout-actions";
++
++export type IdliSide = "left" | "right";
++
++export function parseIdliSide(value: unknown): IdliSide | null {
++  return value === "left" || value === "right" ? value : null;
++}
++
++/** "abc~right" -> { agentId: "abc", side: "right" }; anything else -> { agentId, side: null }. */
++export function splitIdliAgentId(raw: string): { agentId: string; side: IdliSide | null } {
++  const m = /^(.*)~(left|right)$/.exec(raw);
++  return m ? { agentId: m[1] ?? raw, side: m[2] as IdliSide } : { agentId: raw, side: null };
++}
++
++function agentWorkspaceId(serverId: string, agentId: string): string | null {
++  const session = useSessionStore.getState().sessions[serverId];
++  const agent = session?.agents.get(agentId) ?? session?.agentDetails.get(agentId);
++  return agent?.workspaceId ?? null;
++}
++
++function workspaceKeyFor(serverId: string, workspaceId: string): string | null {
++  const keys = Object.keys(useWorkspaceLayoutStore.getState().layoutByWorkspace);
++  const exact = `${serverId}:${workspaceId}`;
++  if (keys.includes(exact)) return exact;
++  return keys.find((key) => key.startsWith(`${serverId}:`) && key.endsWith(workspaceId)) ?? null;
++}
++
++/** One attempt; false when the chat's tab isn't in the layout yet (the caller retries). */
++export function placeAgentOnSide(input: {
++  serverId: string;
++  workspaceId?: string | null;
++  agentId: string;
++  side: IdliSide;
++}): boolean {
++  const store = useWorkspaceLayoutStore.getState();
++  const workspaceId = input.workspaceId || agentWorkspaceId(input.serverId, input.agentId);
++  if (!workspaceId) return false;
++  const key = workspaceKeyFor(input.serverId, workspaceId);
++  if (!key) return false;
++  const layout = store.layoutByWorkspace[key];
++  if (!layout) return false;
++  const tab = collectAllTabs(layout.root).find(
++    (t) => t.target.kind === "agent" && t.target.agentId === input.agentId,
++  );
++  if (!tab) return false;
++  const current = findPaneContainingTab(layout.root, tab.tabId);
++  if (!current) return false;
++  const explorerId = store.explorerSidebarPaneIdByWorkspace[key] ?? null;
++  const mains = collectAllPanes(layout.root).filter((p) => !p.hidden && p.id !== explorerId);
++  const target = input.side === "right" ? mains[mains.length - 1] : mains[0];
++  if (mains.length >= 2 && target && target.id !== current.id) {
++    store.moveTabToPane(key, tab.tabId, target.id);
++  } else if (mains.length < 2 && input.side === "right" && current.tabIds.length > 1) {
++    store.splitPane(key, { tabId: tab.tabId, targetPaneId: current.id, position: "right" });
++  }
++  useWorkspaceLayoutStore.getState().focusTab(key, tab.tabId);
++  return true;
++}
++
++/** Retries while navigation finishes opening the tab (layout hydration, deferred opens). */
++export function placeAgentOnSideSoon(input: Parameters<typeof placeAgentOnSide>[0], tries = 60): void {
++  if (placeAgentOnSide(input) || tries <= 0) return;
++  setTimeout(() => placeAgentOnSideSoon(input, tries - 1), 150);
++}
