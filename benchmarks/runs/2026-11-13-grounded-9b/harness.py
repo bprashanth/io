@@ -38,6 +38,34 @@ SCRIPTS = {
     "panels": ["plot average income and vulnerability score for all wards on one bar chart",
                "what is the graph telling me?", "all im seeing is one panel with income, where is the score?"],
 }
+# HELD OUT (written 2026-11-14 00:55 before any run; code frozen at that commit; never tuned on). New wording, the
+# proposals' cases not used above, and a second taught file never looked at during development. A card is answered
+# with the option matching `card` (the person's intent), else the first option.
+HOLDOUT = {
+    "h_struggle": {"card": "vulnerab", "turns": [
+        "which ward is struggling the most and why?",
+        "the chart looks like it only has one ward on it",
+        "ok show savings instead"]},
+    "h_modify": {"turns": [
+        "compare kasewadi's average debt with the rest of the wards",
+        "now income instead", "make that median", "show the numbers as a table"]},
+    "h_share": {"turns": [
+        "what share of ramtekdi households owe more than a year of income?",
+        "how many households were left out because of missing data?",
+        "and how does that share compare with the other wards?"]},
+    "h_causal": {"card": "saving", "turns": [
+        "hadapsar ward savings look really high",
+        "could a couple of households be skewing that?",
+        "so does having more savings make households less vulnerable?"]},
+    "f_money": {"file": "drive/field_programme_tracker.xlsx", "card": "disburs", "turns": [
+        "why is village C getting so much money?",
+        "what's on the bottom axis of that chart?",
+        "that's not right, I can only see one bar"]},
+    "f_time": {"file": "drive/field_programme_tracker.xlsx", "turns": [
+        "how has disbursement changed month by month?",
+        "which officer did the most visits?",
+        "what does disbursed mean exactly, is it per visit?"]},
+}
 
 
 def tool_defs():
@@ -63,6 +91,23 @@ def run_tool(name, inp):
         return {"error": str(e)}
 
 
+MUSE_ROUTER = os.environ.get("IDLI_ROUTER", "http://127.0.0.1:8185")
+
+
+def muse(j):
+    """Today's product: Muse 30B through the DGX router (which rewrites the request exactly as for the app), with
+    Idli's instructions as Claude Code gives them (CLAUDE.md in the system prompt)."""
+    import urllib.request
+    sysmsg = ("You are Claude Code, Anthropic's official CLI for Claude.\n\nContents of CLAUDE.md (project "
+              "instructions):\n\n" + open(os.path.join(COWORK, "idli", "CLAUDE.md")).read())
+    body = {"model": "muse-glimmer-30b", "max_tokens": 4096, "system": sysmsg, **j}
+    req = urllib.request.Request(MUSE_ROUTER + "/v1/messages", json.dumps(body).encode(),
+                                 {"Content-Type": "application/json", "anthropic-version": "2023-06-01",
+                                  "x-api-key": "none"})
+    with urllib.request.urlopen(req, timeout=600) as r:
+        return json.load(r)
+
+
 def card_answer(card, pick):
     q = card["questions"][0]
     opts = [o["label"] for o in q.get("options") or []]
@@ -74,6 +119,7 @@ def main():
     from lib import modes
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     mode, ids = args[0], args[1:]
+    allscripts = {**{k: {"turns": v} for k, v in SCRIPTS.items()}, **HOLDOUT}
     tools = tool_defs()
     os.makedirs(os.path.join(HERE, "traces"), exist_ok=True)
     for sid in ids:
@@ -82,17 +128,19 @@ def main():
         from lib import careful, auto
         careful._state.clear()
         auto._threads.clear()
-        opened = run_tool("mcp__cowork__file_open", {"file": "drive/households.xlsx", "show_form": False})
+        sc = allscripts[sid]
+        fname = sc.get("file", "drive/households.xlsx")
+        opened = run_tool("mcp__cowork__file_open", {"file": fname, "show_form": False})
         tid = "toolu_" + uuid.uuid4().hex[:20]
         msgs = [{"role": "user", "content": "https://docs.google.com/spreadsheets/d/FIXTURE/edit"},
                 {"role": "assistant", "content": [{"type": "tool_use", "id": tid, "name": "mcp__cowork__file_open",
-                                                   "input": {"file": "drive/households.xlsx"}}]},
+                                                   "input": {"file": fname}}]},
                 {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tid,
                                               "content": json.dumps({k: v for k, v in opened.items() if k != "card"})}]},
                 {"role": "assistant", "content": [{"type": "text", "text": "What would you like to know about the "
                                                                             "households?"}]}]
         trace = []
-        steps = list(SCRIPTS[sid])
+        steps = list(sc["turns"])
         pending_card = None
         while steps:
             step = steps.pop(0)
@@ -116,7 +164,9 @@ def main():
                 turn = {"user": step, "calls": []}
             t0 = time.time()
             for _ in range(8):
-                resp = modes.respond({"model": mode, "messages": msgs, "tools": tools})
+                resp = (muse({"messages": msgs, "tools": tools}) if mode == "muse-glimmer-30b" else
+                        modes.respond({"model": mode, "messages": msgs, "tools": tools}))
+                resp["content"] = [b for b in resp["content"] if b.get("type") in ("text", "tool_use")]
                 msgs.append({"role": "assistant", "content": resp["content"]})
                 uses = [b for b in resp["content"] if b["type"] == "tool_use"]
                 texts = [b["text"] for b in resp["content"] if b["type"] == "text" and b["text"].strip()]
@@ -126,8 +176,17 @@ def main():
                     break
                 u = uses[0]
                 if u["name"] == "AskUserQuestion":
-                    pending_card = (u["id"], u["input"])
                     turn["card"] = u["input"]
+                    if sid in HOLDOUT:  # the person answers by their intent, then the turn goes on
+                        opts = [o["label"] for o in (u["input"].get("questions") or [{}])[0].get("options") or []]
+                        want = sc.get("card") or ""
+                        pick = next((o for o in opts if want and want in o.lower()), opts[0] if opts else "OK")
+                        _, text = card_answer(u["input"], pick)
+                        turn["calls"].append({"tool": "AskUserQuestion", "picked": pick})
+                        msgs.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": u["id"],
+                                                                  "content": text}]})
+                        continue
+                    pending_card = (u["id"], u["input"])
                     break
                 res = run_tool(u["name"], u["input"])
                 turn["calls"].append({"tool": u["name"].split("__")[-1], "input": u["input"],
