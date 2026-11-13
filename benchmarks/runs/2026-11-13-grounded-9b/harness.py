@@ -85,6 +85,8 @@ def tool_defs():
 def run_tool(name, inp):
     from sites.files import tools as T
     short = name.split("__")[-1]
+    if short == "file_get":  # offline: the link is this script's fixture file (no download)
+        return T.t_file_open(CURRENT[0], show_form=False, goal=inp.get("goal"))
     if short in ("teach_send", "chart_request_send"):  # needs Paseo + Claude: recorded as a detour, not run
         return {"started": False, "error": "teaching isn't available in this offline test (recorded as a detour)"}
     fn = T.TOOLS[short][0]
@@ -94,6 +96,9 @@ def run_tool(name, inp):
         return {"error": f"{type(e).__name__}: {e}"[:300]}
 
 
+CURRENT = ["drive/households.xlsx"]
+LINKS = {"drive/households.xlsx": "https://docs.google.com/spreadsheets/d/1HhFixtureHouseholds0000000000000/edit?gid=0",
+         "drive/field_programme_tracker.xlsx": "https://docs.google.com/spreadsheets/d/1FfFixtureTracker00000000000000/edit"}
 MUSE_ROUTER = os.environ.get("IDLI_ROUTER", "http://127.0.0.1:8185")
 
 
@@ -112,8 +117,11 @@ def muse(j):
 
 
 def card_answer(card, pick):
-    q = card["questions"][0]
-    opts = [o["label"] for o in q.get("options") or []]
+    qs = card.get("questions") if isinstance(card, dict) else None
+    q = (qs or [{}])[0] if isinstance(qs, list) else {}
+    q = q if isinstance(q, dict) else {}
+    q.setdefault("question", str(card)[:80])
+    opts = [o.get("label") if isinstance(o, dict) else str(o) for o in q.get("options") or []]
     got = next((o for o in opts if pick.lower() in o.lower()), pick)
     return got, f'User has answered your questions: "{q["question"]}"="{got}". You can now continue with the user\'s answers in mind.'
 
@@ -133,15 +141,25 @@ def main():
         auto._threads.clear()
         sc = allscripts[sid]
         fname = sc.get("file", "drive/households.xlsx")
-        opened = run_tool("mcp__cowork__file_open", {"file": fname, "show_form": False})
-        tid = "toolu_" + uuid.uuid4().hex[:20]
-        msgs = [{"role": "user", "content": "https://docs.google.com/spreadsheets/d/FIXTURE/edit"},
-                {"role": "assistant", "content": [{"type": "tool_use", "id": tid, "name": "mcp__cowork__file_open",
-                                                   "input": {"file": fname}}]},
+        CURRENT[0] = fname
+        # the start as in the app: the person pastes the link, file_get opens it, its card is answered
+        opened = run_tool("mcp__cowork__file_get", {"link": LINKS[fname], "goal": "analyse"})
+        tid, cid = "toolu_" + uuid.uuid4().hex[:20], "toolu_" + uuid.uuid4().hex[:20]
+        msgs = [{"role": "user", "content": LINKS[fname]},
+                {"role": "assistant", "content": [{"type": "tool_use", "id": tid, "name": "mcp__cowork__file_get",
+                                                   "input": {"link": LINKS[fname], "goal": "analyse"}}]},
                 {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tid,
-                                              "content": json.dumps({k: v for k, v in opened.items() if k != "card"})}]},
-                {"role": "assistant", "content": [{"type": "text", "text": "What would you like to know about the "
-                                                                            "households?"}]}]
+                                              "content": json.dumps(opened, ensure_ascii=False, default=str)}]}]
+        card0 = opened.get("card") if isinstance(opened, dict) else None
+        if isinstance(card0, dict):
+            labels = [o.get("label", "") for q in card0.get("questions") or [] for o in q.get("options") or []]
+            pick = next((l for l in labels if l.startswith("I have a question")), None) or \
+                next((l for l in labels if l.startswith("No, analyse")), labels[0] if labels else "OK")
+            _, text = card_answer(card0, pick)
+            msgs += [{"role": "assistant", "content": [{"type": "tool_use", "id": cid, "name": "AskUserQuestion",
+                                                        "input": card0}]},
+                     {"role": "user", "content": [{"type": "tool_result", "tool_use_id": cid, "content": text}]}]
+        msgs.append({"role": "assistant", "content": [{"type": "text", "text": "What would you like to know?"}]})
         trace = []
         steps = list(sc["turns"])
         pending_card = None
