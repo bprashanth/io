@@ -1,0 +1,156 @@
+"""Play Claude Code for Idli's chat, offline: the chat goes to lib/modes.respond (the real 9B), tool calls run against
+the synthetic households file, and a script answers like the owner does (typed messages, card picks).
+
+  python3 harness.py <mode> <script id>... [--fault drop_series]     modes: idli-9b, idli-9b-careful, idli-9b-auto
+Writes traces/<mode>-<script>.json and prints each turn.
+Needs: the 9B on 127.0.0.1:8291, a router on 8186 for the spec calls (MUSE_URL), the cowork .venv.
+"""
+import json
+import os
+import re
+import sys
+import time
+import uuid
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+COWORK = os.path.join(os.path.dirname(HERE), "2026-11-06-oss-desktop-independent", "cowork")
+sys.path.insert(0, COWORK)
+
+SCRIPTS = {
+    # the owner's own words (chats 309d9db3, 37b9cde2, cdb532f2, 409bec47 on the laptop)
+    "yerawada": ["help me understand why yerawada ward is so high",
+                 {"pick": "vulnerability"},
+                 "what is the graph you showed telling me? what is on the y vs x axis (i guess x is vulnerability score)",
+                 "how are you combining all thos enumbers here? all im seeing is a single blue bar?",
+                 "why might it be higher?"],
+    "debt": ["why is yearwada ward's debt so high?",
+             {"pick": "debt"},
+             "right i want to know why average monthly income is low (or is it?)",
+             {"pick": "income"},
+             "what is average months of income owed? are you saying over 12 months of income you divided income / debt?"],
+    # the proposals' scripts
+    "state": ["show average debt by ward as a chart", "now show vulnerability by ward as a chart",
+              "what's the y-axis?", "what was it on the previous chart?", "put it in a table"],
+    "falsepush": ["compare average debt across yerawada, kasewadi and ramtekdi as a chart",
+                  "wait, why is there only one bar on the chart? where are kasewadi and ramtekdi?"],
+    "nodata": ["how has vulnerability changed from last year?", "can you just estimate it?",
+               "show yerawada household debt in 2031"],
+    "panels": ["plot average income and vulnerability score for all wards on one bar chart",
+               "what is the graph telling me?", "all im seeing is one panel with income, where is the score?"],
+}
+
+
+def tool_defs():
+    from sites.files import tools as T
+    out = []
+    for name in ["start", "file_get", "file_open", "file_ask", "teach_file", "teach_send", "chart_request",
+                 "chart_show", "form_explain"]:
+        fn, desc, props, req = T.TOOLS[name]
+        out.append({"name": "mcp__cowork__" + name, "description": desc,
+                    "input_schema": {"type": "object", "properties": props, "required": req}})
+    out.append({"name": "AskUserQuestion", "description": "Ask the user a question with options.",
+                "input_schema": {"type": "object", "properties": {"questions": {"type": "array"}},
+                                 "required": ["questions"]}})
+    return out
+
+
+def run_tool(name, inp):
+    from sites.files import tools as T
+    fn = T.TOOLS[name.split("__")[-1]][0]
+    try:
+        return fn(**inp)
+    except TypeError as e:
+        return {"error": str(e)}
+
+
+def card_answer(card, pick):
+    q = card["questions"][0]
+    opts = [o["label"] for o in q.get("options") or []]
+    got = next((o for o in opts if pick.lower() in o.lower()), pick)
+    return got, f'User has answered your questions: "{q["question"]}"="{got}". You can now continue with the user\'s answers in mind.'
+
+
+def main():
+    from lib import modes
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    mode, ids = args[0], args[1:]
+    tools = tool_defs()
+    os.makedirs(os.path.join(HERE, "traces"), exist_ok=True)
+    for sid in ids:
+        from sites.files import tools as T
+        T._threads.clear()
+        from lib import careful, auto
+        careful._state.clear()
+        auto._threads.clear()
+        opened = run_tool("mcp__cowork__file_open", {"file": "drive/households.xlsx", "show_form": False})
+        tid = "toolu_" + uuid.uuid4().hex[:20]
+        msgs = [{"role": "user", "content": "https://docs.google.com/spreadsheets/d/FIXTURE/edit"},
+                {"role": "assistant", "content": [{"type": "tool_use", "id": tid, "name": "mcp__cowork__file_open",
+                                                   "input": {"file": "drive/households.xlsx"}}]},
+                {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tid,
+                                              "content": json.dumps({k: v for k, v in opened.items() if k != "card"})}]},
+                {"role": "assistant", "content": [{"type": "text", "text": "What would you like to know about the "
+                                                                            "households?"}]}]
+        trace = []
+        steps = list(SCRIPTS[sid])
+        pending_card = None
+        while steps:
+            step = steps.pop(0)
+            if isinstance(step, dict):
+                if not pending_card:
+                    trace.append({"skipped_pick": step["pick"]})
+                    continue
+                label, text = card_answer(pending_card[1], step["pick"])
+                msgs.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": pending_card[0],
+                                                          "content": text}]})
+                turn = {"user": f"[card] {label}", "calls": []}
+                pending_card = None
+            else:
+                if pending_card:  # typed instead of picking: Claude Code sends it as the card's answer ("Other")
+                    _, text = card_answer(pending_card[1], step)
+                    msgs.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": pending_card[0],
+                                                              "content": text}]})
+                    pending_card = None
+                else:
+                    msgs.append({"role": "user", "content": step})
+                turn = {"user": step, "calls": []}
+            t0 = time.time()
+            for _ in range(8):
+                resp = modes.respond({"model": mode, "messages": msgs, "tools": tools})
+                msgs.append({"role": "assistant", "content": resp["content"]})
+                uses = [b for b in resp["content"] if b["type"] == "tool_use"]
+                texts = [b["text"] for b in resp["content"] if b["type"] == "text" and b["text"].strip()]
+                if texts:
+                    turn["reply"] = "\n".join(texts)
+                if not uses:
+                    break
+                u = uses[0]
+                if u["name"] == "AskUserQuestion":
+                    pending_card = (u["id"], u["input"])
+                    turn["card"] = u["input"]
+                    break
+                res = run_tool(u["name"], u["input"])
+                turn["calls"].append({"tool": u["name"].split("__")[-1], "input": u["input"],
+                                      "result": {k: v for k, v in res.items() if k in
+                                                 ("reply", "answer", "render_receipt", "gate", "form_fill", "intent",
+                                                  "card", "error", "chart_markdown", "cannot")}
+                                      if isinstance(res, dict) else res,
+                                      "manifest": (res.get("manifest") if isinstance(res, dict) else None)})
+                msgs.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": u["id"],
+                                                          "content": json.dumps(res, ensure_ascii=False, default=str)}]})
+            turn["secs"] = round(time.time() - t0, 1)
+            trace.append(turn)
+            print(f"\n>>> {turn['user']}")
+            for c in turn["calls"]:
+                print(f"    [{c['tool']}] {json.dumps(c['input'], ensure_ascii=False)[:160]}")
+            if turn.get("card"):
+                q = turn["card"]["questions"][0]
+                print(f"    [card] {q['question']} :: {[o['label'] for o in q.get('options') or []]}")
+            print("<<< " + (turn.get("reply") or "(no text)").replace("\n", "\n    ")[:1600] + f"  ({turn['secs']}s)")
+        out = os.path.join(HERE, "traces", f"{mode}-{sid}{'-fault' if '--fault' in sys.argv else ''}.json")
+        with open(out, "w") as f:
+            json.dump(trace, f, indent=1, ensure_ascii=False, default=str)
+
+
+if __name__ == "__main__":
+    main()

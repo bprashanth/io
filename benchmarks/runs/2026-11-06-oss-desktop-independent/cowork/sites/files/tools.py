@@ -472,7 +472,15 @@ def _tolerant(file, spec, tab):
     return spec, None
 
 
-def t_file_ask(file, spec=None, tab=None, chart=False, question=None):
+def t_file_ask(file, spec=None, tab=None, chart=False, question=None, pipeline=None):
+    if isinstance(chart, str):
+        chart = chart.lower() in ("true", "yes", "1")
+    if question and pipeline in ("careful", "auto"):  # the grounded 9B modes (lib/modes.py sets this, never a model)
+        from lib import careful, auto
+        try:
+            return (careful if pipeline == "careful" else auto).ask(files(), file, question, chart=chart, tab=tab)
+        except Exception as e:  # noqa: BLE001
+            return {"error": f"{type(e).__name__}: {e}"[:300], "then": "Ask the question again in other words."}
     if not question:
         if spec is None:
             return {"error": "Pass spec (or question)."}
@@ -1297,7 +1305,9 @@ TOOLS = {
                   # the 9B and Steam modes pass the person's words instead of a spec (lib/modes.py hides one or the
                   # other per mode, so Muse sees today's tool)
                   "question": {"type": "string", "description": "The person's question in their words, instead of a "
-                                                                "spec: the form's dials are set for you"}}, ["file"]),
+                                                                "spec: the form's dials are set for you"},
+                  "pipeline": {"type": "string", "enum": ["careful", "auto"],
+                               "description": "Set by Idli itself; leave it out."}}, ["file"]),
     "form_explain": (t_form_explain, "What a figure on the form means and how it is worked out (\"how is X "
                      "calculated?\", \"what does X mean?\"). Answered from the taught skill, no need for Claude.",
                      {**FILE, "measure": {"type": "string", "description": "The figure's name as the form shows it "

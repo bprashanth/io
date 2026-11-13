@@ -30,7 +30,8 @@ import uuid
 HERE = os.path.dirname(os.path.abspath(__file__))
 NINE_URL = os.environ.get("IDLI_9B_URL", "http://127.0.0.1:8291")
 NINE_MODEL = "qwen3.5-9b"
-MODES = {"muse-glimmer-30b": "muse", "idli-9b": "nine", "idli-steam": "steam"}
+MODES = {"muse-glimmer-30b": "muse", "idli-9b": "nine", "idli-steam": "steam", "idli-9b-careful": "careful",
+         "idli-9b-auto": "auto"}
 TWELVE = ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "teach_file", "teach_send",
           "working_copy", "working_copy_ready", "chart_request", "chart_show"]
 
@@ -41,6 +42,10 @@ def mode_of(model):
         return MODES[m]
     if m.startswith("idli-steam"):
         return "steam"
+    if m.startswith("idli-9b-careful"):
+        return "careful"
+    if m.startswith("idli-9b-auto"):
+        return "auto"
     if m.startswith("idli-9b") or m.startswith("qwen3.5-9b"):
         return "nine"
     return "muse"
@@ -131,6 +136,7 @@ def muse_body(j):
         if _short(t.get("name", "")) == "file_ask":
             sch = t.get("input_schema") or {}
             (sch.get("properties") or {}).pop("question", None)
+            (sch.get("properties") or {}).pop("pipeline", None)
             sch["required"] = ["file", "spec"]
     msgs = j.get("messages")
     if isinstance(msgs, list) and any(isinstance(m, dict) and m.get("role") == "system" for m in msgs):
@@ -251,10 +257,16 @@ def _card_guard(messages):
     return last if last is not None and not shown else None
 
 
-def nine(j):
-    """The 9B runs the chat the way the E7 eval loop ran it."""
+def nine(j, variant=None, pre=None, check=None):
+    """The 9B runs the chat the way the E7 eval loop ran it. variant (careful / auto, the grounded modes): file_ask
+    gets pipeline=<variant>, and chart_request is not offered (no "ask Claude" in these chats). pre(msgs) may edit
+    the chat before the 9B reads it; check(text, msgs) may send the 9B back once with a reason."""
     msgs = [{"role": "system", "content": _lean_system()}] + _to_openai(j.get("messages") or [])
+    if pre:
+        msgs = pre(msgs)
     tools = _nine_tools(j.get("tools"))
+    if variant:
+        tools = [t for t in tools if _short(t["function"]["name"]) != "chart_request"]
     if not tools:  # Claude Code's side requests (titles, summaries): no tools, answer plainly
         tools = None
     nudged = set()
@@ -286,6 +298,10 @@ def nine(j):
                 why = ("Idli check: these numbers in your reply didn't come from a tool: " + ", ".join(sorted(bad)[:5])
                        + ". Idli never works out numbers itself. Write the reply again with only numbers from tool "
                        "answers (call file_ask if you need another one).")
+        if not why and check and "check" not in nudged:
+            why = check(text, msgs)
+            if why:
+                nudged.add("check")
         if not why:
             break
         msgs += [{"role": "assistant", "content": text or None}, {"role": "user", "content": why}]
@@ -308,8 +324,12 @@ def nine(j):
             content.append(_tool_use("AskUserQuestion", again) if again else
                            _text("Shall I send a copy with fake values to Claude? Say yes and I'll show the card."))
             break
+        args = args if isinstance(args, dict) else {}
+        if variant and _short(name) == "file_ask":
+            args = {k: v for k, v in args.items() if k in ("file", "question", "chart", "tab")}
+            args["pipeline"] = variant
         content.append({"type": "tool_use", "id": c.get("id") or "toolu_" + uuid.uuid4().hex[:24], "name": name,
-                        "input": args if isinstance(args, dict) else {}})
+                        "input": args})
     if not content:
         content = [_text("…")]
     return message(j.get("model", "idli-9b"), content, usage_in)
@@ -651,5 +671,163 @@ def steam(j):
 
 
 def respond(j):
-    """Steam or 9B: the Anthropic Messages response for one Claude Code request."""
-    return steam(j) if mode_of(j.get("model")) == "steam" else nine(j)
+    """Steam, 9B, or a grounded 9B mode: the Anthropic Messages response for one Claude Code request."""
+    mode = mode_of(j.get("model"))
+    if mode == "steam":
+        return steam(j)
+    if mode == "careful":
+        return careful_chat(j)
+    if mode == "auto":
+        return auto_chat(j)
+    return nine(j)
+
+
+# ---------------------------------------------------------------- the grounded 9B modes (2026-11-13)
+# benchmarks/runs/2026-11-13-grounded-9b: two proposals for the Yerawada failure, built independently.
+def _lib(name):
+    import sys
+    root = os.path.dirname(HERE)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    import importlib
+    return importlib.import_module("lib." + name)
+
+
+def _file_ask_results(messages):
+    """[(input, result)] for every file_ask in the chat, oldest first."""
+    uses, out = {}, []
+    for m in messages:
+        for b in _blocks(m.get("content")):
+            if b.get("type") == "tool_use":
+                uses[b["id"]] = (b["name"], b.get("input") or {})
+            elif b.get("type") == "tool_result" and _short(uses.get(b.get("tool_use_id"), ("",))[0]) == "file_ask":
+                out.append((uses[b["tool_use_id"]][1], _json(_strip_reminders(_text_of(b.get("content"))))))
+    return out
+
+
+def _last_typed(messages):
+    """The person's last typed message, if it is the latest thing in the chat."""
+    if not messages or messages[-1].get("role") != "user":
+        return None
+    bl = _blocks(messages[-1].get("content"))
+    if any(b.get("type") == "tool_result" for b in bl):
+        return None
+    t = " ".join(_strip_reminders(b.get("text", "")) for b in bl if b.get("type") == "text").strip()
+    return t or None
+
+
+def _last_assistant_text(messages):
+    for m in reversed(messages[:-1]):
+        if m.get("role") == "assistant":
+            t = " ".join(b.get("text", "") for b in _blocks(m.get("content")) if b.get("type") == "text").strip()
+            if t:
+                return t
+    return ""
+
+
+def _latest_tool(messages):
+    """(short name, input, result) when the chat's latest message is a tool result."""
+    if not messages or messages[-1].get("role") != "user":
+        return None
+    res = [b for b in _blocks(messages[-1].get("content")) if b.get("type") == "tool_result"]
+    if not res:
+        return None
+    uses = {}
+    for m in messages:
+        for b in _blocks(m.get("content")):
+            if b.get("type") == "tool_use":
+                uses[b["id"]] = (b["name"], b.get("input") or {})
+    name, inp = uses.get(res[-1].get("tool_use_id"), ("", {}))
+    raw = _strip_reminders(_text_of(res[-1].get("content")))
+    return _short(name), inp, ({"text": raw} if name == "AskUserQuestion" else _json(raw))
+
+
+TABLE = re.compile(r"(?i)\b(as a table|in a table|table instead|show (me )?(a |the )?table|put it in a table)\b")
+PREVIOUS = re.compile(r"(?i)\b(previous|last|earlier|before|first) (chart|graph|one)\b|\bon the previous\b")
+
+
+def careful_chat(j):
+    """Careful: code answers what it can from the manifests in the chat; the 9B parses everything else."""
+    C, R = _lib("careful"), _lib("receipt")
+    msgs = j.get("messages") or []
+    model = j.get("model", "idli-9b-careful")
+    tools = j.get("tools") or []
+    asks = [(i, r) for i, r in _file_ask_results(msgs) if isinstance(r.get("manifest"), dict)]
+    mans = [r["manifest"] for _, r in asks]
+    latest = _latest_tool(msgs)
+    if latest and latest[0] == "file_ask" and (latest[1] or {}).get("pipeline") == "careful":
+        res = latest[2]
+        if isinstance(res.get("card"), dict):
+            return message(model, [_tool_use("AskUserQuestion", res["card"])])
+        if res.get("reply"):
+            return message(model, [_text(res["reply"])])
+        if res.get("error"):
+            return message(model, [_text(f"I couldn't answer that from the form ({res['error']}). Try asking it "
+                                         "another way.")])
+    if latest and latest[0] == "AskUserQuestion" and (latest[1].get("questions") or [{}])[0].get("header") == \
+            "Which figure":
+        ans = (_card_answers(latest[1], latest[2].get("text", "")) or [None])[0]
+        last_in = next((i for i, r in reversed(_file_ask_results(msgs)) if r.get("card")), {})
+        if ans and last_in.get("file") and _tool_name(tools, "file_ask"):
+            return message(model, [_tool_use(_tool_name(tools, "file_ask"),
+                                             {"file": last_in["file"], "question": "figure: " + ans,
+                                              "pipeline": "careful"})])
+    said = _last_typed(msgs)
+    if said and mans:
+        if R.PUSHBACK.search(said):
+            return message(model, [_text(C.verify_chart(mans[-1], said, _last_assistant_text(msgs)))])
+        if R.READ_CHART.search(said):
+            prev = PREVIOUS.search(said) and len(mans) > 1
+            return message(model, [_text(C.read_chart(mans[-2] if prev else mans[-1],
+                                                      "previous" if prev else "active"))])
+        if TABLE.search(said):
+            return message(model, [_text(C.as_table(mans[-1]))])
+    return nine(j, variant="careful")
+
+
+AUDIT = ("SYSTEM AUDIT: the person reports a difference between your explanation and the chart on screen. Do NOT "
+         "defend your previous answer. Read render_receipt below: say exactly what is on screen (total_bars_on_screen, "
+         "the axes, categories_shown) and anything in omitted_from_chart. If the person's description is wrong and "
+         "the receipt shows more, say what the receipt shows. Never mention or offer other AI models.")
+FLAG = "[PREVIOUS EXPLANATION FLAGGED FOR VISUAL DISCREPANCY — DO NOT REPEAT]"
+
+
+def auto_chat(j):
+    """Auto: the 9B talks, with the render receipt as its only source about the chart."""
+    R = _lib("receipt")
+    msgs = j.get("messages") or []
+    asks = [r for _, r in _file_ask_results(msgs) if isinstance(r.get("render_receipt"), dict)]
+    rc = asks[-1]["render_receipt"] if asks else None
+    said = _last_typed(msgs)
+    push = bool(said and rc and R.PUSHBACK.search(said))
+    read = bool(said and rc and R.READ_CHART.search(said))
+
+    def pre(om):
+        if not rc or not (push or read):
+            return om
+        out = list(om)
+        if push:  # mask what was said about the chart since the last answer: it may be wrong
+            last_tool = max((i for i, m in enumerate(out) if m["role"] == "tool"), default=-1)
+            for i in range(last_tool + 1, len(out)):
+                if out[i]["role"] == "assistant" and out[i].get("content"):
+                    out[i] = {**out[i], "content": FLAG}
+        note = (AUDIT if push else "Answer about the chart using only this render_receipt (what is actually on "
+                "screen):") + "\nrender_receipt: " + json.dumps(rc, ensure_ascii=False) + "\nIn words: " + R.describe(rc)
+        out.append({"role": "user", "content": note})
+        return out
+
+    def check(text, m):
+        if R.mentions_escalation(text):
+            return "Idli check: don't mention or offer other AI models. Write the reply again without that."
+        if rc:
+            bad = R.check_reply(text, rc)
+            if bad:
+                return ("Idli check: your reply contradicts the render receipt (" + "; ".join(bad) + "). Write it again "
+                        "using only render_receipt: " + R.describe(rc))
+        return None
+
+    msg = nine(j, variant="auto", pre=pre, check=check)
+    for b in msg["content"]:
+        if b["type"] == "text":
+            b["text"] = R.scrub_escalation(b["text"]) if R.mentions_escalation(b["text"]) else b["text"]
+    return msg

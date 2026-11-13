@@ -1,0 +1,333 @@
+{
+ "id": "households",
+ "title": "Households",
+ "version": 2,
+ "format": 2,
+ "tabs": {
+  "households.csv": {
+   "headers": [
+    "debts_inr",
+    "household_head",
+    "lat",
+    "lon",
+    "members",
+    "monthly_income_inr",
+    "savings_inr",
+    "vulnerability_score_1to10",
+    "ward"
+   ],
+   "summary": "One row per household: household head, ward, number of members, monthly income, savings and debts (rupees), vulnerability score (1 = least, 10 = most vulnerable) and location (lat/lon). Months of income owed = debts / monthly income. Possible poverty trap = owes more than 12 months of income AND savings below one month of income. Blank money values are unknown, not zero. Below poverty line = monthly income / members under Rs 7,500 (per member per month).",
+   "row_noun": "households",
+   "row_numbers": true,
+   "columns": {
+    "household_head": {
+     "type": "text",
+     "label": "Household head"
+    },
+    "ward": {
+     "type": "category",
+     "label": "Ward"
+    },
+    "members": {
+     "type": "number",
+     "label": "Members"
+    },
+    "monthly_income_inr": {
+     "type": "number",
+     "label": "Monthly income (Rs)"
+    },
+    "savings_inr": {
+     "type": "number",
+     "label": "Savings (Rs)"
+    },
+    "debts_inr": {
+     "type": "number",
+     "label": "Debts (Rs)"
+    },
+    "vulnerability_score_1to10": {
+     "type": "number",
+     "label": "Vulnerability score (1-10)"
+    },
+    "lat": {
+     "type": "number",
+     "label": "Latitude"
+    },
+    "lon": {
+     "type": "number",
+     "label": "Longitude"
+    }
+   },
+   "normalize": {
+    "household_head": {
+     "case": "title"
+    },
+    "ward": {
+     "case": "title"
+    },
+    "members": {
+     "type": "number"
+    },
+    "monthly_income_inr": {
+     "type": "number"
+    },
+    "savings_inr": {
+     "type": "number"
+    },
+    "debts_inr": {
+     "type": "number"
+    },
+    "vulnerability_score_1to10": {
+     "type": "number"
+    },
+    "lat": {
+     "type": "number"
+    },
+    "lon": {
+     "type": "number"
+    }
+   },
+   "validations": [
+    {
+     "column": "household_head",
+     "rule": "required",
+     "message": "household head is missing"
+    },
+    {
+     "column": "ward",
+     "rule": "required",
+     "message": "ward is missing"
+    },
+    {
+     "column": "members",
+     "rule": "required",
+     "message": "members is missing"
+    },
+    {
+     "column": "monthly_income_inr",
+     "rule": "required",
+     "message": "monthly income is missing"
+    },
+    {
+     "column": "savings_inr",
+     "rule": "required",
+     "message": "savings is missing"
+    },
+    {
+     "column": "debts_inr",
+     "rule": "required",
+     "message": "debts is missing"
+    },
+    {
+     "column": "vulnerability_score_1to10",
+     "rule": "required",
+     "message": "vulnerability score is missing"
+    },
+    {
+     "column": "members",
+     "rule": "number",
+     "message": "members is not a number"
+    },
+    {
+     "column": "monthly_income_inr",
+     "rule": "number",
+     "message": "monthly income is not a number"
+    },
+    {
+     "column": "savings_inr",
+     "rule": "number",
+     "message": "savings is not a number"
+    },
+    {
+     "column": "debts_inr",
+     "rule": "number",
+     "message": "debts is not a number"
+    },
+    {
+     "column": "vulnerability_score_1to10",
+     "rule": "number",
+     "message": "vulnerability score is not a number"
+    },
+    {
+     "column": "lat",
+     "rule": "number",
+     "message": "latitude is not a number"
+    },
+    {
+     "column": "lon",
+     "rule": "number",
+     "message": "longitude is not a number"
+    },
+    {
+     "column": "vulnerability_score_1to10",
+     "rule": "range",
+     "arg": [
+      1,
+      10
+     ],
+     "message": "vulnerability score is not between 1 and 10"
+    },
+    {
+     "column": "members",
+     "rule": "range",
+     "arg": [
+      1,
+      20
+     ],
+     "message": "members is not between 1 and 20"
+    },
+    {
+     "column": "monthly_income_inr",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000
+     ],
+     "message": "monthly income is negative or above Rs 10 lakh"
+    },
+    {
+     "column": "savings_inr",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000000
+     ],
+     "message": "savings is negative"
+    },
+    {
+     "column": "debts_inr",
+     "rule": "range",
+     "arg": [
+      0,
+      1000000000
+     ],
+     "message": "debts is negative"
+    },
+    {
+     "column": "lat",
+     "rule": "range",
+     "arg": [
+      -90,
+      90
+     ],
+     "message": "latitude is outside -90 to 90"
+    },
+    {
+     "column": "lon",
+     "rule": "range",
+     "arg": [
+      -180,
+      180
+     ],
+     "message": "longitude is outside -180 to 180"
+    }
+   ],
+   "row_checks": [
+    {
+     "id": "duplicate_household",
+     "column": "household_head",
+     "sql": "t.household_head IS NOT NULL AND (SELECT count(*) FROM {{tab:households.csv}} r WHERE lower(r.household_head) = lower(t.household_head) AND lower(coalesce(r.ward, '')) = lower(coalesce(t.ward, ''))) > 1",
+     "message": "same household head appears more than once in this ward",
+     "why": "Check whether this household was entered twice; if so, remove one copy."
+    },
+    {
+     "id": "zero_location",
+     "column": "lat",
+     "sql": "t.lat = 0 AND t.lon = 0",
+     "value": "CAST(t.lat AS VARCHAR) || ', ' || CAST(t.lon AS VARCHAR)",
+     "message": "location is 0, 0 (a placeholder, not a real place)",
+     "why": "Fill in the household's real location, or leave it blank."
+    },
+    {
+     "id": "score_too_low",
+     "column": "vulnerability_score_1to10",
+     "sql": "t.debts_inr > 12 * t.monthly_income_inr AND t.savings_inr < t.monthly_income_inr AND t.vulnerability_score_1to10 BETWEEN 1 AND 3",
+     "message": "possible poverty trap (owes more than 12 months of income, savings under 1 month) but score is 1-3: score may be too low",
+     "why": "Review: not an error, but the score doesn't match the money numbers."
+    }
+   ],
+   "measures": [
+    {
+     "id": "income_per_member",
+     "label": "Income per member (Rs/month)",
+     "sql": "sum(monthly_income_inr) / NULLIF(sum(members) FILTER (WHERE monthly_income_inr IS NOT NULL), 0)",
+     "format": "inr"
+    },
+    {
+     "id": "avg_income",
+     "label": "Average monthly income per household (Rs)",
+     "sql": "avg(monthly_income_inr)",
+     "format": "inr"
+    },
+    {
+     "id": "months_owed",
+     "label": "Average months of income owed",
+     "sql": "avg(debts_inr / NULLIF(monthly_income_inr, 0))",
+     "format": "number"
+    },
+    {
+     "id": "owe_over_year",
+     "label": "Households owing more than 12 months of income",
+     "sql": "count(*) FILTER (WHERE debts_inr > 12 * monthly_income_inr)",
+     "format": "count"
+    },
+    {
+     "id": "poverty_trap",
+     "label": "Households possibly in a poverty trap",
+     "sql": "count(*) FILTER (WHERE debts_inr > 12 * monthly_income_inr AND savings_inr < monthly_income_inr)",
+     "format": "count"
+    },
+    {
+     "id": "avg_score",
+     "label": "Average vulnerability score",
+     "sql": "avg(vulnerability_score_1to10)",
+     "format": "number"
+    },
+    {
+     "id": "below_poverty_line",
+     "label": "Households below poverty line (income under Rs 7,500 per member per month)",
+     "sql": "count(*) FILTER (WHERE members > 0 AND monthly_income_inr / members < 7500)",
+     "format": "count"
+    }
+   ],
+   "group_by": [
+    {
+     "id": "poverty_trap",
+     "label": "Possible poverty trap",
+     "sql": "CASE WHEN debts_inr IS NULL OR savings_inr IS NULL OR monthly_income_inr IS NULL THEN NULL WHEN debts_inr > 12 * monthly_income_inr AND savings_inr < monthly_income_inr THEN 'Yes' ELSE 'No' END"
+    },
+    {
+     "id": "debt_level",
+     "label": "Months of income owed",
+     "sql": "CASE WHEN debts_inr IS NULL OR monthly_income_inr IS NULL OR monthly_income_inr = 0 THEN NULL WHEN debts_inr <= 3 * monthly_income_inr THEN '0-3 months' WHEN debts_inr <= 6 * monthly_income_inr THEN '3-6 months' WHEN debts_inr <= 12 * monthly_income_inr THEN '6-12 months' ELSE 'Over 12 months' END"
+    },
+    {
+     "id": "below_poverty_line",
+     "label": "Below poverty line (under Rs 7,500 per member per month)",
+     "sql": "CASE WHEN monthly_income_inr IS NULL OR members IS NULL OR members <= 0 THEN NULL WHEN monthly_income_inr / members < 7500 THEN 'Yes' ELSE 'No' END"
+    }
+   ],
+   "hidden": [
+    "lat",
+    "lon"
+   ]
+  }
+ },
+ "questions": [
+  {
+   "id": "poverty_trap_households",
+   "ask": "which households are possibly in a poverty trap",
+   "tab": "households.csv",
+   "sql": "SELECT _row AS sheet_row, household_head, ward, monthly_income_inr, savings_inr, debts_inr, round(debts_inr / monthly_income_inr, 1) AS months_owed, vulnerability_score_1to10 FROM {{table}} WHERE debts_inr > 12 * monthly_income_inr AND savings_inr < monthly_income_inr ORDER BY debts_inr / monthly_income_inr DESC"
+  }
+ ],
+ "history": [
+  {
+   "version": 1,
+   "taught": "checks for mistakes (required, numbers, score 1-10, members 1-20, no negative money, valid coordinates, duplicates, score vs money mismatch); clean-ups for money text, ward and name spellings; debt in months of income, poverty trap, income per member by ward"
+  },
+  {
+   "version": 2,
+   "taught": "below poverty line: income per member per month under Rs 7,500 (count and Yes/No breakdown)"
+  }
+ ]
+}

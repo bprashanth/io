@@ -39,7 +39,11 @@ COWORK_PROVIDER = {
     "env": {"CLAUDE_CONFIG_DIR": T4GC_CLAUDE, "ENABLE_TOOL_SEARCH": "false"},
     # Muse only (owner, 2026-11-12: Steam's answers were hard to read and the 9B described charts it hadn't drawn).
     # The router still serves idli-9b and idli-steam (lib/modes.py) for experiments; add them here to bring them back.
-    "models": [{"id": "muse-glimmer-30b", "label": "Idli 30B", "isDefault": True}],
+    # 2026-11-13: two grounded 9B modes to compare (benchmarks/runs/2026-11-13-grounded-9b): Careful asks first,
+    # Auto acts first; both describe only what was actually drawn.
+    "models": [{"id": "muse-glimmer-30b", "label": "Idli 30B", "isDefault": True},
+               {"id": "idli-9b-careful", "label": "Idli 9B · Careful (asks first)"},
+               {"id": "idli-9b-auto", "label": "Idli 9B · Auto (acts first)"}],
     "disallowedTools": ["Bash", "BashOutput", "KillShell", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit",
                         "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite", "Skill", "mcp__paseo",
                         # unused built-ins: ~60k chars of tool schema = ~11k prompt tokens on Muse
