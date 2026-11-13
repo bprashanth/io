@@ -2,10 +2,11 @@
 # Install Idli's patched Paseo app UI (P13 side-by-side chats, P14 focus ring; desktop/paseo-idli-split.patch) on the
 # laptop. Paseo's desktop shell loads its UI from /opt/Paseo/resources/app-dist; we point that at a folder we own,
 # once (sudo), so later updates and rollbacks need no sudo.
-#   install-paseo-ui.sh [install|off|status]     (DGX=user@host overrides the build host)
+#   install-paseo-ui.sh [install|off|status]     (DGX=user@host overrides the build host; FILE=<build.tgz> installs a
+#                                                 build already on this machine)
 set -e
 DGX=${DGX:-beeps@gx10-0a47.tail5ef239.ts.net}
-BUILD=${BUILD:-paseo-app-dist-0.15.2-idli6}
+BUILD=${BUILD:-paseo-app-dist-0.15.2-idli7}
 RES=/opt/Paseo/resources
 OURS=${IDLI_HOME:-$HOME/idli-insights}/paseo/app-dist
 CFG=${IDLI_HOME:-$HOME/idli-insights}/config/ui.json
@@ -18,7 +19,7 @@ case "${1:-install}" in
     echo "split off" ;;
   install)
     tmp=$(mktemp -d)
-    scp -q "$DGX:idli-builds/$BUILD.tgz" "$tmp/b.tgz"
+    if [ -n "$FILE" ]; then cp "$FILE" "$tmp/b.tgz"; else scp -q "$DGX:idli-builds/$BUILD.tgz" "$tmp/b.tgz"; fi
     rm -rf "$OURS.new" && mkdir -p "$OURS.new" && tar -C "$OURS.new" -xzf "$tmp/b.tgz" && rm -rf "$tmp"
     [ -f "$OURS.new/index.html" ] || { echo "the build has no index.html"; exit 1; }
     rm -rf "$OURS.old"; [ -d "$OURS" ] && mv "$OURS" "$OURS.old"; mv "$OURS.new" "$OURS"

@@ -166,6 +166,23 @@ index f85d09ca..a23dbddb 100644
    });
  
    useEffect(() => {
+diff --git a/packages/app/src/desktop/browser/resident-webviews.ts b/packages/app/src/desktop/browser/resident-webviews.ts
+index dfce3551..6bcba1d8 100644
+--- a/packages/app/src/desktop/browser/resident-webviews.ts
++++ b/packages/app/src/desktop/browser/resident-webviews.ts
+@@ -308,6 +308,12 @@ export function prepareBrowserWebview(
+   webview.setAttribute("allowpopups", "true");
+   webview.setAttribute("spellcheck", "false");
+   webview.setAttribute("autosize", "on");
++  // Idli P16: present as the Chrome it is. Sites such as WhatsApp Web refuse "Electron/" and unknown app tokens
++  // ("WhatsApp works with Google Chrome 100+") although the engine is current Chromium.
++  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
++  if (ua) {
++    webview.setAttribute("useragent", ua.replace(/\s(Electron|Paseo|paseo)\/\S+/g, ""));
++  }
+   if (input.initialUrl) {
+     (webview as BrowserWebviewElement).src = input.initialUrl;
+   }
 diff --git a/packages/app/src/utils/idli-pairing.ts b/packages/app/src/utils/idli-pairing.ts
 new file mode 100644
 index 00000000..5a496168
