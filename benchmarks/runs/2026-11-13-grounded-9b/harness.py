@@ -84,11 +84,14 @@ def tool_defs():
 
 def run_tool(name, inp):
     from sites.files import tools as T
-    fn = T.TOOLS[name.split("__")[-1]][0]
+    short = name.split("__")[-1]
+    if short in ("teach_send", "chart_request_send"):  # needs Paseo + Claude: recorded as a detour, not run
+        return {"started": False, "error": "teaching isn't available in this offline test (recorded as a detour)"}
+    fn = T.TOOLS[short][0]
     try:
         return fn(**inp)
-    except TypeError as e:
-        return {"error": str(e)}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {e}"[:300]}
 
 
 MUSE_ROUTER = os.environ.get("IDLI_ROUTER", "http://127.0.0.1:8185")
@@ -201,7 +204,7 @@ def main():
             trace.append(turn)
             print(f"\n>>> {turn['user']}")
             for c in turn["calls"]:
-                print(f"    [{c['tool']}] {json.dumps(c['input'], ensure_ascii=False)[:160]}")
+                print(f"    [{c['tool']}] {json.dumps(c.get('input') or c.get('picked'), ensure_ascii=False)[:160]}")
             if turn.get("card"):
                 q = turn["card"]["questions"][0]
                 print(f"    [card] {q['question']} :: {[o['label'] for o in q.get('options') or []]}")
