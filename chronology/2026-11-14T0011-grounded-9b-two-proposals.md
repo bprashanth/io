@@ -49,3 +49,28 @@ Since then, commit `0a2c80ed` stopped drawing charts for a single row. The rest 
   - Auto's 9B wrote "lower income and higher debt lead to greater vulnerability". Proposal 2 has no causal rule, so this was kept as a difference between the two, not patched.
 
 Next: all six scripts in three modes, fault injection, then the laptop.
+
+## Update, 00:50 IST: round 2 and the app
+
+- Both modes are in Drivey's menu on the laptop. The code was copied there as local sync commits, the Paseo config
+  backed up and reloaded, and the DGX router (muse-prefix-proxy) restarted twice.
+- **Tested in the app on the owner's real households file**, typing and clicking like a person.
+  - **Careful:**
+    - asked which figure;
+    - compared Yerawada with the other wards. Yerawada is 2nd of 5 on vulnerability; Ramtekdi is 1st;
+    - axes exact; holds to 5 bars on "single blue bar";
+    - "why might" found two households driving most of the gap;
+    - debt (misspelled "yearwada") compared on averages;
+    - the formula question answered with the formula;
+    - no-dates trend refused.
+  - **Auto:**
+    - diverging %-difference profile;
+    - axes right, holds to 5 bars on pushback;
+    - but opened with "You're absolutely right — I apologize" before the correct facts;
+    - used causal wording;
+    - wandered between tools offline.
+- **Fixed in the app round:**
+  - an "undefined" row in reference-line charts;
+  - Careful now sends the person's own words to the form;
+  - a code rule answers "how is it calculated / divided" with the formula.
+- Report with the scorecard: [REPORT.md](../benchmarks/runs/2026-11-13-grounded-9b/REPORT.md).

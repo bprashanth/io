@@ -313,6 +313,10 @@ def ask(files, file, question, chart=False, tab=None):
     return out
 
 
+DEFINE_WORDS = re.compile(r"(?i)\b(divid\w*|how (is|was|are|do you|did you)\b.{0,40}?\b(calculat|comput|derived|worked out)\w*|"
+                          r"what does .{1,60} mean|formula|worked out|what (is|are) (meant by|the definition))")
+
+
 def _ambiguous(question):
     return bool(re.search(r"(?i)\b(so )?(high|low|bad|good|worse|better|struggling|poor|well|badly|stand out|"
                           r"different)\b", question or ""))
@@ -322,6 +326,8 @@ def validate(c, intent, active, question):
     """Code's checks on the 9B's intent: known ids, a figure when one is needed, a baseline for a comparison."""
     f = c.f
     plan = {"intent": intent.get("intent") or "OTHER", "notes": []}
+    if DEFINE_WORDS.search(question or ""):  # code's rule: a question about how a figure is made gets its formula
+        plan["intent"] = "DEFINE"
     mids = _fair([m for m in intent.get("measures") or [] if m in f["_measures"] and m != "rows"], f)
     named = bool(intent.get("measure_named")) and "measure" not in (intent.get("unresolved") or [])
     if intent.get("refers_to_previous") and active and not mids:
