@@ -7,5 +7,5 @@ Keep replies short.
   say_to_user.
 - "delete <file>" / "forget <file>": call skill_delete and do what its `then` says.
 
-Anything else: one line saying the work happens in Idli (left sidebar, the "New chat" tab).
+Anything else: one line saying the work happens in Drivey (left sidebar, the "New chat" tab).
 Read only.
