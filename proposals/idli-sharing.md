@@ -25,10 +25,12 @@ what to do with it.
 | Open | Clicking the Mini fetches the Drive file **every time**, then runs the dashboard on it. No access: "You don't have access to "Household survey 2025" in Google Drive. Ask whoever shared this Mini to share the file with you", with a link to the file. | `/api/minis/open`, `lib/drivefetch.py`, `form.html?mini=` |
 | In chat | "share households" gives the code (`skill_share`); pasting a code shows the same Yes/No card (`skill_import`). | `sites/files/tools.py` |
 
-**Fetching as the person.** `drivefetch` runs `fetch(export URL)` inside a Google tab of the app's browser, so it
-carries the person's own sign-in, with no download box. If no Google tab is open, it reads the browser session's
-Google cookies through any of the app's tabs and makes the same request. Both use DevTools, which is on in our
-dev builds (as the quiet downloads already are). A shipping build needs a small Paseo patch for it.
+**Fetching as the person.** `drivefetch` reads the app browser's Google cookies through DevTools (on in our dev
+builds, as the quiet downloads already are) and requests the Drive export with them, following Google's redirects.
+So it carries the person's own sign-in, with no download box, and the cookies go nowhere but Google. A
+`fetch()` inside a Google tab was tried first: on real Drive the export redirects to googleusercontent.com, and the
+browser won't let the page read that cross-origin answer. A shipping build needs a small Paseo patch for the cookie
+read.
 
 Tested 2026-11-13 on the DGX:
 - Two Idli homes, each with a fake Drive standing for what that person's Google account can open.
@@ -39,17 +41,27 @@ Tested 2026-11-13 on the DGX:
 - After the sheet was edited (31 rows to 14), a reload showed the new numbers.
 - The in-tab fetch ran in real Chromium through DevTools. It followed a redirect to the xlsx (byte-identical), and
   refused a sign-in page and a 403.
-- Not yet run against real Google on the laptop, including the cookie fallback.
+
+Tested 2026-11-13 end to end with real Google (laptop, the test account):
+- Sharer: the Minis page in the app. Households and the Cestrum file were links (opened from Drive before).
+  Share gave `IDLI-K7EX-7E5B`. Clicking Households fetched the sheet in 1.0 s and showed the dashboard in
+  1.5 s ("fetched in 1.0s" in its header).
+- Fetch timings: 7 KB households 1.0 s; 127 KB Cestrum file 1.5 s (byte-identical to the last download); an id
+  this account can't open was refused in 0.45 s.
+- Receiver on the DGX: the laptop's code came through silo with the file attached ("Households: the Google Drive
+  file "households" (7 measures, 21 checks, 0 charts)."), installed, and opening it said "Sign in to Google
+  first". That is correct: the DGX has no app browser.
+- Receiver on the laptop: a second, empty Idli home with its own page server, in the app's browser. It added the
+  code (one line, Yes), got one linked row, opened it (fetched in 1.0 s, same answer as the sharer), then the
+  same Mini pointed at a file this account can't open showed the no-access page.
+- Not tested: two different Google accounts. That needs a second machine or Google profile.
 
 ## Refresh: every time the Mini loads
 
 Each open (clicking the Mini, or reloading its tab) fetches the file. If the bytes are unchanged, the form's cached
 results are reused (the cache is keyed by the file's modified time, which stays put). So the cost of always fetching is the
-export request itself:
-- A small sheet exports in about 1 to 3 seconds; that guess still needs measuring on the laptop.
-- Sheets with many tabs or tens of thousands of rows take longer.
-
-The header shows "fetched in N s", so we'll see real numbers.
+export request itself: measured at 1.0 to 1.5 s for 7 to 127 KB sheets on the laptop. Big sheets (many tabs,
+tens of thousands of rows) will take longer; the header shows "fetched in N s".
 
 **Push notifications from Drive** exist (Drive API `files.watch` / `changes.watch`), but not for us yet:
 - They need a Drive API OAuth token. Idli uses the browser's sign-in, not the API.

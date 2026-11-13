@@ -14,7 +14,10 @@ Either agent adds an entry here for every change that needs something done on th
   DevTools, else the browser session's cookies). Clicking a Mini fetches the file fresh and runs the dashboard;
   without access it says so. Clone (workflow without the file) is [todos P3](../todos/idli-insights/p3/clone_mini.md).
   DGX: two homes with fake Drives (no access, then access, then an edited sheet shows new numbers); the in-tab fetch
-  in real Chromium. Not yet on the laptop against real Google.
+  in real Chromium. Laptop with real Drive: the in-tab fetch fails (cross-origin export redirect), so the cookie route
+  is the only one; Share then open 1.0 s fetch / 1.5 s to the dashboard; a second empty Idli home on the laptop added
+  the code and opened the same file; the DGX added it via silo (no Google there, so "sign in first"); a file the
+  account can't open shows the no-access page. Not tested: two different Google accounts.
 - **2026-11-13, DGX: Minis, shared by code only.** Mission control is now **Minis** ("Here is a list of workflows
   Idli has learned to analyse"): each row is a title with Share (shows the code) and Delete; the top has "Add a Mini
   [code] Add" with a one-line description and Yes/No. File download, Drive link and the hidden sheet tab are gone
