@@ -1,5 +1,68 @@
 # Grounded 9B: Careful vs Auto — report
 
+> **Correction, 2026-11-14 (after the owner's review):** the first version below compared against the old idli-9b
+> mode on the very scripts I tuned on. The right baseline is **Muse 30B** (today's product), and the score that
+> counts is on **held-out** questions. That run is the next section; the earlier scorecard is kept below it,
+> marked as development results.
+
+## Held-out results (code frozen at 09e7de3c; Muse 30B as the baseline)
+
+**Set-up.**
+- **Questions:** 6 scripts and 19 turns, written before any run. Four are about households, in new wording and using
+  the proposals' cases I hadn't used: swap the figure, median, a table, a share, how many rows were left out,
+  outliers, and a causal trap.
+- **A second file:** two scripts on the field programme tracker, which was never looked at during development (three
+  tabs, dates, officers, a "leave out cancelled" rule).
+- **The person:** answers a card with the option matching their intent, else the first option.
+- **Muse** runs through the real router (8185), with Idli's CLAUDE.md.
+- **Harness:** chats start as in the app (link, file_get, card answered).
+- **Fairness:** the harness was fixed three times (teaching recorded as a detour; the start as in the app; no form
+  page server) without touching product code.
+
+**Scoring.** Each turn, by me, from the traces: ✓ right and grounded; ~ partly (right numbers but missed the point,
+or right but with leaked or garbled text); ✗ wrong (wrong figure, wrong claim about the chart, crash, or a detour).
+
+| | ✓ | ~ | ✗ |
+|---|---|---|---|
+| **Muse 30B** (today) | **13** | 4 | 2 |
+| Careful (9B) | 5 | 7 | 7 |
+| Auto (9B) | 4 | 7 | 8 |
+
+**What this says:**
+- **Turning a question into the right form, the 9B modes are worse than Muse on new wording.**
+  - Careful silently swapped "median" for a different figure (income per member).
+  - Careful listed every row for "how many were left out", and answered "what share" with a count.
+  - Careful ranked officers by money for "most visits", and crashed on "month by month" (a date bug on the new file).
+  - Both 9B modes ignored the tracker's "leave out cancelled" rule, so their totals include cancelled visits. Muse
+    applied it.
+  - Auto wandered: 224 s and five form calls for one turn. It leaked its checks ("You're absolutely right—I never
+    calculate numbers myself"), and on the tracker it compared a village's total with the whole file's total (−78%).
+- **On talking about the chart, Muse has the incident's failure and Careful doesn't, even on the unseen file.**
+  - Muse put "Village" on the bottom axis; Village is down the left, and the amounts run along the bottom.
+  - To "I can only see one bar", Muse invented a reason ("the dashboard is showing the single village filter you asked
+    for earlier"; there was none).
+  - On the original scripts Muse also said "that's why you see a single blue bar … it's the totals for that ward",
+    called the score the y-axis, and said "the quick chart only renders one measure at a time" when it had drawn two
+    panels.
+  - Careful answered every axis and pushback turn right from the receipt (tracker: the bottom axis, 8 bars).
+  - Auto said no chart was drawn when one was.
+- **Tuned on my dev scripts, so these don't count as wins there:** the "how is it calculated / divided" rule, the
+  pushback words, the misspelling handling. On held-out, the definition rule fired correctly ("what does disbursed
+  mean"), but Careful still didn't answer the "is it per visit?" part.
+
+**Recommendation.** Don't replace Muse with either 9B mode. Keep Muse for understanding the question and take the
+part that held up on held-out:
+- the render receipt read from the drawn chart;
+- chart follow-ups ("what's on the axis", "I only see one bar") answered by code from it;
+- the "why is X high" comparison with a baseline.
+
+That means adding those to the Muse chat (in the router, like careful_chat's READ/VERIFY routing), then running this
+same held-out set again. The 9B form-filling needs more work before it competes, and a held-out set it hasn't seen.
+
+---
+
+# Development results (tuned on these scripts; not a fair score)
+
 2026-11-14. Plan: [PLAN.md](PLAN.md). Code: `cowork/lib/careful.py`, `cowork/lib/auto.py`, shared
 `cowork/lib/receipt.py`, routing in `cowork/lib/modes.py` (`careful_chat`, `auto_chat`). In Drivey's model menu as
 **Idli 9B · Careful (asks first)** and **Idli 9B · Auto (acts first)**; Muse stays the default.

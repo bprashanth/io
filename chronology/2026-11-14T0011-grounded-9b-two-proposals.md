@@ -74,3 +74,17 @@ Next: all six scripts in three modes, fault injection, then the laptop.
   - Careful now sends the person's own words to the form;
   - a code rule answers "how is it calculated / divided" with the formula.
 - Report with the scorecard: [REPORT.md](../benchmarks/runs/2026-11-13-grounded-9b/REPORT.md).
+
+## Update: held-out against Muse 30B (the owner: "don't overfit"; "the baseline is the 30B")
+
+- The code was frozen at 09e7de3c. Six held-out scripts (19 turns) were written before running: new wording, the
+  proposals' unused cases, and a second taught file never looked at (the field programme tracker). Muse 30B ran
+  through the real router.
+- **Score** (✓ / ~ / ✗): Muse **13 / 4 / 2**, Careful 5 / 7 / 7, Auto 4 / 7 / 8.
+- **Muse is much better at turning a question into the right form:** shares, counts, "median isn't available", and
+  the file's own "leave out cancelled" rule, which both 9B modes ignored.
+- **Muse still has the incident's chart failure:** a wrong axis, an invented reason for "only one bar", and "only one
+  measure is drawn" when two panels were.
+- **Careful's receipt-based chart answers were right on every such turn,** including on the unseen file.
+- **Recommendation:** keep Muse, and add the receipt plus code-answered chart follow-ups (and the baseline comparison)
+  to the Muse chat; then rerun this held-out set. Details in REPORT.md.
