@@ -582,10 +582,11 @@ def t_skill_import(source, confirmed=False):
 
 
 def t_skill_share(file_title):
-    """A share code for one Mini (what Idli learned about one kind of file)."""
+    """A share code for one Mini: the dashboard for one Google Drive file. The receiver opens the same file, so they
+    need access to it in Drive. (Sharing the workflow without the file is a clone: todos P3.)"""
     from lib import share, muse
     try:
-        data, _ = share.pack_bytes(file_title)
+        data, _ = share.pack_bytes(file_title, with_file=True)
         req = urllib.request.Request(muse.base_url() + "/idli/share", data,
                                      {"Content-Type": "application/zip", **muse.headers()})
         with urllib.request.urlopen(req, timeout=60) as r:
@@ -1305,8 +1306,8 @@ TOOLS = {
                      "first; confirmed=true adds it.",
                      {"source": {"type": "string", "description": "The share code"},
                       "confirmed": {"type": "boolean", "description": "Only after a yes on its card"}}, ["source"]),
-    "skill_share": (t_skill_share, "A share code for one Mini (what Idli learned about one kind of file), to give "
-                    "someone who has Idli.",
+    "skill_share": (t_skill_share, "A share code for one Mini (the dashboard for one Google Drive file), to give "
+                    "someone who has Idli and access to that file.",
                     {"file_title": {"type": "string", "description": "The Mini's id or title (skills_list)"}},
                     ["file_title"]),
     "teach_file": (t_teach_file, "Prepare a teaching request for a file Idli doesn't know, or whose layout changed, or a "

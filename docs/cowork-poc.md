@@ -8,6 +8,13 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-13, DGX: share = the same Drive file; a Mini fetches its file on every open.** A Mini records the
+  Drive file it was opened from (`sources.json`); Share sends the workflow plus that file's id, and the receiver's
+  Idli opens the same file with their own Google account (`lib/drivefetch.py`: `fetch()` inside a Google tab via
+  DevTools, else the browser session's cookies). Clicking a Mini fetches the file fresh and runs the dashboard;
+  without access it says so. Clone (workflow without the file) is [todos P3](../todos/idli-insights/p3/clone_mini.md).
+  DGX: two homes with fake Drives (no access, then access, then an edited sheet shows new numbers); the in-tab fetch
+  in real Chromium. Not yet on the laptop against real Google.
 - **2026-11-13, DGX: Minis, shared by code only.** Mission control is now **Minis** ("Here is a list of workflows
   Idli has learned to analyse"): each row is a title with Share (shows the code) and Delete; the top has "Add a Mini
   [code] Add" with a one-line description and Yes/No. File download, Drive link and the hidden sheet tab are gone

@@ -180,6 +180,12 @@ class Files:
                               "suggestion": p.get("suggestion"), "decision": dec.get(self.pkey(p))})
         real = [p for p in e["problems"] if not p.get("skipped")]
         src = self.source(rel) or {}
+        if src.get("id") and not src.get("copy_of"):  # the Mini's Drive file (what Share hands on)
+            from lib import share
+            try:
+                share.remember_source(e["skill"].get("_dir"), src, title)
+            except OSError:
+                pass
         return {"file": rel, "title": e["skill"].get("title") or title, "known": True,
                 "working_copy": src.get("working_copy"), "is_copy": bool(src.get("copy_of")),
                 "problem_kinds": len({(p["tab"], p["column"], p["rule"]) for p in real}),
@@ -285,7 +291,7 @@ Your question, as sent: "{e(req.get('question') or '')}"</div>{''.join(parts)}</
 
 def skills_list():
     """What Idli has learned: one skill per file (from the Claude workspace), with its charts."""
-    from lib import chartkit
+    from lib import chartkit, share
     out = []
     for sk in fk.load_skills():
         tabs = fm.tabs_of(sk)
@@ -295,9 +301,61 @@ def skills_list():
                     "measures": sum(len(t.get("measures") or []) for t in tabs.values()),
                     "charts": [c["title"] or c["id"] for c in chartkit.charts_of(sk)],
                     "taught": (hist[-1].get("taught") if hist else "") or "",
+                    "file": bool(share.source_of(sk)),
                     "changed": dt.datetime.fromtimestamp(os.path.getmtime(os.path.join(sk["_dir"], "skill.json")))
                     .strftime("%d %b %Y %H:%M")})
     return out
+
+
+def open_mini(files, sid):
+    """Fetch the Mini's Drive file as the person (their access decides) into this folder, and return it for the
+    dashboard. The form re-runs on it; unchanged bytes keep the cached results."""
+    import hashlib
+    import time
+    from lib import share, drivefetch
+    sk = next((s for s in fk.load_skills() if s["id"] == sid), None)
+    if not sk:
+        return 404, {"error": f"No Mini '{sid}'."}
+    src = share.source_of(sk)
+    if not src:
+        return 400, {"error": "This Mini hasn't been opened from Google Drive yet. Open the file in Idli from its "
+                              "Drive link once."}
+    name = (re.sub(r"[^\w .()-]+", "_", src.get("title") or "").strip() or sid)[:80]
+    t0 = time.time()
+    try:
+        data = drivefetch.fetch(src["id"], src.get("sheet", True))
+    except drivefetch.NoAccess:
+        who = f" Ask {src['from']} to share it with you." if src.get("from") not in (None, "", "shared") else \
+            " Ask whoever shared this Mini to share the file with you in Google Drive."
+        return 403, {"error": f"You don't have access to \u201c{src.get('title') or name}\u201d in Google Drive.{who}",
+                     "no_access": True, "url": src.get("url")}
+    except drivefetch.NoGoogle:
+        return 409, {"error": "Sign in to Google first (Start here, Logins chat), then open this again."}
+    ms = int((time.time() - t0) * 1000)
+    rel = os.path.join("drive", name + ".xlsx")
+    path = os.path.join(files.data_dir, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    old = None
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            old = hashlib.sha256(f.read()).hexdigest()
+    changed = old != hashlib.sha256(data).hexdigest()
+    if changed:
+        with open(path + ".tmp", "wb") as f:
+            f.write(data)
+        os.replace(path + ".tmp", path)
+    sp = path + ".source.json"
+    try:
+        with open(sp) as f:
+            meta = json.load(f)
+    except (OSError, ValueError):
+        meta = {}
+    if meta.get("id") != src["id"]:
+        meta = {}
+    meta.update(id=src["id"], url=src.get("url"))
+    with open(sp, "w") as f:
+        json.dump(meta, f)
+    return 200, {"file": rel, "fetch_ms": ms, "changed": changed, "bytes": len(data)}
 
 
 def skills_delete(sid):
@@ -395,7 +453,7 @@ def make_handler(files, token):
                     return self._send(200, files.fixlist(body["file"]))
                 if u.path == "/api/skills/code":
                     from lib import share, muse
-                    data, man = share.pack_bytes(body["id"])
+                    data, man = share.pack_bytes(body["id"], with_file=True)
                     req = urllib.request.Request(muse.base_url() + "/idli/share", data,
                                                  {"Content-Type": "application/zip", **muse.headers()})
                     with urllib.request.urlopen(req, timeout=60) as r:
@@ -429,6 +487,8 @@ def make_handler(files, token):
                     files.cache.clear()
                     out.pop("manifest", None)
                     return self._send(200, out)
+                if u.path == "/api/minis/open":  # a Mini is one Drive file's dashboard: fetch it fresh every time
+                    return self._send(*open_mini(files, body["id"]))
                 if u.path == "/api/skills/delete":
                     out = skills_delete(body["id"])
                     files.cache.clear()

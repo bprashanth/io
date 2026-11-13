@@ -36,6 +36,41 @@ def _skill(skill_id):
     return sk
 
 
+SOURCES = "sources.json"  # the Drive files this Mini has been used on, newest last (not shared, not in git)
+
+
+def remember_source(skill_dir, src, title=None):
+    """Record the Drive file a Mini was just used on (from the downloaded file's .source.json)."""
+    if not (src or {}).get("id") or not skill_dir:
+        return
+    p = os.path.join(skill_dir, SOURCES)
+    try:
+        with open(p) as f:
+            have = json.load(f)
+    except (OSError, ValueError):
+        have = []
+    sheet = "/spreadsheets/" in (src.get("url") or "/spreadsheets/")
+    entry = {"id": src["id"], "url": src.get("url"), "title": title or src.get("title") or "", "sheet": sheet,
+             "used": dt.datetime.now().isoformat(timespec="seconds")}
+    if src.get("from"):
+        entry["from"] = src["from"]
+    have = [h for h in have if h.get("id") != src["id"]] + [entry]
+    tmp = p + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(have[-20:], f, indent=1)
+    os.replace(tmp, p)
+
+
+def source_of(skill):
+    """The Drive file this Mini is for: the one it was used on most recently. None if it never came from Drive."""
+    try:
+        with open(os.path.join(skill["_dir"], SOURCES)) as f:
+            have = json.load(f)
+        return have[-1] if have else None
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def real_words(skill):
     """The real labels inside a skill (what someone could learn from it about the original file)."""
     out = []
@@ -49,8 +84,9 @@ def real_words(skill):
     return out
 
 
-def _manifest(skill, files, who=None):
-    return {"format": FORMAT, "kind": "file-skill", "id": skill["id"], "title": skill.get("title") or skill["id"],
+def _manifest(skill, files, who=None, source=None):
+    return {"format": FORMAT, "kind": "mini" if source else "file-skill",
+            **({"file": {k: source.get(k) for k in ("id", "url", "title", "sheet")}} if source else {}), "id": skill["id"], "title": skill.get("title") or skill["id"],
             "version": skill.get("version", 1), "made": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
             "from": who or "", "tabs": {t: sorted((v.get("headers") or [])) for t, v in fm.tabs_of(skill).items()},
             "measures": sum(len(v.get("measures") or []) for v in fm.tabs_of(skill).values()),
@@ -60,9 +96,14 @@ def _manifest(skill, files, who=None):
             "files": {f: hashlib.sha256(b).hexdigest() for f, b in files.items()}}
 
 
-def pack_bytes(skill_id, who=None, with_mock=True):
-    """(zip bytes, manifest)."""
+def pack_bytes(skill_id, who=None, with_mock=True, with_file=False):
+    """(zip bytes, manifest). with_file: a Mini share, tied to the Drive file the sender uses it on (the receiver
+    needs access to that file); without, the skill alone (a clone, todos P3)."""
     sk = _skill(skill_id)
+    source = source_of(sk) if with_file else None
+    if with_file and not source:
+        raise ValueError(f"{sk.get('title') or skill_id} hasn't been opened from Google Drive yet, so there's no file to "
+                         "share. Open the file in Idli from its Drive link first.")
     root = sk["_dir"]
     files = {}
     for dirpath, _, names in os.walk(root):
@@ -76,7 +117,7 @@ def pack_bytes(skill_id, who=None, with_mock=True):
                     files[rel] = f.read()
     with open(os.path.join(root, "skill.json")) as f:
         skill = json.load(f)
-    man = _manifest(skill, files, who)
+    man = _manifest(skill, files, who, source)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("manifest.json", json.dumps(man, indent=1, ensure_ascii=False))
@@ -112,7 +153,7 @@ def inspect(src):
             man = json.loads(z.read("manifest.json"))
         except (KeyError, ValueError):
             return {"manifest": None, "problems": ["no manifest: not an Idli bundle"]}
-        if man.get("format") != FORMAT or man.get("kind") != "file-skill":
+        if man.get("format") != FORMAT or man.get("kind") not in ("file-skill", "mini"):
             problems.append(f"unknown bundle format {man.get('format')!r}/{man.get('kind')!r}")
         if not re.fullmatch(r"[\w.-]{1,80}", str(man.get("id") or "")):
             problems.append("bad skill id")
@@ -165,6 +206,10 @@ def install(src, replace=False):
                     f.write(z.read(n))
     with open(os.path.join(dest, "shared_from.json"), "w") as f:
         json.dump({"from": man.get("from"), "made": man.get("made"), "installed": dt.datetime.now().isoformat()}, f)
+    if kept and os.path.exists(os.path.join(kept, SOURCES)):  # the files it was used on here stay
+        shutil.copy2(os.path.join(kept, SOURCES), os.path.join(dest, SOURCES))
+    if (man.get("file") or {}).get("id"):
+        remember_source(dest, {**man["file"], "from": man.get("from") or "shared"}, man["file"].get("title"))
     return {"installed": True, "id": man["id"], "title": man["title"], "version": man["version"], "replaced": kept,
             "manifest": man}
 
@@ -181,8 +226,11 @@ def from_text(text):
 def short(man):
     """One line for the yes/no before adding a Mini."""
     n = len(man.get("charts") or [])
-    return (f"{man['title']}: {man['measures']} measures, {man['checks']} checks, {n} chart{'' if n == 1 else 's'}, "
-            f"for files with tabs {', '.join(man['tabs'])}.")
+    what = f"{man['measures']} measures, {man['checks']} checks, {n} chart{'' if n == 1 else 's'}"
+    f = man.get("file") or {}
+    if f.get("id"):
+        return f"{man['title']}: the Google Drive file \u201c{f.get('title') or f['id']}\u201d ({what})."
+    return f"{man['title']}: {what}, for files with tabs {', '.join(man['tabs'])}."
 
 
 def describe(man):

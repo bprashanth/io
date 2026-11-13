@@ -88,6 +88,7 @@ details.card > summary { cursor: pointer; font-size: 12px; text-transform: upper
 dialog { max-width: 94vw; max-height: 94vh; border: none; border-radius: 10px; padding: 12px; }
 dialog img { max-width: 90vw; max-height: 82vh; display: block; background: #fff; }
 dialog::backdrop { background: #0008; }
+a.back { display: inline-block; font-size: 13px; color: var(--muted); text-decoration: none; margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -122,7 +123,8 @@ dialog::backdrop { background: #0008; }
 <script src="vendor/vega-interpreter.min.js"></script><script src="vendor/vega-embed.min.js"></script>
 <script>
 const P = new URLSearchParams(location.search);
-const T = P.get("t"), FILE = P.get("file");
+const T = P.get("t"), MINI = P.get("mini");
+let FILE = P.get("file");
 let META = null, TAB = P.get("tab"), SPEC = {};
 try { SPEC = JSON.parse(P.get("spec") || "{}"); } catch (e) { SPEC = {}; }
 const $ = id => document.getElementById(id);
@@ -161,7 +163,7 @@ async function load() {
   let hidden = "";
   if (META.hidden_cells) hidden = `<div class="banner drift">Read from Google's export, which blanks text in number columns: ${esc(Object.entries(META.hidden_cells).map(([k, v]) => `${k} (${v} cells)`).join(", "))}. Totals from these may be low. Ask Idli to download the real file.</div>`;
   $("banner").innerHTML = `<div class="banner ${c.status}">${esc(label)}${c.messages.length ? "<ul>" + c.messages.map(m => `<li>${esc(m)}</li>`).join("") + "</ul>" : ""}</div>` + hidden;
-  $("sub").textContent = `${FILE} - taught v${META.skill.version} - ${META.problem_count ? META.problem_count + " problems found" : "no problems found"}`;
+  $("sub").textContent = `${FILE} - taught v${META.skill.version} - ${META.problem_count ? META.problem_count + " problems found" : "no problems found"}${$("sub").dataset.fetched ? " - " + $("sub").dataset.fetched : ""}`;
   if (!META.tabs.some(t => t.tab === TAB)) TAB = META.tabs[0].tab;
   $("tabs").innerHTML = META.tabs.map(t => `<button data-tab="${esc(t.tab)}" class="${t.tab === TAB ? "on" : ""}">${esc(t.tab)} <span class="muted">${t.rows}</span></button>`).join("");
   $("tabs").querySelectorAll("button").forEach(b => b.onclick = () => { TAB = b.dataset.tab; SPEC = {}; render(); });
@@ -399,7 +401,25 @@ function renderProblems() {
     } catch (e) { $("fixmsg").textContent = e.message; }
   };
 }
-load().then(loadCharts);
+// a Mini (opened from the Minis page) is one Drive file's dashboard: fetch the file fresh on every load
+async function openMini() {
+  $("title").textContent = "Getting the latest from Google Drive…";
+  const r = await fetch("/api/minis/open?t=" + encodeURIComponent(T),
+    {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({id: MINI})});
+  const j = await r.json();
+  if (!r.ok) {
+    $("title").textContent = "Can't open this Mini";
+    $("main").style.display = "none";
+    $("banner").innerHTML = `<div class="banner changed">${esc(j.error || r.statusText)}${j.url ? ` <a href="${esc(j.url)}">Open it in Drive</a>` : ""}</div>`;
+    return false;
+  }
+  FILE = j.file;
+  $("sub").dataset.fetched = `fetched in ${(j.fetch_ms / 1000).toFixed(1)}s`;
+  return true;
+}
+if (MINI) document.querySelector("header").insertAdjacentHTML("afterbegin",
+  `<a class="back" href="/skills?t=${encodeURIComponent(T)}">← Minis</a>`);
+(MINI ? openMini() : Promise.resolve(true)).then(ok => ok && load().then(loadCharts));
 </script>
 </body>
 </html>

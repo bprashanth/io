@@ -19,6 +19,7 @@
   - [Optimizations](p2/optimizations.md). Most of the index rows (1-4) wait on the one-file-at-a-time decision.
 - **p3/**: later.
   - [Strict mode: flag every inconsistency](p3/strict_mode.md)
+  - [Clone a Mini: the workflow without its file, for someone's own copy](p3/clone_mini.md)
   - Candidates: share questions become form measures instead of charts (decision 4 in
     [chart_code_reading](p1/chart_code_reading.md)); Claude planning on redacted questions (E10); a small model for
   setting the form's dials (E9) if constrained output isn't enough.
