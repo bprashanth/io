@@ -4,7 +4,7 @@ Safe to rerun: it only adds what's missing.
 
   Start here       its own folder (~/idli-insights/setup), first in the sidebar
      Logins           the setup chat (sign-in checks; also answers "what has Idli learned")
-     Mission control  a tab: the page listing the files Idli has learned (grows as Claude teaches it)
+     Minis            a tab: the page listing the files Idli has learned (grows as Claude teaches it)
      Drive            a tab for signing in to Google
   Idli         the private folder (~/idli-insights/cowork-real): where the work happens; a "New chat" is always
      Idli      waiting there on its first card (clean up a file / analyse a file)
@@ -208,10 +208,10 @@ def browser_as(agent_id):
 
 
 def learned_tab(agent_id):
-    """The Mission control tab (the page of what Idli has learned) in Start here, at the form server's current address (the server is
+    """The Minis tab (the page of what Idli has learned) in Start here, at the form server's current address (the server is
     started here so the page is live as soon as the app opens)."""
     if not agent_id or DRY:
-        say("would open the Mission control tab")
+        say("would open the Minis tab")
         return
     py = os.path.join(COWORK, ".venv", "bin", "python")
     r = subprocess.run([py if os.path.exists(py) else sys.executable, "-c",
@@ -225,17 +225,17 @@ def learned_tab(agent_id):
     url = f"http://dashboard.localhost:{port}/skills?t={token}"
     browser = browser_as(agent_id)
     if not browser:
-        say("the app's browser isn't available; open Paseo and rerun to add the Mission control tab")
+        say("the app's browser isn't available; open Paseo and rerun to add the Minis tab")
         return
     if opened("learned@" + FOLDER["Start here"]) == url:
-        say("Mission control tab is open")
+        say("Minis tab is open")
         return
     old = next((t for t in browser.tabs() if "/skills" in t["url"]), None)  # only if that workspace is on screen
     if old:
-        say("point the Mission control tab at the current server")
+        say("point the Minis tab at the current server")
         browser.paseo("browser_navigate", browserId=old["id"], url=url)
     else:
-        say("open the Mission control tab")
+        say("open the Minis tab")
         browser.paseo("browser_new_tab", url=url)
     opened("learned@" + FOLDER["Start here"], url)
 
@@ -326,7 +326,7 @@ def main():
     retire_claude_workspace()
     one_idli_workspace()
     agent = start_chat(ids.get("Start here"))
-    learned_tab(agent)  # Mission control: a tab in Start here, next to the chat
+    learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
     chat(ids.get("Idli"), FOLDER["Idli"], "New chat", "hi")  # Idli keeps one waiting from then on
     say("done. Heading order: Start here, Idli, Claude (drag once until Paseo patch P2).")

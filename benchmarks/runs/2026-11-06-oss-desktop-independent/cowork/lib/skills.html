@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mission control</title>
+<title>Minis</title>
 <style>
 :root { --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e3e1dc; --accent: #2f5d50;
   --bad: #9b2c2c; --bad-soft: #fbe5e5; --chip: #f0eee9; }
@@ -20,26 +20,23 @@ h1 { font-size: 20px; margin: 0 0 4px; }
 .chip { display: inline-block; background: var(--chip); border-radius: 5px; padding: 0 6px; margin: 2px 4px 0 0; font-size: 12px; }
 button { font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--line);
   background: var(--panel); color: var(--ink); cursor: pointer; }
-button.del { color: var(--bad); border-color: var(--bad); margin-top: 10px; }
+button.del { color: var(--bad); border-color: var(--bad); }
 button.sure { background: var(--bad); color: #fff; }
 .empty { color: var(--muted); margin-top: 20px; }
 .msg { color: var(--muted); font-size: 13px; margin-top: 6px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-.share, .add { border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 8px; font-size: 13px; }
-.code { font: 600 18px ui-monospace, monospace; letter-spacing: 1px; color: var(--accent); }
+.add { border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 8px; font-size: 13px; }
+.code { font: 600 15px ui-monospace, monospace; letter-spacing: 1px; color: var(--accent); }
 input[type=text] { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
-a.btn { display: inline-block; font-size: 13px; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--accent); color: var(--accent); text-decoration: none; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Mission control: what Idli has learned</h1>
-  <div class="sub">Here is a list of files Idli has learned to analyze.</div>
-  <div class="card" id="addcard"><h2>Add what someone else's Idli learned</h2>
-    <div class="meta">They share a skill from their Mission control: a <b>.idli</b> file (sent any way you like) or a share code.</div>
-    <div class="row"><input type="file" id="addfile" accept=".idli"><span class="meta">or</span>
-      <input type="text" id="addcode" placeholder="share code, e.g. IDLI-7K3Q-M2PX" size="22"><button id="addgo">Look</button></div>
-    <div class="add" id="addout" hidden></div></div>
+  <h1>Minis</h1>
+  <div class="sub">Here is a list of workflows Idli has learned to analyse.</div>
+  <div class="row" id="addrow"><span>Add a Mini</span>
+    <input type="text" id="addcode" placeholder="IDLI-XXXX-XXXX" size="18"><button id="addgo">Add</button></div>
+  <div class="add" id="addout" hidden></div>
   <div id="list">Loading…</div>
 </main>
 <script>
@@ -63,30 +60,16 @@ async function load() {
   last = now;
   if (!skills.length) { el.innerHTML = `<div class="empty">Nothing yet.</div>`; return; }
   el.innerHTML = skills.map(s => `<div class="card" data-id="${esc(s.id)}">
-      <h2>${esc(s.title)} <span class="meta">v${esc(s.version)}</span></h2>
-      <div class="meta">Tabs: ${s.tabs.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
-      <div class="meta">${s.checks} checks · ${s.measures} measures · ${s.charts.length} chart${s.charts.length === 1 ? "" : "s"}${s.charts.length ? ": " + s.charts.map(esc).join(", ") : ""} · changed ${esc(s.changed)}</div>
-      ${s.taught ? `<div class="meta">Taught: ${esc(s.taught)}</div>` : ""}
-      <button class="sharebtn">Share</button> <button class="del">Delete</button>
-      <div class="share" hidden></div>
+      <div class="row" style="margin-top:0"><h2 style="flex:1">${esc(s.title)}</h2>
+      <span class="codeout"></span><button class="sharebtn">Share</button><button class="del">Delete</button></div>
       <div class="msg"></div></div>`).join("");
   el.querySelectorAll(".card").forEach(card => {
-    const sb = card.querySelector(".sharebtn"), box = card.querySelector(".share");
+    const sb = card.querySelector(".sharebtn"), out = card.querySelector(".codeout");
     sb.onclick = async () => {
-      box.hidden = false; box.textContent = "Getting it ready…";
-      try {
-        const j = await api("/api/skills/share", {id: card.dataset.id});
-        box.innerHTML = `<div>${esc(j.describe)}</div>
-          <div class="meta">The recipient needs Idli too. Their Idli uses it on their own copy of this kind of file.</div>
-          <div class="row"><a class="btn" href="/api/skills/bundle?id=${encodeURIComponent(card.dataset.id)}&t=${encodeURIComponent(T)}" download>Download .idli file</a>
-          <button class="codebtn">Get a share code</button><span class="codeout"></span></div>`;
-        box.querySelector(".codebtn").onclick = async (ev) => {
-          ev.target.disabled = true;
-          try { const c = await api("/api/skills/code", {id: card.dataset.id});
-                box.querySelector(".codeout").innerHTML = `<span class="code">${esc(c.code)}</span> <span class="meta">give them this code</span>`; }
-          catch (e) { box.querySelector(".codeout").textContent = e.message; ev.target.disabled = false; }
-        };
-      } catch (e) { box.textContent = e.message; }
+      sb.disabled = true;
+      try { const c = await api("/api/skills/code", {id: card.dataset.id});
+            out.innerHTML = `<span class="code">${esc(c.code)}</span>`; sb.hidden = true; }
+      catch (e) { out.textContent = e.message; sb.disabled = false; }
     };
     const b = card.querySelector(".del");
     b.onclick = async () => {
@@ -107,25 +90,21 @@ async function preview(body) {
     const j = await api("/api/skills/preview", body);
     if (j.problems && j.problems.length) { out.textContent = "Can't add this: " + j.problems.join("; "); return; }
     out.innerHTML = `<div>${esc(j.describe)}</div>${j.have ? `<div class="meta">${esc(j.have)}</div>` : ""}
-      <div class="row"><button id="addyes">Add it</button><button id="addno">No thanks</button></div>`;
+      <div class="row"><button id="addyes">Yes</button><button id="addno">No</button></div>`;
     document.getElementById("addno").onclick = () => { out.hidden = true; };
     document.getElementById("addyes").onclick = async () => {
       try { const r = await api("/api/skills/install", {staged: j.staged});
-            out.textContent = r.installed ? `Added ${r.title} (version ${r.version}). Open a file of this kind in Idli and it's ready.` : r.why;
+            out.textContent = r.installed ? `Added ${r.title}.` : r.why;
+            document.getElementById("addcode").value = "";
             last = null; load(); }
       catch (e) { out.textContent = e.message; }
     };
   } catch (e) { out.textContent = e.message; }
 }
-document.getElementById("addfile").onchange = (ev) => {
-  const f = ev.target.files[0]; if (!f) return;
-  const rd = new FileReader();
-  rd.onload = () => preview({data: String(rd.result).split(",")[1]});
-  rd.readAsDataURL(f);
-};
 document.getElementById("addgo").onclick = () => {
   const c = document.getElementById("addcode").value.trim(); if (c) preview({code: c});
 };
+document.getElementById("addcode").onkeydown = (ev) => { if (ev.key === "Enter") document.getElementById("addgo").click(); };
 load();
 setInterval(() => { if (!document.hidden) load(); }, 5000);  // it grows as Idli learns files
 </script>

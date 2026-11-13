@@ -8,12 +8,18 @@ asks. Don't start new experiments on your own.**
 
 Either agent adds an entry here for every change that needs something done on the other machine. The mechanism, and what the owner starts on the laptop, are in [laptop-dgx-sync.md](laptop-dgx-sync.md).
 
+- **2026-11-13, DGX: Minis, shared by code only.** Mission control is now **Minis** ("Here is a list of workflows
+  Idli has learned to analyse"): each row is a title with Share (shows the code) and Delete; the top has "Add a Mini
+  [code] Add" with a one-line description and Yes/No. File download, Drive link and the hidden sheet tab are gone
+  from the UI and tools (the sheet tab is off unless `IDLI_EMBED_SKILL=1`); the four ways and the open sync
+  questions (refreshing the file; a code that follows the Mini's versions) are in
+  [proposals/idli-sharing.md](../proposals/idli-sharing.md). DGX: two Idli homes, share, wrong code, add, chat tools.
 - **2026-11-12 (late night), DGX + laptop: design narrative; sharing what Idli learned, four ways.**
   - **Design:** [idli-design.md](idli-design.md): a teacher model (Claude) learns from stand-ins and leaves
     scaffolding (forms, checks, charts, site tools) that a private worker model drives; the app makes the teaching
     loop easy and keeps the scaffold. History declauded (166 commits; backup branch
     `backup/oss-desktop-eval-pre-declaude-20261112`); not pushed.
-  - **Sharing** ([idli-sharing.md](idli-sharing.md)): one bundle (`lib/share.py`: the skill, a manifest listing
+  - **Sharing** ([idli-sharing.md](../proposals/idli-sharing.md)): one bundle (`lib/share.py`: the skill, a manifest listing
     the real words inside, hashes) and four ways: a .idli file (Mission control Share / Add), a Drive link
     (`skill_import`), a hidden `_idli_skill` tab in the checked copy (a colleague who opens the shared sheet gets a
     card), and a share code from the Idli server (`/idli/share` on the router). DGX: two Idli homes, A shared and

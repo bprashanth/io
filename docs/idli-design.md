@@ -35,7 +35,7 @@ produces (the scaffold and the worker's tooling) as reusable, shareable artifact
 One window (Paseo, a desktop app that runs Claude Code chats, with our patches):
 
 - **Start here**, a system workspace: the **Logins** chat (Google, Claude and the private model are checked and
-  signed in) and a **Mission control** tab that lists what Idli has learned, one skill per file. A Drive tab
+  signed in) and a **Minis** tab that lists the workflows Idli has learned, one per kind of file, each with a Share code. A Drive tab
   appears only while Google needs a sign-in.
 - **Idli**, the person's workspace. Every Idli chat comes with a **split**:
   - on the left, the worker (Idli, on the private model), working on the real file;
@@ -96,8 +96,9 @@ What a teacher produced for one person's file is useful to everyone with the sam
 template, the same survey form, the same tax export. A skill holds no data rows (it was written against a fake copy)
 except labels the person chose to share. So the natural next step is for one person to **share a skill (form,
 checks, charts) or a site plugin** with another person, and for that person to use it without teaching
-again. That is what turns a one-off teaching session into a growing library. How best to do that, simply, is being
-tried next (see the chronology).
+again. That is what turns a one-off teaching session into a growing library. Shipped: a share code per Mini
+([proposals/idli-sharing.md](../proposals/idli-sharing.md), which also has the ways tried and the open sync
+questions).
 
 ## Open problems
 

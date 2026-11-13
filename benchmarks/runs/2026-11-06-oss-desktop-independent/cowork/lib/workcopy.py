@@ -214,9 +214,9 @@ def build(path, skill, problems, out_path):
 
 def embed(book, skill):
     """A hidden tab carrying the file's skill (form, checks, charts; no fake copy, no rows of data). Anyone who opens
-    the shared sheet with Idli is offered it instead of teaching from scratch. IDLI_EMBED_SKILL=0 turns it off."""
+    the shared sheet with Idli is offered it instead of teaching from scratch. Off unless IDLI_EMBED_SKILL=1 (proposals/idli-sharing.md)."""
     import os
-    if os.environ.get("IDLI_EMBED_SKILL", "1") == "0" or not (skill or {}).get("id"):
+    if os.environ.get("IDLI_EMBED_SKILL", "0") != "1" or not (skill or {}).get("id"):
         return False
     try:
         from lib import share

@@ -178,6 +178,13 @@ def from_text(text):
     return base64.b64decode(re.sub(r"\s+", "", text))
 
 
+def short(man):
+    """One line for the yes/no before adding a Mini."""
+    n = len(man.get("charts") or [])
+    return (f"{man['title']}: {man['measures']} measures, {man['checks']} checks, {n} chart{'' if n == 1 else 's'}, "
+            f"for files with tabs {', '.join(man['tabs'])}.")
+
+
 def describe(man):
     """One paragraph for a card: what the bundle carries, and the real words in it."""
     words = man.get("real_words") or []

@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -255,22 +256,6 @@ def _brief(f):
 def t_file_open(file, show_form=True, goal=None):
     meta = files().meta(file)
     if not meta["known"]:
-        try:
-            from lib import share, workcopy
-            data = workcopy.embedded(files().resolve(file))
-            got = share.inspect(data) if data else None
-        except Exception:  # noqa: BLE001
-            got = None
-        if got and not got["problems"]:  # a shared sheet that carries what a colleague's Idli learned
-            q = ("This file carries what a colleague's Idli learned about it: " + share.describe(got["manifest"])
-                 + " Add it to your Idli, so you can ask questions straight away?")
-            return {"file": file, "known": False, "carries_skill": True, "say_to_user": q,
-                    "card": {"questions": [{"header": "Shared", "multiSelect": False, "question": q, "options": [
-                        {"label": "Yes, add it (Recommended)", "description": "Its form, checks and charts; no data rows"},
-                        {"label": "No, teach Idli myself", "description": "Claude learns it with you from a fake copy"}]}]},
-                    "then": "Call AskUserQuestion with exactly `card` (write nothing first). On \"Yes, add it\": call "
-                            "skill_import with source 'sheet:" + file + "' and confirmed=true, then file_open again. On "
-                            "\"No, teach Idli myself\": call teach_file with their request."}
         return {"file": file, "known": False,
                 "then": "Idli hasn't been taught this file. Call teach_file now with the user's request as the question "
                         "(it only prepares a copy with fake values; nothing is sent until they say yes on its card). "
@@ -561,67 +546,51 @@ def t_form_explain(file, measure=None):
 
 
 def t_skill_import(source, confirmed=False):
-    """Add what someone else's Idli learned. source: a .idli file path, a share code (IDLI-XXXX-XXXX), a Google
-    Drive link to a .idli file, or 'sheet:<file>' (a shared sheet that carries it). First call: a card saying what
-    it carries; confirmed=true installs."""
-    from lib import share, workcopy, muse
-    src = str(source or "").strip()
+    """Add a Mini someone shared: source is its share code (IDLI-XXXX-XXXX). First call: a card saying what it is;
+    confirmed=true adds it. (Other ways were tried and parked: proposals/idli-sharing.md.)"""
+    from lib import share, muse
+    code = re.sub(r"[^A-Za-z0-9-]", "", str(source or "")).upper()
+    if not re.fullmatch(r"IDLI-[2-9A-Z]{4}-[2-9A-Z]{4}", code):
+        return {"error": "That isn't a share code (they look like IDLI-XXXX-XXXX)."}
     data = None
     try:
-        if src.startswith("sheet:"):
-            data = workcopy.embedded(files().resolve(src[6:]))
-        elif re.fullmatch(r"(?i)idli-[2-9a-z]{4}-[2-9a-z]{4}", src):
-            req = urllib.request.Request(muse.base_url() + "/idli/share/" + src.upper(), headers=muse.headers())
-            with urllib.request.urlopen(req, timeout=60) as r:
-                data = r.read()
-        elif LINK.search(src):
-            got = t_file_get(src, open_after=False)
-            if not got.get("downloaded"):
-                return got
-            with open(files().resolve(got["file"]), "rb") as f:
-                data = f.read()
-        else:
-            with open(os.path.expanduser(src), "rb") as f:
-                data = f.read()
+        req = urllib.request.Request(muse.base_url() + "/idli/share/" + code, headers=muse.headers())
+        with urllib.request.urlopen(req, timeout=60) as r:
+            data = r.read()
+    except urllib.error.HTTPError as e:
+        return {"error": "No Mini with that code." if e.code == 404 else f"The code server said {e.code}."}
     except Exception as e:  # noqa: BLE001
-        return {"error": f"Couldn't get the shared skill: {type(e).__name__}: {str(e)[:160]}"}
+        return {"error": f"Couldn't get the Mini: {type(e).__name__}: {str(e)[:160]}"}
     if not data:
         return {"error": "Nothing shared there."}
     got = share.inspect(data)
     if got["problems"]:
         return {"error": "That isn't something Idli can add: " + "; ".join(got["problems"])}
     if not confirmed:
-        q = "Add this to your Idli? " + share.describe(got["manifest"])
-        return {"card": {"questions": [{"header": "Shared", "multiSelect": False, "question": q, "options": [
-                    {"label": "Yes, add it", "description": "Its form, checks and charts"},
+        q = "Add this Mini? " + share.short(got["manifest"])
+        return {"card": {"questions": [{"header": "Mini", "multiSelect": False, "question": q, "options": [
+                    {"label": "Yes", "description": "Add it"},
                     {"label": "No", "description": "Nothing changes"}]}]},
-                "then": "Call AskUserQuestion with exactly `card`. On \"Yes, add it\": call skill_import again with the "
+                "then": "Call AskUserQuestion with exactly `card`. On \"Yes\": call skill_import again with the "
                         "same source and confirmed=true."}
     out = share.install(data, replace=True)
     files().cache.clear() if hasattr(files(), "cache") else None
     out.pop("manifest", None)
     if out.get("installed"):
-        out["say_to_user"] = (f"Added {out['title']} (version {out['version']}). Any file of this kind now opens with "
-                              "its form, checks and charts.")
+        out["say_to_user"] = f"Added {out['title']}."
     return out
 
 
-def t_skill_share(file_title, how="code"):
-    """Share what Idli learned about one file with someone who has Idli: how = code (a short code they type into
-    Mission control), file (a .idli file to send any way). The checked copy in Drive carries it too."""
+def t_skill_share(file_title):
+    """A share code for one Mini (what Idli learned about one kind of file)."""
     from lib import share, muse
     try:
-        if how == "file":
-            got = share.pack(file_title)
-            return {"path": got["path"], "say_to_user": f"Saved {os.path.basename(got['path'])} in {os.path.dirname(got['path'])}. "
-                    "Send it any way you like; they add it on their Mission control tab. " + share.describe(got["manifest"])}
-        data, man = share.pack_bytes(file_title)
+        data, _ = share.pack_bytes(file_title)
         req = urllib.request.Request(muse.base_url() + "/idli/share", data,
                                      {"Content-Type": "application/zip", **muse.headers()})
         with urllib.request.urlopen(req, timeout=60) as r:
             code = json.load(r)["code"]
-        return {"code": code, "say_to_user": f"Share code: {code}. They type it on their Mission control tab (Add what "
-                f"someone else's Idli learned). " + share.describe(man)}
+        return {"code": code, "say_to_user": f"Share code: {code}"}
     except Exception as e:  # noqa: BLE001
         return {"error": f"{type(e).__name__}: {str(e)[:200]}"}
 
@@ -1166,9 +1135,8 @@ def t_show_skills():
     except Exception:
         pass
     from lib import uiswitch
-    uiswitch.show_tab(["Mission control*", "What Idli has learned*", "dashboard.localhost"])
-    return {"say_to_user": "The list of files Idli has learned is in the tab next to this chat. It grows as Claude "
-                           "teaches Idli new files; delete one there to teach it again from scratch."}
+    uiswitch.show_tab(["Minis*", "Mission control*", "dashboard.localhost"])
+    return {"say_to_user": "Your Minis (the workflows Idli has learned) are in the Minis tab next to this chat."}
 
 
 # ---------------------------------------------------------------- the start of an Idli chat
@@ -1333,15 +1301,14 @@ TOOLS = {
                      "calculated?\", \"what does X mean?\"). Answered from the taught skill, no need for Claude.",
                      {**FILE, "measure": {"type": "string", "description": "The figure's name as the form shows it "
                                                                          "(omit to list all)"}}, ["file"]),
-    "skill_import": (t_skill_import, "Add what someone else's Idli learned (a file's form, checks and charts): source = "
-                     "a .idli file path, a share code IDLI-XXXX-XXXX, a Google Drive link to a .idli file, or "
-                     "'sheet:<file>' for a shared sheet that carries it. Shows a card first; confirmed=true adds it.",
-                     {"source": {"type": "string", "description": "Path, share code, Drive link or sheet:<file>"},
+    "skill_import": (t_skill_import, "Add a Mini someone shared, from its share code (IDLI-XXXX-XXXX). Shows a card "
+                     "first; confirmed=true adds it.",
+                     {"source": {"type": "string", "description": "The share code"},
                       "confirmed": {"type": "boolean", "description": "Only after a yes on its card"}}, ["source"]),
-    "skill_share": (t_skill_share, "Share what Idli learned about one file with someone who has Idli: how='code' gives a "
-                    "short code they type into their Mission control; how='file' saves a .idli file to send.",
-                    {"file_title": {"type": "string", "description": "The skill's id or title (skills_list)"},
-                     "how": {"type": "string", "enum": ["code", "file"]}}, ["file_title"]),
+    "skill_share": (t_skill_share, "A share code for one Mini (what Idli learned about one kind of file), to give "
+                    "someone who has Idli.",
+                    {"file_title": {"type": "string", "description": "The Mini's id or title (skills_list)"}},
+                    ["file_title"]),
     "teach_file": (t_teach_file, "Prepare a teaching request for a file Idli doesn't know, or whose layout changed, or a "
                    "question the form can't answer: a copy of the file with fake values and the user's question with "
                    "names removed. Shows what would be sent; nothing is sent yet.",
