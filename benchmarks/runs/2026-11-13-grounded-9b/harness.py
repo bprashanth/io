@@ -128,6 +128,8 @@ def card_answer(card, pick):
 
 def main():
     from lib import modes
+    from sites.files import tools as T0
+    T0._server = lambda: (0, "offline")  # no form page in offline tests (it would start a server per run)
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     mode, ids = args[0], args[1:]
     allscripts = {**{k: {"turns": v} for k, v in SCRIPTS.items()}, **HOLDOUT}
