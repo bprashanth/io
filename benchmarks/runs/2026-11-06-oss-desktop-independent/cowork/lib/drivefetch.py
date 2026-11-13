@@ -1,20 +1,15 @@
 """Fetch a Google Drive file as the person, straight from the app's signed-in browser, with no download box.
 
-A Mini is a dashboard for one Drive file, so it fetches that file every time it opens. This runs `fetch()` inside a
-Google tab of Paseo's browser (DevTools, dev builds; shipping needs a small Paseo patch), so the request carries the
-person's own sign-in: if they can't open the file in Drive, Idli can't either.
+A Mini is a dashboard for one Drive file, so it fetches that file every time it opens. The request carries the
+person's own Google sign-in from Paseo's browser (read through DevTools, on in dev builds; shipping needs a small
+Paseo patch): if they can't open the file in Drive, Idli can't either. About 1-1.5 s for a 7-130 KB sheet.
 
   fetch(file_id, sheet=True) -> bytes        raises NoAccess, NoGoogle
 """
-import base64
-import json
 import os
 import time
 
 from lib import uiswitch
-
-GOOGLE = ("https://docs.google.com/", "https://drive.google.com/")
-
 
 class NoAccess(Exception):
     """The person's Google account can't open the file (or it is gone)."""
@@ -31,33 +26,6 @@ def export_url(file_id, sheet=True):
     return "https://drive.google.com/uc?export=download&id=" + file_id + g.au("&")
 
 
-JS = r"""(async (url) => {
-  const r = await fetch(url, {credentials: "include", redirect: "follow"});
-  const ct = r.headers.get("content-type") || "";
-  if (!r.ok || ct.includes("text/html")) return {status: r.status, html: ct.includes("text/html")};
-  const b = new Uint8Array(await r.arrayBuffer());
-  let s = "";
-  for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768));
-  return {status: r.status, b64: btoa(s), type: ct};
-})"""
-
-
-def tab_fetch(target, url, timeout=90):
-    """Run the fetch in one DevTools target (a tab whose page is on a Google origin). Returns bytes."""
-    c = uiswitch.Cdp(target["webSocketDebuggerUrl"], timeout)
-    try:
-        res = c.call("Runtime.evaluate", {"expression": f"{JS}({json.dumps(url)})", "awaitPromise": True,
-                                          "returnByValue": True})
-    finally:
-        c.close()
-    v = ((res or {}).get("result") or {}).get("value")
-    if not isinstance(v, dict):
-        raise NoGoogle("the Google tab didn't answer")
-    if v.get("b64") is not None:
-        return base64.b64decode(v["b64"])
-    raise NoAccess(f"Drive answered {v.get('status')}" + (" with a sign-in or request-access page" if v.get("html") else ""))
-
-
 def fetch(file_id, sheet=True):
     fake = os.environ.get("IDLI_DRIVE_FAKE")  # tests: a folder of <id>.xlsx; a missing id means no access
     if fake:
@@ -67,20 +35,14 @@ def fetch(file_id, sheet=True):
         time.sleep(float(os.environ.get("IDLI_DRIVE_FAKE_DELAY", "0")))
         with open(p, "rb") as f:
             return f.read()
-    try:
-        targets = [t for t in uiswitch._targets() if t.get("type") in ("webview", "page")
-                   and t.get("url", "").startswith(GOOGLE)]
-    except (OSError, ValueError):
-        targets = []
-    url = export_url(file_id, sheet)
-    if targets:
-        return tab_fetch(targets[0], url)
-    return session_fetch(url)
+    return session_fetch(export_url(file_id, sheet))
 
 
 def session_fetch(url, timeout=90):
-    """No Google tab open: the same request from here, with the browser session's Google cookies (read through any
-    of the app's tabs; they share one session). Follows Google's redirects by hand, sending each host its cookies."""
+    """The request from here, with the app browser's Google cookies (read through any of the app's tabs; they share
+    one session; they never leave this computer except to Google). Follows Google's redirects by hand, sending each
+    host its cookies. (A fetch() inside a Google tab doesn't work: the export redirects to googleusercontent.com,
+    and the browser won't let the page read that cross-origin answer. Tried on the laptop 2026-11-13.)"""
     import urllib.error
     import urllib.parse
     import urllib.request
