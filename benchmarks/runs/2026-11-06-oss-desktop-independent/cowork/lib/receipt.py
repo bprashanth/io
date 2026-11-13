@@ -142,6 +142,10 @@ def _num(v):
     return str(int(x)) if x.is_integer() else str(round(x, 2))
 
 
+def horizontal(p):
+    return str(p.get("orientation", "")).startswith("bars run left")
+
+
 def describe(rcpt):
     """The receipt as two or three plain sentences: what is on screen. Code, not a model."""
     if not rcpt or not rcpt.get("chart_rendered"):
@@ -153,13 +157,13 @@ def describe(rcpt):
         unit = p["measure"].get("unit")
         head = (f"Panel {i + 1}: " if len(rcpt["panels"]) > 1 else "")
         shown = ", ".join(f"{c} {_num(p['values_shown'].get(c))}" for c in cats[:8]) + (" ..." if len(cats) > 8 else "")
-        xa = "x-axis (along the bottom)"
-        ya = "y-axis (down the left side)"
-        cat_on, val_on = (ya, xa) if p["x_axis"] is p["measure"] else (xa, ya)
-        parts.append(f"{head}{p['bars']} bar{'s' if p['bars'] != 1 else ''}, one per {p['category']['field']} "
-                     f"({shown}); {p['category']['field']} is on the {cat_on}, and "
-                     f"{p['measure']['label'] or p['measure']['field']}"
-                     + (f" ({UNIT_WORDS.get(unit, unit)})" if unit else "") + f" is on the {val_on}.")
+        mname = (p['measure']['label'] or p['measure']['field']) + (f" ({UNIT_WORDS.get(unit, unit)})" if unit else "")
+        cname = p['category']['field']
+        if horizontal(p):
+            axes = f"Down the left side (y-axis): {cname}. Along the bottom (x-axis): {mname}."
+        else:
+            axes = f"Along the bottom (x-axis): {cname}. Up the side (y-axis): {mname}."
+        parts.append(f"{head}{p['bars']} bar{'s' if p['bars'] != 1 else ''}, one per {cname} ({shown}). {axes}")
     if rcpt.get("baseline"):
         parts.append(f"Reference: {rcpt['baseline']}.")
     for o in rcpt.get("omitted_from_chart") or []:

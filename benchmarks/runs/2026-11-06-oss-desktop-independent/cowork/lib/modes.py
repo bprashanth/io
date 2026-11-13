@@ -266,7 +266,15 @@ def nine(j, variant=None, pre=None, check=None):
         msgs = pre(msgs)
     tools = _nine_tools(j.get("tools"))
     if variant:
-        tools = [t for t in tools if _short(t["function"]["name"]) != "chart_request"]
+        drop = {"chart_request"} | ({"chart_show"} if variant == "auto" else set())
+        tools = [t for t in tools if _short(t["function"]["name"]) not in drop]
+    asked = set()  # file_ask questions already answered since the person last spoke
+    for m in reversed(msgs):
+        if m["role"] == "user":
+            break
+        for c in m.get("tool_calls") or []:
+            if _short(c["function"]["name"]) == "file_ask":
+                asked.add((_json(c["function"]["arguments"]).get("question") or "").strip().lower())
     if not tools:  # Claude Code's side requests (titles, summaries): no tools, answer plainly
         tools = None
     nudged = set()
@@ -277,6 +285,14 @@ def nine(j, variant=None, pre=None, check=None):
         msg = resp["choices"][0]["message"]
         text = re.sub(r"<think>.*?</think>", "", msg.get("content") or "", flags=re.S).strip()
         calls = msg.get("tool_calls") or []
+        again = [c for c in calls if variant and _short(c["function"]["name"]) == "file_ask" and
+                 (_json(c["function"].get("arguments") or "{}").get("question") or "").strip().lower() in asked]
+        if again and "again" not in nudged:
+            nudged.add("again")
+            msgs += [{"role": "assistant", "content": text or None},
+                     {"role": "user", "content": "Idli check: you already asked file_ask that, and its answer is above. "
+                                                 "Reply to the person now from that answer."}]
+            continue
         if calls or not tools:
             break
         why = None

@@ -19,13 +19,14 @@ import urllib.request
 from lib import receipt as R
 
 INTENTS = ["DESCRIBE", "COMPARE", "RANK", "DISTRIBUTION", "TREND", "EXPLAIN_DIFFERENCE", "INVESTIGATE", "LIST",
-           "OTHER"]
+           "DEFINE", "OTHER"]
 PROMPT = """You read a question about a spreadsheet and fill a typed intent. Code does all the work; you only
 classify. Never guess what the person didn't say: leave it empty and list it in `unresolved`.
 
 - intent: DESCRIBE (a figure), COMPARE (a group against others), RANK (order groups), DISTRIBUTION (spread, typical
   household, outliers), TREND (over time), EXPLAIN_DIFFERENCE ("why is X high/low"), INVESTIGATE (a follow-up asking
   what might explain an earlier difference: "why might it be higher?", "could income explain it?"), LIST (which rows),
+  DEFINE (what a figure means or how it is worked out: "what is X?", "how is X calculated?", "did you divide"),
   OTHER.
 - target: the one group the question is about ({"column": filter column, "values": [value]}), or null.
 - measures: figure ids the person named or clearly meant ("debt" -> a debt figure). If they say high / low / bad /
@@ -123,7 +124,16 @@ def _match_value(x, v):
         if str(k).strip().lower() == low:
             return k
     hits = [k for k in known if low and (low in str(k).lower() or str(k).lower() in low)]
-    return hits[0] if len(hits) == 1 else None
+    if len(hits) == 1:
+        return hits[0]
+    import difflib  # typos: "yearwada" -> "Yerawada Ward"
+    first = {str(k).lower().split()[0]: k for k in known if str(k).strip()}
+    for cand in (low, low.split()[0] if low.split() else low):
+        got = difflib.get_close_matches(cand, [str(k).lower() for k in known], n=1, cutoff=0.8) or \
+            difflib.get_close_matches(cand, list(first), n=1, cutoff=0.75)
+        if got:
+            return next((k for k in known if str(k).lower() == got[0]), None) or first.get(got[0])
+    return None
 
 
 def _sql_cols(f, mid):
@@ -334,6 +344,8 @@ def validate(c, intent, active, question):
             plan["unknown_value"] = (groupish[0]["column"] if groupish else col, v)
         else:
             target.append(k)
+    if target and not _mentioned(target, question) and not intent.get("refers_to_previous"):
+        target, col = [], None  # the 9B added groups the person never named
     if not col and active and intent.get("refers_to_previous"):
         col, target = active.get("target_column"), list(active.get("target") or [])
     plan.update(measures=mids, target_column=col, target=target, group_by=intent.get("group_by") or [])
@@ -365,6 +377,17 @@ def validate(c, intent, active, question):
         if base == "unspecified":
             plan["notes"].append("compared with the other groups (assumed; say 'compare with all' to change)")
     return plan
+
+
+def _mentioned(values, question):
+    """Is each value named in the question (allowing typos: 'yearwada' for 'Yerawada Ward')?"""
+    import difflib
+    words = re.findall(r"[a-z0-9]+", (question or "").lower())
+    for v in values:
+        parts = [w for w in re.findall(r"[a-z0-9]+", str(v).lower()) if len(w) >= 4 and w not in ("ward", "block")]
+        if parts and not any(difflib.get_close_matches(p, words, n=1, cutoff=0.75) for p in parts):
+            return False
+    return True
 
 
 def _comparable(f):
@@ -404,6 +427,25 @@ def execute(c, plan, chart, question):
                             "the same households each time)."])
             m["receipt"] = R.receipt(None, None, why_no_chart="no dates in the file")
             return m
+    if intent == "DEFINE":
+        from sites.files import tools as T
+        mid = mids[0] if mids else None
+        got = T.t_form_explain(c.file, c.label(mid) if mid else None)
+        text = got.get("answer") or got.get("say_to_user") or got.get("error") or json.dumps(got)[:600]
+        m.update(interpretation="Define · " + (c.label(mid) if mid else "the figures"), lines=[str(text)])
+        if mid:
+            m["lines"].append("Worked out as: " + c.f["_measures"][mid]["sql"].replace('"', ""))
+        m["receipt"] = R.receipt(None, None, why_no_chart="a definition, not a chart")
+        return m
+    year = re.search(r"\b(19|20)\d{2}\b", question or "")
+    if year and not f.get("date_columns"):
+        m.update(status="no_data", interpretation=f"{year.group(0)} · this file has no dates",
+                 lines=[f"This file has no date column, so I can't pick out {year.group(0)}: nothing to show (that's "
+                        "no data, not a zero). Ask without the year to see what the file has."])
+        m["receipt"] = R.receipt(None, None, why_no_chart="no dates in the file")
+        return m
+    if intent in ("COMPARE", "EXPLAIN_DIFFERENCE") and len(target) >= 2 and mids:
+        intent = plan["intent"] = "COMPARE_GROUPS"  # the named groups side by side, not lumped against the rest
     if intent in ("EXPLAIN_DIFFERENCE", "COMPARE") and target and mids:
         mid = mids[0]
         lines, parts, path, vl = _compare(c, mid, col, target, True)
@@ -459,12 +501,12 @@ def execute(c, plan, chart, question):
         return m
     # DESCRIBE / RANK / DISTRIBUTION / LIST / OTHER: the form, as asked
     spec = {"measures": mids if intent != "LIST" else [], "group_by": plan.get("group_by") or []}
-    if intent == "RANK" and col and not spec["group_by"]:
+    if intent in ("RANK", "COMPARE_GROUPS") and col and not spec["group_by"]:
         spec["group_by"] = [g["id"] for g in f["group_by"] if g.get("column", g["id"]) == col][:1] or [col]
     if target and col:
         spec["filters"] = {col: target}
     res = c.files.run(c.file, c.tab, spec)
-    m["interpretation"] = (f"{intent.title()} · " + (", ".join(m["requested_measures"]) or "rows") +
+    m["interpretation"] = (f"{intent.replace('_', ' ').title()} · " + (", ".join(m["requested_measures"]) or "rows") +
                            (f" · {col} = {', '.join(target)}" if target else "") +
                            (" · by " + ", ".join(spec["group_by"]) if spec["group_by"] else ""))
     m["lines"] = res["text"].splitlines()
@@ -476,7 +518,7 @@ def execute(c, plan, chart, question):
         m["lines"] = ["No rows match that (nothing to show; this is not a zero)."]
     path = vl = None
     labels = [c.label(x) for x in mids]
-    if chart and spec["group_by"] and mids and len(res["rows"]) >= 2:
+    if (chart or intent == "COMPARE_GROUPS") and spec["group_by"] and mids and len(res["rows"]) >= 2:
         from lib import vlchart
         vl = res.get("vl") or vlchart.spec_for(res, res["described"], spec, c.f)
         if vl:
@@ -524,7 +566,7 @@ def read_chart(m, which="active"):
     lines = []
     for i, p in enumerate(r["panels"]):
         pre = f"Panel {i + 1}: " if len(r["panels"]) > 1 else ""
-        horiz = p["x_axis"] is p["measure"] or p["x_axis"] == p["measure"]
+        horiz = R.horizontal(p)
         xa, ya = (p["measure"], p["category"]) if horiz else (p["category"], p["measure"])
         def name(a):
             return a.get("label") or a.get("field")
