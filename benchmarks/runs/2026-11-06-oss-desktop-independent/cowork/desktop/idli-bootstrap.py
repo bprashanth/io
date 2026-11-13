@@ -6,8 +6,12 @@ Safe to rerun: it only adds what's missing.
      Logins           the setup chat (sign-in checks; also answers "what has Idli learned")
      Minis            a tab: the page listing the files Idli has learned (grows as Claude teaches it)
      Drive            a tab for signing in to Google
-  Idli         the private folder (~/idli-insights/cowork-real): where the work happens; a "New chat" is always
-     Idli      waiting there on its first card (clean up a file / analyse a file)
+  Drivey       the private folder (~/idli-insights/cowork-real): Drive files, where the work happens; a "New chat"
+     Drivey    is always waiting there on its first card (clean up a file / analyse a file). Its chats get the split
+               panel (the private model on the left, Claude beside it).
+  WhatsAppy    ~/idli-insights/whatsappy: chats open straight to Claude (the person's own subscription), no split.
+  Canvay       ~/idli-insights/canvay: the same. Both are open spaces to try out Minis beyond Drive
+               (narrative/IDLI_DESKTOP.md).
   Claude      this cowork/ folder: Claude teaches Idli a file, from fake data only
      Claude
 
@@ -31,18 +35,25 @@ IDLI = os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights")
 DRY = "--dry-run" in sys.argv
 LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md)
     ("Start here", os.path.join(IDLI, "setup"), os.path.join(COWORK, "idli", "START-HERE.md")),
-    ("Idli", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
+    ("Drivey", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
     ("Claude", COWORK, None),
 ]
+CLAUDE_SPACES = [  # (workspace name, folder): chats run plain Claude Code; no Idli tools, no split (the split follows
+    ("WhatsAppy", os.path.join(IDLI, "whatsappy")),  # the private model's provider, Paseo patch P15)
+    ("Canvay", os.path.join(IDLI, "canvay")),
+]
+CLAUDE_PROVIDER = os.environ.get("IDLI_CLAUDE_PROVIDER", "claude")
+LAYOUT += [(n, f, None) for n, f in CLAUDE_SPACES]
 FOLDER = {n: f for n, f, _ in LAYOUT}
 HEADING = {}  # the sidebar heading (project) when it differs from the workspace
+OLD_NAMES = {"Idli": "Drivey"}  # workspace renamed 2026-11-13
 OLD_MISSION_CONTROL = "What Idli has learned"  # its own workspace until 2026-11-12; now a tab in Start here
 SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 # Each chat sees only the tools its job needs (a `cowork.tools` allow-list per folder; a small model chooses better
 # from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
 TOOLSETS = {
     "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import"],
-    "Idli": ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "teach_file", "teach_send",
+    "Drivey": ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "teach_file", "teach_send",
              "working_copy", "working_copy_ready", "chart_request", "chart_show", "form_explain", "skill_import"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
@@ -82,6 +93,12 @@ def same(a, b):
 
 def folders():
     for name, path, instructions in LAYOUT:
+        if name in dict(CLAUDE_SPACES):  # a plain folder: no Idli instructions, tools or sites
+            if not os.path.isdir(path):
+                say(f"create folder {path}")
+                if not DRY:
+                    os.makedirs(path, exist_ok=True)
+            continue
         if path == COWORK or not instructions and os.path.isdir(path):
             continue
         if not os.path.isdir(path):
@@ -124,7 +141,9 @@ def projects_and_workspaces():
             paseo("project", "rename", proj["projectId"], heading, parse=False, change=True)
         wss = [w for w in paseo("workspace", "ls") if same(w["cwd"], path)]
         names = {n for n, _, _ in LAYOUT}
-        ws = next((w for w in wss if w["name"] == name), None) or next((w for w in wss if w["name"] not in names), None)
+        ws = next((w for w in wss if w["name"] == name), None) or \
+            next((w for w in wss if OLD_NAMES.get(w["name"]) == name), None) or \
+            next((w for w in wss if w["name"] not in names), None)
         if not ws and proj:
             say(f"create workspace '{name}'")
             paseo("workspace", "create", "--isolation", "local", "--project", proj["projectId"], "--path", path,
@@ -161,7 +180,7 @@ def start_chat(ws_id):
     return (out or {}).get("agentId")
 
 
-def chat(ws_id, folder, title, prompt):
+def chat(ws_id, folder, title, prompt, provider=START_PROVIDER):
     """A chat that should always be there (made once; found again by its title). Returns its id."""
     old = next((a for a in paseo("ls", "--global") if a["name"] == title and same(a.get("cwd") or "", folder)), None)
     if old:
@@ -170,8 +189,9 @@ def chat(ws_id, folder, title, prompt):
     say(f"create the '{title}' chat")
     if DRY or not ws_id:
         return None
-    out = paseo("run", "--provider", START_PROVIDER, "--workspace", ws_id, "--mode", "bypassPermissions",
-                "--thinking", "low", "--title", title, "--no-wait", prompt)
+    extra = ["--thinking", "low"] if provider == START_PROVIDER else []
+    out = paseo("run", "--provider", provider, "--workspace", ws_id, "--mode", "bypassPermissions", *extra,
+                "--title", title, "--no-wait", prompt)
     return (out or {}).get("agentId")
 
 
@@ -287,13 +307,13 @@ def split_mode():
 
 
 def one_idli_workspace():
-    """Split mode: Idli's folder has one workspace, "Idli". A second one on the same folder (Paseo's "New workspace")
+    """Split mode: Idli's folder has one workspace, "Drivey". A second one on the same folder (Paseo's "New workspace")
     leaves teach_send unable to tell which one the chat is in (Paseo doesn't say), so Claude opened in the wrong one and
     its pairing hid it. Others are archived; their chats stay in History."""
     if not split_mode():
         return
     for w in paseo("workspace", "ls") or []:
-        if same(w["cwd"], FOLDER["Idli"]) and w["name"] != "Idli":
+        if same(w["cwd"], FOLDER["Drivey"]) and w["name"] != "Drivey":
             say(f"archive the extra workspace '{w['name']}' on Idli's folder (its chats stay in History)")
             paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
 
@@ -328,8 +348,10 @@ def main():
     agent = start_chat(ids.get("Start here"))
     learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
-    chat(ids.get("Idli"), FOLDER["Idli"], "New chat", "hi")  # Idli keeps one waiting from then on
-    say("done. Heading order: Start here, Idli, Claude (drag once until Paseo patch P2).")
+    chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on
+    for name, folder in CLAUDE_SPACES:  # one Claude chat waiting in each
+        chat(ids.get(name), folder, "New chat", "hi", provider=CLAUDE_PROVIDER)
+    say("done. Heading order: Start here, Drivey, WhatsAppy, Canvay (drag once until Paseo patch P2).")
 
 
 if __name__ == "__main__":

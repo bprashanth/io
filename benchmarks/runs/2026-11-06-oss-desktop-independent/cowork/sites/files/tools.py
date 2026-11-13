@@ -811,8 +811,8 @@ def _teach_send(request_id):
     home = sh.data_dir() if split else HERE
     try:
         cands = [w for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(home)]
-        # split mode keeps one workspace on Idli's folder (the bootstrap archives others); prefer the one named Idli
-        wid = next(w for w in sorted(cands, key=lambda w: w.get("name") != "Idli"))["workspaceId"]
+        # split mode keeps one workspace on Idli's folder (the bootstrap archives others); prefer the one named Drivey (Idli before 2026-11-13)
+        wid = next(w for w in sorted(cands, key=lambda w: w.get("name") not in ("Drivey", "Idli")))["workspaceId"]
     except (ValueError, StopIteration):
         return {"error": "No Teach workspace found (a Paseo workspace on the co-work plugin folder). Open one, then retry."}
     me = req.get("caller_agent")
