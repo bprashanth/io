@@ -237,7 +237,7 @@ def _bars_chart(c, mid, col, rows, target, ref):
     if ref is not None:
         vl["layer"].append({"data": {"values": [{"ref": ref}]}, "mark": {"type": "rule", "strokeDash": [4, 3],
                                                                          "color": "#555"},
-                            "encoding": {"x": {"field": "ref", "type": "quantitative"}}})
+                            "encoding": {"x": {"field": "ref", "type": "quantitative"}, "y": None}})
     return _render(c, vl, ["careful", mid, col, target])
 
 
@@ -322,7 +322,7 @@ def validate(c, intent, active, question):
     """Code's checks on the 9B's intent: known ids, a figure when one is needed, a baseline for a comparison."""
     f = c.f
     plan = {"intent": intent.get("intent") or "OTHER", "notes": []}
-    mids = [m for m in intent.get("measures") or [] if m in f["_measures"] and m != "rows"]
+    mids = _fair([m for m in intent.get("measures") or [] if m in f["_measures"] and m != "rows"], f)
     named = bool(intent.get("measure_named")) and "measure" not in (intent.get("unresolved") or [])
     if intent.get("refers_to_previous") and active and not mids:
         mids = list(active.get("measures") or [])
@@ -358,7 +358,7 @@ def validate(c, intent, active, question):
         return plan
     if need_figure and (not mids or (not named and _ambiguous(question) and len(mids) != 1)):
         opts = []
-        for m in list(mids) + list(intent.get("candidates") or []) + _comparable(f):
+        for m in list(mids) + _fair(list(intent.get("candidates") or []), f) + _comparable(f):
             if m in f["_measures"] and m != "rows" and m not in opts:
                 opts.append(m)
         opts = opts[:4]
@@ -388,6 +388,17 @@ def _mentioned(values, question):
         if parts and not any(difflib.get_close_matches(p, words, n=1, cutoff=0.75) for p in parts):
             return False
     return True
+
+
+def _fair(ids, f):
+    """A total grows with the group, so groups of different sizes compare on the average: sum:x -> avg:x."""
+    out = []
+    for m in ids:
+        if m.startswith("sum:") and "avg:" + m[4:] in f["_measures"]:
+            m = "avg:" + m[4:]
+        if m not in out:
+            out.append(m)
+    return out
 
 
 def _comparable(f):

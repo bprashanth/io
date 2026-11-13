@@ -798,7 +798,30 @@ def careful_chat(j):
                                                       "previous" if prev else "active"))])
         if TABLE.search(said):
             return message(model, [_text(C.as_table(mans[-1]))])
+    # a question about the open file goes to the form in the person's own words (the 9B parses it there); the chat
+    # 9B only handles the rest (links, greetings, cards it was handed)
+    f = _open_file(msgs)
+    if said and f and not LINK.search(said) and QUESTION.search(said) and _tool_name(tools, "file_ask"):
+        return message(model, [_tool_use(_tool_name(tools, "file_ask"),
+                                         {"file": f, "question": said, "pipeline": "careful"})])
     return nine(j, variant="careful")
+
+
+def _open_file(messages):
+    """The file this chat is working on: the last one file_get / file_open / working_copy_ready / file_ask used."""
+    uses, f = {}, None
+    for m in messages:
+        for b in _blocks(m.get("content")):
+            if b.get("type") == "tool_use":
+                uses[b["id"]] = (_short(b["name"]), b.get("input") or {})
+            elif b.get("type") == "tool_result" and b.get("tool_use_id") in uses:
+                name, inp = uses[b["tool_use_id"]]
+                r = _json(_strip_reminders(_text_of(b.get("content"))))
+                if name in ("file_get", "file_open", "working_copy_ready") and r.get("file") and r.get("known") is not False:
+                    f = r["file"]
+                elif name == "file_ask" and inp.get("file"):
+                    f = inp["file"]
+    return f
 
 
 AUDIT = ("SYSTEM AUDIT: the person reports a difference between your explanation and the chart on screen. Do NOT "

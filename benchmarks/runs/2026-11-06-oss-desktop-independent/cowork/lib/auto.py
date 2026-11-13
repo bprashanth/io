@@ -205,7 +205,7 @@ def _profile(c, tgt, pool, question, actions, got):
                     {"mark": {"type": "text", "align": "left", "dx": 4, "fontSize": 11},
                      "encoding": {"text": {"field": "label"}}},
                     {"data": {"values": [{"z": 0}]}, "mark": {"type": "rule", "color": "#555"},
-                     "encoding": {"x": {"field": "z", "type": "quantitative"}}}]}
+                     "encoding": {"x": {"field": "z", "type": "quantitative"}, "y": None}}]}
     path = _render(c, vl, ["auto-profile", col, val, pool])
     rc = R.receipt(path, vl, requested=["Difference from the whole file (%)"], kind="diverging_bar_pct_diff_from_mean",
                    baseline=f"all {c.f['row_noun']} in the file (each counts once)")
@@ -244,7 +244,7 @@ def _with_baseline(c, tgt, mid, question, actions, got):
                         "condition": {"test": "datum['is'] === 'target'", "value": "#C2552D"}, "value": vlchart.BLUE}}},
                     {"mark": {"type": "text", "align": "left", "dx": 4, "fontSize": 11}, "encoding": {"text": {"field": "t"}}},
                     {"data": {"values": [{"ref": av}]}, "mark": {"type": "rule", "strokeDash": [4, 3], "color": "#555"},
-                     "encoding": {"x": {"field": "ref", "type": "quantitative"}}}]}
+                     "encoding": {"x": {"field": "ref", "type": "quantitative"}, "y": None}}]}
     path = _render(c, vl, ["auto-base", col, val, mid])
     rc = R.receipt(path, vl, requested=[lab], units_of={lab: unit},
                    baseline=f"dashed line = all {c.f['row_noun']} in the file: {_fmt(av, unit)}")
