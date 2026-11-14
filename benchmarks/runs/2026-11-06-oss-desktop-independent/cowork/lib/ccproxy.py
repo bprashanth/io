@@ -473,6 +473,11 @@ def ensure(data_dir):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'ensure':  # ccproxy.py ensure --data-dir DIR: start if needed, print port
+        ep = argparse.ArgumentParser()
+        ep.add_argument('--data-dir', required=True)
+        print(ensure(ep.parse_args(sys.argv[2:]).data_dir))
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-dir', required=True)
     parser.add_argument('--port', type=int, default=8870)

@@ -164,7 +164,8 @@ class Scanner:
     def __call__(self, text):
         if self.status != 'ok':
             return []
-        headers = {'Content-Type': 'application/json'}
+        # Cloudflare (privacy.idli.cc) refuses Python's default User-Agent with a 403
+        headers = {'Content-Type': 'application/json', 'User-Agent': 'idli-privacy/1'}
         token = os.environ.get('IO_PRIVACY_TOKEN')
         if token:
             headers['Authorization'] = 'Bearer ' + token
