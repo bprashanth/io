@@ -402,6 +402,19 @@ def make_handler(files, token):
         def do_GET(self):
             u = urllib.parse.urlparse(self.path)
             qs = urllib.parse.parse_qs(u.query)
+            if u.path == "/home-open":  # Paseo's UI (P18) opens Idli home here: hand the page its token
+                # only for a top-level open (the app's own tab), never for a fetch from another site
+                if self.headers.get("Sec-Fetch-Site") not in (None, "none", "same-origin"):
+                    return self._send(403, {"error": "forbidden"})
+                ws = (qs.get("ws") or [""])[0]
+                dest = "/home?" + urllib.parse.urlencode({"t": token, **({"ws": ws} if re.fullmatch(r"[\w-]{1,80}", ws) else {})})
+                self.send_response(302)
+                self.send_header("Location", dest)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             if u.path == "/health":
                 return self._send(200, {"ok": True})
             if u.path.startswith("/vendor/"):  # the chart libraries (no data): lib/vendor/<name>.min.js
@@ -481,8 +494,11 @@ def make_handler(files, token):
                                   or b"{}")
                 if u.path == "/api/home/prepare":
                     return self._send(200, home.prepare(files.data_dir, body["files"], body.get("question", "")))
+                if u.path == "/api/home/claude":  # the home page asks for its workspace's Claude CLI (right pane)
+                    return self._send(200, home.ensure_claude(files.data_dir, str(body.get("workspace") or "")))
                 if u.path == "/api/home/send":
-                    return self._send(200, home.send(files.data_dir, body["files"], body.get("question", "")))
+                    return self._send(200, home.send(files.data_dir, body["files"], body.get("question", ""),
+                                                     str(body.get("workspace") or "")))
                 if u.path == "/api/mini/run":
                     return self._send(200, home.run_mini(files.data_dir, body["id"], body["qid"], body.get("params", {})))
                 if u.path == "/api/mini/map":
@@ -613,7 +629,9 @@ def ensure(data_dir, python=None):
     except (OSError, ValueError, KeyError):
         pass
     port = None
-    for p in range(PORT, PORT + 20):
+    # Drivey's folder always gets the first port, so Paseo's patched UI (P18) can open Idli home at a fixed address
+    start = PORT if os.path.basename(os.path.realpath(data_dir)) == "cowork-real" else PORT + 3
+    for p in range(start, start + 20):
         with socket.socket() as so:
             if so.connect_ex(("127.0.0.1", p)) != 0:
                 port = p

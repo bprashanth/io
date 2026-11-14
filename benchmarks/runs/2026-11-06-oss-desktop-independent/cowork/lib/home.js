@@ -118,3 +118,10 @@ if (location.pathname === '/home') {
   };
   watch();
 }
+
+// Opened by Paseo for a Drivey workspace (/home-open?ws=…): make sure that workspace's Claude CLI is on the right.
+if (location.pathname === '/home') {
+  const ws = new URLSearchParams(location.search).get('ws') || '';
+  if (ws) fetch(link('/api/home/claude'), {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                           body: JSON.stringify({workspace: ws})}).catch(() => {});
+}

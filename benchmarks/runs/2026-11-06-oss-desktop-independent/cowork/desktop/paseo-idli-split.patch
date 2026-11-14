@@ -50,6 +50,111 @@ index 2ea41196..127a21fe 100644
  import { useNavigation } from "expo-router/react-navigation";
  import { StyleSheet, View } from "react-native";
  import { useLocalSearchParams } from "expo-router";
+diff --git a/packages/app/src/components/sidebar-workspace-list.tsx b/packages/app/src/components/sidebar-workspace-list.tsx
+index 8697a4b2..04fe2ea8 100644
+--- a/packages/app/src/components/sidebar-workspace-list.tsx
++++ b/packages/app/src/components/sidebar-workspace-list.tsx
+@@ -1,3 +1,22 @@
++import { createDriveyWorkspace, createRawClaudeWorkspace } from "@/utils/idli-claude-workspace";
++import { createWorkspaceBrowser } from "@/desktop/browser/store";
++import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
++import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
++import { placeTabOnSideSoon } from "@/utils/idli-side-pane";
++
++// P18: Idli home (left) and the Claude CLI (right) in a new Drivey workspace, Idli home focused.
++function openIdliHome(input: {serverId: string; workspaceId: string; url: string; terminalId: string}) {
++  setTimeout(() => {
++    const { browserId } = createWorkspaceBrowser({ initialUrl: input.url });
++    const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId: input.serverId, workspaceId: input.workspaceId });
++    if (!workspaceKey) return;
++    useWorkspaceLayoutStore.getState().openTab({ workspaceKey, target: { kind: "browser", browserId }, intent: "reveal" });
++    placeTabOnSideSoon({ serverId: input.serverId, workspaceId: input.workspaceId, kind: "terminal", id: input.terminalId,
++                         side: "right", focus: false });
++    setTimeout(() => placeTabOnSideSoon({ serverId: input.serverId, workspaceId: input.workspaceId, kind: "browser",
++                                          id: browserId, side: "left" }), 600);
++  }, 2500);
++}
+ import { LoadingSpinner } from "@/components/ui/loading-spinner";
+ import {
+   View,
+@@ -782,6 +801,34 @@ function NewWorktreeButton({
+   );
+ }
+ 
++function useRawClaudeProjectLaunch(displayName: string, target: SidebarProjectHostTarget | null) {
++  const pending = useRef(false);
++  const toast = useToast();
++  return useMemo(() => displayName === "Drivey" && target ? () => {
++    if (pending.current) return;
++    const client = getHostRuntimeStore().getClient(target.serverId);
++    if (!client) { toast.error("Host is disconnected"); return; }
++    pending.current = true;
++    void createDriveyWorkspace({
++      client, serverId: target.serverId, projectId: target.projectId, path: target.iconWorkingDir,
++      accept: workspace => getHostRuntimeStore().acceptWorkspaceSnapshots(target.serverId, [workspace]),
++      navigate: navigateToWorkspace, openHome: openIdliHome,
++    }).catch(error => toast.error(error instanceof Error ? error.message : String(error)))
++      .finally(() => { pending.current = false; });
++  } : displayName === "Claude Code" && target ? () => {
++    if (pending.current) return;
++    const client = getHostRuntimeStore().getClient(target.serverId);
++    if (!client) { toast.error("Host is disconnected"); return; }
++    pending.current = true;
++    void createRawClaudeWorkspace({
++      client, serverId: target.serverId, projectId: target.projectId, path: target.iconWorkingDir,
++      accept: workspace => getHostRuntimeStore().acceptWorkspaceSnapshots(target.serverId, [workspace]),
++      navigate: navigateToWorkspace,
++    }).catch(error => toast.error(error instanceof Error ? error.message : String(error)))
++      .finally(() => { pending.current = false; });
++  } : null, [displayName, target, toast]);
++}
++
+ function NewWorkspaceGhostRow({
+   project,
+   displayName,
+@@ -794,8 +841,10 @@ function NewWorkspaceGhostRow({
+   onWorkspacePress?: () => void;
+ }) {
+   const { t } = useTranslation();
++  const rawClaudeLaunch = useRawClaudeProjectLaunch(displayName, worktreeTarget);
+   const handlePress = useCallback(() => {
+     onWorkspacePress?.();
++    if (rawClaudeLaunch) { rawClaudeLaunch(); return; }
+     router.navigate(
+       buildNewWorkspaceRoute({
+         serverId: worktreeTarget.serverId,
+@@ -804,7 +853,7 @@ function NewWorkspaceGhostRow({
+         projectId: worktreeTarget.projectId,
+       }) as Href,
+     );
+-  }, [displayName, onWorkspacePress, worktreeTarget]);
++  }, [displayName, onWorkspacePress, worktreeTarget, rawClaudeLaunch]);
+   const rowStyle = useCallback(
+     ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
+       styles.newWorkspaceGhostRow,
+@@ -878,11 +927,13 @@ function ProjectHeaderRow({
+   const localDaemonServerId = useLocalDaemonServerId();
+   const projectPath = resolveSidebarProjectLocalPath(project, localDaemonServerId);
+   const settingsTarget = project.hosts[0] ?? null;
++  const rawClaudeLaunch = useRawClaudeProjectLaunch(displayName, worktreeTarget);
+   const handleBeginWorkspaceSetup = useCallback(() => {
+     if (!worktreeTarget) {
+       return;
+     }
+     onWorkspacePress?.();
++    if (rawClaudeLaunch) { rawClaudeLaunch(); return; }
+     router.navigate(
+       buildNewWorkspaceRoute({
+         serverId: worktreeTarget.serverId,
+@@ -891,7 +942,7 @@ function ProjectHeaderRow({
+         projectId: worktreeTarget.projectId,
+       }) as Href,
+     );
+-  }, [displayName, onWorkspacePress, worktreeTarget]);
++  }, [displayName, onWorkspacePress, worktreeTarget, rawClaudeLaunch]);
+   const interaction = useLongPressDragInteraction({
+     drag,
+     menuController,
 diff --git a/packages/app/src/components/split-container.tsx b/packages/app/src/components/split-container.tsx
 index 27831724..cb5846b7 100644
 --- a/packages/app/src/components/split-container.tsx
@@ -193,12 +298,77 @@ index dfce3551..6bcba1d8 100644
    if (input.initialUrl) {
      (webview as BrowserWebviewElement).src = input.initialUrl;
    }
+diff --git a/packages/app/src/screens/workspace/workspace-screen.tsx b/packages/app/src/screens/workspace/workspace-screen.tsx
+index dd806e1f..9b400534 100644
+--- a/packages/app/src/screens/workspace/workspace-screen.tsx
++++ b/packages/app/src/screens/workspace/workspace-screen.tsx
+@@ -1,3 +1,4 @@
++import { isRawClaudeWorkspace, rawClaudeProfile } from "@/utils/idli-claude-cli";
+ import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
+ import { useHostFeature } from "@/runtime/host-features";
+ import {
+@@ -1778,11 +1779,17 @@ function WorkspaceScreenContent({
+     : t("workspace.tabs.explorerSidebar.open");
+ 
+   const activeTabKey = useMemo(() => activeTabId ?? "", [activeTabId]);
++  const claudeCliProfile = useMemo(() => rawClaudeProfile(isRawClaudeWorkspace(workspaceDescriptor) ? "Claude Code" : null), [workspaceDescriptor]);
+   const handleCreateDraftTab = useCallback(
+     (input?: { paneId?: string }) => {
++      if (claudeCliProfile) {
++        createTerminal({ profile: claudeCliProfile,
++          destination: input?.paneId ? { kind: "open", paneId: input.paneId } : { kind: "open" } });
++        return;
++      }
+       openWorkspaceDraftTab({ paneId: input?.paneId });
+     },
+-    [openWorkspaceDraftTab],
++    [openWorkspaceDraftTab, createTerminal, claudeCliProfile],
+   );
+ 
+   const handleCreateTerminal = useStableEvent((input?: { paneId?: string }) => {
+@@ -1840,6 +1847,10 @@ function WorkspaceScreenContent({
+         return;
+       }
+       if (selection.kind === "agent") {
++        if (claudeCliProfile) {
++          createTerminal({ profile: claudeCliProfile, destination });
++          return;
++        }
+         openTarget({
+           kind: "draft",
+           draftId: generateDraftId(),
+@@ -1856,7 +1867,7 @@ function WorkspaceScreenContent({
+       const { browserId } = createWorkspaceBrowser();
+       openTarget({ kind: "browser", browserId });
+     },
+-    [createTerminal, createWorkspaceTab, persistenceKey, replaceWorkspaceTabTarget],
++    [createTerminal, createWorkspaceTab, persistenceKey, replaceWorkspaceTabTarget, claudeCliProfile],
+   );
+ 
+   const handleOpenUrlInBrowserTab = useCallback(
+@@ -3275,6 +3286,7 @@ function WorkspaceScreenContent({
+       showBrowser: showCreateBrowserTab,
+       terminalDisabled: createTerminalDisabled,
+       launch: launchWorkspaceTab,
++      rawClaude: Boolean(claudeCliProfile),
+     }),
+     [
+       createTerminalDisabled,
+@@ -3282,6 +3294,7 @@ function WorkspaceScreenContent({
+       isGitCheckout,
+       launchWorkspaceTab,
+       showCreateBrowserTab,
++      claudeCliProfile,
+     ],
+   );
+   const focusedPaneIdOrUndefined = useMemo(() => focusedPaneId ?? undefined, [focusedPaneId]);
 diff --git a/packages/app/src/utils/idli-pairing.ts b/packages/app/src/utils/idli-pairing.ts
 new file mode 100644
-index 00000000..5a496168
+index 00000000..fd690cd0
 --- /dev/null
 +++ b/packages/app/src/utils/idli-pairing.ts
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,165 @@
++import { isRawClaudeWorkspace } from "./idli-claude-cli";
 +// Idli P15: every Idli chat has its own Claude chat beside it. In a workspace whose chats run on the Idli provider,
 +// the layout keeps two panes: Idli's chats on the left, and on the right only the Claude chats paired with the Idli
 +// chat shown on the left (label idli.pair=<idli agent id>, set by Idli's teach_send). Switching Idli chats swaps the
@@ -237,6 +407,9 @@ index 00000000..5a496168
 +}
 +
 +export function isIdliWorkspace(serverId: string, workspaceId: string): boolean {
++  const session = useSessionStore.getState().sessions[serverId];
++  const workspace = Array.from(session?.workspaces.values() ?? []).find(w => normalizeWorkspaceOpaqueId(w.id) === normalizeWorkspaceOpaqueId(workspaceId));
++  if (isRawClaudeWorkspace(workspace)) return false;
 +  const agents = workspaceAgents(serverId, workspaceId);
 +  return !isSetup(agents) && agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)));
 +}
@@ -246,6 +419,9 @@ index 00000000..5a496168
 +/** One idempotent pass; each store change triggers another, so it converges step by step. */
 +export function syncIdliPair(serverId: string, workspaceId: string, workspaceKey: string): void {
 +  if (syncing) return;
++  const session = useSessionStore.getState().sessions[serverId];
++  const workspace = Array.from(session?.workspaces.values() ?? []).find(w => normalizeWorkspaceOpaqueId(w.id) === normalizeWorkspaceOpaqueId(workspaceId));
++  if (isRawClaudeWorkspace(workspace)) return;
 +  const agents = workspaceAgents(serverId, workspaceId);
 +  if (!agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)))) return;
 +  syncing = true;
@@ -359,10 +535,10 @@ index 00000000..5a496168
 +}
 diff --git a/packages/app/src/utils/idli-side-pane.ts b/packages/app/src/utils/idli-side-pane.ts
 new file mode 100644
-index 00000000..fa3dec68
+index 00000000..f782147a
 --- /dev/null
 +++ b/packages/app/src/utils/idli-side-pane.ts
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,120 @@
 +// Idli P13: place a chat on one side of a two-pane workspace and give it focus, from the agent deep link
 +// (paseo://h/<server>/agent/<id>~right or ~left: the desktop shell drops a link's query string, and rewriting the
 +// shell means rebuilding app.asar, so the side rides on the agent id; the app strips it). Idli opens Claude's teaching chat on the right and comes back to
@@ -414,6 +590,7 @@ index 00000000..fa3dec68
 +  kind: "agent" | "terminal" | "browser";
 +  id: string;
 +  side: IdliSide;
++  focus?: boolean;
 +}): boolean {
 +  const store = useWorkspaceLayoutStore.getState();
 +  const workspaceId = input.workspaceId;
@@ -447,7 +624,7 @@ index 00000000..fa3dec68
 +  } else if (mains.length < 2 && input.side === "right" && current.tabIds.length > 1) {
 +    store.splitPane(key, { tabId: tab.tabId, targetPaneId: current.id, position: "right" });
 +  }
-+  useWorkspaceLayoutStore.getState().focusTab(key, tab.tabId);
++  if (input.focus !== false) useWorkspaceLayoutStore.getState().focusTab(key, tab.tabId);
 +  return true;
 +}
 +
@@ -482,3 +659,29 @@ index 00000000..fa3dec68
 +    return true;
 +  };
 +}
+diff --git a/packages/app/src/workspace-tabs/launcher/index.tsx b/packages/app/src/workspace-tabs/launcher/index.tsx
+index c55208fc..d563db4d 100644
+--- a/packages/app/src/workspace-tabs/launcher/index.tsx
++++ b/packages/app/src/workspace-tabs/launcher/index.tsx
+@@ -38,6 +38,7 @@ export type WorkspaceTabLaunchDestination =
+   | { kind: "replace"; tabId: string };
+ 
+ export interface NewTabLauncher {
++  rawClaude?: boolean;
+   showChanges: boolean;
+   showPullRequest: boolean;
+   showBrowser: boolean;
+@@ -127,11 +128,11 @@ export function useWorkspaceTabLaunchCatalog(input: {
+     const builtIns: Record<BuiltInLaunchItemId, WorkspaceTabLaunchItem & { hidden?: boolean }> = {
+       agent: {
+         id: "agent",
+-        label: t("workspace.tabs.fallback.agent"),
++        label: launcher.rawClaude ? "New chat" : t("workspace.tabs.fallback.agent"),
+         Icon: SquarePen,
+         shortcutActionId: "workspace-tab-target-agent",
+         disabled: false,
+-        panelKind: "draft",
++        panelKind: launcher.rawClaude ? "terminal" : "draft",
+         launch: launchSelection(BUILT_IN_SELECTIONS.agent),
+       },
+       terminal: {

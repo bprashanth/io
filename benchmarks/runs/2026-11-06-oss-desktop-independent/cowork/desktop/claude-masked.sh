@@ -9,6 +9,8 @@ WORK=${IDLI_CLAUDE_WORK:-$HOME/idli-insights/claude-masked}
 mkdir -p "$WORK"
 ln -sfn "$DATA/drive" "$WORK/drive"
 cp "$COWORK/idli/CLAUDE-masked.md" "$WORK/CLAUDE.md"
+# Idli's local server too (Idli home, charts, Minis): Drivey's "+" opens Idli home beside this terminal
+(cd "$COWORK" && "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import formserver; formserver.ensure(sys.argv[1])" "$DATA") >/dev/null 2>&1 || true
 PORT=$("$COWORK/.venv/bin/python" -I "$COWORK/lib/ccproxy.py" ensure --data-dir "$DATA") || {
   echo "Idli's privacy proxy didn't start; not starting Claude (nothing was sent)." >&2; exit 1; }
 # Only paths go in this generated config. Paseo's agent identity stays inherited by the MCP process.

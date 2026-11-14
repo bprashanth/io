@@ -88,7 +88,7 @@ def show_agent(agent, side=None):
     return {"ok": True}
 
 
-def show_terminal(workspace_id, terminal_id, side="right"):
+def show_terminal(workspace_id, terminal_id, side="right", focus=True):
     """Open a workspace terminal's tab and put it on one side with focus (Paseo UI patch P17, build idli8+): the
     person's Claude CLI goes on the right of Drivey. Needs DevTools (the app started with --remote-debugging-port)."""
     try:
@@ -104,7 +104,7 @@ def show_terminal(workspace_id, terminal_id, side="right"):
         got = _ws_eval(page["webSocketDebuggerUrl"],
                        "typeof window.__idliPlaceTab === 'function' ? window.__idliPlaceTab(" + json.dumps(
                            {"serverId": srv, "workspaceId": workspace_id, "kind": "terminal", "id": terminal_id,
-                            "side": side}) + ") : 'no-p17'")
+                            "side": side, "focus": focus}) + ") : 'no-p17'")
         return {"ok": got is True, "why": None if got is True else "this Paseo UI has no P17 (install idli8)"}
     except (OSError, ValueError, KeyError, StopIteration, ConnectionError, TimeoutError,
             subprocess.SubprocessError) as e:

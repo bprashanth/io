@@ -155,10 +155,65 @@ def type_into(terminal, text):
     cli('terminal', 'send-keys', '-l', terminal, '\r')
 
 
-def send(data_dir, files, question):
-    """Hand the question to the person's Claude Code CLI: a terminal in Drivey running desktop/claude-masked.sh
-    (through the masking proxy), on the right with focus. Started the first time; typed into after that."""
+def _drivey_workspace(data_dir, workspace=''):
+    workspaces = json.loads(cli('workspace', 'ls', '--json'))
+    mine = [w for w in workspaces if Path(w.get('cwd') or '.').expanduser().resolve() == Path(data_dir).resolve()]
+    if workspace and any(w.get('workspaceId') == workspace for w in mine):
+        return workspace
+    if not mine:
+        raise ValueError('No Drivey workspace found')
+    return sorted(mine, key=lambda w: w.get('name') != 'Drivey')[0]['workspaceId']
+
+
+def _claude_terminal(data_dir, wid):
+    """The live Claude terminal recorded for this workspace, or None."""
+    state_path = Path(data_dir) / '.idli/home.json'
+    state = read(state_path) if state_path.exists() else {}
+    tid = (state.get('terminals') or {}).get(wid) or (state.get('terminal') if state.get('workspace') == wid else None)
+    terms = json.loads(cli('terminal', 'ls', '--all', '--json') or '[]')
+    live = {t.get('id') or t.get('terminalId') for t in terms}
+    if tid in live:
+        return tid
+    # Drivey's "+" (Paseo P18) starts the Claude terminal itself: use that one
+    return next((t.get('id') or t.get('terminalId') for t in terms
+                 if (t.get('workspaceId') or t.get('workspace')) == wid and t.get('name') == 'Claude'), None)
+
+
+def _remember(data_dir, wid, tid, **more):
+    state_path = Path(data_dir) / '.idli/home.json'
+    state = read(state_path) if state_path.exists() else {}
+    state.setdefault('terminals', {})[wid] = tid
+    state.update(terminal=tid, workspace=wid, **more)
+    write(state_path, state)
+
+
+def _start_claude(wid, prompt=None):
     import shlex
+    made = json.loads(cli('terminal', 'create', '--workspace', wid, '--name', 'Claude', '--json'))
+    tid = made.get('id') or made.get('terminalId')
+    if not tid:
+        raise ValueError('Paseo did not create a terminal')
+    cmd = 'exec ' + shlex.quote(str(LAUNCHER)) + (' ' + shlex.quote(prompt) if prompt else '')
+    cli('terminal', 'send-keys', '-l', tid, cmd)
+    cli('terminal', 'send-keys', '-l', tid, '\r')
+    return tid
+
+
+def ensure_claude(data_dir, workspace=''):
+    """Idli home opened in a Drivey workspace: make sure the person's Claude CLI is running on the right (without
+    taking focus from Idli home)."""
+    from lib import uiswitch
+    with _SEND_LOCK:
+        wid = _drivey_workspace(data_dir, workspace)
+        tid = _claude_terminal(data_dir, wid) or _start_claude(wid)
+        _remember(data_dir, wid, tid)
+    shown = uiswitch.show_terminal(wid, tid, 'right', focus=False)
+    return {'terminal': tid, 'placed': bool(shown.get('ok'))}
+
+
+def send(data_dir, files, question, workspace=''):
+    """Hand the question to the person's Claude Code CLI in this Drivey workspace (desktop/claude-masked.sh, through
+    the masking proxy), on the right with focus: typed into it, or started with it if it isn't running."""
     from lib import uiswitch
     chosen = selected(data_dir, files)
     if not str(question).strip():
@@ -166,34 +221,16 @@ def send(data_dir, files, question):
     if any(privacy.get(data_dir, x['local'])['mode'] != 'mask' for x in chosen):
         raise ValueError('Choose Mask for these files before sending to Claude')
     with _SEND_LOCK:
-        workspaces = json.loads(cli('workspace', 'ls', '--json'))
-        candidates = [w for w in workspaces if Path(w.get('cwd') or '.').expanduser().resolve() == Path(data_dir).resolve()]
-        if not candidates:
-            raise ValueError('No Drivey workspace found')
-        workspace = sorted(candidates, key=lambda w: w.get('name') != 'Drivey')[0]
-        wid = workspace['workspaceId']
-        state_path = Path(data_dir) / '.idli/home.json'
-        state = read(state_path) if state_path.exists() else {}
+        wid = _drivey_workspace(data_dir, workspace)
         prompt = ('Files (in drive/): ' + ', '.join(x['local'] for x in chosen) + '. ' + ' '.join(str(question).split()))
-        terms = json.loads(cli('terminal', 'ls', '--all', '--json') or '[]')
-        live = {t.get('id') or t.get('terminalId'): t for t in terms}
-        terminal = state.get('terminal') if state.get('terminal') in live and state.get('workspace') == wid else None
-        if terminal:
-            type_into(terminal, prompt)
+        tid = _claude_terminal(data_dir, wid)
+        if tid:
+            type_into(tid, prompt)
         else:
-            made = json.loads(cli('terminal', 'create', '--workspace', wid, '--name', 'Claude', '--json'))
-            terminal = made.get('id') or made.get('terminalId')
-            if not terminal:
-                raise ValueError('Paseo did not create a terminal')
-            cli('terminal', 'send-keys', '-l', terminal, 'exec ' + shlex.quote(str(LAUNCHER)) + ' ' + shlex.quote(prompt))
-            cli('terminal', 'send-keys', '-l', terminal, '\r')
-        # Paseo's browser tools act on behalf of a chat; a terminal has none, so charts borrow one in this workspace
-        agents = json.loads(cli('ls', '--global', '--json') or '[]')
-        helper = next((a.get('id') for a in agents if a.get('workspaceId') == wid and a.get('status') != 'closed'
-                       and not a.get('archived')), state.get('browser_agent'))
-        write(state_path, {'terminal': terminal, 'workspace': wid, 'files': chosen, 'browser_agent': helper})
-        shown = uiswitch.show_terminal(wid, terminal, 'right')
-        return {'terminal': terminal, 'focused': bool(shown.get('ok')), 'message': 'Claude has it on the right'}
+            tid = _start_claude(wid, prompt)
+        _remember(data_dir, wid, tid, files=chosen)
+    shown = uiswitch.show_terminal(wid, tid, 'right')
+    return {'terminal': tid, 'focused': bool(shown.get('ok')), 'message': 'Claude has it on the right'}
 
 
 def object_path(data_dir, kind, ident):
