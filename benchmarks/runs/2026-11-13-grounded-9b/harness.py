@@ -33,6 +33,12 @@ SCRIPTS = {
               "what's the y-axis?", "what was it on the previous chart?", "put it in a table"],
     "falsepush": ["compare average debt across yerawada, kasewadi and ramtekdi as a chart",
                   "wait, why is there only one bar on the chart? where are kasewadi and ramtekdi?"],
+    # the loop from the owner's chat dac6846c (2026-11-14): "monthly income" read as a trend, refused three times
+    "loop": ["show monthly income over wards and specifically yerawadas highlited", {"pick": "highlighted"},
+             "what is on the x axis?"],
+    "loop2": ["how has vulnerability changed from last year?", "not over time, just across the wards",
+              {"pick": "by Ward"}],
+    "loop3": ["plot household debt month on month for each ward", {"pick": "no, just compare kasewadi with the rest"}],
     "nodata": ["how has vulnerability changed from last year?", "can you just estimate it?",
                "show yerawada household debt in 2031"],
     "panels": ["plot average income and vulnerability score for all wards on one bar chart",

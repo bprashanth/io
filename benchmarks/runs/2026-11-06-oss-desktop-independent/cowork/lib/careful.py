@@ -284,6 +284,25 @@ def ask(files, file, question, chart=False, tab=None):
     st = _st(file)
     active = st["analyses"][-1] if st["analyses"] else None
     pending = st.get("pending")
+    if pending and pending.get("views") and re.match(r"(?i)^\s*view:\s*", question or ""):
+        # the answer to our "which view?" card: run the view picked, or the original reading if that was picked
+        picked = re.sub(r"(?i)^\s*view:\s*", "", question).strip()
+        st["pending"] = None
+        if picked in pending["views"]:
+            return _done(st, execute(c, pending["views"][picked], True, pending["question"]))
+        if picked == "As I read it":
+            return _done(st, pending["original"])
+        # typed their own answer ("Other"): a fresh question, keeping the figure and groups of the one it corrects
+        carry = {"measures": pending["original"].get("measures") or [], "rejected":
+                 pending["original"].get("interpretation"), "target": pending["original"].get("target") or []}
+        question, pending = picked, None
+    else:
+        carry = None
+    if pending and re.match(r"(?i)^\s*figure:\s*", question or "") and not any(
+            m["label"] == re.sub(r"(?i)^\s*figure:\s*", "", question).strip() for m in c.f["measures"]):
+        # typed their own answer to "which figure?": the original question plus what they typed
+        question = pending["question"] + " (" + re.sub(r"(?i)^\s*figure:\s*", "", question).strip() + ")"
+        st["pending"] = pending = None
     if pending and re.match(r"(?i)^\s*figure:\s*", question or ""):
         # the answer to our "which figure?" card: carry on with the original question
         picked = re.sub(r"(?i)^\s*figure:\s*", "", question).strip()
@@ -296,8 +315,13 @@ def ask(files, file, question, chart=False, tab=None):
     else:
         prompt = (PROMPT + "\n\nThe form:\n" + json.dumps(_brief(c.f), ensure_ascii=False)
                   + ("\n\nActive analysis: " + active["interpretation"] if active else "\n\nActive analysis: none")
+                  + (f"\n\nThe person just said this reading was wrong: {carry['rejected']}. Choose a different one."
+                     if carry and carry.get("rejected") else "")
                   + "\n\nQuestion: " + question)
         intent, secs = _llm(prompt, _schema(c.f))
+        if carry and not [x for x in intent.get("measures") or [] if x != "rows"] and carry["measures"]:
+            intent = dict(intent, measures=carry["measures"], measure_named=True,
+                          unresolved=[u for u in intent.get("unresolved") or [] if u != "measure"])
     plan = validate(c, intent, active, question)
     plan["parse_secs"] = secs
     if plan.get("card"):
@@ -305,6 +329,81 @@ def ask(files, file, question, chart=False, tab=None):
         return {"card": plan["card"], "intent": intent, "then": "AskUserQuestion with this card.",
                 "reply": None}
     m = execute(c, plan, chart or bool(intent.get("chart")), question)
+    # Never hand back an answer the person couldn't use twice, and never answer "can't" without offering what can be
+    # shown: a reading that can't be answered, or the same reading again after a correction, becomes a card.
+    again = active and active.get("interpretation") == m.get("interpretation") and (
+        active.get("status") != "ok" or CORRECTION.search(question or ""))
+    if m.get("status") == "cannot" or again:
+        views = _views(c, plan, intent, question)
+        if views:
+            st["pending"] = {"question": question, "original": m, "views": {k: v for k, v in views}}
+            what = m.get("interpretation", "that")
+            q = (f"I read that the same way as before (“{what}”). What did you mean?" if again else
+                 f"I read that as “{what}”, which this file can't answer. Did you mean one of these?")
+            opts = [{"label": k, "description": "draw this"} for k, _ in views][:3]
+            opts.append({"label": "As I read it", "description": m["lines"][0][:120] if m.get("lines") else what})
+            return {"card": {"questions": [{"header": "Which view", "multiSelect": False, "question": q,
+                                            "options": opts}]}, "intent": intent, "reply": None,
+                    "then": "AskUserQuestion with this card."}
+    return _done(st, m)
+
+
+CORRECTION = re.compile(r"(?i)^\s*(no\b|not\b|nope|i meant|i mean|that'?s not|wrong|why do you need|i didn'?t (say|ask|mean))"
+                        r"|\bnot (over|by|per|for|about)\b")
+
+
+def _views(c, plan, intent, question):
+    """What this file CAN show for the question: its figure (named, or matched by name) by each grouping, with a named
+    group highlighted against the rest."""
+    import difflib
+    f = c.f
+    mids = list(plan.get("measures") or [])
+    if not mids:
+        words = set(re.findall(r"[a-z]+", (question or "").lower()))
+        for mm in f["measures"]:
+            if mm["id"] == "rows" or mm.get("hidden"):
+                continue
+            lw = [w for w in re.findall(r"[a-z]+", mm["label"].lower()) if len(w) > 3]
+            if lw and all(difflib.get_close_matches(w, words, n=1, cutoff=0.8) for w in lw[:2]):
+                mids.append(mm["id"])
+    mids = _fair(mids, f)[:1] or _comparable(f)[:1]
+    if not mids:
+        return []
+    mid, out = mids[0], []
+    target, col = plan.get("target") or [], plan.get("target_column")
+    if not target:  # a group named in the question, even if the 9B didn't pick it out
+        for x in f["filters"]:
+            if x["kind"] == "choice" and x.get("values") and len(x["values"]) <= 30:
+                hit = [v for v in x["values"] if _mentioned([v], question)
+                       and any(len(w) >= 4 and w not in ("ward", "block") for w in re.findall(r"[a-z0-9]+", str(v).lower()))]
+                if hit and len(hit) < len(x["values"]):
+                    target, col = hit, x["column"]
+                    break
+    words = set(re.findall(r"[a-z]+", (question or "").lower()))
+
+    def score(g):
+        gcol = g.get("column", g["id"])
+        named = any(difflib.get_close_matches(w, words, n=1, cutoff=0.8) for w in re.findall(r"[a-z]+", g["label"].lower())
+                    if len(w) > 3)
+        return (gcol != col, not named)
+    own = c.label(mid).lower()
+    groups = sorted([g for g in f["group_by"] if ":" not in g["id"]
+                     and g["label"].split("(")[0].strip().lower() not in own], key=score)[:3]
+    for g in groups:
+        gcol = g.get("column", g["id"])
+        if target and col == gcol:
+            out.append((f"{c.label(mid)} by {g['label']}, {', '.join(target)} highlighted",
+                        {"intent": "COMPARE", "measures": [mid], "target_column": col, "target": target,
+                         "group_by": [], "notes": [], "baseline": "other_groups"}))
+        else:
+            out.append((f"{c.label(mid)} by {g['label']}",
+                        {"intent": "DESCRIBE", "measures": [mid], "target_column": None, "target": [],
+                         "group_by": [g["id"]], "notes": []}))
+    out.sort(key=lambda kv: "highlighted" not in kv[0])
+    return out
+
+
+def _done(st, m):
     st["analyses"].append(m)
     m["analysis_id"] = f"a{len(st['analyses'])}"
     out = {"reply": compose(m), "manifest": m}

@@ -780,13 +780,14 @@ def careful_chat(j):
         if res.get("error"):
             return message(model, [_text(f"I couldn't answer that from the form ({res['error']}). Try asking it "
                                          "another way.")])
-    if latest and latest[0] == "AskUserQuestion" and (latest[1].get("questions") or [{}])[0].get("header") == \
-            "Which figure":
+    head = (latest[1].get("questions") or [{}])[0].get("header") if latest and latest[0] == "AskUserQuestion" else None
+    if head in ("Which figure", "Which view"):
         ans = (_card_answers(latest[1], latest[2].get("text", "")) or [None])[0]
         last_in = next((i for i, r in reversed(_file_ask_results(msgs)) if r.get("card")), {})
         if ans and last_in.get("file") and _tool_name(tools, "file_ask"):
+            word = "figure: " if head == "Which figure" else "view: "
             return message(model, [_tool_use(_tool_name(tools, "file_ask"),
-                                             {"file": last_in["file"], "question": "figure: " + ans,
+                                             {"file": last_in["file"], "question": word + ans,
                                               "pipeline": "careful"})])
     said = _last_typed(msgs)
     if said and mans:
