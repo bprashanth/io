@@ -19,6 +19,7 @@ import struct
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 
 APP = os.environ.get("PASEO_APP") or next((p for p in ("/opt/Paseo/Paseo", shutil.which("Paseo") or "") if p and os.path.exists(p)), None)
@@ -85,6 +86,25 @@ def show_agent(agent, side=None):
     except subprocess.TimeoutExpired:
         pass
     return {"ok": True}
+
+
+def show_terminal(workspace_id, terminal_id, side="right"):
+    """Open a workspace terminal's tab and put it on one side with focus (Paseo UI patch P17, build idli8+): the
+    person's Claude CLI goes on the right of Drivey. Needs DevTools (the app started with --remote-debugging-port)."""
+    try:
+        page = next(t for t in _targets() if t.get("type") == "page" and str(t.get("url", "")).startswith("paseo://app"))
+        srv = server_id()
+        route = f"paseo://app/h/{srv}/workspace/{workspace_id}?open=" + urllib.parse.quote(f"terminal:{terminal_id}")
+        _ws_eval(page["webSocketDebuggerUrl"], f"location.href = {json.dumps(route)}; true")
+        time.sleep(1.5)
+        got = _ws_eval(page["webSocketDebuggerUrl"],
+                       "typeof window.__idliPlaceTab === 'function' ? window.__idliPlaceTab(" + json.dumps(
+                           {"serverId": srv, "workspaceId": workspace_id, "kind": "terminal", "id": terminal_id,
+                            "side": side}) + ") : 'no-p17'")
+        return {"ok": got is True, "why": None if got is True else "this Paseo UI has no P17 (install idli8)"}
+    except (OSError, ValueError, KeyError, StopIteration, ConnectionError, TimeoutError,
+            subprocess.SubprocessError) as e:
+        return {"ok": False, "why": type(e).__name__}
 
 
 # ---- a minimal DevTools (CDP) client over a websocket, standard library only
