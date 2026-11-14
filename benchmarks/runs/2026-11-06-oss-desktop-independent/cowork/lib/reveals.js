@@ -1,4 +1,5 @@
 'use strict';
+const when=t=>{const d=new Date(t);return isNaN(d)?'':d.toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});};
 const REVEAL_WS=new URLSearchParams(location.search).get('ws')||'';
 const outcomes={approved:'Allowed.',denied:'Kept hidden.',timeout:'This request expired. The value stays hidden.',budget:'No reveals left. You can allow 3 more on the Reveals page.',changed:'The file changed. The value stays hidden.'};
 function decisionLabel(decision){status(outcomes[decision]||'Waiting for your choice.');document.querySelectorAll('#request button').forEach(b=>b.disabled=decision!=='pending');}
@@ -27,7 +28,7 @@ if(location.pathname==='/reveals'){
     const r=await api('/api/reveals?ws='+encodeURIComponent(REVEAL_WS));
     $('budget').textContent=REVEAL_WS?r.remaining+' reveals left in this workspace.':'Open this page from a Drivey workspace to allow more reveals.';
     $('more').disabled=!REVEAL_WS;
-    $('items').innerHTML=r.items.length?r.items.map((v,i)=>`<section class="card" data-kind="${v.kind==='lookup'?'lookup':'unmask'}"><h2>${esc(v.code)}: ${esc(v.value)}</h2><p>${v.kind==='lookup'?'Search allowed. Value kept hidden from Claude.':'Revealed to Claude.'}</p><p>${esc(v.column)} (${esc(v.file)})</p><p>${esc(v.reason)}</p><p class="dim">${esc(v.at)}<br>Workspace: ${esc(v.workspace)}</p><button data-hide="${i}">Hide again</button></section>`).join(''):'<p>No values have been revealed.</p>';
+    $('items').innerHTML=r.items.length?r.items.map((v,i)=>`<section class="card" data-kind="${v.kind==='lookup'?'lookup':'unmask'}"><h2>${esc(v.code)}: ${esc(v.value)}</h2><p>${v.kind==='lookup'?'Search allowed. Value kept hidden from Claude.':'Revealed to Claude.'}</p><p>${esc(v.column)} (${esc(v.file)})</p><p>${esc(v.reason)}</p><p class="dim">${esc(when(v.at))}</p><button data-hide="${i}">Hide again</button></section>`).join(''):'<p>No values have been revealed.</p>';
     document.querySelectorAll('[data-hide]').forEach(b=>b.onclick=async()=>{try{await api('/api/reveals/hide',r.items[Number(b.dataset.hide)]);await refresh();status('Hidden.');}catch(e){status(e.message,true);}});
     status('');
   }

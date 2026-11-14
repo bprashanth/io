@@ -25,7 +25,7 @@ async function draw(spec, data, agent, title, meta={}) {
   if(EMBED&&!composite){local.height=Math.max(100,innerHeight-16);local.autosize={type:'fit',contains:'padding',resize:true};}
   const style=getComputedStyle(document.body),ink=style.color,line=style.getPropertyValue('--line').trim(),accent=style.getPropertyValue('--accent').trim();
   local.background='transparent';
-  local.config={...local.config,background:'transparent',range:{category:[accent,'#719c8d','#b5a379','#8b8fa8','#b37f72']},axis:{...local.config?.axis,labelColor:ink,titleColor:ink,gridColor:line,domainColor:line,tickColor:line},legend:{...local.config?.legend,labelColor:ink,titleColor:ink},header:{...local.config?.header,labelColor:ink,titleColor:ink},title:{...local.config?.title,color:ink,subtitleColor:ink},text:{...local.config?.text,color:ink}};
+  local.config={...local.config,background:'transparent',range:{category:[accent,'#719c8d','#b5a379','#8b8fa8','#b37f72']},axis:{...local.config?.axis,labelColor:ink,titleColor:ink,gridColor:line,domainColor:line,tickColor:line},legend:{...local.config?.legend,labelColor:ink,titleColor:ink},header:{...local.config?.header,labelColor:ink,titleColor:ink},title:{...local.config?.title,color:ink,subtitleColor:ink},text:{...local.config?.text,color:ink},geoshape:{fill:line,stroke:ink,strokeWidth:0.4,strokeOpacity:0.45,...local.config?.geoshape}};
   const result=await vegaEmbed('#viz',local,{actions:false,renderer:'svg',ast:true,expr:vega.expressionInterpreter});
   chartView=result.view;
   if(EMBED||composite){
@@ -145,7 +145,9 @@ function answerHTML(text) {
   return out.join('');
 }
 if(location.pathname==='/view') api('/api/view?id='+encodeURIComponent(ID)).then(async v=>{
-  document.title=v.title;$('title').textContent=v.title;$('description').textContent=v.spec.description||'';await draw(v.spec,v.data,v.agent,v.title,v);status('');
+  // One headline: the chart's own finding title becomes the page title, with its subtitle under it.
+  {const t=v.spec.title,head=typeof t==='string'?t:(Array.isArray(t?.text)?t.text.join(' '):t?.text);if(head){v.title=head;v.spec={...v.spec};delete v.spec.title;$('description').textContent=[t.subtitle,v.spec.description].filter(Boolean).join('. ');}else $('description').textContent=v.spec.description||'';}
+  document.title=v.title;$('title').textContent=v.title;await draw(v.spec,v.data,v.agent,v.title,v);status('');
   const pin=$('pin'),zoom=$('zoom');
   const pinLabel=()=>{pin.textContent=v.pinned?'Pinned':'Pin';pin.setAttribute('aria-pressed',String(!!v.pinned));};
   pin.disabled=false;zoom.disabled=false;pinLabel();
@@ -169,7 +171,7 @@ if(location.pathname==='/mini') (async()=>{
       pick(i);$('mapping').textContent=`${q.question} - ${JSON.stringify(params)}`;status('Running…');
       document.querySelectorAll('.run,#match').forEach(el=>el.disabled=true);
       try{
-        const r=await api('/api/mini/run',{id:ID,qid:q.id,params});$('result').hidden=false;$('result-title').textContent=q.question;$('result-params').textContent='Run with '+JSON.stringify(r.params);$('answer').innerHTML=answerHTML(r.text);$('viz').innerHTML='';
+        const r=await api('/api/mini/run',{id:ID,qid:q.id,params});$('result').hidden=false;$('result-title').textContent=q.question;$('result-params').textContent=Object.entries(r.params||{}).map(([k,x])=>k.replace(/_/g,' ')+': '+x).join(' - ');$('answer').innerHTML=answerHTML(r.text);$('viz').innerHTML='';
         if(r.chart)await draw(r.chart.vega_lite,r.chart.data,r.agent,q.question,r);else unpop();status('Done.');
       }catch(e){status(e.message,true);}finally{document.querySelectorAll('.run,#match').forEach(el=>el.disabled=false);}
     });
