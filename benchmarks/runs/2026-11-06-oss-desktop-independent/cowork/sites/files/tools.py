@@ -730,6 +730,40 @@ MASK_NOTE = ("\nAlso: sort {by: <measure or column id>, dir: desc|asc} and limit
              "(e.g. a share instead of a ratio, a named species instead of a group the form doesn't define), return "
              "that spec and add \"note\": one plain sentence on how it differs from what they asked. Use \"cannot\" "
              "only when nothing in the form is close. The form and the thread follow as JSON.")
+def t_claude_open(file, question):
+    """Open the person's own Claude Code (provider idli-claude: desktop/claude-masked.sh, through the masking proxy)
+    beside this Idli chat, on this file, with their question."""
+    if _pv(file).get("mode") != "mask":
+        return {"error": "This file isn't set to masked, so Claude can't see it. Choose 'Masked' for it first."}
+    paseo = _paseo()
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
+    ws = subprocess.run([paseo, "workspace", "ls", "--json"], capture_output=True, text=True, timeout=60, env=env)
+    try:
+        cands = [w for w in json.loads(ws.stdout) if os.path.realpath(w["cwd"]) == os.path.realpath(sh.data_dir())]
+        wid = next(w for w in sorted(cands, key=lambda w: w.get("name") not in ("Drivey", "Idli")))["workspaceId"]
+    except (ValueError, StopIteration):
+        return {"error": "No Drivey workspace found."}
+    me = os.environ.get("PASEO_AGENT_ID")
+    prompt = f"I'm working on the file {file} (it's in drive/). {question}"
+    r = subprocess.run([paseo, "run", "--provider", "idli-claude", "--workspace", wid,
+                        *(["--label", f"idli.pair={me}"] if me else []), "--mode", "bypassPermissions",
+                        "--title", "Claude: " + os.path.basename(file), "--no-wait", "--json", prompt],
+                       capture_output=True, text=True, timeout=90, env=env)
+    if r.returncode:
+        return {"error": f"Could not start Claude: {(r.stderr or r.stdout)[-300:]}"}
+    try:
+        agent = json.loads(r.stdout).get("agentId")
+    except ValueError:
+        agent = None
+    shown = False
+    if agent:
+        from lib import uiswitch
+        shown = uiswitch.show_agent(agent, side="right").get("ok", False)
+    return {"started": bool(agent), "say_to_user": "Claude is open beside this chat, on " + os.path.basename(file)
+            + ". It sees codes for the masked columns; you see the real values. Carry on there."
+            + ("" if shown else " (Click its tab on the right.)")}
+
+
 _masked_history = {}  # file -> [{"question", "spec"}] (real words; privacy.plan masks them again before sending)
 
 
@@ -744,7 +778,10 @@ def _masked_ask(file, question, tab, send):
                                         "options": [{"label": "Send it", "description": "Claude plans the answer; "
                                                      "the numbers are worked out on this computer"},
                                                     {"label": "Keep it on this computer",
-                                                     "description": "the private model answers instead"}]}]},
+                                                     "description": "the private model answers instead"},
+                                                    {"label": "Work on it with Claude",
+                                                     "description": "open your Claude beside Idli on this file; it "
+                                                     "sees codes, you see real values"}]}]},
                 "masked": m["masked"], "reply": None, "then": "AskUserQuestion with this card."}
     opened = files().open(file)
     forms = opened.get("forms") or {}
@@ -1406,6 +1443,8 @@ TOOLS = {
                                "description": "Set by Idli itself; leave it out."},
                   "send": {"type": "string", "enum": ["yes", "no"], "description": "Set by Idli itself; leave it out."}},
                  ["file"]),
+    "claude_open": (t_claude_open, "Set by Idli itself: open the person's Claude beside this chat on a masked file.",
+                    {**FILE, "question": {"type": "string"}}, ["file", "question"]),
     "file_privacy": (t_file_privacy, "Set by Idli itself after the person picks how Claude may see this file.",
                      {**FILE, "mode": {"type": "string", "enum": ["fake", "mask"]},
                       "review": {"type": "string", "enum": ["ask", "auto"]}}, ["file", "mode"]),

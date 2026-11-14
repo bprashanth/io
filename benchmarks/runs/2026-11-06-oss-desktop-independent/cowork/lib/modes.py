@@ -944,6 +944,8 @@ def privacy_route(j):
             if f:
                 return message(model, [_tool_use(_tool_name(tools, "file_privacy"),
                                                  {"file": f, "mode": mode, "review": review})])
+        if name == "claude_open":
+            return message(model, [_text(res.get("say_to_user") or res.get("error") or "Done.")])
         if name == "file_privacy" and res.get("say_to_user"):
             return message(model, [_text(res["say_to_user"] + "\n\nWhat would you like to know about it?")])
         if name == "file_ask" and inp.get("question") and (isinstance(res.get("card"), dict) and
@@ -955,6 +957,9 @@ def privacy_route(j):
         if name == "AskUserQuestion" and (inp.get("questions") or [{}])[0].get("header") == SEND_HEAD and fa:
             ans = (_card_answers(inp, res.get("text", "")) or [""])[0] or ""
             last = next((i for i, r in reversed(_file_ask_results(msgs)) if r.get("card")), {})
+            if re.search(r"(?i)with claude", ans) and _tool_name(tools, "claude_open") and last.get("file"):
+                return message(model, [_tool_use(_tool_name(tools, "claude_open"),
+                                                 {"file": last["file"], "question": last.get("question", "")})])
             yes = ans.lower().startswith("send")
             mode = mode_of(model)
             args = {"file": last.get("file"), "question": last.get("question"), "chart": True,

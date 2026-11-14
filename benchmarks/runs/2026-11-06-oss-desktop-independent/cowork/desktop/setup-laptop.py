@@ -52,6 +52,10 @@ COWORK_PROVIDER = {
                         # co-work is read-only: find, suggest, download. Drafting mail is a write.
                         "mcp__cowork__gmail_draft_reply", "mcp__cowork__sheet_query", "mcp__cowork__sheet_profile"],
 }
+# Masked Claude (2026-11-14): the person's own Claude Code through Idli's masking proxy, beside Idli in Drivey.
+CLAUDE_MASKED_PROVIDER = {"extends": "claude", "label": "Claude (masked: real files, codes for private values)",
+                          "command": [os.path.join(COWORK, "desktop", "claude-masked.sh")],
+                          "disallowedTools": ["mcp__paseo"]}
 DIY_PROVIDER = {"extends": "claude", "label": "Claude (teaches Idli; fake data and test accounts only)"}
 # Split mode (Idli left, Claude right in Idli's workspace): teaching chats run through a launcher that keeps Claude in
 # this fake-data folder, and without Paseo's browser tools (Idli's workspace has the person's real Google tabs).
@@ -102,6 +106,7 @@ def main():
     providers["t4gc-cowork"] = COWORK_PROVIDER
     providers["diy-claude"] = DIY_PROVIDER
     providers["idli-teach"] = TEACH_PROVIDER
+    providers["idli-claude"] = CLAUDE_MASKED_PROVIDER
     step(f"merge providers t4gc-cowork, diy-claude, browserTools, pluginsEnabled into {CONFIG}")
     if not DRY:
         shutil.copy(CONFIG, f"{CONFIG}.bak-{int(time.time())}")
