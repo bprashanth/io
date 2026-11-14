@@ -164,11 +164,40 @@ def chat_workspace():
         return os.environ['IDLI_WORKSPACE']
     agent = os.environ.get('PASEO_AGENT_ID')
     if agent:
-        chats = json.loads(cli('ls', '--json', '--label', 'idli.left=1'))
+        return _agent_workspace(agent)
+    return None
+
+
+_AGENT_WS = Path.home() / '.cache' / 'idli' / 'agent-workspaces.json'
+
+
+def _agent_workspace(agent):
+    """The Drivey workspace a left chat belongs to. Paseo's JSON omits labels and workspace ids for agents, but its
+    label filter works: try each workspace that has a Claude terminal (newest first) and remember the answer."""
+    try:
+        known = json.loads(_AGENT_WS.read_text())
+    except (OSError, ValueError):
+        known = {}
+    if known.get(agent):
+        return known[agent]
+    terminals = json.loads(cli('terminal', 'ls', '--all', '--json'))
+    seen = []
+    for t in reversed(terminals if isinstance(terminals, list) else []):
+        w = t.get('workspaceId')
+        if w and w not in seen and t.get('name') == 'Claude':
+            seen.append(w)
+    for w in seen:
+        chats = json.loads(cli('ls', '--json', '--label', 'idli.ws=' + w))
         if isinstance(chats, dict):
             chats = chats.get('agents', [])
-        return next(((c.get('labels') or {}).get('idli.ws') for c in chats
-                     if (c.get('id') or c.get('agentId')) == agent), None)
+        if any((c.get('id') or c.get('agentId')) == agent for c in chats):
+            known[agent] = w
+            try:
+                _AGENT_WS.parent.mkdir(parents=True, exist_ok=True)
+                _AGENT_WS.write_text(json.dumps(known))
+            except OSError:
+                pass
+            return w
     return None
 
 
@@ -418,29 +447,102 @@ def chart_markdown(data_dir, title, chart, agent=None, sources=None, script=None
     return f'![{label}]({out})\n[Open interactive]({url})'
 
 
+def _human(key):
+    t = re.sub(r'_inr$', ' (Rs)', str(key), flags=re.I)
+    t = re.sub(r'_?1to10$', ' (1 to 10)', t, flags=re.I).replace('_', ' ').strip()
+    return t[:1].upper() + t[1:]
+
+
+def _indian(n):
+    """3,50,000 style grouping for whole numbers."""
+    neg, s = n < 0, str(abs(int(n)))
+    if len(s) > 3:
+        head, tail = s[:-3], s[-3:]
+        head = ','.join([head[max(0, i - 2):i] for i in range(len(head), 0, -2)][::-1])
+        s = head + ',' + tail
+    return ('-' if neg else '') + s
+
+
+def _nice_cell(v):
+    v = v.strip()
+    if re.fullmatch(r'-?\d{4,}', v):
+        return _indian(int(v))
+    if re.fullmatch(r'-?\d{4,}\.\d+', v):
+        whole, frac = v.split('.')
+        return _indian(int(whole)) + '.' + frac[:2]
+    return v
+
+
+def tidy_answer(text, max_rows=10):
+    """A Mini script's printout made readable: table headings in words, grouped numbers, at most max_rows rows."""
+    out, rows, header = [], 0, None
+    for line in str(text).splitlines():
+        cells = line.strip()
+        if cells.startswith('|') and cells.endswith('|'):
+            parts = [c for c in cells[1:-1].split('|')]
+            if header is None:
+                header = True
+                out.append('| ' + ' | '.join(_human(c.strip()) for c in parts) + ' |')
+            elif re.fullmatch(r'[\s:|-]+', cells):
+                out.append(line)
+            else:
+                rows += 1
+                if rows <= max_rows:
+                    out.append('| ' + ' | '.join(_nice_cell(c) for c in parts) + ' |')
+            continue
+        if header and rows > max_rows:
+            out.append(f'And {rows - max_rows} more rows.')
+        header, rows = None, 0
+        out.append(re.sub(r'\b\d{5,}\b', lambda m: _indian(int(m.group())), line))
+    if header and rows > max_rows:
+        out.append(f'And {rows - max_rows} more rows.')
+    return '\n'.join(out)
+
+
+def _option_words(key, desc):
+    name = _human(key).lower()
+    if desc.get('type') == 'choice':
+        every = any(str(c) == 'All' for c in desc.get('choices', []))
+        choices = [str(c) for c in desc.get('choices', []) if str(c) != 'All']
+        if len(choices) <= 3:
+            return name + ': ' + ' or '.join(choices + (['all'] if every else []))
+        return f'{name}: any of {len(choices)}' + (' or all' if every else '')
+    return name + ': a number'
+
+
 def mini_open(data_dir, ident, workspace=None):
+    """Show what the author left: the story, the pinned charts (live), and what can be asked. No model, no scripts."""
     m = read(object_path(data_dir, 'minis', ident))
     if workspace:
         def change(state):
             state.setdefault('workspace_minis', {})[workspace] = ident
             state.setdefault('workspace_files', {})[workspace] = m.get('files', [])
         update_state(data_dir, change)
-    lines = [m['name'], 'Goal: ' + m['goal'],
-             'Source files: ' + ', '.join(x.get('title') or x.get('local') or x.get('id', '') for x in m.get('files', []))]
     from lib import journey
-    for chart in m.get('charts', []):
-        lines.append('[Pinned chart: ' + plain(chart['title']) + '](' + journey.page_url(
-            data_dir, 'view', id=chart['id'], embed=1, ws=workspace or '') + ')')
+    files = []
+    for x in m.get('files', []):
+        parts = str(x.get('local') or x.get('title') or '').replace('drive/', '', 1).split('/')
+        name = x.get('title') or re.sub(r'\.(xlsx|xls|csv)$', '', parts[-1])
+        files.append('**' + name + '**' + (' in ' + ' / '.join(parts[:-1]) if len(parts) > 1 else ''))
+    lines = ['## ' + m['name'], '', m['goal'], '',
+             '_Reads ' + ', '.join(files) + ' fresh from your Drive each time._' if files else '']
+    charts = m.get('charts', [])
+    for chart in charts:
+        lines += ['', '[' + plain(chart['title']) + '](' + journey.page_url(
+            data_dir, 'view', id=chart['id'], embed=1, ws=workspace or '') + ')']
+    if not charts and m['questions']:
+        try:
+            example = run_mini(data_dir, ident, m['questions'][0]['id'], {})
+            if example['chart']:
+                lines += ['', chart_markdown(data_dir, m['questions'][0]['question'], example['chart'], m.get('agent'),
+                                             example['sources'], example['script'], workspace)]
+        except ValueError:
+            pass
+    lines += ['', '**You can ask**']
     for q in m['questions']:
-        lines.extend(['', q['question']])
-        for key, desc in q.get('params', {}).items():
-            options = ', '.join(map(str, desc['choices'])) if desc['type'] == 'choice' else desc['type']
-            lines.append(f"{key}: {options}; default = {desc.get('default')}")
-        example = run_mini(data_dir, ident, q['id'], {})
-        lines.append('Example: ' + example['text'])
-        if example['chart']:
-            lines.append(chart_markdown(data_dir, q['question'], example['chart'], m.get('agent'),
-                                        example['sources'], example['script'], workspace))
+        opts = [_option_words(k, d) for k, d in q.get('params', {}).items()]
+        lines.append('- ' + q['question'] + (' _(' + '; '.join(opts) + ')_' if opts else ''))
+    lines += ['', 'Ask in your own words. Idli picks the matching question and the Mini works out the answer here.']
     return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'reply': plain('\n'.join(lines))}
 
 
@@ -448,8 +550,9 @@ def mini_ask(data_dir, ident, qid, params, workspace=None):
     m = read(object_path(data_dir, 'minis', ident))
     q = next(q for q in m['questions'] if q['id'] == qid)
     result = run_mini(data_dir, ident, qid, params)
-    using = ', '.join(f'{k} = {v}' for k, v in result['params'].items())
-    lines = ['Using: ' + q['question'] + (': ' + using if using else ''), result['text']]
+    using = ', '.join(f'{_human(k).lower()} {v}' for k, v in result['params'].items())
+    lines = ['_Answered with: ' + q['question'].rstrip('?') + (' (' + using + ')' if using else '') + '_', '',
+             tidy_answer(result['text'])]
     if result['chart']:
         lines.append(chart_markdown(data_dir, q['question'], result['chart'], m.get('agent'),
                                     result['sources'], result['script'], workspace))

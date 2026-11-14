@@ -154,6 +154,8 @@ def questions_checked(questions, root):
             if desc['type'] == 'choice' and (not isinstance(desc.get('choices'), list) or not desc['choices']
                     or any(not isinstance(c, str) or not c.strip() for c in desc['choices'])):
                 raise ValueError('List the choices for every option.')
+        asks = q.get('asks', [])
+        q['asks'] = [home.plain(str(a).strip())[:200] for a in (asks if isinstance(asks, list) else []) if str(a).strip()][:6]
         home.params_for(q, {})
         path = home.inside(root, q.get('script', ''))
         if path.suffix != '.py':

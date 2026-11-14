@@ -197,7 +197,7 @@ class Scanner:
         token = os.environ.get('IO_PRIVACY_TOKEN')
         if token:
             headers['Authorization'] = 'Bearer ' + token
-        req = urllib.request.Request(os.environ.get('IDLI_SCANNER', 'http://127.0.0.1:8899/scan'),
+        req = urllib.request.Request(os.environ.get('IDLI_SCANNER', 'https://privacy.idli.cc/scan'),
                                      json.dumps({'text': text}).encode(), headers)
         try:
             with urllib.request.urlopen(req, timeout=5) as r:
@@ -211,7 +211,7 @@ class Scanner:
 
 def _class(column):
     c = str(column).casefold()
-    for pattern, cls in [(r'name|beneficiary|employee', 'person_name'),
+    for pattern, cls in [(r'name|beneficiary|employee|(^|_|\s)head($|_|\s)|owner|respondent|farmer|guardian|father|mother|spouse|husband|wife|contact_person', 'person_name'),
                          (r'ward|village|town|place|district', 'village'),
                          (r'address', 'address'), (r'phone|mobile', 'phone'), (r'email', 'email')]:
         if re.search(pattern, c):
@@ -233,8 +233,54 @@ def _code_frame(frame, columns, vault):
     return pseudonymise_frame(frame, classes, vault)
 
 
-@locked
+NAME_LIKE = re.compile(r"^[A-Z][a-z'.-]+(?: [A-Z][a-z'.-]*){1,3}$")
+
+
+def _looks_like_names(series):
+    """A backstop when the name scanner can't be reached: most values are two to four capitalised words."""
+    values = [str(v).strip() for v in series.head(200) if str(v).strip() not in ('', 'nan', 'None')]
+    if len(values) < 3:
+        return False
+    return sum(bool(NAME_LIKE.match(v)) for v in values) / len(values) >= .6
+
+
+_SUGGESTED = {}
+_SUGGEST_CACHE = Path.home() / '.cache' / 'idli' / 'suggest'
+
+
 def suggest(path, tab):
+    """Column suggestions, cached per file version and tab (scanning every column takes seconds). Only answers from
+    a reachable scanner are kept, so a scanner outage is never remembered. The cache stays on this computer (0600)."""
+    import hashlib
+    try:
+        st = os.stat(path)
+        key = hashlib.sha256(f'{os.path.realpath(path)}|{st.st_mtime_ns}|{st.st_size}|{tab}'.encode()).hexdigest()
+    except OSError:
+        return _suggest(path, tab)
+    if key in _SUGGESTED:
+        return json.loads(_SUGGESTED[key])
+    disk = _SUGGEST_CACHE / (key + '.json')
+    try:
+        rows = json.loads(disk.read_text())
+        _SUGGESTED[key] = json.dumps(rows)
+        return rows
+    except (OSError, ValueError):
+        pass
+    rows = _suggest(path, tab)
+    if not any('scanner unavailable' in r.get('reason', '') for r in rows):
+        _SUGGESTED[key] = json.dumps(rows)
+        try:
+            _SUGGEST_CACHE.mkdir(parents=True, exist_ok=True, mode=0o700)
+            fd = os.open(disk, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, 'w') as f:
+                f.write(_SUGGESTED[key])
+        except OSError:
+            pass
+    return rows
+
+
+@locked
+def _suggest(path, tab):
     frame = _frame(path, tab)
     scanner = Scanner()
     classes = classify_columns(frame, scanner)
@@ -251,6 +297,8 @@ def suggest(path, tab):
             import pandas as pd
             if len(values) and pd.to_numeric(values, errors='coerce').notna().mean() >= .95:
                 mask, reason = False, 'numeric measure'
+        if not mask and _looks_like_names(frame[c]):
+            mask, reason = True, 'looks like people\'s names'
         choices[str(c)] = mask
         reasons[str(c)] = reason
     coded = _code_frame(frame, choices, vault)

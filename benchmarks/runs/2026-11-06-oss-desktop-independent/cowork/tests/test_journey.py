@@ -257,8 +257,8 @@ class ToolTests(Fixture):
         self.assertEqual(len(home.read(home.object_path(self.data,'minis',saved['id']))['questions']),2)
     def test_mini_open_story_questions_charts_and_context(self):
         self.make_view(pinned=True);ident=self.make_draft(1);r=journey.save_draft(self.data,ident,self.edits(ident))
-        m=tools.t_mini_open(r['id']);self.assertIn('A simple view',m['reply']);self.assertIn('All, Garden',m['reply']);self.assertIn('embed=1',m['reply']);self.assertIn('ws=ws-one',m['reply']);self.assertEqual(m['files'],FILES)
-        answer=tools.t_mini_ask(r['id'],'total-0',{'ward':'Garden'});self.assertIn('Using:',answer['reply']);self.assertIn('views/',answer['reply'])
+        m=tools.t_mini_open(r['id']);self.assertIn('A simple view',m['reply']);self.assertIn('ward: Garden or all',m['reply']);self.assertIn('embed=1',m['reply']);self.assertIn('ws=ws-one',m['reply']);self.assertEqual(m['files'],FILES)
+        answer=tools.t_mini_ask(r['id'],'total-0',{'ward':'Garden'});self.assertIn('Answered with:',answer['reply']);self.assertIn('views/',answer['reply'])
     def test_draft_tool_and_bad_script_fail_before_editor(self):
         with patch.object(uiswitch,'open_url',return_value={'ok':True}):
             r=idli_mcp.idli_draft_mini('Visits','Story',[QUESTION],'Scripts');self.assertTrue(r['opened'])

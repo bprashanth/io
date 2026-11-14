@@ -45,19 +45,51 @@ function showPop(ev, role='dialog') {
   el.style.left=Math.max(16,Math.min((ev?.clientX||40)+8,innerWidth-el.offsetWidth-16))+'px';
   el.style.top=Math.max(16,Math.min((ev?.clientY||120)+8,innerHeight-el.offsetHeight-16))+'px';
 }
+// Plain words for people: "total_debt_inr" -> "Total debt (Rs)", 350000 -> "3,50,000".
+function human(k) {
+  let t=String(k).replace(/_inr$/i,' (Rs)').replace(/_?1to10$/i,' (1 to 10)').replace(/_/g,' ').trim();
+  return t.charAt(0).toUpperCase()+t.slice(1);
+}
+function nice(v) {
+  if(typeof v==='number'||(String(v).trim()!==''&&!isNaN(Number(v))&&/^-?[\d.]+$/.test(String(v).trim()))){
+    const n=Number(v);return Number.isInteger(n)?n.toLocaleString('en-IN'):n.toLocaleString('en-IN',{maximumFractionDigits:2});
+  }
+  return String(v??'');
+}
+function fileParts(path) {
+  const parts=String(path||'').replace(/^drive\//,'').split('/'),file=parts.pop()||'';
+  return {name:file.replace(/\.(xlsx|xls|csv)$/i,''),folder:parts.join(' / ')};
+}
+function scriptName(path) {
+  return String(path||'').split('/').pop().replace(/\.py$/,'').replace(/[_-]+/g,' ');
+}
 function provenance(datum) {
   const el=$('pop'),keys=fields(datum).filter(k=>chartRows.some(r=>Object.hasOwn(r,k)));
   // Match the mark's CSV fields. Vega may add aggregate fields that are absent from the CSV.
   const equal=(a,b)=>String(a)===String(b)||(typeof b==='number'&&String(a).trim()!==''&&Number(a)===b);
   const rows=keys.length?chartRows.filter(r=>keys.every(k=>equal(r[k],datum[k]))):[];
   const columns=[...new Set(rows.flatMap(r=>Object.keys(r)))];
-  el.innerHTML=`<div class="what">Where did this come from?</div><p>Source files (private values are replaced by codes for Claude)</p><pre>${esc((chartMeta.sources||[]).join('\n')||'Not recorded')}</pre><p>Script that made the data</p><pre>${esc(chartMeta.script||'Not recorded')}</pre><p>Chart data</p><pre>${esc(chartMeta.data_csv||'Not recorded')}</pre><p>Rows in this part of the chart: ${rows.length}</p>`+
-    (rows.length?`<div class="scroll"><table><thead><tr>${columns.map(k=>`<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${columns.map(k=>`<td>${esc(r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<p>No matching rows were found for this part of the chart.</p>');
+  const files=(chartMeta.sources||[]).map(fileParts);
+  const from=files.length?files.map(f=>`<b>${esc(f.name)}</b>`+(f.folder?` <span class="dim">in ${esc(f.folder)}</span>`:'')).join(', '):'a file Idli did not record';
+  const made=chartMeta.script?`Worked out by Claude's script <b>${esc(scriptName(chartMeta.script))}</b>, run on this computer.`:'';
+  let detail;
+  if(rows.length===1){
+    detail=`<p class="lead">This part of the chart</p><dl>${columns.map(k=>`<dt>${esc(human(k))}</dt><dd>${esc(nice(rows[0][k]))}</dd>`).join('')}</dl>`;
+  } else if(rows.length){
+    const shown=rows.slice(0,10);
+    detail=`<p class="lead">${rows.length} rows make up this part${rows.length>10?' (first 10 shown)':''}</p><div class="scroll"><table><thead><tr>${columns.map(k=>`<th>${esc(human(k))}</th>`).join('')}</tr></thead><tbody>${shown.map(r=>`<tr>${columns.map(k=>`<td>${esc(nice(r[k]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  } else detail='<p class="dim">This part is a summary, so no single row sits behind it.</p>';
+  const paths=[...(chartMeta.sources||[]),chartMeta.script,chartMeta.data_csv].filter(Boolean);
+  el.innerHTML=`<div class="what">Where did this come from?</div><p>From ${from}. Claude saw ${files.length>1?'these files':'this file'} with private values replaced by codes; you see the real values.</p>`+
+    (made?`<p>${made}</p>`:'')+detail+
+    (paths.length?`<details><summary>File details</summary><pre>${esc(paths.join('\n'))}</pre></details>`:'');
 }
 function contextText(datum) {
   const one=value=>String(value??'').replace(/\s+/g,' ').trim();
-  const origin=`About the chart "${one(chartTitle)}" (data: ${one(chartMeta.data_csv)||'-'}; made by: ${one(chartMeta.script)||'-'}; from: ${(chartMeta.sources||[]).map(one).join(', ')||'-'})`;
-  return origin+(datum?': '+fields(datum).map(k=>`${one(k)} = ${one(datum[k])}`).join(', '):'')+' ';
+  const sources=(chartMeta.sources||[]).map(x=>`redacted(${one(x)})`).join(', ')||'-';
+  const script=one(chartMeta.script).split('/').pop()||'-';
+  const part=datum?', the part '+fields(datum).map(k=>`${one(k)} = ${one(datum[k])}`).join(', '):'';
+  return `About the chart "${one(chartTitle)}"${part} (from: ${sources}; script: ${script}; data: ${one(chartMeta.data_csv)||'-'}) `;
 }
 function contextMenu(ev,datum) {
   const el=$('pop');
@@ -74,7 +106,7 @@ function pop(ev,datum) {
   const el=$('pop'),keys=fields(datum);
   const nums=keys.filter(k=>typeof datum[k]==='number'),labs=keys.filter(k=>!nums.includes(k));
   const what=labs.map(k=>datum[k]).join(' / ')||'this point';
-  const val=nums.map(k=>`${k}: ${datum[k]}`).join('; ');
+  const val=nums.map(k=>`${human(k)}: ${nice(datum[k])}`).join(' - ');
   const piece=`the ${what} mark`+(val?` (${val})`:'')+` on "${chartTitle}"`;
   const say=async text=>{
     el.innerHTML='<div class="note">Sending...</div>';

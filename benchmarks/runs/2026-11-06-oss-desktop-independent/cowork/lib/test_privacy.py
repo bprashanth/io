@@ -174,3 +174,16 @@ def test_claude_process_isolation(monkeypatch):
     monkeypatch.setenv('IDLI_PLANNER_MODEL', 'configured-model')
     monkeypatch.setattr(p.subprocess, 'run', run)
     assert p._claude('masked prompt') == {'spec': {'measures': ['rows']}}
+
+
+def test_names_hidden_without_scanner(tmp_path, monkeypatch):
+    """Laptop 2026-11-14: household_head (people's names) was left visible when the scanner was unreachable."""
+    monkeypatch.setenv('IDLI_SCANNER', 'http://127.0.0.1:1/scan')
+    path = tmp_path/'households.xlsx'
+    pd.DataFrame({'household_head': ['Krishna Kale', 'Meera Singh', 'Sana More', 'Ira Shaikh'],
+                  'respondent_id': ['a1', 'a2', 'a3', 'a4'], 'members': [4, 2, 6, 3],
+                  'enumerator': ['Asha Patil', 'Ravi Shah', 'Asha Patil', 'Ravi Shah'],
+                  'crop': ['jowar', 'bajra', 'jowar', 'rice']}).to_excel(path, index=False)
+    rows = {r['column']: r for r in p.suggest(path, None)}
+    assert rows['household_head']['mask'] and rows['enumerator']['mask']
+    assert not rows['members']['mask'] and not rows['crop']['mask']

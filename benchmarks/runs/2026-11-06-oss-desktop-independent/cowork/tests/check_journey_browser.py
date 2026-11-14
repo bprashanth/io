@@ -18,7 +18,7 @@ from test_journey import Fixture, FILES, home, journey, formserver, uiswitch, pr
 from playwright.sync_api import sync_playwright, expect
 
 # Fixed relative to the repo so this works in a clean checkout without the task file.
-SHOTS=Path(__file__).resolve().parents[5]/'JOURNEY_SHOTS'
+SHOTS=Path(__file__).resolve().parents[5]/'benchmarks/runs/2026-11-14-drivey-journey/page-shots'
 
 
 class BrowserTests(Fixture):
@@ -55,9 +55,11 @@ class BrowserTests(Fixture):
             ident=self.review();p=self.page(scheme)
             p.add_init_script('window.heights=[];addEventListener("message",e=>{if(e.data?.type==="idli-height")window.heights.push(e.data.px);});')
             p.goto(self.url('privacy-review',id=ident,embed=1,a='left-one'))
+            expect(p.locator('#reviews')).to_have_attribute('aria-busy','false')
+            p.locator('details.visible-group').evaluate_all('ds=>ds.forEach(d=>d.open=true)')
             expect(p.get_by_role('switch')).to_have_count(3)
-            name=p.get_by_role('switch',name='Hide name in Visits',exact=True)
-            ward=p.get_by_role('switch',name='Hide ward in Visits',exact=True)
+            name=p.get_by_role('switch',name='Hide Name in Visits',exact=True)
+            ward=p.get_by_role('switch',name='Hide Ward in Visits',exact=True)
             expect(name).to_be_checked();expect(ward).to_be_checked()
             self.assertNotIn('Asha Sample',p.locator('#masked').inner_text())
             ward.uncheck();expect(p.locator('#status')).to_have_text('Choice saved.');expect(p.locator('#masked')).to_contain_text('Garden')

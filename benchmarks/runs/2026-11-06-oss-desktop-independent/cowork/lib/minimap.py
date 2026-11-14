@@ -40,7 +40,7 @@ def map_questions(questions, text, local_url=None):
     """The local 9B selects a saved question, or explicitly declines. Never guess on failure."""
     if not questions:
         raise ValueError('This Mini has no questions')
-    brief = [{k: q.get(k, {}) for k in ('id', 'question', 'params')} for q in questions]
+    brief = [{k: q[k] for k in ('id', 'question', 'params', 'asks') if q.get(k)} for q in questions]
     branches = []
     for q in questions:
         props = {}
@@ -63,7 +63,7 @@ def map_questions(questions, text, local_url=None):
          'or an explicitly named choice is unavailable. Do not substitute a different question. '
          'Match the requested calculation and measure exactly. A comparison of one measure cannot answer '
          'a comparison of a different measure. A numeric summary cannot explain causes or predict the future. '
-         'Paraphrases are fine. Use parameter defaults only when no value is given. '
+         'Paraphrases are fine; asks lists ways people phrase each saved question. Use parameter defaults only when no value is given. '
          'In one short sentence in reason, state the requested measure and calculation and whether a saved question supports both. '
          'Then choose qid and params. Copy explicitly requested numbers and choices, matching choice case. Return JSON only.\n'
          + json.dumps(brief)}, {'role': 'user', 'content': str(text)[:4000]}],

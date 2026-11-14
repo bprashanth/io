@@ -1,11 +1,13 @@
 'use strict';
+const words=k=>{const t=String(k).replace(/_inr$/i,' (Rs)').replace(/_/g,' ').trim();return t.charAt(0).toUpperCase()+t.slice(1);};
 const postHeight=()=>parent.postMessage({type:'idli-height',px:Math.ceil(document.documentElement.scrollHeight)},'*');
 new ResizeObserver(postHeight).observe(document.body);
 const retry=fn=>{$('retry').hidden=false;$('retry').onclick=()=>{$('retry').hidden=true;fn();};};
 const reasonText=row=>{
   if(!row.mask)return 'Visible to Claude. You can hide this column if it feels private.';
   const col=row.column.toLowerCase();
-  if(/name|beneficiary|employee/.test(col))return 'Names may identify a person.';
+  if(/name|beneficiary|employee|head|owner|respondent|farmer|guardian|father|mother|spouse/.test(col))return 'Names may identify a person.';
+  if(/(^|_)(lat|lon|lng|latitude|longitude|gps)($|_)/.test(col))return 'Exact locations can point to a home.';
   if(/ward|village|town|place|district|address/.test(col))return 'Locations may identify a person or community.';
   if(/phone|mobile|email/.test(col))return 'Contact details are personal.';
   return 'These values may be private. Codes keep the analysis useful.';
@@ -14,7 +16,16 @@ if(location.pathname==='/privacy-review'){
   let data, busy=false;
   const render=next=>{
     data=next;$('reviews').setAttribute('aria-busy','false');
-    $('reviews').innerHTML=data.reviews.map((file,i)=>`<article class="card"><h2 class="file-title">${esc(file.title)}</h2>${file.tabs.map(tab=>`<p class="sheet-title">${esc(tab.tab)}</p>${tab.suggestions.map(row=>`<section class="column-card"><div class="column-head"><label><input class="switch" role="switch" type="checkbox" aria-label="Hide ${esc(row.column)} in ${esc(file.title)}" data-file="${i}" data-col="${esc(row.column)}" ${row.mask?'checked':''} ${data.done?'disabled':''}><span class="column-name">${esc(row.column)}</span></label><span class="visibility">${row.mask?'Hidden':'Visible'}</span></div><p class="reason">${esc(reasonText(row))}</p><div class="samples"><div class="sample"><h3>In your file</h3>${row.samples.map(v=>`<p>${esc(v||'(blank)')}</p>`).join('')}</div><div class="sample masked-sample"><h3>Claude sees</h3>${row.as_sent.map(v=>`<p>${esc(v||'(blank)')}</p>`).join('')}</div></div></section>`).join('')}`).join('')}</article>`).join('');
+    const row=(row,i)=>`<div class="col-row${row.mask?' hidden-col':''}"><input class="switch" role="switch" type="checkbox" aria-label="Hide ${esc(words(row.column))} in ${esc(data.reviews[i].title)}" data-file="${i}" data-col="${esc(row.column)}" ${row.mask?'checked':''} ${data.done?'disabled':''}><div class="col-text"><div class="column-name">${esc(words(row.column))}</div><div class="col-sample">${esc(row.samples[0]||'(blank)')}${row.mask?` <span class="dim">-></span> <code>${esc(row.as_sent[0]||'')}</code>`:''}</div>${row.mask?`<div class="reason">${esc(reasonText(row))}</div>`:''}</div></div>`;
+    $('reviews').innerHTML=data.reviews.map((file,i)=>{
+      const tabs=file.tabs.map(tab=>{
+        const hid=tab.suggestions.filter(r=>r.mask),vis=tab.suggestions.filter(r=>!r.mask);
+        const many=file.tabs.length>1?`<p class="sheet-title">${esc(tab.tab)}</p>`:'';
+        return many+`<p class="group-title">Hidden with codes (${hid.length})</p>`+(hid.map(r=>row(r,i)).join('')||'<p class="empty">Nothing hidden in this sheet.</p>')+
+          `<details class="visible-group"${hid.length?'':' open'}><summary>Claude can see ${vis.length} column${vis.length===1?'':'s'}: <span class="dim">${esc(vis.map(r=>words(r.column).toLowerCase()).join(', '))}</span></summary>${vis.map(r=>row(r,i)).join('')}</details>`;
+      }).join('');
+      return `<article class="card"><h2 class="file-title">${esc(file.title)}</h2>${tabs}</article>`;
+    }).join('');
     $('question-card').hidden=false;$('masked').textContent=data.masked_question;
     $('done').disabled=data.done;$('done').textContent=data.done?'Done':'Done';
     $('hint').textContent=data.done?'Privacy checked. Continue in your chat.':'Your choices apply to these files. Nothing has been sent to Claude.';
@@ -39,7 +50,7 @@ if(location.pathname==='/mini-editor'){
   let draft,questions=[],charts=[];
   const renderQuestions=()=>{
     $('q-count').textContent=questions.length+' of 8';
-    $('questions').innerHTML=questions.map((q,i)=>`<article class="card"><div class="question-top"><label for="question-${i}">Question ${i+1}</label><button type="button" class="remove" data-remove-q="${i}" aria-label="Remove question ${i+1}">Remove</button></div><input id="question-${i}" data-question="${i}" value="${esc(q.question)}" required maxlength="1000">${Object.entries(q.params||{}).map(([key,d])=>`<div class="option"><label>${esc(key)}${d.type==='choice'?`<textarea data-choices="${esc(key)}" data-q="${i}" aria-label="Choices for ${esc(key)}">${esc(d.choices.join('\n'))}</textarea><small>One choice per line.</small>`:''}</label><label>Starting value<input data-default="${esc(key)}" data-q="${i}" type="${d.type==='number'?'number':'text'}" ${d.type==='number'?'step="any"':''} value="${esc(d.default)}" required></label></div>`).join('')}</article>`).join('')||'<p class="empty">Keep at least one question to save this Mini.</p>';
+    $('questions').innerHTML=questions.map((q,i)=>`<article class="card"><div class="question-top"><label for="question-${i}">Question ${i+1}</label><button type="button" class="remove" data-remove-q="${i}" aria-label="Remove question ${i+1}">Remove</button></div><input id="question-${i}" data-question="${i}" value="${esc(q.question)}" required maxlength="1000">${Object.entries(q.params||{}).map(([key,d])=>`<div class="option"><div class="option-name">${esc(words(key))}</div>${d.type==='choice'?`<label>Choices <small>one per line</small><textarea data-choices="${esc(key)}" data-q="${i}" rows="${Math.min(6,d.choices.length)}" aria-label="Choices for ${esc(words(key))}">${esc(d.choices.join('\n'))}</textarea></label>`:''}<label>${d.type==='choice'?'Starts with':'Starts at'}<input data-default="${esc(key)}" data-q="${i}" type="${d.type==='number'?'number':'text'}" ${d.type==='number'?'step="any"':''} value="${esc(d.default)}" required></label></div>`).join('')}</article>`).join('')||'<p class="empty">Keep at least one question to save this Mini.</p>';
     $('questions').querySelectorAll('[data-question]').forEach(el=>el.oninput=()=>{questions[Number(el.dataset.question)].question=el.value;});
     $('questions').querySelectorAll('[data-default]').forEach(el=>el.oninput=()=>{const d=questions[Number(el.dataset.q)].params[el.dataset.default];d.default=d.type==='number'?Number(el.value):el.value;});
     $('questions').querySelectorAll('[data-choices]').forEach(el=>el.oninput=()=>{questions[Number(el.dataset.q)].params[el.dataset.choices].choices=el.value.split('\n').map(v=>v.trim()).filter(Boolean);});

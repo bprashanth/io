@@ -1087,10 +1087,11 @@ def drivey_route(j):
         if not isinstance(masked, str):
             return say('I could not prepare the privacy preview. Pick your files with @ and try again.')
         if res.get('mini_id'):
-            text = "This Mini can't answer that. Send your question to Claude with the Mini's files masked? Claude will see: " + masked
+            text = ("This Mini can't answer that, but Claude can work it out from the Mini's files, with private "
+                    'values replaced by codes. Claude will see:\n\n"' + masked + '"')
         else:
-            text = ('Ready. Claude will get your question and these files, with private values replaced by codes. '
-                    'Claude will see: ' + masked + ' Switch to Claude?')
+            text = ('Ready for Claude. It gets your question and these files, with private values replaced by codes. '
+                    'Claude will see:\n\n"' + masked + '"')
         return card('Claude', text, [('Switch to Claude', 'Send your question and open Claude on the right.'),
                                     ('Not yet', 'Keep working here. Nothing is sent.')])
     if not ev:

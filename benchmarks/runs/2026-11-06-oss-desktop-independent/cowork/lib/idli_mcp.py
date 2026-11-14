@@ -91,7 +91,9 @@ TOOLS = {
                 'script': {'type': 'string'}, 'params': {'type': 'object', 'additionalProperties': {
                     'type': 'object', 'properties': {'type': {'enum': ['choice', 'number']},
                         'choices': {'type': 'array'}, 'default': {}}, 'required': ['type', 'default']}},
-                'chart': {}}, 'required': ['id', 'question', 'script', 'params']}}}, ['name', 'goal', 'questions'])}
+                'chart': {}, 'asks': {'type': 'array', 'items': {'type': 'string'}, 'description':
+                    '3 to 5 ways a colleague might ask this in their own words, e.g. "who is most stretched in <a ward>"'}},
+                'required': ['id', 'question', 'script', 'params']}}}, ['name', 'goal', 'questions'])}
 
 
 TOOLS['idli_draft_mini'] = (idli_draft_mini, 'After checking every script, open an editable Mini draft with this workspace\'s pinned charts.',
