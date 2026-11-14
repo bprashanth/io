@@ -45,7 +45,9 @@ def idli_show(title, vega_lite, data_csv):
         chats = json.loads(home.cli('ls', '--json', '--label', 'idli.ws=' + workspace))
         if isinstance(chats, dict):
             chats = chats.get('agents', [])
-        left = next((c for c in chats if (c.get('labels') or {}).get('idli.left') == '1'), None)
+        # `paseo ls --label` already filtered to this workspace's chats, and its JSON carries no labels
+        left = next((c for c in chats if (c.get('labels') or {}).get('idli.left') == '1'), None) or next(
+            (c for c in chats if str(c.get('provider', '')).startswith('t4gc-cowork')), None) or (chats[0] if chats else None)
         if not left:
             raise ValueError('No left chat in this workspace')
         home.cli('send', '--no-wait', left.get('id') or left['agentId'],
