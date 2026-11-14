@@ -10,8 +10,10 @@ Two panes, always:
 - **Right:** the person's own **Claude Code CLI**, the same tool they learned in the Claude Code workspace. Its
   requests pass through Idli's masking proxy, so Claude sees codes for private values and the person sees real ones.
 
-Style for every word on screen: plain language, no jargon, no arrows (write "->" or "up"/"down"), no "·" (use ":"
-or " - "), short sentences, kind and direct. Never make the person feel they did something wrong.
+Style for every word on screen: plain labels and short sentences, no jargon, no poetic or flowery phrasing ("A little
+care, before sharing" -> "Privacy review"; "Your question, as Claude sees it" -> "Example masked question:"), avoid
+commas where a shorter sentence works, no arrows (write "->" or "up"/"down"), no "·" (use ":" or " - "). Never make
+the person feel they did something wrong.
 
 ## A. Making a Mini (no local model at all)
 

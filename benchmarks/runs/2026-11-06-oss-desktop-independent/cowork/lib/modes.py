@@ -1013,7 +1013,7 @@ def privacy_nudge(j):
     return j
 
 
-DRIVEY_OPENING = "Ask about your Drive files. Type @ to pick a file or a folder, or start from a Mini."
+DRIVEY_OPENING = "Ask about your Drive files. Type @ to add a file or folder. Or open a Mini."
 
 
 def _drivey_question(msgs):
@@ -1033,7 +1033,7 @@ def _drivey_question(msgs):
 
 
 DRIVEY_TOOLS = frozenset(('drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask'))
-PICK_FILES = 'Pick the files to use with @ (a file or a whole folder), then send your question again.'
+PICK_FILES = 'Add files or a folder with @ and send again.'
 
 
 def drivey_route(j):
@@ -1085,13 +1085,13 @@ def drivey_route(j):
     def handoff_card(res):
         masked = res.get('masked_question')
         if not isinstance(masked, str):
-            return say('I could not prepare the privacy preview. Pick your files with @ and try again.')
+            return say('Could not prepare the masked question. Add the files with @ again.')
         if res.get('mini_id'):
-            text = ("This Mini can't answer that, but Claude can work it out from the Mini's files, with private "
-                    'values replaced by codes. Claude will see:\n\n"' + masked + '"')
+            text = ("This Mini can't answer that. Claude can work on the Mini's files with private values as codes."
+                    '\n\nMasked question: "' + masked + '"')
         else:
-            text = ('Ready for Claude. It gets your question and these files, with private values replaced by codes. '
-                    'Claude will see:\n\n"' + masked + '"')
+            text = ('Claude gets your question and these files with private values as codes.'
+                    '\n\nMasked question: "' + masked + '"')
         return card('Claude', text, [('Switch to Claude', 'Send your question and open Claude on the right.'),
                                     ('Not yet', 'Keep working here. Nothing is sent.')])
     if not ev:
@@ -1102,8 +1102,10 @@ def drivey_route(j):
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported'):
             return say('These files need spreadsheet copies before Idli can hide private values: ' +
                        ', '.join(res['unsupported']) + '. Save Excel or CSV copies in Drive, then pick them with @.')
+        if res.get('error') and name in ('mini_open', 'mini_ask'):
+            return say('Could not open this Mini. Click its cartridge to try again.')
         if res.get('error') or (not res.get('files') and name in ('drive_fetch', 'privacy_review_open')):
-            return say('I could not prepare those files. Check your Drive access, then pick the files with @ and try again.')
+            return say('Could not open those files. Check you can open them in Drive and add them with @ again.')
         if name == 'drive_fetch':
             labels = ', '.join(f.get('title') or f.get('local', '') for f in res['files'])
             lead = 'Downloaded: ' + labels + '.'
@@ -1111,7 +1113,7 @@ def drivey_route(j):
                 lead += ' To use these too, save spreadsheet copies in Drive and pick them with @: ' + ', '.join(res['unsupported']) + '.'
             if res.get('errors'):
                 lead += ' Some files could not be downloaded. Pick them again to retry, or continue with these files.'
-            return card('Privacy', "Before Claude sees these files, do you want to check what will be hidden, or accept Idli's choices?",
+            return card('Privacy', "Review what Claude will see or accept Idli's choices?",
                         [('Check each file', 'See the columns and change what is hidden.'),
                          ("Accept Idli's choices", 'Use the suggested privacy settings.')], lead)
         if name == 'privacy_review_open':
@@ -1119,7 +1121,7 @@ def drivey_route(j):
                 return handoff_card(res)
             if not res.get('url'):
                 return say('I could not open the review. Choose Check each file to try again.')
-            return say('Check what Claude will see, then choose Done.\n\n[Privacy review](' + res['url'] + ')')
+            return say('Press Done when the review looks right.\n\n[Privacy review](' + res['url'] + ')')
         if name == 'claude_handoff':
             return say(res.get('reply') or 'Claude could not open yet. Send your question again to retry.')
         if name in ('mini_open', 'mini_ask'):
@@ -1133,9 +1135,9 @@ def drivey_route(j):
                 return call('claude_handoff', files=pending['files'], question=pending['question'],
                             **({'mini_id': pending['mini_id']} if pending.get('mini_id') else {}))
             if answer == 'Not yet':
-                return say('OK. Change your question or files and send it again.')
-            return say('OK. Send your question, or pick files with @ to start again.')
-        return say('Send a question or open a Mini to carry on.')
+                return say('OK. Change the question or files and send again.')
+            return say('OK. Nothing was sent.')
+        return say('Send a question or open a Mini.')
     said = last[1]
     if said == 'Privacy checked':
         return preview()

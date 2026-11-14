@@ -70,17 +70,17 @@ function provenance(datum) {
   const rows=keys.length?chartRows.filter(r=>keys.every(k=>equal(r[k],datum[k]))):[];
   const columns=[...new Set(rows.flatMap(r=>Object.keys(r)))];
   const files=(chartMeta.sources||[]).map(fileParts);
-  const from=files.length?files.map(f=>`<b>${esc(f.name)}</b>`+(f.folder?` <span class="dim">in ${esc(f.folder)}</span>`:'')).join(', '):'a file Idli did not record';
-  const made=chartMeta.script?`Worked out by Claude's script <b>${esc(scriptName(chartMeta.script))}</b>, run on this computer.`:'';
+  const from=files.length?files.map(f=>`<b>${esc(f.name)}</b>`+(f.folder?` <span class="dim">(${esc(f.folder)})</span>`:'')).join(', '):'a file Idli did not record';
+  const made=chartMeta.script?`Script: <b>${esc(scriptName(chartMeta.script))}</b>`:'';
   let detail;
   if(rows.length===1){
     detail=`<p class="lead">This part of the chart</p><dl>${columns.map(k=>`<dt>${esc(human(k))}</dt><dd>${esc(nice(rows[0][k]))}</dd>`).join('')}</dl>`;
   } else if(rows.length){
     const shown=rows.slice(0,10);
     detail=`<p class="lead">${rows.length} rows make up this part${rows.length>10?' (first 10 shown)':''}</p><div class="scroll"><table><thead><tr>${columns.map(k=>`<th>${esc(human(k))}</th>`).join('')}</tr></thead><tbody>${shown.map(r=>`<tr>${columns.map(k=>`<td>${esc(nice(r[k]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  } else detail='<p class="dim">This part is a summary, so no single row sits behind it.</p>';
+  } else detail='<p class="dim">No single row: this part is a summary.</p>';
   const paths=[...(chartMeta.sources||[]),chartMeta.script,chartMeta.data_csv].filter(Boolean);
-  el.innerHTML=`<div class="what">Where did this come from?</div><p>From ${from}. Claude saw ${files.length>1?'these files':'this file'} with private values replaced by codes; you see the real values.</p>`+
+  el.innerHTML=`<div class="what">Where did this come from?</div><p>Source: ${from}. Claude saw ${files.length>1?'them':'it'} with codes.</p>`+
     (made?`<p>${made}</p>`:'')+detail+
     (paths.length?`<details><summary>File details</summary><pre>${esc(paths.join('\n'))}</pre></details>`:'');
 }
@@ -144,7 +144,7 @@ if(location.pathname==='/view') api('/api/view?id='+encodeURIComponent(ID)).then
   const pin=$('pin'),zoom=$('zoom');
   const pinLabel=()=>{pin.textContent=v.pinned?'Pinned':'Pin';pin.setAttribute('aria-pressed',String(!!v.pinned));};
   pin.disabled=false;zoom.disabled=false;pinLabel();
-  pin.onclick=async()=>{pin.disabled=true;try{const r=await api('/api/view/pin',{id:ID,pinned:!v.pinned});v.pinned=r.pinned;pinLabel();status(v.pinned?'Pinned. This chart will be included in your next Mini draft.':'Unpinned.');}catch(e){status(e.message,true);}finally{pin.disabled=false;}};
+  pin.onclick=async()=>{pin.disabled=true;try{const r=await api('/api/view/pin',{id:ID,pinned:!v.pinned});v.pinned=r.pinned;pinLabel();status(v.pinned?'Pinned. It goes in your next Mini.':'Unpinned.');}catch(e){status(e.message,true);}finally{pin.disabled=false;}};
   zoom.onclick=async()=>{bigger=!bigger;zoom.textContent=bigger?'Zoom: Bigger':'Zoom: Fit';zoom.setAttribute('aria-pressed',String(bigger));try{await draw(v.spec,v.data,v.agent,v.title,v);}catch(e){status('The chart could not draw. Choose Zoom to try again.',true);}};
   $('claude-back').onclick=async()=>{try{await api('/api/claude-back',{ws:WS});status('Claude is ready on the right.');}catch(e){status(e.message,true);}};
   if(EMBED)parent.postMessage({type:'idli-height',px:Number(new URLSearchParams(location.search).get('h'))||360},'*');

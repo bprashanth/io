@@ -523,9 +523,9 @@ def mini_open(data_dir, ident, workspace=None):
     for x in m.get('files', []):
         parts = str(x.get('local') or x.get('title') or '').replace('drive/', '', 1).split('/')
         name = x.get('title') or re.sub(r'\.(xlsx|xls|csv)$', '', parts[-1])
-        files.append('**' + name + '**' + (' in ' + ' / '.join(parts[:-1]) if len(parts) > 1 else ''))
+        files.append('**' + name + '**' + (' (' + ' / '.join(parts[:-1]) + ')' if len(parts) > 1 else ''))
     lines = ['## ' + m['name'], '', m['goal'], '',
-             '_Reads ' + ', '.join(files) + ' fresh from your Drive each time._' if files else '']
+             'Source: ' + ', '.join(files) if files else '']
     charts = m.get('charts', [])
     for chart in charts:
         lines += ['', '[' + plain(chart['title']) + '](' + journey.page_url(
@@ -542,7 +542,7 @@ def mini_open(data_dir, ident, workspace=None):
     for q in m['questions']:
         opts = [_option_words(k, d) for k, d in q.get('params', {}).items()]
         lines.append('- ' + q['question'] + (' _(' + '; '.join(opts) + ')_' if opts else ''))
-    lines += ['', 'Ask in your own words. Idli picks the matching question and the Mini works out the answer here.']
+    lines += ['', 'Ask in your own words.']
     return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'reply': plain('\n'.join(lines))}
 
 

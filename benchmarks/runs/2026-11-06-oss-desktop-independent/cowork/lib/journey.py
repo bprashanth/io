@@ -108,7 +108,7 @@ def handoff(data_dir, files, question, workspace, mini_id=None):
         state.setdefault('workspace_minis', {})[workspace] = mini_id
         state.setdefault('workspace_files', {})[workspace] = prepared['files']
     home.update_state(data_dir, change)
-    return {**result, 'reply': 'Claude has it on the right. Come back here to start something new or open a Mini.'}
+    return {**result, 'reply': 'Sent to Claude on the right.'}
 
 
 def pin(data_dir, ident, pinned):

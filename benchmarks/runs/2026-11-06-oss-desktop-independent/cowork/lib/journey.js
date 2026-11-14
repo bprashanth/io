@@ -4,13 +4,13 @@ const postHeight=()=>parent.postMessage({type:'idli-height',px:Math.ceil(documen
 new ResizeObserver(postHeight).observe(document.body);
 const retry=fn=>{$('retry').hidden=false;$('retry').onclick=()=>{$('retry').hidden=true;fn();};};
 const reasonText=row=>{
-  if(!row.mask)return 'Visible to Claude. You can hide this column if it feels private.';
+  if(!row.mask)return 'Visible to Claude.';
   const col=row.column.toLowerCase();
-  if(/name|beneficiary|employee|head|owner|respondent|farmer|guardian|father|mother|spouse/.test(col))return 'Names may identify a person.';
-  if(/(^|_)(lat|lon|lng|latitude|longitude|gps)($|_)/.test(col))return 'Exact locations can point to a home.';
-  if(/ward|village|town|place|district|address/.test(col))return 'Locations may identify a person or community.';
-  if(/phone|mobile|email/.test(col))return 'Contact details are personal.';
-  return 'These values may be private. Codes keep the analysis useful.';
+  if(/name|beneficiary|employee|head|owner|respondent|farmer|guardian|father|mother|spouse/.test(col))return 'Names.';
+  if(/(^|_)(lat|lon|lng|latitude|longitude|gps)($|_)/.test(col))return 'Exact location.';
+  if(/ward|village|town|place|district|address/.test(col))return 'Place.';
+  if(/phone|mobile|email/.test(col))return 'Contact details.';
+  return 'May be private.';
 };
 if(location.pathname==='/privacy-review'){
   let data, busy=false;
@@ -28,21 +28,21 @@ if(location.pathname==='/privacy-review'){
     }).join('');
     $('question-card').hidden=false;$('masked').textContent=data.masked_question;
     $('done').disabled=data.done;$('done').textContent=data.done?'Done':'Done';
-    $('hint').textContent=data.done?'Privacy checked. Continue in your chat.':'Your choices apply to these files. Nothing has been sent to Claude.';
+    $('hint').textContent=data.done?'Privacy checked. Continue in your chat.':'Nothing is sent yet.';
     $('reviews').querySelectorAll('input').forEach(el=>el.onchange=async()=>{
       if(busy)return;busy=true;const col=el.dataset.col,local=data.files[Number(el.dataset.file)].local,columns={};
       data.reviews[Number(el.dataset.file)].tabs.forEach(tab=>Object.assign(columns,tab.columns));columns[col]=el.checked;
-      $('done').disabled=true;$('reviews').querySelectorAll('input').forEach(x=>x.disabled=true);status('Updating what Claude sees...');
-      try{render(await api('/api/review-change',{id:ID,file:local,columns}));status('Choice saved.');}
+      $('done').disabled=true;$('reviews').querySelectorAll('input').forEach(x=>x.disabled=true);status('Updating...');
+      try{render(await api('/api/review-change',{id:ID,file:local,columns}));status('Saved.');}
       catch(e){render(data);status(e.message,true);}
       finally{busy=false;$('done').disabled=!!data.done;}
     });
     postHeight();
   };
-  const load=async()=>{try{render(await api('/api/review?id='+encodeURIComponent(ID)));status('Your real samples stay on this computer.');}catch(e){status(e.message,true);retry(load);}};
+  const load=async()=>{try{render(await api('/api/review?id='+encodeURIComponent(ID)));status('Real values stay on this computer.');}catch(e){status(e.message,true);retry(load);}};
   $('done').onclick=async()=>{
     if(busy||data?.done)return;busy=true;$('done').disabled=true;status('Returning to your chat...');
-    try{await api('/api/review-done',{id:ID});data.done=true;render(data);status('Privacy checked. Your chat has the next step.');}
+    try{await api('/api/review-done',{id:ID});data.done=true;render(data);status('Privacy checked.');}
     catch(e){status(e.message,true);$('done').disabled=false;}finally{busy=false;}
   };load();
 }
@@ -65,7 +65,7 @@ if(location.pathname==='/mini-editor'){
   const save=async action=>{
     if(!$('editor').reportValidity())return;
     if(!questions.length){status('Keep at least one question before saving.',true);return;}
-    document.querySelectorAll('#editor button').forEach(b=>b.disabled=true);status('Checking the questions and saving your Mini...');
+    document.querySelectorAll('#editor button').forEach(b=>b.disabled=true);status('Checking and saving...');
     try{
       await api('/api/mini-save',{id:ID,action,name:$('name').value,goal:$('story').value,questions,charts:charts.map(c=>c.id)});
       $('editor').hidden=true;$('saved').hidden=false;status('Saved.');$('saved').setAttribute('tabindex','-1');$('saved').focus();
@@ -77,7 +77,7 @@ if(location.pathname==='/mini-editor'){
       $('name').value=draft.name;$('story').value=draft.goal;$('code').textContent=draft.code||'Saved with this Mini';
       $('sources').textContent=(draft.files||[]).map(f=>f.local).join('\n')||'No files recorded';
       if(draft.source_id){$('add').hidden=false;$('add').textContent='Add to '+draft.source_name;$('save').textContent='Save as a new Mini';}
-      $('editor').hidden=!!draft.saved_id;$('saved').hidden=!draft.saved_id;renderQuestions();renderCharts();status('Edit anything you would like to keep.');
+      $('editor').hidden=!!draft.saved_id;$('saved').hidden=!draft.saved_id;renderQuestions();renderCharts();status('');
     }catch(e){status(e.message,true);retry(load);}
   };
   $('editor').onsubmit=e=>{e.preventDefault();save('new');};$('add').onclick=()=>save('add');

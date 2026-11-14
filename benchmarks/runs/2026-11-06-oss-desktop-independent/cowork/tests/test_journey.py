@@ -82,7 +82,7 @@ class RouterTests(unittest.TestCase):
         t=Transcript();t.said('Compare @Drive/Reports/');self.assertEqual(t.tool()['input']['paths'],['Drive/Reports/'])
     def test_download_failure_and_partial(self):
         t=Transcript();t.said('@Drive/missing.xlsx');t.result({'files':[],'errors':[{'error':'internal detail'}]})
-        self.assertIn('try again',t.text());self.assertNotIn('internal detail',t.text())
+        self.assertIn('with @ again',t.text());self.assertNotIn('internal detail',t.text())
         t=Transcript();t.said('@Drive/visits.xlsx');t.result({'files':FILES,'errors':[{}]})
         self.assertIn('Some files',t.text())
     def test_unsupported_files_explain_how_to_continue(self):
@@ -103,9 +103,9 @@ class RouterTests(unittest.TestCase):
     def test_accept_not_yet(self):
         t=self.fetched();t.choose("Accept Idli's choices");self.assertTrue(t.tool()['input']['preview_only'])
         t.result({'files':FILES,'masked_question':'How many?', 'preview_only':True})
-        t.choose('Not yet');self.assertEqual(t.text(),'OK. Change your question or files and send it again.')
+        t.choose('Not yet');self.assertEqual(t.text(),'OK. Change the question or files and send again.')
     def test_dismiss_card(self):
-        t=self.fetched();t.result('dismissed');self.assertIn('pick files',t.text())
+        t=self.fetched();t.result('dismissed');self.assertIn('Nothing was sent',t.text())
     def test_privacy_failures(self):
         t=self.fetched();t.choose('Check each file');t.result({'error':'secret error code'})
         self.assertNotIn('secret',t.text())
@@ -285,7 +285,7 @@ class ToolTests(Fixture):
         t.said('Privacy checked');t.result(tools.t_privacy_review_open(**t.tool()['input']))
         question=t.tool()['input']['questions'][0]['question'];self.assertNotIn('Asha Sample',question);self.assertIn('NAME_',question)
         t.choose('Switch to Claude');t.result(tools.t_claude_handoff(**t.tool()['input']))
-        self.assertEqual(t.text(),'Claude has it on the right. Come back here to start something new or open a Mini.')
+        self.assertEqual(t.text(),'Sent to Claude on the right.')
         self.assertEqual([c for c in self.calls() if c[0]=='send'],[['send','--no-wait','left-one','Privacy checked']])
         self.assertEqual([c for c in self.calls() if c[:2]==['terminal','send-keys']][-1][-1],'\r')
     def test_mini_handoff_context_and_no_preview_send(self):
