@@ -116,6 +116,15 @@ class H(http.server.BaseHTTPRequestHandler):
             mode = modes.mode_of(j.get("model")) if isinstance(j, dict) else "muse"
             if mode != "muse" and path != "/v1/chat/completions":
                 return self.local(path, j)
+            if mode == "muse" and path == "/v1/messages":  # the per-file privacy choice and masked questions
+                try:
+                    pre = modes.privacy_route(j)
+                except Exception:  # noqa: BLE001
+                    traceback.print_exc()
+                    pre = None
+                if pre:
+                    return self.reply(200, "text/event-stream", modes.sse(pre)) if j.get("stream") else \
+                        self.reply(200, "application/json", json.dumps(pre, ensure_ascii=False).encode())
             if mode != "muse":  # the split's spec call: straight to the 9B
                 j["model"] = modes.NINE_MODEL
                 body = json.dumps(j).encode()

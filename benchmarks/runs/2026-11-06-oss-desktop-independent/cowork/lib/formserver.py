@@ -29,6 +29,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 from lib import filekit as fk  # noqa: E402
 from lib import formkit as fm  # noqa: E402
+from lib import privacy  # noqa: E402
 
 PORT = int(os.environ.get("IDLI_FORM_PORT") or 8797)
 PAGE = os.path.join(HERE, "lib", "form.html")
@@ -414,6 +415,14 @@ def make_handler(files, token):
                 if u.path == "/":
                     with open(PAGE, encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
+                if u.path == "/privacy":
+                    files.resolve(qs["file"][0])
+                    with open(os.path.join(HERE, "lib", "privacy.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/privacy":
+                    rel = qs["file"][0]
+                    return self._send(200, privacy.review(files.data_dir, rel, files.resolve(rel),
+                                                           (qs.get("tab") or [None])[0]))
                 if u.path == "/index":
                     with open(os.path.join(HERE, "lib", "index.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
@@ -460,6 +469,17 @@ def make_handler(files, token):
                                        capture_output=True, text=True)
                     return self._send(200 if r.returncode == 0 else 502,
                                       {"sent": r.returncode == 0} if r.returncode == 0 else {"error": "couldn't send"})
+                if u.path == "/api/privacy":
+                    rel = body["file"]
+                    path = files.resolve(rel)
+                    if body.get("action") in ("preview", "suggest"):
+                        return self._send(200, privacy.review(files.data_dir, rel, path, body.get("tab"),
+                                                               body.get("columns")))
+                    changes = {k: body[k] for k in ("mode", "review", "columns") if k in body}
+                    settings = privacy.set(files.data_dir, rel, **changes)
+                    if settings["mode"] == "mask":
+                        privacy._seed(files.data_dir, rel, path)
+                    return self._send(200, settings)
                 if u.path == "/api/run":
                     return self._send(200, files.run(body["file"], body.get("tab"), body.get("spec") or {}))
                 if u.path == "/api/decide":

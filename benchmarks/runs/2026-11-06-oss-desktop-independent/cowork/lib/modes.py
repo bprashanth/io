@@ -688,6 +688,9 @@ def steam(j):
 
 def respond(j):
     """Steam, 9B, or a grounded 9B mode: the Anthropic Messages response for one Claude Code request."""
+    pre = privacy_route(j)
+    if pre:
+        return pre
     mode = mode_of(j.get("model"))
     if mode == "steam":
         return steam(j)
@@ -871,3 +874,95 @@ def auto_chat(j):
         if b["type"] == "text":
             b["text"] = R.scrub_escalation(b["text"]) if R.mentions_escalation(b["text"]) else b["text"]
     return msg
+
+
+# ---------------------------------------------------------------- privacy, per file (2026-11-14), every model
+# When a file opens, ask once how Claude may see it (fake copy, or masked with or without a check on each question).
+# In mask mode a typed question goes to file_ask in the person's words; file_ask shows the masked question on a card
+# ("Send to Claude") when review is "ask", has Claude plan it, and works the numbers out on this computer.
+PRIV_HEAD, SEND_HEAD = "Claude & file", "Send to Claude"
+PRIV_OPTS = [
+    ("Fake copy (most private)", "Claude only ever sees made-up values. Your questions stay with the private model."),
+    ("Masked, I check each question", "Claude sees your real columns with names, places and any column you pick "
+     "(even income) turned into codes, e.g. Yerawada Ward -> PLACE_001. You approve each question before it goes."),
+    ("Masked, automatic", "The same, without the check each time. The fastest and best answers."),
+]
+
+
+def _privacy_of(messages, f):
+    """The latest privacy setting a tool result reported for file f."""
+    pv = None
+    for i, r in _file_results(messages):
+        if (r.get("file") == f or i.get("file") == f) and isinstance(r.get("privacy"), dict):
+            pv = r["privacy"]
+    return pv
+
+
+def _file_results(messages):
+    uses, out = {}, []
+    for m in messages:
+        for b in _blocks(m.get("content")):
+            if b.get("type") == "tool_use":
+                uses[b["id"]] = (b.get("input") or {})
+            elif b.get("type") == "tool_result" and b.get("tool_use_id") in uses:
+                r = _json(_strip_reminders(_text_of(b.get("content"))))
+                if isinstance(r, dict):
+                    out.append((uses[b["tool_use_id"]], r))
+    return out
+
+
+def _asked(messages, head):
+    return any(b.get("type") == "tool_use" and _short(b.get("name", "")) == "AskUserQuestion"
+               and ((b.get("input") or {}).get("questions") or [{}])[0].get("header") == head
+               for m in messages for b in _blocks(m.get("content")))
+
+
+def privacy_route(j):
+    msgs, tools, model = j.get("messages") or [], j.get("tools") or [], j.get("model", "")
+    if not _tool_name(tools, "file_privacy"):
+        return None
+    fa = _tool_name(tools, "file_ask")
+    latest = _latest_tool(msgs)
+    if latest:
+        name, inp, res = latest
+        if name in ("file_get", "file_open", "working_copy_ready") and res.get("file") \
+                and (res.get("privacy") or {"mode": 1}).get("mode") is None and not _asked(msgs, PRIV_HEAD):
+            return message(model, [_tool_use("AskUserQuestion", {"questions": [{
+                "header": PRIV_HEAD, "multiSelect": False,
+                "question": "Before we start: how may Claude (the smart model online) see this file?",
+                "options": [{"label": a, "description": b} for a, b in PRIV_OPTS]}]})])
+        if name == "AskUserQuestion" and (inp.get("questions") or [{}])[0].get("header") == PRIV_HEAD:
+            ans = (_card_answers(inp, res.get("text", "")) or [""])[0] or ""
+            f = _open_file(msgs)
+            mode = "mask" if re.search(r"(?i)mask", ans) else "fake"
+            review = "auto" if re.search(r"(?i)automatic|auto\b", ans) else "ask"
+            if f:
+                return message(model, [_tool_use(_tool_name(tools, "file_privacy"),
+                                                 {"file": f, "mode": mode, "review": review})])
+        if name == "file_privacy" and res.get("say_to_user"):
+            return message(model, [_text(res["say_to_user"] + "\n\nWhat would you like to know about it?")])
+        if name == "file_ask" and inp.get("question") and (isinstance(res.get("card"), dict) and
+                                                          (res["card"].get("questions") or [{}])[0].get("header") == SEND_HEAD):
+            return message(model, [_tool_use("AskUserQuestion", res["card"])])
+        if name == "file_ask" and inp.get("question") and (res.get("privacy") or {}).get("mode") == "mask" \
+                and res.get("reply") and inp.get("send") != "no":
+            return message(model, [_text(res["reply"])])
+        if name == "AskUserQuestion" and (inp.get("questions") or [{}])[0].get("header") == SEND_HEAD and fa:
+            ans = (_card_answers(inp, res.get("text", "")) or [""])[0] or ""
+            last = next((i for i, r in reversed(_file_ask_results(msgs)) if r.get("card")), {})
+            yes = ans.lower().startswith("send")
+            mode = mode_of(model)
+            args = {"file": last.get("file"), "question": last.get("question"), "chart": True,
+                    "send": "yes" if yes else "no"}
+            if not yes and mode in ("careful", "auto"):
+                args["pipeline"] = mode
+            if yes or mode in ("careful", "auto") or mode == "nine":
+                return message(model, [_tool_use(fa, args)])
+            return None  # Muse answers it itself, on this computer
+        return None
+    said = _last_typed(msgs)
+    f = _open_file(msgs)
+    if said and f and fa and not LINK.search(said) and (_privacy_of(msgs, f) or {}).get("mode") == "mask" \
+            and QUESTION.search(said):
+        return message(model, [_tool_use(fa, {"file": f, "question": said, "chart": bool(CHART_WORDS.search(said))})])
+    return None

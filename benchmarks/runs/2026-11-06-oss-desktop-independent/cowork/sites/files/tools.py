@@ -474,9 +474,13 @@ def _tolerant(file, spec, tab):
     return spec, None
 
 
-def t_file_ask(file, spec=None, tab=None, chart=False, question=None, pipeline=None):
+def t_file_ask(file, spec=None, tab=None, chart=False, question=None, pipeline=None, send=None):
     if isinstance(chart, str):
         chart = chart.lower() in ("true", "yes", "1")
+    if question and send != "no" and _pv(file).get("mode") == "mask":
+        got = _masked_ask(file, question, tab, send)
+        if got:
+            return got
     if question and pipeline in ("careful", "auto"):  # the grounded 9B modes (lib/modes.py sets this, never a model)
         from lib import careful, auto
         try:
@@ -674,6 +678,90 @@ def _file_ask_spec(file, spec, tab=None, chart=False):
             "say_to_user": "Give the answer exactly as written (numbers unchanged), in a sentence or a short list. "
                            + ("Say the form tab now shows it." if shown else "Share the form link.")
                            + (" Rows that failed checks are included." if n_prob else "") + note}
+
+
+# ---------------------------------------------------------------- privacy, per file (lib/privacy.py)
+# fake (today's way): Claude only ever gets a made-up copy, and questions stay with the private model.
+# mask: Claude gets the real layout with the columns the person chose turned into codes, and plans each question from
+# its masked words; the numbers are still worked out here. review "ask" shows each masked question on a card first.
+def _pv(file):
+    try:
+        from lib import privacy
+        return privacy.get(files().data_dir, file)
+    except Exception:  # noqa: BLE001
+        return {"mode": None, "review": "ask", "columns": {}}
+
+
+def _privacy_url(file):
+    port, token = _server()
+    return f"http://dashboard.localhost:{port}/privacy?" + urllib.parse.urlencode({"t": token, "file": file})
+
+
+def t_file_privacy(file, mode, review="ask"):
+    from lib import privacy
+    if mode not in ("fake", "mask") or review not in ("ask", "auto"):
+        return {"error": "mode is fake or mask; review is ask or auto"}
+    dd, path = files().data_dir, files().resolve(file)
+    cols = _pv(file).get("columns") or {}
+    if mode == "mask" and not cols:  # start from the scanner's suggestions; the review page changes them
+        sheets, _ = fk.raw_sheets(str(path))
+        for tab in sheets:
+            for r in privacy.suggest(path, tab):
+                cols[r["column"]] = cols.get(r["column"], False) or r["mask"]
+    privacy.set(dd, file, mode=mode, review=review, columns=cols)
+    if mode == "mask":
+        privacy._seed(dd, file, path)
+    hidden = sorted(c for c, v in cols.items() if v)
+    if mode == "fake":
+        say = "Saved: Claude only ever gets a made-up copy of this file, and your questions stay on this computer."
+    else:
+        say = ("Saved: questions about this file go to Claude with these columns turned into codes: "
+               + (", ".join(hidden) or "none yet") + ". The numbers are still worked out on this computer.")
+        if review == "ask":
+            url = _privacy_url(file)
+            _show(url, file)
+            say += " Check the columns in the tab that just opened (click one to change it), then ask your question."
+    return {"saved": {"mode": mode, "review": review, "masked_columns": hidden}, "say_to_user": say}
+
+
+MASK_NOTE = ("\nAlso: sort {by: <measure or column id>, dir: desc|asc} and limit <n> order and cut a list or a "
+             "breakdown (\"highest\", \"top 5\"). Names, places and other private values are codes like PLACE_001 "
+             "or VALUE_002: use them exactly as they appear. The form and the thread follow as JSON.")
+_masked_history = {}  # file -> [{"question", "spec"}] (real words; privacy.plan masks them again before sending)
+
+
+def _masked_ask(file, question, tab, send):
+    from lib import privacy
+    dd, path = files().data_dir, files().resolve(file)
+    pv = _pv(file)
+    if pv.get("review") == "ask" and send != "yes":
+        m = privacy.mask_text(dd, file, path, question)
+        return {"card": {"questions": [{"header": "Send to Claude", "multiSelect": False,
+                                        "question": f"Claude would see: “{m['masked']}”. Send it?",
+                                        "options": [{"label": "Send it", "description": "Claude plans the answer; "
+                                                     "the numbers are worked out on this computer"},
+                                                    {"label": "Keep it on this computer",
+                                                     "description": "the private model answers instead"}]}]},
+                "masked": m["masked"], "reply": None, "then": "AskUserQuestion with this card."}
+    opened = files().open(file)
+    forms = opened.get("forms") or {}
+    tab_ = tab if tab in forms else next(iter(forms), None)
+    if not tab_:
+        return None
+    got = privacy.plan(dd, file, path, tab_, forms[tab_], question, _masked_history.get(file, []),
+                       instructions=SPLIT_PROMPT + MASK_NOTE)
+    if not got.get("spec"):
+        return {"reply": "Claude couldn't plan that one (" + str(got.get("error") or "no plan") + "). Ask it another "
+                         "way, or say \"keep it on this computer\".", "sent_to_claude": got.get("sent", "")[-400:]}
+    _masked_history.setdefault(file, []).append({"question": question, "spec": got["spec"]})
+    sp = got["spec"] if isinstance(got["spec"], dict) else {}
+    res = _file_ask_spec(file, got["spec"], tab=tab_, chart=bool(sp.get("measures") and sp.get("group_by")))
+    if res.get("error"):
+        return {"reply": f"That plan didn't run here ({res['error']}). Ask it another way.", "spec": got["spec"]}
+    shown = privacy.mask_text(dd, file, path, question)["masked"]
+    body = (res.get("chart_markdown", "") + "\n\n" if res.get("chart_markdown") else "") + res.get("answer", "")
+    return {"reply": body + f"\n\n_Planned by Claude from: “{shown}”. Worked out on this computer._",
+            "spec": got["spec"], "chart_markdown": res.get("chart_markdown"), "form_link": res.get("form_link")}
 
 
 _upload_offered = set()  # (file, skill version) whose "Upload a checked copy?" card this chat has shown
@@ -1309,7 +1397,12 @@ TOOLS = {
                   "question": {"type": "string", "description": "The person's question in their words, instead of a "
                                                                 "spec: the form's dials are set for you"},
                   "pipeline": {"type": "string", "enum": ["careful", "auto"],
-                               "description": "Set by Idli itself; leave it out."}}, ["file"]),
+                               "description": "Set by Idli itself; leave it out."},
+                  "send": {"type": "string", "enum": ["yes", "no"], "description": "Set by Idli itself; leave it out."}},
+                 ["file"]),
+    "file_privacy": (t_file_privacy, "Set by Idli itself after the person picks how Claude may see this file.",
+                     {**FILE, "mode": {"type": "string", "enum": ["fake", "mask"]},
+                      "review": {"type": "string", "enum": ["ask", "auto"]}}, ["file", "mode"]),
     "form_explain": (t_form_explain, "What a figure on the form means and how it is worked out (\"how is X "
                      "calculated?\", \"what does X mean?\"). Answered from the taught skill, no need for Claude.",
                      {**FILE, "measure": {"type": "string", "description": "The figure's name as the form shows it "
@@ -1369,3 +1462,21 @@ TOOLS = {
 
 def whoami():
     return "local files"
+
+
+# every file result says how Claude may see the file, so the chat (lib/modes.py privacy_route) can ask once and route
+def _tag(fn):
+    def run(*a, **k):
+        r = fn(*a, **k)
+        f = (r.get("file") if isinstance(r, dict) else None) or k.get("file")
+        if isinstance(r, dict) and f and r.get("known") is not False:
+            pv = _pv(f)
+            r["privacy"] = {"mode": pv.get("mode"), "review": pv.get("review")}
+        return r
+    run.__name__ = fn.__name__
+    return run
+
+
+for _n in ("file_get", "file_open", "file_ask", "working_copy_ready"):
+    if _n in TOOLS:
+        TOOLS[_n] = (_tag(TOOLS[_n][0]),) + tuple(TOOLS[_n][1:])

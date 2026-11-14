@@ -46,6 +46,10 @@ SCRIPTS = {
                 "Compare Yerawada Ward with the others on Average monthly income per household (Rs).",
                 "The Kasewadi bar (Average monthly income per household (Rs): 16,764.29) on the dashboard chart looks wrong to me. Check it.",
                 "About the Janata Vasahat bar (Average monthly income per household (Rs): 14,933.33) on the dashboard chart: this seems low, we had a camp here last month"],
+    # mask mode: the same kind of questions, with names in them (household heads are masked; wards if chosen)
+    "mask": ["which households in yerawada have the highest debt?", {"pick": "Send it"},
+             "what is the average savings of Ganesh Shinde's household?", {"pick": "Send it"},
+             "compare average income across wards", {"pick": "Keep it"}],
     "nodata": ["how has vulnerability changed from last year?", "can you just estimate it?",
                "show yerawada household debt in 2031"],
     "panels": ["plot average income and vulnerability score for all wards on one bar chart",
@@ -85,7 +89,7 @@ def tool_defs():
     from sites.files import tools as T
     out = []
     for name in ["start", "file_get", "file_open", "file_ask", "teach_file", "teach_send", "chart_request",
-                 "chart_show", "form_explain"]:
+                 "chart_show", "form_explain", "file_privacy"]:
         fn, desc, props, req = T.TOOLS[name]
         out.append({"name": "mcp__cowork__" + name, "description": desc,
                     "input_schema": {"type": "object", "properties": props, "required": req}})
@@ -157,8 +161,15 @@ def main():
         sc = allscripts[sid]
         fname = sc.get("file", "drive/households.xlsx")
         CURRENT[0] = fname
+        # --privacy=fake|mask-ask|mask-auto: the choice the person made on the privacy card (tested by hand in the app)
+        pv = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--privacy=")), None)
         # the start as in the app: the person pastes the link, file_get opens it, its card is answered
         opened = run_tool("mcp__cowork__file_get", {"link": LINKS[fname], "goal": "analyse"})
+        if pv:
+            T._masked_history.clear()
+            print(" privacy:", T.t_file_privacy(opened.get("file") or fname, pv.split("-")[0],
+                                               (pv.split("-") + ["ask"])[1]))
+            opened = run_tool("mcp__cowork__file_get", {"link": LINKS[fname], "goal": "analyse"})
         tid, cid = "toolu_" + uuid.uuid4().hex[:20], "toolu_" + uuid.uuid4().hex[:20]
         msgs = [{"role": "user", "content": LINKS[fname]},
                 {"role": "assistant", "content": [{"type": "tool_use", "id": tid, "name": "mcp__cowork__file_get",
@@ -242,7 +253,8 @@ def main():
                 q = turn["card"]["questions"][0]
                 print(f"    [card] {q['question']} :: {[o['label'] for o in q.get('options') or []]}")
             print("<<< " + (turn.get("reply") or "(no text)").replace("\n", "\n    ")[:1600] + f"  ({turn['secs']}s)")
-        out = os.path.join(HERE, "traces", f"{mode}-{sid}{'-fault' if '--fault' in sys.argv else ''}.json")
+        out = os.path.join(HERE, "traces", f"{mode}-{sid}{'-fault' if '--fault' in sys.argv else ''}"
+                           + "".join("-" + a[10:] for a in sys.argv if a.startswith("--privacy=")) + ".json")
         with open(out, "w") as f:
             json.dump(trace, f, indent=1, ensure_ascii=False, default=str)
 
