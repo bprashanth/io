@@ -15,6 +15,9 @@ for skill in "$COWORK"/idli/claude-skills/*; do
   [ -d "$skill" ] || continue
   cp -R "$skill" "$WORK/.claude/skills/" || exit 1
 done
+# Project commands live beside the checked scripts.
+mkdir -p "$WORK/.claude/commands" || exit 1
+cp "$COWORK/idli/claude-commands/mini.md" "$WORK/.claude/commands/mini.md" || exit 1
 # Idli's local server too (Idli home, charts, Minis): Drivey's "+" opens Idli home beside this terminal
 (cd "$COWORK" && "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import formserver, drivestubs; formserver.ensure(sys.argv[1]); drivestubs.refresh(sys.argv[1])" "$DATA") >/dev/null 2>&1 || true
 PORT=$("$COWORK/.venv/bin/python" -I "$COWORK/lib/ccproxy.py" ensure --data-dir "$DATA") || {

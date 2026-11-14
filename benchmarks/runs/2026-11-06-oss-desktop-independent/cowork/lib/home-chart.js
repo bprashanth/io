@@ -13,24 +13,25 @@ function cleanSpec(spec) {
   };
   return clean(spec);
 }
-let chartView=null;
+let chartView=null, bigger=false;
 async function draw(spec, data, agent, title, meta={}) {
   AGENT=agent||'';chartTitle=title||'chart';chartMeta=meta;chartRows=data;WS=QUERY_WS||meta.workspace||'';unpop();
   if(chartView){chartView.finalize();chartView=null;}
   const local=cleanSpec(spec);
   local.data={values:data};
   const composite=local.facet||local.concat||local.hconcat||local.vconcat||local.repeat;
-  if(!EMBED||!composite)local.width=EMBED?Math.max(140,innerWidth-16):Math.max(140,Math.min(680,$('viz').clientWidth-70));
+  if(!composite)local.width=EMBED?Math.max(140,innerWidth-16):Math.max(140,Math.min(760,$('viz').clientWidth-64))*(bigger?1.6:1);
+  if(!EMBED&&!composite){local.height=bigger?420:260;local.autosize={type:'fit',contains:'padding',resize:true};}
   if(EMBED&&!composite){local.height=Math.max(100,innerHeight-16);local.autosize={type:'fit',contains:'padding',resize:true};}
-  const ink=getComputedStyle(document.body).color;
+  const style=getComputedStyle(document.body),ink=style.color,line=style.getPropertyValue('--line').trim(),accent=style.getPropertyValue('--accent').trim();
   local.background='transparent';
-  local.config={...local.config,background:'transparent',axis:{...local.config?.axis,labelColor:ink,titleColor:ink},legend:{...local.config?.legend,labelColor:ink,titleColor:ink},title:{...local.config?.title,color:ink},text:{...local.config?.text,color:ink}};
+  local.config={...local.config,background:'transparent',range:{category:[accent,'#719c8d','#b5a379','#8b8fa8','#b37f72']},axis:{...local.config?.axis,labelColor:ink,titleColor:ink,gridColor:line,domainColor:line,tickColor:line},legend:{...local.config?.legend,labelColor:ink,titleColor:ink},title:{...local.config?.title,color:ink},text:{...local.config?.text,color:ink}};
   const result=await vegaEmbed('#viz',local,{actions:false,renderer:'svg',ast:true,expr:vega.expressionInterpreter});
   chartView=result.view;
-  if(EMBED){
+  if(EMBED||composite){
     // Facets and concatenated charts do not support Vega-Lite's fit autosize.
     const svg=$('viz').querySelector('svg'),w=Number(svg.getAttribute('width')),h=Number(svg.getAttribute('height'));
-    const scale=Math.min(1,(innerWidth-16)/w,(innerHeight-16)/h);
+    const scale=EMBED?Math.min(1,(innerWidth-16)/w,(innerHeight-16)/h):Math.min(1,Math.max(140,$('viz').clientWidth-16)/w)*(bigger?1.6:1);
     svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('width',w*scale);svg.setAttribute('height',h*scale);
   }
   chartView.addEventListener('click',(ev,item)=>pop(ev,item&&item.datum));
@@ -50,12 +51,12 @@ function provenance(datum) {
   const equal=(a,b)=>String(a)===String(b)||(typeof b==='number'&&String(a).trim()!==''&&Number(a)===b);
   const rows=keys.length?chartRows.filter(r=>keys.every(k=>equal(r[k],datum[k]))):[];
   const columns=[...new Set(rows.flatMap(r=>Object.keys(r)))];
-  el.innerHTML=`<div class="what">Where did this come from?</div><p>Source files (Claude sees them redacted: private values as codes)</p><pre>${esc((chartMeta.sources||[]).map(x=>'redacted('+x+')').join('\n')||'Not recorded')}</pre><p>Script that made the data</p><pre>${esc(chartMeta.script||'Not recorded')}</pre><p>Chart CSV</p><pre>${esc(chartMeta.data_csv||'Not recorded')}</pre><p>Rows behind this element: ${rows.length}</p>`+
-    (rows.length?`<div class="scroll"><table><thead><tr>${columns.map(k=>`<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${columns.map(k=>`<td>${esc(r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<p>No matching CSV rows were found for this element.</p>');
+  el.innerHTML=`<div class="what">Where did this come from?</div><p>Source files (private values are replaced by codes for Claude)</p><pre>${esc((chartMeta.sources||[]).join('\n')||'Not recorded')}</pre><p>Script that made the data</p><pre>${esc(chartMeta.script||'Not recorded')}</pre><p>Chart data</p><pre>${esc(chartMeta.data_csv||'Not recorded')}</pre><p>Rows in this part of the chart: ${rows.length}</p>`+
+    (rows.length?`<div class="scroll"><table><thead><tr>${columns.map(k=>`<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${columns.map(k=>`<td>${esc(r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<p>No matching rows were found for this part of the chart.</p>');
 }
 function contextText(datum) {
   const one=value=>String(value??'').replace(/\s+/g,' ').trim();
-  const origin=`About the chart "${one(chartTitle)}" (data: ${one(chartMeta.data_csv)||'-'}; made by: ${one(chartMeta.script)||'-'}; from: ${(chartMeta.sources||[]).map(x=>'redacted('+one(x)+')').join(', ')||'-'})`;
+  const origin=`About the chart "${one(chartTitle)}" (data: ${one(chartMeta.data_csv)||'-'}; made by: ${one(chartMeta.script)||'-'}; from: ${(chartMeta.sources||[]).map(one).join(', ')||'-'})`;
   return origin+(datum?': '+fields(datum).map(k=>`${one(k)} = ${one(datum[k])}`).join(', '):'')+' ';
 }
 function contextMenu(ev,datum) {
@@ -77,7 +78,7 @@ function pop(ev,datum) {
   const piece=`the ${what} mark`+(val?` (${val})`:'')+` on "${chartTitle}"`;
   const say=async text=>{
     el.innerHTML='<div class="note">Sending...</div>';
-    try{await api('/api/say',{agent:AGENT,...(WS?{ws:WS}:{}),text:text.slice(0,800)});el.innerHTML=`<div class="note">${WS?'Sent to the left chat.':'Sent to Claude.'}</div>`;setTimeout(unpop,1200);}
+    try{await api(WS?'/api/claude-question':'/api/say',{agent:AGENT,...(WS?{ws:WS}:{}),text:text.slice(0,800)});el.innerHTML='<div class="note">Sent to Claude.</div>';setTimeout(unpop,1200);}
     catch(e){el.textContent=e.message;}
   };
   const disabled=!(WS||AGENT)?' disabled':'';
@@ -107,10 +108,17 @@ function answerHTML(text) {
   return out.join('');
 }
 if(location.pathname==='/view') api('/api/view?id='+encodeURIComponent(ID)).then(async v=>{
-  document.title=v.title;$('title').textContent=v.title;await draw(v.spec,v.data,v.agent,v.title,v);
+  document.title=v.title;$('title').textContent=v.title;await draw(v.spec,v.data,v.agent,v.title,v);status('');
+  const pin=$('pin'),zoom=$('zoom');
+  const pinLabel=()=>{pin.textContent=v.pinned?'Pinned':'Pin';pin.setAttribute('aria-pressed',String(!!v.pinned));};
+  pin.disabled=false;zoom.disabled=false;pinLabel();
+  pin.onclick=async()=>{pin.disabled=true;try{const r=await api('/api/view/pin',{id:ID,pinned:!v.pinned});v.pinned=r.pinned;pinLabel();status(v.pinned?'Pinned. This chart will be included in your next Mini draft.':'Unpinned.');}catch(e){status(e.message,true);}finally{pin.disabled=false;}};
+  zoom.onclick=async()=>{bigger=!bigger;zoom.textContent=bigger?'Zoom: Bigger':'Zoom: Fit';zoom.setAttribute('aria-pressed',String(bigger));try{await draw(v.spec,v.data,v.agent,v.title,v);}catch(e){status('The chart could not draw. Choose Zoom to try again.',true);}};
+  $('claude-back').onclick=async()=>{try{await api('/api/claude-back',{ws:WS});status('Claude is ready on the right.');}catch(e){status(e.message,true);}};
+  if(EMBED)parent.postMessage({type:'idli-height',px:Number(new URLSearchParams(location.search).get('h'))||360},'*');
   let resize;const redraw=()=>{clearTimeout(resize);resize=setTimeout(()=>draw(v.spec,v.data,v.agent,v.title,v).catch(e=>status(e.message,true)),100);};
   window.addEventListener('resize',redraw);matchMedia('(prefers-color-scheme: dark)').addEventListener('change',redraw);
-}).catch(e=>status(e.message,true));
+}).catch(e=>{status('This chart could not open. Return to Claude and ask to show it again.',true);});
 
 if(location.pathname==='/mini') (async()=>{
   try{

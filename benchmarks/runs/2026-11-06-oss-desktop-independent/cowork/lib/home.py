@@ -48,6 +48,16 @@ def read(path):
     return json.loads(Path(path).read_text())
 
 
+def update_state(data_dir, change):
+    """Keep workspace records intact across the MCP, page server and download processes."""
+    with privacy.session_lock(data_dir):
+        path = inside(data_dir, '.idli/home.json', exists=False)
+        state = read(path) if path.exists() else {}
+        change(state)
+        write(path, state)
+        return state
+
+
 def search(data_dir, query):
     from lib import driveindex
     results = []
@@ -71,15 +81,15 @@ def search(data_dir, query):
 
 
 def selected(data_dir, files, fetch=False):
-    if not isinstance(files, list) or not files or len(files) > 20:
-        raise ValueError('Choose between one and twenty files')
+    if not isinstance(files, list) or not files:
+        raise ValueError('Choose at least one file')
     root = Path(data_dir).resolve()
     out = []
     for item in files:
         if item.get('local'):
             path = inside(root, item['local'])
-            if not path.is_relative_to(root / 'drive') or path.suffix.lower() != '.xlsx':
-                raise ValueError('Choose an Excel file in drive/')
+            if not path.is_relative_to(root / 'drive') or path.suffix.lower() not in ('.xlsx', '.csv'):
+                raise ValueError('Choose a spreadsheet in drive/')
         elif fetch and item.get('id'):
             from lib import drivefetch
             fid = str(item['id'])
@@ -120,7 +130,7 @@ def prepare(data_dir, files, question):
     with privacy.session_lock(data_dir):
         for item in chosen:
             rel = item['local']
-            if privacy.get(data_dir, rel)['mode'] is None:
+            if privacy.get(data_dir, rel)['mode'] != 'mask':
                 sheets, _ = filekit.raw_sheets(str(Path(data_dir) / rel))
                 columns = {}
                 for tab in sheets:
@@ -141,7 +151,7 @@ def prepare(data_dir, files, question):
 
 
 def cli(*args):
-    env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_')}
+    env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_') or k == 'PASEO_HOME'}
     r = subprocess.run([shutil.which('paseo') or 'paseo', *args], env=env, capture_output=True,
                        text=True, timeout=90, stdin=subprocess.DEVNULL)
     if r.returncode:
@@ -207,8 +217,8 @@ def _drivey_workspace(data_dir, workspace=''):
     mine = [w for w in workspaces if Path(w.get('cwd') or '.').expanduser().resolve() == Path(data_dir).resolve()]
     if workspace and any(w.get('workspaceId') == workspace for w in mine):
         return workspace
-    if not mine:
-        raise ValueError('No Drivey workspace found')
+    if workspace or not mine:
+        raise ValueError('Open this chat in its Drivey workspace and try again.')
     return sorted(mine, key=lambda w: w.get('name') != 'Drivey')[0]['workspaceId']
 
 
@@ -228,11 +238,10 @@ def _claude_terminal(data_dir, wid):
 
 
 def _remember(data_dir, wid, tid, **more):
-    state_path = Path(data_dir) / '.idli/home.json'
-    state = read(state_path) if state_path.exists() else {}
-    state.setdefault('terminals', {})[wid] = tid
-    state.update(terminal=tid, workspace=wid, **more)
-    write(state_path, state)
+    def change(state):
+        state.setdefault('terminals', {})[wid] = tid
+        state.update(terminal=tid, workspace=wid, **more)
+    update_state(data_dir, change)
 
 
 def _start_claude(wid, prompt=None):
@@ -270,13 +279,14 @@ def send(data_dir, files, question, workspace=''):
         raise ValueError('Choose Mask for these files before sending to Claude')
     with _SEND_LOCK:
         wid = _drivey_workspace(data_dir, workspace)
-        prompt = ('Files (in drive/): ' + ', '.join(x['local'] for x in chosen) + '. ' + ' '.join(str(question).split()))
+        prompt = ('Files (masked by Idli): ' + ', '.join(x['local'] for x in chosen) + '. ' + ' '.join(str(question).split()))
         tid = _claude_terminal(data_dir, wid)
         if tid:
             type_into(tid, prompt)
         else:
             tid = _start_claude(wid, prompt)
         _remember(data_dir, wid, tid, files=chosen)
+        update_state(data_dir, lambda state: state.setdefault('workspace_files', {}).update({wid: chosen}))
     shown = uiswitch.show_terminal(wid, tid, 'right')
     return {'terminal': tid, 'focused': bool(shown.get('ok')), 'message': 'Claude has it on the right'}
 
@@ -313,7 +323,7 @@ def view(data_dir, ident):
         raise ValueError('Charts require a CSV file')
     with path.open(newline='') as f:
         data = list(csv.DictReader(f))
-    return {**v, 'data': data}
+    return {**v, 'id': ident, 'data': data}
 
 
 def chart_sources(data_dir, sources=None):
@@ -326,7 +336,10 @@ def chart_sources(data_dir, sources=None):
 
 
 def run_mini(data_dir, ident, qid, params):
-    manifest = object_path(data_dir, 'minis', ident)
+    return run_manifest(data_dir, object_path(data_dir, 'minis', ident), qid, params)
+
+
+def run_manifest(data_dir, manifest, qid, params):
     m = read(manifest)
     q = next((q for q in m['questions'] if q['id'] == qid), None)
     if not q:
@@ -405,10 +418,19 @@ def chart_markdown(data_dir, title, chart, agent=None, sources=None, script=None
     return f'![{label}]({out})\n[Open interactive]({url})'
 
 
-def mini_open(data_dir, ident):
+def mini_open(data_dir, ident, workspace=None):
     m = read(object_path(data_dir, 'minis', ident))
+    if workspace:
+        def change(state):
+            state.setdefault('workspace_minis', {})[workspace] = ident
+            state.setdefault('workspace_files', {})[workspace] = m.get('files', [])
+        update_state(data_dir, change)
     lines = [m['name'], 'Goal: ' + m['goal'],
              'Source files: ' + ', '.join(x.get('title') or x.get('local') or x.get('id', '') for x in m.get('files', []))]
+    from lib import journey
+    for chart in m.get('charts', []):
+        lines.append('[Pinned chart: ' + plain(chart['title']) + '](' + journey.page_url(
+            data_dir, 'view', id=chart['id'], embed=1, ws=workspace or '') + ')')
     for q in m['questions']:
         lines.extend(['', q['question']])
         for key, desc in q.get('params', {}).items():
@@ -418,11 +440,11 @@ def mini_open(data_dir, ident):
         lines.append('Example: ' + example['text'])
         if example['chart']:
             lines.append(chart_markdown(data_dir, q['question'], example['chart'], m.get('agent'),
-                                        example['sources'], example['script']))
-    return {'id': ident, 'questions': m['questions'], 'reply': plain('\n'.join(lines))}
+                                        example['sources'], example['script'], workspace))
+    return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'reply': plain('\n'.join(lines))}
 
 
-def mini_ask(data_dir, ident, qid, params):
+def mini_ask(data_dir, ident, qid, params, workspace=None):
     m = read(object_path(data_dir, 'minis', ident))
     q = next(q for q in m['questions'] if q['id'] == qid)
     result = run_mini(data_dir, ident, qid, params)
@@ -430,5 +452,5 @@ def mini_ask(data_dir, ident, qid, params):
     lines = ['Using: ' + q['question'] + (': ' + using if using else ''), result['text']]
     if result['chart']:
         lines.append(chart_markdown(data_dir, q['question'], result['chart'], m.get('agent'),
-                                    result['sources'], result['script']))
+                                    result['sources'], result['script'], workspace))
     return {**result, 'reply': plain('\n'.join(lines))}

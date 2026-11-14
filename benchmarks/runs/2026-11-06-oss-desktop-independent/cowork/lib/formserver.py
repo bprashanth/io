@@ -30,7 +30,7 @@ if HERE not in sys.path:
 from lib import filekit as fk  # noqa: E402
 from lib import formkit as fm  # noqa: E402
 from lib import privacy  # noqa: E402
-from lib import home  # noqa: E402
+from lib import home, journey  # noqa: E402
 
 PORT = int(os.environ.get("IDLI_FORM_PORT") or 8797)
 PAGE = os.path.join(HERE, "lib", "form.html")
@@ -399,8 +399,11 @@ def make_handler(files, token):
                     self.send_header('Access-Control-Allow-Origin', origin)
                     self.send_header('Vary', 'Origin')
                     self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-            self.end_headers()
-            self.wfile.write(data)
+            try:
+                self.end_headers()
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # the person closed or reloaded the page
 
         def _ok(self, qs):
             return secrets.compare_digest((qs.get("t") or [""])[0], token)
@@ -440,10 +443,10 @@ def make_handler(files, token):
             if not self._ok(qs):
                 return self._send(403, "Forbidden: open the form from Idli's chat.", "text/plain")
             try:
-                if u.path in ("/home", "/view", "/mini"):
+                if u.path in ("/home", "/view", "/mini", "/privacy-review", "/mini-editor"):
                     with open(os.path.join(HERE, "lib", u.path[1:] + ".html"), encoding="utf-8") as f:
                         return self._send(200, f.read().replace("__TOKEN_QUERY__", urllib.parse.urlencode({"t": token})), "text/html")
-                if u.path in ("/home.css", "/home.js", "/home-chart.js"):
+                if u.path in ("/home.css", "/home.js", "/home-chart.js", "/journey.css", "/journey.js"):
                     with open(os.path.join(HERE, "lib", u.path[1:]), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/css" if u.path.endswith(".css") else "application/javascript")
                 if u.path == "/api/home/search":
@@ -458,6 +461,10 @@ def make_handler(files, token):
                     return self._send(200, {"view": names[-1][:-5] if names else None})
                 if u.path == "/api/home/minis":
                     return self._send(200, home.minis(files.data_dir))
+                if u.path == '/api/review':
+                    return self._send(200, journey.review_data(files.data_dir, qs['id'][0]))
+                if u.path == '/api/mini-draft':
+                    return self._send(200, journey.draft_data(files.data_dir, qs['id'][0]))
                 if u.path == "/api/view":
                     return self._send(200, home.view(files.data_dir, qs["id"][0]))
                 if u.path == "/api/mini":
@@ -494,7 +501,7 @@ def make_handler(files, token):
             except (ValueError, KeyError) as e:
                 return self._send(400, {"error": str(e)})
             except Exception as e:  # keep the page alive; the message helps the Teach workspace
-                return self._send(500, {"error": f"{type(e).__name__}: {e}"})
+                return self._send(500, {"error": "Idli could not finish this step. Try again, or return to your chat for help."})
             return self._send(404, {"error": "not found"})
 
         def do_POST(self):
@@ -506,6 +513,25 @@ def make_handler(files, token):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(min(n, 100000))
                                   or b"{}")
+                if u.path == '/api/review-change':
+                    return self._send(200, journey.review_change(files.data_dir, body['id'], body['file'], body['columns']))
+                if u.path == '/api/review-done':
+                    return self._send(200, journey.review_done(files.data_dir, body['id']))
+                if u.path == '/api/view/pin':
+                    return self._send(200, journey.pin(files.data_dir, body['id'], body['pinned']))
+                if u.path == '/api/claude-back':
+                    return self._send(200, journey.back_to_claude(files.data_dir, body['ws']))
+                if u.path == '/api/claude-question':
+                    # Chart follow-ups belong to this workspace's Claude, on the right.
+                    text = body.get('text', '')
+                    if not isinstance(text, str) or not text.strip() or len(text) > 16000:
+                        raise ValueError('Write a short question and try again.')
+                    home.claude_insert(files.data_dir, body['ws'], ' '.join(text.split()))
+                    terminal = home._claude_terminal(files.data_dir, body['ws'])
+                    home.cli('terminal', 'send-keys', '-l', terminal, '\r')
+                    return self._send(200, {'sent': True})
+                if u.path == '/api/mini-save':
+                    return self._send(200, journey.save_draft(files.data_dir, body['id'], body, body.get('action', 'new')))
                 if u.path == "/api/home/prepare":
                     return self._send(200, home.prepare(files.data_dir, body["files"], body.get("question", "")))
                 if u.path == "/api/home/claude":  # the home page asks for its workspace's Claude CLI (right pane)
@@ -620,7 +646,7 @@ def make_handler(files, token):
             except (ValueError, KeyError) as e:
                 return self._send(400, {"error": str(e)})
             except Exception as e:
-                return self._send(500, {"error": f"{type(e).__name__}: {e}"})
+                return self._send(500, {"error": "Idli could not finish this step. Try again, or return to your chat for help."})
             return self._send(404, {"error": "not found"})
 
     return H

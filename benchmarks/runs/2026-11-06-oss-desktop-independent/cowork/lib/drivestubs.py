@@ -58,7 +58,7 @@ def refresh(data_dir):
 from lib.minimap import mentions  # noqa: E402,F401  (light: the router uses it)
 
 
-def fetch(data_dir, paths, workspace=None):
+def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
     if not isinstance(paths, list) or not paths:
         raise ValueError('Choose at least one Drive path')
     entries = refresh(data_dir)
@@ -81,12 +81,15 @@ def fetch(data_dir, paths, workspace=None):
         if not hits:
             raise ValueError('No indexed files at ' + name)
         chosen.update(hits)
-    result, errors = [], []
+    result, errors, unsupported = [], [], []
     for rel, item in chosen.items():
         sheet = item['kind'] in ('Google Sheets', 'application/vnd.google-apps.spreadsheet')
         extension = '.xlsx' if sheet else ('.' + drivefetch.EXPORTS[item['kind']][1]
                                            if item['kind'] in drivefetch.EXPORTS else '')
         target = 'drive/' + rel + (extension if extension and not rel.lower().endswith(extension) else '')
+        if spreadsheets_only and Path(target).suffix.lower() not in ('.xlsx', '.csv'):
+            unsupported.append(item.get('title') or rel)
+            continue
         dest = home.inside(data_dir, target, exists=False)
         try:
             data = (drivefetch.fetch(item['id'], sheet=sheet, kind=item['kind']) if item['kind'] in drivefetch.EXPORTS
@@ -107,11 +110,12 @@ def fetch(data_dir, paths, workspace=None):
                 os.unlink(tmp)
         home.write(str(dest) + '.source.json', {**item, 'sheet': sheet})
         result.append({**item, 'file': target, 'local': target})
-    state_path = home.inside(data_dir, '.idli/home.json', exists=False)
-    state = home.read(state_path) if state_path.exists() else {}
-    state['files'] = result
     workspace = workspace or os.environ.get('IDLI_WORKSPACE')
-    if workspace:
-        state.setdefault('workspace_files', {})[workspace] = result
-    home.write(state_path, state)
-    return {'files': result, **({'errors': errors} if errors else {})}
+    def change(state):
+        state['files'] = result
+        if workspace:
+            state.setdefault('workspace_files', {})[workspace] = result
+            state.setdefault('workspace_minis', {})[workspace] = None
+    home.update_state(data_dir, change)
+    return {'files': result, **({'errors': errors} if errors else {}),
+            **({'unsupported': unsupported} if unsupported else {})}

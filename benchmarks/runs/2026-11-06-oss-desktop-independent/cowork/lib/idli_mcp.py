@@ -4,10 +4,8 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import sys
 import urllib.parse
-import uuid
 
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
@@ -42,10 +40,11 @@ def idli_show(title, vega_lite, data_csv, sources=None, script=None):
             agent = terminal
     markdown = home.chart_markdown(data_dir(), title, {'vega_lite': vega_lite, 'data': rows}, agent,
                                    sources, script, workspace)
-    if workspace:
-        home.cli('send', '--no-wait', home.left_chat(workspace),
-                 'Chart from Claude: ' + home.plain(title) + '\n' + markdown)
-    return 'shown in Idli'
+    url = re.search(r'\n\[Open interactive\]\(([^)]+)\)', markdown)[1]
+    from lib import uiswitch
+    opened = uiswitch.open_url(workspace, url, side='right', focus=True)
+    return {'shown': bool(opened.get('ok')), 'url': url,
+            'message': 'Chart opened on the right.' if opened.get('ok') else 'Open the chart with this link.'}
 
 
 def mini_author():
@@ -66,63 +65,18 @@ def mini_author():
 
 
 def idli_save_mini(name, goal, questions):
-    if not isinstance(questions, list) or not 1 <= len(questions) <= 8:
-        raise ValueError('Give the Mini between one and eight checked questions')
-    import datetime
-    scripts, checked, ids = [], [], set()
-    for i, question in enumerate(questions):
-        q = dict(question)
-        if not re.fullmatch(r'[\w-]{1,80}', str(q.get('id', ''))) or q['id'] in ids:
-            raise ValueError('Give every question a unique id')
-        ids.add(q['id'])
-        path = home.inside(home.work_dir(), q['script'])
-        if path.suffix != '.py' or not str(q.get('question') or '').strip():
-            raise ValueError('Give every question a Python script and question text')
-        params = q.get('params', {})
-        if not isinstance(params, dict) or len(params) > 3 or any(not isinstance(d, dict) or d.get('type') not in
-                                              ('choice', 'number') for d in params.values()):
-            raise ValueError('Invalid parameters')
-        for desc in params.values():
-            if 'default' not in desc or (desc['type'] == 'choice' and
-                    (not isinstance(desc.get('choices'), list) or not desc['choices'] or
-                     any(not isinstance(c, str) for c in desc['choices']))):
-                raise ValueError('List every choice and supply a default for every option')
-        q['params'] = params
-        home.params_for(q, {})
-        q['script'] = f'question_{i + 1}.py'
-        scripts.append(path)
-        checked.append(q)
-    root = data_dir()
-    state = home.inside(root, '.idli/home.json', exists=False)
-    saved_state = home.read(state) if state.exists() else {}
-    selected = saved_state.get('workspace_files', {}).get(os.environ.get('IDLI_WORKSPACE'),
-                                                         saved_state.get('files', []))
-    sources = []
-    for item in selected:
-        path = home.inside(root, item['local'])
-        sidecar = home.inside(root, str(path) + '.source.json', exists=False)
-        sources.append({**item, **(home.read(sidecar) if sidecar.exists() else {})})
-    ident = (re.sub(r'[^a-z0-9]+', '-', str(name).lower()).strip('-') or 'mini')[:60]
-    folder = root / 'minis' / ident
-    if folder.exists():
-        ident += '-' + uuid.uuid4().hex[:8]
-        folder = root / 'minis' / ident
-    # Resolve before creating: reject a redirected minis directory.
-    home.inside(root, folder / 'mini.json', exists=False)
-    folder.mkdir(parents=True)
-    try:
-        for path, q in zip(scripts, checked):
-            shutil.copyfile(path, folder / q['script'])
-        drive = root / 'drive'
-        drive.mkdir(exist_ok=True)
-        (folder / 'drive').symlink_to(drive, target_is_directory=True)
-        home.write(folder / 'mini.json', {'id': ident, 'name': home.plain(name), 'goal': home.plain(goal), 'questions': checked,
-                                        'files': sources, 'date': datetime.date.today().isoformat(), 'author': mini_author(),
-                                        'agent': os.environ.get('PASEO_AGENT_ID')})
-    except Exception:
-        shutil.rmtree(folder)
-        raise
-    return page_url('mini', ident)
+    """Older callers also get the editable draft; only the person can publish it."""
+    return idli_draft_mini(name, goal, questions, str(home.work_dir()))
+
+
+def idli_draft_mini(title, story, questions, code=''):
+    from lib import journey, uiswitch
+    workspace = os.environ.get('IDLI_WORKSPACE')
+    ident = journey.draft_mini(data_dir(), title, story, questions, code, workspace, mini_author())
+    url = journey.page_url(data_dir(), 'mini-editor', id=ident, ws=workspace or '')
+    opened = uiswitch.open_url(workspace, url, side='right', focus=True)
+    return {'draft': ident, 'url': url, 'opened': bool(opened.get('ok')),
+            'message': 'Check the title, story and questions, then choose Save.'}
 
 
 TOOLS = {
@@ -138,6 +92,11 @@ TOOLS = {
                     'type': 'object', 'properties': {'type': {'enum': ['choice', 'number']},
                         'choices': {'type': 'array'}, 'default': {}}, 'required': ['type', 'default']}},
                 'chart': {}}, 'required': ['id', 'question', 'script', 'params']}}}, ['name', 'goal', 'questions'])}
+
+
+TOOLS['idli_draft_mini'] = (idli_draft_mini, 'After checking every script, open an editable Mini draft with this workspace\'s pinned charts.',
+    {'title': {'type': 'string'}, 'story': {'type': 'string'}, 'questions': TOOLS.pop('idli_save_mini')[2]['questions'],
+     'code': {'type': 'string', 'description': 'Where the checked scripts live.'}}, ['title', 'story', 'questions', 'code'])
 
 
 def main():

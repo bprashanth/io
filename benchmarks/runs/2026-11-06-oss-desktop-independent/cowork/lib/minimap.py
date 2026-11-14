@@ -131,3 +131,11 @@ def mentions(text):
                 tail = tail[:end.start() + 1] if end.group().startswith('/') else tail[:end.end()]
         paths.append('Drive/' + tail.strip().rstrip('.,;!?'))
     return list(dict.fromkeys(paths))
+
+
+def without_mentions(text, paths):
+    for path in sorted(paths, key=len, reverse=True):
+        text = text.replace('@"' + path + '"', '').replace("@'" + path + "'", '')
+        text = text.replace('"' + path + '"', '').replace("'" + path + "'", '')
+        text = text.replace('@' + path, '').replace('@' + path.replace(' ', '\\ '), '')
+    return ' '.join(text.split()).strip(' ,:;') or 'Help me understand these files.'

@@ -8,7 +8,9 @@ Google Drive by Idli). Never change or delete them; write anything new into this
 see them, in code too: `df[df.ward == "PLACE_003"]` works, because your commands run on the real file after the codes
 are put back. Don't guess what a code stands for, and don't ask the person to type real values for you.
 
-**How to work:** plain words, no jargon, no arrow characters (write "->", "up" or "down"), never the middle dot;
+**How to work:** work in small steps and check in before moving on. After about ten exchanges, offer to save the
+work as a Mini with `/mini`. Use plain words, no jargon, no arrow characters (write "->", "up" or "down"), never
+the middle dot;
 short answers; say which file, sheet and columns you used and how many rows
 went in (and how many were left out as blank). For anything you compute, run it with Python (pandas) on the file;
 don't estimate. Say plainly when the file can't answer something (e.g. no date column for a trend).
@@ -17,7 +19,8 @@ don't estimate. Say plainly when the file can't answer something (e.g. no date c
 script into a CSV in this folder, then call `idli_show(title, vega_lite, data_csv, sources, script)`.
 Always pass `sources` (the list of source file paths under `drive/`) and `script` (the path of the Python script
 that wrote the CSV). Use field names from the CSV and do not put data URLs in the spec: Idli loads the CSV locally.
-A chart's popover shows its sources and saved CSV rows directly. Other left-click questions go to the left chat;
+The chart opens on the right. Its Pin button keeps it for a Mini. A chart's popover shows its sources and saved
+CSV rows directly. Other left-click questions come back to this Claude prompt;
 right-click copies context here for the person to finish their question. Answer from the script and real rows.
 Never call `idli_show` before their consent.
 
@@ -32,9 +35,11 @@ print a final single line of JSON
 `{"vega_lite": {"mark": "bar", "encoding": {}}, "data": []}` with the computed rows. Scripts run with Python `-I`
 in the saved Mini folder; use paths relative to `drive/` and keep scripts self-contained. Run every script on the
 current files with its default parameters, show the results for the person to check, then call
-`idli_save_mini(name, goal, questions)`. Each question has `id`, `question`, `script` (the .py path), `params`
-(mapping names to `{type: "choice"|"number", choices?, default}`), and optionally `chart`. Save only once
-they have checked the questions and results. The returned URL opens their Mini.
+`idli_draft_mini(title, story, questions, code)`. Each question has `id`, `question`, `script` (the .py path), `params`
+(mapping names to `{type: "choice"|"number", choices?, default}`), and optionally `chart`. Draft only once
+they have checked the questions and results. `code` is the folder holding the scripts. The editor opens on the right
+with this workspace's pinned charts. The person can edit and Save there. When building on a Mini, they can Add to
+that Mini or Save as a new Mini. Use `/mini` for these steps. Do not save a Mini directly with idli_save_mini.
 
 **Mini scripts** run with Idli's own Python (it has pandas), in strict `-I` mode. If your `python3` can't import
 pandas under `-I`, that's your Python, not the Mini's: test with plain `python3` and don't warn the person about it.

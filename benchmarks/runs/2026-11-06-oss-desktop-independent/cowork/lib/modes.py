@@ -1032,100 +1032,125 @@ def _drivey_question(msgs):
     return None
 
 
+DRIVEY_TOOLS = frozenset(('drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask'))
+PICK_FILES = 'Pick the files to use with @ (a file or a whole folder), then send your question again.'
+
+
 def drivey_route(j):
-    """Runs in privacy_route for every chat model, including Muse. State stays in chat history."""
+    """Drivey's left chat is a code-written conversation. Only Mini mapping calls the 9B.
+
+    Identify it from its MCP allow-list, including on its very first typed message.
+    Native Claude Code tools (AskUserQuestion, Read, etc.) do not change that identity.
+    Rebuild state from completed tool exchanges; never trust model-written prose as state.
+    """
     msgs, tools, model = j.get('messages') or [], j.get('tools') or [], j.get('model', '')
-    latest, said = _latest_tool(msgs), _last_typed(msgs)
-    # Claude Code adds its own blocks, and sometimes a whole reminder-only user message after the typed one: what the
-    # person (or P19) typed is the last non-empty text of the user messages since the last assistant turn
-    if not latest:
-        said = None
-        for m in reversed(msgs):
-            if m.get('role') == 'system':  # Claude Code's own notes ride along as a "system" message
-                continue
-            if m.get('role') != 'user':
-                break
-            c = m.get('content')
-            blocks = [{'type': 'text', 'text': c}] if isinstance(c, str) else (c or [])
-            if any(b.get('type') == 'tool_result' for b in blocks):
-                break
-            own = [t for t in (_strip_reminders(b.get('text', '')).strip() for b in blocks if b.get('type') == 'text') if t]
-            if own:
-                said = own[-1]
-                break
-    if os.environ.get('IDLI_DRIVEY_DEBUG'):  # debug only: the shape of the latest user message (no content)
-        with open(os.environ['IDLI_DRIVEY_DEBUG'], 'a') as f:
-            last = msgs[-1].get('content') if msgs else None
-            f.write(json.dumps({'roles': [m.get('role') for m in msgs], 'texts': [[len(_strip_reminders(b.get('text', '')).strip()) for b in (m.get('content') if isinstance(m.get('content'), list) else [{'text': m.get('content') or ''}]) if b.get('type', 'text') == 'text'] for m in msgs[-3:]], 'said_len': len(said or ''), 'said_is_start': said == 'Start Drivey', 'n_msgs': len(msgs),
-                                'blocks': [b.get('type') for b in last] if isinstance(last, list) else type(last).__name__,
-                                'tail': (said or '')[-40:]}) + '\n')
+    names = {_short(t.get('name', '')) for t in tools
+             if t.get('name', '').startswith('mcp__cowork__') or _short(t.get('name', '')) in DRIVEY_TOOLS}
+    if names != DRIVEY_TOOLS:
+        return None
+    ev = _events(msgs)
     def say(text):
         return message(model, [_text(_lib('minimap').plain(text))])
-    if said == 'Start Drivey':
+    def call(name, **args):
+        return message(model, [_tool_use(_tool_name(tools, name), args)])
+    def card(header, text, options, lead=None):
+        content = [_text(lead)] if lead else []
+        content.append(_tool_use('AskUserQuestion', {'questions': [{'header': header, 'multiSelect': False,
+            'question': _lib('minimap').plain(text), 'options': [{'label': a, 'description': b} for a, b in options]}]}))
+        return message(model, content)
+    active, pending = None, None
+    for e in ev:
+        if e[0] == 'said':
+            if e[1] != 'Privacy checked':
+                pending = None
+            continue
+        _, name, inp, res = e
+        if name == 'mini_open':
+            active = res if res.get('id') and res.get('questions') else None
+            pending = None
+        elif name == 'drive_fetch':
+            active = None
+            pending = {**res, 'question': inp.get('question', '')}
+        elif name == 'privacy_review_open' and res.get('files'):
+            pending = {**res, 'question': inp.get('question', ''), 'mini_id': inp.get('mini_id')}
+        elif name == 'AskUserQuestion' and 'Not yet' in (_card_answers(inp, res.get('text', '')) or []):
+            pending = None
+        elif name == 'claude_handoff':
+            active = pending = None
+    def preview(review=False):
+        if not pending or not pending.get('files'):
+            return say(PICK_FILES)
+        return call('privacy_review_open', files=pending['files'], question=pending['question'],
+                    preview_only=not review, **({'mini_id': pending['mini_id']} if pending.get('mini_id') else {}))
+    def handoff_card(res):
+        masked = res.get('masked_question')
+        if not isinstance(masked, str):
+            return say('I could not prepare the privacy preview. Pick your files with @ and try again.')
+        if res.get('mini_id'):
+            text = "This Mini can't answer that. Send your question to Claude with the Mini's files masked? Claude will see: " + masked
+        else:
+            text = ('Ready. Claude will get your question and these files, with private values replaced by codes. '
+                    'Claude will see: ' + masked + ' Switch to Claude?')
+        return card('Claude', text, [('Switch to Claude', 'Send your question and open Claude on the right.'),
+                                    ('Not yet', 'Keep working here. Nothing is sent.')])
+    if not ev:
         return say(DRIVEY_OPENING)
-    if said and said.startswith('Chart from Claude:'):
-        return say(said)
-    if latest and latest[0] in ('mini_open', 'mini_ask'):
-        return say(latest[2].get('reply') or 'I could not open this Mini. Ask Claude to check it.')
-    # @Drive files in a Drivey chat: code runs the steps (download -> open for analysis -> the form), no cards; the
-    # chat model's only part is the form's choices inside file_ask. The reply is the form's answer, written by code.
-    def _plain(c):
-        return c if isinstance(c, str) else ' '.join(b.get('text', '') for b in (c or []) if b.get('type') == 'text')
-    drivey = any(_strip_reminders(_plain(m.get('content'))).strip().endswith('Start Drivey')
-                 for m in msgs[:3] if m.get('role') == 'user')
-    if drivey and latest and latest[0] == 'drive_fetch':
-        res = latest[2]
-        files = [f.get('local') for f in res.get('files') or [] if f.get('local')]
-        if not files:
-            return say("I couldn't download that from Drive. " + ' '.join(e.get('error', '') for e in res.get('errors') or []))
-        return message(model, [_tool_use(_tool_name(tools, 'file_open'), {'file': files[0], 'goal': 'analyse',
-                                                                          'show_form': False})])
-    if drivey and latest and latest[0] == 'file_open':
-        res = latest[2]
-        if res.get('known') is False or res.get('error'):
-            return say("Idli hasn't learned this file yet, so I can't answer from it here. Ask Claude on the right: "
-                       "it works on your real file and sees codes for private values.")
-        question = _drivey_question(msgs)
-        if question:
-            return message(model, [_tool_use(_tool_name(tools, 'file_ask'), {
-                'file': latest[1].get('file') or res.get('file'), 'question': question,
-                'chart': bool(CHART_WORDS.search(question))})])
-    if drivey and latest and latest[0] == 'file_ask' and latest[1].get('question'):
-        res = latest[2]
-        if res.get('error') or res.get('cannot'):
-            return say("The form for this file can't answer that: " + str(res.get('cannot') or res.get('error'))
-                       + ". Ask Claude on the right.")
-        body = (res.get('chart_markdown') + '\n\n' if res.get('chart_markdown') else '') + str(
-            res.get('answer') or res.get('reply') or '')
-        if body.strip():
-            return say(body)
-    if not said:
-        return None
+    last = ev[-1]
+    if last[0] == 'tool':
+        _, name, inp, res = last
+        if name == 'drive_fetch' and not res.get('files') and res.get('unsupported'):
+            return say('These files need spreadsheet copies before Idli can hide private values: ' +
+                       ', '.join(res['unsupported']) + '. Save Excel or CSV copies in Drive, then pick them with @.')
+        if res.get('error') or (not res.get('files') and name in ('drive_fetch', 'privacy_review_open')):
+            return say('I could not prepare those files. Check your Drive access, then pick the files with @ and try again.')
+        if name == 'drive_fetch':
+            labels = ', '.join(f.get('title') or f.get('local', '') for f in res['files'])
+            lead = 'Downloaded: ' + labels + '.'
+            if res.get('unsupported'):
+                lead += ' To use these too, save spreadsheet copies in Drive and pick them with @: ' + ', '.join(res['unsupported']) + '.'
+            if res.get('errors'):
+                lead += ' Some files could not be downloaded. Pick them again to retry, or continue with these files.'
+            return card('Privacy', "Before Claude sees these files, do you want to check what will be hidden, or accept Idli's choices?",
+                        [('Check each file', 'See the columns and change what is hidden.'),
+                         ("Accept Idli's choices", 'Use the suggested privacy settings.')], lead)
+        if name == 'privacy_review_open':
+            if res.get('preview_only'):
+                return handoff_card(res)
+            if not res.get('url'):
+                return say('I could not open the review. Choose Check each file to try again.')
+            return say('Check what Claude will see, then choose Done.\n\n[Privacy review](' + res['url'] + ')')
+        if name == 'claude_handoff':
+            return say(res.get('reply') or 'Claude could not open yet. Send your question again to retry.')
+        if name in ('mini_open', 'mini_ask'):
+            return say(res.get('reply') or 'I could not open this Mini. Open it again, or pick its files with @ to ask Claude.')
+        if name == 'AskUserQuestion':
+            answer = (_card_answers(inp, res.get('text', '')) or [None])[0]
+            head = (inp.get('questions') or [{}])[0].get('header')
+            if head == 'Privacy' and answer in ('Check each file', "Accept Idli's choices"):
+                return preview(answer == 'Check each file')
+            if head == 'Claude' and answer == 'Switch to Claude' and pending:
+                return call('claude_handoff', files=pending['files'], question=pending['question'],
+                            **({'mini_id': pending['mini_id']} if pending.get('mini_id') else {}))
+            if answer == 'Not yet':
+                return say('OK. Change your question or files and send it again.')
+            return say('OK. Send your question, or pick files with @ to start again.')
+        return say('Send a question or open a Mini to carry on.')
+    said = last[1]
+    if said == 'Privacy checked':
+        return preview()
     opened = re.fullmatch(r'Open Mini: .+ \[([\w-]{1,100})\]', said)
     if opened:
-        tool = _tool_name(tools, 'mini_open')
-        return (message(model, [_tool_use(tool, {'id': opened[1]})]) if tool
-                else say('The Mini tools are unavailable. Reopen this workspace after updating Idli.'))
-    # A successful mini_open switches this chat into Mini mode until another Mini is opened.
-    uses, active = {}, None
-    for m in msgs:
-        for block in _blocks(m.get('content')):
-            if block.get('type') == 'tool_use':
-                uses[block['id']] = _short(block['name'])
-            elif block.get('type') == 'tool_result' and uses.get(block.get('tool_use_id')) == 'mini_open':
-                res = _json(_strip_reminders(_text_of(block.get('content'))))
-                if res.get('id') and res.get('questions'):
-                    active = res
-    if active:
-        mapped = _lib('minimap').map_questions(active['questions'], said, NINE_URL)
-        tool = _tool_name(tools, 'mini_ask')
-        if mapped.get('qid') and tool:
-            return message(model, [_tool_use(tool, {'id': active['id'], 'qid': mapped['qid'],
-                                                   'params': mapped['params']})])
-        return say("I don't know. This Mini can answer: " + '; '.join(q['question'] for q in active['questions']))
+        return call('mini_open', id=opened[1])
     paths = _lib('minimap').mentions(said)
     if paths:
-        tool = _tool_name(tools, 'drive_fetch')
-        return (message(model, [_tool_use(tool, {'paths': paths})]) if tool
-                else say('The Drive tools are unavailable. Reopen this workspace after updating Idli.'))
-    return None
+        question = _lib('minimap').without_mentions(said, paths)
+        return message(model, [_text('Getting your files from Drive...'),
+                               _tool_use(_tool_name(tools, 'drive_fetch'), {'paths': paths, 'question': question})])
+    if active:
+        mapped = _lib('minimap').map_questions(active['questions'], said, NINE_URL)
+        if mapped.get('qid'):
+            return call('mini_ask', id=active['id'], qid=mapped['qid'], params=mapped['params'])
+        if not active.get('files'):
+            return say("This Mini can't answer that. " + PICK_FILES)
+        return call('privacy_review_open', files=active['files'], question=said, preview_only=True, mini_id=active['id'])
+    return say(PICK_FILES)

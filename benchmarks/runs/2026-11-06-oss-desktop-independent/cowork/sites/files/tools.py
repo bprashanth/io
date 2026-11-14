@@ -1416,24 +1416,48 @@ SPEC = {"type": "object", "description":
         "\"filters\": {\"category\": [\"Hardware\"]}, \"date\": {\"period\": \"this_year\"}}"}
 
 
-def t_drive_fetch(paths):
-    from lib import drivestubs, home
-    return drivestubs.fetch(files().data_dir, paths, home.chat_workspace())
+def t_drive_fetch(paths, question='Help me understand these files.'):
+    from lib import drivestubs, home, journey
+    data_dir = files().data_dir
+    journey.invalidate_review(data_dir, os.environ.get('PASEO_AGENT_ID'))
+    fetched = drivestubs.fetch(data_dir, paths, home.chat_workspace(), spreadsheets_only=True)
+    if fetched.get('files'):
+        prepared = home.prepare(data_dir, fetched['files'], question)
+        fetched.update(masked_question=prepared['masked_question'])
+    return fetched
+
+
+def t_privacy_review_open(files, question, preview_only=False, mini_id=None):
+    from lib import home, journey
+    return journey.review_open(os.path.realpath(sh.data_dir()), files, question,
+                               os.environ.get('PASEO_AGENT_ID'), home.chat_workspace(), preview_only, mini_id)
+
+
+def t_claude_handoff(files, question, mini_id=None):
+    from lib import home, journey
+    return journey.handoff(os.path.realpath(sh.data_dir()), files, question, home.chat_workspace(), mini_id)
 
 
 def t_mini_open(id):
-    from lib import home
-    return home.mini_open(files().data_dir, id)
+    from lib import home, journey
+    journey.invalidate_review(files().data_dir, os.environ.get('PASEO_AGENT_ID'))
+    return home.mini_open(files().data_dir, id, home.chat_workspace())
 
 
 def t_mini_ask(id, qid, params=None):
     from lib import home
-    return home.mini_ask(files().data_dir, id, qid, params or {})
+    return home.mini_ask(files().data_dir, id, qid, params or {}, home.chat_workspace())
 
 
 TOOLS = {
     "drive_fetch": (t_drive_fetch, "Fetch @Drive paths; a folder path ends in / and includes every file below it.",
-                    {"paths": {"type": "array", "items": {"type": "string"}}}, ["paths"]),
+                    {"paths": {"type": "array", "items": {"type": "string"}}, "question": {"type": "string"}}, ["paths", "question"]),
+    "privacy_review_open": (t_privacy_review_open, "Prepare privacy choices locally. Open a review, or preview the masked question only.",
+        {"files": {"type": "array", "items": {"type": "object"}}, "question": {"type": "string"},
+         "preview_only": {"type": "boolean"}, "mini_id": {"type": "string"}}, ["files", "question"]),
+    "claude_handoff": (t_claude_handoff, "After consent, send masked file references and the question to this workspace's Claude.",
+        {"files": {"type": "array", "items": {"type": "object"}}, "question": {"type": "string"},
+         "mini_id": {"type": "string"}}, ["files", "question"]),
     "mini_open": (t_mini_open, "Open a saved Mini with its questions, options and example charts.",
                   {"id": {"type": "string"}}, ["id"]),
     "mini_ask": (t_mini_ask, "Run exactly one saved Mini question with validated parameters.",

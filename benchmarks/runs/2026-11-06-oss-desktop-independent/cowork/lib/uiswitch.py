@@ -111,6 +111,21 @@ def show_terminal(workspace_id, terminal_id, side="right", focus=True):
         return {"ok": False, "why": type(e).__name__}
 
 
+def open_url(workspace_id, url, side='right', focus=True):
+    """Open a browser tab in the specified workspace using the P21 UI bridge."""
+    if side not in ('left', 'right') or not isinstance(workspace_id, str) or not workspace_id:
+        return {'ok': False, 'why': 'Open this page from a Drivey workspace.'}
+    try:
+        page = next(t for t in _targets() if t.get('type') == 'page' and str(t.get('url', '')).startswith('paseo://app'))
+        args = {'serverId': server_id(), 'workspaceId': workspace_id, 'url': url, 'side': side, 'focus': bool(focus)}
+        got = _ws_eval(page['webSocketDebuggerUrl'],
+                       "(async () => { if (typeof window.__idliOpenTab !== 'function') return false; "
+                       "return (await window.__idliOpenTab(" + json.dumps(args) + ")) !== false; })()")
+        return {'ok': got is True, 'why': None if got is True else 'Choose the page link to open it. The Paseo UI needs P21.'}
+    except (OSError, ValueError, KeyError, StopIteration, ConnectionError, TimeoutError, subprocess.SubprocessError):
+        return {'ok': False, 'why': 'Choose the page link to open it. Paseo could not open a tab.'}
+
+
 # ---- a minimal DevTools (CDP) client over a websocket, standard library only
 class Cdp:
     def __init__(self, ws_url, timeout=10):
@@ -174,7 +189,7 @@ class Cdp:
 def _ws_eval(ws_url, expression, timeout=10):
     c = Cdp(ws_url, timeout)
     try:
-        return ((c.call("Runtime.evaluate", {"expression": expression, "returnByValue": True}) or {})
+        return ((c.call("Runtime.evaluate", {"expression": expression, "returnByValue": True, "awaitPromise": True}) or {})
                 .get("result", {}).get("value"))
     finally:
         c.close()
@@ -232,7 +247,7 @@ class Page:
         self.c = Cdp(t["webSocketDebuggerUrl"], timeout)
 
     def eval(self, js):
-        return ((self.c.call("Runtime.evaluate", {"expression": js, "returnByValue": True}) or {})
+        return ((self.c.call("Runtime.evaluate", {"expression": js, "returnByValue": True, "awaitPromise": True}) or {})
                 .get("result", {}).get("value"))
 
     def drop_file(self, path, x=None, y=None):

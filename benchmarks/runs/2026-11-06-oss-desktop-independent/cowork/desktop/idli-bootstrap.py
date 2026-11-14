@@ -53,8 +53,7 @@ SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 # from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
 TOOLSETS = {
     "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import"],
-    "Drivey": ["drive_fetch", "mini_open", "mini_ask", "start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "file_privacy", "claude_open", "teach_file", "teach_send",
-             "working_copy", "working_copy_ready", "chart_request", "chart_show", "form_explain", "skill_import"],
+    "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name Start here)
