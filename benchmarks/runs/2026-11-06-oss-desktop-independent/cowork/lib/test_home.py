@@ -414,7 +414,7 @@ def test_claude_insert_and_left_chat(workspace, paseo, monkeypatch):
     home.write(root / '.idli/home.json', {'terminals': {'drivey': 'term-other'}})
     shown = []
     monkeypatch.setattr(uiswitch, 'show_terminal', lambda *args: shown.append(args) or {'ok': True})
-    context = 'About the chart "Counts" (data: counts.csv; made by: answer.py; from: drive/households.xlsx): Group = A '
+    context = 'About the chart "Counts" (data: counts.csv; made by: answer.py; from: redacted(drive/households.xlsx)): Group = A '
     with running(formserver.make_handler(formserver.Files(root), TOKEN)) as server:
         assert api(server, '/api/claude-insert', {'ws': 'drivey', 'text': context}) == {
             'inserted': True, 'terminal': 'term-drivey', 'focused': True}
@@ -492,7 +492,7 @@ def test_embed_browser(workspace, paseo, monkeypatch, tmp_path):
             page.locator('#pop').wait_for(state='hidden')
             assert posts[-1][0].endswith('/api/claude-insert')
             body = posts[-1][1]
-            base = f'About the chart "Household counts" (data: {csv}; made by: {script}; from: drive/households.xlsx)'
+            base = f'About the chart "Household counts" (data: {csv}; made by: {script}; from: redacted(drive/households.xlsx))'
             assert body == {'ws': 'drivey', 'text': base + (' ' if whole else ': Group = A, Count = 2 ')}
         for scheme in ('dark', 'light'):
             page.emulate_media(color_scheme=scheme)

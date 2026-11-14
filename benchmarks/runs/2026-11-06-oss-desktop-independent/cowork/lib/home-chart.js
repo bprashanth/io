@@ -50,12 +50,12 @@ function provenance(datum) {
   const equal=(a,b)=>String(a)===String(b)||(typeof b==='number'&&String(a).trim()!==''&&Number(a)===b);
   const rows=keys.length?chartRows.filter(r=>keys.every(k=>equal(r[k],datum[k]))):[];
   const columns=[...new Set(rows.flatMap(r=>Object.keys(r)))];
-  el.innerHTML=`<div class="what">Where did this come from?</div><p>Source files</p><pre>${esc((chartMeta.sources||[]).join('\n')||'Not recorded')}</pre><p>Script that made the data</p><pre>${esc(chartMeta.script||'Not recorded')}</pre><p>Chart CSV</p><pre>${esc(chartMeta.data_csv||'Not recorded')}</pre><p>Rows behind this element: ${rows.length}</p>`+
+  el.innerHTML=`<div class="what">Where did this come from?</div><p>Source files (Claude sees them redacted: private values as codes)</p><pre>${esc((chartMeta.sources||[]).map(x=>'redacted('+x+')').join('\n')||'Not recorded')}</pre><p>Script that made the data</p><pre>${esc(chartMeta.script||'Not recorded')}</pre><p>Chart CSV</p><pre>${esc(chartMeta.data_csv||'Not recorded')}</pre><p>Rows behind this element: ${rows.length}</p>`+
     (rows.length?`<div class="scroll"><table><thead><tr>${columns.map(k=>`<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${columns.map(k=>`<td>${esc(r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<p>No matching CSV rows were found for this element.</p>');
 }
 function contextText(datum) {
   const one=value=>String(value??'').replace(/\s+/g,' ').trim();
-  const origin=`About the chart "${one(chartTitle)}" (data: ${one(chartMeta.data_csv)||'-'}; made by: ${one(chartMeta.script)||'-'}; from: ${(chartMeta.sources||[]).map(one).join(', ')||'-'})`;
+  const origin=`About the chart "${one(chartTitle)}" (data: ${one(chartMeta.data_csv)||'-'}; made by: ${one(chartMeta.script)||'-'}; from: ${(chartMeta.sources||[]).map(x=>'redacted('+one(x)+')').join(', ')||'-'})`;
   return origin+(datum?': '+fields(datum).map(k=>`${one(k)} = ${one(datum[k])}`).join(', '):'')+' ';
 }
 function contextMenu(ev,datum) {
