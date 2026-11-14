@@ -251,10 +251,10 @@ index 00000000..fcd88257
 +});
 diff --git a/packages/app/src/components/idli-mini-cartridges.tsx b/packages/app/src/components/idli-mini-cartridges.tsx
 new file mode 100644
-index 00000000..30a41a3e
+index 00000000..737c0ba3
 --- /dev/null
 +++ b/packages/app/src/components/idli-mini-cartridges.tsx
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,129 @@
 +import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 +import { Text, View } from "react-native";
 +import { StyleSheet } from "react-native-unistyles";
@@ -351,24 +351,27 @@ index 00000000..30a41a3e
 +        {miniDisplayText(mini.heading)}
 +      </Text>
 +      <Text style={styles.metadata} numberOfLines={1}>
-+        {miniDate(mini.date)}
-+        {" - "}
-+        {miniDisplayText(mini.author)}
++        {[miniDate(mini.date), miniDisplayText(mini.author)].filter((part) => part.trim()).join(" - ")}
 +      </Text>
 +    </PressHighlight>
 +  );
 +}
 +
 +const styles = StyleSheet.create((theme) => ({
-+  list: { width: "100%", paddingVertical: theme.spacing[2] },
++  list: { width: "100%", paddingVertical: theme.spacing[2], gap: theme.spacing[1] },
 +  row: {
-+    _web: { _hover: { backgroundColor: theme.colors.surface1 } },
++    _web: { _hover: { borderColor: theme.colors.accent } },
 +    flexDirection: "row",
 +    alignItems: "center",
 +    gap: theme.spacing[3],
 +    paddingHorizontal: theme.spacing[3],
 +    paddingVertical: theme.spacing[2],
 +    borderRadius: theme.borderRadius.md,
++    borderWidth: 1,
++    borderColor: theme.colors.border,
++    borderLeftWidth: 4,
++    borderLeftColor: theme.colors.accent,
++    backgroundColor: theme.colors.surface1,
 +  },
 +  highlight: { backgroundColor: theme.colors.surface1 },
 +  pending: { opacity: 0.5 },
@@ -919,10 +922,10 @@ index 00000000..78208c14
 +});
 diff --git a/packages/app/src/utils/idli-claude-workspace.ts b/packages/app/src/utils/idli-claude-workspace.ts
 new file mode 100644
-index 00000000..3c8fecfc
+index 00000000..e0a079a6
 --- /dev/null
 +++ b/packages/app/src/utils/idli-claude-workspace.ts
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,110 @@
 +import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 +import { normalizeWorkspaceDescriptor } from "@/stores/session-store";
 +
@@ -1000,6 +1003,7 @@ index 00000000..3c8fecfc
 +  const agent = await input.client.createAgent({
 +    provider: "t4gc-cowork",
 +    model: IDLI_DRIVEY_MODEL,
++    modeId: "bypassPermissions", // like every Idli chat: no permission prompts for Idli's own tools
 +    cwd: workspace.workspaceDirectory,
 +    workspaceId: workspace.id,
 +    labels: { "idli.ws": workspace.id, "idli.left": "1" },
@@ -1210,10 +1214,10 @@ index 00000000..465a9774
 +}
 diff --git a/packages/app/src/utils/idli-pairing.ts b/packages/app/src/utils/idli-pairing.ts
 new file mode 100644
-index 00000000..fd690cd0
+index 00000000..6c5b5269
 --- /dev/null
 +++ b/packages/app/src/utils/idli-pairing.ts
-@@ -0,0 +1,165 @@
+@@ -0,0 +1,168 @@
 +import { isRawClaudeWorkspace } from "./idli-claude-cli";
 +// Idli P15: every Idli chat has its own Claude chat beside it. In a workspace whose chats run on the Idli provider,
 +// the layout keeps two panes: Idli's chats on the left, and on the right only the Claude chats paired with the Idli
@@ -1257,7 +1261,8 @@ index 00000000..fd690cd0
 +  const workspace = Array.from(session?.workspaces.values() ?? []).find(w => normalizeWorkspaceOpaqueId(w.id) === normalizeWorkspaceOpaqueId(workspaceId));
 +  if (isRawClaudeWorkspace(workspace)) return false;
 +  const agents = workspaceAgents(serverId, workspaceId);
-+  return !isSetup(agents) && agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)));
++  return !isSetup(agents) && !agents.some((a) => a.labels?.["idli.left"] === "1")
++    && agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)));
 +}
 +
 +let syncing = false;
@@ -1270,6 +1275,8 @@ index 00000000..fd690cd0
 +  if (isRawClaudeWorkspace(workspace)) return;
 +  const agents = workspaceAgents(serverId, workspaceId);
 +  if (!agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)))) return;
++  // P19 Drivey workspaces keep the person's Claude CLI terminal on the right: no paired teaching chat
++  if (agents.some((a) => a.labels?.["idli.left"] === "1")) return;
 +  syncing = true;
 +  try {
 +    const store = useWorkspaceLayoutStore.getState();

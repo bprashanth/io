@@ -47,6 +47,56 @@ def fetch(file_id, sheet=True, kind=None):
     return session_fetch(export_url(file_id, sheet))
 
 
+def _cookies_from(tab):
+    c = uiswitch.Cdp(tab["webSocketDebuggerUrl"], 20)
+    try:
+        got = c.call("Network.getCookies", {"urls": ["https://docs.google.com/", "https://drive.google.com/",
+                                                     "https://accounts.google.com/", "https://www.google.com/"]})
+    finally:
+        c.close()
+    return (got or {}).get("cookies") or []
+
+
+def _google_cookies():
+    """Google's cookies from a tab of the app's browser (its tabs share one session; the app window itself doesn't).
+    A browser tab only exists while one is open in the current workspace: when none is (a new Drivey workspace),
+    open Drive in a tab on behalf of this chat, read the session, and close that tab again."""
+    def browser_tabs():
+        try:
+            return [t for t in uiswitch._targets() if t.get("type") == "webview"]
+        except (OSError, ValueError):
+            return []
+    for tab in browser_tabs():
+        jar = _cookies_from(tab)
+        if any(k.get("name", "").endswith("SID") for k in jar):
+            return jar
+    if not os.environ.get("PASEO_AGENT_ID"):
+        return []
+    from lib import browser
+    import re as _re
+    import time as _time
+    opened = None
+    try:
+        out = browser.paseo("browser_new_tab", url="https://drive.google.com/drive/my-drive")
+        m = _re.search(r"browserId=(\S+)", out or "")
+        opened = m.group(1) if m else None
+        for _ in range(30):
+            _time.sleep(0.5)
+            for tab in browser_tabs():
+                jar = _cookies_from(tab)
+                if any(k.get("name", "").endswith("SID") for k in jar):
+                    return jar
+        return []
+    except Exception:  # noqa: BLE001
+        return []
+    finally:
+        if opened:
+            try:
+                browser.paseo("browser_close_tab", browserId=opened)
+            except Exception:  # noqa: BLE001
+                pass
+
+
 def session_fetch(url, timeout=90):
     """The request from here, with the app browser's Google cookies (read through any of the app's tabs; they share
     one session; they never leave this computer except to Google). Follows Google's redirects by hand, sending each
@@ -55,17 +105,7 @@ def session_fetch(url, timeout=90):
     import urllib.error
     import urllib.parse
     import urllib.request
-    try:
-        tab = next(t for t in uiswitch._targets() if t.get("type") in ("webview", "page"))
-    except (OSError, ValueError, StopIteration):
-        raise NoGoogle("the app's browser isn't reachable")
-    c = uiswitch.Cdp(tab["webSocketDebuggerUrl"], 20)
-    try:
-        got = c.call("Network.getCookies", {"urls": ["https://docs.google.com/", "https://drive.google.com/",
-                                                     "https://accounts.google.com/", "https://www.google.com/"]})
-    finally:
-        c.close()
-    jar = (got or {}).get("cookies") or []
+    jar = _google_cookies()
     if not any(k.get("name", "").endswith("SID") for k in jar):
         raise NoGoogle("not signed in to Google in the app's browser")
 

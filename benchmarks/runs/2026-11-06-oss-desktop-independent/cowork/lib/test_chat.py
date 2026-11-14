@@ -1,4 +1,5 @@
 """Drivey chat contract: synthetic files only, with local HTTP/Paseo doubles."""
+import importlib
 import copy
 from contextlib import contextmanager
 from http.server import ThreadingHTTPServer
@@ -113,10 +114,10 @@ def test_routing_four_message_kinds_and_mini_state(data, monkeypatch, model):
     answer = result(opened,'mini_ask',{}, {'reply':'Using: Test: ward = Kasewadi, months = 6\nNo households.'})
     assert 'No households.' in modes.privacy_route(answer)['content'][0]['text']
     active['messages'].append({'role':'user','content':'the question'})
-    monkeypatch.setattr(home, 'map_questions', lambda *a: {'qid':'threshold','params':{'ward':'Kasewadi','months':6}})
+    monkeypatch.setattr(importlib.import_module('lib.minimap'), 'map_questions', lambda *a: {'qid':'threshold','params':{'ward':'Kasewadi','months':6}})
     routed = modes.privacy_route(active)['content'][0]
     assert routed['input'] == {'id':'synthetic','qid':'threshold','params':{'ward':'Kasewadi','months':6}}
-    monkeypatch.setattr(home, 'map_questions', lambda *a: {'qid':None,'params':{}})
+    monkeypatch.setattr(importlib.import_module('lib.minimap'), 'map_questions', lambda *a: {'qid':None,'params':{}})
     assert modes.privacy_route(active)['content'][0]['text'].startswith("I don't know. This Mini can answer:")
     assert modes.privacy_route(req('hello',model)) is None
     # Drive fetching must return to the ordinary model path, rather than repeatedly downloading.
@@ -128,7 +129,7 @@ def test_open_and_run_examples(data):
     got = ft.t_mini_open('synthetic')
     assert len(got['questions']) == 5
     assert 'Goal:' in got['reply'] and 'Source files: households.xlsx, field_programme_tracker.xlsx' in got['reply']
-    assert got['reply'].count('Open interactive:') == 5
+    assert got['reply'].count('[Open interactive](') == 5
     assert got['reply'].count('![') == 5
     assert len(list((data/'views').glob('*.svg'))) == 5
     answer = ft.t_mini_ask('synthetic','threshold', {'ward':'Kasewadi','months':6})
@@ -193,7 +194,7 @@ def test_claude_posts_to_matching_left_chat(data, monkeypatch):
     assert calls[1] == ('ls','--json','--label','idli.ws=workspace-2')
     assert calls[2][:3] == ('send','--no-wait','left')
     assert calls[2][3].startswith('Chart from Claude: Debt\n![Debt](')
-    assert '\nOpen interactive: ' in calls[2][3]
+    assert '\n[Open interactive](' in calls[2][3]
     assert next(home.read(p)['agent'] for p in (data/'views').glob('*.json')) == 'claude-terminal'
 
 

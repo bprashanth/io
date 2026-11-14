@@ -1016,18 +1016,89 @@ def privacy_nudge(j):
 DRIVEY_OPENING = "Ask about your Drive files. Type @ to pick a file or a folder, or start from a Mini."
 
 
+def _drivey_question(msgs):
+    """The person's last typed question (before the tool steps), without the Drive paths they picked."""
+    for m in reversed(msgs):
+        if m.get('role') != 'user':
+            continue
+        c = m.get('content')
+        blocks = [{'type': 'text', 'text': c}] if isinstance(c, str) else (c or [])
+        if any(b.get('type') == 'tool_result' for b in blocks):
+            continue
+        own = [t for t in (_strip_reminders(b.get('text', '')).strip() for b in blocks if b.get('type') == 'text') if t]
+        if own:
+            q = re.sub(r'@?"Drive/[^"]+"|@?\'Drive/[^\']+\'|@Drive/\S+', 'this file', own[-1])
+            return ' '.join(q.split())
+    return None
+
+
 def drivey_route(j):
     """Runs in privacy_route for every chat model, including Muse. State stays in chat history."""
     msgs, tools, model = j.get('messages') or [], j.get('tools') or [], j.get('model', '')
     latest, said = _latest_tool(msgs), _last_typed(msgs)
+    # Claude Code adds its own blocks, and sometimes a whole reminder-only user message after the typed one: what the
+    # person (or P19) typed is the last non-empty text of the user messages since the last assistant turn
+    if not latest:
+        said = None
+        for m in reversed(msgs):
+            if m.get('role') == 'system':  # Claude Code's own notes ride along as a "system" message
+                continue
+            if m.get('role') != 'user':
+                break
+            c = m.get('content')
+            blocks = [{'type': 'text', 'text': c}] if isinstance(c, str) else (c or [])
+            if any(b.get('type') == 'tool_result' for b in blocks):
+                break
+            own = [t for t in (_strip_reminders(b.get('text', '')).strip() for b in blocks if b.get('type') == 'text') if t]
+            if own:
+                said = own[-1]
+                break
+    if os.environ.get('IDLI_DRIVEY_DEBUG'):  # debug only: the shape of the latest user message (no content)
+        with open(os.environ['IDLI_DRIVEY_DEBUG'], 'a') as f:
+            last = msgs[-1].get('content') if msgs else None
+            f.write(json.dumps({'roles': [m.get('role') for m in msgs], 'texts': [[len(_strip_reminders(b.get('text', '')).strip()) for b in (m.get('content') if isinstance(m.get('content'), list) else [{'text': m.get('content') or ''}]) if b.get('type', 'text') == 'text'] for m in msgs[-3:]], 'said_len': len(said or ''), 'said_is_start': said == 'Start Drivey', 'n_msgs': len(msgs),
+                                'blocks': [b.get('type') for b in last] if isinstance(last, list) else type(last).__name__,
+                                'tail': (said or '')[-40:]}) + '\n')
     def say(text):
-        return message(model, [_text(_lib('home').plain(text))])
+        return message(model, [_text(_lib('minimap').plain(text))])
     if said == 'Start Drivey':
         return say(DRIVEY_OPENING)
     if said and said.startswith('Chart from Claude:'):
         return say(said)
     if latest and latest[0] in ('mini_open', 'mini_ask'):
         return say(latest[2].get('reply') or 'I could not open this Mini. Ask Claude to check it.')
+    # @Drive files in a Drivey chat: code runs the steps (download -> open for analysis -> the form), no cards; the
+    # chat model's only part is the form's choices inside file_ask. The reply is the form's answer, written by code.
+    def _plain(c):
+        return c if isinstance(c, str) else ' '.join(b.get('text', '') for b in (c or []) if b.get('type') == 'text')
+    drivey = any(_strip_reminders(_plain(m.get('content'))).strip().endswith('Start Drivey')
+                 for m in msgs[:3] if m.get('role') == 'user')
+    if drivey and latest and latest[0] == 'drive_fetch':
+        res = latest[2]
+        files = [f.get('local') for f in res.get('files') or [] if f.get('local')]
+        if not files:
+            return say("I couldn't download that from Drive. " + ' '.join(e.get('error', '') for e in res.get('errors') or []))
+        return message(model, [_tool_use(_tool_name(tools, 'file_open'), {'file': files[0], 'goal': 'analyse',
+                                                                          'show_form': False})])
+    if drivey and latest and latest[0] == 'file_open':
+        res = latest[2]
+        if res.get('known') is False or res.get('error'):
+            return say("Idli hasn't learned this file yet, so I can't answer from it here. Ask Claude on the right: "
+                       "it works on your real file and sees codes for private values.")
+        question = _drivey_question(msgs)
+        if question:
+            return message(model, [_tool_use(_tool_name(tools, 'file_ask'), {
+                'file': latest[1].get('file') or res.get('file'), 'question': question,
+                'chart': bool(CHART_WORDS.search(question))})])
+    if drivey and latest and latest[0] == 'file_ask' and latest[1].get('question'):
+        res = latest[2]
+        if res.get('error') or res.get('cannot'):
+            return say("The form for this file can't answer that: " + str(res.get('cannot') or res.get('error'))
+                       + ". Ask Claude on the right.")
+        body = (res.get('chart_markdown') + '\n\n' if res.get('chart_markdown') else '') + str(
+            res.get('answer') or res.get('reply') or '')
+        if body.strip():
+            return say(body)
     if not said:
         return None
     opened = re.fullmatch(r'Open Mini: .+ \[([\w-]{1,100})\]', said)
@@ -1046,13 +1117,13 @@ def drivey_route(j):
                 if res.get('id') and res.get('questions'):
                     active = res
     if active:
-        mapped = _lib('home').map_questions(active['questions'], said, NINE_URL)
+        mapped = _lib('minimap').map_questions(active['questions'], said, NINE_URL)
         tool = _tool_name(tools, 'mini_ask')
         if mapped.get('qid') and tool:
             return message(model, [_tool_use(tool, {'id': active['id'], 'qid': mapped['qid'],
                                                    'params': mapped['params']})])
         return say("I don't know. This Mini can answer: " + '; '.join(q['question'] for q in active['questions']))
-    paths = _lib('drivestubs').mentions(said)
+    paths = _lib('minimap').mentions(said)
     if paths:
         tool = _tool_name(tools, 'drive_fetch')
         return (message(model, [_tool_use(tool, {'paths': paths})]) if tool

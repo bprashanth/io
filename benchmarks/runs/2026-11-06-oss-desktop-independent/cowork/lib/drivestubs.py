@@ -55,23 +55,7 @@ def refresh(data_dir):
     return entries
 
 
-def mentions(text):
-    """Keep quoted/escaped paths and ordinary picker paths with spaces.
-
-    An extension or a folder's final slash ends an unquoted path. Extensionless
-    file names are resolved against the index by fetch(), using the longest match.
-    """
-    pattern = r'@(?:"Drive/([^"\n]+)"|\'Drive/([^\'\n]+)\'|Drive/([^@\n<>"\'`]+))'
-    paths = []
-    for match in re.finditer(pattern, str(text)):
-        quoted = match[1] or match[2]
-        tail = (quoted or match[3]).replace('\\ ', ' ')
-        if not quoted:
-            end = re.search(r'/\s|\.[A-Za-z0-9]{1,10}(?=[\s,;!?)]|$)', tail)
-            if end:
-                tail = tail[:end.start() + 1] if end.group().startswith('/') else tail[:end.end()]
-        paths.append('Drive/' + tail.strip().rstrip('.,;!?'))
-    return list(dict.fromkeys(paths))
+from lib.minimap import mentions  # noqa: E402,F401  (light: the router uses it)
 
 
 def fetch(data_dir, paths, workspace=None):

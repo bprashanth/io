@@ -3,7 +3,7 @@
 # going through Idli's masking proxy (lib/ccproxy.py). Claude works on the real files in ~/idli-insights/claude-masked
 # (drive/ links to Drivey's downloads); the proxy turns the values of masked columns into codes on the way out and back
 # into real values on the way in, so the person sees real values and Anthropic sees codes.
-COWORK="$(cd "$(dirname "$0")/.." && pwd)"
+COWORK="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"   # follow ~/idli-insights/bin/claude-masked
 DATA=${IDLI_DATA:-$HOME/idli-insights/cowork-real}
 WORK=${IDLI_CLAUDE_WORK:-$HOME/idli-insights/claude-masked}
 mkdir -p "$WORK"
