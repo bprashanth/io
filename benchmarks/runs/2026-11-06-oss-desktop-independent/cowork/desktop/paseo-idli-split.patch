@@ -1,3 +1,87 @@
+diff --git a/packages/app/src/agent-stream/view.tsx b/packages/app/src/agent-stream/view.tsx
+index 72923b42..af5bcd3c 100644
+--- a/packages/app/src/agent-stream/view.tsx
++++ b/packages/app/src/agent-stream/view.tsx
+@@ -1,3 +1,5 @@
++import { IdliMiniCartridges } from "@/components/idli-mini-cartridges";
++import { shouldShowIdliMinis } from "@/utils/idli-minis";
+ import { ChatFind, ChatFindExpansion } from "@/agent-stream/chat-find";
+ import { LoadingSpinner } from "@/components/ui/loading-spinner";
+ import React, {
+@@ -116,13 +118,24 @@ function renderLiveAuxiliaryNode(input: {
+   pendingPermissions: ReactNode;
+   turnFooter: ReactNode;
+   bottomOverlayInset: number;
++  minis: ReactNode;
+ }): ReactNode {
+-  if (!input.pendingPermissions && !input.turnFooter && input.bottomOverlayInset === 0) {
++  if (
++    !input.pendingPermissions &&
++    !input.turnFooter &&
++    !input.minis &&
++    input.bottomOverlayInset === 0
++  ) {
+     return null;
+   }
+   return (
+     <>
+       {input.turnFooter}
++      {input.minis ? (
++        <View style={stylesheet.contentWrapper}>
++          <View style={stylesheet.listHeaderContent}>{input.minis}</View>
++        </View>
++      ) : null}
+       {input.pendingPermissions ? (
+         <View style={stylesheet.contentWrapper}>
+           <View style={stylesheet.listHeaderContent}>{input.pendingPermissions}</View>
+@@ -381,6 +394,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+     const sessionStreamHead = useSessionStore((state) =>
+       state.sessions[resolvedServerId]?.agentStreamHead?.get(agentId),
+     );
++    const isIdliLeft = useSessionStore((state) => {
++      const session = state.sessions[resolvedServerId];
++      const agent = session?.agents.get(agentId) ?? session?.agentDetails.get(agentId);
++      return agent?.labels?.["idli.left"] === "1";
++    });
+     const streamHead = providedStreamHead ?? sessionStreamHead;
+     const forkAgent = useForkAgent({ serverId: resolvedServerId, toast, readOnly });
+     const supportsAgentForkContextCursor = useSessionStore(
+@@ -1133,6 +1151,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+           renderStreamItem,
+         }),
+     );
++    const showMinis = shouldShowIdliMinis({
++      isLeft: isIdliLeft,
++      readOnly,
++      historyReady: isAuthoritativeHistoryReady,
++      hasOlder: remoteHasOlder,
++      pendingCount: pendingMessageSubmissions.length,
++      tail: effectiveStreamItems,
++      head: effectiveStreamHead,
++    });
+     const renderLiveAuxiliary = useCallback<StreamSegmentRenderers["renderLiveAuxiliary"]>(() => {
+       const existingTailSpacing =
+         auxiliary.turnFooter && !auxiliary.pendingPermissions ? TURN_FOOTER_BOTTOM_SPACING : 0;
+@@ -1144,8 +1171,18 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+         pendingPermissions: auxiliary.pendingPermissions,
+         turnFooter: auxiliary.turnFooter,
+         bottomOverlayInset,
++        minis: showMinis ? (
++          <IdliMiniCartridges key={agentId} serverId={resolvedServerId} agentId={agentId} />
++        ) : null,
+       });
+-    }, [auxiliary.pendingPermissions, auxiliary.turnFooter, bottomOverlayTailClearance]);
++    }, [
++      auxiliary.pendingPermissions,
++      auxiliary.turnFooter,
++      bottomOverlayTailClearance,
++      showMinis,
++      resolvedServerId,
++      agentId,
++    ]);
+ 
+     const renderers = useMemo<StreamSegmentRenderers>(
+       () => ({
 diff --git a/packages/app/src/app/h/[serverId]/agent/[agentId].tsx b/packages/app/src/app/h/[serverId]/agent/[agentId].tsx
 index 551e3b60..42e3ac3f 100644
 --- a/packages/app/src/app/h/[serverId]/agent/[agentId].tsx
@@ -50,83 +134,349 @@ index 2ea41196..127a21fe 100644
  import { useNavigation } from "expo-router/react-navigation";
  import { StyleSheet, View } from "react-native";
  import { useLocalSearchParams } from "expo-router";
+diff --git a/packages/app/src/components/idli-mini-cartridges.test.tsx b/packages/app/src/components/idli-mini-cartridges.test.tsx
+new file mode 100644
+index 00000000..fcd88257
+--- /dev/null
++++ b/packages/app/src/components/idli-mini-cartridges.test.tsx
+@@ -0,0 +1,109 @@
++/** @vitest-environment jsdom */
++import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
++import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { ToastProvider } from "@/contexts/toast-context";
++import { IdliMiniCartridges } from "./idli-mini-cartridges";
++import { IDLI_MINIS_URL } from "@/utils/idli-minis";
++
++// Idli and the daemon run outside the app; keep this test at their API boundaries.
++const runtime = vi.hoisted(() => ({ sendAgentMessage: vi.fn() }));
++vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => runtime }));
++// Toast content is real; jsdom cannot own Reanimated's browser animation observer.
++vi.mock("react-native-reanimated", async (importOriginal) => {
++  const original = await importOriginal<typeof import("react-native-reanimated")>();
++  const { View } = await import("react-native");
++  return { ...original, default: { ...original.default, View } };
++});
++const fetchMock = vi.fn<typeof fetch>();
++
++beforeEach(() => {
++  runtime.sendAgentMessage.mockReset();
++  fetchMock.mockReset();
++  fetchMock.mockResolvedValue(
++    new Response(
++      JSON.stringify([
++        {
++          id: "sales-14",
++          name: "Sales",
++          heading: "Revenue by region",
++          date: "2026-11-14",
++          author: "Asha",
++        },
++        {
++          id: "costs-14",
++          name: "Costs",
++          heading: "Spend by team",
++          date: "2026-11-14",
++          author: "Asha",
++        },
++      ]),
++    ),
++  );
++  vi.stubGlobal("fetch", fetchMock);
++});
++afterEach(() => {
++  cleanup();
++  vi.unstubAllGlobals();
++});
++
++function showMinis() {
++  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++  const view = render(
++    <QueryClientProvider client={queryClient}>
++      <ToastProvider>
++        <IdliMiniCartridges serverId="host" agentId="left-agent" />
++      </ToastProvider>
++    </QueryClientProvider>,
++  );
++  return view;
++}
++
++describe("Mini rows", () => {
++  it("fetches public Minis and sends one exact message while disabling repeat clicks", async () => {
++    runtime.sendAgentMessage.mockResolvedValue({});
++    showMinis();
++    const row = await screen.findByRole("button", {
++      name: /Sales - Revenue by region\s*14 Nov - Asha/,
++    });
++    expect(fetchMock).toHaveBeenCalledWith(
++      IDLI_MINIS_URL,
++      expect.objectContaining({ credentials: "omit" }),
++    );
++    fireEvent.click(row);
++    fireEvent.click(row);
++    await waitFor(() =>
++      expect(runtime.sendAgentMessage).toHaveBeenCalledExactlyOnceWith(
++        "left-agent",
++        "Open Mini: Sales [sales-14]",
++      ),
++    );
++    expect(row.getAttribute("aria-disabled")).toBe("true");
++    expect(
++      screen
++        .getByRole("button", { name: /Costs - Spend by team\s*14 Nov - Asha/ })
++        .getAttribute("aria-disabled"),
++    ).toBe("true");
++  });
++
++  it("shows a send failure and lets the person retry", async () => {
++    runtime.sendAgentMessage.mockRejectedValueOnce(new Error("Could not open Mini"));
++    runtime.sendAgentMessage.mockResolvedValueOnce({});
++    showMinis();
++    const row = await screen.findByRole("button", {
++      name: /Sales - Revenue by region\s*14 Nov - Asha/,
++    });
++    fireEvent.click(row);
++    await screen.findByText("Could not open Mini");
++    await waitFor(() => expect(row.getAttribute("aria-disabled")).not.toBe("true"));
++    fireEvent.click(row);
++    await waitFor(() => expect(runtime.sendAgentMessage).toHaveBeenCalledTimes(2));
++  });
++
++  it("shows a failed list fetch without inventing cartridge content", async () => {
++    fetchMock.mockResolvedValue(new Response("unavailable", { status: 503 }));
++    showMinis();
++    await screen.findByText("Could not load Minis");
++    expect(screen.queryByRole("button", { name: /Sales/ })).toBeNull();
++  });
++});
+diff --git a/packages/app/src/components/idli-mini-cartridges.tsx b/packages/app/src/components/idli-mini-cartridges.tsx
+new file mode 100644
+index 00000000..30a41a3e
+--- /dev/null
++++ b/packages/app/src/components/idli-mini-cartridges.tsx
+@@ -0,0 +1,126 @@
++import { useCallback, useEffect, useMemo, useRef, useState } from "react";
++import { Text, View } from "react-native";
++import { StyleSheet } from "react-native-unistyles";
++import { useFetchQuery } from "@/data/query";
++import { PressHighlight } from "@/components/ui/press-highlight";
++import { useHostRuntimeClient } from "@/runtime/host-runtime";
++import { useToast } from "@/contexts/toast-context";
++import {
++  IDLI_MINIS_URL,
++  IdliMinisSchema,
++  miniDate,
++  miniDisplayText,
++  miniMessage,
++  type IdliMini,
++} from "@/utils/idli-minis";
++
++export function IdliMiniCartridges({ serverId, agentId }: { serverId: string; agentId: string }) {
++  const client = useHostRuntimeClient(serverId);
++  const toast = useToast();
++  const sending = useRef(false);
++  const [selectedId, setSelectedId] = useState<string | null>(null);
++  const minis = useFetchQuery({
++    queryKey: ["idli-minis-public"],
++    queryFn: async ({ signal }) => {
++      const response = await fetch(IDLI_MINIS_URL, { signal, credentials: "omit" });
++      if (!response.ok) throw new Error("Could not load Minis");
++      return IdliMinisSchema.parse(await response.json());
++    },
++    staleTimeMs: 60_000,
++    dataShape: "list",
++  });
++  useEffect(() => {
++    if (minis.error) toast.error("Could not load Minis");
++  }, [minis.error, toast]);
++
++  const openMini = useCallback(
++    async (mini: IdliMini) => {
++      if (sending.current) return;
++      if (!client) {
++        toast.error("Host is disconnected");
++        return;
++      }
++      sending.current = true;
++      setSelectedId(mini.id);
++      try {
++        await client.sendAgentMessage(agentId, miniMessage(mini));
++        // Keep rows disabled until the timeline removes them after delivery.
++      } catch (error) {
++        sending.current = false;
++        setSelectedId(null);
++        toast.error(
++          error instanceof Error ? miniDisplayText(error.message) : "Could not open Mini",
++        );
++      }
++    },
++    [client, agentId, toast],
++  );
++
++  return (
++    <View style={styles.list} testID="idli-mini-cartridges">
++      {minis.data?.map((mini) => (
++        <MiniRow key={mini.id} mini={mini} selectedId={selectedId} onOpen={openMini} />
++      ))}
++    </View>
++  );
++}
++
++function MiniRow({
++  mini,
++  selectedId,
++  onOpen,
++}: {
++  mini: IdliMini;
++  selectedId: string | null;
++  onOpen: (mini: IdliMini) => Promise<void>;
++}) {
++  const onPress = useCallback(() => void onOpen(mini), [onOpen, mini]);
++  const accessibilityState = useMemo(
++    () => ({ disabled: selectedId !== null, busy: selectedId === mini.id }),
++    [selectedId, mini.id],
++  );
++  return (
++    <PressHighlight
++      accessibilityRole="button"
++      disabled={selectedId !== null}
++      accessibilityState={accessibilityState}
++      onPress={onPress}
++      style={[styles.row, selectedId === mini.id && styles.pending]}
++      highlightStyle={styles.highlight}
++    >
++      <Text style={styles.summary} numberOfLines={1}>
++        <Text style={styles.name}>{miniDisplayText(mini.name)}</Text>
++        {" - "}
++        {miniDisplayText(mini.heading)}
++      </Text>
++      <Text style={styles.metadata} numberOfLines={1}>
++        {miniDate(mini.date)}
++        {" - "}
++        {miniDisplayText(mini.author)}
++      </Text>
++    </PressHighlight>
++  );
++}
++
++const styles = StyleSheet.create((theme) => ({
++  list: { width: "100%", paddingVertical: theme.spacing[2] },
++  row: {
++    _web: { _hover: { backgroundColor: theme.colors.surface1 } },
++    flexDirection: "row",
++    alignItems: "center",
++    gap: theme.spacing[3],
++    paddingHorizontal: theme.spacing[3],
++    paddingVertical: theme.spacing[2],
++    borderRadius: theme.borderRadius.md,
++  },
++  highlight: { backgroundColor: theme.colors.surface1 },
++  pending: { opacity: 0.5 },
++  summary: { flex: 1, color: theme.colors.foreground, fontSize: theme.fontSize.sm },
++  name: { fontWeight: theme.fontWeight.bold },
++  metadata: {
++    color: theme.colors.foregroundMuted,
++    fontSize: theme.fontSize.sm,
++    textAlign: "right",
++    flexShrink: 0,
++  },
++}));
 diff --git a/packages/app/src/components/sidebar-workspace-list.tsx b/packages/app/src/components/sidebar-workspace-list.tsx
-index 8697a4b2..5ee2471e 100644
+index 8697a4b2..1fc80380 100644
 --- a/packages/app/src/components/sidebar-workspace-list.tsx
 +++ b/packages/app/src/components/sidebar-workspace-list.tsx
-@@ -1,3 +1,25 @@
+@@ -1,3 +1,26 @@
 +import { createDriveyWorkspace, createRawClaudeWorkspace } from "@/utils/idli-claude-workspace";
-+import { createWorkspaceBrowser } from "@/desktop/browser/store";
-+import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
-+import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
-+import { placeTabOnSideSoon } from "@/utils/idli-side-pane";
++import { placeAgentOnSide, placeTabOnSide } from "@/utils/idli-side-pane";
++import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 +
-+// P18: Idli home (left) and the Claude CLI (right) in a new Drivey workspace, Idli home focused.
-+function openIdliHome(input: {serverId: string; workspaceId: string; url: string; terminalId: string}) {
-+  setTimeout(() => {
-+    const { browserId } = createWorkspaceBrowser({ initialUrl: input.url });
-+    const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId: input.serverId, workspaceId: input.workspaceId });
-+    if (!workspaceKey) return;
-+    useWorkspaceLayoutStore.getState().openTab({ workspaceKey, target: { kind: "browser", browserId }, intent: "reveal" });
-+    placeTabOnSideSoon({ serverId: input.serverId, workspaceId: input.workspaceId, kind: "terminal", id: input.terminalId,
-+                         side: "right", focus: false });
-+    // Idli home ends up focused: once now, and again after the terminal's own navigation has settled
-+    for (const ms of [600, 3000]) {
-+      setTimeout(() => placeTabOnSideSoon({ serverId: input.serverId, workspaceId: input.workspaceId, kind: "browser",
-+                                            id: browserId, side: "left" }), ms);
-+    }
-+  }, 2500);
++// Wait for navigation to hydrate the chat tab before splitting off Claude.
++function openIdliClaude(
++  input: { serverId: string; workspaceId: string; agentId: string; terminalId: string },
++  tries = 60,
++) {
++  const placed = placeAgentOnSide({ ...input, side: "left" });
++  if (
++    placed &&
++    placeTabOnSide({
++      ...input,
++      kind: "terminal",
++      id: input.terminalId,
++      side: "right",
++      focus: false,
++    })
++  )
++    return;
++  if (tries > 0) setTimeout(() => openIdliClaude(input, tries - 1), 150);
 +}
  import { LoadingSpinner } from "@/components/ui/loading-spinner";
  import {
    View,
-@@ -782,6 +804,34 @@ function NewWorktreeButton({
+@@ -782,6 +805,49 @@ function NewWorktreeButton({
    );
  }
  
 +function useRawClaudeProjectLaunch(displayName: string, target: SidebarProjectHostTarget | null) {
 +  const pending = useRef(false);
 +  const toast = useToast();
-+  return useMemo(() => displayName === "Drivey" && target ? () => {
-+    if (pending.current) return;
-+    const client = getHostRuntimeStore().getClient(target.serverId);
-+    if (!client) { toast.error("Host is disconnected"); return; }
-+    pending.current = true;
-+    void createDriveyWorkspace({
-+      client, serverId: target.serverId, projectId: target.projectId, path: target.iconWorkingDir,
-+      accept: workspace => getHostRuntimeStore().acceptWorkspaceSnapshots(target.serverId, [workspace]),
-+      navigate: navigateToWorkspace, openHome: openIdliHome,
-+    }).catch(error => toast.error(error instanceof Error ? error.message : String(error)))
-+      .finally(() => { pending.current = false; });
-+  } : displayName === "Claude Code" && target ? () => {
-+    if (pending.current) return;
-+    const client = getHostRuntimeStore().getClient(target.serverId);
-+    if (!client) { toast.error("Host is disconnected"); return; }
-+    pending.current = true;
-+    void createRawClaudeWorkspace({
-+      client, serverId: target.serverId, projectId: target.projectId, path: target.iconWorkingDir,
-+      accept: workspace => getHostRuntimeStore().acceptWorkspaceSnapshots(target.serverId, [workspace]),
-+      navigate: navigateToWorkspace,
-+    }).catch(error => toast.error(error instanceof Error ? error.message : String(error)))
-+      .finally(() => { pending.current = false; });
-+  } : null, [displayName, target, toast]);
++  return useMemo(() => {
++    if (!target || (displayName !== "Drivey" && displayName !== "Claude Code")) return null;
++    return () => {
++      if (pending.current) return;
++      const client = getHostRuntimeStore().getClient(target.serverId);
++      if (!client) {
++        toast.error("Host is disconnected");
++        return;
++      }
++      pending.current = true;
++      const input = {
++        client,
++        serverId: target.serverId,
++        projectId: target.projectId,
++        path: target.iconWorkingDir,
++        accept: (workspace: Parameters<Parameters<typeof createDriveyWorkspace>[0]["accept"]>[0]) =>
++          getHostRuntimeStore().acceptWorkspaceSnapshots(target.serverId, [workspace]),
++        navigate: navigateToWorkspace,
++      };
++      const launch =
++        displayName === "Drivey"
++          ? createDriveyWorkspace({
++              ...input,
++              acceptAgent: (agent) =>
++                getHostRuntimeStore().acceptAgentSnapshot(
++                  target.serverId,
++                  normalizeAgentSnapshot(agent, target.serverId),
++                ),
++              openClaude: openIdliClaude,
++            })
++          : createRawClaudeWorkspace(input);
++      void launch
++        .catch((error) => toast.error(error instanceof Error ? error.message : String(error)))
++        .finally(() => {
++          pending.current = false;
++        });
++    };
++  }, [displayName, target, toast]);
 +}
 +
  function NewWorkspaceGhostRow({
    project,
    displayName,
-@@ -794,8 +844,10 @@ function NewWorkspaceGhostRow({
+@@ -794,8 +860,13 @@ function NewWorkspaceGhostRow({
    onWorkspacePress?: () => void;
  }) {
    const { t } = useTranslation();
 +  const rawClaudeLaunch = useRawClaudeProjectLaunch(displayName, worktreeTarget);
    const handlePress = useCallback(() => {
      onWorkspacePress?.();
-+    if (rawClaudeLaunch) { rawClaudeLaunch(); return; }
++    if (rawClaudeLaunch) {
++      rawClaudeLaunch();
++      return;
++    }
      router.navigate(
        buildNewWorkspaceRoute({
          serverId: worktreeTarget.serverId,
-@@ -804,7 +856,7 @@ function NewWorkspaceGhostRow({
+@@ -804,7 +875,7 @@ function NewWorkspaceGhostRow({
          projectId: worktreeTarget.projectId,
        }) as Href,
      );
@@ -135,7 +485,7 @@ index 8697a4b2..5ee2471e 100644
    const rowStyle = useCallback(
      ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
        styles.newWorkspaceGhostRow,
-@@ -878,11 +930,13 @@ function ProjectHeaderRow({
+@@ -878,11 +949,16 @@ function ProjectHeaderRow({
    const localDaemonServerId = useLocalDaemonServerId();
    const projectPath = resolveSidebarProjectLocalPath(project, localDaemonServerId);
    const settingsTarget = project.hosts[0] ?? null;
@@ -145,11 +495,14 @@ index 8697a4b2..5ee2471e 100644
        return;
      }
      onWorkspacePress?.();
-+    if (rawClaudeLaunch) { rawClaudeLaunch(); return; }
++    if (rawClaudeLaunch) {
++      rawClaudeLaunch();
++      return;
++    }
      router.navigate(
        buildNewWorkspaceRoute({
          serverId: worktreeTarget.serverId,
-@@ -891,7 +945,7 @@ function ProjectHeaderRow({
+@@ -891,7 +967,7 @@ function ProjectHeaderRow({
          projectId: worktreeTarget.projectId,
        }) as Href,
      );
@@ -365,6 +718,496 @@ index dd806e1f..9b400534 100644
      ],
    );
    const focusedPaneIdOrUndefined = useMemo(() => focusedPaneId ?? undefined, [focusedPaneId]);
+diff --git a/packages/app/src/utils/idli-claude-cli.test.ts b/packages/app/src/utils/idli-claude-cli.test.ts
+new file mode 100644
+index 00000000..88b4c705
+--- /dev/null
++++ b/packages/app/src/utils/idli-claude-cli.test.ts
+@@ -0,0 +1,22 @@
++import { describe, expect, it } from "vitest";
++import { rawClaudeProfile } from "./idli-claude-cli";
++
++describe("raw Claude workspace", () => {
++  it("launches the native interactive CLI with no prompt or permission overrides", () => {
++    expect(rawClaudeProfile("Claude Code")).toMatchObject({command:"claude", args:[]});
++  });
++  it("leaves all other workspaces on their existing chat path", () => {
++    for (const title of [null, undefined, "Drivey", "WhatsAppy", "Canvay", "Claude Code test"])
++      expect(rawClaudeProfile(title)).toBeUndefined();
++  });
++});
++
++import { isRawClaudeWorkspace } from "./idli-claude-cli";
++describe("project identity instead of one workspace title", () => {
++  it("recognizes renamed workspaces inside the Claude Code project", () => {
++    expect(isRawClaudeWorkspace({title:"Greeting",projectCustomName:"Claude Code",projectDisplayName:"drivey-tui"})).toBe(true);
++  });
++  it("does not reroute Drivey just because its workspace title matches", () => {
++    expect(isRawClaudeWorkspace({title:"Claude Code",projectDisplayName:"Drivey"})).toBe(false);
++  });
++});
+diff --git a/packages/app/src/utils/idli-claude-cli.ts b/packages/app/src/utils/idli-claude-cli.ts
+new file mode 100644
+index 00000000..b0529c0b
+--- /dev/null
++++ b/packages/app/src/utils/idli-claude-cli.ts
+@@ -0,0 +1,15 @@
++import type { TerminalProfile } from "@getpaseo/protocol/messages";
++
++/** Explicit opt-in by workspace title; never reroute Drivey or other agent workspaces. */
++export function rawClaudeProfile(title: string | null | undefined): TerminalProfile | undefined {
++  return title === "Claude Code"
++    ? { id: "idli-raw-claude", name: "Claude Code", command: "claude", args: [], icon: "claude" }
++    : undefined;
++}
++
++export function isRawClaudeWorkspace(workspace: {
++  title?: string | null; projectCustomName?: string | null; projectDisplayName?: string;
++} | null | undefined): boolean {
++  if (!workspace) return false;
++  return (workspace.projectCustomName ?? workspace.projectDisplayName ?? workspace.title) === "Claude Code";
++}
+diff --git a/packages/app/src/utils/idli-claude-workspace.test.ts b/packages/app/src/utils/idli-claude-workspace.test.ts
+new file mode 100644
+index 00000000..78208c14
+--- /dev/null
++++ b/packages/app/src/utils/idli-claude-workspace.test.ts
+@@ -0,0 +1,144 @@
++import { describe, expect, it, vi } from "vitest";
++vi.mock("@/stores/session-store", () => ({ normalizeWorkspaceDescriptor: (w: unknown) => w }));
++import {
++  createRawClaudeWorkspace,
++  createDriveyWorkspace,
++  IDLI_DRIVEY_MODEL,
++} from "./idli-claude-workspace";
++
++describe("Claude Code project heading +", () => {
++  function fixture() {
++    return {
++      client: {
++        createWorkspace: vi
++          .fn()
++          .mockResolvedValue({
++            workspace: { id: "new-workspace", workspaceDirectory: "/public-demo" },
++          }),
++        createTerminal: vi.fn().mockResolvedValue({ terminal: { id: "new-terminal" } }),
++      },
++      serverId: "host",
++      projectId: "claude-project",
++      path: "/public-demo",
++      accept: vi.fn(),
++      navigate: vi.fn(),
++    };
++  }
++  it("creates no initial agent and opens the bare CLI in the new workspace", async () => {
++    const f = fixture();
++    await createRawClaudeWorkspace(f as unknown as Parameters<typeof createRawClaudeWorkspace>[0]);
++    expect(f.client.createWorkspace).toHaveBeenCalledWith({
++      source: { kind: "directory", path: "/public-demo", projectId: "claude-project" },
++      title: "Claude Code",
++    });
++    expect(f.client.createTerminal).toHaveBeenCalledWith("/public-demo", "Claude Code", undefined, {
++      workspaceId: "new-workspace",
++      command: "claude",
++      args: [],
++    });
++    expect(f.navigate).toHaveBeenCalledWith({
++      serverId: "host",
++      workspaceId: "new-workspace",
++      target: { kind: "terminal", terminalId: "new-terminal" },
++    });
++  });
++  it("does not fall back to a managed chat on terminal failure", async () => {
++    const f = fixture();
++    f.client.createTerminal.mockResolvedValue({ error: "missing claude" });
++    await expect(
++      createRawClaudeWorkspace(f as unknown as Parameters<typeof createRawClaudeWorkspace>[0]),
++    ).rejects.toThrow("missing claude");
++    expect(f.navigate).not.toHaveBeenCalled();
++  });
++  it("does not launch a terminal when workspace creation fails", async () => {
++    const f = fixture();
++    f.client.createWorkspace.mockResolvedValue({ error: "disconnected" });
++    await expect(
++      createRawClaudeWorkspace(f as unknown as Parameters<typeof createRawClaudeWorkspace>[0]),
++    ).rejects.toThrow("disconnected");
++    expect(f.client.createTerminal).not.toHaveBeenCalled();
++  });
++});
++
++describe("Drivey project heading +", () => {
++  function fixture() {
++    return {
++      client: {
++        createWorkspace: vi
++          .fn()
++          .mockResolvedValue({ workspace: { id: "drivey-ws", workspaceDirectory: "/drivey" } }),
++        createAgent: vi.fn().mockResolvedValue({ id: "left-agent" }),
++        createTerminal: vi.fn().mockResolvedValue({ terminal: { id: "claude-terminal" } }),
++      },
++      serverId: "host",
++      projectId: "drivey-project",
++      path: "/drivey",
++      accept: vi.fn(),
++      acceptAgent: vi.fn(),
++      navigate: vi.fn(),
++      openClaude: vi.fn(),
++    };
++  }
++
++  it("opens the labeled Drivey chat focused and launches masked Claude with its workspace", async () => {
++    const f = fixture();
++    await createDriveyWorkspace(f);
++    expect(f.client.createWorkspace).toHaveBeenCalledWith({
++      source: { kind: "directory", path: "/drivey", projectId: "drivey-project" },
++      title: "Drivey",
++    });
++    expect(f.client.createAgent).toHaveBeenCalledWith({
++      provider: "t4gc-cowork",
++      model: IDLI_DRIVEY_MODEL,
++      cwd: "/drivey",
++      workspaceId: "drivey-ws",
++      labels: { "idli.ws": "drivey-ws", "idli.left": "1" },
++      initialPrompt: "Start Drivey",
++    });
++    expect(f.acceptAgent).toHaveBeenCalledWith({ id: "left-agent" });
++    expect(f.navigate).toHaveBeenCalledExactlyOnceWith({
++      serverId: "host",
++      workspaceId: "drivey-ws",
++      target: { kind: "agent", agentId: "left-agent" },
++    });
++    expect(f.client.createTerminal).toHaveBeenCalledWith("/drivey", "Claude", undefined, {
++      workspaceId: "drivey-ws",
++      command: "/bin/sh",
++      args: ["-c", "IDLI_WORKSPACE='drivey-ws' exec \"$HOME/idli-insights/bin/claude-masked\""],
++    });
++    expect(f.openClaude).toHaveBeenCalledWith({
++      serverId: "host",
++      workspaceId: "drivey-ws",
++      agentId: "left-agent",
++      terminalId: "claude-terminal",
++    });
++  });
++
++  it("does not launch Claude if chat creation fails", async () => {
++    const f = fixture();
++    f.client.createAgent.mockRejectedValue(new Error("Provider unavailable"));
++    await expect(createDriveyWorkspace(f)).rejects.toThrow("Provider unavailable");
++    expect(f.client.createTerminal).not.toHaveBeenCalled();
++    expect(f.navigate).not.toHaveBeenCalled();
++  });
++
++  it("keeps the chat open and reports terminal failure", async () => {
++    const f = fixture();
++    f.client.createTerminal.mockResolvedValue({ error: "Launcher missing" });
++    await expect(createDriveyWorkspace(f)).rejects.toThrow("Launcher missing");
++    expect(f.navigate).toHaveBeenCalledWith({
++      serverId: "host",
++      workspaceId: "drivey-ws",
++      target: { kind: "agent", agentId: "left-agent" },
++    });
++    expect(f.openClaude).not.toHaveBeenCalled();
++  });
++
++  it("stops on workspace failure", async () => {
++    const f = fixture();
++    f.client.createWorkspace.mockResolvedValue({ error: "Host is disconnected" });
++    await expect(createDriveyWorkspace(f)).rejects.toThrow("Host is disconnected");
++    expect(f.client.createAgent).not.toHaveBeenCalled();
++    expect(f.client.createTerminal).not.toHaveBeenCalled();
++  });
++});
+diff --git a/packages/app/src/utils/idli-claude-workspace.ts b/packages/app/src/utils/idli-claude-workspace.ts
+new file mode 100644
+index 00000000..3c8fecfc
+--- /dev/null
++++ b/packages/app/src/utils/idli-claude-workspace.ts
+@@ -0,0 +1,109 @@
++import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
++import { normalizeWorkspaceDescriptor } from "@/stores/session-store";
++
++/** Heading + creates a workspace and a native terminal, never a managed chat agent. */
++export async function createRawClaudeWorkspace(input: {
++  client: Pick<DaemonClient, "createWorkspace" | "createTerminal">;
++  serverId: string;
++  projectId: string;
++  path: string;
++  accept: (workspace: ReturnType<typeof normalizeWorkspaceDescriptor>) => void;
++  navigate: (input: {
++    serverId: string;
++    workspaceId: string;
++    target: { kind: "terminal"; terminalId: string };
++  }) => void;
++}) {
++  const result = await input.client.createWorkspace({
++    source: { kind: "directory", path: input.path, projectId: input.projectId },
++    title: "Claude Code",
++  });
++  if (result.error || !result.workspace)
++    throw new Error(result.error ?? "Could not create Claude Code workspace");
++  const workspace = normalizeWorkspaceDescriptor(result.workspace);
++  input.accept(workspace);
++  const terminal = await input.client.createTerminal(
++    workspace.workspaceDirectory,
++    "Claude Code",
++    undefined,
++    {
++      workspaceId: workspace.id,
++      command: "claude",
++      args: [],
++    },
++  );
++  if (terminal.error || !terminal.terminal)
++    throw new Error(terminal.error ?? "Could not start Claude Code terminal");
++  input.navigate({
++    serverId: input.serverId,
++    workspaceId: workspace.id,
++    target: { kind: "terminal", terminalId: terminal.terminal.id },
++  });
++}
++
++// Change this one model ID when Drivey switches models.
++export const IDLI_DRIVEY_MODEL = "idli-9b";
++export const IDLI_CLAUDE_LAUNCH = 'exec "$HOME/idli-insights/bin/claude-masked"';
++
++export async function createDriveyWorkspace(input: {
++  client: Pick<DaemonClient, "createWorkspace" | "createAgent" | "createTerminal">;
++  serverId: string;
++  projectId: string;
++  path: string;
++  accept: (workspace: ReturnType<typeof normalizeWorkspaceDescriptor>) => void;
++  acceptAgent: (agent: Awaited<ReturnType<DaemonClient["createAgent"]>>) => void;
++  navigate: (input: {
++    serverId: string;
++    workspaceId: string;
++    target: { kind: "agent"; agentId: string };
++  }) => void;
++  openClaude: (input: {
++    serverId: string;
++    workspaceId: string;
++    agentId: string;
++    terminalId: string;
++  }) => void;
++}) {
++  const result = await input.client.createWorkspace({
++    source: { kind: "directory", path: input.path, projectId: input.projectId },
++    title: "Drivey",
++  });
++  if (result.error || !result.workspace)
++    throw new Error(result.error ?? "Could not create Drivey workspace");
++  const workspace = normalizeWorkspaceDescriptor(result.workspace);
++  input.accept(workspace);
++  const agent = await input.client.createAgent({
++    provider: "t4gc-cowork",
++    model: IDLI_DRIVEY_MODEL,
++    cwd: workspace.workspaceDirectory,
++    workspaceId: workspace.id,
++    labels: { "idli.ws": workspace.id, "idli.left": "1" },
++    initialPrompt: "Start Drivey",
++  });
++  input.acceptAgent(agent);
++  input.navigate({
++    serverId: input.serverId,
++    workspaceId: workspace.id,
++    target: { kind: "agent", agentId: agent.id },
++  });
++  // Quote the daemon-owned ID as a shell value, including embedded single quotes.
++  const workspaceValue = "'" + workspace.id.replaceAll("'", "'\"'\"'") + "'";
++  const terminal = await input.client.createTerminal(
++    workspace.workspaceDirectory,
++    "Claude",
++    undefined,
++    {
++      workspaceId: workspace.id,
++      command: "/bin/sh",
++      args: ["-c", `IDLI_WORKSPACE=${workspaceValue} ${IDLI_CLAUDE_LAUNCH}`],
++    },
++  );
++  if (terminal.error || !terminal.terminal)
++    throw new Error(terminal.error ?? "Could not start Claude");
++  input.openClaude({
++    serverId: input.serverId,
++    workspaceId: workspace.id,
++    agentId: agent.id,
++    terminalId: terminal.terminal.id,
++  });
++}
+diff --git a/packages/app/src/utils/idli-minis.test.ts b/packages/app/src/utils/idli-minis.test.ts
+new file mode 100644
+index 00000000..6225d5d6
+--- /dev/null
++++ b/packages/app/src/utils/idli-minis.test.ts
+@@ -0,0 +1,89 @@
++import { describe, expect, it } from "vitest";
++import type { StreamItem } from "@/types/stream";
++import {
++  hasOnlyDriveyOpening,
++  IDLI_DRIVEY_OPENING,
++  IdliMinisSchema,
++  miniDate,
++  miniDisplayText,
++  miniMessage,
++  shouldShowIdliMinis,
++} from "./idli-minis";
++
++const timestamp = new Date("2026-11-14T00:00:00Z");
++const opening: StreamItem[] = [
++  { kind: "user_message", id: "start", text: "Start Drivey", timestamp },
++  { kind: "assistant_message", id: "reply", text: IDLI_DRIVEY_OPENING, timestamp },
++];
++
++describe("Drivey Mini cartridges", () => {
++  it("shows only during the opening exchange, including a streaming greeting", () => {
++    expect(hasOnlyDriveyOpening(opening)).toBe(true);
++    expect(hasOnlyDriveyOpening(opening.slice(0, 1))).toBe(true);
++    expect(
++      hasOnlyDriveyOpening([
++        ...opening.slice(0, 1),
++        { kind: "assistant_message", id: "partial", text: "Ask about", timestamp },
++      ]),
++    ).toBe(true);
++    expect(hasOnlyDriveyOpening([])).toBe(false);
++  });
++  it("hides for a Mini, manual prompt, chart, or another assistant response", () => {
++    for (const text of [
++      "Open Mini: Sales [sales]",
++      "Find @Drive/Sales",
++      "Chart from Claude: Sales",
++    ]) {
++      expect(
++        hasOnlyDriveyOpening([...opening, { kind: "user_message", id: "next", text, timestamp }]),
++      ).toBe(false);
++    }
++    expect(hasOnlyDriveyOpening([...opening, opening[1]])).toBe(false);
++    expect(
++      hasOnlyDriveyOpening([
++        { kind: "user_message", id: "other", text: "Something else", timestamp },
++      ]),
++    ).toBe(false);
++  });
++  it("requires the left label, complete history and no pending prompt", () => {
++    const input = {
++      isLeft: true,
++      readOnly: false,
++      historyReady: true,
++      hasOlder: false,
++      pendingCount: 0,
++      tail: opening,
++      head: undefined,
++    };
++    expect(shouldShowIdliMinis(input)).toBe(true);
++    expect(shouldShowIdliMinis({ ...input, isLeft: false })).toBe(false);
++    expect(shouldShowIdliMinis({ ...input, readOnly: true })).toBe(false);
++    expect(shouldShowIdliMinis({ ...input, historyReady: false })).toBe(false);
++    expect(shouldShowIdliMinis({ ...input, hasOlder: true })).toBe(false);
++    expect(shouldShowIdliMinis({ ...input, pendingCount: 1 })).toBe(false);
++    expect(
++      shouldShowIdliMinis({
++        ...input,
++        head: [{ kind: "user_message", id: "next", text: "Sales", timestamp }],
++      }),
++    ).toBe(false);
++  });
++  it("validates public records and sends exactly the named Mini", () => {
++    const [mini] = IdliMinisSchema.parse([
++      {
++        id: "sales-14",
++        name: "Sales",
++        heading: "Revenue by region",
++        date: "2026-11-14",
++        author: "Asha",
++      },
++    ]);
++    expect(miniMessage(mini)).toBe("Open Mini: Sales [sales-14]");
++    expect(miniDate(mini.date)).toBe("14 Nov");
++    expect(IdliMinisSchema.safeParse([{ id: "broken" }]).success).toBe(false);
++  });
++  it("uses plain separators in display text without changing the message", () => {
++    expect(miniDisplayText("Sales → Region · Asha")).toBe("Sales -> Region - Asha");
++    expect(miniDate("14 Nov")).toBe("14 Nov");
++  });
++});
+diff --git a/packages/app/src/utils/idli-minis.ts b/packages/app/src/utils/idli-minis.ts
+new file mode 100644
+index 00000000..465a9774
+--- /dev/null
++++ b/packages/app/src/utils/idli-minis.ts
+@@ -0,0 +1,75 @@
++import { z } from "zod";
++import type { StreamItem } from "@/types/stream";
++
++export const IDLI_MINIS_URL = "http://dashboard.localhost:8797/api/minis-public";
++export const IDLI_DRIVEY_OPENING =
++  "Ask about your Drive files. Type @ to pick a file or a folder, or start from a Mini.";
++
++export const IdliMinisSchema = z.array(
++  z.object({
++    id: z.string(),
++    name: z.string(),
++    heading: z.string(),
++    date: z.string(),
++    author: z.string(),
++  }),
++);
++export type IdliMini = z.infer<typeof IdliMinisSchema>[number];
++
++export function hasOnlyDriveyOpening(items: readonly StreamItem[]): boolean {
++  let users = 0;
++  let assistants = 0;
++  for (const item of items) {
++    if (item.kind === "notification") continue;
++    if (item.kind === "user_message") {
++      if (item.text !== "Start Drivey" || ++users > 1) return false;
++    } else if (item.kind === "assistant_message") {
++      if (!IDLI_DRIVEY_OPENING.startsWith(item.text) || ++assistants > 1) return false;
++    } else {
++      return false;
++    }
++  }
++  return users === 1;
++}
++
++export function miniMessage(mini: IdliMini): string {
++  return `Open Mini: ${mini.name} [${mini.id}]`;
++}
++
++export function miniDisplayText(value: string): string {
++  return value
++    .replace(/[\u2190-\u21ff\u27f0-\u27ff\u2900-\u297f]/g, "->")
++    .replace(/\s*·\s*/g, " - ");
++}
++
++export function miniDate(value: string): string {
++  if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return miniDisplayText(value);
++  const date = new Date(value);
++  if (Number.isNaN(date.getTime())) return miniDisplayText(value);
++  return new Intl.DateTimeFormat("en-GB", {
++    day: "numeric",
++    month: "short",
++    timeZone: "UTC",
++  }).format(date);
++}
++
++interface IdliMinisVisibility {
++  isLeft: boolean;
++  readOnly: boolean;
++  historyReady: boolean;
++  hasOlder: boolean;
++  pendingCount: number;
++  tail: readonly StreamItem[];
++  head: readonly StreamItem[] | undefined;
++}
++
++export function shouldShowIdliMinis(input: IdliMinisVisibility): boolean {
++  return (
++    input.isLeft &&
++    !input.readOnly &&
++    input.historyReady &&
++    !input.hasOlder &&
++    input.pendingCount === 0 &&
++    hasOnlyDriveyOpening([...input.tail, ...(input.head ?? [])])
++  );
++}
 diff --git a/packages/app/src/utils/idli-pairing.ts b/packages/app/src/utils/idli-pairing.ts
 new file mode 100644
 index 00000000..fd690cd0
@@ -536,19 +1379,89 @@ index 00000000..fd690cd0
 +    };
 +  }, [serverId, workspaceId, workspaceKey]);
 +}
+diff --git a/packages/app/src/utils/idli-side-pane.test.ts b/packages/app/src/utils/idli-side-pane.test.ts
+new file mode 100644
+index 00000000..1e809d1e
+--- /dev/null
++++ b/packages/app/src/utils/idli-side-pane.test.ts
+@@ -0,0 +1,60 @@
++import { beforeEach, describe, expect, it } from "vitest";
++import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
++import {
++  collectAllPanes,
++  collectAllTabs,
++  findPaneContainingTab,
++} from "@/stores/workspace-layout-actions";
++import { placeTabOnSide } from "./idli-side-pane";
++
++const workspaceKey = "host:drivey-ws";
++
++beforeEach(() => {
++  useWorkspaceLayoutStore.setState({
++    layoutByWorkspace: {},
++    layoutMode: "split-panes",
++    explorerSidebarPaneIdByWorkspace: {},
++  });
++  useWorkspaceLayoutStore
++    .getState()
++    .openTab({ workspaceKey, target: { kind: "agent", agentId: "left-agent" }, intent: "reveal" });
++});
++
++describe("Idli pane placement", () => {
++  it("opens Claude on the right and keeps the left chat focused", () => {
++    expect(
++      placeTabOnSide({
++        serverId: "host",
++        workspaceId: "drivey-ws",
++        kind: "terminal",
++        id: "claude",
++        side: "right",
++        focus: false,
++      }),
++    ).toBe(true);
++    const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
++    const panes = collectAllPanes(layout.root);
++    const tabs = collectAllTabs(layout.root);
++    const left = tabs.find((tab) => tab.target.kind === "agent");
++    const right = tabs.find((tab) => tab.target.kind === "terminal");
++    expect(panes).toHaveLength(2);
++    expect(panes[0].tabIds).toEqual([left?.tabId]);
++    expect(panes[1].tabIds).toEqual([right?.tabId]);
++    expect(layout.focusedPaneId).toBe(panes[0].id);
++    expect(panes[0].focusedTabId).toBe(left?.tabId);
++  });
++  it("still focuses the right terminal for explicit CLI placement", () => {
++    placeTabOnSide({
++      serverId: "host",
++      workspaceId: "drivey-ws",
++      kind: "terminal",
++      id: "claude",
++      side: "right",
++    });
++    const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
++    const terminal = collectAllTabs(layout.root).find((tab) => tab.target.kind === "terminal");
++    expect(terminal).toBeDefined();
++    if (!terminal) throw new Error("Terminal tab missing");
++    expect(layout.focusedPaneId).toBe(findPaneContainingTab(layout.root, terminal.tabId)?.id);
++  });
++});
 diff --git a/packages/app/src/utils/idli-side-pane.ts b/packages/app/src/utils/idli-side-pane.ts
 new file mode 100644
-index 00000000..f782147a
+index 00000000..9d2928a9
 --- /dev/null
 +++ b/packages/app/src/utils/idli-side-pane.ts
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,157 @@
 +// Idli P13: place a chat on one side of a two-pane workspace and give it focus, from the agent deep link
 +// (paseo://h/<server>/agent/<id>~right or ~left: the desktop shell drops a link's query string, and rewriting the
 +// shell means rebuilding app.asar, so the side rides on the agent id; the app strips it). Idli opens Claude's teaching chat on the right and comes back to
 +// its own chat on the left; the pane in control carries the focus ring (P14), so a switch reads as "focus moved".
 +import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 +import { useSessionStore } from "@/stores/session-store";
-+import { collectAllPanes, collectAllTabs, findPaneContainingTab } from "@/stores/workspace-layout-actions";
++import {
++  collectAllPanes,
++  collectAllTabs,
++  findPaneContainingTab,
++} from "@/stores/workspace-layout-actions";
 +
 +export type IdliSide = "left" | "right";
 +
@@ -583,7 +1496,13 @@ index 00000000..f782147a
 +  side: IdliSide;
 +}): boolean {
 +  const workspaceId = input.workspaceId || agentWorkspaceId(input.serverId, input.agentId);
-+  return placeTabOnSide({ serverId: input.serverId, workspaceId, kind: "agent", id: input.agentId, side: input.side });
++  return placeTabOnSide({
++    serverId: input.serverId,
++    workspaceId,
++    kind: "agent",
++    id: input.agentId,
++    side: input.side,
++  });
 +}
 +
 +/** P17: any tab (a chat or a terminal) on one side, focused. Idli puts the person's Claude CLI terminal on the right. */
@@ -602,16 +1521,24 @@ index 00000000..f782147a
 +  if (!key) return false;
 +  const layout = store.layoutByWorkspace[key];
 +  if (!layout) return false;
-+  const match = (t: ReturnType<typeof collectAllTabs>[number]) =>
-+    input.kind === "agent"
-+      ? t.target.kind === "agent" && t.target.agentId === input.id
-+      : input.kind === "browser"
-+        ? t.target.kind === "browser" && t.target.browserId === input.id
-+        : t.target.kind === "terminal" && t.target.terminalId === input.id;
++  function match(t: ReturnType<typeof collectAllTabs>[number]) {
++    if (input.kind === "agent") return t.target.kind === "agent" && t.target.agentId === input.id;
++    if (input.kind === "browser")
++      return t.target.kind === "browser" && t.target.browserId === input.id;
++    return t.target.kind === "terminal" && t.target.terminalId === input.id;
++  }
++  const focusedTabId = collectAllPanes(layout.root).find(
++    (pane) => pane.id === layout.focusedPaneId,
++  )?.focusedTabId;
 +  let tab = collectAllTabs(layout.root).find(match);
 +  if (!tab && input.kind === "terminal") {
 +    // a terminal made from the CLI has no tab yet: open one (this is what ?open=terminal:<id> does on first load)
-+    store.openTab({ workspaceKey: key, target: { kind: "terminal", terminalId: input.id }, intent: "reveal" });
++    store.openTab({
++      workspaceKey: key,
++      target: { kind: "terminal", terminalId: input.id },
++      intent: "background",
++      placement: { mode: "focused" },
++    });
 +    const fresh = useWorkspaceLayoutStore.getState().layoutByWorkspace[key];
 +    tab = fresh ? collectAllTabs(fresh.root).find(match) : undefined;
 +  }
@@ -619,7 +1546,7 @@ index 00000000..f782147a
 +  const now = useWorkspaceLayoutStore.getState().layoutByWorkspace[key] ?? layout;
 +  const current = findPaneContainingTab(now.root, tab.tabId);
 +  if (!current) return false;
-+  const explorerId = store.explorerSidebarPaneIdByWorkspace[key] ?? null;
++  const explorerId = store.explorerSidebarPaneIdByWorkspace[key];
 +  const mains = collectAllPanes(now.root).filter((p) => !p.hidden && p.id !== explorerId);
 +  const target = input.side === "right" ? mains[mains.length - 1] : mains[0];
 +  if (mains.length >= 2 && target && target.id !== current.id) {
@@ -627,12 +1554,17 @@ index 00000000..f782147a
 +  } else if (mains.length < 2 && input.side === "right" && current.tabIds.length > 1) {
 +    store.splitPane(key, { tabId: tab.tabId, targetPaneId: current.id, position: "right" });
 +  }
-+  if (input.focus !== false) useWorkspaceLayoutStore.getState().focusTab(key, tab.tabId);
++  // Opening, moving and splitting can focus the terminal internally.
++  const focusTabId = input.focus === false ? focusedTabId : tab.tabId;
++  if (focusTabId) useWorkspaceLayoutStore.getState().focusTab(key, focusTabId);
 +  return true;
 +}
 +
 +/** Retries while navigation finishes opening the tab (layout hydration, deferred opens). */
-+export function placeAgentOnSideSoon(input: Parameters<typeof placeAgentOnSide>[0], tries = 60): void {
++export function placeAgentOnSideSoon(
++  input: Parameters<typeof placeAgentOnSide>[0],
++  tries = 60,
++): void {
 +  if (placeAgentOnSide(input) || tries <= 0) return;
 +  setTimeout(() => placeAgentOnSideSoon(input, tries - 1), 150);
 +}
@@ -651,13 +1583,27 @@ index 00000000..f782147a
 +  if (!key) return "no layout key; keys: " + keys.slice(0, 8).join(", ");
 +  const layout = store.layoutByWorkspace[key];
 +  if (!layout) return "no layout for " + key;
-+  const tabs = collectAllTabs(layout.root).map((t) => t.target.kind + ":" + JSON.stringify(t.target).slice(0, 60));
-+  return "key " + key + "; tabs " + tabs.length + ": " + tabs.filter((t) => !t.startsWith("browser")).slice(0, 12).join(" | ");
++  const tabs = collectAllTabs(layout.root).map(
++    (t) => t.target.kind + ":" + JSON.stringify(t.target).slice(0, 60),
++  );
++  return (
++    "key " +
++    key +
++    "; tabs " +
++    tabs.length +
++    ": " +
++    tabs
++      .filter((t) => !t.startsWith("browser"))
++      .slice(0, 12)
++      .join(" | ")
++  );
 +}
 +
 +if (typeof window !== "undefined") {
 +  (window as unknown as { __idliExplain?: unknown }).__idliExplain = explainPlace;
-+  (window as unknown as { __idliPlaceTab?: unknown }).__idliPlaceTab = (input: Parameters<typeof placeTabOnSide>[0]) => {
++  (window as unknown as { __idliPlaceTab?: unknown }).__idliPlaceTab = (
++    input: Parameters<typeof placeTabOnSide>[0],
++  ) => {
 +    placeTabOnSideSoon(input);
 +    return true;
 +  };
