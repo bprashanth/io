@@ -61,3 +61,28 @@ Style rules: no arrows (write "->", "up", "down"), no "·".
 - The Claude terminal renders garbled at the laptop's narrow window width.
 - About 14 test Drivey workspaces were created on the laptop; archive them.
 - The author shows the OS user ("desinotorious") until IDLI_AUTHOR or accounts.json has a name.
+
+## Update: charts live inside the chat (Paseo P20, idli17)
+- **Built (Codex x2):**
+  - an Idli chart in a chat reply is drawn live inside the bubble (an embedded chart page), with "Enlarge" (a large
+    view over the app);
+  - left-click a bar for the popover, whose first item "Where did this come from?" is answered by code: source files,
+    the script that made the data, the chart's data file, and the rows behind the bar;
+  - right-click for "Copy to Claude" or "Copy whole chart to Claude": a one-line reference is typed into this
+    workspace's Claude prompt without sending, and focus moves to Claude;
+  - idli_show and Mini charts record their sources and script.
+- **Tested on the laptop (real file, 9B chat, Claude Pro):**
+  - a Mini's charts showed live in the chat;
+  - right-clicking the Yerawada bar, then "Copy to Claude", put `About the chart "…" (data: …csv; made by:
+    …question_1.py; from: drive/households.xlsx): ward = Yerawada Ward, households = 6, avg_debt_inr = 81667` into
+    Claude's prompt;
+  - "where did this number come from?" got Rs 4,90,000 / 6 = Rs 81,667 and the script's steps;
+  - 0 real names in the requests that left the laptop;
+  - the left-click popover and Enlarge work.
+- **Notes:**
+  - Paseo keeps other workspaces' chart pages alive in the background (harmless; my test clicked one by mistake);
+  - "rows behind" a summary bar are the chart's rows; listing the household rows behind an average is a follow-up;
+  - the Enlarge view shows scrollbars.
+- **Unmasking a field on request:** ideas given to the owner (classify masked columns as personal or contextual;
+  an `unmask` tool with a reason and a card; a budget and an on-screen log; a `lookup` tool that uses the real value
+  on the laptop without showing it to Claude).
