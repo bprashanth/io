@@ -39,6 +39,13 @@ SCRIPTS = {
     "loop2": ["how has vulnerability changed from last year?", "not over time, just across the wards",
               {"pick": "by Ward"}],
     "loop3": ["plot household debt month on month for each ward", {"pick": "no, just compare kasewadi with the rest"}],
+    # what the dashboard chart popover sends (lib/form.html pop()), after a chart in the chat
+    "popover": ["show average monthly income by ward as a chart",
+                "How is the Hadapsar Ward bar (Average monthly income per household (Rs): 24,400) on the dashboard chart worked out?",
+                "Show me the rows behind the Ramtekdi bar (Average monthly income per household (Rs): 13,400) on the dashboard chart.",
+                "Compare Yerawada Ward with the others on Average monthly income per household (Rs).",
+                "The Kasewadi bar (Average monthly income per household (Rs): 16,764.29) on the dashboard chart looks wrong to me. Check it.",
+                "About the Janata Vasahat bar (Average monthly income per household (Rs): 14,933.33) on the dashboard chart: this seems low, we had a camp here last month"],
     "nodata": ["how has vulnerability changed from last year?", "can you just estimate it?",
                "show yerawada household debt in 2031"],
     "panels": ["plot average income and vulnerability score for all wards on one bar chart",

@@ -348,6 +348,10 @@ def ask(files, file, question, chart=False, tab=None):
     return _done(st, m)
 
 
+TIME_WORDS = re.compile(r"(?i)\b(over time|trend\w*|chang\w*|last (year|month|quarter)|this year|month (on|by|to|over) "
+                        r"month|year (on|by|to|over) year|each (month|year)|per (year|quarter)|by (month|year|quarter|date)|"
+                        r"growth|grow\w*|grew|since|increas\w*|decreas\w*|rose|risen|fell|fallen|went (up|down)|"
+                        r"over the (years|months)|history|historical|(19|20)\d\d)\b")
 CORRECTION = re.compile(r"(?i)^\s*(no\b|not\b|nope|i meant|i mean|that'?s not|wrong|why do you need|i didn'?t (say|ask|mean))"
                         r"|\bnot (over|by|per|for|about)\b")
 
@@ -360,17 +364,22 @@ def _views(c, plan, intent, question):
     mids = list(plan.get("measures") or [])
     if not mids:
         words = set(re.findall(r"[a-z]+", (question or "").lower()))
-        for mm in f["measures"]:
-            if mm["id"] == "rows" or mm.get("hidden"):
+        best = (0, None)
+        for mm in f["measures"]:  # the figure whose distinctive words the question uses most
+            if mm["id"] == "rows" or mm.get("hidden") or mm["id"].startswith("sum:"):
                 continue
-            lw = [w for w in re.findall(r"[a-z]+", mm["label"].lower()) if len(w) > 3]
-            if lw and all(difflib.get_close_matches(w, words, n=1, cutoff=0.8) for w in lw[:2]):
-                mids.append(mm["id"])
+            lw = [w for w in re.findall(r"[a-z]+", mm["label"].split("(")[0].lower()) if len(w) > 3
+                  and w not in ("average", "number", "total", "households", "household", "share", "count", "with")]
+            hit = sum(bool(difflib.get_close_matches(w, words, n=1, cutoff=0.8)) for w in lw)
+            if lw and hit and hit / len(lw) > best[0]:
+                best = (hit / len(lw), mm["id"])
+        mids = [best[1]] if best[1] else []
     mids = _fair(mids, f)[:1] or _comparable(f)[:1]
     if not mids:
         return []
     mid, out = mids[0], []
-    target, col = plan.get("target") or [], plan.get("target_column")
+    target = plan.get("target") or []
+    col = plan.get("target_column") if target else None
     if not target:  # a group named in the question, even if the 9B didn't pick it out
         for x in f["filters"]:
             if x["kind"] == "choice" and x.get("values") and len(x["values"]) <= 30:
@@ -379,13 +388,14 @@ def _views(c, plan, intent, question):
                 if hit and len(hit) < len(x["values"]):
                     target, col = hit, x["column"]
                     break
-    words = set(re.findall(r"[a-z]+", (question or "").lower()))
+    # words naming the figure ("monthly income") don't name a grouping
+    words = set(re.findall(r"[a-z]+", (question or "").lower())) - set(re.findall(r"[a-z]+", c.label(mid).lower()))
 
     def score(g):
         gcol = g.get("column", g["id"])
-        named = any(difflib.get_close_matches(w, words, n=1, cutoff=0.8) for w in re.findall(r"[a-z]+", g["label"].lower())
-                    if len(w) > 3)
-        return (gcol != col, not named)
+        lw = [w for w in re.findall(r"[a-z]+", g["label"].split("(")[0].lower()) if len(w) > 3]
+        named = sum(bool(difflib.get_close_matches(w, words, n=1, cutoff=0.8)) for w in lw) / (len(lw) or 1)
+        return (gcol != col, -named)
     own = c.label(mid).lower()
     groups = sorted([g for g in f["group_by"] if ":" not in g["id"]
                      and g["label"].split("(")[0].strip().lower() not in own], key=score)[:3]
@@ -457,7 +467,7 @@ def validate(c, intent, active, question):
     if plan.get("unknown_value"):
         return plan
     need_figure = plan["intent"] in ("EXPLAIN_DIFFERENCE", "COMPARE", "RANK", "DISTRIBUTION", "INVESTIGATE")
-    if plan["intent"] == "INVESTIGATE" and active:
+    if plan["intent"] == "INVESTIGATE" and active and not (target and _mentioned(target, question)):
         plan.update(measures=list(active.get("measures") or []), target_column=active.get("target_column"),
                     target=list(active.get("target") or []))
         return plan
@@ -534,6 +544,11 @@ def execute(c, plan, chart, question):
         m["receipt"] = R.receipt(None, None, why_no_chart="nothing to draw: no matching rows")
         return m
     col, target, mids = plan.get("target_column"), plan.get("target") or [], plan["measures"]
+    if intent == "TREND" and not (f.get("date_columns") or []) and not TIME_WORDS.search(question or ""):
+        # "monthly income by ward": a word inside a figure's name isn't a question about time
+        v = _views(c, plan, {}, question)
+        if v:
+            return execute(c, v[0][1], True, question)
     if intent == "TREND":
         dates = f.get("date_columns") or []
         if not dates:

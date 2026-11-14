@@ -18,6 +18,16 @@
   }
 }
 * { box-sizing: border-box; }
+#pop { position: fixed; z-index: 20; width: min(320px, calc(100vw - 32px)); background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+#pop .what { font-weight: 600; margin-bottom: 8px; }
+#pop button { display: block; width: 100%; text-align: left; margin: 4px 0; padding: 7px 10px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--chip); color: var(--ink); font: inherit; cursor: pointer; }
+#pop button:hover { border-color: var(--accent); }
+#pop textarea { width: 100%; margin-top: 6px; min-height: 52px; font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 7px; padding: 6px; }
+#pop .note { color: var(--muted); font-size: 12px; margin-top: 4px; font-weight: 400; }
+body.popping #vg-tooltip-element { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
 header { padding: 18px 24px 10px; }
 h1 { margin: 0; font-size: 20px; font-weight: 650; }
@@ -116,6 +126,7 @@ a.back { display: inline-block; font-size: 13px; color: var(--muted); text-decor
       <details><summary>How this was worked out</summary><code id="sql"></code></details></div>
     <div class="card" id="chartcard" hidden><h2>Charts</h2><div class="gallery" id="charts"></div></div>
     <details class="card" id="probcard"><summary id="probhead">Problems</summary><div id="problems"></div></details>
+    <div id="pop" hidden role="dialog" aria-label="Ask about this part of the chart"></div>
     <dialog id="big"><img id="bigimg" alt=""><form method="dialog"><button>Close</button></form></dialog>
   </section>
 </main>
@@ -278,16 +289,63 @@ function run() {
 
 // The same Vega-Lite chart the chat shows (lib/vlchart.py), interactive here: hover for values, click a bar, a cell or
 // a point in time to drill into it (that value becomes a filter and the breakdown moves on to the next one).
+let LAST = null;
 function viz(r, spec) {
+  LAST = r;
   if (r.vl && window.vegaEmbed && window.vega && vega.expressionInterpreter) {
     $("viz").innerHTML = "";
     vegaEmbed("#viz", r.vl, {actions: false, renderer: "svg", ast: true, expr: vega.expressionInterpreter})
-      .then(res => res.view.addEventListener("click", (ev, item) => drill(item && item.datum, spec)))
+      .then(res => res.view.addEventListener("click", (ev, item) => pop(ev, item && item.datum, spec)))
       .catch(() => { $("viz").innerHTML = bars(r, spec); });
     return;
   }
   $("viz").innerHTML = bars(r, spec);
 }
+// Click a bar, a point or a cell: ask the chat about exactly that piece (it arrives as the person's own message, naming
+// the piece and its value), or drill into it as before. Without a chat to send to, a click just drills.
+const AGENT = new URLSearchParams(location.search).get("a") || "";
+function pop(ev, datum, spec) {
+  if (!datum) return;
+  const el = $("pop");
+  const cols = (LAST && LAST.columns) || [];
+  const keys = Object.keys(datum).filter(k => (cols.length ? cols.includes(k) : !/(^__|_start$|_end$|sort_index)/.test(k))
+                                             && typeof datum[k] !== "object");
+  const nums = keys.filter(k => typeof datum[k] === "number"), labs = keys.filter(k => !nums.includes(k));
+  const what = labs.map(k => datum[k]).join(" / ") || "this point";
+  const val = nums.map(k => `${k}: ${indian(datum[k])}`).join("; ");
+  const piece = `the ${what} ${nums.length ? "bar" : "mark"}` + (val ? ` (${val})` : "");
+  if (!AGENT) { drill(datum, spec); return; }
+  const say = async t => {
+    el.innerHTML = `<div class="what">${esc(what)}</div><div class="note">Sent to the chat.</div>`;
+    try { await api("/api/say", {agent: AGENT, text: t}); } catch (e) { el.innerHTML += `<div class="note">${esc(e.message)}</div>`; }
+    setTimeout(unpop, 1200);
+  };
+  el.innerHTML = `<div class="what">${esc(what)}${val ? `<div class="note">${esc(val)}</div>` : ""}</div>
+    <button data-q="calc">How is this number worked out?</button>
+    <button data-q="rows">Show the rows behind it</button>
+    <button data-q="cmp">Compare it with the others</button>
+    <button data-q="wrong">This looks wrong</button>
+    <button data-q="drill">Narrow the dashboard to ${esc(what)}</button>
+    <textarea placeholder="Or write a comment about it…"></textarea><button data-q="note">Send comment</button>`;
+  const Q = {calc: `How is ${piece} on the dashboard chart worked out?`,
+             rows: `Show me the rows behind ${piece} on the dashboard chart.`,
+             cmp: `Compare ${what} with the others on ${nums[0] || "this"}.`,
+             wrong: `${piece[0].toUpperCase() + piece.slice(1)} on the dashboard chart looks wrong to me. Check it.`};
+  el.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const q = b.dataset.q;
+    if (q === "drill") { unpop(); drill(datum, spec); return; }
+    if (q === "note") { const t = el.querySelector("textarea").value.trim(); if (t) say(`About ${piece} on the dashboard chart: ${t}`); return; }
+    say(Q[q]);
+  });
+  const e = ev && (ev.clientX != null ? ev : null);
+  el.hidden = false; document.body.classList.add("popping");
+  const x = e ? e.clientX : 40, y = e ? e.clientY : 120, w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.max(16, Math.min(x + 8, innerWidth - w - 16)) + "px";
+  el.style.top = Math.max(16, Math.min(y + 8, innerHeight - h - 16)) + "px";
+}
+function unpop() { $("pop").hidden = true; document.body.classList.remove("popping"); }
+document.addEventListener("keydown", e => { if (e.key === "Escape") unpop(); });
+document.addEventListener("mousedown", e => { const el = $("pop"); if (!el.hidden && !el.contains(e.target) && !e.target.closest("#viz")) unpop(); });
 function drill(datum, spec) {
   if (!datum) return;
   const f = form();

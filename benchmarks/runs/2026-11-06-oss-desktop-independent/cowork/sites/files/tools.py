@@ -51,6 +51,8 @@ def form_url(file, tab=None, spec=None):
         q["tab"] = tab
     if spec:
         q["spec"] = json.dumps(spec, separators=(",", ":"))
+    if os.environ.get("PASEO_AGENT_ID"):  # the chart popover sends questions about a bar into this chat
+        q["a"] = os.environ["PASEO_AGENT_ID"]
     # *.localhost reaches this computer; the tab reads "dashboard.localhost" until it loads (then the file's title),
     # instead of a bare 127.0.0.1 nobody recognises
     return f"http://dashboard.localhost:{port}/?" + urllib.parse.urlencode(q)

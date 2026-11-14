@@ -12,6 +12,8 @@ import json
 import re
 import os
 import secrets
+import shutil
+import subprocess
 import sys
 import threading
 import urllib.error
@@ -445,6 +447,19 @@ def make_handler(files, token):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(min(n, 100000))
                                   or b"{}")
+                if u.path == "/api/say":  # the chart popover: the person's question about one bar, into their chat
+                    agent, text = str(body.get("agent") or ""), str(body.get("text") or "").strip()
+                    if not re.fullmatch(r"[0-9a-f][0-9a-f-]{7,63}", agent) or not text or len(text) > 800:
+                        return self._send(400, {"error": "bad request"})
+                    exe = next((p for p in (shutil.which("paseo"), os.path.expanduser("~/.local/bin/paseo"),
+                                            "/usr/local/bin/paseo", "/usr/bin/paseo") if p and os.path.exists(p)), None)
+                    if not exe:
+                        return self._send(503, {"error": "Paseo isn't available to send this"})
+                    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_") or k == "PASEO_HOME"}
+                    r = subprocess.run([exe, "send", "--no-wait", agent, text], env=env, timeout=60,
+                                       capture_output=True, text=True)
+                    return self._send(200 if r.returncode == 0 else 502,
+                                      {"sent": r.returncode == 0} if r.returncode == 0 else {"error": "couldn't send"})
                 if u.path == "/api/run":
                     return self._send(200, files.run(body["file"], body.get("tab"), body.get("spec") or {}))
                 if u.path == "/api/decide":
