@@ -68,6 +68,16 @@ def show_agent(agent, side=None):
             f"~{side}" if side in ("left", "right") and split_enabled() else "")
     except (ValueError, KeyError, OSError, subprocess.SubprocessError) as e:
         return {"ok": False, "why": f"could not read Paseo's server id: {type(e).__name__}"}
+    # Navigate the running window through DevTools when it's on (the app is started with --remote-debugging-port).
+    # Handing the link to a second launch of the app was unreliable (2026-11-14: the window didn't move, and a
+    # second launch can be left running as a second window).
+    try:
+        page = next(t for t in _targets() if t.get("type") == "page" and str(t.get("url", "")).startswith("paseo://app"))
+        route = link.replace("paseo://h/", "paseo://app/h/", 1)
+        _ws_eval(page["webSocketDebuggerUrl"], f"location.href = {json.dumps(route)}; true")
+        return {"ok": True, "via": "devtools"}
+    except (OSError, ValueError, KeyError, StopIteration, ConnectionError, TimeoutError):
+        pass
     p = subprocess.Popen([APP, link], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)
     try:
