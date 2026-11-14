@@ -963,7 +963,7 @@ def privacy_route(j):
                 args["pipeline"] = mode
             if yes or mode in ("careful", "auto") or mode == "nine":
                 return message(model, [_tool_use(fa, args)])
-            return None  # Muse answers it itself, on this computer
+            return None  # Muse answers it itself, on this computer (privacy_nudge reminds it of the question)
         return None
     said = _last_typed(msgs)
     f = _open_file(msgs)
@@ -972,3 +972,23 @@ def privacy_route(j):
             and QUESTION.search(said) and not _lib("careful").DEFINE_WORDS.search(said):
         return message(model, [_tool_use(fa, {"file": f, "question": said, "chart": bool(CHART_WORDS.search(said))})])
     return None
+
+
+def privacy_nudge(j):
+    """Muse, after "Keep it on this computer": remind it of the exact question and what to do when no figure fits
+    (2026-11-14: it answered 'ratio of invasives to natives' with tree counts by species)."""
+    msgs = j.get("messages") or []
+    latest = _latest_tool(msgs)
+    if not latest or latest[0] != "AskUserQuestion" or \
+            (latest[1].get("questions") or [{}])[0].get("header") != SEND_HEAD:
+        return j
+    last = next((i for i, r in reversed(_file_ask_results(msgs)) if r.get("card")), {})
+    if not last.get("question"):
+        return j
+    note = ("Answer exactly this question, on this computer: \"" + last["question"] + "\". Pick the form's figure that "
+            "means what they asked. If none does, say so in one line, name the closest figure the form has and what "
+            "it shows, and offer teach_file to add the missing one. Don't answer a different question.")
+    content = msgs[-1].get("content")
+    if isinstance(content, list):
+        msgs[-1] = dict(msgs[-1], content=content + [{"type": "text", "text": note}])
+    return j

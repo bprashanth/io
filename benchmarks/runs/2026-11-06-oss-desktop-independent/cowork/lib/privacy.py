@@ -383,11 +383,13 @@ def plan(data_dir, file, path, tab, form, question, history, instructions=None):
             attempts.append(sent)
             got = _claude(sent)
             if got.get('cannot'):
-                return {'spec': None, 'sent': sent, 'sent_attempts': attempts, 'error': 'Planner cannot express this question'}
+                return {'spec': None, 'sent': sent, 'sent_attempts': attempts, 'error': 'Planner cannot express this question',
+                        'why': unmask(data_dir, file, str(got['cannot']))[:300]}
             spec = unmask(data_dir, file, got.get('spec'))
             error = _shape(form, spec)
             if not error:
-                return {'spec': spec, 'sent': sent, 'sent_attempts': attempts, 'error': None, 'scanner': scanner.status}
+                return {'spec': spec, 'sent': sent, 'sent_attempts': attempts, 'error': None, 'scanner': scanner.status,
+                        'note': str(got['note'])[:300] if got.get('note') else None}
             # One backtrack with a fixed shape-only message; never return local errors/data.
             prompt += ('\nPrevious spec: ' + json.dumps(got.get('spec'), ensure_ascii=False)
                        + '\nThe previous plan had an invalid shape: ' + error + ' Return a repaired JSON plan.')

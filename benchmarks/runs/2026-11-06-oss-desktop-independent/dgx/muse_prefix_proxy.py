@@ -125,6 +125,10 @@ class H(http.server.BaseHTTPRequestHandler):
                 if pre:
                     return self.reply(200, "text/event-stream", modes.sse(pre)) if j.get("stream") else \
                         self.reply(200, "application/json", json.dumps(pre, ensure_ascii=False).encode())
+                try:
+                    j = modes.privacy_nudge(j)
+                except Exception:  # noqa: BLE001
+                    traceback.print_exc()
             if mode != "muse":  # the split's spec call: straight to the 9B
                 j["model"] = modes.NINE_MODEL
                 body = json.dumps(j).encode()

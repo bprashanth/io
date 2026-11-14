@@ -726,7 +726,10 @@ def t_file_privacy(file, mode, review="ask"):
 
 MASK_NOTE = ("\nAlso: sort {by: <measure or column id>, dir: desc|asc} and limit <n> order and cut a list or a "
              "breakdown (\"highest\", \"top 5\"). Names, places and other private values are codes like PLACE_001 "
-             "or VALUE_002: use them exactly as they appear. The form and the thread follow as JSON.")
+             "or VALUE_002: use them exactly as they appear. If the exact figure isn't in the form but a close one is "
+             "(e.g. a share instead of a ratio, a named species instead of a group the form doesn't define), return "
+             "that spec and add \"note\": one plain sentence on how it differs from what they asked. Use \"cannot\" "
+             "only when nothing in the form is close. The form and the thread follow as JSON.")
 _masked_history = {}  # file -> [{"question", "spec"}] (real words; privacy.plan masks them again before sending)
 
 
@@ -751,8 +754,9 @@ def _masked_ask(file, question, tab, send):
     got = privacy.plan(dd, file, path, tab_, forms[tab_], question, _masked_history.get(file, []),
                        instructions=SPLIT_PROMPT + MASK_NOTE)
     if not got.get("spec"):
-        return {"reply": "Claude couldn't plan that one (" + str(got.get("error") or "no plan") + "). Ask it another "
-                         "way, or say \"keep it on this computer\".", "sent_to_claude": got.get("sent", "")[-400:]}
+        why = got.get("why") or got.get("error") or "no plan"
+        return {"reply": f"The form can't answer that yet: {why}. Say \"teach Idli\" and Claude can add this figure "
+                         "from a fake copy, or ask for something the form has.", "sent_to_claude": got.get("sent", "")[-400:]}
     _masked_history.setdefault(file, []).append({"question": question, "spec": got["spec"]})
     sp = got["spec"] if isinstance(got["spec"], dict) else {}
     res = _file_ask_spec(file, got["spec"], tab=tab_, chart=bool(sp.get("measures") and sp.get("group_by")))
@@ -760,6 +764,8 @@ def _masked_ask(file, question, tab, send):
         return {"reply": f"That plan didn't run here ({res['error']}). Ask it another way.", "spec": got["spec"]}
     shown = privacy.mask_text(dd, file, path, question)["masked"]
     body = (res.get("chart_markdown", "") + "\n\n" if res.get("chart_markdown") else "") + res.get("answer", "")
+    note = privacy.unmask(dd, file, got.get("note")) if got.get("note") else ""
+    body = (f"**Closest the form has:** {note}\n\n" if note else "") + body
     return {"reply": body + f"\n\n_Planned by Claude from: “{shown}”. Worked out on this computer._",
             "spec": got["spec"], "chart_markdown": res.get("chart_markdown"), "form_link": res.get("form_link")}
 

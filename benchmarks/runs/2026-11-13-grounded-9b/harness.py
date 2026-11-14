@@ -50,6 +50,8 @@ SCRIPTS = {
     "mask": ["which households in yerawada have the highest debt?", {"pick": "Send it"},
              "what is the average savings of Ganesh Shinde's household?", {"pick": "Send it"},
              "compare average income across wards", {"pick": "Keep it"}],
+    # a question the form has no figure for, kept local (Muse must say so, not answer something else)
+    "keepnofit": ["what is the ratio of women-headed to men-headed households across all wards?", {"pick": "Keep it"}],
     "nodata": ["how has vulnerability changed from last year?", "can you just estimate it?",
                "show yerawada household debt in 2031"],
     "panels": ["plot average income and vulnerability score for all wards on one bar chart",
