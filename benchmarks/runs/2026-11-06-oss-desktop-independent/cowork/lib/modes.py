@@ -954,6 +954,17 @@ def privacy_route(j):
         if name == "file_ask" and inp.get("question") and (res.get("privacy") or {}).get("mode") == "mask" \
                 and res.get("reply") and inp.get("send") != "no":
             return message(model, [_text(res["reply"])])
+        if name == "AskUserQuestion" and (inp.get("questions") or [{}])[0].get("header") not in (SEND_HEAD, PRIV_HEAD,
+                                                                                               "Which figure", "Which view"):
+            # a question typed into another card's "Other" box (people type while a card is open): route it like a
+            # typed message when the file is masked
+            ans = (_card_answers(inp, res.get("text", "")) or [""])[0] or ""
+            labels = {o.get("label") for q in inp.get("questions") or [] for o in q.get("options") or []}
+            f = _open_file(msgs)
+            if ans and ans not in labels and f and QUESTION.search(ans) and not LINK.search(ans) \
+                    and (_privacy_of(msgs, f) or {}).get("mode") == "mask" and not _lib("careful").DEFINE_WORDS.search(ans):
+                return message(model, [_tool_use(fa, {"file": f, "question": ans,
+                                                      "chart": bool(CHART_WORDS.search(ans))})])
         if name == "AskUserQuestion" and (inp.get("questions") or [{}])[0].get("header") == SEND_HEAD and fa:
             ans = (_card_answers(inp, res.get("text", "")) or [""])[0] or ""
             last = next((i for i, r in reversed(_file_ask_results(msgs)) if r.get("card")), {})
