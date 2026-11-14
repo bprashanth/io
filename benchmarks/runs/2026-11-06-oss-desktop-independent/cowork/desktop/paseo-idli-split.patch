@@ -1,5 +1,5 @@
 diff --git a/packages/app/src/agent-stream/view.tsx b/packages/app/src/agent-stream/view.tsx
-index 72923b42..af5bcd3c 100644
+index 72923b42..357a2d7a 100644
 --- a/packages/app/src/agent-stream/view.tsx
 +++ b/packages/app/src/agent-stream/view.tsx
 @@ -1,3 +1,5 @@
@@ -46,7 +46,32 @@ index 72923b42..af5bcd3c 100644
      const streamHead = providedStreamHead ?? sessionStreamHead;
      const forkAgent = useForkAgent({ serverId: resolvedServerId, toast, readOnly });
      const supportsAgentForkContextCursor = useSessionStore(
-@@ -1133,6 +1151,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -776,6 +794,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+                   message={item.text}
+                   timestamp={item.timestamp.getTime()}
+                   workspaceRoot={workspaceRoot}
++                  workspaceId={context.workspaceId ?? undefined}
+                   serverId={resolvedServerId}
+                   client={client}
+                   spacing={layoutItem.assistantSpacing}
+@@ -786,7 +805,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+           </AssistantFileLinkResolverProvider>
+         );
+       },
+-      [agentId, client, handleInlinePathPress, resolvedServerId, toast, workspaceRoot],
++      [
++        agentId,
++        client,
++        context.workspaceId,
++        handleInlinePathPress,
++        resolvedServerId,
++        toast,
++        workspaceRoot,
++      ],
+     );
+ 
+     const renderThoughtItem = useCallback(
+@@ -1133,6 +1160,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
            renderStreamItem,
          }),
      );
@@ -62,7 +87,7 @@ index 72923b42..af5bcd3c 100644
      const renderLiveAuxiliary = useCallback<StreamSegmentRenderers["renderLiveAuxiliary"]>(() => {
        const existingTailSpacing =
          auxiliary.turnFooter && !auxiliary.pendingPermissions ? TURN_FOOTER_BOTTOM_SPACING : 0;
-@@ -1144,8 +1171,18 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -1144,8 +1180,18 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
          pendingPermissions: auxiliary.pendingPermissions,
          turnFooter: auxiliary.turnFooter,
          bottomOverlayInset,
@@ -384,6 +409,666 @@ index 00000000..737c0ba3
 +    flexShrink: 0,
 +  },
 +}));
+diff --git a/packages/app/src/components/markdown/idli-chart/embed.tsx b/packages/app/src/components/markdown/idli-chart/embed.tsx
+new file mode 100644
+index 00000000..34244804
+--- /dev/null
++++ b/packages/app/src/components/markdown/idli-chart/embed.tsx
+@@ -0,0 +1,5 @@
++import type { IdliChartEmbedProps } from "./types";
++
++export function IdliChartEmbed(_props: IdliChartEmbedProps) {
++  return null;
++}
+diff --git a/packages/app/src/components/markdown/idli-chart/embed.web.tsx b/packages/app/src/components/markdown/idli-chart/embed.web.tsx
+new file mode 100644
+index 00000000..88c30a7b
+--- /dev/null
++++ b/packages/app/src/components/markdown/idli-chart/embed.web.tsx
+@@ -0,0 +1,132 @@
++import { useCallback, useEffect, useReducer } from "react";
++import { Text, View } from "react-native";
++import { StyleSheet } from "react-native-unistyles";
++import { Button } from "@/components/ui/button";
++import { Modal } from "@/components/ui/modal";
++import { ChartSurface } from "./surface";
++import type { IdliChartEmbedProps } from "./types";
++
++type ChartState = "loading" | "ready" | "enlarged";
++type ChartAction = "loaded" | "enlarge" | "close";
++
++function chartState(state: ChartState, action: ChartAction): ChartState {
++  if (action === "enlarge") return "enlarged";
++  if (action === "close") return "ready";
++  return state === "loading" ? "ready" : state;
++}
++
++export function IdliChartEmbed({ url, title, onFailed }: IdliChartEmbedProps) {
++  const [state, dispatch] = useReducer(chartState, "loading");
++  const loaded = useCallback(() => dispatch("loaded"), []);
++  const enlarge = useCallback(() => dispatch("enlarge"), []);
++  const close = useCallback(() => dispatch("close"), []);
++  const failed = useCallback(() => onFailed(url), [onFailed, url]);
++  useEffect(() => {
++    if (state !== "loading") return;
++    const timeout = window.setTimeout(failed, 5_000);
++    return () => window.clearTimeout(timeout);
++  }, [failed, state]);
++  return (
++    <View style={styles.container} testID="idli-chart">
++      <View style={styles.frame}>
++        <ChartSurface url={url} title={title} onLoad={loaded} onError={failed} />
++      </View>
++      <View style={styles.toolbar}>
++        {state === "loading" ? <Text style={styles.status}>Loading chart</Text> : null}
++        <Button variant="ghost" size="sm" onPress={enlarge} disabled={state === "loading"}>
++          Enlarge
++        </Button>
++      </View>
++      {state === "enlarged" ? (
++        <EnlargedChart url={url} title={title} onClose={close} onFailed={failed} />
++      ) : null}
++    </View>
++  );
++}
++
++interface EnlargedChartProps {
++  url: string;
++  title: string;
++  onClose: () => void;
++  onFailed: () => void;
++}
++
++function EnlargedChart({ url, title, onClose, onFailed }: EnlargedChartProps) {
++  const [ready, loaded] = useReducer(() => true, false);
++  useEffect(() => {
++    if (ready) return;
++    const timeout = window.setTimeout(onFailed, 5_000);
++    return () => window.clearTimeout(timeout);
++  }, [onFailed, ready]);
++  useEffect(() => {
++    function keydown(event: KeyboardEvent) {
++      if (event.key !== "Escape") return;
++      event.preventDefault();
++      event.stopImmediatePropagation();
++      onClose();
++    }
++    window.addEventListener("keydown", keydown, true);
++    return () => window.removeEventListener("keydown", keydown, true);
++  }, [onClose]);
++  return (
++    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
++      <View style={styles.backdrop}>
++        <View style={styles.dialog} role="dialog" aria-label={title} testID="idli-chart-enlarged">
++          <View style={styles.header}>
++            <Text style={styles.title} numberOfLines={1}>
++              {title}
++            </Text>
++            <Button variant="ghost" size="sm" onPress={onClose}>
++              Close
++            </Button>
++          </View>
++          <View style={styles.largeFrame}>
++            <ChartSurface
++              url={url}
++              title={title}
++              onLoad={loaded}
++              onError={onFailed}
++              onEscape={onClose}
++            />
++          </View>
++        </View>
++      </View>
++    </Modal>
++  );
++}
++
++const styles = StyleSheet.create((theme) => ({
++  container: { width: "100%", minWidth: 0 },
++  frame: { height: 320, width: "100%", backgroundColor: theme.colors.surface0 },
++  toolbar: {
++    flexDirection: "row",
++    alignItems: "center",
++    justifyContent: "flex-end",
++    gap: theme.spacing[2],
++  },
++  status: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
++  backdrop: {
++    flex: 1,
++    alignItems: "center",
++    justifyContent: "center",
++    padding: theme.spacing[6],
++    backgroundColor: "rgba(0, 0, 0, 0.6)",
++  },
++  dialog: {
++    width: "100%",
++    height: "90%",
++    maxWidth: 1440,
++    backgroundColor: theme.colors.surface0,
++    borderRadius: theme.borderRadius.lg,
++    overflow: "hidden",
++  },
++  header: {
++    flexDirection: "row",
++    alignItems: "center",
++    justifyContent: "space-between",
++    gap: theme.spacing[2],
++    padding: theme.spacing[3],
++  },
++  title: { flex: 1, color: theme.colors.foreground, fontSize: theme.fontSize.base },
++  largeFrame: { flex: 1, minHeight: 0 },
++}));
+diff --git a/packages/app/src/components/markdown/idli-chart/markdown.test.ts b/packages/app/src/components/markdown/idli-chart/markdown.test.ts
+new file mode 100644
+index 00000000..27655700
+--- /dev/null
++++ b/packages/app/src/components/markdown/idli-chart/markdown.test.ts
+@@ -0,0 +1,104 @@
++import { describe, expect, it } from "vitest";
++import { splitIdliChartMarkdown } from "./markdown";
++
++const ID = "0123456789abcdef0123456789abcdef";
++const IMAGE = `![Revenue](</data/views/${ID}.svg>)`;
++const LINK = `[Open interactive](http://dashboard.localhost:8797/view?id=${ID}&t=secret)`;
++const EMBED_URL = `http://dashboard.localhost:8797/view?id=${ID}&t=secret&embed=1&ws=workspace`;
++
++describe("Idli chart Markdown", () => {
++  it("pairs a view image with its interactive link and includes the displayed workspace", () => {
++    expect(splitIdliChartMarkdown(`${IMAGE}\n${LINK}`, "workspace")).toEqual([
++      { kind: "chart", key: "0", title: "Revenue", url: EMBED_URL },
++    ]);
++  });
++
++  it("keeps the original image and link after the chart fails", () => {
++    const source = `${IMAGE}\n${LINK}`;
++    expect(splitIdliChartMarkdown(source, "workspace", new Set([EMBED_URL]))).toEqual([
++      { kind: "markdown", key: "0", source },
++    ]);
++  });
++
++  it.each([
++    LINK.replace(ID, "f".repeat(32)),
++    LINK.replace("http:", "https:"),
++    LINK.replace(":8797", ":8798"),
++    LINK.replace("dashboard.localhost", "dashboard.localhost.evil.test"),
++    LINK.replace("dashboard.localhost", "user@dashboard.localhost"),
++    LINK.replace("/view?", "/other?"),
++    LINK.replace("&t=secret", ""),
++    LINK.replace("&t=secret", "&t="),
++    LINK.replace("Open interactive", "Another link"),
++    `\`${LINK}\``,
++    `\`\`\`md\n${LINK}\n\`\`\``,
++  ])("does not embed an image with an unrelated or untrusted link: %s", (link) => {
++    const source = `${IMAGE}\n${link}`;
++    expect(splitIdliChartMarkdown(source, "workspace")).toEqual([
++      { kind: "markdown", key: "0", source },
++    ]);
++  });
++
++  it.each([
++    IMAGE.replace("/views/", "/other/"),
++    IMAGE.replace(ID, "short"),
++    IMAGE.replace(".svg", ".png"),
++    IMAGE.replace(".svg", ".svg?preview=1"),
++    `\`${IMAGE}\``,
++    `\`\`\`md\n${IMAGE}\n\`\`\``,
++  ])("keeps ordinary images and chart examples in code: %s", (image) => {
++    const source = `${image}\n${LINK}`;
++    expect(splitIdliChartMarkdown(source, "workspace")).toEqual([
++      { kind: "markdown", key: "0", source },
++    ]);
++  });
++
++  it("pairs across the message, preserving prose, other links and images", () => {
++    const source = `${LINK}\n\nBefore\n\n${IMAGE}\n\nAfter [docs](https://example.com) ![other](/other.png)`;
++    const segments = splitIdliChartMarkdown(source, "workspace");
++    expect(segments.filter((segment) => segment.kind === "chart")).toEqual([
++      expect.objectContaining({ title: "Revenue", url: EMBED_URL }),
++    ]);
++    const markdown = segments
++      .filter((segment) => segment.kind === "markdown")
++      .map((segment) => segment.source)
++      .join("");
++    expect(markdown).toContain("Before");
++    expect(markdown).toContain("After [docs](https://example.com) ![other](/other.png)");
++    expect(markdown).not.toContain("Open interactive");
++  });
++
++  it("encodes the token and workspace without accepting workspace overrides from the link", () => {
++    const link = LINK.replace("secret", "a%2Bb%26c%3D").replace(")", "&ws=wrong&embed=0)");
++    const segments = splitIdliChartMarkdown(`${IMAGE}\n${link}`, "real workspace & right");
++    const chart = segments.find((segment) => segment.kind === "chart");
++    expect(chart).toBeDefined();
++    const url = new URL(chart!.url);
++    expect(url.searchParams.get("t")).toBe("a+b&c=");
++    expect(url.searchParams.get("ws")).toBe("real workspace & right");
++    expect(url.searchParams.get("embed")).toBe("1");
++  });
++
++  it("handles reference images and links and retains other reference definitions", () => {
++    const source = `![Revenue][chart]\n[Open interactive][live]\n\n[Read more][doc]\n\n[chart]: /data/views/${ID}.svg\n[live]: http://dashboard.localhost:8797/view?id=${ID}&t=secret\n[doc]: https://example.com`;
++    const segments = splitIdliChartMarkdown(source, "workspace");
++    expect(segments[0]).toMatchObject({ kind: "chart", title: "Revenue", url: EMBED_URL });
++    expect(segments[1]).toMatchObject({
++      kind: "markdown",
++      source: expect.stringContaining("[doc]: https://example.com"),
++    });
++  });
++
++  it("falls back independently when a message has several charts", () => {
++    const otherId = "f".repeat(32);
++    const source = `${IMAGE}\n${LINK}\n\n${IMAGE.replace(ID, otherId)}\n${LINK.replace(ID, otherId)}`;
++    const segments = splitIdliChartMarkdown(source, "workspace", new Set([EMBED_URL]));
++    expect(segments.filter((segment) => segment.kind === "chart")).toEqual([
++      expect.objectContaining({ url: EMBED_URL.replace(ID, otherId) }),
++    ]);
++    expect(segments[0]).toMatchObject({
++      kind: "markdown",
++      source: expect.stringContaining(`${IMAGE}\n${LINK}`),
++    });
++  });
++});
+diff --git a/packages/app/src/components/markdown/idli-chart/markdown.ts b/packages/app/src/components/markdown/idli-chart/markdown.ts
+new file mode 100644
+index 00000000..0cc4a9e2
+--- /dev/null
++++ b/packages/app/src/components/markdown/idli-chart/markdown.ts
+@@ -0,0 +1,149 @@
++import { fromMarkdown } from "mdast-util-from-markdown";
++import type { Definition, Nodes } from "mdast";
++
++const DASHBOARD = "http://dashboard.localhost:8797";
++
++interface MarkdownSegment {
++  kind: "markdown";
++  key: string;
++  source: string;
++}
++
++export interface IdliChartSegment {
++  kind: "chart";
++  key: string;
++  title: string;
++  url: string;
++}
++
++interface ChartLink {
++  id: string;
++  url: string;
++  start: number;
++  end: number;
++}
++
++interface Replacement {
++  start: number;
++  end: number;
++  chart?: IdliChartSegment;
++}
++
++interface ChartDocument {
++  nodes: Nodes[];
++  definitions: Map<string, Definition>;
++}
++
++function interactiveUrl(href: string, workspaceId: string): { id: string; url: string } | null {
++  let target: URL;
++  try {
++    target = new URL(href);
++  } catch {
++    return null;
++  }
++  const trusted = target.origin === DASHBOARD && target.pathname === "/view";
++  const id = target.searchParams.get("id");
++  const token = target.searchParams.get("t");
++  if (!trusted || target.username || target.password || !id || !token) return null;
++  if (!/^[a-f\d]{32}$/i.test(id)) return null;
++  const url = new URL("/view", DASHBOARD);
++  url.searchParams.set("id", id);
++  url.searchParams.set("t", token);
++  url.searchParams.set("embed", "1");
++  url.searchParams.set("ws", workspaceId);
++  return { id: id.toLowerCase(), url: url.toString() };
++}
++
++function chartDocument(source: string): ChartDocument {
++  const tree = fromMarkdown(source);
++  const definitions = new Map<string, Definition>();
++  const nodes: Nodes[] = [];
++  function visit(node: Nodes) {
++    nodes.push(node);
++    if (node.type === "definition" && !definitions.has(node.identifier))
++      definitions.set(node.identifier, node);
++    if ("children" in node) node.children.forEach(visit);
++  }
++  visit(tree);
++  return { nodes, definitions };
++}
++
++function chartLinks(document: ChartDocument, workspaceId: string): ChartLink[] {
++  const links: ChartLink[] = [];
++  for (const node of document.nodes) {
++    if (node.type !== "link" && node.type !== "linkReference") continue;
++    const label = node.children.map((child) => (child.type === "text" ? child.value : "")).join("");
++    if (label !== "Open interactive") continue;
++    const href = node.type === "link" ? node.url : document.definitions.get(node.identifier)?.url;
++    const start = node.position?.start.offset;
++    const end = node.position?.end.offset;
++    if (!href || start === undefined || end === undefined) continue;
++    const target = interactiveUrl(href, workspaceId);
++    if (target) links.push({ ...target, start, end });
++  }
++  return links;
++}
++
++interface ChartImagesInput extends ChartDocument {
++  links: ChartLink[];
++  failedUrls: ReadonlySet<string>;
++}
++
++function chartImages({ nodes, definitions, links, failedUrls }: ChartImagesInput): Replacement[] {
++  const replacements: Replacement[] = [];
++  for (const node of nodes) {
++    if (node.type !== "image" && node.type !== "imageReference") continue;
++    const href = node.type === "image" ? node.url : definitions.get(node.identifier)?.url;
++    const id = href?.match(/\/views\/([a-f\d]{32})\.svg$/i)?.[1].toLowerCase();
++    const start = node.position?.start.offset;
++    const end = node.position?.end.offset;
++    const link = links.find((candidate) => candidate.id === id);
++    if (!link || start === undefined || end === undefined || failedUrls.has(link.url)) continue;
++    replacements.push({
++      start,
++      end,
++      chart: { kind: "chart", key: String(start), title: node.alt || "Chart", url: link.url },
++    });
++  }
++  return replacements;
++}
++
++/** Match real Markdown nodes before local image URLs are replaced by cached blob URLs. */
++export function splitIdliChartMarkdown(
++  source: string,
++  workspaceId: string,
++  failedUrls: ReadonlySet<string> = new Set(),
++): (MarkdownSegment | IdliChartSegment)[] {
++  const plain: MarkdownSegment[] = [{ kind: "markdown", key: "0", source }];
++  if (!source.includes("views/") || !source.includes("Open interactive")) return plain;
++  const document = chartDocument(source);
++  const links = chartLinks(document, workspaceId);
++  const replacements = chartImages({ ...document, links, failedUrls });
++  if (replacements.length === 0) return plain;
++  const embeddedUrls = new Set(replacements.map((replacement) => replacement.chart!.url));
++  for (const link of links) {
++    if (embeddedUrls.has(link.url)) replacements.push({ start: link.start, end: link.end });
++  }
++  // Reference definitions must stay available in every fragment after splitting the message.
++  const referenceSource = [...document.definitions.values()]
++    .map((node) => source.slice(node.position!.start.offset, node.position!.end.offset))
++    .join("\n");
++  const segments: (MarkdownSegment | IdliChartSegment)[] = [];
++  function addMarkdown(start: number, end: number) {
++    const fragment = source.slice(start, end);
++    if (!fragment.trim()) return;
++    segments.push({
++      kind: "markdown",
++      key: String(start),
++      source: referenceSource ? `${referenceSource}\n\n${fragment}` : fragment,
++    });
++  }
++  let cursor = 0;
++  for (const replacement of replacements.sort((a, b) => a.start - b.start)) {
++    addMarkdown(cursor, replacement.start);
++    if (replacement.chart) segments.push(replacement.chart);
++    cursor = replacement.end;
++  }
++  addMarkdown(cursor, source.length);
++  return segments;
++}
+diff --git a/packages/app/src/components/markdown/idli-chart/surface.electron.tsx b/packages/app/src/components/markdown/idli-chart/surface.electron.tsx
+new file mode 100644
+index 00000000..e84fa530
+--- /dev/null
++++ b/packages/app/src/components/markdown/idli-chart/surface.electron.tsx
+@@ -0,0 +1,65 @@
++import { createElement, useEffect, useRef } from "react";
++import { getDesktopHost } from "@/desktop/host";
++import type { ChartSurfaceProps } from "./types";
++
++interface ChartWebview extends HTMLElement {
++  executeJavaScript(code: string): Promise<unknown>;
++}
++
++// A promise returned by executeJavaScript crosses the guest boundary without a new preload.
++// Parent key listeners cannot see Escape after a click inside a cross-origin iframe.
++const ESCAPE_SCRIPT = `new Promise(resolve => {
++  document.addEventListener('keydown', function closeChart(event) {
++    if (event.key !== 'Escape') return;
++    event.preventDefault();
++    event.stopImmediatePropagation();
++    document.removeEventListener('keydown', closeChart, true);
++    resolve('escape');
++  }, true);
++})`;
++
++export function ChartSurface({ url, title, onLoad, onError, onEscape }: ChartSurfaceProps) {
++  const frame = useRef<ChartWebview>(null);
++  const partition = getDesktopHost()?.browser?.profilePartition;
++  useEffect(() => {
++    const guest = frame.current;
++    if (!guest || !partition) {
++      onError();
++      return;
++    }
++    let active = true;
++    function loaded() {
++      onLoad();
++      if (!onEscape) return;
++      void guest!.executeJavaScript(ESCAPE_SCRIPT).then(
++        () => {
++          if (active) onEscape();
++          return undefined;
++        },
++        () => {
++          // Closing or navigating the guest destroys the pending keyboard promise.
++          return undefined;
++        },
++      );
++    }
++    function failed(event: Event) {
++      if ("isMainFrame" in event && event.isMainFrame === false) return;
++      onError();
++    }
++    function navigated(event: Event) {
++      if ("httpResponseCode" in event && Number(event.httpResponseCode) >= 400) onError();
++    }
++    guest.addEventListener("did-finish-load", loaded);
++    guest.addEventListener("did-fail-load", failed);
++    guest.addEventListener("did-navigate", navigated);
++    return () => {
++      active = false;
++      guest.removeEventListener("did-finish-load", loaded);
++      guest.removeEventListener("did-fail-load", failed);
++      guest.removeEventListener("did-navigate", navigated);
++    };
++  }, [onError, onEscape, onLoad, partition]);
++  return createElement("webview", { ref: frame, src: url, title, partition, style: frameStyle });
++}
++
++const frameStyle = { width: "100%", height: "100%", display: "flex" } as const;
+diff --git a/packages/app/src/components/markdown/idli-chart/surface.tsx b/packages/app/src/components/markdown/idli-chart/surface.tsx
+new file mode 100644
+index 00000000..f278e95e
+--- /dev/null
++++ b/packages/app/src/components/markdown/idli-chart/surface.tsx
+@@ -0,0 +1,5 @@
++import type { ChartSurfaceProps } from "./types";
++
++export function ChartSurface(_props: ChartSurfaceProps) {
++  return null;
++}
+diff --git a/packages/app/src/components/markdown/idli-chart/surface.web.tsx b/packages/app/src/components/markdown/idli-chart/surface.web.tsx
+new file mode 100644
+index 00000000..b3f1ef06
+--- /dev/null
++++ b/packages/app/src/components/markdown/idli-chart/surface.web.tsx
+@@ -0,0 +1,31 @@
++/* oxlint-disable react/iframe-missing-sandbox -- Chart scripts fetch their own CSV; the matcher pins a separate dashboard origin. */
++import { useEffect, useRef } from "react";
++import type { ChartSurfaceProps } from "./types";
++
++export function ChartSurface({ url, title, onLoad, onError, onEscape }: ChartSurfaceProps) {
++  const frame = useRef<HTMLIFrameElement>(null);
++  useEffect(() => {
++    // Cross-origin frames can opt into forwarding Escape when their content has focus.
++    function receive(event: MessageEvent) {
++      if (event.origin !== new URL(url).origin || event.source !== frame.current?.contentWindow)
++        return;
++      if (event.data?.type === "idli.chart.escape") onEscape?.();
++    }
++    window.addEventListener("message", receive);
++    return () => window.removeEventListener("message", receive);
++  }, [onEscape, url]);
++  return (
++    <iframe
++      ref={frame}
++      src={url}
++      title={title}
++      onLoad={onLoad}
++      onError={onError}
++      referrerPolicy="no-referrer"
++      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
++      style={frameStyle}
++    />
++  );
++}
++
++const frameStyle = { width: "100%", height: "100%", border: 0, display: "block" } as const;
+diff --git a/packages/app/src/components/markdown/idli-chart/types.ts b/packages/app/src/components/markdown/idli-chart/types.ts
+new file mode 100644
+index 00000000..cdc42ecb
+--- /dev/null
++++ b/packages/app/src/components/markdown/idli-chart/types.ts
+@@ -0,0 +1,13 @@
++export interface ChartSurfaceProps {
++  url: string;
++  title: string;
++  onLoad: () => void;
++  onError: () => void;
++  onEscape?: () => void;
++}
++
++export interface IdliChartEmbedProps {
++  url: string;
++  title: string;
++  onFailed: (url: string) => void;
++}
+diff --git a/packages/app/src/components/markdown/renderer.tsx b/packages/app/src/components/markdown/renderer.tsx
+index c14ecb51..26f12a89 100644
+--- a/packages/app/src/components/markdown/renderer.tsx
++++ b/packages/app/src/components/markdown/renderer.tsx
+@@ -1,4 +1,4 @@
+-import { memo, useMemo, useState } from "react";
++import { memo, useCallback, useMemo, useState } from "react";
+ import { EnrichedMarkdownText, type LinkPressEvent } from "react-native-enriched-markdown";
+ import { withUnistyles } from "react-native-unistyles";
+ import {
+@@ -17,6 +17,8 @@ import { createMarkdownStyles } from "./styles";
+ import { PENDING_MARKDOWN_IMAGE } from "./source";
+ import { splitStreamingMarkdown } from "./streaming";
+ import { useMarkdownSource, type MarkdownImageContext } from "./images";
++import { IdliChartEmbed } from "./idli-chart/embed";
++import { splitIdliChartMarkdown } from "./idli-chart/markdown";
+ 
+ import { MermaidFence, MermaidStreamingContext, splitMermaidFences } from "./fence/mermaid";
+ 
+@@ -43,6 +45,8 @@ function pickMarkdownStyle(compact: boolean, muted: boolean) {
+ 
+ export interface MarkdownRendererProps extends MarkdownImageContext {
+   text: string;
++  /** Set only by chat, using the workspace in which the message is displayed. */
++  workspaceId?: string;
+   compact?: boolean;
+   /** Muted text colour. Compact surfaces only. */
+   muted?: boolean;
+@@ -54,6 +58,34 @@ export interface MarkdownRendererProps extends MarkdownImageContext {
+ 
+ /** All Markdown surfaces share the same engine and source adaptation. */
+ export const MarkdownRenderer = memo(function MarkdownRenderer(props: MarkdownRendererProps) {
++  const [failedCharts, setFailedCharts] = useState<ReadonlySet<string>>(() => new Set());
++  const chartFailed = useCallback((url: string) => {
++    setFailedCharts((previous) => new Set([...previous, url]));
++  }, []);
++  const segments = useMemo(() => {
++    if (!isWeb || !props.workspaceId) return null;
++    return splitIdliChartMarkdown(props.text, props.workspaceId, failedCharts);
++  }, [props.text, props.workspaceId, failedCharts]);
++  if (!segments?.some((segment) => segment.kind === "chart")) return <MarkdownContent {...props} />;
++  return (
++    <MarkdownBlockStack>
++      {segments.map((segment) =>
++        segment.kind === "chart" ? (
++          <IdliChartEmbed
++            key={`chart:${segment.key}:${segment.url}`}
++            title={segment.title}
++            url={segment.url}
++            onFailed={chartFailed}
++          />
++        ) : (
++          <MarkdownContent key={`markdown:${segment.key}`} {...props} text={segment.source} />
++        ),
++      )}
++    </MarkdownBlockStack>
++  );
++});
++
++function MarkdownContent(props: MarkdownRendererProps) {
+   const streaming = !isWeb && !!props.streaming;
+   // Only completed lines affect block closure. Do not run mdast on every reveal frame.
+   const completeLines = streaming ? props.text.slice(0, props.text.lastIndexOf("\n") + 1) : "";
+@@ -69,7 +101,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer(props: MarkdownRe
+       <Part {...props} text={props.text.slice(boundary)} />
+     </MarkdownBlockStack>
+   );
+-});
++}
+ 
+ const CommandMarkdownPart = memo(function CommandMarkdownPart(props: MarkdownRendererProps) {
+   const commandHints = useAgentCommandHints();
+@@ -84,6 +116,7 @@ const MarkdownPart = memo(function MarkdownPart({
+   streaming = false,
+   onLinkPress,
+   agentCommands: _agentCommands,
++  workspaceId: _workspaceId,
+   commandHints = null,
+   ...imageContext
+ }: MarkdownRendererProps & { commandHints?: CommandHints | null }) {
+diff --git a/packages/app/src/components/message.tsx b/packages/app/src/components/message.tsx
+index 0ec5cbfb..1b9c0dab 100644
+--- a/packages/app/src/components/message.tsx
++++ b/packages/app/src/components/message.tsx
+@@ -724,6 +724,7 @@ interface AssistantMessageProps {
+   message: string;
+   timestamp: number;
+   workspaceRoot?: string;
++  workspaceId?: string;
+   serverId?: string;
+   client?: DaemonClient | null;
+   spacing?: "default" | "compactTop" | "compactBottom" | "compactBoth";
+@@ -1147,6 +1148,7 @@ export const AssistantMessage = memo(function AssistantMessage({
+   message,
+   timestamp: _timestamp,
+   workspaceRoot,
++  workspaceId,
+   serverId,
+   client,
+   spacing = "default",
+@@ -1199,6 +1201,7 @@ export const AssistantMessage = memo(function AssistantMessage({
+     >
+       <MarkdownRenderer
+         text={revealedMessage}
++        workspaceId={workspaceId}
+         agentCommands
+         streaming={phase !== "complete" || revealedMessage.length < renderedMessage.text.length}
+         client={client}
 diff --git a/packages/app/src/components/sidebar-workspace-list.tsx b/packages/app/src/components/sidebar-workspace-list.tsx
 index 8697a4b2..1fc80380 100644
 --- a/packages/app/src/components/sidebar-workspace-list.tsx
