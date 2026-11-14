@@ -14,9 +14,12 @@ went in (and how many were left out as blank). For anything you compute, run it 
 don't estimate. Say plainly when the file can't answer something (e.g. no date column for a trend).
 
 **Charts:** offer a chart in one short sentence. Only after the person says yes, compute its data with a Python
-script into a CSV in this folder, then call `idli_show(title, vega_lite, data_csv)`. Use field names from the CSV
-and do not put data URLs in the spec: Idli loads the CSV locally. A click on a bar sends the person's question back
-here; answer from the script and real rows. Never call `idli_show` before their consent.
+script into a CSV in this folder, then call `idli_show(title, vega_lite, data_csv, sources, script)`.
+Always pass `sources` (the list of source file paths under `drive/`) and `script` (the path of the Python script
+that wrote the CSV). Use field names from the CSV and do not put data URLs in the spec: Idli loads the CSV locally.
+A chart's popover shows its sources and saved CSV rows directly. Other left-click questions go to the left chat;
+right-click copies context here for the person to finish their question. Answer from the script and real rows.
+Never call `idli_show` before their consent.
 
 **Make a Mini:** brainstorm the goal and reusable questions with the person first. Write one `.py` script per
 question in this folder. A Mini has at most 8 questions and each question has at most 3 options (parameters).

@@ -24,7 +24,7 @@ def page_url(page, ident):
     return f'http://dashboard.localhost:{port}/{page}?' + urllib.parse.urlencode({'id': ident, 't': token})
 
 
-def idli_show(title, vega_lite, data_csv):
+def idli_show(title, vega_lite, data_csv, sources=None, script=None):
     import csv
     path = home.allowed_path(data_dir(), data_csv)
     if path.suffix.lower() != '.csv' or not isinstance(vega_lite, dict):
@@ -40,17 +40,10 @@ def idli_show(title, vega_lite, data_csv):
         if terminal:
             home._remember(data_dir(), workspace, terminal)
             agent = terminal
-    markdown = home.chart_markdown(data_dir(), title, {'vega_lite': vega_lite, 'data': rows}, agent)
+    markdown = home.chart_markdown(data_dir(), title, {'vega_lite': vega_lite, 'data': rows}, agent,
+                                   sources, script, workspace)
     if workspace:
-        chats = json.loads(home.cli('ls', '--json', '--label', 'idli.ws=' + workspace))
-        if isinstance(chats, dict):
-            chats = chats.get('agents', [])
-        # `paseo ls --label` already filtered to this workspace's chats, and its JSON carries no labels
-        left = next((c for c in chats if (c.get('labels') or {}).get('idli.left') == '1'), None) or next(
-            (c for c in chats if str(c.get('provider', '')).startswith('t4gc-cowork')), None) or (chats[0] if chats else None)
-        if not left:
-            raise ValueError('No left chat in this workspace')
-        home.cli('send', '--no-wait', left.get('id') or left['agentId'],
+        home.cli('send', '--no-wait', home.left_chat(workspace),
                  'Chart from Claude: ' + home.plain(title) + '\n' + markdown)
     return 'shown in Idli'
 
@@ -134,7 +127,9 @@ def idli_save_mini(name, goal, questions):
 
 TOOLS = {
     'idli_show': (idli_show, 'After the person agrees to see a chart, show your computed CSV in Idli.', {
-        'title': {'type': 'string'}, 'vega_lite': {'type': 'object'}, 'data_csv': {'type': 'string'}},
+        'title': {'type': 'string'}, 'vega_lite': {'type': 'object'}, 'data_csv': {'type': 'string'},
+        'sources': {'type': 'array', 'items': {'type': 'string'}, 'description': 'Source files under drive/'},
+        'script': {'type': 'string', 'description': 'Script that wrote the CSV'}},
         ['title', 'vega_lite', 'data_csv']),
     'idli_save_mini': (idli_save_mini, 'Save questions after brainstorming and checking every script result with the person.', {
         'name': {'type': 'string'}, 'goal': {'type': 'string'}, 'questions': {'type': 'array', 'items': {

@@ -171,6 +171,37 @@ def type_into(terminal, text):
     cli('terminal', 'send-keys', '-l', terminal, '\r')
 
 
+def left_chat(workspace):
+    if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
+        raise ValueError('Invalid workspace')
+    chats = json.loads(cli('ls', '--json', '--label', 'idli.ws=' + workspace))
+    if isinstance(chats, dict):
+        chats = chats.get('agents', [])
+    # Paseo has already filtered by workspace; older versions omit labels in JSON.
+    left = next((c for c in chats if (c.get('labels') or {}).get('idli.left') == '1'), None) or next(
+        (c for c in chats if str(c.get('provider', '')).startswith('t4gc-cowork')), None) or (chats[0] if chats else None)
+    if not left:
+        raise ValueError('No left chat in this workspace')
+    return left.get('id') or left['agentId']
+
+
+def claude_insert(data_dir, workspace, text):
+    """Insert chart context into this workspace's existing Claude, leaving it unsubmitted."""
+    from lib import uiswitch
+    if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
+        raise ValueError('Invalid workspace')
+    if (not isinstance(text, str) or not text.strip() or len(text) > 16000
+            or any(ord(c) < 32 or ord(c) == 127 for c in text)):
+        raise ValueError('Supply one line of chart context')
+    with _SEND_LOCK:
+        tid = _claude_terminal(data_dir, workspace)
+        if not tid:
+            raise ValueError('No Claude terminal in this workspace')
+        cli('terminal', 'send-keys', '-l', tid, text)
+    shown = uiswitch.show_terminal(workspace, tid, 'right')
+    return {'inserted': True, 'terminal': tid, 'focused': bool(shown.get('ok'))}
+
+
 def _drivey_workspace(data_dir, workspace=''):
     workspaces = json.loads(cli('workspace', 'ls', '--json'))
     mine = [w for w in workspaces if Path(w.get('cwd') or '.').expanduser().resolve() == Path(data_dir).resolve()]
@@ -187,7 +218,8 @@ def _claude_terminal(data_dir, wid):
     state = read(state_path) if state_path.exists() else {}
     tid = (state.get('terminals') or {}).get(wid) or (state.get('terminal') if state.get('workspace') == wid else None)
     terms = json.loads(cli('terminal', 'ls', '--all', '--json') or '[]')
-    live = {t.get('id') or t.get('terminalId') for t in terms}
+    live = {t.get('id') or t.get('terminalId') for t in terms
+            if (t.get('workspaceId') or t.get('workspace')) == wid}
     if tid in live:
         return tid
     # Drivey's "+" (Paseo P18) starts the Claude terminal itself: use that one
@@ -284,6 +316,15 @@ def view(data_dir, ident):
     return {**v, 'data': data}
 
 
+def chart_sources(data_dir, sources=None):
+    if sources is None:
+        return []
+    if not isinstance(sources, list) or any(not isinstance(s, str) for s in sources):
+        raise ValueError('Sources must be a list of files in drive/')
+    root = Path(data_dir).resolve()
+    return list(dict.fromkeys(str(inside(root / 'drive', root / s).relative_to(root)) for s in sources))
+
+
 def run_mini(data_dir, ident, qid, params):
     manifest = object_path(data_dir, 'minis', ident)
     m = read(manifest)
@@ -315,17 +356,21 @@ def run_mini(data_dir, ident, qid, params):
                 lines.pop()
         except ValueError:
             pass
-    return {'text': '\n'.join(lines), 'chart': chart, 'qid': qid, 'params': values, 'agent': m.get('agent')}
+    return {'text': '\n'.join(lines), 'chart': chart, 'qid': qid, 'params': values, 'agent': m.get('agent'),
+            'sources': chart_sources(data_dir, [f['local'] for f in m.get('files', []) if f.get('local')]),
+            'script': str(script)}
 
 
 def map_question(data_dir, ident, text):
     return map_questions(read(object_path(data_dir, 'minis', ident))['questions'], text)
 
 
-def chart_markdown(data_dir, title, chart, agent=None):
+def chart_markdown(data_dir, title, chart, agent=None, sources=None, script=None, workspace=None):
     """Save one computed chart as both a local SVG and an interactive view."""
     if not chart:
         return ''
+    sources = chart_sources(data_dir, sources)
+    script = str(allowed_path(data_dir, script)) if script else None
     import copy
     import vl_convert
     from lib import formserver
@@ -352,7 +397,8 @@ def chart_markdown(data_dir, title, chart, agent=None):
         writer.writeheader()
         writer.writerows(rows)
     write(out.with_suffix('.json'), {'title': title, 'spec': spec,
-                                    'data_csv': str(csv_path), 'agent': agent})
+                                    'data_csv': str(csv_path), 'agent': agent, 'sources': sources, 'script': script,
+                                    'workspace': workspace})
     port, token = formserver.ensure(str(data_dir))
     url = f'http://dashboard.localhost:{port}/view?' + urllib.parse.urlencode({'id': ident, 't': token})
     label = title.replace('[', '').replace(']', '').replace('\n', ' ')
@@ -371,7 +417,8 @@ def mini_open(data_dir, ident):
         example = run_mini(data_dir, ident, q['id'], {})
         lines.append('Example: ' + example['text'])
         if example['chart']:
-            lines.append(chart_markdown(data_dir, q['question'], example['chart'], m.get('agent')))
+            lines.append(chart_markdown(data_dir, q['question'], example['chart'], m.get('agent'),
+                                        example['sources'], example['script']))
     return {'id': ident, 'questions': m['questions'], 'reply': plain('\n'.join(lines))}
 
 
@@ -382,5 +429,6 @@ def mini_ask(data_dir, ident, qid, params):
     using = ', '.join(f'{k} = {v}' for k, v in result['params'].items())
     lines = ['Using: ' + q['question'] + (': ' + using if using else ''), result['text']]
     if result['chart']:
-        lines.append(chart_markdown(data_dir, q['question'], result['chart'], m.get('agent')))
+        lines.append(chart_markdown(data_dir, q['question'], result['chart'], m.get('agent'),
+                                    result['sources'], result['script']))
     return {**result, 'reply': plain('\n'.join(lines))}

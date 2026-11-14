@@ -132,9 +132,16 @@ def test_open_and_run_examples(data):
     assert got['reply'].count('[Open interactive](') == 5
     assert got['reply'].count('![') == 5
     assert len(list((data/'views').glob('*.svg'))) == 5
+    for path in (data/'views').glob('*.json'):
+        view = home.read(path)
+        assert view['sources'] == ['drive/households.xlsx', 'drive/field_programme_tracker.xlsx']
+        assert Path(view['script']).parent == data/'minis/synthetic'
+        assert Path(view['script']).is_file()
     answer = ft.t_mini_ask('synthetic','threshold', {'ward':'Kasewadi','months':6})
     assert answer['reply'].startswith('Using: Which households')
     assert 'ward = Kasewadi, months = 6' in answer['reply']
+    latest = max((data/'views').glob('*.json'), key=lambda p: p.stat().st_mtime_ns)
+    assert home.read(latest)['script'] == str(data/'minis/synthetic/threshold.py')
     assert '<svg' in next((data/'views').glob('*.svg')).read_text()
     with pytest.raises(ValueError): ft.t_mini_ask('synthetic','threshold',{'ward':'Unknown'})
 
@@ -196,6 +203,7 @@ def test_claude_posts_to_matching_left_chat(data, monkeypatch):
     assert calls[2][3].startswith('Chart from Claude: Debt\n![Debt](')
     assert '\n[Open interactive](' in calls[2][3]
     assert next(home.read(p)['agent'] for p in (data/'views').glob('*.json')) == 'claude-terminal'
+    assert next(home.read(p)['workspace'] for p in (data/'views').glob('*.json')) == 'workspace-2'
 
 
 def test_save_limits_and_author(data, monkeypatch):
@@ -283,3 +291,24 @@ def test_visible_chart_text_is_plain(data):
     assert '·' not in markdown and '→' not in markdown
     svg = next((data/'views').glob('*.svg')).read_text()
     assert '·' not in svg and '→' not in svg
+
+
+def test_chart_provenance_paths(data, monkeypatch, tmp_path):
+    monkeypatch.setenv('IDLI_CLAUDE_WORK', str(data))
+    csv = data/'counts.csv'
+    csv.write_text('ward,count\nA,2\n')
+    script = data/'counts.py'
+    script.write_text('# Synthetic CSV writer\n')
+    idli_mcp.idli_show('Counts', {'mark': 'bar'}, str(csv), ['drive/households.xlsx'], str(script))
+    view = home.read(next((data/'views').glob('*.json')))
+    assert view['sources'] == ['drive/households.xlsx'] and view['script'] == str(script)
+    assert home.view(data, next((data/'views').glob('*.json')).stem)['data'] == [{'ward':'A','count':'2'}]
+    outside = tmp_path/'outside.xlsx'
+    outside.write_text('outside')
+    (data/'drive/escape.xlsx').symlink_to(outside)
+    for sources in (['counts.csv'], [str(outside)], ['drive/escape.xlsx'], 'drive/households.xlsx'):
+        with pytest.raises(ValueError):
+            idli_mcp.idli_show('Bad source', {'mark':'bar'}, str(csv), sources, str(script))
+    with pytest.raises(ValueError):
+        idli_mcp.idli_show('Bad script', {'mark':'bar'}, str(csv), [], str(outside))
+    assert len(list((data/'views').glob('*.json'))) == 1

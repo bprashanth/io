@@ -213,7 +213,8 @@ def test_mcp_stdio_and_mini(workspace, monkeypatch):
             {'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2025-06-18'}},
             {'id': 2, 'method': 'tools/list'},
             {'id': 3, 'method': 'tools/call', 'params': {'name': 'idli_show', 'arguments': {
-                'title': 'Counts', 'vega_lite': {'mark': 'bar'}, 'data_csv': str(csv)}}},
+                'title': 'Counts', 'vega_lite': {'mark': 'bar'}, 'data_csv': str(csv),
+                'sources': ['drive/households.xlsx'], 'script': str(work / 'answer.py')}}},
             {'id': 4, 'method': 'tools/call', 'params': {'name': 'idli_save_mini', 'arguments': {
                 'name': 'Households', 'goal': 'Count checked households', 'questions': q}}},
             {'id': 5, 'method': 'tools/call', 'params': {'name': 'idli_show', 'arguments': {
@@ -230,6 +231,9 @@ def test_mcp_stdio_and_mini(workspace, monkeypatch):
         assert len(views) == 1
         view = home.read(views[0])
         assert Path(view['data_csv']).read_text() == csv.read_text() and view['agent'] == AGENT
+        assert view['sources'] == ['drive/households.xlsx'] and view['script'] == str(work / 'answer.py')
+        props = replies[1]['result']['tools'][0]['inputSchema']['properties']
+        assert props['sources']['type'] == 'array' and props['script']['type'] == 'string'
         assert len(api(server, '/api/view?id=' + views[0].stem)['data']) == 2
         mini = home.read(root / 'minis/households/mini.json')
         assert mini['files'][0]['id'] == 'drive-households'
@@ -335,11 +339,12 @@ def test_browser(workspace, paseo, monkeypatch):
         assert '7' in page.locator('#answer').inner_text()
         page.locator('#viz .mark-rect path').first.wait_for()
         page.locator('#viz .mark-rect path').first.click()
-        assert page.locator('#pop').is_hidden()  # no Claude agent on this Mini
+        assert page.locator('#pop').is_visible()  # local provenance works without a Claude agent
+        assert page.get_by_text('How is this number worked out?', exact=True).is_disabled()
         page.locator('#ask').fill('count households')
         page.locator('#match').click()
         page.wait_for_function("() => document.querySelector('#mapping').textContent.includes('This Mini can answer:')")
-        assert 'Check the inputs' in page.locator('#mapping').inner_text()
+        assert 'Count households' in page.locator('#mapping').inner_text()
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         page.screenshot(path=str(shots / 'mini-dark.png'), full_page=True)
         assert not errors
@@ -396,3 +401,128 @@ def test_mcp_path_confinement(workspace, tmp_path, monkeypatch):
     with pytest.raises(ValueError): idli_mcp.idli_show('bad destination', {}, str(work / 'valid.csv'))
     with pytest.raises(ValueError): idli_mcp.idli_save_mini('bad', '', [{
         'id': 'bad', 'question': 'Bad', 'script': str(outside), 'params': {}}])
+
+
+def test_claude_insert_and_left_chat(workspace, paseo, monkeypatch):
+    root, _ = workspace
+    record, agents = paseo
+    agents.write_text(json.dumps([{'id': AGENT, 'labels': {'idli.left': '1'}}]))
+    agents.with_name('terms.json').write_text(json.dumps([
+        {'id': 'term-other', 'workspaceId': 'other', 'name': 'Claude'},
+        {'id': 'term-drivey', 'workspaceId': 'drivey', 'name': 'Claude'}]))
+    # A stale recorded terminal from another workspace must never win.
+    home.write(root / '.idli/home.json', {'terminals': {'drivey': 'term-other'}})
+    shown = []
+    monkeypatch.setattr(uiswitch, 'show_terminal', lambda *args: shown.append(args) or {'ok': True})
+    context = 'About the chart "Counts" (data: counts.csv; made by: answer.py; from: drive/households.xlsx): Group = A '
+    with running(formserver.make_handler(formserver.Files(root), TOKEN)) as server:
+        assert api(server, '/api/claude-insert', {'ws': 'drivey', 'text': context}) == {
+            'inserted': True, 'terminal': 'term-drivey', 'focused': True}
+        assert api(server, '/api/say', {'ws': 'drivey', 'agent': 'term-other', 'text': 'Compare A'}) == {'sent': True}
+        calls = [json.loads(line)['args'] for line in record.read_text().splitlines()]
+        assert ['terminal', 'send-keys', '-l', 'term-drivey', context] in calls
+        assert ['ls', '--json', '--label', 'idli.ws=drivey'] in calls
+        assert ['send', '--no-wait', AGENT, 'Compare A'] in calls
+        assert shown == [('drivey', 'term-drivey', 'right')]
+        for body in ({'ws': '', 'text': context}, {'ws': 'missing', 'text': context},
+                     {'ws': 'drivey', 'text': 'bad\rinput'}, {'ws': 'drivey', 'text': 'bad\ninput'},
+                     {'ws': 'drivey', 'text': '\x1b[20~'}, {'ws': 'drivey', 'text': ''}):
+            with pytest.raises(HTTPError) as err:
+                api(server, '/api/claude-insert', body)
+            assert err.value.code == 400
+        with pytest.raises(HTTPError) as err:
+            api(server, '/api/claude-insert', {'ws': 'drivey', 'text': context}, token='wrong')
+        assert err.value.code == 403
+    keys = [json.loads(line)['args'] for line in record.read_text().splitlines()
+            if json.loads(line)['args'][:2] == ['terminal', 'send-keys']]
+    assert keys == [['terminal', 'send-keys', '-l', 'term-drivey', context]]  # no Enter or startup command
+
+
+@pytest.mark.skipif(os.environ.get('HOME_BROWSER') != '1', reason='Set HOME_BROWSER=1 for Chromium')
+def test_embed_browser(workspace, paseo, monkeypatch, tmp_path):
+    from playwright.sync_api import sync_playwright
+    root, work = workspace
+    record, agents = paseo
+    agents.write_text(json.dumps([{'id': AGENT, 'labels': {'idli.left': '1'}}]))
+    agents.with_name('terms.json').write_text(json.dumps([
+        {'id': 'claude-drivey', 'workspaceId': 'drivey', 'name': 'Claude'}]))
+    shown = []
+    monkeypatch.setattr(uiswitch, 'show_terminal', lambda *args: shown.append(args) or {'ok': True})
+    ident = 'a' * 32
+    csv = work / 'counts.csv'
+    csv.write_text('Group,Count\nA,2\nB,3\n')
+    script = work / 'counts.py'
+    script.write_text('# Synthetic CSV writer\n')
+    home.write(root / f'views/{ident}.json', {'title': 'Household counts', 'agent': 'claude-drivey',
+        'data_csv': str(csv), 'sources': ['drive/households.xlsx'], 'script': str(script),
+        'spec': {'mark': 'bar', 'encoding': {'x': {'field': 'Group', 'type': 'nominal'},
+                                          'y': {'field': 'Count', 'type': 'quantitative'}}}})
+    with running(formserver.make_handler(formserver.Files(root), TOKEN)) as server, sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
+        page = browser.new_page(viewport={'width': 480, 'height': 320})
+        errors, posts = [], []
+        page.on('pageerror', lambda err: errors.append(str(err)))
+        page.on('request', lambda req: posts.append((req.url.split('?')[0], req.post_data_json)) if req.method == 'POST' else None)
+        page.goto(f'http://127.0.0.1:{server.server_port}/view?id={ident}&t={TOKEN}&embed=1&ws=drivey')
+        marks = page.locator('#viz .mark-rect path')
+        marks.first.wait_for()
+        assert page.locator('#homelink').is_hidden() and page.locator('#title').is_hidden()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight')
+        svg = page.locator('#viz svg').bounding_box()
+        assert svg['width'] <= 480 and svg['height'] <= 320
+        marks.first.click()
+        assert page.locator('#pop button').first.inner_text() == 'Where did this come from?'
+        page.locator('#pop button').first.click()
+        detail = page.locator('#pop').inner_text()
+        assert 'drive/households.xlsx' in detail and str(script) in detail and str(csv) in detail
+        assert 'Rows behind this element: 1' in detail
+        assert page.locator('#pop tbody').inner_text() == 'A\t2'
+        assert posts == []  # provenance comes from the saved CSV and metadata, without a model
+        page.keyboard.press('Escape')
+        marks.first.click()
+        page.get_by_text('Show the rows behind it', exact=True).click()
+        page.wait_for_function("() => document.querySelector('#pop').textContent.includes('Sent to the left chat.')")
+        assert posts[-1][0].endswith('/api/say') and posts[-1][1]['ws'] == 'drivey'
+        page.keyboard.press('Escape')
+        for whole in (False, True):
+            marks.first.click(button='right')
+            assert page.locator('#pop').get_attribute('role') == 'menu'
+            assert page.locator('#pop button').all_text_contents() == ['Copy to Claude', 'Copy whole chart to Claude']
+            page.get_by_text('Copy whole chart to Claude' if whole else 'Copy to Claude', exact=True).click()
+            page.locator('#pop').wait_for(state='hidden')
+            assert posts[-1][0].endswith('/api/claude-insert')
+            body = posts[-1][1]
+            base = f'About the chart "Household counts" (data: {csv}; made by: {script}; from: drive/households.xlsx)'
+            assert body == {'ws': 'drivey', 'text': base + (' ' if whole else ': Group = A, Count = 2 ')}
+        for scheme in ('dark', 'light'):
+            page.emulate_media(color_scheme=scheme)
+            page.set_viewport_size({'width': 360 if scheme == 'dark' else 720, 'height': 320})
+            page.wait_for_timeout(250)
+            marks.first.wait_for()
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight')
+            assert page.evaluate('getComputedStyle(document.body).backgroundColor') == ('rgb(22, 22, 21)' if scheme == 'dark' else 'rgb(246, 245, 242)')
+            assert page.locator('#viz .role-axis-label text').first.get_attribute('fill') == ('rgb(236, 235, 231)' if scheme == 'dark' else 'rgb(29, 29, 27)')
+            page.screenshot(path=str(tmp_path / f'embed-{scheme}.png'))
+        # Multi-panel charts cannot use fit autosize. Scaling must preserve click targeting and CSV lineage.
+        panel = {'mark': 'bar', 'width': 400, 'height': 400, 'encoding': {
+            'x': {'field': 'Group', 'type': 'nominal'},
+            'y': {'field': 'Count', 'aggregate': 'sum', 'type': 'quantitative'}}}
+        view = home.read(root / f'views/{ident}.json')
+        view['spec'] = {'hconcat': [panel, panel], 'background': 'white'}
+        home.write(root / f'views/{ident}.json', view)
+        csv.write_text('Group,Count\nA,2\nA,4\nB,3\n')
+        page.reload()
+        marks.first.wait_for()
+        svg = page.locator('#viz svg').bounding_box()
+        assert svg['width'] <= 720 and svg['height'] <= 320
+        marks.first.click()
+        page.get_by_text('Where did this come from?', exact=True).click()
+        assert 'Rows behind this element: 2' in page.locator('#pop').inner_text()
+        assert page.locator('#pop tbody tr').count() == 2
+        assert not errors
+        browser.close()
+    calls = [json.loads(line)['args'] for line in record.read_text().splitlines()]
+    assert any(c[:3] == ['send', '--no-wait', AGENT] for c in calls)
+    keys = [c for c in calls if c[:2] == ['terminal', 'send-keys']]
+    assert len(keys) == 2 and all(c[2:4] == ['-l', 'claude-drivey'] and c[-1].endswith(' ') for c in keys)
+    assert shown == [('drivey', 'claude-drivey', 'right')] * 2

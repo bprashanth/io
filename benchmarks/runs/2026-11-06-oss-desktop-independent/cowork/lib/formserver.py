@@ -517,8 +517,15 @@ def make_handler(files, token):
                     return self._send(200, home.run_mini(files.data_dir, body["id"], body["qid"], body.get("params", {})))
                 if u.path == "/api/mini/map":
                     return self._send(200, home.map_question(files.data_dir, body["id"], body.get("question", "")))
+                if u.path == "/api/claude-insert":
+                    return self._send(200, home.claude_insert(files.data_dir, body.get("ws"), body.get("text")))
                 if u.path == "/api/say":  # the chart popover: the person's question about one bar, into their chat
                     agent, text = str(body.get("agent") or ""), str(body.get("text") or "").strip()
+                    if body.get('ws'):
+                        if not text or len(text) > 800:
+                            return self._send(400, {"error": "bad request"})
+                        home.cli('send', '--no-wait', home.left_chat(body['ws']), text)
+                        return self._send(200, {'sent': True})
                     if not re.fullmatch(r"[0-9a-f][0-9a-f-]{7,63}", agent) or not text or len(text) > 800:
                         return self._send(400, {"error": "bad request"})
                     exe = next((p for p in (shutil.which("paseo"), os.path.expanduser("~/.local/bin/paseo"),
