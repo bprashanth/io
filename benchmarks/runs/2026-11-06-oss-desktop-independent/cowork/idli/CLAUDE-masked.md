@@ -26,3 +26,6 @@ current files with its default parameters, show the results for the person to ch
 `idli_save_mini(name, goal, questions)`. Each question has `id`, `question`, `script` (the .py path), `params`
 (mapping names to `{type: "choice"|"number"|"text", choices?, default}`), and optionally `chart`. Save only once
 they have checked the questions and results. The returned URL opens their Mini.
+
+**Mini scripts** run with Idli's own Python (it has pandas), in strict `-I` mode. If your `python3` can't import
+pandas under `-I`, that's your Python, not the Mini's: test with plain `python3` and don't warn the person about it.
