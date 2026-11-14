@@ -27,6 +27,8 @@ def main():
         shutil.copy2(COWORK / "desktop/claude-masked.sh", launcher)
         shutil.copy2(COWORK / "idli/CLAUDE-masked.md", install / "idli/CLAUDE-masked.md")
         shutil.copytree(COWORK / "idli/claude-skills", install / "idli/claude-skills")
+        shutil.copytree(COWORK / "idli/claude-commands", install / "idli/claude-commands")
+        shutil.copytree(COWORK / "lib", install / "lib", ignore=shutil.ignore_patterns("__pycache__"))
         # Simulate proxy readiness and skip the server. Execute only the launcher's
         # configuration-writing Python against our temporary paths.
         executable(install / ".venv/bin/python", f"#!{sys.executable}\n" + '''
@@ -51,6 +53,8 @@ pathlib.Path('launch-result.json').write_text(json.dumps({'cwd':os.getcwd(), 'ar
         custom = work / ".claude/skills/custom/SKILL.md"
         custom.parent.mkdir(parents=True)
         custom.write_text("User's unrelated local skill\n")
+        settings = work / ".claude/settings.json"
+        settings.write_text(json.dumps({"theme":"dark", "permissions":{"allow":["Read"],"ask":["Bash"]}}))
 
         def launch():
             subprocess.run(["sh", str(launcher), "--print", "synthetic question"], env=env, check=True,
@@ -66,6 +70,8 @@ pathlib.Path('launch-result.json').write_text(json.dumps({'cwd':os.getcwd(), 'ar
             assert (work / "drive").resolve() == data / "drive"
             result = json.loads((work / "launch-result.json").read_text())
             assert result == {"cwd": str(work), "args": [f"--mcp-config={work}/.idli-mcp.json", "--print", "synthetic question"]}
+            merged = json.loads(settings.read_text())
+            assert merged == {"theme":"dark", "permissions":{"allow":["Read"], "ask":["Bash", "mcp__idli__unmask", "mcp__idli__lookup"]}}
             config = work / ".idli-mcp.json"
             assert config.stat().st_mode & 0o777 == 0o600
             assert json.loads(config.read_text())["mcpServers"]["idli"]["args"] == ["-I", str(install / "lib/idli_mcp.py")]

@@ -29,6 +29,8 @@ def idli_show(title, vega_lite, data_csv, sources=None, script=None):
         raise ValueError('Supply a CSV and a Vega-Lite object')
     with path.open(newline='') as f:
         rows = list(csv.DictReader(f))
+    from lib import maps
+    vega_lite = maps.prepare(vega_lite, rows)
     state = Path(data_dir()) / '.idli/home.json'
     st = home.read(state) if state.exists() else {}
     agent = os.environ.get('PASEO_AGENT_ID') or st.get('terminal')
@@ -45,6 +47,23 @@ def idli_show(title, vega_lite, data_csv, sources=None, script=None):
     opened = uiswitch.open_url(workspace, url, side='right', focus=True)
     return {'shown': bool(opened.get('ok')), 'url': url,
             'message': 'Chart opened on the right.' if opened.get('ok') else 'Open the chart with this link.'}
+
+
+def unmask(code, reason):
+    from lib import reveals
+    result = reveals.ask(data_dir(), code, reason, os.environ.get('IDLI_WORKSPACE'))
+    return {'code': code, 'value': result['value']} if 'refused' not in result else result
+
+
+def lookup(code, query, reason):
+    from lib import reveals
+    result = reveals.ask(data_dir(), code, reason, os.environ.get('IDLI_WORKSPACE'), 'lookup', query)
+    if 'refused' in result:
+        return result
+    try:
+        return reveals.lookup_results(data_dir(), code, result['query'], result['value'])
+    except (OSError, ValueError):
+        return {'refused': 'The search could not finish. The value stays hidden from Claude.'}
 
 
 def mini_author():
@@ -101,6 +120,15 @@ TOOLS['idli_draft_mini'] = (idli_draft_mini, 'After checking every script, open 
      'code': {'type': 'string', 'description': 'Where the checked scripts live.'}}, ['title', 'story', 'questions', 'code'])
 
 
+for name, fn, description in [
+        ('unmask', unmask, 'Ask the person to reveal one contextual code. Personal data is never revealed.'),
+        ('lookup', lookup, 'Ask to search from this computer with one contextual code. Search results stay masked.')]:
+    props = {'code': {'type': 'string'}, 'reason': {'type': 'string'}}
+    if name == 'lookup':
+        props['query'] = {'type': 'string', 'description': 'Search text containing {value}.'}
+    TOOLS[name] = (fn, description, props, list(props))
+
+
 def main():
     for line in sys.stdin:
         try:
@@ -120,6 +148,10 @@ def main():
                     args = message['params']
                     out = TOOLS[args['name']][0](**args.get('arguments', {}))
                     result = {'content': [{'type': 'text', 'text': out if isinstance(out, str) else json.dumps(out)}]}
+                except ValueError as exc:
+                    from lib.maps import MapError
+                    detail = str(exc) if isinstance(exc, MapError) else 'Check the file paths and inputs, then retry.'
+                    result = {'isError': True, 'content': [{'type': 'text', 'text': detail}]}
                 except Exception:
                     # Keep paths, tool contents and browser URLs (which contain tokens) out of errors.
                     result = {'isError': True, 'content': [{'type': 'text', 'text':

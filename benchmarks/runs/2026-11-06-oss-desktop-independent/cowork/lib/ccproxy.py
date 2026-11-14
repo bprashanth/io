@@ -43,13 +43,12 @@ def walk(node, fn, keys=False):
     if isinstance(node, dict):
         if node.get('type') in SIGNED:
             return copy.deepcopy(node)
-        return {fn(k) if keys else k: walk(v, fn, keys) for k, v in node.items()}
+        result = {fn(k) if keys else k: walk(v, fn, keys) for k, v in node.items()}
+        if keys and node.get('type') == 'tool_use' and node.get('name') in ('mcp__idli__unmask', 'mcp__idli__lookup'):
+            if isinstance(node.get('input'), dict) and 'code' in node['input']:
+                result['input']['code'] = node['input']['code']
+        return result
     return node
-
-
-def eligible(value):
-    # Whole numeric cells from selected columns only; short counts are too ambiguous.
-    return not re.fullmatch(r'[+-]?\d+(?:\.\d+)?', value) or len(re.sub(r'\D', '', value)) >= 4
 
 
 CONTENT_FIELDS = ("system", "messages")
@@ -76,17 +75,18 @@ class Transformer:
                 stat = (self.data_dir / key).stat()
                 files.append((key, stat.st_mtime_ns, stat.st_size))
         vp = self.data_dir / 'vault' / 'session.json'
-        signature = (raw, tuple(files), vp.stat().st_mtime_ns if vp.exists() else None)
+        rp = self.data_dir / '.idli/reveals.json'
+        revealed = rp.read_bytes() if rp.exists() else b'[]'
+        signature = (raw, tuple(files), vp.stat().st_mtime_ns if vp.exists() else None, revealed)
         if signature == self.signature:
             return
         self.full = privacy.session_vault(self.data_dir)
-        self.vault = privacy.active_vault(self.data_dir, self.full)
-        self.vault.display = {c: v for c, v in self.vault.display.items() if eligible(v)}
+        self.vault, self.allowed = privacy.proxy_vault(self.data_dir, self.full)
         self.vault.forward = {normalise(v): c for c, v in self.vault.display.items()}
         self.vault.refresh()
         self.cache.clear()
         self.revision += 1
-        self.signature = (raw, tuple(files), vp.stat().st_mtime_ns)
+        self.signature = (raw, tuple(files), vp.stat().st_mtime_ns, revealed)
 
     def string(self, text, scan, scanner, stats):
         digest = hashlib.sha256(text.encode()).digest()
@@ -111,7 +111,14 @@ class Transformer:
                     if not re.fullmatch(r'[+-]?\d+(?:\.\d+)?', remaining[a:b])]
 
         before = len(self.vault.display)
+        # Shield approved contextual values from both regex and scanner re-detection.
+        protected = {}
+        for n, value in enumerate(sorted(self.allowed.values(), key=len, reverse=True)):
+            marker = '\ue000' + chr(0xe100 + n) + '\ue001'
+            text = re.sub(privacy._value_pattern(value), lambda m: protected.setdefault(marker, m.group()) and marker, text, flags=re.I)
         out, found = privacy._redact(text, self.vault, detect)
+        for marker, value in protected.items():
+            out = out.replace(marker, value)
         if len(self.vault.display) != before:
             self.revision += 1
             self.cache.clear()  # old history may now contain a newly discovered private value
@@ -156,7 +163,7 @@ class Transformer:
         self.full.counters.update(self.vault.counters)
         if self.full.display != PseudonymMap(self.full.path).display:
             privacy._save(self.full)
-            self.signature = (*self.signature[:2], self.full.path.stat().st_mtime_ns)
+            self.signature = (*self.signature[:2], self.full.path.stat().st_mtime_ns, self.signature[3])
         return out, stats
 
     def leaks(self, body):
@@ -240,6 +247,7 @@ class SSE:
     def __init__(self, vault):
         self.vault = vault
         self.blocks = {}
+        self.code_tools = {}
 
     @staticmethod
     def event(obj):
@@ -256,11 +264,18 @@ class SSE:
             return raw
         kind = obj.get('type')
         index = obj.get('index')
+        if kind == 'content_block_start':
+            block = obj.get('content_block', {})
+            if block.get('type') == 'tool_use' and block.get('name') in ('mcp__idli__unmask', 'mcp__idli__lookup'):
+                self.code_tools[index] = ''
         if kind == 'content_block_delta':
             delta = obj.get('delta', {})
             if not isinstance(delta, dict):
                 return raw
             field = {'text_delta': 'text', 'input_json_delta': 'partial_json'}.get(delta.get('type'))
+            if field == 'partial_json' and index in self.code_tools:
+                self.code_tools[index] += delta[field]
+                return b''
             if field and isinstance(delta.get(field), str):
                 key = (index, delta['type'])
                 restorer = self.blocks.setdefault(key, StreamRestorer(self.vault, field == 'partial_json'))
@@ -268,6 +283,15 @@ class SSE:
                 return self.event(obj)
         if kind == 'content_block_stop':
             flushed = b''
+            if index in self.code_tools:
+                text = self.code_tools.pop(index)
+                if text:
+                    args = json.loads(text)
+                    restored = walk(args, self.vault.rehydrate, keys=True)
+                    if 'code' in args:
+                        restored['code'] = args['code']
+                    flushed = self.event({'type': 'content_block_delta', 'index': index,
+                                          'delta': {'type': 'input_json_delta', 'partial_json': json.dumps(restored)}})
             for key in list(self.blocks):
                 if key[0] == index:
                     text = self.blocks.pop(key).flush()

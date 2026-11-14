@@ -25,7 +25,7 @@ async function draw(spec, data, agent, title, meta={}) {
   if(EMBED&&!composite){local.height=Math.max(100,innerHeight-16);local.autosize={type:'fit',contains:'padding',resize:true};}
   const style=getComputedStyle(document.body),ink=style.color,line=style.getPropertyValue('--line').trim(),accent=style.getPropertyValue('--accent').trim();
   local.background='transparent';
-  local.config={...local.config,background:'transparent',range:{category:[accent,'#719c8d','#b5a379','#8b8fa8','#b37f72']},axis:{...local.config?.axis,labelColor:ink,titleColor:ink,gridColor:line,domainColor:line,tickColor:line},legend:{...local.config?.legend,labelColor:ink,titleColor:ink},title:{...local.config?.title,color:ink},text:{...local.config?.text,color:ink}};
+  local.config={...local.config,background:'transparent',range:{category:[accent,'#719c8d','#b5a379','#8b8fa8','#b37f72']},axis:{...local.config?.axis,labelColor:ink,titleColor:ink,gridColor:line,domainColor:line,tickColor:line},legend:{...local.config?.legend,labelColor:ink,titleColor:ink},header:{...local.config?.header,labelColor:ink,titleColor:ink},title:{...local.config?.title,color:ink,subtitleColor:ink},text:{...local.config?.text,color:ink}};
   const result=await vegaEmbed('#viz',local,{actions:false,renderer:'svg',ast:true,expr:vega.expressionInterpreter});
   chartView=result.view;
   if(EMBED||composite){
@@ -34,8 +34,13 @@ async function draw(spec, data, agent, title, meta={}) {
     const scale=EMBED?Math.min(1,(innerWidth-16)/w,(innerHeight-16)/h):Math.min(1,Math.max(140,$('viz').clientWidth-16)/w)*(bigger?1.6:1);
     svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('width',w*scale);svg.setAttribute('height',h*scale);
   }
-  chartView.addEventListener('click',(ev,item)=>pop(ev,item&&item.datum));
-  chartView.addEventListener('contextmenu',(ev,item)=>{if(item&&item.datum){ev.preventDefault();contextMenu(ev,item.datum);}});
+  chartView.addEventListener('click',(ev,item)=>pop(ev,markDatum(item&&item.datum)));
+  chartView.addEventListener('contextmenu',(ev,item)=>{if(item&&item.datum){ev.preventDefault();contextMenu(ev,markDatum(item.datum));}});
+}
+function markDatum(datum) {
+  if(!datum)return null;
+  // Geoshapes carry source columns in GeoJSON properties. Keep them available to both menus.
+  return datum.type==='Feature'?{...datum.properties}:datum;
 }
 function fields(datum) {
   return Object.keys(datum||{}).filter(k=>!/(^__|_start$|_end$|sort_index)/.test(k)&&datum[k]!==undefined&&typeof datum[k]!=='object');
@@ -140,7 +145,7 @@ function answerHTML(text) {
   return out.join('');
 }
 if(location.pathname==='/view') api('/api/view?id='+encodeURIComponent(ID)).then(async v=>{
-  document.title=v.title;$('title').textContent=v.title;await draw(v.spec,v.data,v.agent,v.title,v);status('');
+  document.title=v.title;$('title').textContent=v.title;$('description').textContent=v.spec.description||'';await draw(v.spec,v.data,v.agent,v.title,v);status('');
   const pin=$('pin'),zoom=$('zoom');
   const pinLabel=()=>{pin.textContent=v.pinned?'Pinned':'Pin';pin.setAttribute('aria-pressed',String(!!v.pinned));};
   pin.disabled=false;zoom.disabled=false;pinLabel();

@@ -27,6 +27,9 @@ export IDLI_DATA="$DATA" IDLI_CLAUDE_WORK="$WORK"
 "$COWORK/.venv/bin/python" -I - "$COWORK" "$WORK/.idli-mcp.json" <<'PYCONFIG'
 import json, os, sys
 root, target = sys.argv[1:]
+sys.path.insert(0, root)
+from lib.launchsettings import merge
+merge(os.path.dirname(target))
 fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
     json.dump({'mcpServers': {'idli': {'command': root + '/.venv/bin/python',

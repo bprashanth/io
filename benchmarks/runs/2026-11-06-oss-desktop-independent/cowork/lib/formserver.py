@@ -30,7 +30,7 @@ if HERE not in sys.path:
 from lib import filekit as fk  # noqa: E402
 from lib import formkit as fm  # noqa: E402
 from lib import privacy  # noqa: E402
-from lib import home, journey  # noqa: E402
+from lib import home, journey, reveals  # noqa: E402
 
 PORT = int(os.environ.get("IDLI_FORM_PORT") or 8797)
 PAGE = os.path.join(HERE, "lib", "form.html")
@@ -434,6 +434,12 @@ def make_handler(files, token):
                 return self._send(200, [{k: m[k] for k in keys} for m in home.minis(files.data_dir)])
             if u.path == "/health":
                 return self._send(200, {"ok": True})
+            if u.path.startswith('/geo/'):
+                from lib import maps
+                try:
+                    return self._send(200, maps.boundary(u.path[5:]), 'application/json')
+                except ValueError as e:
+                    return self._send(404, {'error': str(e)})
             if u.path.startswith("/vendor/"):  # the chart libraries (no data): lib/vendor/<name>.min.js
                 name = os.path.basename(u.path)
                 if name in VENDOR:
@@ -443,10 +449,10 @@ def make_handler(files, token):
             if not self._ok(qs):
                 return self._send(403, "Forbidden: open the form from Idli's chat.", "text/plain")
             try:
-                if u.path in ("/home", "/view", "/mini", "/privacy-review", "/mini-editor"):
+                if u.path in ("/home", "/view", "/mini", "/privacy-review", "/mini-editor", "/consent", "/reveals"):
                     with open(os.path.join(HERE, "lib", u.path[1:] + ".html"), encoding="utf-8") as f:
                         return self._send(200, f.read().replace("__TOKEN_QUERY__", urllib.parse.urlencode({"t": token})), "text/html")
-                if u.path in ("/home.css", "/home.js", "/home-chart.js", "/journey.css", "/journey.js"):
+                if u.path in ("/home.css", "/home.js", "/home-chart.js", "/journey.css", "/journey.js", "/reveals.js"):
                     with open(os.path.join(HERE, "lib", u.path[1:]), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/css" if u.path.endswith(".css") else "application/javascript")
                 if u.path == "/api/home/search":
@@ -487,6 +493,12 @@ def make_handler(files, token):
                     from lib import driveindex as di
                     st = di.status()
                     return self._send(200, {"status": st, "line": di.progress_line(st)})
+                if u.path == '/api/consent':
+                    return self._send(200, reveals.consent_data(files.data_dir, qs['id'][0]))
+                if u.path == '/api/reveals':
+                    ws = (qs.get('ws') or [''])[0]
+                    return self._send(200, {'items': privacy.reveals(files.data_dir),
+                                            'remaining': reveals.remaining(files.data_dir, ws)})
                 if u.path == "/api/form":
                     return self._send(200, files.meta(qs["file"][0]))
                 if u.path == "/api/chart":
@@ -513,6 +525,12 @@ def make_handler(files, token):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(min(n, 100000))
                                   or b"{}")
+                if u.path == '/api/consent':
+                    return self._send(200, reveals.decide(files.data_dir, body['id'], body['approve']))
+                if u.path == '/api/reveals/hide':
+                    return self._send(200, reveals.hide(files.data_dir, body['code'], body['workspace'], body['at']))
+                if u.path == '/api/reveals/more':
+                    return self._send(200, reveals.allow_more(files.data_dir, body['workspace']))
                 if u.path == '/api/review-change':
                     return self._send(200, journey.review_change(files.data_dir, body['id'], body['file'], body['columns']))
                 if u.path == '/api/review-done':

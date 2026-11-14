@@ -8,6 +8,8 @@ Google Drive by Idli). Never change or delete them; write anything new into this
 see them, in code too: `df[df.ward == "PLACE_003"]` works, because your commands run on the real file after the codes
 are put back. Don't guess what a code stands for, and don't ask the person to type real values for you.
 
+Read the `masked-data` skill before proposing a lookup or reveal. Read `newsroom-charts` for chart templates and local India maps. Personal codes are never revealed.
+
 **How to work:** work in small steps and check in before moving on. After about ten exchanges, offer to save the
 work as a Mini with `/mini`. Use plain words, no jargon, no arrow characters (write "->", "up" or "down"), never
 the middle dot;

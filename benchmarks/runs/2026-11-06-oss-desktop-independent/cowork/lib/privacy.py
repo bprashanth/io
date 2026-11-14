@@ -211,12 +211,93 @@ class Scanner:
 
 def _class(column):
     c = str(column).casefold()
-    for pattern, cls in [(r'name|beneficiary|employee|(^|_|\s)head($|_|\s)|owner|respondent|farmer|guardian|father|mother|spouse|husband|wife|contact_person', 'person_name'),
-                         (r'ward|village|town|place|district', 'village'),
-                         (r'address', 'address'), (r'phone|mobile', 'phone'), (r'email', 'email')]:
+    people = r'beneficiary|employee|(^|_|\s)head($|_|\s)|owner|respondent|farmer|guardian|father|mother|spouse|husband|wife|contact_person'
+    if re.search(people, c):
+        return 'person_name'
+    # A district_name or organisation_name is a contextual label, not a person's name.
+    if re.search(r'ward|village|town|place|district|block|organi[sz]ation|programme|program|scheme|categor|company|institution|agency', c):
+        return 'village'
+    for pattern, cls in [(r'name', 'person_name'), (r'address', 'address'),
+                         (r'phone|mobile', 'phone'), (r'email', 'email')]:
         if re.search(pattern, c):
             return cls
     return 'value'
+
+
+def column_class(column, series=None):
+    """Reveal policy, independent of the person's masking switches. Unknowns stay personal."""
+    c = re.sub(r'[^a-z0-9]+', '_', str(column).casefold()).strip('_')
+    if re.search(r'phone|mobile|email|address|aadhaar|aadhar|voter|account|ifsc|upi|(^|_)(pan|ration|bank|id|lat|latitude|lon|lng|longitude|gps|coordinates?)($|_)', c):
+        return 'personal'
+    if _class(c) == 'person_name':
+        return 'personal'
+    if re.search(r'ward|village|district|block|town|place|organi[sz]ation|programme|program|scheme|categor|company|institution|agency', c):
+        return 'contextual'
+    # This also covers the names backstop. No unrecognised column is revealable.
+    return 'personal'
+
+
+@locked
+def code_index(data_dir, vault=None):
+    """Derive provenance from source cells in mask-mode files. Any personal use wins across files."""
+    vault = vault or session_vault(data_dir)
+    path = Path(data_dir) / 'privacy.json'
+    settings = json.loads(path.read_text()) if path.exists() else {}
+    out = {}
+    for file, options in sorted(settings.items()):
+        if options.get('mode') != 'mask':
+            continue
+        sheets, _ = fk.raw_sheets(str(Path(data_dir) / _key(data_dir, file)))
+        for frame in sheets.values():
+            for column in frame.columns:
+                info = {'file': file, 'column': str(column), 'class': column_class(column, frame[column])}
+                for value in frame[column]:
+                    code = vault.forward.get(normalise(str(value)))
+                    if code and (code not in out or info['class'] == 'personal'):
+                        out[code] = info
+    for code, info in out.items():
+        if re.match(r'^(NAME|PHONE|EMAIL|AADHAAR|PAN|VOTER|RATION|ACCOUNT|IFSC|UPI|ADDRESS|GPS)_', code):
+            info['class'] = 'personal'
+    return out
+
+
+@locked
+def code_info(data_dir, code):
+    vault = session_vault(data_dir)
+    if code not in vault.display:
+        return None
+    return code_index(data_dir, vault).get(code, {'file': '', 'column': '', 'class': 'personal'})
+
+
+@locked
+def reveals(data_dir):
+    path = Path(data_dir) / '.idli/reveals.json'
+    return json.loads(path.read_text()) if path.exists() else []
+
+
+@locked
+def revealed_values(data_dir, vault=None, index=None):
+    vault = vault or session_vault(data_dir)
+    index = index if index is not None else code_index(data_dir, vault)
+    return {r['code']: vault.display[r['code']] for r in reveals(data_dir)
+            if r.get('kind', 'unmask') == 'unmask' and r.get('code') in vault.display
+            and index.get(r['code'], {}).get('class') == 'contextual'
+            and r.get('value') == vault.display[r['code']]}
+
+
+@locked
+def proxy_vault(data_dir, full=None):
+    """Reveals can exempt contextual values only. Personal values remain guarded even if switched off."""
+    full = full or session_vault(data_dir)
+    index = code_index(data_dir, full)
+    active = active_vault(data_dir, full)
+    allowed = revealed_values(data_dir, full, index)
+    active.display.update({c: v for c, v in full.display.items()
+                           if index.get(c, {}).get('class', 'personal') == 'personal'})
+    active.display = {c: v for c, v in active.display.items() if c not in allowed}
+    active.forward = {normalise(v): c for c, v in active.display.items()}
+    active.refresh()
+    return active, allowed
 
 
 def _frame(path, tab):

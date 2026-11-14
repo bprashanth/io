@@ -184,11 +184,11 @@ def test_numbers_and_whole_tokens(book):
     transform = cc.Transformer(root)
     out, _ = transform.outbound(request('7 42 123 9876 12345.5 19876 x9876 9876x 4444 9876.1 .9876'))
     text = out['messages'][0]['content']
-    assert text.startswith('7 42 123 ' + code(transform.vault, '9876'))
+    assert text.startswith(' '.join(code(transform.vault, v) for v in ['7', '42', '123', '9876']))
     assert code(transform.vault, '12345.5') in text
     assert '19876 x9876 9876x 4444 9876.1 .9876' in text
     assert not transform.leaks(out)
-    assert not transform.leaks(request('7 42 123'))
+    assert transform.leaks(request('7 42 123'))  # Unknown masked columns fail closed, including short identifiers.
     assert transform.leaks({'input': {'number': 9876}})
     assert transform.leaks({'input': {'number': 9876.0}})
     assert transform.restore(code(transform.full, '42')) == '42'

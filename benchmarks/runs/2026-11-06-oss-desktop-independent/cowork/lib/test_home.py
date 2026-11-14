@@ -170,7 +170,7 @@ def test_send_terminal_first_then_typed(workspace, paseo, monkeypatch):
     assert len(creates) == 1 and creates[0][creates[0].index('--workspace') + 1] == 'drivey'
     assert keys[0].startswith('IDLI_WORKSPACE=drivey exec ') and 'claude-masked.sh' in keys[0] and 'Yerawada Ward' in keys[0]
     assert keys[1] == '\r' and 'Compare Village A' in keys[2] and keys[3] == '\r'
-    assert not any(json.loads(line)['paseo_env'] for line in record.read_text().splitlines())
+    assert not any(set(json.loads(line)['paseo_env']) - {'PASEO_HOME'} for line in record.read_text().splitlines())
     assert shown == [('drivey', 'term-1', 'right')] * 2
     assert home.read(root / '.idli/home.json')['terminal'] == 'term-1'
 
@@ -192,11 +192,11 @@ def questions(work):
              'params': {'n': {'type': 'number', 'default': 2}}}]
 
 
-def test_mcp_stdio_and_mini(workspace, monkeypatch):
+def test_mcp_stdio_and_mini(workspace, paseo, monkeypatch):
     root, work = workspace
     q = questions(work)
     home.write(root / 'drive/households.xlsx.source.json', {'id': 'drive-households', 'url': 'https://example.invalid/sheet'})
-    home.write(root / '.idli/home.json', {'agent': AGENT, 'files': [{'title': 'Households', 'local': 'drive/households.xlsx'}]})
+    home.write(root / '.idli/home.json', {'agent': AGENT, 'workspace_files': {'synthetic-home':[{'title':'Households','local':'drive/households.xlsx'}]}, 'files': [{'title': 'Households', 'local': 'drive/households.xlsx'}]})
     csv = work / 'chart.csv'
     csv.write_text('Group,Count\nA,2\nB,3\n')
     browser_calls = []
@@ -208,15 +208,15 @@ def test_mcp_stdio_and_mini(workspace, monkeypatch):
             self.send_response(200); self.end_headers(); self.wfile.write(data)
     with running(formserver.make_handler(formserver.Files(root), TOKEN)) as server, running(Browser) as browser:
         home.write(root / '.idli/form-server.json', {'port': server.server_port, 'token': TOKEN})
-        env = {**os.environ, 'PASEO_MCP_URL': f'http://127.0.0.1:{browser.server_port}/mcp', 'PASEO_AGENT_ID': AGENT}
+        env = {**os.environ, 'PASEO_MCP_URL': f'http://127.0.0.1:{browser.server_port}/mcp', 'PASEO_AGENT_ID': AGENT, 'IDLI_WORKSPACE':'synthetic-home'}
         requests = [
             {'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2025-06-18'}},
             {'id': 2, 'method': 'tools/list'},
             {'id': 3, 'method': 'tools/call', 'params': {'name': 'idli_show', 'arguments': {
                 'title': 'Counts', 'vega_lite': {'mark': 'bar'}, 'data_csv': str(csv),
                 'sources': ['drive/households.xlsx'], 'script': str(work / 'answer.py')}}},
-            {'id': 4, 'method': 'tools/call', 'params': {'name': 'idli_save_mini', 'arguments': {
-                'name': 'Households', 'goal': 'Count checked households', 'questions': q}}},
+            {'id': 4, 'method': 'tools/call', 'params': {'name': 'idli_draft_mini', 'arguments': {
+                'title': 'Households', 'story': 'Count checked households', 'questions': q, 'code': str(work)}}},
             {'id': 5, 'method': 'tools/call', 'params': {'name': 'idli_show', 'arguments': {
                 'title': 'bad', 'vega_lite': {}, 'data_csv': '/etc/passwd'}}}]
         r = subprocess.run([sys.executable, '-I', str(HERE / 'lib/idli_mcp.py')],
@@ -224,7 +224,7 @@ def test_mcp_stdio_and_mini(workspace, monkeypatch):
                            capture_output=True, text=True, env=env, timeout=30)
         assert r.returncode == 0 and not r.stderr
         replies = [json.loads(line) for line in r.stdout.splitlines()]
-        assert replies[2]['result']['content'][0]['text'] == 'shown in Idli'
+        assert 'url' in json.loads(replies[2]['result']['content'][0]['text'])
         assert not replies[3]['result'].get('isError') and replies[4]['result']['isError']
         assert len(browser_calls) == 0
         views = list((root / 'views').glob('*.json'))
@@ -235,19 +235,25 @@ def test_mcp_stdio_and_mini(workspace, monkeypatch):
         props = replies[1]['result']['tools'][0]['inputSchema']['properties']
         assert props['sources']['type'] == 'array' and props['script']['type'] == 'string'
         assert len(api(server, '/api/view?id=' + views[0].stem)['data']) == 2
-        mini = home.read(root / 'minis/households/mini.json')
-        assert mini['files'][0]['id'] == 'drive-households'
-        assert (root / 'minis/households/question_1.py').is_file()
-        result = api(server, '/api/mini/run', {'id': 'households', 'qid': 'count', 'params': {'n': 7}})
+        draft_id = json.loads(replies[3]['result']['content'][0]['text'])['draft']
+        assert not list((root / 'minis').glob('*/mini.json'))
+        draft = api(server, '/api/mini-draft?id=' + draft_id)
+        saved = api(server, '/api/mini-save', {'id': draft_id, 'name': draft['name'], 'goal': draft['goal'],
+                                            'questions': draft['questions'], 'charts': []})
+        mini_id = saved['id']
+        mini = home.read(root / 'minis' / mini_id / 'mini.json')
+        assert mini['files'][0]['local'] == 'drive/households.xlsx'
+        assert (root / 'minis' / mini_id / mini['questions'][0]['script']).is_file()
+        result = api(server, '/api/mini/run', {'id': mini_id, 'qid': 'count', 'params': {'n': 7}})
         assert '| A | 7 |' in result['text'] and result['chart']['data'][0]['Count'] == 7
-        assert result['agent'] == AGENT
-        mapped = api(server, '/api/mini/map', {'id': 'households', 'question': 'count households'})
+        assert result['agent'] is None
+        mapped = api(server, '/api/mini/map', {'id': mini_id, 'question': 'count households'})
         assert mapped == {'qid': None, 'params': {}, 'method': 'unavailable'}
         with pytest.raises(HTTPError) as err:
-            api(server, '/api/mini?id=households', token='wrong')
+            api(server, '/api/mini?id=' + mini_id, token='wrong')
         assert err.value.code == 403
         with pytest.raises(ValueError): home.view(root, '../escape')
-        with pytest.raises(ValueError): home.run_mini(root, 'households', 'count', {'bad': 1})
+        with pytest.raises(ValueError): home.run_mini(root, mini_id, 'count', {'bad': 1})
 
 
 def test_router_schema_and_validation(workspace, monkeypatch):
@@ -359,6 +365,10 @@ def test_launcher_config_and_proxy(tmp_path):
     (clone / '.venv/bin').mkdir(parents=True)
     shutil.copyfile(HERE / 'desktop/claude-masked.sh', clone / 'desktop/claude-masked.sh')
     shutil.copyfile(HERE / 'idli/CLAUDE-masked.md', clone / 'idli/CLAUDE-masked.md')
+    shutil.copytree(HERE / 'idli/claude-commands', clone / 'idli/claude-commands')
+    shutil.copytree(HERE / 'idli/claude-skills', clone / 'idli/claude-skills')
+    (clone / 'lib').mkdir()
+    shutil.copyfile(HERE / 'lib/launchsettings.py', clone / 'lib/launchsettings.py')
     py = clone / '.venv/bin/python'
     py.write_text('#!' + sys.executable + '\n' + '''import subprocess, sys
 if 'ensure' in sys.argv: print('18870')
@@ -386,6 +396,7 @@ Path(os.environ['LAUNCH_RECORD']).write_text(json.dumps({'args':sys.argv[1:],'cw
     config = home.read(work / '.idli-mcp.json')['mcpServers']['idli']
     assert config['args'] == ['-I', str(clone / 'lib/idli_mcp.py')]
     assert (work / '.idli-mcp.json').stat().st_mode & 0o777 == 0o600
+    assert home.read(work / '.claude/settings.json')['permissions']['ask'] == ['mcp__idli__unmask', 'mcp__idli__lookup']
     assert (work / 'drive').resolve() == data / 'drive'
 
 
