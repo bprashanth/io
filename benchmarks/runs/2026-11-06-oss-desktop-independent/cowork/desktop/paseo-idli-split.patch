@@ -1,14 +1,65 @@
+diff --git a/packages/app/src/agent-presentation/index.ts b/packages/app/src/agent-presentation/index.ts
+index f3c3f139..63d89d4d 100644
+--- a/packages/app/src/agent-presentation/index.ts
++++ b/packages/app/src/agent-presentation/index.ts
+@@ -1,7 +1,13 @@
++import { isDriveyLeft, openedMiniName } from "@/utils/idli-drivey";
+ import { useShallow } from "zustand/shallow";
+ import { useProviderIcon } from "@/components/provider-icons";
+ import type { PanelDescriptor } from "@/panels/panel-registry";
+-import { useSessionStore, selectAgentTurnPresentation, type Agent } from "@/stores/session-store";
++import {
++  useSessionStore,
++  selectAgentTurnPresentation,
++  type Agent,
++  type SessionState,
++} from "@/stores/session-store";
+ import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
+ 
+ function formatProviderLabel(provider: Agent["provider"]): string {
+@@ -40,7 +46,7 @@ export function useAgentDescriptor(
+         session?.agents?.get(target.agentId) ?? session?.agentDetails?.get(target.agentId) ?? null;
+       return {
+         provider: agent?.provider ?? "codex",
+-        title: agent?.title ?? null,
++        title: driveyTabTitle(session, agent, target.agentId),
+         status: agent?.status ?? null,
+         pendingPermissionCount: agent?.pendingPermissions.length ?? 0,
+         requiresAttention: agent?.requiresAttention ?? false,
+@@ -82,3 +88,21 @@ export function buildAgentDescriptor(input: {
+       : null,
+   };
+ }
++
++function driveyTabTitle(
++  session: SessionState | undefined,
++  agent: Agent | null,
++  agentId: string,
++): string | null {
++  if (!isDriveyLeft(agent)) return agent?.title ?? null;
++  const tail = session?.agentStreamTail.get(agentId) ?? [];
++  const head = session?.agentStreamHead.get(agentId) ?? [];
++  const firstUser =
++    tail.find((item) => item.kind === "user_message" && item.text !== "Start Drivey") ??
++    head.find((item) => item.kind === "user_message" && item.text !== "Start Drivey");
++  if (firstUser?.kind === "user_message") {
++    const miniName = openedMiniName(firstUser.text);
++    if (miniName) return miniName;
++  }
++  return openedMiniName(agent?.title ?? "") ?? agent?.title ?? null;
++}
 diff --git a/packages/app/src/agent-stream/view.tsx b/packages/app/src/agent-stream/view.tsx
-index 72923b42..357a2d7a 100644
+index 72923b42..e72117c7 100644
 --- a/packages/app/src/agent-stream/view.tsx
 +++ b/packages/app/src/agent-stream/view.tsx
-@@ -1,3 +1,5 @@
+@@ -1,3 +1,6 @@
++import { driveyVisibleItems, openedMiniName } from "@/utils/idli-drivey";
 +import { IdliMiniCartridges } from "@/components/idli-mini-cartridges";
 +import { shouldShowIdliMinis } from "@/utils/idli-minis";
  import { ChatFind, ChatFindExpansion } from "@/agent-stream/chat-find";
  import { LoadingSpinner } from "@/components/ui/loading-spinner";
  import React, {
-@@ -116,13 +118,24 @@ function renderLiveAuxiliaryNode(input: {
+@@ -116,13 +119,24 @@ function renderLiveAuxiliaryNode(input: {
    pendingPermissions: ReactNode;
    turnFooter: ReactNode;
    bottomOverlayInset: number;
@@ -34,7 +85,29 @@ index 72923b42..357a2d7a 100644
        {input.pendingPermissions ? (
          <View style={stylesheet.contentWrapper}>
            <View style={stylesheet.listHeaderContent}>{input.pendingPermissions}</View>
-@@ -381,6 +394,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -142,6 +156,7 @@ function BottomOverlayInset({ height }: { height: number }) {
+ 
+ function renderPendingPermissionsNode(input: {
+   pendingPermissions: PendingPermission[];
++  isDrivey: boolean;
+   client: DaemonClient | null;
+ }): ReactNode {
+   if (input.pendingPermissions.length === 0) {
+@@ -150,7 +165,12 @@ function renderPendingPermissionsNode(input: {
+   return (
+     <View style={stylesheet.permissionsContainer}>
+       {input.pendingPermissions.map((permission) => (
+-        <PermissionRequestCard key={permission.key} permission={permission} client={input.client} />
++        <PermissionRequestCard
++          key={permission.key}
++          permission={permission}
++          client={input.client}
++          isDrivey={input.isDrivey}
++        />
+       ))}
+     </View>
+   );
+@@ -381,6 +401,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
      const sessionStreamHead = useSessionStore((state) =>
        state.sessions[resolvedServerId]?.agentStreamHead?.get(agentId),
      );
@@ -46,21 +119,94 @@ index 72923b42..357a2d7a 100644
      const streamHead = providedStreamHead ?? sessionStreamHead;
      const forkAgent = useForkAgent({ serverId: resolvedServerId, toast, readOnly });
      const supportsAgentForkContextCursor = useSessionStore(
-@@ -776,6 +794,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -524,13 +549,21 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+     const effectiveTurnPresentation = useRetainedValue(turnPresentation, isActive);
+     const isTurnActive = effectiveTurnPresentation.isActive;
+     const presentStream = useMemo(() => createStreamPresentation(), []);
++    const presentationTail = useMemo(
++      () => (isIdliLeft ? driveyVisibleItems(effectiveStreamItems) : effectiveStreamItems),
++      [isIdliLeft, effectiveStreamItems],
++    );
++    const presentationHead = useMemo(() => {
++      const head = effectiveStreamHead ?? EMPTY_STREAM_HEAD;
++      return isIdliLeft ? driveyVisibleItems(head) : head;
++    }, [isIdliLeft, effectiveStreamHead]);
+     const presentation = useMemo(
+       () =>
+         presentStream({
+-          tail: effectiveStreamItems,
+-          head: effectiveStreamHead ?? EMPTY_STREAM_HEAD,
++          tail: presentationTail,
++          head: presentationHead,
+           transform: transformTimelineItem,
+-          display: chatDisplay,
++          display: isIdliLeft ? "full" : chatDisplay,
+           autoExpandReasoning,
+           expandedTurnHostIds,
+           isTurnActive,
+@@ -538,8 +571,9 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+         }),
+       [
+         presentStream,
+-        effectiveStreamItems,
+-        effectiveStreamHead,
++        isIdliLeft,
++        presentationTail,
++        presentationHead,
+         transformTimelineItem,
+         chatDisplay,
+         autoExpandReasoning,
+@@ -714,6 +748,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+ 
+     const setToolCallGroupExpanded = toolCallExpansion.setGroupExpanded;
+ 
++    const firstUserItemId = useMemo(() => {
++      const items = [...effectiveStreamItems, ...(effectiveStreamHead ?? EMPTY_STREAM_HEAD)];
++      return items.find((item) => item.kind === "user_message" && item.text !== "Start Drivey")?.id;
++    }, [effectiveStreamItems, effectiveStreamHead]);
++
+     const renderUserMessageItem = useCallback(
+       (layoutItem: StreamLayoutItem, item: Extract<StreamItem, { kind: "user_message" }>) => {
+         const collapsedTurn = getCollapsedTurn(item.id);
+@@ -722,7 +761,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+             serverId={resolvedServerId}
+             agentId={agentId}
+             messageId={item.messageId}
+-            message={item.text}
++            message={
++              isIdliLeft && item.id === firstUserItemId && openedMiniName(item.text)
++                ? `Opened ${openedMiniName(item.text)}`
++                : item.text
++            }
+             sender={item.sender}
+             images={item.images}
+             attachments={item.attachments}
+@@ -749,6 +792,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+       },
+       [
+         context.capabilities,
++        isIdliLeft,
++        firstUserItemId,
+         agentId,
+         client,
+         getCollapsedTurn,
+@@ -776,6 +821,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
                    message={item.text}
                    timestamp={item.timestamp.getTime()}
                    workspaceRoot={workspaceRoot}
 +                  workspaceId={context.workspaceId ?? undefined}
++                  isDrivey={isIdliLeft}
                    serverId={resolvedServerId}
                    client={client}
                    spacing={layoutItem.assistantSpacing}
-@@ -786,7 +805,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -786,7 +833,16 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
            </AssistantFileLinkResolverProvider>
          );
        },
 -      [agentId, client, handleInlinePathPress, resolvedServerId, toast, workspaceRoot],
 +      [
 +        agentId,
++        isIdliLeft,
 +        client,
 +        context.workspaceId,
 +        handleInlinePathPress,
@@ -71,7 +217,90 @@ index 72923b42..357a2d7a 100644
      );
  
      const renderThoughtItem = useCallback(
-@@ -1133,6 +1160,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -993,6 +1049,12 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+     const renderStreamItem = useCallback(
+       (layoutItem: StreamLayoutItem) => {
+         const content = renderStreamItemContent(layoutItem);
++        if (isIdliLeft)
++          return (
++            <StreamItemWrapper gapBelow={layoutItem.gapBelow} turnIndent="none">
++              {content}
++            </StreamItemWrapper>
++          );
+         return renderStreamItemWithTurnFooter({
+           content,
+           layoutItem,
+@@ -1004,6 +1066,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+       },
+       [
+         getTurnIndent,
++        isIdliLeft,
+         handleForkAssistantTurn,
+         readOnly,
+         renderStreamItemContent,
+@@ -1021,34 +1084,36 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+       () =>
+         renderPendingPermissionsNode({
+           pendingPermissions: pendingPermissionItems,
++          isDrivey: isIdliLeft,
+           client,
+         }),
+-      [client, pendingPermissionItems],
+-    );
+-    const turnFooterNode = useMemo(
+-      () =>
+-        isTurnActive || bottomTurnFooterHost ? (
+-          <TurnFooter
+-            isRunning={isTurnActive}
+-            inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
+-            host={bottomTurnFooterHost}
+-            strategy={streamRenderStrategy}
+-            supportsTimelineCursor={supportsAgentForkContextCursor}
+-            onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
+-            onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
+-          />
+-        ) : null,
+-      [
+-        handleForkAssistantTurn,
+-        handleForkInFlightTurn,
+-        readOnly,
+-        isTurnActive,
+-        baseRenderModel.turnTiming.runningStartedAt,
+-        bottomTurnFooterHost,
+-        streamRenderStrategy,
+-        supportsAgentForkContextCursor,
+-      ],
++      [client, pendingPermissionItems, isIdliLeft],
+     );
++    const turnFooterNode = useMemo(() => {
++      if (isIdliLeft)
++        return isTurnActive ? <Text style={stylesheet.driveyProgress}>Working…</Text> : null;
++      return isTurnActive || bottomTurnFooterHost ? (
++        <TurnFooter
++          isRunning={isTurnActive}
++          inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
++          host={bottomTurnFooterHost}
++          strategy={streamRenderStrategy}
++          supportsTimelineCursor={supportsAgentForkContextCursor}
++          onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
++          onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
++        />
++      ) : null;
++    }, [
++      isIdliLeft,
++      handleForkAssistantTurn,
++      handleForkInFlightTurn,
++      readOnly,
++      isTurnActive,
++      baseRenderModel.turnTiming.runningStartedAt,
++      bottomTurnFooterHost,
++      streamRenderStrategy,
++      supportsAgentForkContextCursor,
++    ]);
+     const renderModel = useMemo<AgentStreamRenderModel>(() => {
+       return {
+         ...baseRenderModel,
+@@ -1133,6 +1198,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
            renderStreamItem,
          }),
      );
@@ -87,7 +316,7 @@ index 72923b42..357a2d7a 100644
      const renderLiveAuxiliary = useCallback<StreamSegmentRenderers["renderLiveAuxiliary"]>(() => {
        const existingTailSpacing =
          auxiliary.turnFooter && !auxiliary.pendingPermissions ? TURN_FOOTER_BOTTOM_SPACING : 0;
-@@ -1144,8 +1180,18 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -1144,8 +1218,18 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
          pendingPermissions: auxiliary.pendingPermissions,
          turnFooter: auxiliary.turnFooter,
          bottomOverlayInset,
@@ -107,6 +336,34 @@ index 72923b42..357a2d7a 100644
  
      const renderers = useMemo<StreamSegmentRenderers>(
        () => ({
+@@ -1514,9 +1598,11 @@ function PermissionActionButton({
+ function PermissionRequestCard({
+   permission,
+   client,
++  isDrivey,
+ }: {
+   permission: PendingPermission;
+   client: DaemonClient | null;
++  isDrivey: boolean;
+ }) {
+   const { t } = useTranslation();
+   const isMobile = useIsCompactFormFactor();
+@@ -1655,6 +1741,7 @@ function PermissionRequestCard({
+     return (
+       <QuestionFormCard
+         permission={permission}
++        isDrivey={isDrivey}
+         onRespond={handleResponse}
+         isResponding={isResponding}
+         responseError={responseError}
+@@ -1735,6 +1822,7 @@ function PermissionRequestCard({
+ }
+ 
+ const stylesheet = StyleSheet.create((theme) => ({
++  driveyProgress: { fontSize: 12, color: theme.colors.foregroundMuted, paddingVertical: 8 },
+   container: {
+     flex: 1,
+     backgroundColor: theme.colors.surface0,
 diff --git a/packages/app/src/app/h/[serverId]/agent/[agentId].tsx b/packages/app/src/app/h/[serverId]/agent/[agentId].tsx
 index 551e3b60..42e3ac3f 100644
 --- a/packages/app/src/app/h/[serverId]/agent/[agentId].tsx
@@ -161,10 +418,10 @@ index 2ea41196..127a21fe 100644
  import { useLocalSearchParams } from "expo-router";
 diff --git a/packages/app/src/components/idli-mini-cartridges.test.tsx b/packages/app/src/components/idli-mini-cartridges.test.tsx
 new file mode 100644
-index 00000000..fcd88257
+index 00000000..5abd1255
 --- /dev/null
 +++ b/packages/app/src/components/idli-mini-cartridges.test.tsx
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,147 @@
 +/** @vitest-environment jsdom */
 +import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 +import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -214,12 +471,16 @@ index 00000000..fcd88257
 +  vi.unstubAllGlobals();
 +});
 +
-+function showMinis() {
++function showMinis(onSubmit?: (text: string) => Promise<void>) {
 +  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 +  const view = render(
 +    <QueryClientProvider client={queryClient}>
 +      <ToastProvider>
-+        <IdliMiniCartridges serverId="host" agentId="left-agent" />
++        {onSubmit ? (
++          <IdliMiniCartridges onSubmit={onSubmit} />
++        ) : (
++          <IdliMiniCartridges serverId="host" agentId="left-agent" />
++        )}
 +      </ToastProvider>
 +    </QueryClientProvider>,
 +  );
@@ -227,6 +488,40 @@ index 00000000..fcd88257
 +}
 +
 +describe("Mini rows", () => {
++  it("submits a cartridge through the empty draft instead of sending to an existing agent", async () => {
++    const submit = vi.fn().mockResolvedValue(undefined);
++    showMinis(submit);
++    const row = await screen.findByRole("button", { name: /Sales - Revenue by region/ });
++    fireEvent.click(row);
++    fireEvent.click(row);
++    await waitFor(() =>
++      expect(submit).toHaveBeenCalledExactlyOnceWith("Open Mini: Sales [sales-14]"),
++    );
++    expect(runtime.sendAgentMessage).not.toHaveBeenCalled();
++  });
++
++  it("lets a failed cartridge submission be retried", async () => {
++    const submit = vi
++      .fn()
++      .mockRejectedValueOnce(new Error("Please try again"))
++      .mockResolvedValue(undefined);
++    showMinis(submit);
++    const row = await screen.findByRole("button", { name: /Sales - Revenue by region/ });
++    fireEvent.click(row);
++    await screen.findByText("Could not open this Mini. Try again.");
++    await waitFor(() => expect(row.getAttribute("aria-disabled")).not.toBe("true"));
++    fireEvent.click(row);
++    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
++  });
++
++  it("can reload Minis after a failed fetch", async () => {
++    fetchMock.mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
++    showMinis();
++    await screen.findByText("Could not load Minis");
++    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
++    await screen.findByRole("button", { name: /Sales - Revenue by region/ });
++    expect(screen.queryByText("Could not load Minis")).toBeNull();
++  });
 +  it("fetches public Minis and sends one exact message while disabling repeat clicks", async () => {
 +    runtime.sendAgentMessage.mockResolvedValue({});
 +    showMinis();
@@ -261,7 +556,7 @@ index 00000000..fcd88257
 +      name: /Sales - Revenue by region\s*14 Nov - Asha/,
 +    });
 +    fireEvent.click(row);
-+    await screen.findByText("Could not open Mini");
++    await screen.findByText("Could not open this Mini. Try again.");
 +    await waitFor(() => expect(row.getAttribute("aria-disabled")).not.toBe("true"));
 +    fireEvent.click(row);
 +    await waitFor(() => expect(runtime.sendAgentMessage).toHaveBeenCalledTimes(2));
@@ -276,11 +571,11 @@ index 00000000..fcd88257
 +});
 diff --git a/packages/app/src/components/idli-mini-cartridges.tsx b/packages/app/src/components/idli-mini-cartridges.tsx
 new file mode 100644
-index 00000000..737c0ba3
+index 00000000..d9e9b74a
 --- /dev/null
 +++ b/packages/app/src/components/idli-mini-cartridges.tsx
-@@ -0,0 +1,129 @@
-+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+@@ -0,0 +1,173 @@
++import { useCallback, useMemo, useRef, useState } from "react";
 +import { Text, View } from "react-native";
 +import { StyleSheet } from "react-native-unistyles";
 +import { useFetchQuery } from "@/data/query";
@@ -296,8 +591,29 @@ index 00000000..737c0ba3
 +  type IdliMini,
 +} from "@/utils/idli-minis";
 +
-+export function IdliMiniCartridges({ serverId, agentId }: { serverId: string; agentId: string }) {
++interface MiniListProps {
++  onSubmit: (text: string) => Promise<void>;
++  disabled?: boolean;
++}
++
++export function IdliMiniCartridges(props: MiniListProps | { serverId: string; agentId: string }) {
++  if ("onSubmit" in props) return <MiniCartridgeList {...props} />;
++  return <AgentMiniCartridges {...props} />;
++}
++
++function AgentMiniCartridges({ serverId, agentId }: { serverId: string; agentId: string }) {
 +  const client = useHostRuntimeClient(serverId);
++  const submit = useCallback(
++    async (text: string) => {
++      if (!client) throw new Error("Reconnect to your host, then try again.");
++      await client.sendAgentMessage(agentId, text);
++    },
++    [client, agentId],
++  );
++  return <MiniCartridgeList onSubmit={submit} />;
++}
++
++function MiniCartridgeList({ onSubmit, disabled = false }: MiniListProps) {
 +  const toast = useToast();
 +  const sending = useRef(false);
 +  const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -309,39 +625,53 @@ index 00000000..737c0ba3
 +      return IdliMinisSchema.parse(await response.json());
 +    },
 +    staleTimeMs: 60_000,
++    refetchInterval: 15_000,
 +    dataShape: "list",
 +  });
-+  useEffect(() => {
-+    if (minis.error) toast.error("Could not load Minis");
-+  }, [minis.error, toast]);
-+
++  const refetch = minis.refetch;
++  const retry = useCallback(() => {
++    void refetch();
++  }, [refetch]);
 +  const openMini = useCallback(
 +    async (mini: IdliMini) => {
-+      if (sending.current) return;
-+      if (!client) {
-+        toast.error("Host is disconnected");
-+        return;
-+      }
++      if (sending.current || disabled) return;
 +      sending.current = true;
 +      setSelectedId(mini.id);
 +      try {
-+        await client.sendAgentMessage(agentId, miniMessage(mini));
++        await onSubmit(miniMessage(mini));
 +        // Keep rows disabled until the timeline removes them after delivery.
-+      } catch (error) {
++      } catch {
 +        sending.current = false;
 +        setSelectedId(null);
-+        toast.error(
-+          error instanceof Error ? miniDisplayText(error.message) : "Could not open Mini",
-+        );
++        toast.error("Could not open this Mini. Try again.");
 +      }
 +    },
-+    [client, agentId, toast],
++    [onSubmit, disabled, toast],
 +  );
 +
 +  return (
 +    <View style={styles.list} testID="idli-mini-cartridges">
++      {selectedId ? <Text style={styles.status}>Opening Mini</Text> : null}
++      {minis.isPending ? <Text style={styles.status}>Loading Minis</Text> : null}
++      {minis.error ? (
++        <View style={styles.feedback}>
++          <Text style={styles.status}>Could not load Minis</Text>
++          <PressHighlight accessibilityRole="button" onPress={retry}>
++            <Text style={styles.retry}>Try again</Text>
++          </PressHighlight>
++        </View>
++      ) : null}
++      {minis.data?.length === 0 ? (
++        <Text style={styles.status}>Your saved Minis will appear here.</Text>
++      ) : null}
 +      {minis.data?.map((mini) => (
-+        <MiniRow key={mini.id} mini={mini} selectedId={selectedId} onOpen={openMini} />
++        <MiniRow
++          key={mini.id}
++          mini={mini}
++          selectedId={selectedId}
++          disabled={disabled}
++          onOpen={openMini}
++        />
 +      ))}
 +    </View>
 +  );
@@ -350,45 +680,53 @@ index 00000000..737c0ba3
 +function MiniRow({
 +  mini,
 +  selectedId,
++  disabled,
 +  onOpen,
 +}: {
 +  mini: IdliMini;
 +  selectedId: string | null;
++  disabled: boolean;
 +  onOpen: (mini: IdliMini) => Promise<void>;
 +}) {
 +  const onPress = useCallback(() => void onOpen(mini), [onOpen, mini]);
 +  const accessibilityState = useMemo(
-+    () => ({ disabled: selectedId !== null, busy: selectedId === mini.id }),
-+    [selectedId, mini.id],
++    () => ({ disabled: disabled || selectedId !== null, busy: selectedId === mini.id }),
++    [disabled, selectedId, mini.id],
 +  );
 +  return (
 +    <PressHighlight
 +      accessibilityRole="button"
-+      disabled={selectedId !== null}
++      disabled={disabled || selectedId !== null}
 +      accessibilityState={accessibilityState}
 +      onPress={onPress}
-+      style={[styles.row, selectedId === mini.id && styles.pending]}
 +      highlightStyle={styles.highlight}
 +    >
-+      <Text style={styles.summary} numberOfLines={1}>
-+        <Text style={styles.name}>{miniDisplayText(mini.name)}</Text>
-+        {" - "}
-+        {miniDisplayText(mini.heading)}
-+      </Text>
-+      <Text style={styles.metadata} numberOfLines={1}>
-+        {[miniDate(mini.date), miniDisplayText(mini.author)].filter((part) => part.trim()).join(" - ")}
-+      </Text>
++      <View style={[styles.row, selectedId === mini.id && styles.pending]}>
++        <Text style={styles.summary} numberOfLines={1}>
++          <Text style={styles.name}>{miniDisplayText(mini.name)}</Text>
++          {" - "}
++          {miniDisplayText(mini.heading)}
++        </Text>
++        <Text style={styles.metadata} numberOfLines={1}>
++          {[miniDate(mini.date), miniDisplayText(mini.author)]
++            .filter((part) => part.trim())
++            .join(" - ")}
++        </Text>
++      </View>
 +    </PressHighlight>
 +  );
 +}
 +
 +const styles = StyleSheet.create((theme) => ({
 +  list: { width: "100%", paddingVertical: theme.spacing[2], gap: theme.spacing[1] },
++  status: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
++  feedback: { gap: theme.spacing[2] },
++  retry: { color: theme.colors.accent, fontSize: theme.fontSize.sm },
 +  row: {
 +    _web: { _hover: { borderColor: theme.colors.accent } },
 +    flexDirection: "row",
 +    alignItems: "center",
-+    gap: theme.spacing[3],
++    gap: theme.spacing[2],
 +    paddingHorizontal: theme.spacing[3],
 +    paddingVertical: theme.spacing[2],
 +    borderRadius: theme.borderRadius.md,
@@ -400,14 +738,67 @@ index 00000000..737c0ba3
 +  },
 +  highlight: { backgroundColor: theme.colors.surface1 },
 +  pending: { opacity: 0.5 },
-+  summary: { flex: 1, color: theme.colors.foreground, fontSize: theme.fontSize.sm },
++  summary: { flex: 1, minWidth: 0, color: theme.colors.foreground, fontSize: theme.fontSize.sm },
 +  name: { fontWeight: theme.fontWeight.bold },
 +  metadata: {
 +    color: theme.colors.foregroundMuted,
 +    fontSize: theme.fontSize.sm,
++    maxWidth: "38%",
 +    textAlign: "right",
 +    flexShrink: 0,
 +  },
++}));
+diff --git a/packages/app/src/components/idli-start-claude.tsx b/packages/app/src/components/idli-start-claude.tsx
+new file mode 100644
+index 00000000..232538b5
+--- /dev/null
++++ b/packages/app/src/components/idli-start-claude.tsx
+@@ -0,0 +1,46 @@
++import { useState } from "react";
++import { Pressable, Text, View } from "react-native";
++import { StyleSheet } from "react-native-unistyles";
++import { getHostRuntimeStore } from "@/runtime/host-runtime";
++import { useWorkspace } from "@/stores/session-store-hooks";
++import { startDriveyClaude } from "@/utils/idli-claude-workspace";
++import { placeTabOnSideSoon } from "@/utils/idli-side-pane";
++
++/** Right pane of a Drivey workspace that has no Claude yet (made without the Drivey + button). */
++export function IdliStartClaude({ serverId, workspaceId }: { serverId: string; workspaceId: string }) {
++  const workspace = useWorkspace(serverId, workspaceId);
++  const [state, setState] = useState<"idle" | "starting" | "failed">("idle");
++  const start = () => {
++    const client = getHostRuntimeStore().getClient(serverId);
++    if (!client || !workspace || state === "starting") return;
++    setState("starting");
++    startDriveyClaude({ client, workspaceId, cwd: workspace.workspaceDirectory })
++      .then((terminalId) =>
++        placeTabOnSideSoon({ serverId, workspaceId, kind: "terminal", id: terminalId, side: "right", focus: true }),
++      )
++      .catch(() => setState("failed"));
++  };
++  return (
++    <View style={styles.box}>
++      <Text style={styles.title}>Claude</Text>
++      <Text style={styles.text}>Claude is not open in this workspace.</Text>
++      <Pressable accessibilityRole="button" onPress={start} disabled={state === "starting"} style={styles.button}>
++        <Text style={styles.buttonText}>{state === "starting" ? "Starting..." : "Start Claude"}</Text>
++      </Pressable>
++      {state === "failed" ? <Text style={styles.text}>Could not start Claude. Try again.</Text> : null}
++    </View>
++  );
++}
++
++const styles = StyleSheet.create((theme) => ({
++  box: { alignItems: "center", gap: theme.spacing[3] },
++  title: { color: theme.colors.foreground, fontSize: theme.fontSize.lg, fontWeight: "600" },
++  text: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm, textAlign: "center" },
++  button: {
++    backgroundColor: theme.colors.accent,
++    borderRadius: theme.borderRadius.md,
++    paddingHorizontal: theme.spacing[4],
++    paddingVertical: theme.spacing[2],
++  },
++  buttonText: { color: theme.colors.accentForeground, fontWeight: "600" },
 +}));
 diff --git a/packages/app/src/components/markdown/idli-chart/embed.tsx b/packages/app/src/components/markdown/idli-chart/embed.tsx
 new file mode 100644
@@ -422,17 +813,18 @@ index 00000000..34244804
 +}
 diff --git a/packages/app/src/components/markdown/idli-chart/embed.web.tsx b/packages/app/src/components/markdown/idli-chart/embed.web.tsx
 new file mode 100644
-index 00000000..88c30a7b
+index 00000000..199cdb42
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/embed.web.tsx
-@@ -0,0 +1,132 @@
-+import { useCallback, useEffect, useReducer } from "react";
+@@ -0,0 +1,161 @@
++import { useCallback, useEffect, useReducer, useState } from "react";
 +import { Text, View } from "react-native";
 +import { StyleSheet } from "react-native-unistyles";
 +import { Button } from "@/components/ui/button";
 +import { Modal } from "@/components/ui/modal";
 +import { ChartSurface } from "./surface";
 +import type { IdliChartEmbedProps } from "./types";
++import { idliPageHeight } from "./markdown";
 +
 +type ChartState = "loading" | "ready" | "enlarged";
 +type ChartAction = "loaded" | "enlarge" | "close";
@@ -443,8 +835,21 @@ index 00000000..88c30a7b
 +  return state === "loading" ? "ready" : state;
 +}
 +
-+export function IdliChartEmbed({ url, title, onFailed }: IdliChartEmbedProps) {
++export function IdliChartEmbed({
++  url,
++  title,
++  onFailed,
++  height = 320,
++  enlarge: canEnlarge = true,
++  page = false,
++  noScroll = false,
++}: IdliChartEmbedProps) {
 +  const [state, dispatch] = useReducer(chartState, "loading");
++  const [pageHeight, setPageHeight] = useState(height);
++  const resize = useCallback((px: number) => {
++    const next = idliPageHeight(px);
++    if (next !== null) setPageHeight(next);
++  }, []);
 +  const loaded = useCallback(() => dispatch("loaded"), []);
 +  const enlarge = useCallback(() => dispatch("enlarge"), []);
 +  const close = useCallback(() => dispatch("close"), []);
@@ -456,30 +861,43 @@ index 00000000..88c30a7b
 +  }, [failed, state]);
 +  return (
 +    <View style={styles.container} testID="idli-chart">
-+      <View style={styles.frame}>
-+        <ChartSurface url={url} title={title} onLoad={loaded} onError={failed} />
++      <View style={[styles.frame, noScroll && styles.driveyFrame, { height: pageHeight }]}>
++        <ChartSurface
++          url={url}
++          title={title}
++          onLoad={loaded}
++          onError={failed}
++          onHeight={resize}
++          page={page}
++          noScroll={noScroll}
++        />
 +      </View>
 +      <View style={styles.toolbar}>
-+        {state === "loading" ? <Text style={styles.status}>Loading chart</Text> : null}
-+        <Button variant="ghost" size="sm" onPress={enlarge} disabled={state === "loading"}>
-+          Enlarge
-+        </Button>
++        {state === "loading" ? (
++          <Text style={styles.status}>Opening {title.toLowerCase()}</Text>
++        ) : null}
++        {canEnlarge ? (
++          <Button variant="ghost" size="sm" onPress={enlarge} disabled={state === "loading"}>
++            Enlarge
++          </Button>
++        ) : null}
 +      </View>
 +      {state === "enlarged" ? (
-+        <EnlargedChart url={url} title={title} onClose={close} onFailed={failed} />
++        <EnlargedChart url={url} title={title} onClose={close} onFailed={failed} page={page} />
 +      ) : null}
 +    </View>
 +  );
 +}
 +
 +interface EnlargedChartProps {
++  page: boolean;
 +  url: string;
 +  title: string;
 +  onClose: () => void;
 +  onFailed: () => void;
 +}
 +
-+function EnlargedChart({ url, title, onClose, onFailed }: EnlargedChartProps) {
++function EnlargedChart({ url, title, onClose, onFailed, page }: EnlargedChartProps) {
 +  const [ready, loaded] = useReducer(() => true, false);
 +  useEffect(() => {
 +    if (ready) return;
@@ -515,6 +933,7 @@ index 00000000..88c30a7b
 +              onLoad={loaded}
 +              onError={onFailed}
 +              onEscape={onClose}
++              page={page}
 +            />
 +          </View>
 +        </View>
@@ -526,6 +945,7 @@ index 00000000..88c30a7b
 +const styles = StyleSheet.create((theme) => ({
 +  container: { width: "100%", minWidth: 0 },
 +  frame: { height: 320, width: "100%", backgroundColor: theme.colors.surface0 },
++  driveyFrame: { minWidth: 0, overflow: "hidden" },
 +  toolbar: {
 +    flexDirection: "row",
 +    alignItems: "center",
@@ -560,10 +980,10 @@ index 00000000..88c30a7b
 +}));
 diff --git a/packages/app/src/components/markdown/idli-chart/markdown.test.ts b/packages/app/src/components/markdown/idli-chart/markdown.test.ts
 new file mode 100644
-index 00000000..27655700
+index 00000000..48a73d20
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/markdown.test.ts
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,173 @@
 +import { describe, expect, it } from "vitest";
 +import { splitIdliChartMarkdown } from "./markdown";
 +
@@ -573,6 +993,75 @@ index 00000000..27655700
 +const EMBED_URL = `http://dashboard.localhost:8797/view?id=${ID}&t=secret&embed=1&ws=workspace`;
 +
 +describe("Idli chart Markdown", () => {
++  it.each(["privacy-review", "view", "mini-card"])(
++    "embeds %s links with any label and preserves page parameters",
++    (page) => {
++      const source = `Before\n\n[Open this](http://dashboard.localhost:8797/${page}?embed=1&a=left-agent&h=540&ws=wrong)\n\nAfter`;
++      const segments = splitIdliChartMarkdown(source, "workspace");
++      const embed = segments.find((segment) => segment.kind === "chart");
++      expect(embed).toMatchObject({ height: 540, enlarge: page === "view" });
++      const url = new URL(embed!.url);
++      expect(url.searchParams.get("a")).toBe("left-agent");
++      expect(url.searchParams.get("ws")).toBe("workspace");
++      const text = segments
++        .filter((segment) => segment.kind === "markdown")
++        .map((segment) => segment.source)
++        .join("");
++      expect(text).toBe("Before\n\n\n\nAfter");
++    },
++  );
++
++  it("uses 360px by default and restores the page link on failure", () => {
++    const source = "[Check files](http://dashboard.localhost:8797/privacy-review?embed=1)";
++    const segments = splitIdliChartMarkdown(source, "workspace");
++    expect(segments).toEqual([
++      {
++        kind: "chart",
++        key: "0",
++        title: "Privacy review",
++        height: 360,
++        enlarge: false,
++        page: true,
++        url: "http://dashboard.localhost:8797/privacy-review?embed=1&ws=workspace",
++      },
++    ]);
++    expect(
++      splitIdliChartMarkdown(
++        source,
++        "workspace",
++        new Set([segments[0].kind === "chart" ? segments[0].url : ""]),
++      ),
++    ).toEqual([{ kind: "markdown", key: "0", source }]);
++  });
++
++  it.each([
++    "http://dashboard.localhost:8797/privacy-review",
++    "http://dashboard.localhost:8797/privacy-review?embed=0",
++    "http://dashboard.localhost:8797/other?embed=1",
++    "http://dashboard.localhost:8797/constructor?embed=1",
++    "http://dashboard.localhost.evil.test:8797/view?embed=1",
++    "http://user@dashboard.localhost:8797/view?embed=1",
++    "https://dashboard.localhost:8797/view?embed=1",
++  ])("keeps non-embed and untrusted pages as ordinary links: %s", (url) => {
++    const source = `[Review](${url})`;
++    expect(splitIdliChartMarkdown(source, "workspace")).toEqual([
++      { kind: "markdown", key: "0", source },
++    ]);
++  });
++
++  it("embeds reference page links but leaves code examples alone", () => {
++    const url = "http://dashboard.localhost:8797/mini-card?embed=1";
++    const segments = splitIdliChartMarkdown(
++      `[Mini][mini]\n\n[mini]: ${url}\n\n\`[Mini](${url})\``,
++      "workspace",
++    );
++    expect(segments[0]).toMatchObject({ kind: "chart", title: "Mini" });
++    expect(segments[1]).toMatchObject({
++      kind: "markdown",
++      source: expect.stringContaining(`\`[Mini](${url})\``),
++    });
++  });
++
 +  it("pairs a view image with its interactive link and includes the displayed workspace", () => {
 +    expect(splitIdliChartMarkdown(`${IMAGE}\n${LINK}`, "workspace")).toEqual([
 +      { kind: "chart", key: "0", title: "Revenue", url: EMBED_URL },
@@ -670,10 +1159,10 @@ index 00000000..27655700
 +});
 diff --git a/packages/app/src/components/markdown/idli-chart/markdown.ts b/packages/app/src/components/markdown/idli-chart/markdown.ts
 new file mode 100644
-index 00000000..0cc4a9e2
+index 00000000..b521ef9a
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/markdown.ts
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,209 @@
 +import { fromMarkdown } from "mdast-util-from-markdown";
 +import type { Definition, Nodes } from "mdast";
 +
@@ -690,6 +1179,9 @@ index 00000000..0cc4a9e2
 +  key: string;
 +  title: string;
 +  url: string;
++  height?: number;
++  enlarge?: boolean;
++  page?: boolean;
 +}
 +
 +interface ChartLink {
@@ -791,15 +1283,16 @@ index 00000000..0cc4a9e2
 +  failedUrls: ReadonlySet<string> = new Set(),
 +): (MarkdownSegment | IdliChartSegment)[] {
 +  const plain: MarkdownSegment[] = [{ kind: "markdown", key: "0", source }];
-+  if (!source.includes("views/") || !source.includes("Open interactive")) return plain;
++  if (!source.includes("views/") && !source.includes("dashboard.localhost:8797")) return plain;
 +  const document = chartDocument(source);
 +  const links = chartLinks(document, workspaceId);
 +  const replacements = chartImages({ ...document, links, failedUrls });
-+  if (replacements.length === 0) return plain;
 +  const embeddedUrls = new Set(replacements.map((replacement) => replacement.chart!.url));
 +  for (const link of links) {
 +    if (embeddedUrls.has(link.url)) replacements.push({ start: link.start, end: link.end });
 +  }
++  addEmbeddedPages(document, workspaceId, failedUrls, replacements);
++  if (replacements.length === 0) return plain;
 +  // Reference definitions must stay available in every fragment after splitting the message.
 +  const referenceSource = [...document.definitions.values()]
 +    .map((node) => source.slice(node.position!.start.offset, node.position!.end.offset))
@@ -823,15 +1316,72 @@ index 00000000..0cc4a9e2
 +  addMarkdown(cursor, source.length);
 +  return segments;
 +}
++
++function addEmbeddedPages(
++  document: ChartDocument,
++  workspaceId: string,
++  failedUrls: ReadonlySet<string>,
++  replacements: Replacement[],
++) {
++  for (const node of document.nodes) {
++    if (node.type !== "link" && node.type !== "linkReference") continue;
++    const href = node.type === "link" ? node.url : document.definitions.get(node.identifier)?.url;
++    const start = node.position?.start.offset;
++    const end = node.position?.end.offset;
++    if (!href || start === undefined || end === undefined) continue;
++    const page = embeddedPage(href, workspaceId);
++    const alreadyReplaced = replacements.some((replacement) => replacement.start === start);
++    if (!page || failedUrls.has(page.url) || alreadyReplaced) continue;
++    replacements.push({ start, end, chart: { kind: "chart", key: String(start), ...page } });
++  }
++}
++
++export function idliPageHeight(value: unknown): number | null {
++  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
++  return Math.min(4000, Math.max(120, Math.round(value)));
++}
++
++function embeddedPage(href: string, workspaceId: string) {
++  let target: URL;
++  try {
++    target = new URL(href);
++  } catch {
++    return null;
++  }
++  const titles = new Map([
++    ["/privacy-review", "Privacy review"],
++    ["/view", "Chart"],
++    ["/mini-card", "Mini"],
++  ]);
++  const title = titles.get(target.pathname);
++  if (
++    target.origin !== DASHBOARD ||
++    target.username ||
++    target.password ||
++    !title ||
++    target.searchParams.get("embed") !== "1"
++  )
++    return null;
++  target.searchParams.set("ws", workspaceId);
++  const height = idliPageHeight(Number(target.searchParams.get("h"))) ?? 360;
++  return {
++    url: target.toString(),
++    title,
++    height,
++    enlarge: target.pathname === "/view",
++    page: true,
++  };
++}
 diff --git a/packages/app/src/components/markdown/idli-chart/surface.electron.tsx b/packages/app/src/components/markdown/idli-chart/surface.electron.tsx
 new file mode 100644
-index 00000000..e84fa530
+index 00000000..65a6f648
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/surface.electron.tsx
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,73 @@
 +import { createElement, useEffect, useRef } from "react";
 +import { getDesktopHost } from "@/desktop/host";
 +import type { ChartSurfaceProps } from "./types";
++import { ChartSurface as PageSurface } from "./surface.web";
 +
 +interface ChartWebview extends HTMLElement {
 +  executeJavaScript(code: string): Promise<unknown>;
@@ -849,7 +1399,14 @@ index 00000000..e84fa530
 +  }, true);
 +})`;
 +
-+export function ChartSurface({ url, title, onLoad, onError, onEscape }: ChartSurfaceProps) {
++export function ChartSurface(props: ChartSurfaceProps) {
++  // Pages post their first height while loading. An iframe can receive that message
++  // before DOMContentLoaded; a webview cannot install its guest listener until then.
++  if (props.page) return <PageSurface {...props} />;
++  return <ElectronChartSurface {...props} />;
++}
++
++function ElectronChartSurface({ url, title, onLoad, onError, onEscape }: ChartSurfaceProps) {
 +  const frame = useRef<ChartWebview>(null);
 +  const partition = getDesktopHost()?.browser?.profilePartition;
 +  useEffect(() => {
@@ -907,15 +1464,23 @@ index 00000000..f278e95e
 +}
 diff --git a/packages/app/src/components/markdown/idli-chart/surface.web.tsx b/packages/app/src/components/markdown/idli-chart/surface.web.tsx
 new file mode 100644
-index 00000000..b3f1ef06
+index 00000000..d9abb33c
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/surface.web.tsx
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,42 @@
 +/* oxlint-disable react/iframe-missing-sandbox -- Chart scripts fetch their own CSV; the matcher pins a separate dashboard origin. */
 +import { useEffect, useRef } from "react";
 +import type { ChartSurfaceProps } from "./types";
 +
-+export function ChartSurface({ url, title, onLoad, onError, onEscape }: ChartSurfaceProps) {
++export function ChartSurface({
++  url,
++  title,
++  onLoad,
++  onError,
++  onEscape,
++  onHeight,
++  noScroll = false,
++}: ChartSurfaceProps) {
 +  const frame = useRef<HTMLIFrameElement>(null);
 +  useEffect(() => {
 +    // Cross-origin frames can opt into forwarding Escape when their content has focus.
@@ -923,46 +1488,56 @@ index 00000000..b3f1ef06
 +      if (event.origin !== new URL(url).origin || event.source !== frame.current?.contentWindow)
 +        return;
 +      if (event.data?.type === "idli.chart.escape") onEscape?.();
++      if (event.data?.type === "idli-height") onHeight?.(event.data.px);
 +    }
 +    window.addEventListener("message", receive);
 +    return () => window.removeEventListener("message", receive);
-+  }, [onEscape, url]);
++  }, [onEscape, onHeight, url]);
 +  return (
 +    <iframe
 +      ref={frame}
 +      src={url}
 +      title={title}
++      scrolling={noScroll ? "no" : undefined}
 +      onLoad={onLoad}
 +      onError={onError}
 +      referrerPolicy="no-referrer"
 +      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-+      style={frameStyle}
++      style={noScroll ? driveyFrameStyle : frameStyle}
 +    />
 +  );
 +}
 +
 +const frameStyle = { width: "100%", height: "100%", border: 0, display: "block" } as const;
++const driveyFrameStyle = { ...frameStyle, minWidth: 0, maxWidth: "100%" } as const;
 diff --git a/packages/app/src/components/markdown/idli-chart/types.ts b/packages/app/src/components/markdown/idli-chart/types.ts
 new file mode 100644
-index 00000000..cdc42ecb
+index 00000000..6a0dca32
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/types.ts
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,20 @@
 +export interface ChartSurfaceProps {
 +  url: string;
 +  title: string;
 +  onLoad: () => void;
 +  onError: () => void;
 +  onEscape?: () => void;
++  onHeight?: (px: number) => void;
++  page?: boolean;
++  noScroll?: boolean;
 +}
 +
 +export interface IdliChartEmbedProps {
 +  url: string;
 +  title: string;
 +  onFailed: (url: string) => void;
++  height?: number;
++  enlarge?: boolean;
++  page?: boolean;
++  noScroll?: boolean;
 +}
 diff --git a/packages/app/src/components/markdown/renderer.tsx b/packages/app/src/components/markdown/renderer.tsx
-index c14ecb51..26f12a89 100644
+index c14ecb51..606ce435 100644
 --- a/packages/app/src/components/markdown/renderer.tsx
 +++ b/packages/app/src/components/markdown/renderer.tsx
 @@ -1,4 +1,4 @@
@@ -980,16 +1555,17 @@ index c14ecb51..26f12a89 100644
  
  import { MermaidFence, MermaidStreamingContext, splitMermaidFences } from "./fence/mermaid";
  
-@@ -43,6 +45,8 @@ function pickMarkdownStyle(compact: boolean, muted: boolean) {
+@@ -43,6 +45,9 @@ function pickMarkdownStyle(compact: boolean, muted: boolean) {
  
  export interface MarkdownRendererProps extends MarkdownImageContext {
    text: string;
 +  /** Set only by chat, using the workspace in which the message is displayed. */
 +  workspaceId?: string;
++  isDrivey?: boolean;
    compact?: boolean;
    /** Muted text colour. Compact surfaces only. */
    muted?: boolean;
-@@ -54,6 +58,34 @@ export interface MarkdownRendererProps extends MarkdownImageContext {
+@@ -54,6 +59,38 @@ export interface MarkdownRendererProps extends MarkdownImageContext {
  
  /** All Markdown surfaces share the same engine and source adaptation. */
  export const MarkdownRenderer = memo(function MarkdownRenderer(props: MarkdownRendererProps) {
@@ -1010,6 +1586,10 @@ index c14ecb51..26f12a89 100644
 +            key={`chart:${segment.key}:${segment.url}`}
 +            title={segment.title}
 +            url={segment.url}
++            height={segment.height}
++            enlarge={segment.enlarge}
++            page={segment.page || props.isDrivey}
++            noScroll={props.isDrivey}
 +            onFailed={chartFailed}
 +          />
 +        ) : (
@@ -1024,7 +1604,7 @@ index c14ecb51..26f12a89 100644
    const streaming = !isWeb && !!props.streaming;
    // Only completed lines affect block closure. Do not run mdast on every reveal frame.
    const completeLines = streaming ? props.text.slice(0, props.text.lastIndexOf("\n") + 1) : "";
-@@ -69,7 +101,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer(props: MarkdownRe
+@@ -69,7 +106,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer(props: MarkdownRe
        <Part {...props} text={props.text.slice(boundary)} />
      </MarkdownBlockStack>
    );
@@ -1033,57 +1613,491 @@ index c14ecb51..26f12a89 100644
  
  const CommandMarkdownPart = memo(function CommandMarkdownPart(props: MarkdownRendererProps) {
    const commandHints = useAgentCommandHints();
-@@ -84,6 +116,7 @@ const MarkdownPart = memo(function MarkdownPart({
+@@ -84,6 +121,8 @@ const MarkdownPart = memo(function MarkdownPart({
    streaming = false,
    onLinkPress,
    agentCommands: _agentCommands,
 +  workspaceId: _workspaceId,
++  isDrivey: _isDrivey,
    commandHints = null,
    ...imageContext
  }: MarkdownRendererProps & { commandHints?: CommandHints | null }) {
 diff --git a/packages/app/src/components/message.tsx b/packages/app/src/components/message.tsx
-index 0ec5cbfb..1b9c0dab 100644
+index 0ec5cbfb..5d809d8f 100644
 --- a/packages/app/src/components/message.tsx
 +++ b/packages/app/src/components/message.tsx
-@@ -724,6 +724,7 @@ interface AssistantMessageProps {
+@@ -724,6 +724,8 @@ interface AssistantMessageProps {
    message: string;
    timestamp: number;
    workspaceRoot?: string;
 +  workspaceId?: string;
++  isDrivey?: boolean;
    serverId?: string;
    client?: DaemonClient | null;
    spacing?: "default" | "compactTop" | "compactBottom" | "compactBoth";
-@@ -1147,6 +1148,7 @@ export const AssistantMessage = memo(function AssistantMessage({
+@@ -1147,6 +1149,8 @@ export const AssistantMessage = memo(function AssistantMessage({
    message,
    timestamp: _timestamp,
    workspaceRoot,
 +  workspaceId,
++  isDrivey,
    serverId,
    client,
    spacing = "default",
-@@ -1199,6 +1201,7 @@ export const AssistantMessage = memo(function AssistantMessage({
+@@ -1199,6 +1203,8 @@ export const AssistantMessage = memo(function AssistantMessage({
      >
        <MarkdownRenderer
          text={revealedMessage}
 +        workspaceId={workspaceId}
++        isDrivey={isDrivey}
          agentCommands
          streaming={phase !== "complete" || revealedMessage.length < renderedMessage.text.length}
          client={client}
+diff --git a/packages/app/src/components/question-form-card-core.ts b/packages/app/src/components/question-form-card-core.ts
+index 78007dba..fcab7f89 100644
+--- a/packages/app/src/components/question-form-card-core.ts
++++ b/packages/app/src/components/question-form-card-core.ts
+@@ -145,6 +145,8 @@ export function shouldSubmitEmptyOnDismiss(questions: QuestionFormQuestion[]): b
+ export function resolveDismissLabel(
+   questions: QuestionFormQuestion[],
+   fallbackLabel = "Dismiss",
++  useFallback = false,
+ ): string {
++  if (useFallback) return fallbackLabel;
+   return questions.find((question) => question.dismissLabel)?.dismissLabel ?? fallbackLabel;
+ }
+diff --git a/packages/app/src/components/question-form-card.browser.test.tsx b/packages/app/src/components/question-form-card.browser.test.tsx
+index 0b2a5df2..6da90aed 100644
+--- a/packages/app/src/components/question-form-card.browser.test.tsx
++++ b/packages/app/src/components/question-form-card.browser.test.tsx
+@@ -53,7 +53,11 @@ function buildPermission(question: Record<string, unknown>): PendingPermission {
+   };
+ }
+ 
+-function mountCard(question: Record<string, unknown>) {
++function mountCard(
++  question: Record<string, unknown>,
++  isDrivey = false,
++  responseError: string | null = null,
++) {
+   const onRespond = vi.fn<(response: AgentPermissionResponse) => void>();
+   const container = document.createElement("div");
+   document.body.appendChild(container);
+@@ -62,9 +66,10 @@ function mountCard(question: Record<string, unknown>) {
+     root.render(
+       <QuestionFormCard
+         permission={buildPermission(question)}
++        isDrivey={isDrivey}
+         onRespond={onRespond}
+         isResponding={false}
+-        responseError={null}
++        responseError={responseError}
+       />,
+     ),
+   );
+@@ -90,7 +95,7 @@ function mountCard(question: Record<string, unknown>) {
+     if (!response || response.behavior !== "allow") throw new Error("card did not submit");
+     return (response.updatedInput as { answers: Record<string, string> }).answers;
+   };
+-  return { check, type, otherInput, submit, submittedAnswers };
++  return { check, type, otherInput, submit, submittedAnswers, view, onRespond };
+ }
+ 
+ const multiSelectQuestion = {
+@@ -154,3 +159,42 @@ describe("QuestionFormCard other answers", () => {
+     expect(card.submittedAnswers()).toEqual({ Provider: "Codex" });
+   });
+ });
++
++describe("Drivey question cards", () => {
++  it("keeps a failed answer visible and lets the same option retry", () => {
++    const card = mountCard(singleSelectQuestion, true, "Could not send your answer. Try again.");
++    expect(card.view.getByText("Could not send your answer. Try again.").textContent).toBe(
++      "Could not send your answer. Try again.",
++    );
++    act(() => card.view.getByRole("button", { name: "Codex" }).click());
++    act(() => card.view.getByRole("button", { name: "Codex" }).click());
++    expect(card.onRespond).toHaveBeenCalledTimes(2);
++    expect(card.submittedAnswers()).toEqual({ Provider: "Codex" });
++  });
++
++  it("hides Other and Submit, and answers immediately with the clicked option", () => {
++    const card = mountCard(singleSelectQuestion, true);
++    expect(card.view.queryByRole("textbox")).toBeNull();
++    expect(card.view.queryByRole("button", { name: "Submit" })).toBeNull();
++    act(() => card.view.getByRole("button", { name: "Claude Code" }).click());
++    expect(card.submittedAnswers()).toEqual({ Provider: "Claude Code" });
++    expect(card.onRespond).toHaveBeenCalledTimes(1);
++  });
++  it("retains Dismiss as a text action", () => {
++    const card = mountCard(singleSelectQuestion, true);
++    act(() => card.view.getByRole("button", { name: "Dismiss" }).click());
++    expect(card.onRespond).toHaveBeenCalledExactlyOnceWith({
++      behavior: "deny",
++      message: "Dismissed by user",
++    });
++  });
++  it("keeps explicit submission for multiple selections without an Other box", () => {
++    const card = mountCard(multiSelectQuestion, true);
++    card.check("Apple");
++    card.check("Banana");
++    expect(card.onRespond).not.toHaveBeenCalled();
++    expect(card.view.queryByRole("textbox")).toBeNull();
++    card.submit();
++    expect(card.submittedAnswers()).toEqual({ Fruits: "Apple, Banana" });
++  });
++});
+diff --git a/packages/app/src/components/question-form-card.tsx b/packages/app/src/components/question-form-card.tsx
+index 8ff81963..82af5db4 100644
+--- a/packages/app/src/components/question-form-card.tsx
++++ b/packages/app/src/components/question-form-card.tsx
+@@ -32,6 +32,7 @@ import {
+ } from "./question-form-card-core";
+ 
+ interface QuestionFormCardProps {
++  isDrivey?: boolean;
+   permission: PendingPermission;
+   onRespond: (response: AgentPermissionResponse) => void;
+   isResponding: boolean;
+@@ -72,6 +73,7 @@ function getQuestionInputPlaceholder({
+ }
+ 
+ interface QuestionOptionRowProps {
++  isDrivey: boolean;
+   qIndex: number;
+   optIndex: number;
+   option: QuestionOption;
+@@ -82,6 +84,7 @@ interface QuestionOptionRowProps {
+ }
+ 
+ function QuestionOptionRow({
++  isDrivey,
+   qIndex,
+   optIndex,
+   option,
+@@ -95,24 +98,27 @@ function QuestionOptionRow({
+   const descriptionRef = useRef<View>(null);
+   const handlePress = useCallback(
+     (event: GestureResponderEvent) => {
+-      if (isNonAnsweringClick(event, descriptionRef.current)) return;
++      if (isNonAnsweringClick(event, isDrivey ? null : descriptionRef.current)) return;
+       onToggle(qIndex, optIndex, multiSelect);
+     },
+-    [onToggle, qIndex, optIndex, multiSelect],
++    [onToggle, qIndex, optIndex, multiSelect, isDrivey],
+   );
+ 
+   const pressableStyle = useCallback(
+     ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
+       styles.optionItem,
++      isDrivey && styles.driveyOption,
+       (Boolean(hovered) || isSelected) && {
+         backgroundColor: theme.colors.surface2,
+       },
+       pressed && styles.optionItemPressed,
+     ],
+-    [isSelected, theme.colors.surface2],
++    [isSelected, isDrivey, theme.colors.surface2],
+   );
+ 
+   const accessibilityState = useMemo(() => ({ checked: isSelected }), [isSelected]);
++  const selectionRole = multiSelect ? "checkbox" : "radio";
++  const optionRole = isDrivey && !multiSelect ? "button" : selectionRole;
+ 
+   // Static left-side control: square for multi-select, circle for single-select.
+   // Always rendered so toggling only swaps fill/border — the row never reflows.
+@@ -137,25 +143,27 @@ function QuestionOptionRow({
+       style={pressableStyle}
+       onPress={handlePress}
+       disabled={isResponding}
+-      accessibilityRole={multiSelect ? "checkbox" : "radio"}
++      accessibilityRole={optionRole}
+       accessibilityLabel={option.label}
+       accessibilityState={accessibilityState}
+       aria-checked={isSelected}
+     >
+       <View style={styles.optionItemContent}>
+-        <View style={controlStyle}>
+-          {isSelected && multiSelect ? (
+-            <Check size={12} color={theme.colors.accentForeground} />
+-          ) : null}
+-          {isSelected && !multiSelect ? <View style={radioDotStyle} /> : null}
+-        </View>
++        {!isDrivey || multiSelect ? (
++          <View style={controlStyle}>
++            {isSelected && multiSelect ? (
++              <Check size={12} color={theme.colors.accentForeground} />
++            ) : null}
++            {isSelected && !multiSelect ? <View style={radioDotStyle} /> : null}
++          </View>
++        ) : null}
+         <View style={styles.optionTextBlock}>
+           <MarkdownRenderer text={option.label} compact muted={!isSelected} selectable={false} />
+           {option.description ? (
+             <View
+               ref={descriptionRef}
+               testID="question-form-option-description"
+-              onStartShouldSetResponder={claimResponder}
++              onStartShouldSetResponder={isDrivey ? undefined : claimResponder}
+             >
+               <MarkdownRenderer text={option.description} compact muted />
+             </View>
+@@ -363,6 +371,7 @@ function QuestionOtherInput({
+ }
+ 
+ export function QuestionFormCard({
++  isDrivey = false,
+   permission,
+   onRespond,
+   isResponding,
+@@ -371,10 +380,12 @@ export function QuestionFormCard({
+   const { theme } = useUnistyles();
+   const { t } = useTranslation();
+   const isMobile = useIsCompactFormFactor();
+-  const questions = useMemo(
+-    () => parseQuestionFormQuestions(permission.request.input),
+-    [permission.request.input],
+-  );
++  const questions = useMemo(() => {
++    const parsed = parseQuestionFormQuestions(permission.request.input);
++    return isDrivey
++      ? (parsed?.map((question) => ({ ...question, allowOther: false })) ?? null)
++      : parsed;
++  }, [permission.request.input, isDrivey]);
+ 
+   const [selections, setSelections] = useState<Record<number, Set<number>>>({});
+   const [otherTexts, setOtherTexts] = useState<Record<number, string>>({});
+@@ -384,6 +395,7 @@ export function QuestionFormCard({
+ 
+   const toggleOption = useCallback(
+     (qIndex: number, optIndex: number, multiSelect: boolean) => {
++      if (isResponding) return;
+       const current = selections[qIndex] ?? new Set<number>();
+       const next = new Set(current);
+       if (multiSelect) {
+@@ -392,14 +404,30 @@ export function QuestionFormCard({
+         } else {
+           next.add(optIndex);
+         }
+-      } else if (next.has(optIndex)) {
++      } else if (!isDrivey && next.has(optIndex)) {
+         next.clear();
+       } else {
+         next.clear();
+         next.add(optIndex);
+       }
+ 
+-      setSelections((prev) => ({ ...prev, [qIndex]: next }));
++      const nextSelections = { ...selections, [qIndex]: next };
++      setSelections(nextSelections);
++      if (
++        isDrivey &&
++        !multiSelect &&
++        questions &&
++        areQuestionsAnswered(questions, nextSelections, {})
++      ) {
++        setRespondingAction("submit");
++        onRespond({
++          behavior: "allow",
++          updatedInput: {
++            ...permission.request.input,
++            answers: buildQuestionFormAnswers(questions, nextSelections, {}),
++          },
++        });
++      }
+ 
+       // Single-select: an option and a custom answer replace each other, as in Claude Code.
+       // Multi-select keeps both. The editing surface owns its text and never replays state
+@@ -418,7 +446,16 @@ export function QuestionFormCard({
+         setActiveQuestionIndex(Math.min(qIndex + 1, questions.length - 1));
+       }
+     },
+-    [activeQuestionIndex, otherTexts, questions, selections],
++    [
++      activeQuestionIndex,
++      otherTexts,
++      questions,
++      selections,
++      isDrivey,
++      isResponding,
++      onRespond,
++      permission.request.input,
++    ],
+   );
+ 
+   const setOtherText = useCallback(
+@@ -510,9 +547,10 @@ export function QuestionFormCard({
+         backgroundColor: hovered ? theme.colors.surface2 : theme.colors.surface1,
+         borderColor: theme.colors.borderAccent,
+       },
++      isDrivey && styles.driveyDismiss,
+       pressed && styles.optionItemPressed,
+     ],
+-    [theme.colors.surface2, theme.colors.surface1, theme.colors.borderAccent],
++    [isDrivey, theme.colors.surface2, theme.colors.surface1, theme.colors.borderAccent],
+   );
+ 
+   const pendingAction = isResponding ? respondingAction : null;
+@@ -555,12 +593,12 @@ export function QuestionFormCard({
+     [activeQuestion],
+   );
+   const actionsContainerStyle = useMemo(
+-    () => [styles.actionsContainer, !isMobile && styles.actionsContainerDesktop],
+-    [isMobile],
+-  );
+-  const dismissActionTextStyle = useMemo(
+-    () => [styles.actionText, { color: theme.colors.foregroundMuted }],
+-    [theme.colors.foregroundMuted],
++    () => [
++      styles.actionsContainer,
++      !isMobile && styles.actionsContainerDesktop,
++      isDrivey && styles.driveyActions,
++    ],
++    [isMobile, isDrivey],
+   );
+   const submitActionTextColor = theme.colors.accentForeground;
+   const submitActionTextStyle = useMemo(
+@@ -572,7 +610,7 @@ export function QuestionFormCard({
+     return null;
+   }
+ 
+-  const dismissLabel = resolveDismissLabel(questions, t("common.actions.dismiss"));
++  const dismissLabel = resolveDismissLabel(questions, t("common.actions.dismiss"), isDrivey);
+   const selected = selections[resolvedActiveQuestionIndex] ?? new Set<number>();
+   const otherText = otherTexts[resolvedActiveQuestionIndex] ?? "";
+   const showTextInput = questionShowsTextInput(questions[resolvedActiveQuestionIndex]);
+@@ -599,6 +637,7 @@ export function QuestionFormCard({
+               {activeQuestion.options.map((opt, optIndex) => (
+                 <QuestionOptionRow
+                   key={opt.label}
++                  isDrivey={isDrivey}
+                   qIndex={resolvedActiveQuestionIndex}
+                   optIndex={optIndex}
+                   option={opt}
+@@ -640,39 +679,84 @@ export function QuestionFormCard({
+           accessibilityLabel={dismissLabel}
+           testID="question-form-dismiss"
+         >
+-          {pendingAction === "dismiss" ? (
+-            <LoadingSpinner size="small" color={theme.colors.foregroundMuted} />
+-          ) : (
+-            <View style={styles.actionContent}>
+-              <X size={14} color={theme.colors.foregroundMuted} />
+-              <Text style={dismissActionTextStyle}>{dismissLabel}</Text>
+-            </View>
+-          )}
++          <QuestionDismissContent
++            pending={pendingAction === "dismiss"}
++            isDrivey={isDrivey}
++            color={theme.colors.foregroundMuted}
++            label={dismissLabel}
++          />
+         </Pressable>
+ 
+-        <Pressable
+-          style={submitButtonStyle}
+-          onPress={handlePrimaryAction}
+-          disabled={primaryDisabled}
+-          accessibilityRole="button"
+-          accessibilityLabel={primaryActionLabel}
+-          testID="question-form-primary-action"
+-        >
+-          {pendingAction === "submit" ? (
+-            <LoadingSpinner size="small" color={theme.colors.accentForeground} />
+-          ) : (
+-            <View style={styles.actionContent}>
+-              <Check size={14} color={submitActionTextColor} />
+-              <Text style={submitActionTextStyle}>{primaryActionLabel}</Text>
+-            </View>
+-          )}
+-        </Pressable>
++        {showQuestionSubmit(questions, isDrivey) ? (
++          <Pressable
++            style={submitButtonStyle}
++            onPress={handlePrimaryAction}
++            disabled={primaryDisabled}
++            accessibilityRole="button"
++            accessibilityLabel={primaryActionLabel}
++            testID="question-form-primary-action"
++          >
++            {pendingAction === "submit" ? (
++              <LoadingSpinner size="small" color={theme.colors.accentForeground} />
++            ) : (
++              <View style={styles.actionContent}>
++                <Check size={14} color={submitActionTextColor} />
++                <Text style={submitActionTextStyle}>{primaryActionLabel}</Text>
++              </View>
++            )}
++          </Pressable>
++        ) : null}
+       </View>
+     </View>
+   );
+ }
+ 
++function showQuestionSubmit(questions: QuestionFormQuestion[], isDrivey: boolean): boolean {
++  return (
++    !isDrivey || questions.some((question) => question.multiSelect || question.options.length === 0)
++  );
++}
++
++function QuestionDismissContent({
++  pending,
++  isDrivey,
++  color,
++  label,
++}: {
++  pending: boolean;
++  isDrivey: boolean;
++  color: string;
++  label: string;
++}) {
++  if (pending) return <LoadingSpinner size="small" color={color} />;
++  return (
++    <View style={styles.actionContent}>
++      {!isDrivey ? <X size={14} color={color} /> : null}
++      <Text style={[styles.dismissActionText, isDrivey && styles.driveyDismissText]}>{label}</Text>
++    </View>
++  );
++}
++
+ const styles = StyleSheet.create((theme) => ({
++  dismissActionText: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.base },
++  driveyDismissText: { fontSize: theme.fontSize.sm },
++  driveyOption: {
++    borderWidth: 1,
++    borderColor: theme.colors.border,
++    borderRadius: theme.borderRadius.md,
++    backgroundColor: theme.colors.surface2,
++    padding: theme.spacing[3],
++  },
++  driveyDismiss: {
++    borderWidth: 0,
++    backgroundColor: "transparent",
++    flexGrow: 0,
++    flexShrink: 0,
++    flexBasis: "auto",
++    paddingHorizontal: theme.spacing[1],
++    minHeight: 28,
++  },
++  driveyActions: { justifyContent: "flex-end" },
+   container: {
+     padding: theme.spacing[3],
+     borderRadius: theme.spacing[2],
 diff --git a/packages/app/src/components/sidebar-workspace-list.tsx b/packages/app/src/components/sidebar-workspace-list.tsx
-index 8697a4b2..1fc80380 100644
+index 8697a4b2..1528b7ed 100644
 --- a/packages/app/src/components/sidebar-workspace-list.tsx
 +++ b/packages/app/src/components/sidebar-workspace-list.tsx
-@@ -1,3 +1,26 @@
+@@ -1,3 +1,25 @@
 +import { createDriveyWorkspace, createRawClaudeWorkspace } from "@/utils/idli-claude-workspace";
-+import { placeAgentOnSide, placeTabOnSide } from "@/utils/idli-side-pane";
-+import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
++import { placeTabOnSide } from "@/utils/idli-side-pane";
 +
 +// Wait for navigation to hydrate the chat tab before splitting off Claude.
 +function openIdliClaude(
-+  input: { serverId: string; workspaceId: string; agentId: string; terminalId: string },
++  input: { serverId: string; workspaceId: string; draftId: string; terminalId: string },
 +  tries = 60,
 +) {
-+  const placed = placeAgentOnSide({ ...input, side: "left" });
++  const placed = placeTabOnSide({ ...input, kind: "draft", id: input.draftId, side: "left" });
 +  if (
 +    placed &&
 +    placeTabOnSide({
@@ -1100,7 +2114,7 @@ index 8697a4b2..1fc80380 100644
  import { LoadingSpinner } from "@/components/ui/loading-spinner";
  import {
    View,
-@@ -782,6 +805,49 @@ function NewWorktreeButton({
+@@ -782,6 +804,44 @@ function NewWorktreeButton({
    );
  }
  
@@ -1130,11 +2144,6 @@ index 8697a4b2..1fc80380 100644
 +        displayName === "Drivey"
 +          ? createDriveyWorkspace({
 +              ...input,
-+              acceptAgent: (agent) =>
-+                getHostRuntimeStore().acceptAgentSnapshot(
-+                  target.serverId,
-+                  normalizeAgentSnapshot(agent, target.serverId),
-+                ),
 +              openClaude: openIdliClaude,
 +            })
 +          : createRawClaudeWorkspace(input);
@@ -1150,7 +2159,7 @@ index 8697a4b2..1fc80380 100644
  function NewWorkspaceGhostRow({
    project,
    displayName,
-@@ -794,8 +860,13 @@ function NewWorkspaceGhostRow({
+@@ -794,8 +854,13 @@ function NewWorkspaceGhostRow({
    onWorkspacePress?: () => void;
  }) {
    const { t } = useTranslation();
@@ -1164,7 +2173,7 @@ index 8697a4b2..1fc80380 100644
      router.navigate(
        buildNewWorkspaceRoute({
          serverId: worktreeTarget.serverId,
-@@ -804,7 +875,7 @@ function NewWorkspaceGhostRow({
+@@ -804,7 +869,7 @@ function NewWorkspaceGhostRow({
          projectId: worktreeTarget.projectId,
        }) as Href,
      );
@@ -1173,7 +2182,7 @@ index 8697a4b2..1fc80380 100644
    const rowStyle = useCallback(
      ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
        styles.newWorkspaceGhostRow,
-@@ -878,11 +949,16 @@ function ProjectHeaderRow({
+@@ -878,11 +943,16 @@ function ProjectHeaderRow({
    const localDaemonServerId = useLocalDaemonServerId();
    const projectPath = resolveSidebarProjectLocalPath(project, localDaemonServerId);
    const settingsTarget = project.hosts[0] ?? null;
@@ -1190,7 +2199,7 @@ index 8697a4b2..1fc80380 100644
      router.navigate(
        buildNewWorkspaceRoute({
          serverId: worktreeTarget.serverId,
-@@ -891,7 +967,7 @@ function ProjectHeaderRow({
+@@ -891,7 +961,7 @@ function ProjectHeaderRow({
          projectId: worktreeTarget.projectId,
        }) as Href,
      );
@@ -1200,20 +2209,21 @@ index 8697a4b2..1fc80380 100644
      drag,
      menuController,
 diff --git a/packages/app/src/components/split-container.tsx b/packages/app/src/components/split-container.tsx
-index 27831724..cb5846b7 100644
+index 27831724..7fc36bad 100644
 --- a/packages/app/src/components/split-container.tsx
 +++ b/packages/app/src/components/split-container.tsx
-@@ -12,7 +12,8 @@ import {
+@@ -12,7 +12,9 @@ import {
    type SetStateAction,
  } from "react";
  import { useStableEvent } from "@/hooks/use-stable-event";
 -import { View, type LayoutChangeEvent } from "react-native";
 +import { Text, View, type LayoutChangeEvent } from "react-native";
 +import { isIdliWorkspace, useIdliPairing } from "@/utils/idli-pairing";
++import { IdliStartClaude } from "@/components/idli-start-claude";
  import Animated, {
    useAnimatedStyle,
    useSharedValue,
-@@ -193,6 +194,7 @@ export function SplitContainer({
+@@ -193,6 +195,7 @@ export function SplitContainer({
      [layout.root, explorerSidebarPaneId],
    );
    const workspaceHasMultiplePanes = Boolean(mainRoot && hasMultipleVisiblePanes(mainRoot));
@@ -1221,7 +2231,7 @@ index 27831724..cb5846b7 100644
    useEffect(() => {
      if (
        maximizedPaneId &&
-@@ -706,7 +708,12 @@ const SplitPaneView = memo(function SplitPaneView({
+@@ -706,7 +709,12 @@ const SplitPaneView = memo(function SplitPaneView({
        <View
          ref={paneRef}
          collapsable={false}
@@ -1235,7 +2245,7 @@ index 27831724..cb5846b7 100644
          testID={`workspace-pane-${pane.id}`}
        >
          <WindowChromeSafeArea placement="inline" style={styles.paneTabs}>
-@@ -748,6 +755,17 @@ const SplitPaneView = memo(function SplitPaneView({
+@@ -748,6 +756,13 @@ const SplitPaneView = memo(function SplitPaneView({
          </WindowChromeSafeArea>
  
          <View style={styles.paneContent}>
@@ -1243,17 +2253,13 @@ index 27831724..cb5846b7 100644
 +          isIdliWorkspace(normalizedServerId, normalizedWorkspaceId) ? (
 +            // Idli P15: the right side waits for this chat's Claude conversation
 +            <View style={styles.idliPlaceholder}>
-+              <Text style={styles.idliPlaceholderTitle}>Claude</Text>
-+              <Text style={styles.idliPlaceholderText}>
-+                When Idli sends Claude a copy with fake values (to design a chart or learn a file), that conversation
-+                appears here, next to this chat. Your data stays on the left.
-+              </Text>
++              <IdliStartClaude serverId={normalizedServerId} workspaceId={normalizedWorkspaceId} />
 +            </View>
 +          ) : null}
            <WorkspacePanelHost
              paneId={pane.id}
              tabs={paneTabs}
-@@ -854,6 +872,42 @@ const styles = StyleSheet.create((theme) => ({
+@@ -854,6 +869,42 @@ const styles = StyleSheet.create((theme) => ({
      backgroundColor: theme.colors.surface0,
      overflow: "hidden",
    },
@@ -1296,6 +2302,711 @@ index 27831724..cb5846b7 100644
    paneTabs: {
      position: "relative",
      minWidth: 0,
+diff --git a/packages/app/src/components/terminal-emulator-contract.ts b/packages/app/src/components/terminal-emulator-contract.ts
+index b4e3dd93..a321fa0a 100644
+--- a/packages/app/src/components/terminal-emulator-contract.ts
++++ b/packages/app/src/components/terminal-emulator-contract.ts
+@@ -75,5 +75,6 @@ export interface TerminalEmulatorProps {
+   pendingModifiers?: PendingTerminalModifiers;
+   focusRequestToken?: number;
+   resizeRequestToken?: number;
++  forceResizeOnRequest?: boolean;
+   onFilePaste?: (file: Promise<TerminalFile | null>) => void;
+ }
+diff --git a/packages/app/src/components/terminal-emulator.tsx b/packages/app/src/components/terminal-emulator.tsx
+index 7504843c..7f3c7880 100644
+--- a/packages/app/src/components/terminal-emulator.tsx
++++ b/packages/app/src/components/terminal-emulator.tsx
+@@ -140,6 +140,7 @@ interface TerminalEmulatorProps {
+   pendingModifiers?: PendingTerminalModifiers;
+   focusRequestToken?: number;
+   resizeRequestToken?: number;
++  forceResizeOnRequest?: boolean;
+ }
+ 
+ declare global {
+@@ -177,6 +178,7 @@ export default function TerminalEmulator({
+   pendingModifiers = { ctrl: false, shift: false, alt: false },
+   focusRequestToken = 0,
+   resizeRequestToken = 0,
++  forceResizeOnRequest = false,
+ }: TerminalEmulatorProps) {
+   const rootRef = useRef<HTMLDivElement | null>(null);
+   const hostRef = useRef<HTMLDivElement | null>(null);
+@@ -537,8 +539,12 @@ export default function TerminalEmulator({
+     if (resizeRequestToken <= 0) {
+       return;
+     }
+-    runtimeRef.current?.resize({ forceClaim: false, shouldClaim: false });
+-  }, [resizeRequestToken]);
++    runtimeRef.current?.resize({
++      forceRefresh: forceResizeOnRequest,
++      forceClaim: false,
++      shouldClaim: false,
++    });
++  }, [resizeRequestToken, forceResizeOnRequest]);
+ 
+   const showTerminalContextMenu = useCallback(() => {
+     const showContextMenu = window.paseoDesktop?.menu?.showContextMenu;
+diff --git a/packages/app/src/components/terminal-pane-focus-claim.test.ts b/packages/app/src/components/terminal-pane-focus-claim.test.ts
+index 528cdffc..7985c89c 100644
+--- a/packages/app/src/components/terminal-pane-focus-claim.test.ts
++++ b/packages/app/src/components/terminal-pane-focus-claim.test.ts
+@@ -250,3 +250,51 @@ describe("terminal pane focus claim", () => {
+     expect(changed.shouldRequest).toBe(true);
+   });
+ });
++
++describe("initial split terminal sizing", () => {
++  const input = {
++    size: { rows: 30, cols: 80 },
++    previousSentSize: null,
++    shouldClaim: false,
++    forceClaim: false,
++    supportsTerminalSizeOwnership: true,
++    readiness: {
++      isWorkspaceFocused: true,
++      isPaneFocused: false,
++      isAppActivelyVisible: true,
++      isClientReady: true,
++      isConnected: true,
++      isRendererReady: true,
++    },
++  };
++  it("claims the initial Drivey right-pane size while the left composer keeps focus", () => {
++    expect(resolveTerminalResizeClaim({ ...input, claimInitialSize: true })).toEqual({
++      shouldSend: true,
++      intent: "claim",
++    });
++    expect(resolveTerminalResizeClaim(input)).toEqual({ shouldSend: true, intent: "update" });
++  });
++  it("uses owner-only updates after the first claim and ignores hidden or unready panes", () => {
++    expect(
++      resolveTerminalResizeClaim({
++        ...input,
++        claimInitialSize: true,
++        previousSentSize: { rows: 25, cols: 100 },
++      }),
++    ).toEqual({ shouldSend: true, intent: "update" });
++    expect(
++      resolveTerminalResizeClaim({
++        ...input,
++        claimInitialSize: true,
++        readiness: { ...input.readiness, isWorkspaceFocused: false },
++      }),
++    ).toEqual({ shouldSend: false, intent: "claim" });
++    expect(
++      resolveTerminalResizeClaim({
++        ...input,
++        claimInitialSize: true,
++        readiness: { ...input.readiness, isRendererReady: false },
++      }),
++    ).toEqual({ shouldSend: false, intent: "claim" });
++  });
++});
+diff --git a/packages/app/src/components/terminal-pane-focus-claim.ts b/packages/app/src/components/terminal-pane-focus-claim.ts
+index c22f96bd..1b6c9ec9 100644
+--- a/packages/app/src/components/terminal-pane-focus-claim.ts
++++ b/packages/app/src/components/terminal-pane-focus-claim.ts
+@@ -26,13 +26,18 @@ export function resolveTerminalResizeClaim(input: {
+   size: TerminalSize;
+   previousSentSize: TerminalSize | null;
+   shouldClaim: boolean;
++  claimInitialSize?: boolean;
+   forceClaim: boolean;
+   supportsTerminalSizeOwnership: boolean;
+   readiness: FocusClaimReadiness;
+ }): { shouldSend: boolean; intent: "claim" | "update" } {
+-  const intent = input.shouldClaim ? "claim" : "update";
++  const initialClaim = input.claimInitialSize === true && input.previousSentSize === null;
++  const intent = input.shouldClaim || initialClaim ? "claim" : "update";
+   if (intent === "claim") {
+-    if (!canRequestFocusClaim(input.readiness)) {
++    const canClaim = initialClaim
++      ? canRequestOwnedSizeUpdate(input.readiness)
++      : canRequestFocusClaim(input.readiness);
++    if (!canClaim) {
+       return { shouldSend: false, intent };
+     }
+     if (input.supportsTerminalSizeOwnership) {
+diff --git a/packages/app/src/components/terminal-pane.tsx b/packages/app/src/components/terminal-pane.tsx
+index 4c5e74ef..fa4db859 100644
+--- a/packages/app/src/components/terminal-pane.tsx
++++ b/packages/app/src/components/terminal-pane.tsx
+@@ -103,6 +103,7 @@ import {
+ } from "@/workspace/file-open";
+ 
+ interface TerminalPaneProps {
++  fitDriveyPane?: boolean;
+   serverId: string;
+   cwd: string;
+   terminalId: string;
+@@ -257,6 +258,7 @@ function KeyboardToggleButton({
+ }
+ 
+ export function TerminalPane({
++  fitDriveyPane = false,
+   serverId,
+   cwd,
+   terminalId,
+@@ -506,6 +508,27 @@ export function TerminalPane({
+     terminalId,
+   ]);
+ 
++  const driveyRefitTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
++  const refitDriveyPane = useCallback(() => {
++    if (!fitDriveyPane || !isTerminalPresented) return;
++    requestTerminalReflow();
++    if (driveyRefitTimeout.current) clearTimeout(driveyRefitTimeout.current);
++    driveyRefitTimeout.current = setTimeout(requestTerminalReflow, 320);
++  }, [fitDriveyPane, isTerminalPresented, requestTerminalReflow]);
++  const handlePaneLayout = useCallback(
++    (event: LayoutChangeEvent) => {
++      const { width, height } = event.nativeEvent.layout;
++      if (width > 0 && height > 0) refitDriveyPane();
++    },
++    [refitDriveyPane],
++  );
++  useEffect(() => {
++    if (rendererReadyStreamKey === terminalStreamKey) refitDriveyPane();
++    return () => {
++      if (driveyRefitTimeout.current) clearTimeout(driveyRefitTimeout.current);
++    };
++  }, [refitDriveyPane, rendererReadyStreamKey, terminalStreamKey]);
++
+   const clearKeyboardRefitTimeouts = useCallback(() => {
+     if (keyboardRefitTimeoutsRef.current.length === 0) {
+       return;
+@@ -905,6 +928,7 @@ export function TerminalPane({
+       size: nextSize,
+       previousSentSize: lastSentTerminalSizeRef.current,
+       shouldClaim: input.shouldClaim,
++      claimInitialSize: fitDriveyPane,
+       forceClaim: input.forceClaim ?? false,
+       supportsTerminalSizeOwnership,
+       readiness: {
+@@ -1171,7 +1195,10 @@ export function TerminalPane({
+     <Animated.View style={containerStyle}>
+       <FileDropZone style={styles.outputContainer}>
+         <TerminalFileDropSink onFiles={handleDroppedFiles} />
+-        <View style={styles.terminalGestureContainer}>
++        <View
++          style={styles.terminalGestureContainer}
++          onLayout={fitDriveyPane ? handlePaneLayout : undefined}
++        >
+           <TerminalEmulator
+             ref={emulatorRef}
+             dom={TERMINAL_EMULATOR_DOM_PROPS}
+@@ -1204,6 +1231,7 @@ export function TerminalPane({
+             pendingModifiers={modifiers}
+             focusRequestToken={focusRequestToken}
+             resizeRequestToken={resizeRequestToken}
++            forceResizeOnRequest={fitDriveyPane}
+           />
+         </View>
+ 
+diff --git a/packages/app/src/components/ui/autocomplete.tsx b/packages/app/src/components/ui/autocomplete.tsx
+index a9cb10f3..15623aa4 100644
+--- a/packages/app/src/components/ui/autocomplete.tsx
++++ b/packages/app/src/components/ui/autocomplete.tsx
+@@ -19,6 +19,7 @@ export interface AutocompleteOption {
+   id: string;
+   label: string;
+   detail?: string;
++  emphasizeLabel?: boolean;
+   description?: string;
+   kind?: "command" | "file" | "directory";
+ }
+@@ -91,10 +92,19 @@ function AutocompleteRow({
+           </View>
+           <View style={styles.itemMain}>
+             <View style={styles.itemHeader}>
+-              <Text style={styles.itemLabel}>{optionLabel}</Text>
+-              {removeBoltGlyphs(option.detail) ? (
+-                <Text style={styles.itemDetail}>{removeBoltGlyphs(option.detail)}</Text>
+-              ) : null}
++              {option.emphasizeLabel ? (
++                <Text style={styles.driveyEntry}>
++                  <Text style={styles.emphasizedLabel}>{optionLabel}</Text>
++                  {option.detail ? <Text style={styles.itemDetail}> {option.detail}</Text> : null}
++                </Text>
++              ) : (
++                <>
++                  <Text style={styles.itemLabel}>{optionLabel}</Text>
++                  {removeBoltGlyphs(option.detail) ? (
++                    <Text style={styles.itemDetail}>{removeBoltGlyphs(option.detail)}</Text>
++                  ) : null}
++                </>
++              )}
+             </View>
+             {optionDescription ? (
+               <Text style={styles.itemDescription} numberOfLines={1}>
+@@ -289,6 +299,13 @@ export function Autocomplete({
+ }
+ 
+ const styles = StyleSheet.create((theme: Theme) => ({
++  emphasizedLabel: { fontWeight: theme.fontWeight.semibold },
++  driveyEntry: {
++    flex: 1,
++    flexShrink: 1,
++    color: theme.colors.foreground,
++    fontSize: theme.fontSize.base,
++  },
+   outerWrapper: {
+     flexShrink: 1,
+     minHeight: 0,
+diff --git a/packages/app/src/components/worktree-setup-callout-source.tsx b/packages/app/src/components/worktree-setup-callout-source.tsx
+index b7ec157e..db4efe40 100644
+--- a/packages/app/src/components/worktree-setup-callout-source.tsx
++++ b/packages/app/src/components/worktree-setup-callout-source.tsx
+@@ -1,3 +1,4 @@
++import { useDriveyWorkspace } from "@/hooks/use-drivey-workspace";
+ import { useQuery } from "@tanstack/react-query";
+ import { useRouter } from "expo-router";
+ import { useEffect, useMemo } from "react";
+@@ -14,6 +15,7 @@ import {
+ 
+ export function WorktreeSetupCalloutSource() {
+   const selection = useActiveWorkspaceSelection();
++  const isDrivey = useDriveyWorkspace(selection?.serverId ?? "", selection?.workspaceId ?? "");
+   const selectedWorkspaceProject = useWorkspaceFields(
+     selection?.serverId ?? null,
+     selection?.workspaceId ?? null,
+@@ -44,10 +46,10 @@ export function WorktreeSetupCalloutSource() {
+ 
+   const calloutPolicy = useMemo(
+     () =>
+-      activeProject && shouldShowWorktreeSetupCallout(readQuery.data)
++      !isDrivey && activeProject && shouldShowWorktreeSetupCallout(readQuery.data)
+         ? buildWorktreeSetupCalloutPolicy(activeProject)
+         : null,
+-    [activeProject, readQuery.data],
++    [activeProject, readQuery.data, isDrivey],
+   );
+ 
+   useEffect(() => {
+diff --git a/packages/app/src/composer/draft/surface.tsx b/packages/app/src/composer/draft/surface.tsx
+new file mode 100644
+index 00000000..a0ff64d8
+--- /dev/null
++++ b/packages/app/src/composer/draft/surface.tsx
+@@ -0,0 +1,94 @@
++import type { ReactNode } from "react";
++import { ScrollView, Text, View } from "react-native";
++import { StyleSheet } from "react-native-unistyles";
++import { ComposerDock } from "@/composer/dock";
++import { FileDropZone } from "@/components/file-drop/file-drop-zone";
++import { IdliMiniCartridges } from "@/components/idli-mini-cartridges";
++import { IDLI_DRIVEY_OPENING } from "@/utils/idli-minis";
++
++interface WorkspaceDraftSurfaceProps {
++  isDrivey: boolean;
++  isSubmitting: boolean;
++  fullscreen: boolean;
++  error: string;
++  onOpenMini: (text: string) => Promise<void>;
++  minisDisabled: boolean;
++  children: [ReactNode, ReactNode];
++}
++
++export function WorkspaceDraftSurface({
++  isDrivey,
++  isSubmitting,
++  fullscreen,
++  error,
++  onOpenMini,
++  minisDisabled,
++  children: [content, composer],
++}: WorkspaceDraftSurfaceProps) {
++  if (isDrivey && !isSubmitting && !fullscreen) {
++    return (
++      <FileDropZone style={styles.container}>
++        <ScrollView
++          contentContainerStyle={styles.driveyContent}
++          keyboardShouldPersistTaps="handled"
++        >
++          <View style={styles.driveyWelcome}>
++            <Text style={styles.driveyTitle}>Ask about your Drive files</Text>
++            <Text style={styles.driveyHint}>{IDLI_DRIVEY_OPENING}</Text>
++          </View>
++          {error ? (
++            <View style={styles.errorContainer}>
++              <Text style={styles.errorText}>
++                Could not start this chat. Check that Idli is running on your computer, then try
++                again.
++              </Text>
++            </View>
++          ) : null}
++          <View>{composer}</View>
++          <View style={styles.driveyMinis}>
++            <Text style={styles.driveyMiniTitle}>Minis</Text>
++            <IdliMiniCartridges onSubmit={onOpenMini} disabled={minisDisabled} />
++          </View>
++        </ScrollView>
++      </FileDropZone>
++    );
++  }
++  return (
++    <FileDropZone style={styles.container}>
++      <ComposerDock fullscreen={fullscreen}>
++        {content}
++        {composer}
++      </ComposerDock>
++    </FileDropZone>
++  );
++}
++
++const styles = StyleSheet.create((theme) => ({
++  driveyContent: {
++    flexGrow: 1,
++    paddingTop: theme.spacing[8],
++    paddingBottom: theme.spacing[6],
++    gap: theme.spacing[3],
++  },
++  driveyWelcome: { paddingHorizontal: theme.spacing[4], gap: theme.spacing[2] },
++  driveyTitle: {
++    color: theme.colors.foreground,
++    fontSize: theme.fontSize.lg,
++    fontWeight: theme.fontWeight.semibold,
++  },
++  driveyHint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm, lineHeight: 20 },
++  driveyMinis: { paddingHorizontal: theme.spacing[4] },
++  driveyMiniTitle: {
++    color: theme.colors.foregroundMuted,
++    fontSize: theme.fontSize.sm,
++    fontWeight: theme.fontWeight.semibold,
++  },
++  container: { flex: 1, width: "100%", backgroundColor: theme.colors.surface0 },
++  errorContainer: {
++    marginHorizontal: theme.spacing[4],
++    padding: theme.spacing[3],
++    borderRadius: theme.borderRadius.md,
++    backgroundColor: theme.colors.surface2,
++  },
++  errorText: { color: theme.colors.destructive },
++}));
+diff --git a/packages/app/src/composer/draft/workspace-tab.tsx b/packages/app/src/composer/draft/workspace-tab.tsx
+index c4ef45cb..09ca3722 100644
+--- a/packages/app/src/composer/draft/workspace-tab.tsx
++++ b/packages/app/src/composer/draft/workspace-tab.tsx
+@@ -1,13 +1,12 @@
++import { DRIVEY_PLACEHOLDER } from "@/utils/idli-drivey";
+ import { useCallback, useEffect, useMemo, useRef } from "react";
+ import { Keyboard, ScrollView, StyleSheet as RNStyleSheet, Text, View } from "react-native";
+ import { useTranslation } from "react-i18next";
+ import { StyleSheet } from "react-native-unistyles";
+-import { ComposerDock } from "@/composer/dock";
+ import { useContainerWidthBelow } from "@/hooks/use-container-width";
+ import invariant from "tiny-invariant";
+ import { Composer } from "@/composer";
+ import { useComposerEditingSession, useComposerFullscreen } from "@/composer/editing-session";
+-import { FileDropZone } from "@/components/file-drop/file-drop-zone";
+ import { ComposerImportPill } from "@/composer/draft/import-pill";
+ import { COMPOSER_PILL_CLEARANCE } from "@/composer/pill-styles";
+ import { AgentStreamView } from "@/agent-stream/view";
+@@ -49,6 +48,8 @@ import {
+ } from "@/workspace-tabs/model";
+ import { openWorkspaceChanges } from "@/workspace-tabs/open-supporting-view";
+ import { useSettings } from "@/hooks/use-settings";
++import { driveyAgentRequest, isDriveyDraft } from "@/utils/idli-claude-workspace";
++import { WorkspaceDraftSurface } from "./surface";
+ 
+ const EMPTY_PENDING_PERMISSIONS = new Map();
+ const DRAFT_CAPABILITIES: AgentCapabilityFlags = {
+@@ -180,6 +181,7 @@ async function submitDraftCreateRequest(input: {
+     config,
+     workspaceId,
+     initialPrompt: text,
++    ...(isDriveyDraft(input.draftId) ? driveyAgentRequest({ workspaceId, cwd, text }) : {}),
+     clientMessageId: attempt.clientMessageId,
+     ...(imagesData && imagesData.length > 0 ? { images: imagesData } : {}),
+     ...(attachmentsArray && attachmentsArray.length > 0 ? { attachments: attachmentsArray } : {}),
+@@ -282,14 +284,15 @@ interface WorkspaceDraftAgentTabProps {
+   onOpenImportSheet?: () => void;
+ }
+ 
+-function resolveImportPillPress(
+-  onOpenImportSheet: (() => void) | undefined,
+-  isSubmitting: boolean,
+-): (() => void) | null {
+-  if (isSubmitting) {
++function resolveImportPillPress(input: {
++  onOpenImportSheet: (() => void) | undefined;
++  isSubmitting: boolean;
++  isDrivey: boolean;
++}): (() => void) | null {
++  if (input.isSubmitting || input.isDrivey) {
+     return null;
+   }
+-  return onOpenImportSheet ?? null;
++  return input.onOpenImportSheet ?? null;
+ }
+ 
+ export function WorkspaceDraftAgentTab({
+@@ -312,6 +315,7 @@ export function WorkspaceDraftAgentTab({
+   }));
+   const workspaceDirectory = workspaceFields?.workspaceDirectory || null;
+   const draftSetup = initialSetup ?? null;
++  const isDrivey = isDriveyDraft(draftId);
+   const draftWorkingDirectory = resolveDraftWorkingDirectory({
+     workspaceDirectory,
+     initialSetup: draftSetup,
+@@ -339,9 +343,7 @@ export function WorkspaceDraftAgentTab({
+     },
+   });
+   const composerState = draftInput.composerState;
+-  if (!composerState) {
+-    throw new Error("Workspace draft composer state is required");
+-  }
++  invariant(composerState, "Workspace draft composer state is required");
+ 
+   const draftProvider = composerState.selectedProvider;
+   const draftProviderDefinitions = composerState.providerDefinitions;
+@@ -499,7 +501,7 @@ export function WorkspaceDraftAgentTab({
+   );
+   useAgentControlCommandCenterActions({
+     sourceId: `draft:${serverId}:${tabId}`,
+-    enabled: isPaneFocused && !isSubmitting,
++    enabled: isPaneFocused && !isSubmitting && !isDrivey,
+     controls: {
+       serverId,
+       ownerKey: tabId,
+@@ -591,14 +593,22 @@ export function WorkspaceDraftAgentTab({
+   const handleDropdownCloseFocus = useCallback(() => {
+     focusInputRef.current?.();
+   }, []);
+-  const importPillPress = resolveImportPillPress(onOpenImportSheet, isSubmitting);
++  const importPillPress = resolveImportPillPress({ onOpenImportSheet, isSubmitting, isDrivey });
+   const composerAgentControls = useMemo(
+     () => ({
+       ...composerState.agentControls,
+       onDropdownClose: handleDropdownCloseFocus,
+-      disabled: isSubmitting,
++      disabled: isSubmitting || isDrivey,
+     }),
+-    [composerState.agentControls, handleDropdownCloseFocus, isSubmitting],
++    [composerState.agentControls, handleDropdownCloseFocus, isSubmitting, isDrivey],
++  );
++  const openMini = useCallback(
++    async (text: string) => {
++      if (!draftWorkingDirectory)
++        throw new Error("Your workspace is still opening. Try again in a moment.");
++      await handleCreateFromInput({ text, attachments: [], cwd: draftWorkingDirectory });
++    },
++    [draftWorkingDirectory, handleCreateFromInput],
+   );
+   const dockContent = (
+     <View style={styles.contentContainer}>
+@@ -629,47 +639,62 @@ export function WorkspaceDraftAgentTab({
+     </View>
+   );
+ 
+-  return (
+-    <FileDropZone style={styles.container}>
+-      <ComposerDock fullscreen={isComposerFullscreen}>
+-        {dockContent}
+-        <View style={animatedStaticStyles.inputAreaWrapper} onLayout={onInputAreaLayout}>
+-          {importPillPress && !isComposerFullscreen ? (
+-            <View style={styles.importPillRow}>
+-              <View style={styles.importPillContent}>
+-                <ComposerImportPill onPress={importPillPress} />
+-              </View>
+-            </View>
+-          ) : null}
+-          <Composer
+-            agentId={tabId}
+-            serverId={serverId}
+-            workspaceId={workspaceId}
+-            isPaneFocused={isPaneFocused}
+-            onSubmitMessage={handleCreateFromInput}
+-            isSubmitLoading={isSubmitting}
+-            blurOnSubmit={true}
+-            textSource={draftInput.textSource}
+-            onChangeText={draftInput.editText}
+-            textReplacement={draftInput.textReplacement}
+-            attachments={draftInput.attachments}
+-            attachmentScopeKeys={attachmentScopeKeys}
+-            onOpenWorkspaceAttachment={handleOpenWorkspaceAttachment}
+-            onChangeAttachments={draftInput.setAttachments}
+-            cwd={composerState.workingDir}
+-            clearDraft={draftInput.clear}
+-            editingSession={editingSession}
+-            autoFocus={shouldAutoFocusWorkspaceDraftComposer({ isPaneFocused, isSubmitting })}
+-            autoFocusKey={String(draftInput.attachmentFocusRequestId)}
+-            onFocusInput={handleFocusInputCallback}
+-            commandDraft={composerState.commandDraft}
+-            agentControls={composerAgentControls}
+-            isCompactLayout={isCompactComposerLayout}
+-          />
++  const composer = (
++    <View style={animatedStaticStyles.inputAreaWrapper} onLayout={onInputAreaLayout}>
++      {importPillPress && !isComposerFullscreen ? (
++        <View style={styles.importPillRow}>
++          <View style={styles.importPillContent}>
++            <ComposerImportPill onPress={importPillPress} />
++          </View>
+         </View>
+-      </ComposerDock>
+-    </FileDropZone>
++      ) : null}
++      <Composer
++        agentId={tabId}
++        serverId={serverId}
++        workspaceId={workspaceId}
++        isPaneFocused={isPaneFocused}
++        onSubmitMessage={handleCreateFromInput}
++        isSubmitLoading={isSubmitting}
++        blurOnSubmit={true}
++        textSource={draftInput.textSource}
++        onChangeText={draftInput.editText}
++        textReplacement={draftInput.textReplacement}
++        attachments={draftInput.attachments}
++        attachmentScopeKeys={attachmentScopeKeys}
++        onOpenWorkspaceAttachment={handleOpenWorkspaceAttachment}
++        onChangeAttachments={draftInput.setAttachments}
++        cwd={composerState.workingDir}
++        clearDraft={draftInput.clear}
++        editingSession={editingSession}
++        autoFocus={shouldAutoFocusWorkspaceDraftComposer({ isPaneFocused, isSubmitting })}
++        autoFocusKey={String(draftInput.attachmentFocusRequestId)}
++        onFocusInput={handleFocusInputCallback}
++        commandDraft={composerState.commandDraft}
++        agentControls={composerAgentControls}
++        isCompactLayout={isCompactComposerLayout}
++        isDrivey={isDrivey}
++        placeholder={driveyPlaceholder(draftId)}
++      />
++    </View>
+   );
++
++  return (
++    <WorkspaceDraftSurface
++      isDrivey={isDrivey}
++      isSubmitting={isSubmitting}
++      fullscreen={isComposerFullscreen}
++      error={formErrorMessage}
++      onOpenMini={openMini}
++      minisDisabled={!draftInput.isHydrated || !isConnected}
++    >
++      {dockContent}
++      {composer}
++    </WorkspaceDraftSurface>
++  );
++}
++
++function driveyPlaceholder(draftId: string): string | undefined {
++  return isDriveyDraft(draftId) ? DRIVEY_PLACEHOLDER : undefined;
+ }
+ 
+ const animatedStaticStyles = RNStyleSheet.create({
+diff --git a/packages/app/src/composer/index.tsx b/packages/app/src/composer/index.tsx
+index d6b4bae6..7664c4aa 100644
+--- a/packages/app/src/composer/index.tsx
++++ b/packages/app/src/composer/index.tsx
+@@ -1,3 +1,4 @@
++import { DRIVEY_PLACEHOLDER, isDriveyLeft } from "@/utils/idli-drivey";
+ import {
+   useComposerEditingSession,
+   useComposerFullscreen,
+@@ -982,6 +983,7 @@ interface ComposerProps {
+   submitLabel?: string;
+   /** Overrides the mode's default placeholder, for text only the caller can build. */
+   placeholder?: string;
++  isDrivey?: boolean;
+   /**
+    * The host that also lays out the dock and chrome shares this session so its
+    * fullscreen state and the composer's agree. Defaults to the tab's session for
+@@ -1278,6 +1280,7 @@ function ComposerContentImpl({
+   readOnly = false,
+   submitLabel,
+   placeholder,
++  isDrivey: driveyDraft = false,
+ }: ComposerContentProps) {
+   const mode = resolveComposerInputMode(inputMode);
+   const { t } = useTranslation();
+@@ -1313,7 +1316,17 @@ function ComposerContentImpl({
+   const isDesktopWebBreakpoint = resolveIsDesktopWebBreakpoint(isCompactFormFactor);
+   const hasFinePointer = useHasFinePointer();
+   const isDesktopLayout = resolveIsDesktopWebBreakpoint(isCompactLayout);
+-  const messagePlaceholder = resolveMessagePlaceholder(inputMode, isDesktopLayout, t, placeholder);
++  const driveyAgent = useSessionStore((state) => {
++    const session = state.sessions[serverId];
++    return isDriveyLeft(session?.agents.get(agentId) ?? session?.agentDetails.get(agentId));
++  });
++  const isDrivey = driveyDraft || driveyAgent;
++  const messagePlaceholder = resolveMessagePlaceholder(
++    inputMode,
++    isDesktopLayout,
++    t,
++    isDrivey ? DRIVEY_PLACEHOLDER : placeholder,
++  );
+   const hasText = useSyncExternalStore(
+     textSource.subscribe,
+     () => textSource.getSnapshot().trim().length > 0,
+@@ -2225,15 +2238,27 @@ function ComposerContentImpl({
+ 
+   const leftContent = useMemo(
+     () =>
+-      renderLeftContent({
+-        agentControls,
+-        agentId,
+-        serverId,
+-        focusInput,
+-        isCompactLayout,
+-        showAgentControls: mode.showAgentControls,
+-      }),
+-    [agentControls, agentId, focusInput, isCompactLayout, mode.showAgentControls, serverId],
++      isDrivey ? (
++        <Text style={styles.driveyModelLabel}>Idli 9B</Text>
++      ) : (
++        renderLeftContent({
++          agentControls,
++          agentId,
++          serverId,
++          focusInput,
++          isCompactLayout,
++          showAgentControls: mode.showAgentControls,
++        })
++      ),
++    [
++      isDrivey,
++      agentControls,
++      agentId,
++      focusInput,
++      isCompactLayout,
++      mode.showAgentControls,
++      serverId,
++    ],
+   );
+ 
+   const handleAttachButtonRef = useCallback((node: View | null) => {
+@@ -2368,12 +2393,14 @@ function ComposerContentImpl({
+       serverId,
+       agentId,
+       draft: commandDraft,
++      isDrivey,
+       canExecuteClientSlashCommand: buildOutgoingAttachments(attachments).length === 0,
+       onClientSlashCommand: runClientSlashCommand,
+       pluginClientSlashCommands,
+     }),
+     [
+       replaceUserInput,
++      isDrivey,
+       serverId,
+       agentId,
+       commandDraft,
+@@ -2555,6 +2582,11 @@ const animatedStaticStyles = RNStyleSheet.create({
+ });
+ 
+ const styles = StyleSheet.create((theme: Theme) => ({
++  driveyModelLabel: {
++    color: theme.colors.foregroundMuted,
++    fontSize: theme.fontSize.sm,
++    paddingHorizontal: theme.spacing[2],
++  },
+   borderSeparator: {
+     height: theme.borderWidth[1],
+     backgroundColor: theme.colors.border,
 diff --git a/packages/app/src/desktop/agent-navigation.tsx b/packages/app/src/desktop/agent-navigation.tsx
 index f85d09ca..a23dbddb 100644
 --- a/packages/app/src/desktop/agent-navigation.tsx
@@ -1325,6 +3036,207 @@ index f85d09ca..a23dbddb 100644
    });
  
    useEffect(() => {
+diff --git a/packages/app/src/desktop/browser/pane/index.electron.tsx b/packages/app/src/desktop/browser/pane/index.electron.tsx
+index c728c5cd..1310c00f 100644
+--- a/packages/app/src/desktop/browser/pane/index.electron.tsx
++++ b/packages/app/src/desktop/browser/pane/index.electron.tsx
+@@ -1,3 +1,5 @@
++import { useDriveyWorkspace } from "@/hooks/use-drivey-workspace";
++import { isIdliDashboardUrl } from "@/utils/idli-drivey";
+ import {
+   useCallback,
+   useEffect,
+@@ -597,6 +599,8 @@ export function BrowserPane({
+   const { theme } = useUnistyles();
+   const { t } = useTranslation();
+   const browser = useBrowserStore((state) => state.browsersById[browserId] ?? null);
++  const isDrivey = useDriveyWorkspace(serverId, workspaceId);
++  const quietChrome = isDrivey && isIdliDashboardUrl(browser?.url ?? "");
+   const updateBrowser = useBrowserStore((state) => state.updateBrowser);
+   const setBrowserViewport = useBrowserStore((state) => state.setBrowserViewport);
+   const browserViewport = browser?.viewport ?? RESPONSIVE_BROWSER_VIEWPORT;
+@@ -1436,22 +1440,26 @@ export function BrowserPane({
+     <View style={styles.container}>
+       <View style={styles.chromeRow}>
+         <View style={styles.chromeLeft}>
+-          <ToolbarButton
+-            label={t("workspace.browser.controls.back")}
+-            disabled={!browser?.canGoBack}
+-            onPress={handleBack}
+-            style={backIconButtonStyle}
+-          >
+-            <ArrowLeft size={16} color={theme.colors.foregroundMuted} />
+-          </ToolbarButton>
+-          <ToolbarButton
+-            label={t("workspace.browser.controls.forward")}
+-            disabled={!browser?.canGoForward}
+-            onPress={handleForward}
+-            style={forwardIconButtonStyle}
+-          >
+-            <ArrowRight size={16} color={theme.colors.foregroundMuted} />
+-          </ToolbarButton>
++          {!quietChrome ? (
++            <>
++              <ToolbarButton
++                label={t("workspace.browser.controls.back")}
++                disabled={!browser?.canGoBack}
++                onPress={handleBack}
++                style={backIconButtonStyle}
++              >
++                <ArrowLeft size={16} color={theme.colors.foregroundMuted} />
++              </ToolbarButton>
++              <ToolbarButton
++                label={t("workspace.browser.controls.forward")}
++                disabled={!browser?.canGoForward}
++                onPress={handleForward}
++                style={forwardIconButtonStyle}
++              >
++                <ArrowRight size={16} color={theme.colors.foregroundMuted} />
++              </ToolbarButton>
++            </>
++          ) : null}
+           <ToolbarButton
+             label={
+               browser?.isLoading
+@@ -1464,69 +1472,75 @@ export function BrowserPane({
+             <RotateCw size={16} color={theme.colors.foregroundMuted} />
+           </ToolbarButton>
+         </View>
+-        <View style={styles.urlBarWrap}>
+-          <TextInput
+-            accessibilityLabel={t("workspace.browser.controls.browserUrl")}
+-            autoCapitalize="none"
+-            autoCorrect={false}
+-            onChangeText={setDraftUrl}
+-            onFocus={handleUrlBarFocus}
+-            onSubmitEditing={handleNavigateDraftUrl}
+-            placeholder={t("workspace.browser.controls.enterUrl")}
+-            placeholderTextColor={theme.colors.foregroundMuted}
+-            ref={urlInputRef}
+-            style={urlInputStyle}
+-            initialValue={draftUrl}
+-          />
+-        </View>
+-        <View style={styles.chromeRight}>
+-          <DeviceSizeMenu
+-            selectedId={selectedDeviceSizeId}
+-            onSelect={handleSelectDeviceSize}
+-            triggerStyle={baseIconButtonStyle}
+-          />
+-          <ToolbarButton
+-            label={t("workspace.browser.controls.openDevTools")}
+-            onPress={handleOpenDevTools}
+-            style={baseIconButtonStyle}
+-          >
+-            <Wrench size={16} color={theme.colors.foregroundMuted} />
+-          </ToolbarButton>
+-          <ToolbarButton
+-            label={
+-              selectorMode === "annotate"
+-                ? t("workspace.browser.controls.cancelSelector")
+-                : t("workspace.browser.controls.annotateElement")
+-            }
+-            active={selectorMode === "annotate"}
+-            onPress={handleToggleElementSelector}
+-            style={annotateIconButtonStyle}
+-          >
+-            <MousePointer2
+-              size={16}
+-              color={
+-                selectorMode === "annotate" ? theme.colors.accent : theme.colors.foregroundMuted
+-              }
+-            />
+-          </ToolbarButton>
+-          <ToolbarButton
+-            label={
+-              selectorMode === "screenshot"
+-                ? t("workspace.browser.controls.cancelSelector")
+-                : t("workspace.browser.controls.screenshotElement")
+-            }
+-            active={selectorMode === "screenshot"}
+-            onPress={handleToggleScreenshot}
+-            style={screenshotIconButtonStyle}
+-          >
+-            <Camera
+-              size={16}
+-              color={
+-                selectorMode === "screenshot" ? theme.colors.accent : theme.colors.foregroundMuted
+-              }
+-            />
+-          </ToolbarButton>
+-        </View>
++        {!quietChrome ? (
++          <>
++            <View style={styles.urlBarWrap}>
++              <TextInput
++                accessibilityLabel={t("workspace.browser.controls.browserUrl")}
++                autoCapitalize="none"
++                autoCorrect={false}
++                onChangeText={setDraftUrl}
++                onFocus={handleUrlBarFocus}
++                onSubmitEditing={handleNavigateDraftUrl}
++                placeholder={t("workspace.browser.controls.enterUrl")}
++                placeholderTextColor={theme.colors.foregroundMuted}
++                ref={urlInputRef}
++                style={urlInputStyle}
++                initialValue={draftUrl}
++              />
++            </View>
++            <View style={styles.chromeRight}>
++              <DeviceSizeMenu
++                selectedId={selectedDeviceSizeId}
++                onSelect={handleSelectDeviceSize}
++                triggerStyle={baseIconButtonStyle}
++              />
++              <ToolbarButton
++                label={t("workspace.browser.controls.openDevTools")}
++                onPress={handleOpenDevTools}
++                style={baseIconButtonStyle}
++              >
++                <Wrench size={16} color={theme.colors.foregroundMuted} />
++              </ToolbarButton>
++              <ToolbarButton
++                label={
++                  selectorMode === "annotate"
++                    ? t("workspace.browser.controls.cancelSelector")
++                    : t("workspace.browser.controls.annotateElement")
++                }
++                active={selectorMode === "annotate"}
++                onPress={handleToggleElementSelector}
++                style={annotateIconButtonStyle}
++              >
++                <MousePointer2
++                  size={16}
++                  color={
++                    selectorMode === "annotate" ? theme.colors.accent : theme.colors.foregroundMuted
++                  }
++                />
++              </ToolbarButton>
++              <ToolbarButton
++                label={
++                  selectorMode === "screenshot"
++                    ? t("workspace.browser.controls.cancelSelector")
++                    : t("workspace.browser.controls.screenshotElement")
++                }
++                active={selectorMode === "screenshot"}
++                onPress={handleToggleScreenshot}
++                style={screenshotIconButtonStyle}
++              >
++                <Camera
++                  size={16}
++                  color={
++                    selectorMode === "screenshot"
++                      ? theme.colors.accent
++                      : theme.colors.foregroundMuted
++                  }
++                />
++              </ToolbarButton>
++            </View>
++          </>
++        ) : null}
+       </View>
+       {browser?.lastError ? (
+         <View style={styles.errorRow}>
 diff --git a/packages/app/src/desktop/browser/resident-webviews.ts b/packages/app/src/desktop/browser/resident-webviews.ts
 index dfce3551..6bcba1d8 100644
 --- a/packages/app/src/desktop/browser/resident-webviews.ts
@@ -1342,25 +3254,281 @@ index dfce3551..6bcba1d8 100644
    if (input.initialUrl) {
      (webview as BrowserWebviewElement).src = input.initialUrl;
    }
+diff --git a/packages/app/src/hooks/use-agent-autocomplete.ts b/packages/app/src/hooks/use-agent-autocomplete.ts
+index ef144477..f0c22168 100644
+--- a/packages/app/src/hooks/use-agent-autocomplete.ts
++++ b/packages/app/src/hooks/use-agent-autocomplete.ts
+@@ -26,10 +26,13 @@ import {
+ import {
+   applyFileMentionReplacement,
+   findActiveFileMention,
++  rankDriveyFileMatches,
++  fileMentionParts,
+   type FileMentionRange,
+ } from "@/utils/file-mention-autocomplete";
+ 
+ interface UseAgentAutocompleteInput {
++  isDrivey?: boolean;
+   userInput: string;
+   cursorIndex: number;
+   setUserInput: (nextValue: string) => void;
+@@ -200,6 +203,7 @@ interface BuildAutocompleteOptionsInput {
+   activeSlashCommand: SlashCommandRange | null;
+   activeFileMention: FileMentionRange | null;
+   fileSuggestions: DirectorySuggestionEntry[];
++  isDrivey?: boolean;
+   t: TFunction;
+ }
+ 
+@@ -242,11 +246,16 @@ function buildCommandAutocompleteOptions(input: BuildAutocompleteOptionsInput) {
+ 
+   const activeFileMention = input.activeFileMention;
+   if (input.mode === "file" && activeFileMention) {
+-    const orderedEntries = orderAutocompleteOptions(input.fileSuggestions);
++    const entries = input.isDrivey
++      ? rankDriveyFileMatches(input.fileSuggestions, activeFileMention.query)
++      : input.fileSuggestions;
++    const orderedEntries = orderAutocompleteOptions(entries);
+     return orderedEntries.map((entry) => ({
+       type: "workspace_entry" as const,
+       id: `${entry.kind}:${entry.path}`,
+-      label: entry.path,
++      label: input.isDrivey ? fileMentionParts(entry.path).name : entry.path,
++      detail: input.isDrivey ? fileMentionParts(entry.path).folder : undefined,
++      emphasizeLabel: input.isDrivey,
+       kind: entry.kind,
+       entryPath: entry.path,
+       mention: activeFileMention,
+@@ -488,6 +497,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
+         pluginCommands: pluginClientSlashCommands,
+         activeSlashCommand,
+         fileSuggestions: fileSuggestionsQuery.data ?? [],
++        isDrivey: input.isDrivey,
+         isDraftContext,
+         isVisible,
+         mode,
+@@ -500,6 +510,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
+       commands,
+       pluginClientSlashCommands,
+       fileSuggestionsQuery.data,
++      input.isDrivey,
+       isDraftContext,
+       isVisible,
+       mode,
+diff --git a/packages/app/src/hooks/use-drivey-workspace.ts b/packages/app/src/hooks/use-drivey-workspace.ts
+new file mode 100644
+index 00000000..b0995c5c
+--- /dev/null
++++ b/packages/app/src/hooks/use-drivey-workspace.ts
+@@ -0,0 +1,35 @@
++import { useMemo } from "react";
++import { useSessionStore } from "@/stores/session-store";
++import { collectAllTabs, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
++import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
++import { isDriveyDraft } from "@/utils/idli-claude-workspace";
++import { isDriveyLeft, isDriveyProject } from "@/utils/idli-drivey";
++
++export function useDriveyWorkspace(serverId: string, workspaceId: string): boolean {
++  const workspace = useSessionStore((state) =>
++    state.sessions[serverId]?.workspaces.get(workspaceId),
++  );
++  const agents = useSessionStore((state) => state.sessions[serverId]?.agents);
++  const details = useSessionStore((state) => state.sessions[serverId]?.agentDetails);
++  const matchesSession = useMemo(() => {
++    if (isDriveyProject(workspace)) return true;
++    for (const collection of [agents, details]) {
++      if (!collection) continue;
++      for (const agent of collection.values()) {
++        if (agent.workspaceId === workspaceId && isDriveyLeft(agent)) return true;
++      }
++    }
++    return false;
++  }, [workspace, workspaceId, agents, details]);
++  const key = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
++  const layout = useWorkspaceLayoutStore((state) =>
++    key ? state.layoutByWorkspace[key] : undefined,
++  );
++  const hasDraft = useMemo(() => {
++    if (!layout) return false;
++    return collectAllTabs(layout.root).some(
++      (tab) => tab.target.kind === "draft" && isDriveyDraft(tab.target.draftId),
++    );
++  }, [layout]);
++  return matchesSession || hasDraft;
++}
+diff --git a/packages/app/src/panels/agent-panel-descriptor.test.tsx b/packages/app/src/panels/agent-panel-descriptor.test.tsx
+index ac577781..022169d4 100644
+--- a/packages/app/src/panels/agent-panel-descriptor.test.tsx
++++ b/packages/app/src/panels/agent-panel-descriptor.test.tsx
+@@ -121,3 +121,25 @@ describe("shared agent descriptor", () => {
+     );
+   });
+ });
++
++describe("Drivey tab titles", () => {
++  it("names only the Drivey draft New question", () => {
++    expect(
++      buildDraftPanelDescriptor({ isCreating: false, draftId: "idli-drivey:ws", icon: TestIcon })
++        .label,
++    ).toBe("New question");
++    expect(
++      buildDraftPanelDescriptor({ isCreating: false, draftId: "ordinary", icon: TestIcon }).label,
++    ).toBe("New Agent");
++  });
++  it("shows the Mini name while creating a Drivey chat", () => {
++    expect(
++      buildDraftPanelDescriptor({
++        isCreating: true,
++        draftId: "idli-drivey:ws",
++        pendingPrompt: "Open Mini: Household debt [private-id]",
++        icon: TestIcon,
++      }).label,
++    ).toBe("Household debt");
++  });
++});
+diff --git a/packages/app/src/panels/agent-panel.tsx b/packages/app/src/panels/agent-panel.tsx
+index a59ffc12..b9835462 100644
+--- a/packages/app/src/panels/agent-panel.tsx
++++ b/packages/app/src/panels/agent-panel.tsx
+@@ -399,6 +399,7 @@ export function useDraftPanelDescriptor(
+ 
+   return buildDraftPanelDescriptor({
+     ...createDescriptorState,
++    draftId: target.draftId,
+     icon: SquarePen,
+   });
+ }
+diff --git a/packages/app/src/panels/draft-panel-descriptor.ts b/packages/app/src/panels/draft-panel-descriptor.ts
+index 645fd9ad..27786890 100644
+--- a/packages/app/src/panels/draft-panel-descriptor.ts
++++ b/packages/app/src/panels/draft-panel-descriptor.ts
+@@ -1,15 +1,21 @@
++import { isDriveyDraft } from "@/utils/idli-claude-workspace";
++import { openedMiniName } from "@/utils/idli-drivey";
+ import type { ComponentType } from "react";
+ import { i18n } from "@/i18n/i18next";
+ import type { PanelDescriptor, PanelIconProps } from "@/panels/panel-registry";
+ 
+ export function buildDraftPanelDescriptor(input: {
+   isCreating: boolean;
++  draftId?: string;
+   pendingPrompt?: string | null;
+   icon: ComponentType<PanelIconProps>;
+ }): PanelDescriptor {
+   const { icon, isCreating, pendingPrompt } = input;
+-  const newAgentLabel = i18n.t("panels.draft.newAgent");
+-  const creatingLabel = pendingPrompt?.trim() || newAgentLabel;
++  const isDrivey = isDriveyDraft(input.draftId ?? "");
++  const newAgentLabel = isDrivey ? "New question" : i18n.t("panels.draft.newAgent");
++  const creatingLabel =
++    (isDrivey ? openedMiniName(pendingPrompt ?? "") : null) ??
++    (pendingPrompt?.trim() || newAgentLabel);
+   if (isCreating) {
+     return {
+       label: creatingLabel,
+diff --git a/packages/app/src/panels/terminal-panel.tsx b/packages/app/src/panels/terminal-panel.tsx
+index 3492c40c..26085c0f 100644
+--- a/packages/app/src/panels/terminal-panel.tsx
++++ b/packages/app/src/panels/terminal-panel.tsx
+@@ -1,3 +1,4 @@
++import { useDriveyWorkspace } from "@/hooks/use-drivey-workspace";
+ import { useCallback } from "react";
+ import { useQuery } from "@tanstack/react-query";
+ import { useTranslation } from "react-i18next";
+@@ -79,6 +80,7 @@ function useTerminalPanelDescriptor(
+ 
+ function TerminalPanel() {
+   const { serverId, workspaceId, target, openFileInWorkspace } = usePaneContext();
++  const isDrivey = useDriveyWorkspace(serverId, workspaceId);
+   const { isWorkspaceFocused, isPaneFocused } = usePaneFocus();
+   const workspaceFields = useWorkspaceFields(serverId, workspaceId, (w) => ({
+     workspaceDirectory: w.workspaceDirectory,
+@@ -107,6 +109,7 @@ function TerminalPanel() {
+   return (
+     <TerminalPane
+       serverId={serverId}
++      fitDriveyPane={isDrivey}
+       cwd={workspaceDirectory}
+       terminalId={target.terminalId}
+       isWorkspaceFocused={isWorkspaceFocused}
+diff --git a/packages/app/src/screens/workspace/compact-workspace-header/tab-switcher.tsx b/packages/app/src/screens/workspace/compact-workspace-header/tab-switcher.tsx
+index 737e92b4..3d678527 100644
+--- a/packages/app/src/screens/workspace/compact-workspace-header/tab-switcher.tsx
++++ b/packages/app/src/screens/workspace/compact-workspace-header/tab-switcher.tsx
+@@ -1,3 +1,4 @@
++import { isDriveyDraft } from "@/utils/idli-claude-workspace";
+ import { memo, useCallback, useMemo, useRef, useState } from "react";
+ import { Keyboard, Pressable, Text, View } from "react-native";
+ import { useTranslation } from "react-i18next";
+@@ -40,7 +41,7 @@ function getFallbackTabOptionLabel(
+     return labels.newTab;
+   }
+   if (tab.target.kind === "draft") {
+-    return labels.newAgent;
++    return isDriveyDraft(tab.target.draftId) ? "New question" : labels.newAgent;
+   }
+   if (tab.target.kind === "setup") {
+     return labels.setup;
+@@ -87,7 +88,7 @@ function getFallbackTabOptionDescription(
+     return labels.newTab;
+   }
+   if (tab.target.kind === "draft") {
+-    return labels.newAgent;
++    return isDriveyDraft(tab.target.draftId) ? "New question" : labels.newAgent;
+   }
+   if (tab.target.kind === "setup") {
+     return labels.workspaceSetup;
+diff --git a/packages/app/src/screens/workspace/workspace-desktop-tabs-row.tsx b/packages/app/src/screens/workspace/workspace-desktop-tabs-row.tsx
+index bf957a27..a9db94dc 100644
+--- a/packages/app/src/screens/workspace/workspace-desktop-tabs-row.tsx
++++ b/packages/app/src/screens/workspace/workspace-desktop-tabs-row.tsx
+@@ -1,3 +1,4 @@
++import { isDriveyDraft } from "@/utils/idli-claude-workspace";
+ import { LoadingSpinner } from "@/components/ui/loading-spinner";
+ import React, {
+   Fragment,
+@@ -618,7 +619,7 @@ function getFallbackTabLabel(
+     return labels.newTab;
+   }
+   if (tab.target.kind === "draft") {
+-    return labels.newAgent;
++    return isDriveyDraft(tab.target.draftId) ? "New question" : labels.newAgent;
+   }
+   if (tab.target.kind === "setup") {
+     return labels.setup;
 diff --git a/packages/app/src/screens/workspace/workspace-screen.tsx b/packages/app/src/screens/workspace/workspace-screen.tsx
-index dd806e1f..9b400534 100644
+index dd806e1f..f8afe9fb 100644
 --- a/packages/app/src/screens/workspace/workspace-screen.tsx
 +++ b/packages/app/src/screens/workspace/workspace-screen.tsx
-@@ -1,3 +1,4 @@
+@@ -1,3 +1,5 @@
++import { useDriveyWorkspace } from "@/hooks/use-drivey-workspace";
 +import { isRawClaudeWorkspace, rawClaudeProfile } from "@/utils/idli-claude-cli";
  import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
  import { useHostFeature } from "@/runtime/host-features";
  import {
-@@ -1778,11 +1779,17 @@ function WorkspaceScreenContent({
+@@ -1038,6 +1040,7 @@ function WorkspaceScreenContent({
+     () => resolveWorkspaceRouteId({ routeWorkspaceId: workspaceId }) ?? "",
+     [workspaceId],
+   );
++  const isDriveyWorkspace = useDriveyWorkspace(normalizedServerId, normalizedWorkspaceId);
+   const workspaceDescriptor = useWorkspace(normalizedServerId, normalizedWorkspaceId);
+   useEffect(() => {
+     if (!normalizedServerId || !normalizedWorkspaceId || workspaceDescriptor) return;
+@@ -1778,11 +1781,22 @@ function WorkspaceScreenContent({
      : t("workspace.tabs.explorerSidebar.open");
  
    const activeTabKey = useMemo(() => activeTabId ?? "", [activeTabId]);
-+  const claudeCliProfile = useMemo(() => rawClaudeProfile(isRawClaudeWorkspace(workspaceDescriptor) ? "Claude Code" : null), [workspaceDescriptor]);
++  const claudeCliProfile = useMemo(
++    () => rawClaudeProfile(isRawClaudeWorkspace(workspaceDescriptor) ? "Claude Code" : null),
++    [workspaceDescriptor],
++  );
    const handleCreateDraftTab = useCallback(
      (input?: { paneId?: string }) => {
 +      if (claudeCliProfile) {
-+        createTerminal({ profile: claudeCliProfile,
-+          destination: input?.paneId ? { kind: "open", paneId: input.paneId } : { kind: "open" } });
++        createTerminal({
++          profile: claudeCliProfile,
++          destination: input?.paneId ? { kind: "open", paneId: input.paneId } : { kind: "open" },
++        });
 +        return;
 +      }
        openWorkspaceDraftTab({ paneId: input?.paneId });
@@ -1370,7 +3538,7 @@ index dd806e1f..9b400534 100644
    );
  
    const handleCreateTerminal = useStableEvent((input?: { paneId?: string }) => {
-@@ -1840,6 +1847,10 @@ function WorkspaceScreenContent({
+@@ -1840,6 +1854,10 @@ function WorkspaceScreenContent({
          return;
        }
        if (selection.kind === "agent") {
@@ -1381,16 +3549,41 @@ index dd806e1f..9b400534 100644
          openTarget({
            kind: "draft",
            draftId: generateDraftId(),
-@@ -1856,7 +1867,7 @@ function WorkspaceScreenContent({
+@@ -1856,7 +1874,13 @@ function WorkspaceScreenContent({
        const { browserId } = createWorkspaceBrowser();
        openTarget({ kind: "browser", browserId });
      },
 -    [createTerminal, createWorkspaceTab, persistenceKey, replaceWorkspaceTabTarget],
-+    [createTerminal, createWorkspaceTab, persistenceKey, replaceWorkspaceTabTarget, claudeCliProfile],
++    [
++      createTerminal,
++      createWorkspaceTab,
++      persistenceKey,
++      replaceWorkspaceTabTarget,
++      claudeCliProfile,
++    ],
    );
  
    const handleOpenUrlInBrowserTab = useCallback(
-@@ -3275,6 +3286,7 @@ function WorkspaceScreenContent({
+@@ -3208,7 +3232,9 @@ function WorkspaceScreenContent({
+         ) : null}
+         {workspaceDirectory ? (
+           <>
+-            <WorkspaceActions serverId={normalizedServerId} cwd={workspaceDirectory} />
++            {!isDriveyWorkspace ? (
++              <WorkspaceActions serverId={normalizedServerId} cwd={workspaceDirectory} />
++            ) : null}
+             <WorkspaceHeaderExplorerToggle
+               owner={explorerToggleOwner}
+               onPress={handleToggleExplorerSidebar}
+@@ -3223,6 +3249,7 @@ function WorkspaceScreenContent({
+       </View>
+     ),
+     [
++      isDriveyWorkspace,
+       workspaceDescriptor,
+       normalizedServerId,
+       normalizedWorkspaceId,
+@@ -3275,6 +3302,7 @@ function WorkspaceScreenContent({
        showBrowser: showCreateBrowserTab,
        terminalDisabled: createTerminalDisabled,
        launch: launchWorkspaceTab,
@@ -1398,7 +3591,7 @@ index dd806e1f..9b400534 100644
      }),
      [
        createTerminalDisabled,
-@@ -3282,6 +3294,7 @@ function WorkspaceScreenContent({
+@@ -3282,6 +3310,7 @@ function WorkspaceScreenContent({
        isGitCheckout,
        launchWorkspaceTab,
        showCreateBrowserTab,
@@ -1406,6 +3599,80 @@ index dd806e1f..9b400534 100644
      ],
    );
    const focusedPaneIdOrUndefined = useMemo(() => focusedPaneId ?? undefined, [focusedPaneId]);
+diff --git a/packages/app/src/utils/file-mention-autocomplete.test.ts b/packages/app/src/utils/file-mention-autocomplete.test.ts
+index c74c8215..6d429aab 100644
+--- a/packages/app/src/utils/file-mention-autocomplete.test.ts
++++ b/packages/app/src/utils/file-mention-autocomplete.test.ts
+@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
+ import {
+   applyFileMentionReplacement,
+   findActiveFileMention,
++  fileMentionParts,
++  rankDriveyFileMatches,
+   formatQuotedFileMentionPath,
+ } from "./file-mention-autocomplete";
+ 
+@@ -147,3 +149,33 @@ describe("applyFileMentionReplacement", () => {
+     expect(next).toBe('"src/\\"quoted\\".ts"');
+   });
+ });
++
++describe("Drivey file matches", () => {
++  it("ranks name prefixes, name substrings, then folder matches, preserving ties", () => {
++    const paths = [
++      "household/notes.txt",
++      "Drive/My Drive/old-households.csv",
++      "Drive/My Drive/Households.csv",
++      "Drive/household-summary.csv",
++      "household/other.txt",
++    ];
++    expect(
++      rankDriveyFileMatches(
++        paths.map((path) => ({ path })),
++        "household",
++      ).map((entry) => entry.path),
++    ).toEqual([
++      "Drive/My Drive/Households.csv",
++      "Drive/household-summary.csv",
++      "Drive/My Drive/old-households.csv",
++      "household/notes.txt",
++      "household/other.txt",
++    ]);
++    expect(fileMentionParts("Drive/My Drive/Households.csv")).toEqual({
++      name: "Households.csv",
++      folder: "Drive/My Drive",
++    });
++    expect(fileMentionParts("Drive/My Drive/")).toEqual({ name: "My Drive", folder: "Drive" });
++    expect(fileMentionParts("Households.csv")).toEqual({ name: "Households.csv", folder: "" });
++  });
++});
+diff --git a/packages/app/src/utils/file-mention-autocomplete.ts b/packages/app/src/utils/file-mention-autocomplete.ts
+index fe09b52f..f18745c0 100644
+--- a/packages/app/src/utils/file-mention-autocomplete.ts
++++ b/packages/app/src/utils/file-mention-autocomplete.ts
+@@ -55,3 +55,22 @@ export function applyFileMentionReplacement(input: ApplyFileMentionReplacementIn
+   const after = input.text.slice(input.mention.end);
+   return `${before}${formatQuotedFileMentionPath(input.relativePath)}${after}`;
+ }
++
++export function fileMentionParts(path: string): { name: string; folder: string } {
++  const clean = path.replace(/\/$/, "");
++  const slash = clean.lastIndexOf("/");
++  return { name: clean.slice(slash + 1), folder: slash < 0 ? "" : clean.slice(0, slash) };
++}
++
++export function rankDriveyFileMatches<T extends { path: string }>(
++  entries: readonly T[],
++  query: string,
++): T[] {
++  const lower = query.toLowerCase();
++  function rank(entry: T): number {
++    const name = fileMentionParts(entry.path).name.toLowerCase();
++    if (name.startsWith(lower)) return 0;
++    return name.includes(lower) ? 1 : 2;
++  }
++  return [...entries].sort((left, right) => rank(left) - rank(right));
++}
 diff --git a/packages/app/src/utils/idli-claude-cli.test.ts b/packages/app/src/utils/idli-claude-cli.test.ts
 new file mode 100644
 index 00000000..88b4c705
@@ -1457,27 +3724,27 @@ index 00000000..b0529c0b
 +}
 diff --git a/packages/app/src/utils/idli-claude-workspace.test.ts b/packages/app/src/utils/idli-claude-workspace.test.ts
 new file mode 100644
-index 00000000..78208c14
+index 00000000..cecfaf15
 --- /dev/null
 +++ b/packages/app/src/utils/idli-claude-workspace.test.ts
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,162 @@
 +import { describe, expect, it, vi } from "vitest";
 +vi.mock("@/stores/session-store", () => ({ normalizeWorkspaceDescriptor: (w: unknown) => w }));
 +import {
 +  createRawClaudeWorkspace,
 +  createDriveyWorkspace,
 +  IDLI_DRIVEY_MODEL,
++  driveyAgentRequest,
++  isDriveyDraft,
 +} from "./idli-claude-workspace";
 +
 +describe("Claude Code project heading +", () => {
 +  function fixture() {
 +    return {
 +      client: {
-+        createWorkspace: vi
-+          .fn()
-+          .mockResolvedValue({
-+            workspace: { id: "new-workspace", workspaceDirectory: "/public-demo" },
-+          }),
++        createWorkspace: vi.fn().mockResolvedValue({
++          workspace: { id: "new-workspace", workspaceDirectory: "/public-demo" },
++        }),
 +        createTerminal: vi.fn().mockResolvedValue({ terminal: { id: "new-terminal" } }),
 +      },
 +      serverId: "host",
@@ -1537,32 +3804,34 @@ index 00000000..78208c14
 +      projectId: "drivey-project",
 +      path: "/drivey",
 +      accept: vi.fn(),
-+      acceptAgent: vi.fn(),
 +      navigate: vi.fn(),
 +      openClaude: vi.fn(),
 +    };
 +  }
 +
-+  it("opens the labeled Drivey chat focused and launches masked Claude with its workspace", async () => {
++  it("opens an empty focused draft and launches masked Claude without creating an agent", async () => {
 +    const f = fixture();
 +    await createDriveyWorkspace(f);
 +    expect(f.client.createWorkspace).toHaveBeenCalledWith({
 +      source: { kind: "directory", path: "/drivey", projectId: "drivey-project" },
 +      title: "Drivey",
 +    });
-+    expect(f.client.createAgent).toHaveBeenCalledWith({
-+      provider: "t4gc-cowork",
-+      model: IDLI_DRIVEY_MODEL,
-+      cwd: "/drivey",
-+      workspaceId: "drivey-ws",
-+      labels: { "idli.ws": "drivey-ws", "idli.left": "1" },
-+      initialPrompt: "Start Drivey",
-+    });
-+    expect(f.acceptAgent).toHaveBeenCalledWith({ id: "left-agent" });
++    expect(f.client.createAgent).not.toHaveBeenCalled();
 +    expect(f.navigate).toHaveBeenCalledExactlyOnceWith({
 +      serverId: "host",
 +      workspaceId: "drivey-ws",
-+      target: { kind: "agent", agentId: "left-agent" },
++      target: {
++        kind: "draft",
++        draftId: "idli-drivey:drivey-ws",
++        setup: {
++          provider: "t4gc-cowork",
++          model: IDLI_DRIVEY_MODEL,
++          modeId: "bypassPermissions",
++          cwd: "/drivey",
++          thinkingOptionId: null,
++          featureValues: {},
++        },
++      },
 +    });
 +    expect(f.client.createTerminal).toHaveBeenCalledWith("/drivey", "Claude", undefined, {
 +      workspaceId: "drivey-ws",
@@ -1572,27 +3841,19 @@ index 00000000..78208c14
 +    expect(f.openClaude).toHaveBeenCalledWith({
 +      serverId: "host",
 +      workspaceId: "drivey-ws",
-+      agentId: "left-agent",
++      draftId: "idli-drivey:drivey-ws",
 +      terminalId: "claude-terminal",
 +    });
 +  });
 +
-+  it("does not launch Claude if chat creation fails", async () => {
-+    const f = fixture();
-+    f.client.createAgent.mockRejectedValue(new Error("Provider unavailable"));
-+    await expect(createDriveyWorkspace(f)).rejects.toThrow("Provider unavailable");
-+    expect(f.client.createTerminal).not.toHaveBeenCalled();
-+    expect(f.navigate).not.toHaveBeenCalled();
-+  });
-+
-+  it("keeps the chat open and reports terminal failure", async () => {
++  it("keeps the empty draft open and reports terminal failure", async () => {
 +    const f = fixture();
 +    f.client.createTerminal.mockResolvedValue({ error: "Launcher missing" });
 +    await expect(createDriveyWorkspace(f)).rejects.toThrow("Launcher missing");
 +    expect(f.navigate).toHaveBeenCalledWith({
 +      serverId: "host",
 +      workspaceId: "drivey-ws",
-+      target: { kind: "agent", agentId: "left-agent" },
++      target: expect.objectContaining({ kind: "draft", draftId: "idli-drivey:drivey-ws" }),
 +    });
 +    expect(f.openClaude).not.toHaveBeenCalled();
 +  });
@@ -1605,14 +3866,40 @@ index 00000000..78208c14
 +    expect(f.client.createTerminal).not.toHaveBeenCalled();
 +  });
 +});
++
++describe("Drivey draft submissions", () => {
++  it.each(["How many files?", "Open Mini: Sales [sales-14]"])(
++    "uses the left-chat contract for %s",
++    (text) => {
++      expect(driveyAgentRequest({ workspaceId: "drivey-ws", cwd: "/drivey", text })).toEqual({
++        config: {
++          provider: "t4gc-cowork",
++          model: "idli-9b",
++          modeId: "bypassPermissions",
++          cwd: "/drivey",
++          ...(text.startsWith("Open Mini:") ? { title: "Sales" } : {}),
++        },
++        workspaceId: "drivey-ws",
++        labels: { "idli.ws": "drivey-ws", "idli.left": "1" },
++        initialPrompt: text,
++      });
++    },
++  );
++  it("identifies only the persisted Drivey draft identity", () => {
++    expect(isDriveyDraft("idli-drivey:drivey-ws")).toBe(true);
++    expect(isDriveyDraft("draft-other")).toBe(false);
++  });
++});
 diff --git a/packages/app/src/utils/idli-claude-workspace.ts b/packages/app/src/utils/idli-claude-workspace.ts
 new file mode 100644
-index 00000000..e0a079a6
+index 00000000..303770b1
 --- /dev/null
 +++ b/packages/app/src/utils/idli-claude-workspace.ts
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,144 @@
++import { openedMiniName } from "./idli-drivey";
 +import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 +import { normalizeWorkspaceDescriptor } from "@/stores/session-store";
++import type { WorkspaceDraftTabSetup } from "@/workspace-tabs/model";
 +
 +/** Heading + creates a workspace and a native terminal, never a managed chat agent. */
 +export async function createRawClaudeWorkspace(input: {
@@ -1657,23 +3944,43 @@ index 00000000..e0a079a6
 +// Change this one model ID when Drivey switches models.
 +export const IDLI_DRIVEY_MODEL = "idli-9b";
 +export const IDLI_CLAUDE_LAUNCH = 'exec "$HOME/idli-insights/bin/claude-masked"';
++const DRIVEY_DRAFT_PREFIX = "idli-drivey:";
++
++export function isDriveyDraft(draftId: string): boolean {
++  return draftId.startsWith(DRIVEY_DRAFT_PREFIX);
++}
++
++export function driveyAgentRequest(input: { workspaceId: string; cwd: string; text: string }) {
++  const miniName = openedMiniName(input.text);
++  return {
++    config: {
++      provider: "t4gc-cowork",
++      model: IDLI_DRIVEY_MODEL,
++      modeId: "bypassPermissions",
++      cwd: input.cwd,
++      ...(miniName ? { title: miniName } : {}),
++    },
++    workspaceId: input.workspaceId,
++    labels: { "idli.ws": input.workspaceId, "idli.left": "1" },
++    initialPrompt: input.text,
++  };
++}
 +
 +export async function createDriveyWorkspace(input: {
-+  client: Pick<DaemonClient, "createWorkspace" | "createAgent" | "createTerminal">;
++  client: Pick<DaemonClient, "createWorkspace" | "createTerminal">;
 +  serverId: string;
 +  projectId: string;
 +  path: string;
 +  accept: (workspace: ReturnType<typeof normalizeWorkspaceDescriptor>) => void;
-+  acceptAgent: (agent: Awaited<ReturnType<DaemonClient["createAgent"]>>) => void;
 +  navigate: (input: {
 +    serverId: string;
 +    workspaceId: string;
-+    target: { kind: "agent"; agentId: string };
++    target: { kind: "draft"; draftId: string; setup: WorkspaceDraftTabSetup };
 +  }) => void;
 +  openClaude: (input: {
 +    serverId: string;
 +    workspaceId: string;
-+    agentId: string;
++    draftId: string;
 +    terminalId: string;
 +  }) => void;
 +}) {
@@ -1685,48 +3992,109 @@ index 00000000..e0a079a6
 +    throw new Error(result.error ?? "Could not create Drivey workspace");
 +  const workspace = normalizeWorkspaceDescriptor(result.workspace);
 +  input.accept(workspace);
-+  const agent = await input.client.createAgent({
-+    provider: "t4gc-cowork",
-+    model: IDLI_DRIVEY_MODEL,
-+    modeId: "bypassPermissions", // like every Idli chat: no permission prompts for Idli's own tools
-+    cwd: workspace.workspaceDirectory,
-+    workspaceId: workspace.id,
-+    labels: { "idli.ws": workspace.id, "idli.left": "1" },
-+    initialPrompt: "Start Drivey",
-+  });
-+  input.acceptAgent(agent);
++  // The draft identity survives layout persistence without creating an agent or sending a turn.
++  const draftId = `${DRIVEY_DRAFT_PREFIX}${workspace.id}`;
 +  input.navigate({
 +    serverId: input.serverId,
 +    workspaceId: workspace.id,
-+    target: { kind: "agent", agentId: agent.id },
-+  });
-+  // Quote the daemon-owned ID as a shell value, including embedded single quotes.
-+  const workspaceValue = "'" + workspace.id.replaceAll("'", "'\"'\"'") + "'";
-+  const terminal = await input.client.createTerminal(
-+    workspace.workspaceDirectory,
-+    "Claude",
-+    undefined,
-+    {
-+      workspaceId: workspace.id,
-+      command: "/bin/sh",
-+      args: ["-c", `IDLI_WORKSPACE=${workspaceValue} ${IDLI_CLAUDE_LAUNCH}`],
++    target: {
++      kind: "draft",
++      draftId,
++      setup: {
++        provider: "t4gc-cowork",
++        model: IDLI_DRIVEY_MODEL,
++        modeId: "bypassPermissions",
++        cwd: workspace.workspaceDirectory,
++        thinkingOptionId: null,
++        featureValues: {},
++      },
 +    },
-+  );
-+  if (terminal.error || !terminal.terminal)
-+    throw new Error(terminal.error ?? "Could not start Claude");
++  });
++  const terminalId = await startDriveyClaude({
++    client: input.client,
++    workspaceId: workspace.id,
++    cwd: workspace.workspaceDirectory,
++  });
 +  input.openClaude({
 +    serverId: input.serverId,
 +    workspaceId: workspace.id,
-+    agentId: agent.id,
-+    terminalId: terminal.terminal.id,
++    draftId,
++    terminalId,
 +  });
++}
++
++/** The masked Claude terminal for a Drivey workspace (also used when a Drivey workspace was made without one). */
++export async function startDriveyClaude(input: {
++  client: Pick<DaemonClient, "createTerminal">;
++  workspaceId: string;
++  cwd: string;
++}): Promise<string> {
++  // Quote the daemon-owned ID as a shell value, including embedded single quotes.
++  const workspaceValue = "'" + input.workspaceId.replaceAll("'", "'\"'\"'") + "'";
++  const terminal = await input.client.createTerminal(input.cwd, "Claude", undefined, {
++    workspaceId: input.workspaceId,
++    command: "/bin/sh",
++    args: ["-c", `IDLI_WORKSPACE=${workspaceValue} ${IDLI_CLAUDE_LAUNCH}`],
++  });
++  if (terminal.error || !terminal.terminal)
++    throw new Error(terminal.error ?? "Could not start Claude");
++  return terminal.terminal.id;
++}
+diff --git a/packages/app/src/utils/idli-drivey.ts b/packages/app/src/utils/idli-drivey.ts
+new file mode 100644
+index 00000000..91e2d750
+--- /dev/null
++++ b/packages/app/src/utils/idli-drivey.ts
+@@ -0,0 +1,36 @@
++import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
++import type { StreamItem } from "@/types/stream";
++
++export const DRIVEY_PLACEHOLDER = "Ask a question. Type @ to add a file.";
++
++export function isDriveyLeft(agent: Pick<Agent, "labels"> | null | undefined): boolean {
++  return agent?.labels["idli.left"] === "1";
++}
++
++export function isDriveyProject(
++  workspace:
++    | Pick<WorkspaceDescriptor, "projectDisplayName" | "projectCustomName">
++    | null
++    | undefined,
++): boolean {
++  return (workspace?.projectCustomName ?? workspace?.projectDisplayName) === "Drivey";
++}
++
++export function isIdliDashboardUrl(url: string): boolean {
++  try {
++    const target = new URL(url);
++    return (
++      target.origin === "http://dashboard.localhost:8797" && !target.username && !target.password
++    );
++  } catch {
++    return false;
++  }
++}
++
++export function openedMiniName(text: string): string | null {
++  return /^Open Mini: (.+) \[[^\]\r\n]+\]$/.exec(text)?.[1] ?? null;
++}
++
++export function driveyVisibleItems(items: StreamItem[]): StreamItem[] {
++  return items.filter((item) => item.kind !== "tool_call" && item.kind !== "thought");
 +}
 diff --git a/packages/app/src/utils/idli-minis.test.ts b/packages/app/src/utils/idli-minis.test.ts
 new file mode 100644
-index 00000000..6225d5d6
+index 00000000..99df2bc4
 --- /dev/null
 +++ b/packages/app/src/utils/idli-minis.test.ts
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,145 @@
++import {
++  isDriveyLeft,
++  isDriveyProject,
++  isIdliDashboardUrl,
++  openedMiniName,
++  driveyVisibleItems,
++} from "./idli-drivey";
 +import { describe, expect, it } from "vitest";
 +import type { StreamItem } from "@/types/stream";
 +import {
@@ -1816,9 +4184,58 @@ index 00000000..6225d5d6
 +    expect(miniDate("14 Nov")).toBe("14 Nov");
 +  });
 +});
++
++describe("Drivey presentation scope", () => {
++  it("requires the left label or the Drivey project rather than a workspace title", () => {
++    expect(isDriveyLeft({ labels: { "idli.left": "1" } })).toBe(true);
++    expect(isDriveyLeft({ labels: { "idli.left": "0" } })).toBe(false);
++    expect(isDriveyProject({ projectDisplayName: "Drivey" })).toBe(true);
++    expect(isDriveyProject({ projectDisplayName: "Claude Code" })).toBe(false);
++  });
++  it("matches only dashboard pages at the exact Idli origin", () => {
++    expect(isIdliDashboardUrl("http://dashboard.localhost:8797/view?id=mini")).toBe(true);
++    for (const url of [
++      "https://dashboard.localhost:8797/view",
++      "http://dashboard.localhost.evil:8797/view",
++      "http://user@dashboard.localhost:8797/view",
++      "invalid",
++    ]) {
++      expect(isIdliDashboardUrl(url)).toBe(false);
++    }
++  });
++  it("extracts a Mini name without its id only for the cartridge command", () => {
++    expect(openedMiniName("Open Mini: Household debt [households-14]")).toBe("Household debt");
++    expect(openedMiniName("Ask about Open Mini: Household debt [households-14]")).toBeNull();
++    expect(openedMiniName("Open Mini: Household debt")).toBeNull();
++  });
++  it("removes tool and thought rows while retaining written progress and questions", () => {
++    const thought: StreamItem = {
++      kind: "thought",
++      id: "thinking",
++      text: "Thinking",
++      status: "loading",
++      timestamp,
++    };
++    const tool: StreamItem = {
++      kind: "tool_call",
++      id: "fetch",
++      timestamp,
++      payload: {
++        source: "orchestrator",
++        data: {
++          toolCallId: "fetch",
++          toolName: "mcp__cowork__drive_fetch",
++          arguments: {},
++          status: "executing",
++        },
++      },
++    };
++    expect(driveyVisibleItems([...opening, tool, thought])).toEqual(opening);
++  });
++});
 diff --git a/packages/app/src/utils/idli-minis.ts b/packages/app/src/utils/idli-minis.ts
 new file mode 100644
-index 00000000..465a9774
+index 00000000..afa0afa1
 --- /dev/null
 +++ b/packages/app/src/utils/idli-minis.ts
 @@ -0,0 +1,75 @@
@@ -1827,7 +4244,7 @@ index 00000000..465a9774
 +
 +export const IDLI_MINIS_URL = "http://dashboard.localhost:8797/api/minis-public";
 +export const IDLI_DRIVEY_OPENING =
-+  "Ask about your Drive files. Type @ to pick a file or a folder, or start from a Mini.";
++  "Type @ to add a file or folder. Or open a Mini below.";
 +
 +export const IdliMinisSchema = z.array(
 +  z.object({
@@ -2073,22 +4490,28 @@ index 00000000..6c5b5269
 +}
 diff --git a/packages/app/src/utils/idli-side-pane.test.ts b/packages/app/src/utils/idli-side-pane.test.ts
 new file mode 100644
-index 00000000..1e809d1e
+index 00000000..8fb07ce2
 --- /dev/null
 +++ b/packages/app/src/utils/idli-side-pane.test.ts
-@@ -0,0 +1,60 @@
-+import { beforeEach, describe, expect, it } from "vitest";
+@@ -0,0 +1,157 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
 +import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 +import {
 +  collectAllPanes,
 +  collectAllTabs,
 +  findPaneContainingTab,
 +} from "@/stores/workspace-layout-actions";
-+import { placeTabOnSide } from "./idli-side-pane";
++import { placeTabOnSide, openIdliTab } from "./idli-side-pane";
++import { useBrowserStore } from "@/desktop/browser/store";
++import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
++
++vi.mock("@/stores/navigation-active-workspace-store", () => ({ navigateToWorkspace: vi.fn() }));
 +
 +const workspaceKey = "host:drivey-ws";
 +
 +beforeEach(() => {
++  vi.mocked(navigateToWorkspace).mockClear();
++  useBrowserStore.setState({ browsersById: {} });
 +  useWorkspaceLayoutStore.setState({
 +    layoutByWorkspace: {},
 +    layoutMode: "split-panes",
@@ -2100,6 +4523,97 @@ index 00000000..1e809d1e
 +});
 +
 +describe("Idli pane placement", () => {
++  it("splits Claude beside the empty draft and leaves that draft focused", () => {
++    useWorkspaceLayoutStore.setState({ layoutByWorkspace: {} });
++    const draftId = "idli-drivey:drivey-ws";
++    const draftTabId = useWorkspaceLayoutStore.getState().openTab({
++      workspaceKey,
++      target: { kind: "draft", draftId },
++      intent: "reveal",
++    });
++    expect(
++      placeTabOnSide({
++        serverId: "host",
++        workspaceId: "drivey-ws",
++        kind: "draft",
++        id: draftId,
++        side: "left",
++      }),
++    ).toBe(true);
++    expect(
++      placeTabOnSide({
++        serverId: "host",
++        workspaceId: "drivey-ws",
++        kind: "terminal",
++        id: "claude",
++        side: "right",
++        focus: false,
++      }),
++    ).toBe(true);
++    const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
++    const panes = collectAllPanes(layout.root);
++    expect(panes).toHaveLength(2);
++    expect(panes[0].focusedTabId).toBe(draftTabId);
++    expect(layout.focusedPaneId).toBe(panes[0].id);
++    expect(
++      collectAllTabs(layout.root)
++        .filter((tab) => panes[1].tabIds.includes(tab.tabId))
++        .map((tab) => tab.target),
++    ).toEqual([{ kind: "terminal", terminalId: "claude" }]);
++  });
++
++  it.each([true, false])("opens a browser beside Claude with focus=%s", (focus) => {
++    placeTabOnSide({
++      serverId: "host",
++      workspaceId: "drivey-ws",
++      kind: "terminal",
++      id: "claude",
++      side: "right",
++      focus: false,
++    });
++    const before = useWorkspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
++    const browserId = openIdliTab({
++      serverId: "host",
++      workspaceId: "drivey-ws",
++      side: "right",
++      focus,
++      url: "http://dashboard.localhost:8797/mini-card?id=test",
++    });
++    expect(useBrowserStore.getState().browsersById[browserId].url).toBe(
++      "http://dashboard.localhost:8797/mini-card?id=test",
++    );
++    const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
++    const panes = collectAllPanes(layout.root);
++    expect(panes).toHaveLength(2);
++    const browser = collectAllTabs(layout.root)
++      .filter((tab) => panes[1].tabIds.includes(tab.tabId))
++      .find((tab) => tab.target.kind === "browser");
++    expect(browser?.target).toEqual({ kind: "browser", browserId });
++    expect(
++      collectAllTabs(layout.root)
++        .filter((tab) => panes[1].tabIds.includes(tab.tabId))
++        .map((tab) => tab.target.kind),
++    ).toContain("terminal");
++    expect(layout.focusedPaneId).toBe(focus ? panes[1].id : before.focusedPaneId);
++    expect(vi.mocked(navigateToWorkspace).mock.calls).toEqual(
++      focus
++        ? [[{ serverId: "host", workspaceId: "drivey-ws", target: { kind: "browser", browserId } }]]
++        : [],
++    );
++  });
++
++  it("rejects a non-web URL without adding a browser", () => {
++    expect(() =>
++      openIdliTab({
++        serverId: "host",
++        workspaceId: "drivey-ws",
++        side: "right",
++        focus: true,
++        url: "javascript:alert(1)",
++      }),
++    ).toThrow("Choose a web page");
++    expect(useBrowserStore.getState().browsersById).toEqual({});
++  });
 +  it("opens Claude on the right and keeps the left chat focused", () => {
 +    expect(
 +      placeTabOnSide({
@@ -2139,16 +4653,19 @@ index 00000000..1e809d1e
 +});
 diff --git a/packages/app/src/utils/idli-side-pane.ts b/packages/app/src/utils/idli-side-pane.ts
 new file mode 100644
-index 00000000..9d2928a9
+index 00000000..1c3badd9
 --- /dev/null
 +++ b/packages/app/src/utils/idli-side-pane.ts
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,198 @@
 +// Idli P13: place a chat on one side of a two-pane workspace and give it focus, from the agent deep link
 +// (paseo://h/<server>/agent/<id>~right or ~left: the desktop shell drops a link's query string, and rewriting the
 +// shell means rebuilding app.asar, so the side rides on the agent id; the app strips it). Idli opens Claude's teaching chat on the right and comes back to
 +// its own chat on the left; the pane in control carries the focus ring (P14), so a switch reads as "focus moved".
 +import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 +import { useSessionStore } from "@/stores/session-store";
++import { isWeb } from "@/constants/platform";
++import { createWorkspaceBrowser, useBrowserStore } from "@/desktop/browser/store";
++import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 +import {
 +  collectAllPanes,
 +  collectAllTabs,
@@ -2201,7 +4718,7 @@ index 00000000..9d2928a9
 +export function placeTabOnSide(input: {
 +  serverId: string;
 +  workspaceId?: string | null;
-+  kind: "agent" | "terminal" | "browser";
++  kind: "agent" | "terminal" | "browser" | "draft";
 +  id: string;
 +  side: IdliSide;
 +  focus?: boolean;
@@ -2215,6 +4732,7 @@ index 00000000..9d2928a9
 +  if (!layout) return false;
 +  function match(t: ReturnType<typeof collectAllTabs>[number]) {
 +    if (input.kind === "agent") return t.target.kind === "agent" && t.target.agentId === input.id;
++    if (input.kind === "draft") return t.target.kind === "draft" && t.target.draftId === input.id;
 +    if (input.kind === "browser")
 +      return t.target.kind === "browser" && t.target.browserId === input.id;
 +    return t.target.kind === "terminal" && t.target.terminalId === input.id;
@@ -2291,7 +4809,44 @@ index 00000000..9d2928a9
 +  );
 +}
 +
-+if (typeof window !== "undefined") {
++export interface IdliOpenTabInput {
++  serverId: string;
++  workspaceId: string;
++  url: string;
++  side: IdliSide;
++  focus: boolean;
++}
++
++export function openIdliTab(input: IdliOpenTabInput): string {
++  const url = new URL(input.url);
++  if (url.protocol !== "http:" && url.protocol !== "https:")
++    throw new Error("Choose a web page to open.");
++  if (!input.serverId.trim() || !input.workspaceId.trim() || !parseIdliSide(input.side))
++    throw new Error("Choose a workspace and a side for this page.");
++  const { browserId } = createWorkspaceBrowser({ initialUrl: url.toString() });
++  const workspaceKey = `${input.serverId}:${input.workspaceId}`;
++  const tabId = useWorkspaceLayoutStore.getState().openTab({
++    workspaceKey,
++    target: { kind: "browser", browserId },
++    intent: "background",
++  });
++  if (!tabId) {
++    useBrowserStore.getState().removeBrowser(browserId);
++    throw new Error("Could not open this page. Try again.");
++  }
++  placeTabOnSideSoon({ ...input, kind: "browser", id: browserId });
++  if (input.focus) {
++    navigateToWorkspace({
++      serverId: input.serverId,
++      workspaceId: input.workspaceId,
++      target: { kind: "browser", browserId },
++    });
++  }
++  return browserId;
++}
++
++if (isWeb && typeof window !== "undefined") {
++  (window as unknown as { __idliOpenTab?: unknown }).__idliOpenTab = openIdliTab;
 +  (window as unknown as { __idliExplain?: unknown }).__idliExplain = explainPlace;
 +  (window as unknown as { __idliPlaceTab?: unknown }).__idliPlaceTab = (
 +    input: Parameters<typeof placeTabOnSide>[0],
