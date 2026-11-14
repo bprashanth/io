@@ -362,18 +362,8 @@ def _views(c, plan, intent, question):
     import difflib
     f = c.f
     mids = list(plan.get("measures") or [])
-    if not mids:
-        words = set(re.findall(r"[a-z]+", (question or "").lower()))
-        best = (0, None)
-        for mm in f["measures"]:  # the figure whose distinctive words the question uses most
-            if mm["id"] == "rows" or mm.get("hidden") or mm["id"].startswith("sum:"):
-                continue
-            lw = [w for w in re.findall(r"[a-z]+", mm["label"].split("(")[0].lower()) if len(w) > 3
-                  and w not in ("average", "number", "total", "households", "household", "share", "count", "with")]
-            hit = sum(bool(difflib.get_close_matches(w, words, n=1, cutoff=0.8)) for w in lw)
-            if lw and hit and hit / len(lw) > best[0]:
-                best = (hit / len(lw), mm["id"])
-        mids = [best[1]] if best[1] else []
+    named = _named_figure(f, question)
+    mids = [named] if named else mids
     mids = _fair(mids, f)[:1] or _comparable(f)[:1]
     if not mids:
         return []
@@ -439,6 +429,11 @@ def validate(c, intent, active, question):
         plan["intent"] = "DEFINE"
     mids = _fair([m for m in intent.get("measures") or [] if m in f["_measures"] and m != "rows"], f)
     named = bool(intent.get("measure_named")) and "measure" not in (intent.get("unresolved") or [])
+    if not named:  # guessed: if the question's words name a figure, that one goes first
+        pick = _named_figure(f, question)
+        if pick:
+            mids = [pick] + [m for m in mids if m != pick]
+            named = True
     if intent.get("refers_to_previous") and active and not mids:
         mids = list(active.get("measures") or [])
         named = bool(mids)
@@ -462,6 +457,9 @@ def validate(c, intent, active, question):
     if target and not _mentioned(target, question) and not intent.get("refers_to_previous"):
         target, col = [], None  # the 9B added groups the person never named
     if not col and active and intent.get("refers_to_previous"):
+        col, target = active.get("target_column"), list(active.get("target") or [])
+    if not target and active and active.get("target") and plan["intent"] == "EXPLAIN_DIFFERENCE":
+        # "why is income low?" naming no group: the group this conversation is about
         col, target = active.get("target_column"), list(active.get("target") or [])
     plan.update(measures=mids, target_column=col, target=target, group_by=intent.get("group_by") or [])
     if plan.get("unknown_value"):
@@ -492,6 +490,22 @@ def validate(c, intent, active, question):
         if base == "unspecified":
             plan["notes"].append("compared with the other groups (assumed; say 'compare with all' to change)")
     return plan
+
+
+def _named_figure(f, question, among=None):
+    """The figure whose distinctive words the question uses most ('monthly income' -> Average monthly income), or None."""
+    import difflib
+    words = set(re.findall(r"[a-z]+", (question or "").lower()))
+    best = (0, None)
+    for mm in f["measures"]:
+        if mm["id"] == "rows" or mm.get("hidden") or mm["id"].startswith("sum:") or (among and mm["id"] not in among):
+            continue
+        lw = [w for w in re.findall(r"[a-z]+", mm["label"].split("(")[0].lower()) if len(w) > 3
+              and w not in ("average", "number", "total", "households", "household", "share", "count", "with")]
+        hit = sum(bool(difflib.get_close_matches(w, words, n=1, cutoff=0.8)) for w in lw)
+        if lw and hit and hit / len(lw) > best[0]:
+            best = (hit / len(lw), mm["id"])
+    return best[1]
 
 
 def _mentioned(values, question):

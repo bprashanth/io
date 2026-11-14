@@ -895,6 +895,8 @@ def _privacy_of(messages, f):
     for i, r in _file_results(messages):
         if (r.get("file") == f or i.get("file") == f) and isinstance(r.get("privacy"), dict):
             pv = r["privacy"]
+        elif i.get("file") == f and isinstance(r.get("saved"), dict) and r["saved"].get("mode"):  # file_privacy
+            pv = r["saved"]
     return pv
 
 
@@ -919,13 +921,13 @@ def _asked(messages, head):
 
 def privacy_route(j):
     msgs, tools, model = j.get("messages") or [], j.get("tools") or [], j.get("model", "")
-    if not _tool_name(tools, "file_privacy"):
-        return None
     fa = _tool_name(tools, "file_ask")
+    if not fa:
+        return None
     latest = _latest_tool(msgs)
     if latest:
         name, inp, res = latest
-        if name in ("file_get", "file_open", "working_copy_ready") and res.get("file") \
+        if name in ("file_get", "file_open", "working_copy_ready") and res.get("file") and _tool_name(tools, "file_privacy") \
                 and (res.get("privacy") or {"mode": 1}).get("mode") is None and not _asked(msgs, PRIV_HEAD):
             return message(model, [_tool_use("AskUserQuestion", {"questions": [{
                 "header": PRIV_HEAD, "multiSelect": False,
@@ -962,7 +964,8 @@ def privacy_route(j):
         return None
     said = _last_typed(msgs)
     f = _open_file(msgs)
+    # "how is X worked out" is answered from the form's own definition: nothing to plan, nothing to send
     if said and f and fa and not LINK.search(said) and (_privacy_of(msgs, f) or {}).get("mode") == "mask" \
-            and QUESTION.search(said):
+            and QUESTION.search(said) and not _lib("careful").DEFINE_WORDS.search(said):
         return message(model, [_tool_use(fa, {"file": f, "question": said, "chart": bool(CHART_WORDS.search(said))})])
     return None

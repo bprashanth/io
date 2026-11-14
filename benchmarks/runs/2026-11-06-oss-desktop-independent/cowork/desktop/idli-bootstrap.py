@@ -53,7 +53,7 @@ SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 # from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
 TOOLSETS = {
     "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import"],
-    "Drivey": ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "teach_file", "teach_send",
+    "Drivey": ["start", "file_get", "gsheet_read", "file_open", "show_dashboard", "file_ask", "file_privacy", "teach_file", "teach_send",
              "working_copy", "working_copy_ready", "chart_request", "chart_show", "form_explain", "skill_import"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
