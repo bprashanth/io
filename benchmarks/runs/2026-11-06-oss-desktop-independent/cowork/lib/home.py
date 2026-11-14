@@ -146,7 +146,19 @@ def cli(*args):
     return r.stdout
 
 
+LAUNCHER = Path(__file__).resolve().parent.parent / 'desktop' / 'claude-masked.sh'
+
+
+def type_into(terminal, text):
+    """Type one line into a terminal and press Enter (the person's Claude CLI)."""
+    cli('terminal', 'send-keys', '-l', terminal, ' '.join(str(text).split()))
+    cli('terminal', 'send-keys', '-l', terminal, '\r')
+
+
 def send(data_dir, files, question):
+    """Hand the question to the person's Claude Code CLI: a terminal in Drivey running desktop/claude-masked.sh
+    (through the masking proxy), on the right with focus. Started the first time; typed into after that."""
+    import shlex
     from lib import uiswitch
     chosen = selected(data_dir, files)
     if not str(question).strip():
@@ -160,28 +172,28 @@ def send(data_dir, files, question):
             raise ValueError('No Drivey workspace found')
         workspace = sorted(candidates, key=lambda w: w.get('name') != 'Drivey')[0]
         wid = workspace['workspaceId']
-        agents = json.loads(cli('ls', '--global', '--json'))
-        eligible = [a for a in agents if str(a.get('providerId') or a.get('provider') or '').startswith('idli-claude')
-                    and a.get('workspaceId') == wid and a.get('status') not in ('closed', 'archived')
-                    and not a.get('archived') and not a.get('closedAt') and not a.get('archivedAt')
-                    and 'idli.home' in (a.get('labels') or {})]
-        state = Path(data_dir) / '.idli/home.json'
-        previous = read(state).get('agent') if state.exists() else None
-        eligible.sort(key=lambda a: a.get('id') != previous)
-        prompt = 'Files (in drive/):\n' + '\n'.join('- ' + x['local'] for x in chosen) + '\n\n' + str(question)
-        if eligible:
-            agent = eligible[0]['id']
-            cli('send', '--no-wait', agent, prompt)
+        state_path = Path(data_dir) / '.idli/home.json'
+        state = read(state_path) if state_path.exists() else {}
+        prompt = ('Files (in drive/): ' + ', '.join(x['local'] for x in chosen) + '. ' + ' '.join(str(question).split()))
+        terms = json.loads(cli('terminal', 'ls', '--all', '--json') or '[]')
+        live = {t.get('id') or t.get('terminalId'): t for t in terms}
+        terminal = state.get('terminal') if state.get('terminal') in live and state.get('workspace') == wid else None
+        if terminal:
+            type_into(terminal, prompt)
         else:
-            result = json.loads(cli('run', '--provider', 'idli-claude', '--workspace', wid,
-                                    '--mode', 'bypassPermissions', '--title', 'Claude', '--label', 'idli.home=1',
-                                    '--no-wait', '--json', prompt))
-            agent = result.get('agentId')
-            if not agent:
-                raise ValueError('Paseo did not return a Claude chat')
-        write(state, {'agent': agent, 'files': chosen})
-        shown = uiswitch.show_agent(agent, side='right')
-        return {'agent': agent, 'focused': bool(shown.get('ok')), 'message': 'Claude has it on the right'}
+            made = json.loads(cli('terminal', 'create', '--workspace', wid, '--name', 'Claude', '--json'))
+            terminal = made.get('id') or made.get('terminalId')
+            if not terminal:
+                raise ValueError('Paseo did not create a terminal')
+            cli('terminal', 'send-keys', '-l', terminal, 'exec ' + shlex.quote(str(LAUNCHER)) + ' ' + shlex.quote(prompt))
+            cli('terminal', 'send-keys', '-l', terminal, '\r')
+        # Paseo's browser tools act on behalf of a chat; a terminal has none, so charts borrow one in this workspace
+        agents = json.loads(cli('ls', '--global', '--json') or '[]')
+        helper = next((a.get('id') for a in agents if a.get('workspaceId') == wid and a.get('status') != 'closed'
+                       and not a.get('archived')), state.get('browser_agent'))
+        write(state_path, {'terminal': terminal, 'workspace': wid, 'files': chosen, 'browser_agent': helper})
+        shown = uiswitch.show_terminal(wid, terminal, 'right')
+        return {'terminal': terminal, 'focused': bool(shown.get('ok')), 'message': 'Claude has it on the right'}
 
 
 def object_path(data_dir, kind, ident):

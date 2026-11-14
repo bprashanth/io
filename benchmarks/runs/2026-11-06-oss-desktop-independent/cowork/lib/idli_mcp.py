@@ -30,8 +30,14 @@ def idli_show(title, vega_lite, data_csv):
     if path.suffix.lower() != '.csv' or not isinstance(vega_lite, dict):
         raise ValueError('Supply a CSV and a Vega-Lite object')
     ident = uuid.uuid4().hex
+    st = home.read(Path(data_dir()) / '.idli/home.json') if (Path(data_dir()) / '.idli/home.json').exists() else {}
+    # the person's Claude is a terminal (no chat id): clicks on the chart are typed into it; Paseo's browser tools
+    # act for a chat, so the tab is opened on behalf of one in the same workspace
     home.write(home.inside(data_dir(), 'views/' + ident + '.json', exists=False),
-               {'title': str(title), 'spec': vega_lite, 'data_csv': str(path), 'agent': os.environ.get('PASEO_AGENT_ID')})
+               {'title': str(title), 'spec': vega_lite, 'data_csv': str(path),
+                'agent': os.environ.get('PASEO_AGENT_ID') or st.get('terminal')})
+    if not os.environ.get('PASEO_AGENT_ID') and st.get('browser_agent'):
+        os.environ['PASEO_AGENT_ID'] = st['browser_agent']
     browser.paseo('browser_new_tab', url=page_url('view', ident))
     uiswitch.show_tab([str(title), 'dashboard.localhost'])
     return 'shown'

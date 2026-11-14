@@ -488,8 +488,20 @@ def make_handler(files, token):
                     if not exe:
                         return self._send(503, {"error": "Paseo isn't available to send this"})
                     env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_") or k == "PASEO_HOME"}
-                    r = subprocess.run([exe, "send", "--no-wait", agent, text], env=env, timeout=60,
-                                       capture_output=True, text=True)
+                    try:
+                        with open(os.path.join(files.data_dir, ".idli", "home.json")) as f:
+                            term = json.load(f).get("terminal")
+                    except (OSError, ValueError):
+                        term = None
+                    if agent == term:  # the person's Claude CLI: type it in
+                        r = subprocess.run([exe, "terminal", "send-keys", "-l", agent, " ".join(text.split())],
+                                           env=env, timeout=60, capture_output=True, text=True)
+                        if r.returncode == 0:
+                            r = subprocess.run([exe, "terminal", "send-keys", "-l", agent, "\r"], env=env, timeout=60,
+                                               capture_output=True, text=True)
+                    else:
+                        r = subprocess.run([exe, "send", "--no-wait", agent, text], env=env, timeout=60,
+                                           capture_output=True, text=True)
                     return self._send(200 if r.returncode == 0 else 502,
                                       {"sent": r.returncode == 0} if r.returncode == 0 else {"error": "couldn't send"})
                 if u.path == "/api/privacy":

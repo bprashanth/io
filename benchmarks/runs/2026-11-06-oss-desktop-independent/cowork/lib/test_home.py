@@ -84,6 +84,12 @@ with open(os.environ['FAKE_RECORD'],'a') as f:
 if args[:2]==['workspace','ls']:
     print(json.dumps([{'workspaceId':'other','name':'Other','cwd':os.environ['IDLI_DATA']},
                       {'workspaceId':'drivey','name':'Drivey','cwd':os.environ['IDLI_DATA']}]))
+elif args[:2]==['terminal','ls']:
+    t=Path(os.environ['FAKE_AGENTS']).with_name('terms.json')
+    print(t.read_text() if t.exists() else '[]')
+elif args[:2]==['terminal','create']:
+    t=Path(os.environ['FAKE_AGENTS']).with_name('terms.json')
+    t.write_text(json.dumps([{'id':'term-1','workspaceId':'drivey'}])); print(json.dumps({'id':'term-1'}))
 elif args[0]=='ls': print(Path(os.environ['FAKE_AGENTS']).read_text())
 elif args[0]=='run':
     agent={'id':'abcdef12-1234-1234-1234-abcdef123456','provider':'idli-claude','workspaceId':'drivey',
@@ -147,30 +153,24 @@ def test_search_and_download(workspace, monkeypatch, tmp_path):
         home.prepare(root, [{'local': '../outside.xlsx', 'title': 'bad'}], '')
 
 
-def test_send_first_reuse_and_closed(workspace, paseo, monkeypatch):
+def test_send_terminal_first_then_typed(workspace, paseo, monkeypatch):
+    """Send starts the person's Claude CLI in a Drivey terminal (masked launcher) the first time, then types into it."""
     root, _ = workspace
     record, agents = paseo
     shown = []
-    monkeypatch.setattr(uiswitch, 'show_agent', lambda a, side: shown.append((a, side)) or {'ok': True})
+    monkeypatch.setattr(uiswitch, 'show_terminal', lambda w, t, side: shown.append((w, t, side)) or {'ok': True})
     chosen = home.prepare(root, files(), 'Yerawada Ward')['files']
-    assert home.send(root, chosen, 'Yerawada Ward')['agent'] == AGENT
+    assert home.send(root, chosen, 'Yerawada Ward')['terminal'] == 'term-1'
     home.send(root, chosen, 'Compare Village A')
-    calls = [json.loads(line) for line in record.read_text().splitlines()]
-    runs = [c['args'] for c in calls if c['args'][0] == 'run']
-    sends = [c['args'] for c in calls if c['args'][0] == 'send']
-    assert len(runs) == 1 and len(sends) == 1
-    assert runs[0][runs[0].index('--workspace') + 1] == 'drivey'
-    assert runs[0][runs[0].index('--label') + 1] == 'idli.home=1'
-    assert runs[0][-1].startswith('Files (in drive/):\n- drive/') and 'Yerawada Ward' in runs[0][-1]
-    assert not any(c['paseo_env'] for c in calls)
-    assert shown == [(AGENT, 'right'), (AGENT, 'right')]
-    assert home.read(root / '.idli/home.json')['agent'] == AGENT
-    saved = home.read(agents)
-    saved[0]['archivedAt'] = '2026-11-14'
-    agents.write_text(json.dumps(saved))
-    home.send(root, chosen, 'Again')
-    calls = [json.loads(line) for line in record.read_text().splitlines()]
-    assert sum(c['args'][0] == 'run' for c in calls) == 2
+    calls = [json.loads(line)['args'] for line in record.read_text().splitlines()]
+    creates = [c for c in calls if c[:2] == ['terminal', 'create']]
+    keys = [c[-1] for c in calls if c[:2] == ['terminal', 'send-keys']]
+    assert len(creates) == 1 and creates[0][creates[0].index('--workspace') + 1] == 'drivey'
+    assert keys[0].startswith('exec ') and 'claude-masked.sh' in keys[0] and 'Yerawada Ward' in keys[0]
+    assert keys[1] == '\r' and 'Compare Village A' in keys[2] and keys[3] == '\r'
+    assert not any(json.loads(line)['paseo_env'] for line in record.read_text().splitlines())
+    assert shown == [('drivey', 'term-1', 'right')] * 2
+    assert home.read(root / '.idli/home.json')['terminal'] == 'term-1'
 
 
 def script(work):
@@ -309,7 +309,7 @@ def test_browser(workspace, paseo, monkeypatch):
         page.locator('#send').click()
         page.wait_for_function("() => document.querySelector('#status').textContent.includes('Claude has it')")
         assert not page.locator('#chips .chip').count() and not page.locator('#question').input_value()
-        assert any(json.loads(line)['args'][0] == 'run' for line in paseo[0].read_text().splitlines())
+        assert any(json.loads(line)['args'][:2] == ['terminal', 'create'] for line in paseo[0].read_text().splitlines())
         page.screenshot(path=str(shots / 'home-sent.png'), full_page=True)
         go('/view?id=counts')
         page.locator('#viz .mark-rect path').first.wait_for()
