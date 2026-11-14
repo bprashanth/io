@@ -11,8 +11,9 @@ as 'regex only'; names/places unknown to the vault may then be missed. Review=as
 is a setting for callers to enforce before invoking plan; plan itself sends.
 """
 import difflib
+from contextlib import contextmanager
 import functools
-import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -28,12 +29,37 @@ from .privacy_engine.detect import regex_engine
 from .privacy_engine.pseudonymize import PseudonymMap, TOKEN_RE, normalise, pseudonymise_frame, redact_text
 
 _LOCK = threading.RLock()
+_HELD = threading.local()
+
+
+@contextmanager
+def session_lock(data_dir):
+    """Serialize vault read/modify/write across the proxy and the form server."""
+    import fcntl
+    root = Path(data_dir).resolve()
+    with _LOCK:
+        held = getattr(_HELD, 'roots', frozenset())
+        if root in held:
+            yield
+            return
+        folder = root / '.idli'
+        folder.mkdir(parents=True, exist_ok=True)
+        fd = os.open(folder / 'privacy.lock', os.O_CREAT | os.O_RDWR, 0o600)
+        with os.fdopen(fd, 'a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            _HELD.roots = held | {root}
+            try:
+                yield
+            finally:
+                _HELD.roots = held
 
 
 def locked(fn):
+    directory = next(iter(inspect.signature(fn).parameters), None) == 'data_dir'
     @functools.wraps(fn)
     def call(*args, **kwargs):
-        with _LOCK:
+        guard = session_lock(args[0] if args else kwargs['data_dir']) if directory else _LOCK
+        with guard:
             return fn(*args, **kwargs)
     return call
 
@@ -84,10 +110,47 @@ def set(data_dir, file, **changes):
 
 
 def _vault(data_dir, file):
-    key = _key(data_dir, file)
-    safe = re.sub(r'[^\w.-]', '_', key)[:100]
-    path = Path(data_dir) / 'vault' / (safe + '-' + hashlib.sha256(key.encode()).hexdigest()[:12] + '.json')
-    return PseudonymMap(path)
+    _key(data_dir, file)  # retain the per-file path validation
+    return _session_map(data_dir)
+
+
+def _session_map(data_dir):
+    """One code namespace for the directory, including existing per-file vaults.
+
+    Conflicting legacy codes cannot be safely reinterpreted: refuse migration rather
+    than silently restore a tool call to a different person's value.
+    """
+    path = Path(data_dir) / 'vault' / 'session.json'
+    vault = PseudonymMap(path)
+    if not path.exists():
+        for old in sorted(path.parent.glob('*.json')):
+            legacy = PseudonymMap(old)
+            for code, real in legacy.display.items():
+                key = normalise(real)
+                if ((code in vault.display and normalise(vault.display[code]) != key)
+                        or (key in vault.forward and vault.forward[key] != code)):
+                    raise ValueError('Conflicting legacy vaults; use a new data directory')
+                vault.display[code], vault.forward[key] = real, code
+            for prefix, count in legacy.counters.items():
+                vault.counters[prefix] = max(vault.counters.get(prefix, 0), count)
+    return vault
+
+
+@locked
+def session_vault(data_dir):
+    """Seed every selected cell in every mask-mode file into the shared vault."""
+    vault = _session_map(data_dir)
+    path = Path(data_dir) / 'privacy.json'
+    settings = json.loads(path.read_text()) if path.exists() else {}
+    for file, options in sorted(settings.items()):
+        if options.get('mode') != 'mask':
+            continue
+        key = _key(data_dir, file)
+        sheets, _ = fk.raw_sheets(str(Path(data_dir) / key))
+        for frame in sheets.values():
+            _code_frame(frame, options.get('columns', {}), vault)
+    _save(vault)
+    return vault
 
 
 def _save(vault):
@@ -187,12 +250,18 @@ def _seed(data_dir, file, path):
     return vault
 
 
+def _value_pattern(value):
+    if re.fullmatch(r'[+-]?\d+(?:\.\d+)?', value):
+        return r'(?<![\w.])' + re.escape(value) + r'(?!\w|\.\d)'
+    return r'(?<!\w)' + re.escape(value) + r'(?!\w)'
+
+
 def _known(text, vault):
     # Include short and numeric values too; avoid matching numbers inside code suffixes.
     values = sorted(vault.display.values(), key=len, reverse=True)
     if not values:
         return text, []
-    pattern = re.compile(r'(?<!\w)(?:' + '|'.join(re.escape(v) for v in values) + r')(?!\w)', re.I)
+    pattern = re.compile('|'.join(_value_pattern(v) for v in values), re.I)
     found = []
     def sub(m):
         code = vault.forward[normalise(m.group())]
@@ -283,12 +352,16 @@ def unmask(data_dir, file, obj):
 
 @locked
 def leak_check(data_dir, file, outgoing):
+    return known_leaks(outgoing, _vault(data_dir, file))
+
+
+def known_leaks(outgoing, vault):
     # Decode JSON escapes as well, and remove codes so e.g. a masked '001' doesn't
     # match inside NAME_001. Fail closed for known values in labels or instructions.
     text = TOKEN_RE.sub('', outgoing)
     text = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m[1], 16)), text)
-    return [v for v in _vault(data_dir, file).display.values()
-            if re.search(r'(?<!\w)' + re.escape(v) + r'(?!\w)', text, re.I)]
+    return [v for v in vault.display.values()
+            if re.search(_value_pattern(v), text, re.I)]
 
 
 def _shape(form, spec):
