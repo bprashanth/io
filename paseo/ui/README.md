@@ -95,6 +95,56 @@ Also part of the Paseo side:
   - `formserver.py`: stop the laptop's formserver, and the next tool call restarts it.
   - Paseo UI patches: rebuild and reinstall.
 
+## Checkpoint 2026-11-14 (known good; revert to this)
+
+The state tested in the app on 2026-11-14, with Drivey, WhatsAppy and Canvay, the chart popover and file privacy.
+
+| Piece | Checkpoint | Check |
+|---|---|---|
+| Paseo desktop shell (laptop) | 0.15.3 (`/opt/Paseo`, unpatched) | `app startup { version: '0.15.3' }` |
+| Paseo UI source | upstream 0.15.2, commit `e896c05b09707e711a2324fcab7da84a0ae57291`, plus the patch below | |
+| UI patch (P13–P16) | `cowork/desktop/paseo-idli-split.patch` | sha256 `fe0abd98…` (matched the checkout byte for byte) |
+| Desktop patch (P1, not installed) | `cowork/desktop/paseo-browser-downloads.patch` | the staged desktop diff, sha256 `42147c92…` |
+| UI build | `~/idli-builds/paseo-app-dist-0.15.2-idli7.tgz` on the DGX | sha256 `2b0b8d51…` |
+| Installed UI (laptop) | `/opt/Paseo/resources/app-dist` → `~/idli-insights/paseo/app-dist` (idli7) | |
+| Laptop backup | `~/idli-insights/archive/paseo-checkpoint-2026-11-14/` | listed below |
+| Idli code | git tag `paseo-ui-checkpoint-2026-11-14` (DGX repo) | |
+
+The laptop backup holds:
+- `config.json`: Paseo's config with providers `t4gc-cowork` (Muse, Careful, Auto), `idli-teach`, `diy-claude` and
+  others; mode 600; may contain settings, don't share it;
+- `app-dist-idli7.tgz`: the installed UI as it was (sha256 `481ef37d…`);
+- `cowork.tools`: Drivey's tool allow-list;
+- `workspaces.txt` and `plugins.txt`.
+
+The `declaude` rewrite before a push changes commit hashes. If the tag ends up on a pre-rewrite commit, find the
+same state by this README's text and the checksums above.
+
+**To revert the laptop to this checkpoint:**
+1. Quit Paseo.
+2. Restore the UI:
+   ```sh
+   K=~/idli-insights/archive/paseo-checkpoint-2026-11-14
+   rm -rf ~/idli-insights/paseo/app-dist
+   tar xzf $K/app-dist-idli7.tgz -C ~/idli-insights/paseo
+   ```
+   The symlink in `/opt/Paseo/resources` already points there.
+3. Restore the config: `cp $K/config.json ~/.paseo/config.json` (keep the current one first), and
+   `cp $K/cowork.tools ~/idli-insights/cowork-real/`.
+4. Restore the code: on the DGX, `git checkout paseo-ui-checkpoint-2026-11-14 -- benchmarks/runs/2026-11-06-oss-desktop-independent`;
+   restart `muse-prefix-proxy`; copy `cowork/` to the laptop.
+5. Start Paseo with `--remote-debugging-port=9333`.
+
+**To go back to stock Paseo:** remove the `/opt/Paseo/resources/app-dist` symlink (the packaged UI in `app.asar` is
+used), restart Paseo, and restore the backed-up `config.json` without the Idli providers. Or reinstall the Paseo
+package.
+
+**To rebuild idli7 from scratch:**
+1. Clone Paseo and check out `e896c05b`.
+2. `git apply cowork/desktop/paseo-idli-split.patch`.
+3. In `packages/app`: `PASEO_WEB_PLATFORM=electron npx expo export --platform web`.
+4. Tar the output and install it with `install-paseo-ui.sh FILE=…`.
+
 ## History
 
 `chronology/` (repo root) records each step. The latest are `2026-11-13T1155-drivey-whatsappy-canvay-p16.md`,
