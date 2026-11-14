@@ -9,6 +9,12 @@ WORK=${IDLI_CLAUDE_WORK:-$HOME/idli-insights/claude-masked}
 mkdir -p "$WORK"
 ln -sfn "$DATA/drive" "$WORK/drive"
 cp "$COWORK/idli/CLAUDE-masked.md" "$WORK/CLAUDE.md"
+# Project skills travel with this work folder, including their local chart templates.
+mkdir -p "$WORK/.claude/skills" || exit 1
+for skill in "$COWORK"/idli/claude-skills/*; do
+  [ -d "$skill" ] || continue
+  cp -R "$skill" "$WORK/.claude/skills/" || exit 1
+done
 # Idli's local server too (Idli home, charts, Minis): Drivey's "+" opens Idli home beside this terminal
 (cd "$COWORK" && "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import formserver, drivestubs; formserver.ensure(sys.argv[1]); drivestubs.refresh(sys.argv[1])" "$DATA") >/dev/null 2>&1 || true
 PORT=$("$COWORK/.venv/bin/python" -I "$COWORK/lib/ccproxy.py" ensure --data-dir "$DATA") || {

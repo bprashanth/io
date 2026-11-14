@@ -1,0 +1,218 @@
+{
+  "status": "passed",
+  "versions": {
+    "python": "3.12.3",
+    "pandas": "3.1.1",
+    "openpyxl": "3.1.5",
+    "vl_convert": "1.9.0"
+  },
+  "sources": {
+    "Households": {
+      "file": "households.xlsx",
+      "rows_read": 48,
+      "columns": [
+        "household_id",
+        "contact_name",
+        "ward",
+        "village",
+        "enrolled_on",
+        "assigned_officer",
+        "livelihood"
+      ],
+      "blank_cells": {
+        "livelihood": 3
+      }
+    },
+    "Groups": {
+      "file": "groups.xlsx",
+      "rows_read": 6,
+      "columns": [
+        "group_id",
+        "group_name",
+        "formed_on"
+      ],
+      "blank_cells": {}
+    },
+    "Members": {
+      "file": "groups.xlsx",
+      "rows_read": 48,
+      "columns": [
+        "member_id",
+        "household_id",
+        "group_id",
+        "joined_on"
+      ],
+      "blank_cells": {}
+    },
+    "Loans": {
+      "file": "loans.xlsx",
+      "rows_read": 48,
+      "columns": [
+        "loan_id",
+        "household_id",
+        "group_id",
+        "principal_rs",
+        "disbursed_on"
+      ],
+      "blank_cells": {}
+    },
+    "Repayments": {
+      "file": "loans.xlsx",
+      "rows_read": 864,
+      "columns": [
+        "repayment_id",
+        "loan_id",
+        "due_on",
+        "due_rs",
+        "paid_rs",
+        "paid_on"
+      ],
+      "blank_cells": {
+        "paid_rs": 2,
+        "paid_on": 37
+      }
+    },
+    "Visits": {
+      "file": "field_visits.xlsx",
+      "rows_read": 458,
+      "columns": [
+        "visit_id",
+        "household_id",
+        "officer",
+        "visited_on",
+        "purpose",
+        "notes"
+      ],
+      "blank_cells": {
+        "notes": 49
+      }
+    },
+    "Trainings": {
+      "file": "trainings.xlsx",
+      "rows_read": 30,
+      "columns": [
+        "training_id",
+        "group_id",
+        "scheduled_on",
+        "topic",
+        "status",
+        "attended_members",
+        "facilitator"
+      ],
+      "blank_cells": {
+        "attended_members": 1,
+        "facilitator": 1
+      }
+    }
+  },
+  "checks": {
+    "unique_primary_keys": true,
+    "all_foreign_keys_match": true,
+    "no_fact_row_multiplication": true,
+    "blank_paid_amounts_excluded": 2,
+    "unknown_attendance_counts_excluded": 1,
+    "ward_04_households": 24,
+    "officer_caseloads": [
+      30,
+      9,
+      9
+    ],
+    "sakhi_drop_percentage_points": 45.3,
+    "distinct_chart_families": 7,
+    "all_svg_have_data_marks": true
+  },
+  "charts": [
+    {
+      "stem": "01-matrix",
+      "question": "Where are household/officer connections concentrated?",
+      "chart": "matrix",
+      "csv_rows": 12,
+      "rendered_mark_elements": 24,
+      "sources": [
+        "Households: household_id, ward, assigned_officer"
+      ],
+      "finding": "Ward 04 has 24 of 48 households."
+    },
+    {
+      "stem": "02-ranked-dot",
+      "question": "Who has the largest caseload and how many households went unvisited in June?",
+      "chart": "ranked-dot",
+      "csv_rows": 3,
+      "rendered_mark_elements": 12,
+      "sources": [
+        "Households: household_id, assigned_officer",
+        "Visits: household_id, officer, visited_on"
+      ],
+      "finding": "Caseloads are 30, 9, 9; the 16-household reference is illustrative, not an NGO policy."
+    },
+    {
+      "stem": "03-small-multiples",
+      "question": "Which group's monthly repayment diverges from the others?",
+      "chart": "small-multiples",
+      "csv_rows": 108,
+      "rendered_mark_elements": 114,
+      "sources": [
+        "Repayments: loan_id, due_on, due_rs, paid_rs",
+        "Loans: loan_id, household_id, group_id",
+        "Members: household_id, group_id",
+        "Groups: group_id, group_name"
+      ],
+      "finding": "18 months per group; exclude 2 unknown paid amounts from both sums."
+    },
+    {
+      "stem": "04-event-strip",
+      "question": "How does Sakhi's missed training line up with its repayment change?",
+      "chart": "event-strip",
+      "csv_rows": 23,
+      "rendered_mark_elements": 23,
+      "sources": [
+        "Repayments: loan_id, due_on, due_rs, paid_rs",
+        "Loans: loan_id, household_id, group_id",
+        "Members: household_id, group_id",
+        "Groups: group_id, group_name",
+        "Trainings: group_id, scheduled_on, topic, status"
+      ],
+      "finding": "Sakhi missed 15 October 2025; repayment below 80% starts in November. Sequence does not prove causation."
+    },
+    {
+      "stem": "05-slope",
+      "question": "Which groups changed between July\u2013September and November\u2013January?",
+      "chart": "slope",
+      "csv_rows": 12,
+      "rendered_mark_elements": 18,
+      "sources": [
+        "Repayments: loan_id, due_on, due_rs, paid_rs",
+        "Loans: loan_id, household_id, group_id",
+        "Members: household_id, group_id",
+        "Groups: group_id, group_name",
+        "Trainings: group_id, scheduled_on, status (defines event month)"
+      ],
+      "finding": "Before: Jul\u2013Sep 2025; after: Nov 2025\u2013Jan 2026. Sakhi falls 45.3 percentage points."
+    },
+    {
+      "stem": "06-layered-bars",
+      "question": "How do member households connect self-help groups to wards?",
+      "chart": "layered-bars",
+      "csv_rows": 9,
+      "rendered_mark_elements": 9,
+      "sources": [
+        "Members: household_id, group_id",
+        "Households: household_id, ward",
+        "Groups: group_id, group_name"
+      ],
+      "finding": "Pragati, Ujjwal and Sakhi each connect eight member households to Ward 04; each household counted once."
+    },
+    {
+      "stem": "07-cohort-table",
+      "question": "Do first-training cohorts sustain attendance at comparable stages?",
+      "chart": "cohort-table",
+      "csv_rows": 15,
+      "rendered_mark_elements": 15,
+      "sources": [
+        "Trainings: training_id, group_id, scheduled_on, attended_members",
+        "Members: household_id, group_id"
+      ],
+      "finding": "Known attendance / eligible member-session slots. One unknown attendance count excluded from both sums; missed session stays zero. Future periods blank."
+    }
+  ]
+}
