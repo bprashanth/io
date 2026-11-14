@@ -9,7 +9,7 @@ if(location.pathname==='/consent') (async()=>{
     const r=await api('/api/consent?id='+encodeURIComponent(ID));
     const lookup=r.kind==='lookup';
     $('title').textContent=lookup?'Claude asks to search the web with a masked value':'Claude asks to see a masked value';
-    $('intro').textContent=lookup?'Claude will not see the value. The search is sent from this computer to DuckDuckGo.':'Only this value will be shared with Claude.';
+    $('intro').textContent=lookup?'Claude will not see the value. The search is sent from this computer to Google News and Wikipedia.':'Only this value will be shared with Claude.';
     $('details').innerHTML=[['Code',r.code],['Column',r.column+' ('+r.file.replace(/^drive\//,'').replace(/\.[^.]+$/,'')+')'],['Real value',r.value],['Reason',r.reason]].map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
     $('search').textContent=lookup?'Search: '+r.query.replaceAll('{value}',r.value):'';
     $('approve').textContent=lookup?'Allow search':'Reveal to Claude';$('request').hidden=false;decisionLabel(r.decision);

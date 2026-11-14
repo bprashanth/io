@@ -187,3 +187,19 @@ def test_names_hidden_without_scanner(tmp_path, monkeypatch):
     rows = {r['column']: r for r in p.suggest(path, None)}
     assert rows['household_head']['mask'] and rows['enumerator']['mask']
     assert not rows['members']['mask'] and not rows['crop']['mask']
+
+
+def test_value_variants_are_masked():
+    """DGX wire audit 2026-11-15: a ward inside a Wikipedia link and a padded longitude went out unmasked."""
+    vault = p.PseudonymMap()
+    for real, code in [('Satpur', 'PLACE_002'), ('Yerawada Ward', 'PLACE_003'), ('73.7354', 'VALUE_008'), ('idli', 'NAME_032')]:
+        vault.forward[p.normalise(real)] = code
+        vault.display[code] = real
+    text = ('https://en.wikipedia.org/wiki/Satpur_Kamil_Madrasah https://x.test/Yerawada_Ward?q=yerawada%20ward '
+            'lon 73.73540 and 73.7354 but not 73.73541 or Satpurkar or NAME_0073 or Satpur_Kamil outside a link '
+            'and the tool mcp__idli__idli_show')
+    out, found = p._known(text, vault)
+    assert 'wiki/Satpur_' not in out and 'Yerawada' not in out and 'yerawada' not in out
+    assert out.count('VALUE_008') == 2 and '73.73541' in out and 'Satpurkar' in out
+    assert p.known_leaks(text, vault) and not p.known_leaks(out, vault)
+    assert 'mcp__idli__idli_show' in out and 'Satpur_Kamil outside' in out

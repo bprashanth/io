@@ -408,23 +408,52 @@ def _seed(data_dir, file, path):
     return vault
 
 
+SEP = r'(?:\s+|_|\+|-|%20)'
+URL = re.compile(r'https?://[^\s"\'<>)\]\\]+')
+# The product's own words are never private, even if a scanner tags them (a tool named mcp__idli__idli_show went out
+# as mcp__NAME_032__NAME_032_show on the DGX, 2026-11-15).
+NEVER_PRIVATE = {'idli', 'claude', 'drivey', 'paseo', 'mini', 'minis', 'anthropic', 'codex'}
+
+
 def _value_pattern(value):
+    """A known value as a whole word; decimals also with trailing zeros (73.7354 printed as 73.73540)."""
     if re.fullmatch(r'[+-]?\d+(?:\.\d+)?', value):
-        return r'(?<![\w.])' + re.escape(value) + r'(?!\w|\.\d)'
+        return r'(?<![\w.])' + re.escape(value) + ('0*' if '.' in value else '') + r'(?!\w|\.\d)'
     return r'(?<!\w)' + re.escape(value) + r'(?!\w)'
+
+
+def _url_pattern(value):
+    """Inside a web link a value can be joined by _ + - or %20 (/wiki/Satpur_Kamil): DGX wire audit 2026-11-15."""
+    if re.fullmatch(r'[+-]?\d+(?:\.\d+)?', value):
+        return _value_pattern(value)
+    return r'(?<![^\W_])' + SEP.join(re.escape(part) for part in value.split()) + r'(?![^\W_])'
+
+
+def _code_for(vault, found):
+    """The code for a matched variant of a known value."""
+    for key in (found, re.sub(SEP, ' ', found), found.rstrip('0').rstrip('.') if re.fullmatch(r'[+-]?\d+\.\d+', found) else None):
+        if key is not None and normalise(key) in vault.forward:
+            return vault.forward[normalise(key)]
+    target = normalise(re.sub(SEP, ' ', found))
+    for code, real in vault.display.items():
+        if normalise(re.sub(SEP, ' ', real)) == target:
+            return code
+    raise KeyError(found)
 
 
 def _known(text, vault):
     # Include short and numeric values too; avoid matching numbers inside code suffixes.
-    values = sorted(vault.display.values(), key=len, reverse=True)
+    values = sorted((v for v in vault.display.values() if v.strip().casefold() not in NEVER_PRIVATE), key=len, reverse=True)
     if not values:
         return text, []
     pattern = re.compile('|'.join(_value_pattern(v) for v in values), re.I)
+    in_url = re.compile('|'.join(_url_pattern(v) for v in values), re.I)
     found = []
     def sub(m):
-        code = vault.forward[normalise(m.group())]
+        code = _code_for(vault, m.group())
         found.append({'real': m.group(), 'code': code, 'why': 'known value'})
         return code
+    text = URL.sub(lambda u: in_url.sub(sub, u.group()), text)
     return pattern.sub(sub, text), found
 
 
@@ -479,7 +508,7 @@ def _redact(text, vault, scanner):
     found += [{'real': e['text'], 'code': e['token'], 'why': 'regex validator'} for e in events]
     # The scanner gets only the remaining text: blank out existing codes first.
     remaining = TOKEN_RE.sub(lambda m: ' ' * len(m.group()), text)
-    spans = scanner(remaining)
+    spans = [s for s in scanner(remaining) if remaining[s[0]:s[1]].strip().casefold() not in NEVER_PRIVATE]
     text, events = redact_text(text, vault, lambda _: spans)
     found += [{'real': e['text'], 'code': e['token'], 'why': 'scanner'} for e in events]
     return text, found
@@ -525,8 +554,9 @@ def known_leaks(outgoing, vault):
     # match inside NAME_001. Fail closed for known values in labels or instructions.
     text = TOKEN_RE.sub('', outgoing)
     text = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m[1], 16)), text)
-    return [v for v in vault.display.values()
-            if re.search(_value_pattern(v), text, re.I)]
+    urls = ' '.join(URL.findall(text))
+    return [v for v in vault.display.values() if v.strip().casefold() not in NEVER_PRIVATE
+            and (re.search(_value_pattern(v), text, re.I) or re.search(_url_pattern(v), urls, re.I))]
 
 
 def _shape(form, spec):

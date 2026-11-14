@@ -115,6 +115,10 @@ def open_url(workspace_id, url, side='right', focus=True):
     """Open a browser tab in the specified workspace using the P21 UI bridge."""
     if side not in ('left', 'right') or not isinstance(workspace_id, str) or not workspace_id:
         return {'ok': False, 'why': 'Open this page from a Drivey workspace.'}
+    if os.environ.get('IDLI_TEST_OPEN_LOG'):  # tests without Paseo: record the page; a headless browser opens it
+        with open(os.environ['IDLI_TEST_OPEN_LOG'], 'a') as f:
+            f.write(url + '\n')
+        return {'ok': True, 'why': None}
     try:
         page = next(t for t in _targets() if t.get('type') == 'page' and str(t.get('url', '')).startswith('paseo://app'))
         args = {'serverId': server_id(), 'workspaceId': workspace_id, 'url': url, 'side': side, 'focus': bool(focus)}

@@ -36,7 +36,10 @@ def idli_show(title, vega_lite, data_csv, sources=None, script=None):
     agent = os.environ.get('PASEO_AGENT_ID') or st.get('terminal')
     workspace = os.environ.get('IDLI_WORKSPACE')
     if workspace:
-        terminal = home._claude_terminal(data_dir(), workspace)
+        try:  # only for "Copy to Claude"; a chart must still open without Paseo's command line
+            terminal = home._claude_terminal(data_dir(), workspace)
+        except (OSError, ValueError):
+            terminal = None
         if terminal:
             home._remember(data_dir(), workspace, terminal)
             agent = terminal
@@ -150,7 +153,9 @@ def main():
                     result = {'content': [{'type': 'text', 'text': out if isinstance(out, str) else json.dumps(out)}]}
                 except ValueError as exc:
                     from lib.maps import MapError
-                    detail = str(exc) if isinstance(exc, MapError) else 'Check the file paths and inputs, then retry.'
+                    # Idli's own messages are written for people; strip any path or page token before Claude sees it.
+                    detail = re.sub(r'(?:[A-Za-z]:)?/[^\s,;)]+|[?&]t=[\w-]+', '<path>', str(exc)).strip()[:300]
+                    detail = detail if isinstance(exc, MapError) or detail else 'Check the file paths and inputs, then retry.'
                     result = {'isError': True, 'content': [{'type': 'text', 'text': detail}]}
                 except Exception:
                     # Keep paths, tool contents and browser URLs (which contain tokens) out of errors.

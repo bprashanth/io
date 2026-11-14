@@ -112,16 +112,20 @@ def test_lookup_http_top_six_and_masks_all_files_even_revealed(data):
     approve(data)
     pd.DataFrame({'Email':['private@example.test']}).to_csv(data/'second.csv',index=False)
     privacy.set(data,'second.csv',mode='mask',columns={'Email':True})
-    html=''.join(f'<div><a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.test%2FYerawada%2520Ward">Yerawada Ward <b>{i}</b></a><a class="result__snippet">Asha Sample private@example.test in Yerawada Ward</a></div>' for i in range(8))
-    with patch.object(reveals.urllib.request,'urlopen',return_value=io.BytesIO(html.encode())) as http:
+    rss='<rss><channel>'+''.join(f'<item><title>Yerawada Ward {i} Asha Sample private@example.test</title><link>https://example.test/n{i}</link><source>Paper</source><pubDate>Sat, 14 Nov 2026 10:00:00 GMT</pubDate></item>' for i in range(5))+'</channel></rss>'
+    wiki=json.dumps({'query':{'search':[{'title':f'Yerawada Ward {i}','snippet':'<span>Yerawada Ward</span> near Asha Sample'} for i in range(3)]}})
+    calls=[]
+    def fake(req,timeout=10):
+        calls.append((req,timeout));return io.BytesIO((rss if 'news.google.com' in req.full_url else wiki).encode())
+    with patch.object(reveals.urllib.request,'urlopen',side_effect=fake):
         out=reveals.lookup_results(data,code(data,'Yerawada Ward'),'Statistics for {value}','Yerawada Ward')
     assert len(out['results'])==6
     assert all(set(r)=={'title','url','snippet'} for r in out['results'])
     assert not privacy.known_leaks(json.dumps(out),privacy.session_vault(data))
     assert code(data,'Yerawada Ward') in json.dumps(out)
-    req=http.call_args.args[0]
-    assert req.full_url.startswith('https://html.duckduckgo.com/html/?') and 'Yerawada+Ward' in req.full_url
-    assert req.get_header('User-agent')=='Idli/1.0' and http.call_args.kwargs['timeout']==10
+    assert calls[0][0].full_url.startswith('https://news.google.com/rss/search?') and 'Yerawada+Ward' in calls[0][0].full_url
+    assert any(c[0].full_url.startswith('https://en.wikipedia.org/w/api.php?') for c in calls)
+    assert all(c[1]==10 and c[0].get_header('User-agent').startswith('Idli/1.0') for c in calls)
 
 def test_query_cannot_send_another_private_value(data):
     ident=reveals.create(data,code(data,'River Ward'),'Check table','synthetic-workspace','lookup','{value} Asha Sample')['id']
@@ -229,7 +233,7 @@ def test_lookup_sends_only_the_approved_query(data):
     approved={'query':'Approved search {value}','value':'River Ward'}
     with patch.object(reveals,'ask',return_value=approved),patch.object(reveals,'search',return_value=[]) as search:
         assert idli_mcp.lookup(c,'Unapproved Asha Sample {value}','Check table')['code']==c
-        search.assert_called_once_with('Approved search River Ward')
+        search.assert_called_once_with('Approved search River Ward', 'River Ward')
     with patch.object(reveals,'search',side_effect=AssertionError('No personal search')):
         with pytest.raises(ValueError,match='Names, contacts'):reveals.lookup_results(data,code(data,'Asha Sample'),'{value}','Asha Sample')
 
@@ -244,3 +248,17 @@ def test_budget_write_failure_does_not_publish_reveal(data):
         with pytest.raises(OSError):reveals.decide(data,ident,True)
     assert privacy.reveals(data)==[]
     assert reveals.consent_data(data,ident)['decision']=='pending'
+
+
+def test_gps_map_groups_labels_and_orders_colour_bands():
+    """DGX live run 2026-11-15: 14 labels piled on one ward, points had no colour, bands sorted alphabetically."""
+    from lib import maps
+    rows = [{'ward': w, 'lat': str(18.5 + i / 100), 'lon': str(73.8 + i / 100), 'band': b}
+            for i, (w, b) in enumerate([('A', 'Over 6 months'), ('A', 'Under 3 months'), ('B', '3 to 6 months')])]
+    spec = {'usermeta': {'idli_map': {'type': 'gps', 'lat': 'lat', 'lon': 'lon', 'label': 'ward', 'color': 'band'}},
+            'layer': [{'mark': 'point', 'encoding': {'tooltip': [{'field': 'ward'}]}}]}
+    out = maps.prepare(spec, rows)
+    point, text = out['layer'][1], out['layer'][2]
+    assert point['encoding']['color']['scale']['domain'] == ['Under 3 months', '3 to 6 months', 'Over 6 months']
+    assert point['encoding']['tooltip'] == [{'field': 'ward'}] and 'color' not in point['mark']
+    assert text['transform'][-1]['groupby'] == ['ward']

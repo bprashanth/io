@@ -45,13 +45,13 @@ the CSV does not reset the previous chart choice.
 
 | Question shape | Chart family and template | Required CSV fields | Useful alternative |
 | --- | --- | --- | --- |
-| Which entities connect across two categories; where are the concentrations? | [Join matrix](templates/matrix.vl.json) | `ward`, `officer`, `households` | Layered bars for fewer categories |
-| Who has the most linked entities, compared with a reference? | [Ranked dots with links to a reference](templates/ranked-dot.vl.json) | `officer`, `households`, `capacity`, `visited`, `unvisited` | Matrix by ward and officer |
-| Does a relationship evolve differently for each group? | [Small multiples](templates/small-multiples.vl.json) | `group`, `month`, `repayment_rate` | Slope for two specified windows |
-| Which events precede/follow an outcome for one entity? | [Event strip](templates/event-strip.vl.json) | `date`, `lane`, `outcome`, `details` | Small multiples for several entities |
-| Which groups changed between two windows? | [Before/after slope](templates/slope.vl.json) | `group`, `period`, `repayment_rate` | Ranked change dots |
-| How do members connect two sets (e.g. groups and wards)? | [Bipartite-like layered bars](templates/layered-bars.vl.json) | `group`, `ward`, `households` | Join matrix for many categories |
-| Do entry cohorts retain participation at the same elapsed stage? | [Cohort table](templates/cohort-table.vl.json) | `cohort`, `elapsed_quarter`, `attendance_label`, `observed_sessions`, `planned_sessions` | Small multiples of elapsed time |
+| Which entities connect across two categories; where are the concentrations? | [Join matrix](.claude/skills/relationship-visuals/templates/matrix.vl.json) | `ward`, `officer`, `households` | Layered bars for fewer categories |
+| Who has the most linked entities, compared with a reference? | [Ranked dots with links to a reference](.claude/skills/relationship-visuals/templates/ranked-dot.vl.json) | `officer`, `households`, `capacity`, `visited`, `unvisited` | Matrix by ward and officer |
+| Does a relationship evolve differently for each group? | [Small multiples](.claude/skills/relationship-visuals/templates/small-multiples.vl.json) | `group`, `month`, `repayment_rate` | Slope for two specified windows |
+| Which events precede/follow an outcome for one entity? | [Event strip](.claude/skills/relationship-visuals/templates/event-strip.vl.json) | `date`, `lane`, `outcome`, `details` | Small multiples for several entities |
+| Which groups changed between two windows? | [Before/after slope](.claude/skills/relationship-visuals/templates/slope.vl.json) | `group`, `period`, `repayment_rate` | Ranked change dots |
+| How do members connect two sets (e.g. groups and wards)? | [Bipartite-like layered bars](.claude/skills/relationship-visuals/templates/layered-bars.vl.json) | `group`, `ward`, `households` | Join matrix for many categories |
+| Do entry cohorts retain participation at the same elapsed stage? | [Cohort table](.claude/skills/relationship-visuals/templates/cohort-table.vl.json) | `cohort`, `elapsed_quarter`, `attendance_label`, `observed_sessions`, `planned_sessions` | Small multiples of elapsed time |
 
 These seven templates are executable Vega-Lite v5 JSON, with no data or transforms.
 All joins, ordering variables, cohorts, windows, and labels are computed in Python.

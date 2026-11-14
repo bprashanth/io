@@ -174,14 +174,61 @@ class SearchResults(HTMLParser):
             self.rows[-1][self.capture] += data
 
 
-def search(query):
-    url = 'https://html.duckduckgo.com/html/?' + urllib.parse.urlencode({'q': query})
-    req = urllib.request.Request(url, headers={'User-Agent': 'Idli/1.0'})
-    with urllib.request.urlopen(req, timeout=10) as response:
-        page = response.read(2_000_000).decode('utf-8', errors='replace')
-    parser = SearchResults()
-    parser.feed(page)
-    return parser.rows[:6]
+def _get(url, timeout=10):
+    req = urllib.request.Request(url, headers={'User-Agent': 'Idli/1.0 (local research helper)'})
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return response.read(2_000_000).decode('utf-8', errors='replace')
+
+
+def _strip_tags(text):
+    import html
+    import re
+    return html.unescape(re.sub(r'<[^>]+>', '', text or '')).strip()
+
+
+def search_news(query, limit=4):
+    """Google News RSS: recent local news. Parsed as XML; no page content is executed."""
+    import xml.etree.ElementTree as ET
+    url = 'https://news.google.com/rss/search?' + urllib.parse.urlencode(
+        {'q': query, 'hl': 'en-IN', 'gl': 'IN', 'ceid': 'IN:en'})
+    rows = []
+    for item in ET.fromstring(_get(url)).iter('item'):
+        link = (item.findtext('link') or '').strip()
+        if urllib.parse.urlsplit(link).scheme not in ('http', 'https'):
+            continue
+        source = item.findtext('source') or ''
+        date = (item.findtext('pubDate') or '')[:16]
+        rows.append({'title': _strip_tags(item.findtext('title')), 'url': link,
+                     'snippet': ' - '.join(x for x in (source.strip(), date.strip()) if x)})
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def search_wikipedia(query, limit=3):
+    """Wikipedia search: background on places and programmes."""
+    url = 'https://en.wikipedia.org/w/api.php?' + urllib.parse.urlencode(
+        {'action': 'query', 'list': 'search', 'srsearch': query, 'format': 'json', 'srlimit': limit})
+    rows = []
+    for hit in json.loads(_get(url)).get('query', {}).get('search', [])[:limit]:
+        title = str(hit.get('title', ''))
+        rows.append({'title': title, 'url': 'https://en.wikipedia.org/wiki/' + urllib.parse.quote(title.replace(' ', '_')),
+                     'snippet': _strip_tags(hit.get('snippet', ''))})
+    return rows
+
+
+def search(query, fallback=None):
+    """News first, then encyclopedia background; at most 6. (DuckDuckGo's HTML endpoint answers scripts with a bot
+    challenge, tried 2026-11-15, so it is not used.) A source that fails is skipped."""
+    rows = []
+    for source in (search_news, search_wikipedia):
+        try:
+            rows += source(query)
+        except (OSError, ValueError, Exception):  # noqa: BLE001 - one failing source must not hide the other
+            continue
+    if not rows and fallback and fallback != query:
+        return search(fallback)
+    return rows[:6]
 
 
 def lookup_results(data_dir, code, query, value):
@@ -195,7 +242,7 @@ def lookup_results(data_dir, code, query, value):
         personal.display = {c: v for c, v in vault.display.items() if index.get(c, {}).get('class', 'personal') == 'personal'}
         if privacy.known_leaks(query, personal):
             raise ValueError(PERSONAL)
-    rows = search(query)
+    rows = search(query, value)
     with privacy.session_lock(data_dir):
         vault = privacy.session_vault(data_dir)
         def mask(text):

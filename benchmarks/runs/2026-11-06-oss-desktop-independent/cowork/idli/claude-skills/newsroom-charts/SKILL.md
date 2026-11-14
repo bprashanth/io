@@ -13,15 +13,15 @@ Read one template that fits the question. Replace fields, headline, subtitle and
 
 | Template | When to use it |
 | --- | --- |
-| [sorted-bars](templates/sorted-bars.vl.json) | Rank a few groups. Direct counts and one highlighted group. |
-| [comparison-dots](templates/comparison-dots.vl.json) | Compare group values without the visual weight of bars. |
-| [annotated-outlier](templates/annotated-outlier.vl.json) | Point out one unusual value with a short annotation. |
-| [slope](templates/slope.vl.json) | Compare the same groups at two dates. Label the final point. |
-| [small-multiples](templates/small-multiples.vl.json) | Compare trends across groups on the same scale. |
-| [ranged-dots](templates/ranged-dots.vl.json) | Show an estimate and its range. Say what the range means. |
-| [heat-table](templates/heat-table.vl.json) | Compare groups across a small set of periods. |
-| [gps-points](templates/gps-points.vl.json) | Show rows with numeric lat and lon. The local server fits an India state basemap to the points. |
-| [district-map](templates/district-map.vl.json) | Compare district totals. Combine rows to one per district first. |
+| [sorted-bars](.claude/skills/newsroom-charts/templates/sorted-bars.vl.json) | Rank a few groups. Direct counts and one highlighted group. |
+| [comparison-dots](.claude/skills/newsroom-charts/templates/comparison-dots.vl.json) | Compare group values without the visual weight of bars. |
+| [annotated-outlier](.claude/skills/newsroom-charts/templates/annotated-outlier.vl.json) | Point out one unusual value with a short annotation. |
+| [slope](.claude/skills/newsroom-charts/templates/slope.vl.json) | Compare the same groups at two dates. Label the final point. |
+| [small-multiples](.claude/skills/newsroom-charts/templates/small-multiples.vl.json) | Compare trends across groups on the same scale. |
+| [ranged-dots](.claude/skills/newsroom-charts/templates/ranged-dots.vl.json) | Show an estimate and its range. Say what the range means. |
+| [heat-table](.claude/skills/newsroom-charts/templates/heat-table.vl.json) | Compare groups across a small set of periods. |
+| [gps-points](.claude/skills/newsroom-charts/templates/gps-points.vl.json) | Show rows with numeric lat and lon. The local server fits an India state basemap to the points. In usermeta.idli_map set label to a group column (one label per group) and color to the column that colours the points. |
+| [district-map](.claude/skills/newsroom-charts/templates/district-map.vl.json) | Compare district totals. Combine rows to one per district first. |
 
 Maps use `usermeta.idli_map` as in the templates. GPS maps name `lat` and `lon` fields. District maps name `field` and numeric `value`. Add `state` to distinguish duplicate district names. The server checks coordinates and matches names locally. Case, spacing, a district suffix and common spelling variants are handled. Ambiguous names remain unmatched. Check `description` for unmatched districts and tell the person which data was left out. If no names match, fix the input instead of drawing an empty map.
 

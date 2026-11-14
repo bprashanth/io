@@ -34,7 +34,7 @@ fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
     json.dump({'mcpServers': {'idli': {'command': root + '/.venv/bin/python',
                'args': ['-I', root + '/lib/idli_mcp.py'],
-               'env': {k: os.environ[k] for k in ('IDLI_WORKSPACE', 'IDLI_AUTHOR', 'IDLI_DATA', 'IDLI_CLAUDE_WORK')
+               'env': {k: os.environ[k] for k in ('IDLI_WORKSPACE', 'IDLI_AUTHOR', 'IDLI_DATA', 'IDLI_CLAUDE_WORK', 'IDLI_TEST_OPEN_LOG')
                        if k in os.environ}}}}, f)
 PYCONFIG
 if [ "$?" -ne 0 ]; then exit 1; fi

@@ -81,6 +81,28 @@ ALIASES = {'poona': 'pune', 'bengaluru': 'bangalore', 'bengaluruurban': 'bangalo
            'bombay': 'mumbai', 'calcutta': 'kolkata'}
 
 
+def band_order(values):
+    """Order band labels by the numbers in them: "Under 3" < "3 to 6" < "Over 6". Others keep first-seen order."""
+    import re as _re
+    seen = list(dict.fromkeys(str(v) for v in values))
+    def key(label):
+        m = _re.search(r'-?\d+(?:\.\d+)?', label)
+        if not m:
+            return (1, seen.index(label))
+        low = _re.search(r'(?i)\b(under|below|less|fewer|up to)\b', label)
+        high = _re.search(r'(?i)\b(over|above|more|plus)\b|\+', label)
+        return (0, float(m.group()) - (.5 if low else 0) + (.5 if high else 0))
+    return sorted(seen, key=key)
+
+
+def _number(value):
+    try:
+        x = float(value)
+        return x if math.isfinite(x) else None
+    except (TypeError, ValueError):
+        return None
+
+
 def normalise(name):
     name = unicodedata.normalize('NFKD', str(name)).casefold().strip()
     name = re.sub(r'\bdistrict\s*$', '', name).strip()
@@ -155,17 +177,47 @@ def prepare(spec, rows):
         xs, ys = zip(*coordinates)
         pad = max(.05, (max(xs)-min(xs))*.08, (max(ys)-min(ys))*.08)
         extent = {'type':'MultiPoint', 'coordinates': [[min(xs)-pad,min(ys)-pad],[max(xs)+pad,max(ys)+pad]]}
-        encoding = spec.get('encoding', {})
-        layer = {'mark': {'type': 'point', 'filled': True, 'size': 75, 'color': '#41788b', 'clip': True},
+        # Keep the chart author's point encoding (colour, tooltip) from the top level or their point layer.
+        encoding = dict(spec.get('encoding', {}))
+        for old_layer in spec.get('layer', []):
+            mark = old_layer.get('mark')
+            if (mark if isinstance(mark, str) else (mark or {}).get('type')) in ('point', 'circle'):
+                encoding = {**old_layer.get('encoding', {}), **encoding}
+        color = cfg.get('color')
+        if color and not encoding.get('color'):
+            if any(color not in row for row in rows):
+                raise MapError('The GPS colour field is missing from the CSV.')
+            numeric = all(_number(row[color]) is not None for row in rows)
+            encoding['color'] = ({'field': color, 'type': 'quantitative', 'scale': {'scheme': 'orangered'},
+                                  'legend': {'orient': 'bottom', 'title': color.replace('_', ' '), 'gradientLength': 160}}
+                                 if numeric else
+                                 {'field': color, 'type': 'ordinal',
+                                  'scale': {'scheme': 'orangered', 'domain': band_order(row[color] for row in rows)},
+                                  'legend': {'orient': 'bottom', 'title': None}})
+        mark = {'type': 'point', 'filled': True, 'size': 70, 'opacity': .8, 'stroke': 'white', 'strokeWidth': .6,
+                'clip': True}
+        if not encoding.get('color'):
+            mark['color'] = '#41788b'
+        layer = {'mark': mark,
                  'encoding': {**encoding, 'latitude': {'field': lat, 'type': 'quantitative'},
                               'longitude': {'field': lon, 'type': 'quantitative'}}}
         spec['layer'] = [background, layer]
+        spec.pop('encoding', None)
         label = cfg.get('label')
         if label:
             if any(label not in row for row in rows):
                 raise MapError('The GPS label field is missing from the CSV.')
-            spec['layer'].append({'mark': {'type': 'text', 'dx': 7, 'dy': -10, 'align': 'left', 'clip': True},
-                                  'encoding': {**layer['encoding'], 'text': {'field': label, 'type': 'nominal'}}})
+            # One label per group at its centre (a label per point piles up into a smudge).
+            spec['layer'].append({
+                'transform': [{'calculate': 'toNumber(datum["' + lat + '"])', 'as': '__lat'},
+                              {'calculate': 'toNumber(datum["' + lon + '"])', 'as': '__lon'},
+                              {'aggregate': [{'op': 'mean', 'field': '__lat', 'as': '__lat'},
+                                             {'op': 'mean', 'field': '__lon', 'as': '__lon'},
+                                             {'op': 'count', 'as': '__n'}], 'groupby': [label]}],
+                'mark': {'type': 'text', 'dx': 9, 'dy': -9, 'align': 'left', 'fontWeight': 600, 'clip': True},
+                'encoding': {'latitude': {'field': '__lat', 'type': 'quantitative'},
+                             'longitude': {'field': '__lon', 'type': 'quantitative'},
+                             'text': {'field': label, 'type': 'nominal'}}})
     else:
         field, value, state = cfg.get('field'), cfg.get('value'), cfg.get('state')
         if not field or not value or any(field not in r or value not in r for r in rows):
