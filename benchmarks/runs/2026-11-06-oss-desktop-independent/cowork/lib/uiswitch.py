@@ -94,9 +94,13 @@ def show_terminal(workspace_id, terminal_id, side="right"):
     try:
         page = next(t for t in _targets() if t.get("type") == "page" and str(t.get("url", "")).startswith("paseo://app"))
         srv = server_id()
-        route = f"paseo://app/h/{srv}/workspace/{workspace_id}?open=" + urllib.parse.quote(f"terminal:{terminal_id}")
-        _ws_eval(page["webSocketDebuggerUrl"], f"location.href = {json.dumps(route)}; true")
-        time.sleep(1.5)
+        ws = page["webSocketDebuggerUrl"]
+        if _ws_eval(ws, "typeof window.__idliPlaceTab") != "function":  # older UI: open it by URL, then place
+            route = f"paseo://app/h/{srv}/workspace/{workspace_id}?open=" + urllib.parse.quote(f"terminal:{terminal_id}")
+            _ws_eval(ws, f"location.href = {json.dumps(route)}; true")
+            time.sleep(4)
+            page = next(t for t in _targets() if t.get("type") == "page" and str(t.get("url", "")).startswith("paseo://app"))
+        # P17 opens the terminal's tab itself when it has none, so no reload is needed
         got = _ws_eval(page["webSocketDebuggerUrl"],
                        "typeof window.__idliPlaceTab === 'function' ? window.__idliPlaceTab(" + json.dumps(
                            {"serverId": srv, "workspaceId": workspace_id, "kind": "terminal", "id": terminal_id,

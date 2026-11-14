@@ -221,7 +221,7 @@ def test_mcp_stdio_and_mini(workspace, monkeypatch):
                            capture_output=True, text=True, env=env, timeout=30)
         assert r.returncode == 0 and not r.stderr
         replies = [json.loads(line) for line in r.stdout.splitlines()]
-        assert replies[2]['result']['content'][0]['text'] == 'shown'
+        assert replies[2]['result']['content'][0]['text'] == 'shown in Idli'
         assert not replies[3]['result'].get('isError') and replies[4]['result']['isError']
         assert len(browser_calls) == 1
         views = list((root / 'views').glob('*.json'))
@@ -371,7 +371,7 @@ Path(os.environ['LAUNCH_RECORD']).write_text(json.dumps({'args':sys.argv[1:],'cw
     assert r.returncode == 0 and not r.stdout and not r.stderr
     launch = home.read(record)
     assert launch['base_url'] == 'http://127.0.0.1:18870' and launch['cwd'] == str(work)
-    assert launch['args'] == ['--mcp-config', str(work / '.idli-mcp.json'), '--print', 'test']
+    assert launch['args'] == ['--mcp-config=' + str(work / '.idli-mcp.json'), '--print', 'test']
     config = home.read(work / '.idli-mcp.json')['mcpServers']['idli']
     assert config['args'] == ['-I', str(clone / 'lib/idli_mcp.py')]
     assert (work / '.idli-mcp.json').stat().st_mode & 0o777 == 0o600

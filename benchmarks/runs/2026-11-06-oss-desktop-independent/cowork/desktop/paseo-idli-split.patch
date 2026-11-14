@@ -359,10 +359,10 @@ index 00000000..5a496168
 +}
 diff --git a/packages/app/src/utils/idli-side-pane.ts b/packages/app/src/utils/idli-side-pane.ts
 new file mode 100644
-index 00000000..d22e554a
+index 00000000..fa3dec68
 --- /dev/null
 +++ b/packages/app/src/utils/idli-side-pane.ts
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,119 @@
 +// Idli P13: place a chat on one side of a two-pane workspace and give it focus, from the agent deep link
 +// (paseo://h/<server>/agent/<id>~right or ~left: the desktop shell drops a link's query string, and rewriting the
 +// shell means rebuilding app.asar, so the side rides on the agent id; the app strips it). Idli opens Claude's teaching chat on the right and comes back to
@@ -411,7 +411,7 @@ index 00000000..d22e554a
 +export function placeTabOnSide(input: {
 +  serverId: string;
 +  workspaceId?: string | null;
-+  kind: "agent" | "terminal";
++  kind: "agent" | "terminal" | "browser";
 +  id: string;
 +  side: IdliSide;
 +}): boolean {
@@ -422,16 +422,25 @@ index 00000000..d22e554a
 +  if (!key) return false;
 +  const layout = store.layoutByWorkspace[key];
 +  if (!layout) return false;
-+  const tab = collectAllTabs(layout.root).find((t) =>
++  const match = (t: ReturnType<typeof collectAllTabs>[number]) =>
 +    input.kind === "agent"
 +      ? t.target.kind === "agent" && t.target.agentId === input.id
-+      : t.target.kind === "terminal" && t.target.terminalId === input.id,
-+  );
++      : input.kind === "browser"
++        ? t.target.kind === "browser" && t.target.browserId === input.id
++        : t.target.kind === "terminal" && t.target.terminalId === input.id;
++  let tab = collectAllTabs(layout.root).find(match);
++  if (!tab && input.kind === "terminal") {
++    // a terminal made from the CLI has no tab yet: open one (this is what ?open=terminal:<id> does on first load)
++    store.openTab({ workspaceKey: key, target: { kind: "terminal", terminalId: input.id }, intent: "reveal" });
++    const fresh = useWorkspaceLayoutStore.getState().layoutByWorkspace[key];
++    tab = fresh ? collectAllTabs(fresh.root).find(match) : undefined;
++  }
 +  if (!tab) return false;
-+  const current = findPaneContainingTab(layout.root, tab.tabId);
++  const now = useWorkspaceLayoutStore.getState().layoutByWorkspace[key] ?? layout;
++  const current = findPaneContainingTab(now.root, tab.tabId);
 +  if (!current) return false;
 +  const explorerId = store.explorerSidebarPaneIdByWorkspace[key] ?? null;
-+  const mains = collectAllPanes(layout.root).filter((p) => !p.hidden && p.id !== explorerId);
++  const mains = collectAllPanes(now.root).filter((p) => !p.hidden && p.id !== explorerId);
 +  const target = input.side === "right" ? mains[mains.length - 1] : mains[0];
 +  if (mains.length >= 2 && target && target.id !== current.id) {
 +    store.moveTabToPane(key, tab.tabId, target.id);
@@ -455,7 +464,19 @@ index 00000000..d22e554a
 +
 +// P17: Idli (lib/uiswitch.py, over DevTools) opens a terminal with ?open=terminal:<id> and then calls this to put it on
 +// a side with focus. Agent tabs work the same way.
++function explainPlace(input: Parameters<typeof placeTabOnSide>[0]): string {
++  const store = useWorkspaceLayoutStore.getState();
++  const keys = Object.keys(store.layoutByWorkspace);
++  const key = input.workspaceId ? workspaceKeyFor(input.serverId, input.workspaceId) : null;
++  if (!key) return "no layout key; keys: " + keys.slice(0, 8).join(", ");
++  const layout = store.layoutByWorkspace[key];
++  if (!layout) return "no layout for " + key;
++  const tabs = collectAllTabs(layout.root).map((t) => t.target.kind + ":" + JSON.stringify(t.target).slice(0, 60));
++  return "key " + key + "; tabs " + tabs.length + ": " + tabs.filter((t) => !t.startsWith("browser")).slice(0, 12).join(" | ");
++}
++
 +if (typeof window !== "undefined") {
++  (window as unknown as { __idliExplain?: unknown }).__idliExplain = explainPlace;
 +  (window as unknown as { __idliPlaceTab?: unknown }).__idliPlaceTab = (input: Parameters<typeof placeTabOnSide>[0]) => {
 +    placeTabOnSideSoon(input);
 +    return true;

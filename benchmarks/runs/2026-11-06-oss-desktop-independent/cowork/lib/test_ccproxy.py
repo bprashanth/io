@@ -372,16 +372,19 @@ def test_fake_upstream_roundtrip_and_refusal(book):
             status, _, data = call(server.server_port, body, '/v1/messages/count_tokens', headers=headers)
             assert status == 200 and json.loads(data)['input_tokens'] == 42
             assert auth_ok == [True] * 3
-            for leftover in ({'metadata': {'user_id': ward}}, {'tools': [{'description': ward}]},
-                             {'messages': [{'role': 'assistant', 'content': [{'type': 'thinking', 'thinking': ward}]}]}):
-                status, _, data = call(server.server_port, {**body, **leftover})
-                assert status == 403 and json.loads(data)['error']['type'] == 'permission_error'
+            # Claude Code's own fields (tools, metadata) aren't checked: ordinary words in its tool text matched short
+            # masked values and blocked every request; a real value left in the conversation is still refused
+            assert not proxy.transformer.leaks({'messages': [], 'tools': [{'description': ward}], 'metadata': {'user_id': ward}})
+            status, _, data = call(server.server_port, {**body, 'messages': [
+                {'role': 'assistant', 'content': [{'type': 'thinking', 'thinking': ward}]}]})
+            assert status == 403 and json.loads(data)['error']['type'] == 'permission_error'
             assert len(seen) == 3  # refused requests never reach upstream
             assert call(server.server_port, path='/api/hello', method='GET')[::2] == (201, b'passthrough')
             assert call(server.server_port, path='/api/hello', method='HEAD')[0] == 204
     logs = [json.loads(line) for line in (root / 'ccproxy.log').read_text().splitlines()]
-    assert len(logs) == 8 and sum(e['refused'] for e in logs) == 3
-    assert all(set(e) == {'time', 'path', 'status', 'masked', 'scanner', 'refused'} for e in logs)
+    assert len(logs) == 6 and sum(e['refused'] for e in logs) == 1
+    assert all(set(e) - {'leaks'} == {'time', 'path', 'status', 'masked', 'scanner', 'refused'} for e in logs)
+    assert all(isinstance(c, str) and c.isupper() or c == '?' for e in logs for _, c in e.get('leaks', []))  # codes only, never values
     wires = list((root / 'ccproxy-wire').glob('*.json'))
     assert len(wires) == 3
     for path in [root / 'ccproxy.log', *wires]:

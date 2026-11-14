@@ -421,6 +421,14 @@ def make_handler(files, token):
                         return self._send(200, f.read(), "text/css" if u.path.endswith(".css") else "application/javascript")
                 if u.path == "/api/home/search":
                     return self._send(200, home.search(files.data_dir, (qs.get("q") or [""])[0]))
+                if u.path == "/api/home/latest-view":  # the home page opens a chart Claude just showed (idli_show)
+                    vdir = os.path.join(files.data_dir, "views")
+                    try:
+                        names = sorted((f for f in os.listdir(vdir) if f.endswith(".json")),
+                                       key=lambda f: os.path.getmtime(os.path.join(vdir, f)))
+                    except OSError:
+                        names = []
+                    return self._send(200, {"view": names[-1][:-5] if names else None})
                 if u.path == "/api/home/minis":
                     return self._send(200, home.minis(files.data_dir))
                 if u.path == "/api/view":
@@ -490,15 +498,19 @@ def make_handler(files, token):
                     env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_") or k == "PASEO_HOME"}
                     try:
                         with open(os.path.join(files.data_dir, ".idli", "home.json")) as f:
-                            term = json.load(f).get("terminal")
+                            hj = json.load(f)
+                        term, term_ws = hj.get("terminal"), hj.get("workspace")
                     except (OSError, ValueError):
-                        term = None
+                        term = term_ws = None
                     if agent == term:  # the person's Claude CLI: type it in
                         r = subprocess.run([exe, "terminal", "send-keys", "-l", agent, " ".join(text.split())],
                                            env=env, timeout=60, capture_output=True, text=True)
                         if r.returncode == 0:
                             r = subprocess.run([exe, "terminal", "send-keys", "-l", agent, "\r"], env=env, timeout=60,
                                                capture_output=True, text=True)
+                        if r.returncode == 0 and term_ws:  # so the person sees Claude's answer arrive
+                            from lib import uiswitch
+                            uiswitch.show_terminal(term_ws, agent, "right")
                     else:
                         r = subprocess.run([exe, "send", "--no-wait", agent, text], env=env, timeout=60,
                                            capture_output=True, text=True)

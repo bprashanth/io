@@ -103,3 +103,18 @@ if (location.pathname === '/home') {
   };
   api('/api/home/minis').then(rows=>{$('minis').innerHTML=rows.length?rows.map(m=>`<a class="card" href="${esc(link('/mini?id='+encodeURIComponent(m.id)))}"><h3>${esc(m.name)}</h3><p>${esc(m.goal)}</p><small>${m.questions} questions</small></a>`).join(''):'<p class="muted">Minis you make with Claude will appear here.</p>';}).catch(e=>status(e.message,true));
 }
+
+// Claude's charts (idli_show) open here in Idli's pane: the home page watches for a new one and goes to it.
+if (location.pathname === '/home') {
+  let seen;
+  const watch = async () => {
+    try {
+      const r = await fetch(link('/api/home/latest-view'));
+      const view = (await r.json()).view;
+      if (seen === undefined) seen = view;
+      else if (view && view !== seen) { location.href = link('/view?id=' + encodeURIComponent(view)); return; }
+    } catch (e) { /* the server restarts now and then */ }
+    setTimeout(watch, 2000);
+  };
+  watch();
+}

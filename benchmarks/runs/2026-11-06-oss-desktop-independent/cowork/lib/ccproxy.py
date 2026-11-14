@@ -2,6 +2,7 @@
 """Loopback Claude Code masking proxy. Run with python -I lib/ccproxy.py --data-dir DIR."""
 import argparse
 from collections import OrderedDict
+
 import copy
 import datetime as dt
 import hashlib
@@ -49,6 +50,9 @@ def walk(node, fn, keys=False):
 def eligible(value):
     # Whole numeric cells from selected columns only; short counts are too ambiguous.
     return not re.fullmatch(r'[+-]?\d+(?:\.\d+)?', value) or len(re.sub(r'\D', '', value)) >= 4
+
+
+CONTENT_FIELDS = ("system", "messages")
 
 
 class Transformer:
@@ -169,7 +173,23 @@ class Transformer:
                 for k, v in node.items():
                     yield k
                     yield from strings(v)
+        # Only what can carry the person's data: the system prompt and the conversation. Claude Code's own tool
+        # definitions and settings fields (tools, safeguards, metadata...) are its fixed text, and ordinary words in
+        # them ("pip", "mine") matched short values of masked columns and blocked every request (2026-11-14).
+        if isinstance(body, dict) and any(k in body for k in CONTENT_FIELDS):  # a whole request
+            body = {k: body[k] for k in CONTENT_FIELDS if k in body}
         return any(privacy.known_leaks(text, self.vault) for text in strings(body))
+
+    def where(self, body):
+        """For the log when a request is refused: which codes leaked and under which top-level field (never the
+        values themselves), e.g. [["tools", "PLACE_004"]]."""
+        out = []
+        for field, node in ((k, body[k]) for k in CONTENT_FIELDS if isinstance(body, dict) and k in body):
+            text = json.dumps(node, ensure_ascii=False)
+            for v in privacy.known_leaks(text, self.vault):
+                code = self.vault.forward.get(privacy.normalise(v)) if hasattr(self.vault, 'forward') else None
+                out.append([field, code or '?'])
+        return out[:20]
 
     def restore(self, body):
         return walk(body, self.full.rehydrate, keys=True)
@@ -368,7 +388,7 @@ class Proxy:
                         obj, stats = self.transformer.outbound(obj)
                         entry.update(stats)
                         if self.transformer.leaks(obj):
-                            entry.update(status=403, refused=True)
+                            entry.update(status=403, refused=True, leaks=self.transformer.where(obj))
                             return self.error(h, 403, 'Refused: private values remain in the outgoing body')
                         body = json.dumps(obj, ensure_ascii=False, separators=(',', ':')).encode()
                         # Each response retains the vault for its own request, including during concurrent requests.

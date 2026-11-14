@@ -36,11 +36,14 @@ def idli_show(title, vega_lite, data_csv):
     home.write(home.inside(data_dir(), 'views/' + ident + '.json', exists=False),
                {'title': str(title), 'spec': vega_lite, 'data_csv': str(path),
                 'agent': os.environ.get('PASEO_AGENT_ID') or st.get('terminal')})
-    if not os.environ.get('PASEO_AGENT_ID') and st.get('browser_agent'):
-        os.environ['PASEO_AGENT_ID'] = st['browser_agent']
-    browser.paseo('browser_new_tab', url=page_url('view', ident))
-    uiswitch.show_tab([str(title), 'dashboard.localhost'])
-    return 'shown'
+    # Idli's home page (Drivey's left pane) watches for new views and opens this one itself; a chat-side Claude can
+    # also open it as a tab
+    if os.environ.get('PASEO_AGENT_ID'):
+        try:
+            browser.paseo('browser_new_tab', url=page_url('view', ident))
+        except Exception:  # noqa: BLE001
+            pass
+    return 'shown in Idli'
 
 
 def idli_save_mini(name, goal, questions):

@@ -39,4 +39,5 @@ cd "$WORK" || exit 1
 unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CONFIG_DIR
 export ANTHROPIC_BASE_URL="http://127.0.0.1:$PORT"
 CLAUDE_BIN=${CLAUDE_BIN:-$(command -v claude || echo "$HOME/.local/bin/claude")}
-exec "$CLAUDE_BIN" --mcp-config "$WORK/.idli-mcp.json" "$@"
+# --mcp-config takes several files, so give it as one --flag=value: a prompt after it would be read as another file
+exec "$CLAUDE_BIN" "--mcp-config=$WORK/.idli-mcp.json" "$@"
