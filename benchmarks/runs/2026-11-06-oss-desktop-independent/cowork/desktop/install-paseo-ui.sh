@@ -22,7 +22,8 @@ case "${1:-install}" in
     if [ -n "$FILE" ]; then cp "$FILE" "$tmp/b.tgz"; else scp -q "$DGX:idli-builds/$BUILD.tgz" "$tmp/b.tgz"; fi
     rm -rf "$OURS.new" && mkdir -p "$OURS.new" && tar -C "$OURS.new" -xzf "$tmp/b.tgz" && rm -rf "$tmp"
     [ -f "$OURS.new/index.html" ] || { echo "the build has no index.html"; exit 1; }
-    rm -rf "$OURS.old"; [ -d "$OURS" ] && mv "$OURS" "$OURS.old"; mv "$OURS.new" "$OURS"
+    [ -e "$OURS.old" ] && mv "$OURS.old" "$OURS.old-$(date +%s)"   # never delete: old builds can hold read-only files
+    [ -d "$OURS" ] && mv "$OURS" "$OURS.old"; mv "$OURS.new" "$OURS"
     echo "$BUILD" > "$OURS/IDLI_BUILD"
     if [ "$(readlink "$RES/app-dist")" != "$OURS" ]; then
       echo "One-time step (needs your password): point Paseo at the Idli build:"
