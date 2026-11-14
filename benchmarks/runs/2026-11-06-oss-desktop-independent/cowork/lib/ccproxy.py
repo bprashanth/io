@@ -76,8 +76,8 @@ class Transformer:
         if signature == self.signature:
             return
         self.full = privacy.session_vault(self.data_dir)
-        self.vault = PseudonymMap(self.full.path)
-        self.vault.display = {c: v for c, v in self.full.display.items() if eligible(v)}
+        self.vault = privacy.active_vault(self.data_dir, self.full)
+        self.vault.display = {c: v for c, v in self.vault.display.items() if eligible(v)}
         self.vault.forward = {normalise(v): c for c, v in self.vault.display.items()}
         self.vault.refresh()
         self.cache.clear()

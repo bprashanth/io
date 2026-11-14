@@ -10,6 +10,7 @@ served only by the authenticated loopback formserver. Scanner failure is reporte
 as 'regex only'; names/places unknown to the vault may then be missed. Review=ask
 is a setting for callers to enforce before invoking plan; plan itself sends.
 """
+import builtins
 import difflib
 from contextlib import contextmanager
 import functools
@@ -150,6 +151,33 @@ def session_vault(data_dir):
         for frame in sheets.values():
             _code_frame(frame, options.get('columns', {}), vault)
     _save(vault)
+    return vault
+
+
+@locked
+def active_vault(data_dir, vault=None):
+    """Keep stable codes in storage, but stop masking cells explicitly switched off.
+
+    Values still selected in another file/column stay private. Scanner-discovered values
+    that are not cells also remain private.
+    """
+    import copy
+    vault = copy.deepcopy(vault or session_vault(data_dir))
+    path = Path(data_dir) / 'privacy.json'
+    settings = json.loads(path.read_text()) if path.exists() else {}
+    active, inactive = builtins.set(), builtins.set()
+    for file, options in settings.items():
+        if options.get('mode') != 'mask':
+            continue
+        sheets, _ = fk.raw_sheets(str(Path(data_dir) / _key(data_dir, file)))
+        for frame in sheets.values():
+            for column in frame.columns:
+                dest = active if options.get('mode') == 'mask' and options.get('columns', {}).get(str(column)) else inactive
+                dest.update(normalise(str(v)) for v in frame[column] if str(v).strip())
+    excluded = inactive - active
+    vault.display = {code: real for code, real in vault.display.items() if normalise(real) not in excluded}
+    vault.forward = {normalise(real): code for code, real in vault.display.items()}
+    vault.refresh()
     return vault
 
 
@@ -329,11 +357,18 @@ def _redact(text, vault, scanner):
 
 
 @locked
-def mask_text(data_dir, file, path, text):
-    vault = _seed(data_dir, file, path)
+def mask_text(data_dir, file, path, text, active=False):
+    full = _seed(data_dir, file, path)
+    vault = active_vault(data_dir, full) if active else full
     scanner = Scanner()
     masked, found = _redact(str(text), vault, scanner)
-    _save(vault)
+    if active:
+        full.forward.update(vault.forward)
+        full.display.update(vault.display)
+        full.counters.update(vault.counters)
+        _save(full)
+    else:
+        _save(vault)
     return {'masked': masked, 'found': found, 'scanner': scanner.status}
 
 

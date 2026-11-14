@@ -30,6 +30,7 @@ if HERE not in sys.path:
 from lib import filekit as fk  # noqa: E402
 from lib import formkit as fm  # noqa: E402
 from lib import privacy  # noqa: E402
+from lib import home  # noqa: E402
 
 PORT = int(os.environ.get("IDLI_FORM_PORT") or 8797)
 PAGE = os.path.join(HERE, "lib", "form.html")
@@ -390,7 +391,7 @@ def make_handler(files, token):
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                             "style-src 'unsafe-inline'; connect-src 'self'; img-src data:")
+                             "style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src data:")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
@@ -412,6 +413,20 @@ def make_handler(files, token):
             if not self._ok(qs):
                 return self._send(403, "Forbidden: open the form from Idli's chat.", "text/plain")
             try:
+                if u.path in ("/home", "/view", "/mini"):
+                    with open(os.path.join(HERE, "lib", u.path[1:] + ".html"), encoding="utf-8") as f:
+                        return self._send(200, f.read().replace("__TOKEN_QUERY__", urllib.parse.urlencode({"t": token})), "text/html")
+                if u.path in ("/home.css", "/home.js", "/home-chart.js"):
+                    with open(os.path.join(HERE, "lib", u.path[1:]), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/css" if u.path.endswith(".css") else "application/javascript")
+                if u.path == "/api/home/search":
+                    return self._send(200, home.search(files.data_dir, (qs.get("q") or [""])[0]))
+                if u.path == "/api/home/minis":
+                    return self._send(200, home.minis(files.data_dir))
+                if u.path == "/api/view":
+                    return self._send(200, home.view(files.data_dir, qs["id"][0]))
+                if u.path == "/api/mini":
+                    return self._send(200, home.read(home.object_path(files.data_dir, "minis", qs["id"][0])))
                 if u.path == "/":
                     with open(PAGE, encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
@@ -456,6 +471,14 @@ def make_handler(files, token):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(min(n, 100000))
                                   or b"{}")
+                if u.path == "/api/home/prepare":
+                    return self._send(200, home.prepare(files.data_dir, body["files"], body.get("question", "")))
+                if u.path == "/api/home/send":
+                    return self._send(200, home.send(files.data_dir, body["files"], body.get("question", "")))
+                if u.path == "/api/mini/run":
+                    return self._send(200, home.run_mini(files.data_dir, body["id"], body["qid"], body.get("params", {})))
+                if u.path == "/api/mini/map":
+                    return self._send(200, home.map_question(files.data_dir, body["id"], body.get("question", "")))
                 if u.path == "/api/say":  # the chart popover: the person's question about one bar, into their chat
                     agent, text = str(body.get("agent") or ""), str(body.get("text") or "").strip()
                     if not re.fullmatch(r"[0-9a-f][0-9a-f-]{7,63}", agent) or not text or len(text) > 800:
