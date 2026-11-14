@@ -134,7 +134,8 @@ def prepare(data_dir, files, question):
             masked = privacy.mask_text(data_dir, rel, path, masked, active=True)['masked']
             sheets, _ = filekit.raw_sheets(str(path))
             reviews.append({**item, 'tabs': [privacy.review(data_dir, rel, path, tab) for tab in sheets]})
-        return {'files': chosen, 'reviews': reviews, 'masked_question': masked}
+        return {'files': chosen, 'reviews': reviews, 'masked_question': masked,
+                'warning': privacy.review_warning(data_dir, [x['local'] for x in chosen])}
 
 
 def cli(*args):
@@ -144,6 +145,19 @@ def cli(*args):
     if r.returncode:
         raise ValueError('Paseo could not complete the request')
     return r.stdout
+
+
+def chat_workspace():
+    if os.environ.get('IDLI_WORKSPACE'):
+        return os.environ['IDLI_WORKSPACE']
+    agent = os.environ.get('PASEO_AGENT_ID')
+    if agent:
+        chats = json.loads(cli('ls', '--json', '--label', 'idli.left=1'))
+        if isinstance(chats, dict):
+            chats = chats.get('agents', [])
+        return next(((c.get('labels') or {}).get('idli.ws') for c in chats
+                     if (c.get('id') or c.get('agentId')) == agent), None)
+    return None
 
 
 LAUNCHER = Path(__file__).resolve().parent.parent / 'desktop' / 'claude-masked.sh'
@@ -193,7 +207,7 @@ def _start_claude(wid, prompt=None):
     tid = made.get('id') or made.get('terminalId')
     if not tid:
         raise ValueError('Paseo did not create a terminal')
-    cmd = 'exec ' + shlex.quote(str(LAUNCHER)) + (' ' + shlex.quote(prompt) if prompt else '')
+    cmd = 'IDLI_WORKSPACE=' + shlex.quote(wid) + ' exec ' + shlex.quote(str(LAUNCHER)) + (' ' + shlex.quote(prompt) if prompt else '')
     cli('terminal', 'send-keys', '-l', tid, cmd)
     cli('terminal', 'send-keys', '-l', tid, '\r')
     return tid
@@ -244,7 +258,9 @@ def minis(data_dir):
     for path in sorted((Path(data_dir) / 'minis').glob('*/mini.json')):
         try:
             m = read(object_path(data_dir, 'minis', path.parent.name))
-            out.append({'id': path.parent.name, 'name': m['name'], 'goal': m['goal'], 'questions': len(m['questions'])})
+            out.append({'id': path.parent.name, 'name': plain(m['name']), 'goal': plain(m['goal']),
+                        'heading': plain(m.get('heading') or m['goal']), 'date': m.get('date', ''),
+                        'author': plain(m.get('author', '')), 'questions': len(m['questions'])})
         except (OSError, ValueError, KeyError):
             continue
     return out
@@ -278,6 +294,8 @@ def params_for(q, values):
             import math
             if isinstance(value, bool) or not math.isfinite(float(value)):
                 raise ValueError('Enter a finite number for ' + key)
+            value = float(value)
+            value = int(value) if value.is_integer() else value
         if not isinstance(value, (str, int, float)) or len(str(value)) > 2000:
             raise ValueError('Invalid parameter value')
         out[key] = value
@@ -318,35 +336,146 @@ def run_mini(data_dir, ident, qid, params):
     return {'text': '\n'.join(lines), 'chart': chart, 'qid': qid, 'params': values, 'agent': m.get('agent')}
 
 
-def map_question(data_dir, ident, text):
-    m = read(object_path(data_dir, 'minis', ident))
-    questions = m['questions']
+def map_questions(questions, text, local_url=None):
+    """The local 9B selects a saved question, or explicitly declines. Never guess on failure."""
     if not questions:
         raise ValueError('This Mini has no questions')
-    brief = [{k: q[k] for k in ('id', 'question', 'params')} for q in questions]
-    schema = {'type': 'object', 'properties': {'qid': {'type': 'string', 'enum': [q['id'] for q in questions]},
-                                             'params': {'type': 'object'}}, 'required': ['qid', 'params'],
-              'additionalProperties': False}
-    payload = {'model': 'idli-9b', 'messages': [
-        {'role': 'system', 'content': 'Map the question to one saved question and its parameters. Use defaults '
-         'unless the person supplies a value. Return JSON only.\n' + json.dumps(brief)},
-        {'role': 'user', 'content': str(text)[:4000]}],
-        'response_format': {'type': 'json_schema', 'json_schema': {'name': 'mini_question', 'schema': schema}}}
-    try:
-        req = urllib.request.Request(muse.base_url() + '/v1/chat/completions', json.dumps(payload).encode(),
-                                     {'Content-Type': 'application/json', **muse.headers()})
-        with urllib.request.urlopen(req, timeout=12) as response:
-            result = json.loads(json.load(response)['choices'][0]['message']['content'])
-        q = next(q for q in questions if q['id'] == result['qid'])
-        return {'qid': q['id'], 'params': params_for(q, result['params']), 'method': 'idli-9b'}
-    except (OSError, ValueError, KeyError, TypeError, StopIteration):
-        words = set(re.findall(r'\w+', str(text).casefold()))
-        q = max(questions, key=lambda q: len(words & set(re.findall(r'\w+', q['question'].casefold()))))
-        values = {k: v.get('default') for k, v in q.get('params', {}).items()}
+    brief = [{k: q.get(k, {}) for k in ('id', 'question', 'params')} for q in questions]
+    branches = []
+    for q in questions:
+        props = {}
         for key, desc in q.get('params', {}).items():
-            if desc['type'] == 'choice':
-                for value in desc.get('choices', []):
-                    if str(value).casefold() in str(text).casefold():
-                        values[key] = value
-                        break
-        return {'qid': q['id'], 'params': values, 'method': 'word match'}
+            props[key] = ({'type': 'string', 'enum': desc['choices']} if desc['type'] == 'choice'
+                          else {'type': 'number'} if desc['type'] == 'number' else {'type': 'string'})
+        branches.append({'type': 'object', 'properties': {'reason': {'type': 'string', 'maxLength': 160}, 'qid': {'const': q['id']},
+                         'params': {'type': 'object', 'properties': props, 'required': list(props),
+                                    'additionalProperties': False}},
+                         'required': ['reason', 'qid', 'params'], 'additionalProperties': False})
+    branches.append({'type': 'object', 'properties': {'reason': {'type': 'string', 'maxLength': 160}, 'qid': {'type': 'null'},
+                     'params': {'type': 'object', 'properties': {}, 'additionalProperties': False}},
+                     'required': ['reason', 'qid', 'params'], 'additionalProperties': False})
+    schema = {'oneOf': branches}
+    direct = local_url or os.environ.get('IDLI_9B_URL')
+    payload = {'model': 'qwen3.5-9b' if direct else 'idli-9b', 'temperature': 0, 'max_tokens': 400,
+               'chat_template_kwargs': {'enable_thinking': False}, 'messages': [
+        {'role': 'system', 'content': 'Map the person\'s request to a saved question. Do not answer it. '
+         'Choose qid null with params {} if the requested calculation is not supported, the topic is unrelated, '
+         'or an explicitly named choice is unavailable. Do not substitute a different question. '
+         'Match the requested calculation and measure exactly. A comparison of one measure cannot answer '
+         'a comparison of a different measure. A numeric summary cannot explain causes or predict the future. '
+         'Paraphrases are fine. Use parameter defaults only when no value is given. '
+         'In one short sentence in reason, state the requested measure and calculation and whether a saved question supports both. '
+         'Then choose qid and params. Copy explicitly requested numbers and choices, matching choice case. Return JSON only.\n'
+         + json.dumps(brief)}, {'role': 'user', 'content': str(text)[:4000]}],
+        'response_format': {'type': 'json_schema', 'json_schema': {'name': 'mini_question', 'schema': schema}}}
+    # The DGX chat router calls its local 9B; laptop pages use the configured spec router.
+    url = (direct or muse.base_url()).rstrip('/')
+    try:
+        req = urllib.request.Request(url + '/v1/chat/completions', json.dumps(payload).encode(),
+                                     {'Content-Type': 'application/json', **({} if direct else muse.headers())})
+        with urllib.request.urlopen(req, timeout=60) as response:
+            result = json.loads(json.load(response)['choices'][0]['message']['content'])
+        if result['qid'] is None:
+            return {'qid': None, 'params': {}, 'method': 'idli-9b'}
+        q = next(q for q in questions if q['id'] == result['qid'])
+        values = params_for(q, result['params'])
+        # Check only the chosen question, without competing questions that share a word.
+        # This catches unsupported measures/forecasts and checks explicit values against defaults.
+        param_schema = next(b['properties']['params'] for b in branches if b['properties']['qid'].get('const') == q['id'])
+        verification = {'type': 'object', 'properties': {'reason': {'type': 'string', 'maxLength': 160},
+                        'supported': {'type': 'boolean'}, 'params': param_schema},
+                        'required': ['reason', 'supported', 'params'], 'additionalProperties': False}
+        payload['response_format']['json_schema']['schema'] = verification
+        payload['messages'] = [
+            {'role': 'system', 'content': 'Check one saved calculation against a request. Be strict about support. '
+             'The saved question must support the exact requested measure, statistic, operation and time period. '
+             'A numeric comparison cannot answer a request for causes. Current data cannot predict future data. '
+             'A list cannot provide fields it does not list. Reject unavailable named choices and requests to change data. '
+             'Use supported false if the calculation cannot answer the request. If it can, verify the parameters: '
+             'correct explicit choices and numbers (including number words); use defaults only for unspecified values. '
+             'State the check in one short sentence in reason, then supported and params. Return JSON only.'},
+            {'role': 'user', 'content': json.dumps({'request': str(text)[:4000],
+                                                  'saved_question': next(b for b in brief if b['id'] == q['id']),
+                                                  'proposed_params': values})}]
+        req = urllib.request.Request(url + '/v1/chat/completions', json.dumps(payload).encode(),
+                                     {'Content-Type': 'application/json', **({} if direct else muse.headers())})
+        with urllib.request.urlopen(req, timeout=60) as response:
+            checked = json.loads(json.load(response)['choices'][0]['message']['content'])
+        if checked.get('supported') is not True:
+            return {'qid': None, 'params': {}, 'method': 'idli-9b'}
+        return {'qid': q['id'], 'params': params_for(q, checked['params']), 'method': 'idli-9b'}
+    except (OSError, ValueError, KeyError, TypeError, StopIteration):
+        return {'qid': None, 'params': {}, 'method': 'unavailable'}
+
+
+def map_question(data_dir, ident, text):
+    return map_questions(read(object_path(data_dir, 'minis', ident))['questions'], text)
+
+
+def plain(text):
+    """Shared visible-text contract, including Mini script output and chart titles."""
+    return re.sub('[\u2190-\u21ff\u27f0-\u27ff]', ' -> ', str(text)).replace('·', ' - ')
+
+
+def chart_markdown(data_dir, title, chart, agent=None):
+    """Save one computed chart as both a local SVG and an interactive view."""
+    if not chart:
+        return ''
+    import copy
+    import vl_convert
+    from lib import formserver
+    ident = uuid.uuid4().hex
+    title = plain(title)
+    def clean(value):
+        if isinstance(value, dict):
+            return {plain(k): clean(v) for k, v in value.items() if k not in ('url', 'href', 'datasets')}
+        if isinstance(value, list):
+            return [clean(v) for v in value]
+        return plain(value) if isinstance(value, str) else value
+    spec = clean(copy.deepcopy(chart['vega_lite']))
+    rows = clean(chart['data'])
+    # Computed rows are authoritative. Never load external URLs from a Mini's spec.
+    spec['data'] = {'values': rows}
+    svg = vl_convert.vegalite_to_svg(json.dumps(spec))
+    out = inside(data_dir, 'views/' + ident + '.svg', exists=False)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(svg)
+    csv_path = out.with_suffix('.csv')
+    keys = list(dict.fromkeys(k for row in rows for k in row))
+    with csv_path.open('w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
+        writer.writeheader()
+        writer.writerows(rows)
+    write(out.with_suffix('.json'), {'title': title, 'spec': spec,
+                                    'data_csv': str(csv_path), 'agent': agent})
+    port, token = formserver.ensure(str(data_dir))
+    url = f'http://dashboard.localhost:{port}/view?' + urllib.parse.urlencode({'id': ident, 't': token})
+    label = title.replace('[', '').replace(']', '').replace('\n', ' ')
+    return f'![{label}]({out})\nOpen interactive: {url}'
+
+
+def mini_open(data_dir, ident):
+    m = read(object_path(data_dir, 'minis', ident))
+    lines = [m['name'], 'Goal: ' + m['goal'],
+             'Source files: ' + ', '.join(x.get('title') or x.get('local') or x.get('id', '') for x in m.get('files', []))]
+    for q in m['questions']:
+        lines.extend(['', q['question']])
+        for key, desc in q.get('params', {}).items():
+            options = ', '.join(map(str, desc['choices'])) if desc['type'] == 'choice' else desc['type']
+            lines.append(f"{key}: {options}; default = {desc.get('default')}")
+        example = run_mini(data_dir, ident, q['id'], {})
+        lines.append('Example: ' + example['text'])
+        if example['chart']:
+            lines.append(chart_markdown(data_dir, q['question'], example['chart'], m.get('agent')))
+    return {'id': ident, 'questions': m['questions'], 'reply': plain('\n'.join(lines))}
+
+
+def mini_ask(data_dir, ident, qid, params):
+    m = read(object_path(data_dir, 'minis', ident))
+    q = next(q for q in m['questions'] if q['id'] == qid)
+    result = run_mini(data_dir, ident, qid, params)
+    using = ', '.join(f'{k} = {v}' for k, v in result['params'].items())
+    lines = ['Using: ' + q['question'] + (': ' + using if using else ''), result['text']]
+    if result['chart']:
+        lines.append(chart_markdown(data_dir, q['question'], result['chart'], m.get('agent')))
+    return {**result, 'reply': plain('\n'.join(lines))}

@@ -393,11 +393,22 @@ def make_handler(files, token):
             self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; "
                              "style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src data:")
             self.send_header("Content-Length", str(len(data)))
+            if urllib.parse.urlparse(self.path).path == '/api/minis-public':
+                origin = self.headers.get('Origin')
+                if origin in ('paseo://app', 'null'):
+                    self.send_header('Access-Control-Allow-Origin', origin)
+                    self.send_header('Vary', 'Origin')
+                    self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
             self.end_headers()
             self.wfile.write(data)
 
         def _ok(self, qs):
             return secrets.compare_digest((qs.get("t") or [""])[0], token)
+
+        def do_OPTIONS(self):
+            if urllib.parse.urlparse(self.path).path == '/api/minis-public':
+                return self._send(204, b'')
+            return self._send(403, {'error': 'forbidden'})
 
         def do_GET(self):
             u = urllib.parse.urlparse(self.path)
@@ -415,6 +426,9 @@ def make_handler(files, token):
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
+            if u.path == '/api/minis-public':
+                keys = ('id', 'name', 'heading', 'date', 'author')
+                return self._send(200, [{k: m[k] for k in keys} for m in home.minis(files.data_dir)])
             if u.path == "/health":
                 return self._send(200, {"ok": True})
             if u.path.startswith("/vendor/"):  # the chart libraries (no data): lib/vendor/<name>.min.js
@@ -516,6 +530,9 @@ def make_handler(files, token):
                         with open(os.path.join(files.data_dir, ".idli", "home.json")) as f:
                             hj = json.load(f)
                         term, term_ws = hj.get("terminal"), hj.get("workspace")
+                        for workspace, terminal in hj.get('terminals', {}).items():
+                            if agent == terminal:
+                                term, term_ws = terminal, workspace
                     except (OSError, ValueError):
                         term = term_ws = None
                     if agent == term:  # the person's Claude CLI: type it in

@@ -318,6 +318,9 @@ def _build(minutes=5.0, workers=5, muse_parallel=4):
             con.execute("INSERT INTO files (id, name, kind, path, where_, indexed_at, modified) VALUES (?, ?, ?, ?, ?, ?, ?)",
                         [f["id"], f["name"], f["kind"], f["path"], f["where_"], now, f.get("modified")])
         con.close()
+        from lib import drivestubs
+        drivestubs.refresh(os.environ.get('COWORK_DATA_DIR') or os.environ.get('IDLI_DATA') or
+                           os.path.join(IDLI, 'cowork-real'))
         todo = [f for f in files if f["kind"] in ("Google Sheets", "Microsoft Excel", "Google Docs")]
         _write_state(phase="reading", files=len(files), to_read=len(todo))
         done = 0

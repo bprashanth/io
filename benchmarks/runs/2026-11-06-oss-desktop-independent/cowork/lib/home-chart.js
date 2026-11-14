@@ -73,7 +73,7 @@ if(location.pathname==='/mini') (async()=>{
     document.querySelectorAll('.run').forEach(b=>b.onclick=async()=>{
       const i=Number(b.dataset.i),q=m.questions[i],params={};
       $('q-'+i).querySelectorAll('[data-param]').forEach(el=>{const d=q.params[el.dataset.param];params[el.dataset.param]=d.type==='number'?Number(el.value):d.type==='choice'?d.choices.find(v=>String(v)===el.value):el.value;});
-      pick(i);$('mapping').textContent=`${q.question} · ${JSON.stringify(params)}`;status('Running…');
+      pick(i);$('mapping').textContent=`${q.question} - ${JSON.stringify(params)}`;status('Running…');
       document.querySelectorAll('.run,#match').forEach(el=>el.disabled=true);
       try{
         const r=await api('/api/mini/run',{id:ID,qid:q.id,params});$('result').hidden=false;$('result-title').textContent=q.question;$('result-params').textContent='Run with '+JSON.stringify(r.params);$('answer').innerHTML=answerHTML(r.text);$('viz').innerHTML='';
@@ -83,9 +83,11 @@ if(location.pathname==='/mini') (async()=>{
     $('match').onclick=async()=>{
       if(!$('ask').value.trim())return;$('match').disabled=true;status('Finding a saved question…');
       try{
-        const r=await api('/api/mini/map',{id:ID,question:$('ask').value});const i=m.questions.findIndex(q=>q.id===r.qid);pick(i);
+        const r=await api('/api/mini/map',{id:ID,question:$('ask').value});const i=m.questions.findIndex(q=>q.id===r.qid);
+        if(i<0){$('mapping').textContent="I don't know. This Mini can answer: "+m.questions.map(q=>q.question).join('; ');status('');return;}
+        pick(i);
         $('q-'+i).querySelectorAll('[data-param]').forEach(el=>{if(r.params[el.dataset.param]!=null)el.value=r.params[el.dataset.param];});
-        $('mapping').textContent=`Picked: ${m.questions[i].question} · ${JSON.stringify(r.params)} (${r.method}). Check the inputs, then Run.`;
+        $('mapping').textContent=`Picked: ${m.questions[i].question} - ${JSON.stringify(r.params)} (${r.method}). Check the inputs, then Run.`;
         $('q-'+i).scrollIntoView({block:'nearest',behavior:'smooth'});status('');
       }catch(e){status(e.message,true);}finally{$('match').disabled=false;}
     };

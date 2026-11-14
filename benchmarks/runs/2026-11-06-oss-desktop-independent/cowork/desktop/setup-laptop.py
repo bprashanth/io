@@ -8,7 +8,7 @@ Idempotent; prints what it did.
 
 It:
   1. writes cowork.mcp.json with this checkout's absolute paths;
-  2. creates .venv (duckdb, pandas, openpyxl, matplotlib) with uv or python3 -m venv;
+  2. creates .venv (duckdb, pandas, openpyxl, matplotlib, vl-convert) with uv or python3 -m venv;
   3. merges into ~/.paseo/config.json (backup first): daemon.browserTools.enabled, pluginsEnabled,
      providers t4gc-cowork + diy-claude;
   4. creates ~/idli-insights/cowork-real (stand-in "real" workbook + cowork.sites) for the co-work workspace.
@@ -37,13 +37,13 @@ COWORK_PROVIDER = {
     "label": "Idli - 30B (private, on Muse)",
     "command": [CLAUDE, "--mcp-config", os.path.join(COWORK, "cowork.mcp.json")],
     "env": {"CLAUDE_CONFIG_DIR": T4GC_CLAUDE, "ENABLE_TOOL_SEARCH": "false"},
-    # Muse only (owner, 2026-11-12: Steam's answers were hard to read and the 9B described charts it hadn't drawn).
-    # The router still serves idli-9b and idli-steam (lib/modes.py) for experiments; add them here to bring them back.
+    # Muse is the menu default; Paseo P19 explicitly selects idli-9b for the Drivey chat experiment.
     # 2026-11-13: two grounded 9B modes to compare (benchmarks/runs/2026-11-13-grounded-9b): Careful asks first,
     # Auto acts first; both describe only what was actually drawn.
     "models": [{"id": "muse-glimmer-30b", "label": "Idli 30B", "isDefault": True},
-               {"id": "idli-9b-careful", "label": "Idli 9B · Careful (asks first)"},
-               {"id": "idli-9b-auto", "label": "Idli 9B · Auto (acts first)"}],
+               {"id": "idli-9b", "label": "Idli 9B"},
+               {"id": "idli-9b-careful", "label": "Idli 9B - Careful (asks first)"},
+               {"id": "idli-9b-auto", "label": "Idli 9B - Auto (acts first)"}],
     "disallowedTools": ["Bash", "BashOutput", "KillShell", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit",
                         "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite", "Skill", "mcp__paseo",
                         # unused built-ins: ~60k chars of tool schema = ~11k prompt tokens on Muse
@@ -91,12 +91,26 @@ def main():
     if not os.path.exists(py):
         if shutil.which("uv"):
             run(["uv", "venv", "-q", ".venv", "--python", "3.12"], cwd=COWORK)
-            run(["uv", "pip", "install", "-q", "--python", py, "duckdb", "pandas", "openpyxl", "matplotlib"], cwd=COWORK)
+            run(["uv", "pip", "install", "-q", "--python", py, "duckdb", "pandas", "openpyxl", "matplotlib", "vl-convert-python"], cwd=COWORK)
         else:
             run([sys.executable, "-m", "venv", ".venv"], cwd=COWORK)
-            run([py, "-m", "pip", "install", "-q", "duckdb", "pandas", "openpyxl", "matplotlib"], cwd=COWORK)
+            run([py, "-m", "pip", "install", "-q", "duckdb", "pandas", "openpyxl", "matplotlib", "vl-convert-python"], cwd=COWORK)
     else:
         step(".venv exists")
+        if subprocess.run([py, '-c', 'import vl_convert'], capture_output=True).returncode:
+            command = (["uv", "pip", "install", "-q", "--python", py] if shutil.which("uv") else
+                       [py, "-m", "pip", "install", "-q"])
+            run(command + ["vl-convert-python"], cwd=COWORK)
+
+    launcher = os.path.join(IDLI, 'bin', 'claude-masked')
+    source = os.path.join(COWORK, 'desktop', 'claude-masked.sh')
+    if os.path.realpath(launcher) != source:
+        step(f"install Claude launcher at {launcher}")
+        if not DRY:
+            os.makedirs(os.path.dirname(launcher), exist_ok=True)
+            if os.path.lexists(launcher):
+                os.replace(launcher, launcher + f'.bak-{int(time.time())}')
+            os.symlink(source, launcher)
 
     with open(CONFIG) as f:
         cfg = json.load(f)

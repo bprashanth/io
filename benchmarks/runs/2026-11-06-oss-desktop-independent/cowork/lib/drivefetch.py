@@ -26,7 +26,11 @@ def export_url(file_id, sheet=True):
     return "https://drive.google.com/uc?export=download&id=" + file_id + g.au("&")
 
 
-def fetch(file_id, sheet=True):
+EXPORTS = {'Google Docs': ('document', 'docx'), 'Google Slides': ('presentation', 'pptx'),
+           'Google Drawings': ('drawings', 'svg')}
+
+
+def fetch(file_id, sheet=True, kind=None):
     fake = os.environ.get("IDLI_DRIVE_FAKE")  # tests: a folder of <id>.xlsx; a missing id means no access
     if fake:
         p = os.path.join(fake, file_id + ".xlsx")
@@ -35,6 +39,11 @@ def fetch(file_id, sheet=True):
         time.sleep(float(os.environ.get("IDLI_DRIVE_FAKE_DELAY", "0")))
         with open(p, "rb") as f:
             return f.read()
+    if kind in EXPORTS:
+        family, extension = EXPORTS[kind]
+        suffix = f'export?format={extension}' if family == 'document' else f'export/{extension}'
+        url = f'https://docs.google.com/{family}/d/{file_id}/{suffix}'
+        return session_fetch(url)
     return session_fetch(export_url(file_id, sheet))
 
 

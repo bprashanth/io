@@ -924,6 +924,9 @@ def _asked(messages, head):
 
 def privacy_route(j):
     msgs, tools, model = j.get("messages") or [], j.get("tools") or [], j.get("model", "")
+    drivey = drivey_route(j)
+    if drivey:
+        return drivey
     fa = _tool_name(tools, "file_ask")
     if not fa:
         return None
@@ -1008,3 +1011,50 @@ def privacy_nudge(j):
     if isinstance(content, list):
         msgs[-1] = dict(msgs[-1], content=content + [{"type": "text", "text": note}])
     return j
+
+
+DRIVEY_OPENING = "Ask about your Drive files. Type @ to pick a file or a folder, or start from a Mini."
+
+
+def drivey_route(j):
+    """Runs in privacy_route for every chat model, including Muse. State stays in chat history."""
+    msgs, tools, model = j.get('messages') or [], j.get('tools') or [], j.get('model', '')
+    latest, said = _latest_tool(msgs), _last_typed(msgs)
+    def say(text):
+        return message(model, [_text(_lib('home').plain(text))])
+    if said == 'Start Drivey':
+        return say(DRIVEY_OPENING)
+    if said and said.startswith('Chart from Claude:'):
+        return say(said)
+    if latest and latest[0] in ('mini_open', 'mini_ask'):
+        return say(latest[2].get('reply') or 'I could not open this Mini. Ask Claude to check it.')
+    if not said:
+        return None
+    opened = re.fullmatch(r'Open Mini: .+ \[([\w-]{1,100})\]', said)
+    if opened:
+        tool = _tool_name(tools, 'mini_open')
+        return (message(model, [_tool_use(tool, {'id': opened[1]})]) if tool
+                else say('The Mini tools are unavailable. Reopen this workspace after updating Idli.'))
+    # A successful mini_open switches this chat into Mini mode until another Mini is opened.
+    uses, active = {}, None
+    for m in msgs:
+        for block in _blocks(m.get('content')):
+            if block.get('type') == 'tool_use':
+                uses[block['id']] = _short(block['name'])
+            elif block.get('type') == 'tool_result' and uses.get(block.get('tool_use_id')) == 'mini_open':
+                res = _json(_strip_reminders(_text_of(block.get('content'))))
+                if res.get('id') and res.get('questions'):
+                    active = res
+    if active:
+        mapped = _lib('home').map_questions(active['questions'], said, NINE_URL)
+        tool = _tool_name(tools, 'mini_ask')
+        if mapped.get('qid') and tool:
+            return message(model, [_tool_use(tool, {'id': active['id'], 'qid': mapped['qid'],
+                                                   'params': mapped['params']})])
+        return say("I don't know. This Mini can answer: " + '; '.join(q['question'] for q in active['questions']))
+    paths = _lib('drivestubs').mentions(said)
+    if paths:
+        tool = _tool_name(tools, 'drive_fetch')
+        return (message(model, [_tool_use(tool, {'paths': paths})]) if tool
+                else say('The Drive tools are unavailable. Reopen this workspace after updating Idli.'))
+    return None

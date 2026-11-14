@@ -112,6 +112,19 @@ if _ALLOWED is not None:
         del TOOLS[_n]
 
 
+def refresh_drive_stubs():
+    if 'drive_fetch' in TOOLS:
+        try:
+            from sites.sheets.tools import data_dir
+            from lib import drivestubs
+            drivestubs.refresh(data_dir())
+        except Exception:
+            pass  # No index yet: Drive sign-in/indexing can happen later.
+
+
+refresh_drive_stubs()
+
+
 def call(name, args):
     try:
         return TOOLS[name][0](**args), False

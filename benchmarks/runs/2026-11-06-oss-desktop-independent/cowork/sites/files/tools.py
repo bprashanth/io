@@ -773,8 +773,9 @@ def _masked_ask(file, question, tab, send):
     pv = _pv(file)
     if pv.get("review") == "ask" and send != "yes":
         m = privacy.mask_text(dd, file, path, question)
+        warning = privacy.review_warning(dd)
         return {"card": {"questions": [{"header": "Send to Claude", "multiSelect": False,
-                                        "question": f"Claude would see: “{m['masked']}”. Send it?",
+                                        "question": (warning + "\n" if warning else "") + f"Claude would see: “{m['masked']}”. Send it?",
                                         "options": [{"label": "Send it", "description": "Claude plans the answer; "
                                                      "the numbers are worked out on this computer"},
                                                     {"label": "Keep it on this computer",
@@ -1413,7 +1414,31 @@ SPEC = {"type": "object", "description":
         "sort {by: id, dir: desc|asc}, limit n. "
         "measures [] lists the matching rows: use it for who/which questions. Example: {\"measures\": [\"amount\"], \"group_by\": [\"employee\"], "
         "\"filters\": {\"category\": [\"Hardware\"]}, \"date\": {\"period\": \"this_year\"}}"}
+
+
+def t_drive_fetch(paths):
+    from lib import drivestubs, home
+    return drivestubs.fetch(files().data_dir, paths, home.chat_workspace())
+
+
+def t_mini_open(id):
+    from lib import home
+    return home.mini_open(files().data_dir, id)
+
+
+def t_mini_ask(id, qid, params=None):
+    from lib import home
+    return home.mini_ask(files().data_dir, id, qid, params or {})
+
+
 TOOLS = {
+    "drive_fetch": (t_drive_fetch, "Fetch @Drive paths; a folder path ends in / and includes every file below it.",
+                    {"paths": {"type": "array", "items": {"type": "string"}}}, ["paths"]),
+    "mini_open": (t_mini_open, "Open a saved Mini with its questions, options and example charts.",
+                  {"id": {"type": "string"}}, ["id"]),
+    "mini_ask": (t_mini_ask, "Run exactly one saved Mini question with validated parameters.",
+                 {"id": {"type": "string"}, "qid": {"type": "string"}, "params": {"type": "object"}},
+                 ["id", "qid", "params"]),
     "file_get": (t_file_get, "Download the real spreadsheet from a Google Sheets or Drive link into this folder. The browser may show a Save "
                  "dialog; the user clicks Save. Then call file_open.",
                  {"link": {"type": "string", "description": "A docs.google.com/spreadsheets or drive.google.com link "

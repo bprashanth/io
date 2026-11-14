@@ -528,4 +528,21 @@ def review(data_dir, file, path, tab=None, columns=None):
     for row in rows:
         row['mask'] = choices[row['column']]
         row['as_sent'] = coded[row['column']].head(3).astype(str).tolist()
-    return {**settings, 'columns': choices, 'tabs': list(sheets), 'tab': tab, 'suggestions': rows}
+    return {**settings, 'columns': choices, 'tabs': list(sheets), 'tab': tab, 'suggestions': rows, 'warning': review_warning(data_dir)}
+
+
+@locked
+def review_warning(data_dir, files=None):
+    """Count the mask-mode files in this question (or the proxy's active file set)."""
+    path = Path(data_dir) / 'privacy.json'
+    settings = json.loads(path.read_text()) if path.exists() else {}
+    state = Path(data_dir) / '.idli/home.json'
+    if files is None and state.exists():
+        selected = json.loads(state.read_text()).get('files')
+        if selected:
+            files = [item['local'] for item in selected]
+    chosen = builtins.set(files) if files is not None else builtins.set(settings)
+    masked = [v for k, v in settings.items() if k in chosen and v.get('mode') == 'mask']
+    if len(masked) > 10 and any(v.get('review', 'ask') == 'ask' for v in masked):
+        return f'{len(masked)} files are masked for this question. Reviewing each one may take time. Consider switching review to Auto.'
+    return ''

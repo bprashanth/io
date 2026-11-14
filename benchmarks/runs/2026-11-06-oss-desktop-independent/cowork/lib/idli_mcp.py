@@ -25,30 +25,55 @@ def page_url(page, ident):
 
 
 def idli_show(title, vega_lite, data_csv):
-    from lib import browser, uiswitch
+    import csv
     path = home.allowed_path(data_dir(), data_csv)
     if path.suffix.lower() != '.csv' or not isinstance(vega_lite, dict):
         raise ValueError('Supply a CSV and a Vega-Lite object')
-    ident = uuid.uuid4().hex
-    st = home.read(Path(data_dir()) / '.idli/home.json') if (Path(data_dir()) / '.idli/home.json').exists() else {}
-    # the person's Claude is a terminal (no chat id): clicks on the chart are typed into it; Paseo's browser tools
-    # act for a chat, so the tab is opened on behalf of one in the same workspace
-    home.write(home.inside(data_dir(), 'views/' + ident + '.json', exists=False),
-               {'title': str(title), 'spec': vega_lite, 'data_csv': str(path),
-                'agent': os.environ.get('PASEO_AGENT_ID') or st.get('terminal')})
-    # Idli's home page (Drivey's left pane) watches for new views and opens this one itself; a chat-side Claude can
-    # also open it as a tab
-    if os.environ.get('PASEO_AGENT_ID'):
-        try:
-            browser.paseo('browser_new_tab', url=page_url('view', ident))
-        except Exception:  # noqa: BLE001
-            pass
+    with path.open(newline='') as f:
+        rows = list(csv.DictReader(f))
+    state = Path(data_dir()) / '.idli/home.json'
+    st = home.read(state) if state.exists() else {}
+    agent = os.environ.get('PASEO_AGENT_ID') or st.get('terminal')
+    workspace = os.environ.get('IDLI_WORKSPACE')
+    if workspace:
+        terminal = home._claude_terminal(data_dir(), workspace)
+        if terminal:
+            home._remember(data_dir(), workspace, terminal)
+            agent = terminal
+    markdown = home.chart_markdown(data_dir(), title, {'vega_lite': vega_lite, 'data': rows}, agent)
+    if workspace:
+        chats = json.loads(home.cli('ls', '--json', '--label', 'idli.ws=' + workspace))
+        if isinstance(chats, dict):
+            chats = chats.get('agents', [])
+        left = next((c for c in chats if (c.get('labels') or {}).get('idli.left') == '1'), None)
+        if not left:
+            raise ValueError('No left chat in this workspace')
+        home.cli('send', '--no-wait', left.get('id') or left['agentId'],
+                 'Chart from Claude: ' + home.plain(title) + '\n' + markdown)
     return 'shown in Idli'
 
 
+def mini_author():
+    if os.environ.get('IDLI_AUTHOR', '').strip():
+        return home.plain(os.environ['IDLI_AUTHOR'].strip())
+    # Read only the supported name field, never an account id or token.
+    path = Path(os.environ.get('IDLI_HOME', '~/idli-insights')).expanduser() / 'config/accounts.json'
+    try:
+        accounts = home.read(path)
+        names = [accounts.get('name'), (accounts.get('google') or {}).get('name')]
+        for name in names:
+            if isinstance(name, str) and name.strip():
+                return home.plain(name.strip())
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    import getpass
+    return getpass.getuser()
+
+
 def idli_save_mini(name, goal, questions):
-    if not isinstance(questions, list) or not questions:
-        raise ValueError('Give the Mini at least one checked question')
+    if not isinstance(questions, list) or not 1 <= len(questions) <= 8:
+        raise ValueError('Give the Mini between one and eight checked questions')
+    import datetime
     scripts, checked, ids = [], [], set()
     for i, question in enumerate(questions):
         q = dict(question)
@@ -59,9 +84,14 @@ def idli_save_mini(name, goal, questions):
         if path.suffix != '.py' or not str(q.get('question') or '').strip():
             raise ValueError('Give every question a Python script and question text')
         params = q.get('params', {})
-        if not isinstance(params, dict) or any(not isinstance(d, dict) or d.get('type') not in
-                                              ('choice', 'number', 'text') for d in params.values()):
+        if not isinstance(params, dict) or len(params) > 3 or any(not isinstance(d, dict) or d.get('type') not in
+                                              ('choice', 'number') for d in params.values()):
             raise ValueError('Invalid parameters')
+        for desc in params.values():
+            if 'default' not in desc or (desc['type'] == 'choice' and
+                    (not isinstance(desc.get('choices'), list) or not desc['choices'] or
+                     any(not isinstance(c, str) for c in desc['choices']))):
+                raise ValueError('List every choice and supply a default for every option')
         q['params'] = params
         home.params_for(q, {})
         q['script'] = f'question_{i + 1}.py'
@@ -69,7 +99,9 @@ def idli_save_mini(name, goal, questions):
         checked.append(q)
     root = data_dir()
     state = home.inside(root, '.idli/home.json', exists=False)
-    selected = home.read(state).get('files', []) if state.exists() else []
+    saved_state = home.read(state) if state.exists() else {}
+    selected = saved_state.get('workspace_files', {}).get(os.environ.get('IDLI_WORKSPACE'),
+                                                         saved_state.get('files', []))
     sources = []
     for item in selected:
         path = home.inside(root, item['local'])
@@ -89,8 +121,9 @@ def idli_save_mini(name, goal, questions):
         drive = root / 'drive'
         drive.mkdir(exist_ok=True)
         (folder / 'drive').symlink_to(drive, target_is_directory=True)
-        home.write(folder / 'mini.json', {'id': ident, 'name': str(name), 'goal': str(goal), 'questions': checked,
-                                        'files': sources, 'agent': os.environ.get('PASEO_AGENT_ID')})
+        home.write(folder / 'mini.json', {'id': ident, 'name': home.plain(name), 'goal': home.plain(goal), 'questions': checked,
+                                        'files': sources, 'date': datetime.date.today().isoformat(), 'author': mini_author(),
+                                        'agent': os.environ.get('PASEO_AGENT_ID')})
     except Exception:
         shutil.rmtree(folder)
         raise
@@ -105,7 +138,7 @@ TOOLS = {
         'name': {'type': 'string'}, 'goal': {'type': 'string'}, 'questions': {'type': 'array', 'items': {
             'type': 'object', 'properties': {'id': {'type': 'string'}, 'question': {'type': 'string'},
                 'script': {'type': 'string'}, 'params': {'type': 'object', 'additionalProperties': {
-                    'type': 'object', 'properties': {'type': {'enum': ['choice', 'number', 'text']},
+                    'type': 'object', 'properties': {'type': {'enum': ['choice', 'number']},
                         'choices': {'type': 'array'}, 'default': {}}, 'required': ['type', 'default']}},
                 'chart': {}}, 'required': ['id', 'question', 'script', 'params']}}}, ['name', 'goal', 'questions'])}
 

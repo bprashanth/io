@@ -10,10 +10,10 @@ mkdir -p "$WORK"
 ln -sfn "$DATA/drive" "$WORK/drive"
 cp "$COWORK/idli/CLAUDE-masked.md" "$WORK/CLAUDE.md"
 # Idli's local server too (Idli home, charts, Minis): Drivey's "+" opens Idli home beside this terminal
-(cd "$COWORK" && "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import formserver; formserver.ensure(sys.argv[1])" "$DATA") >/dev/null 2>&1 || true
+(cd "$COWORK" && "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import formserver, drivestubs; formserver.ensure(sys.argv[1]); drivestubs.refresh(sys.argv[1])" "$DATA") >/dev/null 2>&1 || true
 PORT=$("$COWORK/.venv/bin/python" -I "$COWORK/lib/ccproxy.py" ensure --data-dir "$DATA") || {
   echo "Idli's privacy proxy didn't start; not starting Claude (nothing was sent)." >&2; exit 1; }
-# Only paths go in this generated config. Paseo's agent identity stays inherited by the MCP process.
+# Pass the workspace explicitly so the MCP can find its left chat.
 export IDLI_DATA="$DATA" IDLI_CLAUDE_WORK="$WORK"
 "$COWORK/.venv/bin/python" -I - "$COWORK" "$WORK/.idli-mcp.json" <<'PYCONFIG'
 import json, os, sys
@@ -21,7 +21,9 @@ root, target = sys.argv[1:]
 fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
     json.dump({'mcpServers': {'idli': {'command': root + '/.venv/bin/python',
-               'args': ['-I', root + '/lib/idli_mcp.py']}}}, f)
+               'args': ['-I', root + '/lib/idli_mcp.py'],
+               'env': {k: os.environ[k] for k in ('IDLI_WORKSPACE', 'IDLI_AUTHOR', 'IDLI_DATA', 'IDLI_CLAUDE_WORK')
+                       if k in os.environ}}}}, f)
 PYCONFIG
 if [ "$?" -ne 0 ]; then exit 1; fi
 # Idli's own folder for Claude: answer Claude Code's one-time "do you trust this folder?" the way the person would

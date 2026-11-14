@@ -35,8 +35,10 @@ def workspace(tmp_path, monkeypatch):
     work.mkdir()
     monkeypatch.setenv('IDLI_DATA', str(root))
     monkeypatch.setenv('IDLI_CLAUDE_WORK', str(work))
+    monkeypatch.setenv('IDLI_HOME', str(tmp_path / 'idli-home'))
     monkeypatch.setenv('IDLI_SCANNER', 'http://127.0.0.1:1/scan')
     monkeypatch.setenv('MUSE_URL', 'http://127.0.0.1:1')
+    monkeypatch.setenv('IDLI_9B_URL', 'http://127.0.0.1:1')
     monkeypatch.setenv('IDLI_CDP_PORT', '1')
     monkeypatch.setenv('COWORK_LOG', '')
     monkeypatch.setattr(driveindex, 'DB', str(tmp_path / 'no-index.duckdb'))
@@ -166,7 +168,7 @@ def test_send_terminal_first_then_typed(workspace, paseo, monkeypatch):
     creates = [c for c in calls if c[:2] == ['terminal', 'create']]
     keys = [c[-1] for c in calls if c[:2] == ['terminal', 'send-keys']]
     assert len(creates) == 1 and creates[0][creates[0].index('--workspace') + 1] == 'drivey'
-    assert keys[0].startswith('exec ') and 'claude-masked.sh' in keys[0] and 'Yerawada Ward' in keys[0]
+    assert keys[0].startswith('IDLI_WORKSPACE=drivey exec ') and 'claude-masked.sh' in keys[0] and 'Yerawada Ward' in keys[0]
     assert keys[1] == '\r' and 'Compare Village A' in keys[2] and keys[3] == '\r'
     assert not any(json.loads(line)['paseo_env'] for line in record.read_text().splitlines())
     assert shown == [('drivey', 'term-1', 'right')] * 2
@@ -223,11 +225,11 @@ def test_mcp_stdio_and_mini(workspace, monkeypatch):
         replies = [json.loads(line) for line in r.stdout.splitlines()]
         assert replies[2]['result']['content'][0]['text'] == 'shown in Idli'
         assert not replies[3]['result'].get('isError') and replies[4]['result']['isError']
-        assert len(browser_calls) == 1
+        assert len(browser_calls) == 0
         views = list((root / 'views').glob('*.json'))
         assert len(views) == 1
         view = home.read(views[0])
-        assert view['data_csv'] == str(csv) and view['agent'] == AGENT
+        assert Path(view['data_csv']).read_text() == csv.read_text() and view['agent'] == AGENT
         assert len(api(server, '/api/view?id=' + views[0].stem)['data']) == 2
         mini = home.read(root / 'minis/households/mini.json')
         assert mini['files'][0]['id'] == 'drive-households'
@@ -236,7 +238,7 @@ def test_mcp_stdio_and_mini(workspace, monkeypatch):
         assert '| A | 7 |' in result['text'] and result['chart']['data'][0]['Count'] == 7
         assert result['agent'] == AGENT
         mapped = api(server, '/api/mini/map', {'id': 'households', 'question': 'count households'})
-        assert mapped == {'qid': 'count', 'params': {'n': 2}, 'method': 'word match'}
+        assert mapped == {'qid': None, 'params': {}, 'method': 'unavailable'}
         with pytest.raises(HTTPError) as err:
             api(server, '/api/mini?id=households', token='wrong')
         assert err.value.code == 403
@@ -255,16 +257,20 @@ def test_router_schema_and_validation(workspace, monkeypatch):
         def do_POST(self):
             seen.append(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
             value = {'qid': 'income', 'params': {'n': 4}}
+            if seen[-1]['messages'][0]['content'].startswith('Check one saved'):
+                value = {'reason':'Same calculation', 'supported':True, 'params':{'n':4}}
             data = json.dumps({'choices': [{'message': {'content': json.dumps(value)}}]}).encode()
             self.send_response(200); self.end_headers(); self.wfile.write(data)
     with running(Router) as router:
-        monkeypatch.setenv('MUSE_URL', f'http://127.0.0.1:{router.server_port}')
+        monkeypatch.setenv('IDLI_9B_URL', f'http://127.0.0.1:{router.server_port}')
         got = home.map_question(root, 'test', 'mean earnings')
     assert got == {'qid': 'income', 'params': {'n': 4}, 'method': 'idli-9b'}
-    assert seen[0]['model'] == 'idli-9b'
-    assert seen[0]['response_format']['json_schema']['schema']['properties']['qid']['enum'] == ['count', 'income']
+    assert seen[0]['model'] == 'qwen3.5-9b'
+    assert [b['properties']['qid'] for b in seen[0]['response_format']['json_schema']['schema']['oneOf']] == [
+        {'const': 'count'}, {'const': 'income'}, {'type': 'null'}]
     monkeypatch.setenv('MUSE_URL', 'http://127.0.0.1:1')
-    assert home.map_question(root, 'test', 'average income')['qid'] == 'income'
+    monkeypatch.setenv('IDLI_9B_URL', 'http://127.0.0.1:1')
+    assert home.map_question(root, 'test', 'average income')['qid'] is None
 
 
 @pytest.mark.skipif(os.environ.get('HOME_BROWSER') != '1', reason='Set HOME_BROWSER=1 to run Chromium and save screenshots')
@@ -332,7 +338,7 @@ def test_browser(workspace, paseo, monkeypatch):
         assert page.locator('#pop').is_hidden()  # no Claude agent on this Mini
         page.locator('#ask').fill('count households')
         page.locator('#match').click()
-        page.wait_for_function("() => document.querySelector('#mapping').textContent.includes('word match')")
+        page.wait_for_function("() => document.querySelector('#mapping').textContent.includes('This Mini can answer:')")
         assert 'Check the inputs' in page.locator('#mapping').inner_text()
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         page.screenshot(path=str(shots / 'mini-dark.png'), full_page=True)
