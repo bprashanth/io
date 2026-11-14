@@ -348,6 +348,8 @@ def ask(files, file, question, chart=False, tab=None):
     return _done(st, m)
 
 
+ALL_WORDS = re.compile(r"(?i)\b(all (the |five |\d+ )?\w+s|every \w+|each \w+|no filter|unfiltered|whole file|"
+                       r"across (all|the) \w+s)\b")
 TIME_WORDS = re.compile(r"(?i)\b(over time|trend\w*|chang\w*|last (year|month|quarter)|this year|month (on|by|to|over) "
                         r"month|year (on|by|to|over) year|each (month|year)|per (year|quarter)|by (month|year|quarter|date)|"
                         r"growth|grow\w*|grew|since|increas\w*|decreas\w*|rose|risen|fell|fallen|went (up|down)|"
@@ -454,8 +456,11 @@ def validate(c, intent, active, question):
             plan["unknown_value"] = (groupish[0]["column"] if groupish else col, v)
         else:
             target.append(k)
-    if target and not _mentioned(target, question) and not intent.get("refers_to_previous"):
+    same_as_before = bool(active) and set(target) == set(active.get("target") or [])
+    if target and not _mentioned(target, question) and not (intent.get("refers_to_previous") and same_as_before):
         target, col = [], None  # the 9B added groups the person never named
+    if ALL_WORDS.search(question or ""):  # "all wards", "no filter": nothing picked out
+        target, col = [], None
     if not col and active and intent.get("refers_to_previous"):
         col, target = active.get("target_column"), list(active.get("target") or [])
     if not target and active and active.get("target") and plan["intent"] == "EXPLAIN_DIFFERENCE":

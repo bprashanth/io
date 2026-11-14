@@ -412,6 +412,9 @@ def _card_answers(card, text):
         s += len(q) + 4
         ends = [x for x in starts[i + 1:] if x > s]
         e = (ends[0] - 2) if ends else text.find(". You can now continue", s)
+        if e < 0:  # newer Claude Code: '"q"="answer". Read the answers carefully ...'
+            m = re.search(r'"(\.\s|,\s*"|\s*$)', text[s:])
+            e = s + m.start() if m else -1
         out.append(text[s:e].rstrip('"').strip() if e > 0 else text[s:].strip())
     return out
 
@@ -791,7 +794,7 @@ def careful_chat(j):
             word = "figure: " if head == "Which figure" else "view: "
             return message(model, [_tool_use(_tool_name(tools, "file_ask"),
                                              {"file": last_in["file"], "question": word + ans,
-                                              "pipeline": "careful"})])
+                                              "pipeline": "careful", "send": "no"})])  # its own card: stays local
     said = _last_typed(msgs)
     if said and mans:
         if R.PUSHBACK.search(said):
