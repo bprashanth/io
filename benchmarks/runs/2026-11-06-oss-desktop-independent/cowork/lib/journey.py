@@ -7,7 +7,7 @@ import threading
 import urllib.parse
 import uuid
 
-from lib import home, privacy
+from lib import home, maskcopy, privacy
 
 LOCK = threading.RLock()
 
@@ -168,6 +168,9 @@ def draft_mini(data_dir, title, story, questions, code, workspace, author):
     if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
         raise ValueError('Open Claude from a Drivey workspace and try again.')
     questions = questions_checked(questions, home.work_dir())
+    # Claude wrote these with codes. The Mini runs on the real file for people, so it gets the real values back.
+    title, story, questions = home.rehydrate(data_dir, [title, story, questions])
+    vault = privacy.session_vault(data_dir)
     ident = uuid.uuid4().hex
     folder = home.inside(data_dir, f'.idli/drafts/{ident}/mini.json', exists=False).parent
     state_path = Path(data_dir) / '.idli/home.json'
@@ -185,7 +188,8 @@ def draft_mini(data_dir, title, story, questions, code, workspace, author):
         for i, q in enumerate(questions):
             source = home.inside(home.work_dir(), q['script'])
             q['script'] = f'question_{i + 1}.py'
-            shutil.copyfile(source, folder / q['script'])
+            text, _ = maskcopy.rehydrate_script(source.read_text(), vault)
+            (folder / q['script']).write_text(text)
         drive = Path(data_dir).resolve() / 'drive'
         drive.mkdir(exist_ok=True)
         (folder / 'drive').symlink_to(drive, target_is_directory=True)

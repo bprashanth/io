@@ -29,6 +29,8 @@ def idli_show(title, vega_lite, data_csv, sources=None, script=None):
         raise ValueError('Supply a CSV and a Vega-Lite object')
     with path.open(newline='') as f:
         rows = list(csv.DictReader(f))
+    # Claude's CSV and spec hold codes (its scripts run on masked copies); the person sees real values.
+    title, vega_lite, rows = home.rehydrate(data_dir(), [title, vega_lite, rows])
     from lib import maps
     vega_lite = maps.prepare(vega_lite, rows)
     state = Path(data_dir()) / '.idli/home.json'
@@ -52,10 +54,19 @@ def idli_show(title, vega_lite, data_csv, sources=None, script=None):
             'message': 'Chart opened on the right.' if opened.get('ok') else 'Open the chart with this link.'}
 
 
-def unmask(code, reason):
+def unmask(code, reason, whole_column=False):
     from lib import reveals
-    result = reveals.ask(data_dir(), code, reason, os.environ.get('IDLI_WORKSPACE'))
-    return {'code': code, 'value': result['value']} if 'refused' not in result else result
+    result = reveals.ask(data_dir(), code, reason, os.environ.get('IDLI_WORKSPACE'), whole_column=bool(whole_column))
+    if 'refused' in result:
+        return result
+    # The masked copies in Claude's folder now show the values too, so its commands keep matching the data.
+    from lib import maskcopy
+    maskcopy.build(data_dir(), home.work_dir())
+    if result.get('values'):
+        return {'column': result['column'], 'values': {v['code']: v['value'] for v in result['values']},
+                'note': 'Your copies in drive/ now show these values instead of the codes.'}
+    return {'code': code, 'value': result['value'],
+            'note': 'Your copies in drive/ now show this value instead of the code.'}
 
 
 def lookup(code, query, reason):
@@ -124,12 +135,16 @@ TOOLS['idli_draft_mini'] = (idli_draft_mini, 'After checking every script, open 
 
 
 for name, fn, description in [
-        ('unmask', unmask, 'Ask the person to reveal one contextual code. Personal data is never revealed.'),
+        ('unmask', unmask, 'Ask the person to reveal one contextual code, or with whole_column every code in its column '
+                           '(for short category or species codes). Personal data is never revealed.'),
         ('lookup', lookup, 'Ask to search from this computer with one contextual code. Search results stay masked.')]:
     props = {'code': {'type': 'string'}, 'reason': {'type': 'string'}}
     if name == 'lookup':
         props['query'] = {'type': 'string', 'description': 'Search text containing {value}.'}
-    TOOLS[name] = (fn, description, props, list(props))
+    required = list(props)
+    if name == 'unmask':
+        props['whole_column'] = {'type': 'boolean', 'description': 'Reveal every value in this code\'s column (one reveal).'}
+    TOOLS[name] = (fn, description, props, required)
 
 
 def main():

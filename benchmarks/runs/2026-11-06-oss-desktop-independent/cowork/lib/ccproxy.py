@@ -43,15 +43,17 @@ def walk(node, fn, keys=False):
     if isinstance(node, dict):
         if node.get('type') in SIGNED:
             return copy.deepcopy(node)
-        result = {fn(k) if keys else k: walk(v, fn, keys) for k, v in node.items()}
-        if keys and node.get('type') == 'tool_use' and node.get('name') in ('mcp__idli__unmask', 'mcp__idli__lookup'):
-            if isinstance(node.get('input'), dict) and 'code' in node['input']:
-                result['input']['code'] = node['input']['code']
-        return result
+        if keys and node.get('type') in ('tool_use', 'server_tool_use') and node.get('name') not in DISPLAY_TOOLS:
+            # Claude's commands and scripts run on the masked copies in its folder, so they keep their codes.
+            return copy.deepcopy(node)
+        return {fn(k) if keys else k: walk(v, fn, keys) for k, v in node.items()}
     return node
 
 
 CONTENT_FIELDS = ("system", "messages")
+# Tools whose input is only shown to the person (questions with options, a task list): these get real values back.
+# Every other tool input keeps its codes, because Claude's commands run on masked copies of the files.
+DISPLAY_TOOLS = {'AskUserQuestion', 'TodoWrite', 'ExitPlanMode'}
 
 
 class Transformer:
@@ -177,6 +179,11 @@ class Transformer:
                 for v in node:
                     yield from strings(v)
             elif isinstance(node, dict):
+                # Claude's own signed reasoning came from Anthropic word for word and cannot be edited (the signature
+                # would break), so it can only hold what Anthropic already had. Refusing it stalled a whole session
+                # when a scanner false positive ("six" tagged as an age) appeared in Claude's reasoning (2026-11-15).
+                if node.get('type') in SIGNED and node.get('signature' if node['type'] == 'thinking' else 'data'):
+                    return
                 for k, v in node.items():
                     yield k
                     yield from strings(v)
@@ -247,7 +254,7 @@ class SSE:
     def __init__(self, vault):
         self.vault = vault
         self.blocks = {}
-        self.code_tools = {}
+        self.code_tools = set()
 
     @staticmethod
     def event(obj):
@@ -266,16 +273,15 @@ class SSE:
         index = obj.get('index')
         if kind == 'content_block_start':
             block = obj.get('content_block', {})
-            if block.get('type') == 'tool_use' and block.get('name') in ('mcp__idli__unmask', 'mcp__idli__lookup'):
-                self.code_tools[index] = ''
+            if block.get('type') in ('tool_use', 'server_tool_use') and block.get('name') not in DISPLAY_TOOLS:
+                self.code_tools.add(index)
         if kind == 'content_block_delta':
             delta = obj.get('delta', {})
             if not isinstance(delta, dict):
                 return raw
             field = {'text_delta': 'text', 'input_json_delta': 'partial_json'}.get(delta.get('type'))
             if field == 'partial_json' and index in self.code_tools:
-                self.code_tools[index] += delta[field]
-                return b''
+                return raw
             if field and isinstance(delta.get(field), str):
                 key = (index, delta['type'])
                 restorer = self.blocks.setdefault(key, StreamRestorer(self.vault, field == 'partial_json'))
@@ -283,15 +289,7 @@ class SSE:
                 return self.event(obj)
         if kind == 'content_block_stop':
             flushed = b''
-            if index in self.code_tools:
-                text = self.code_tools.pop(index)
-                if text:
-                    args = json.loads(text)
-                    restored = walk(args, self.vault.rehydrate, keys=True)
-                    if 'code' in args:
-                        restored['code'] = args['code']
-                    flushed = self.event({'type': 'content_block_delta', 'index': index,
-                                          'delta': {'type': 'input_json_delta', 'partial_json': json.dumps(restored)}})
+            self.code_tools.discard(index)
             for key in list(self.blocks):
                 if key[0] == index:
                     text = self.blocks.pop(key).flush()

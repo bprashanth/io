@@ -1,13 +1,15 @@
 #!/bin/sh
 # Launcher for Paseo provider idli-claude: the person's own Claude Code (their subscription login), with every request
-# going through Idli's masking proxy (lib/ccproxy.py). Claude works on the real files in ~/idli-insights/claude-masked
-# (drive/ links to Drivey's downloads); the proxy turns the values of masked columns into codes on the way out and back
-# into real values on the way in, so the person sees real values and Anthropic sees codes.
+# going through Idli's masking proxy (lib/ccproxy.py). Claude works in ~/idli-insights/claude-masked on masked copies
+# of the reviewed files (drive/, written by lib/maskcopy.py), never on the real downloads: its shell runs in Claude
+# Code's sandbox, which cannot read Idli's private folder. The proxy turns private values into codes on the way out and
+# codes in Claude's text back into real values on the way in, so the person reads real values and Anthropic sees codes.
 COWORK="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"   # follow ~/idli-insights/bin/claude-masked
 DATA=${IDLI_DATA:-$HOME/idli-insights/cowork-real}
 WORK=${IDLI_CLAUDE_WORK:-$HOME/idli-insights/claude-masked}
 mkdir -p "$WORK"
-ln -sfn "$DATA/drive" "$WORK/drive"
+# Masked copies only (an older install linked drive/ to the real downloads).
+[ -L "$WORK/drive" ] && rm "$WORK/drive"
 cp "$COWORK/idli/CLAUDE-masked.md" "$WORK/CLAUDE.md"
 # Project skills travel with this work folder, including their local chart templates.
 mkdir -p "$WORK/.claude/skills" || exit 1
@@ -20,6 +22,8 @@ mkdir -p "$WORK/.claude/commands" || exit 1
 cp "$COWORK/idli/claude-commands/mini.md" "$WORK/.claude/commands/mini.md" || exit 1
 # Idli's local server too (Idli home, charts, Minis): Drivey's "+" opens Idli home beside this terminal
 (cd "$COWORK" && "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import formserver, drivestubs; formserver.ensure(sys.argv[1]); drivestubs.refresh(sys.argv[1])" "$DATA") >/dev/null 2>&1 || true
+(cd "$COWORK" && IDLI_CLAUDE_WORK="$WORK" "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import maskcopy; maskcopy.build(sys.argv[1], sys.argv[2])" "$DATA" "$WORK") >/dev/null 2>&1 || {
+  echo "Idli couldn't prepare the masked copies; not starting Claude (nothing was sent)." >&2; exit 1; }
 PORT=$("$COWORK/.venv/bin/python" -I "$COWORK/lib/ccproxy.py" ensure --data-dir "$DATA") || {
   echo "Idli's privacy proxy didn't start; not starting Claude (nothing was sent)." >&2; exit 1; }
 # Pass the workspace explicitly so the MCP can find its left chat.
@@ -29,7 +33,7 @@ import json, os, sys
 root, target = sys.argv[1:]
 sys.path.insert(0, root)
 from lib.launchsettings import merge
-merge(os.path.dirname(target))
+merge(os.path.dirname(target), os.environ['IDLI_DATA'])
 fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
     json.dump({'mcpServers': {'idli': {'command': root + '/.venv/bin/python',

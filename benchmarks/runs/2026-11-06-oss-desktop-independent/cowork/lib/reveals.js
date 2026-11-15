@@ -7,10 +7,11 @@ if(location.pathname==='/consent') (async()=>{
   $('ledger').href=link('/reveals?ws='+encodeURIComponent(REVEAL_WS));
   try{
     const r=await api('/api/consent?id='+encodeURIComponent(ID));
-    const lookup=r.kind==='lookup';
-    $('title').textContent=lookup?'Claude asks to search the web with a masked value':'Claude asks to see a masked value';
-    $('intro').textContent=lookup?'Claude will not see the value. The search is sent from this computer to Google News and Wikipedia.':'Only this value will be shared with Claude.';
-    $('details').innerHTML=[['Code',r.code],['Column',r.column+' ('+r.file.replace(/^drive\//,'').replace(/\.[^.]+$/,'')+')'],['Real value',r.value],['Reason',r.reason]].map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+    const lookup=r.kind==='lookup',many=!lookup&&Array.isArray(r.values)&&r.values.length;
+    $('title').textContent=lookup?'Claude asks to search the web with a masked value':many?'Claude asks to see one column':'Claude asks to see a masked value';
+    $('intro').textContent=lookup?'Claude will not see the value. The search is sent from this computer to Google News and Wikipedia.':many?`All ${r.values.length} values in this column will be shared with Claude. This uses one reveal.`:'Only this value will be shared with Claude.';
+    const where=r.column+' ('+r.file.replace(/^drive\//,'').replace(/\.[^.]+$/,'')+')';
+    $('details').innerHTML=(many?[['Column',where],['Values',r.values.map(v=>v.value).join(', ')],['Reason',r.reason]]:[['Code',r.code],['Column',where],['Real value',r.value],['Reason',r.reason]]).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
     $('search').textContent=lookup?'Search: '+r.query.replaceAll('{value}',r.value):'';
     $('approve').textContent=lookup?'Allow search':'Reveal to Claude';$('request').hidden=false;decisionLabel(r.decision);
     let done=r.decision!=='pending';

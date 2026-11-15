@@ -48,8 +48,11 @@ def hide(data_dir, code, workspace, at):
     return {'hidden': True}
 
 
+COLUMN_LIMIT = 80
+
+
 @privacy.locked
-def create(data_dir, code, reason, workspace, kind='unmask', query=None):
+def create(data_dir, code, reason, workspace, kind='unmask', query=None, whole_column=False):
     info = privacy.code_info(data_dir, code)
     if not info or info['class'] != 'contextual':
         return {'refused': PERSONAL}
@@ -65,9 +68,19 @@ def create(data_dir, code, reason, workspace, kind='unmask', query=None):
         return {'refused': BUDGET}
     if query is not None:
         query = privacy._redact(query, privacy.session_vault(data_dir), lambda _: [])[0]
+    values = None
+    if whole_column and kind == 'unmask':
+        # Every contextual code from the same column (short species or category codes), shared as one reveal.
+        vault = privacy.session_vault(data_dir)
+        index = privacy.code_index(data_dir, vault)
+        values = sorted(({'code': c, 'value': vault.display[c]} for c, i in index.items()
+                         if i['file'] == info['file'] and i['column'] == info['column'] and i['class'] == 'contextual'
+                         and c in vault.display), key=lambda v: v['value'].casefold())
+        if len(values) > COLUMN_LIMIT:
+            return {'refused': f'This column has {len(values)} values. Ask for one value at a time.'}
     ident = uuid.uuid4().hex
     record = {**info, 'code': code, 'value': privacy.session_vault(data_dir).display[code],
-              'workspace': workspace, 'reason': reason.strip(), 'kind': kind, 'query': query,
+              'workspace': workspace, 'reason': reason.strip(), 'kind': kind, 'query': query, 'values': values,
               'expires': time.time() + 120, 'decision': 'pending'}
     privacy._write(_path(data_dir, f'consents/{ident}.json'), record)
     return {'id': ident}
@@ -100,8 +113,13 @@ def decide(data_dir, ident, approve):
             decision = 'budget'
         else:
             rows = privacy.reveals(data_dir)
-            rows.append({k: record[k] for k in ('code', 'value', 'column', 'file', 'workspace', 'reason', 'kind')}
-                        | {'at': dt.datetime.now(dt.timezone.utc).isoformat()})
+            vault = privacy.session_vault(data_dir)
+            at = dt.datetime.now(dt.timezone.utc).isoformat()
+            for item in record.get('values') or [{'code': record['code'], 'value': record['value']}]:
+                if vault.display.get(item['code']) != item['value']:
+                    continue  # the file changed since the request; that value stays hidden
+                rows.append({k: record[k] for k in ('column', 'file', 'workspace', 'reason', 'kind')}
+                            | {'code': item['code'], 'value': item['value'], 'at': at})
             if record['kind'] == 'unmask':
                 b = _budget(data_dir)
                 entry = b.setdefault(record['workspace'], {'limit': 3, 'used': 0})
@@ -115,9 +133,9 @@ def decide(data_dir, ident, approve):
     return {'decision': decision}
 
 
-def ask(data_dir, code, reason, workspace, kind='unmask', query=None):
+def ask(data_dir, code, reason, workspace, kind='unmask', query=None, whole_column=False):
     from lib import uiswitch
-    result = create(data_dir, code, reason, workspace, kind, query)
+    result = create(data_dir, code, reason, workspace, kind, query, whole_column)
     if 'refused' in result:
         return result
     ident = result['id']

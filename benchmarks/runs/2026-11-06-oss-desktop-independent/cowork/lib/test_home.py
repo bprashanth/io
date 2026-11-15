@@ -367,8 +367,7 @@ def test_launcher_config_and_proxy(tmp_path):
     shutil.copyfile(HERE / 'idli/CLAUDE-masked.md', clone / 'idli/CLAUDE-masked.md')
     shutil.copytree(HERE / 'idli/claude-commands', clone / 'idli/claude-commands')
     shutil.copytree(HERE / 'idli/claude-skills', clone / 'idli/claude-skills')
-    (clone / 'lib').mkdir()
-    shutil.copyfile(HERE / 'lib/launchsettings.py', clone / 'lib/launchsettings.py')
+    shutil.copytree(HERE / 'lib', clone / 'lib', ignore=shutil.ignore_patterns('test_*', '__pycache__'))
     py = clone / '.venv/bin/python'
     py.write_text('#!' + sys.executable + '\n' + '''import subprocess, sys
 if 'ensure' in sys.argv: print('18870')
@@ -397,7 +396,10 @@ Path(os.environ['LAUNCH_RECORD']).write_text(json.dumps({'args':sys.argv[1:],'cw
     assert config['args'] == ['-I', str(clone / 'lib/idli_mcp.py')]
     assert (work / '.idli-mcp.json').stat().st_mode & 0o777 == 0o600
     assert home.read(work / '.claude/settings.json')['permissions']['ask'] == ['mcp__idli__unmask', 'mcp__idli__lookup']
-    assert (work / 'drive').resolve() == data / 'drive'
+    # drive/ holds masked copies (none yet: nothing reviewed), never a link to the real downloads.
+    assert (work / 'drive').is_dir() and not (work / 'drive').is_symlink()
+    settings = home.read(work / '.claude/settings.json')
+    assert settings['sandbox']['enabled'] and str(data.resolve()) in settings['sandbox']['filesystem']['denyRead']
 
 
 def test_mcp_path_confinement(workspace, tmp_path, monkeypatch):

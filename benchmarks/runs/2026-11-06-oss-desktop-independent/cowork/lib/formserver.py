@@ -528,7 +528,10 @@ def make_handler(files, token):
                 if u.path == '/api/consent':
                     return self._send(200, reveals.decide(files.data_dir, body['id'], body['approve']))
                 if u.path == '/api/reveals/hide':
-                    return self._send(200, reveals.hide(files.data_dir, body['code'], body['workspace'], body['at']))
+                    hidden = reveals.hide(files.data_dir, body['code'], body['workspace'], body['at'])
+                    from lib import maskcopy
+                    maskcopy.build(files.data_dir, home.work_dir())  # the code goes back into Claude's copies
+                    return self._send(200, hidden)
                 if u.path == '/api/reveals/more':
                     return self._send(200, reveals.allow_more(files.data_dir, body['workspace']))
                 if u.path == '/api/review-change':

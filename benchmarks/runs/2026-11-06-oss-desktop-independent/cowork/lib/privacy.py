@@ -185,6 +185,9 @@ def _save(vault):
     _write(vault.path, {'forward': vault.forward, 'display': vault.display, 'counters': vault.counters})
 
 
+UNIDENTIFYING = {'age', 'dob', 'date_of_birth', 'date', 'birth_date'}
+
+
 class Scanner:
     def __init__(self):
         self.status = 'ok'
@@ -202,8 +205,11 @@ class Scanner:
         try:
             with urllib.request.urlopen(req, timeout=5) as r:
                 spans = json.load(r)['spans']
+            # An age or a date found in running text identifies no one ("All six scripts" was tagged as an age, and
+            # today's date as a birth date). Ages and birth dates in a sheet are hidden by their column instead.
             return [(int(a), int(b), str(c), float(d)) for a, b, c, d in spans
-                    if 0 <= int(a) < int(b) <= len(text) and float(d) >= .7]
+                    if 0 <= int(a) < int(b) <= len(text) and float(d) >= .7
+                    and str(c).casefold().replace(' ', '_') not in UNIDENTIFYING]
         except (OSError, ValueError, KeyError, TypeError):
             self.status = 'regex only'
             return []
@@ -232,6 +238,9 @@ def column_class(column, series=None):
     if _class(c) == 'person_name':
         return 'personal'
     if re.search(r'ward|village|district|block|town|place|organi[sz]ation|programme|program|scheme|categor|company|institution|agency', c):
+        return 'contextual'
+    # Plants, animals and crops are about the land, not about people.
+    if re.search(r'species|(^|_)spp?($|_)|spp|taxon|genus|plant|tree|crop|bird|animal|habit', c):
         return 'contextual'
     # This also covers the names backstop. No unrecognised column is revealable.
     return 'personal'
@@ -311,7 +320,20 @@ def _frame(path, tab):
 def _code_frame(frame, columns, vault):
     # Explicit choices always code the entire cell, including numbers, dates and GPS.
     classes = {c: _class(c) for c in frame.columns if columns.get(str(c), False)}
-    return pseudonymise_frame(frame, classes, vault)
+    # A header repeated inside the sheet ("sppnam" in the sppnam column) is the column's name, not a private value.
+    repeats = {}
+    for c in classes:
+        hit = frame[c].astype(str).map(normalise) == normalise(str(c))
+        if hit.any():
+            repeats[c] = hit
+    if repeats:
+        frame = frame.copy()
+        for c, hit in repeats.items():
+            frame.loc[hit, c] = ''
+    result = pseudonymise_frame(frame, classes, vault)
+    for c, hit in repeats.items():
+        result.loc[hit, c] = str(c)
+    return result
 
 
 NAME_LIKE = re.compile(r"^[A-Z][a-z'.-]+(?: [A-Z][a-z'.-]*){1,3}$")

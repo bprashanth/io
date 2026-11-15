@@ -92,7 +92,9 @@ def test_transform_nested_and_signed(book):
     assert out['messages'][1]['content'][0]['content'][0]['text'] == name_code
     assert out['tools'] == body['tools'] and out['metadata'] == body['metadata'] and out['model'] == 'model'
     assert stats['masked'] > 0
-    assert transform.leaks(out)  # excluded fields still trigger the final fail-closed check
+    # The signed blocks still hold the ward word for word, but they are Anthropic's own text: not a leak.
+    assert not transform.leaks(out)
+    assert transform.leaks({**out, 'messages': out['messages'] + [{'role': 'user', 'content': ward}]})
     restored = transform.restore({'content': [signed, redacted, {'type': 'text', 'text': name_code + '/' + ward_code}]})
     assert restored['content'] == [signed, redacted, {'type': 'text', 'text': name + '/' + ward}]
     assert transform.restore({name_code: ward_code}) == {name: ward}
@@ -174,7 +176,15 @@ def test_regex_on_system_tool_arguments_results_and_history(book, monkeypatch):
     out, stats = transform.outbound(body)
     assert '@example.org' not in json.dumps(out)
     assert stats['masked'] == 4 and stats['scanner'] == 'not used'
-    assert transform.restore(out) == body
+    # Claude's commands run on masked copies, so a tool input keeps its code; text gets the real value back.
+    restored = transform.restore(out)
+    assert restored['messages'][1]['content'][0]['input']['arg'] == out['messages'][1]['content'][0]['input']['arg']
+    assert restored['messages'][1]['content'][0]['input']['arg'].startswith('EMAIL_')
+    restored['messages'][1]['content'][0]['input']['arg'] = 'tool@example.org'
+    assert restored == body
+    shown = transform.restore({'type': 'tool_use', 'name': 'AskUserQuestion',
+                               'input': {'q': out['messages'][1]['content'][0]['input']['arg']}})
+    assert shown['input']['q'] == 'tool@example.org'
 
 
 def test_numbers_and_whole_tokens(book):
@@ -321,7 +331,8 @@ def test_fake_upstream_roundtrip_and_refusal(book):
                 answer = event('message_start', message={'content': []})
                 for i, kind, field, text in [(0, 'text_delta', 'text', name_code + ' in ' + ward_code),
                                               (1, 'input_json_delta', 'partial_json', tool_json)]:
-                    answer += event('content_block_start', index=i, content_block={'type': 'text', 'text': ''})
+                    block = {'type': 'text', 'text': ''} if i == 0 else {'type': 'tool_use', 'name': 'Bash', 'input': {}}
+                    answer += event('content_block_start', index=i, content_block=block)
                     # Split at every character, including UTF-8 and JSON token boundaries.
                     for char in text:
                         answer += event('content_block_delta', index=i, delta={'type': kind, field: char})
@@ -360,7 +371,8 @@ def test_fake_upstream_roundtrip_and_refusal(book):
             assert status == 200
             result = json.loads(data)
             assert result['content'][1]['text'] == name + ' in ' + ward
-            assert result['content'][2]['input'] == {'path': '/tmp/' + ward, 'name': name}
+            name_code, ward_code = code(proxy.transformer.vault, name), code(proxy.transformer.vault, ward)
+            assert result['content'][2]['input'] == {'path': '/tmp/' + ward_code, 'name': name_code}
             assert result['content'][0]['thinking'] == code(proxy.transformer.vault, ward)
             status, _, data = call(server.server_port, {**body, 'stream': True}, headers=headers)
             assert status == 200
@@ -368,7 +380,7 @@ def test_fake_upstream_roundtrip_and_refusal(book):
             text = ''.join(o['delta']['text'] for o in events if o.get('delta', {}).get('type') == 'text_delta')
             args = ''.join(o['delta']['partial_json'] for o in events if o.get('delta', {}).get('type') == 'input_json_delta')
             assert text == name + ' in ' + ward
-            assert json.loads(args) == {'command': 'echo ' + name + ' ' + ward}
+            assert json.loads(args) == {'command': 'echo ' + name_code + ' ' + ward_code}
             status, _, data = call(server.server_port, body, '/v1/messages/count_tokens', headers=headers)
             assert status == 200 and json.loads(data)['input_tokens'] == 42
             assert auth_ok == [True] * 3
@@ -378,6 +390,9 @@ def test_fake_upstream_roundtrip_and_refusal(book):
             status, _, data = call(server.server_port, {**body, 'messages': [
                 {'role': 'assistant', 'content': [{'type': 'thinking', 'thinking': ward}]}]})
             assert status == 403 and json.loads(data)['error']['type'] == 'permission_error'
+            # A signed block is Anthropic's own text, passed back unchanged: not a leak.
+            assert not proxy.transformer.leaks({'messages': [{'role': 'assistant', 'content': [
+                {'type': 'thinking', 'thinking': ward, 'signature': 'sig'}]}]})
             assert len(seen) == 3  # refused requests never reach upstream
             assert call(server.server_port, path='/api/hello', method='GET')[::2] == (201, b'passthrough')
             assert call(server.server_port, path='/api/hello', method='HEAD')[0] == 204

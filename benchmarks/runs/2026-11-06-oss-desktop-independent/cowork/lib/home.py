@@ -146,8 +146,26 @@ def prepare(data_dir, files, question):
             masked = privacy.mask_text(data_dir, rel, path, masked, active=True)['masked']
             sheets, _ = filekit.raw_sheets(str(path))
             reviews.append({**item, 'tabs': [privacy.review(data_dir, rel, path, tab) for tab in sheets]})
-        return {'files': chosen, 'reviews': reviews, 'masked_question': masked,
-                'warning': privacy.review_warning(data_dir, [x['local'] for x in chosen])}
+        result = {'files': chosen, 'reviews': reviews, 'masked_question': masked,
+                  'warning': privacy.review_warning(data_dir, [x['local'] for x in chosen])}
+    # Claude's folder gets masked copies of the reviewed files (never the real ones).
+    from lib import maskcopy
+    maskcopy.build(data_dir, work_dir())
+    return result
+
+
+def rehydrate(data_dir, obj):
+    """Real values for the person's own screen: every code in keys and string values."""
+    vault = privacy.session_vault(data_dir)
+    def walk(v):
+        if isinstance(v, str):
+            return vault.rehydrate(v)
+        if isinstance(v, list):
+            return [walk(x) for x in v]
+        if isinstance(v, dict):
+            return {walk(k): walk(x) for k, x in v.items()}
+        return v
+    return walk(obj)
 
 
 def cli(*args):
