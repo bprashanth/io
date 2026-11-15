@@ -36,34 +36,67 @@ the person feel they did something wrong.
    to Claude?"* Yes -> Claude's pane gets the masked files and the question, and takes focus.
 7. **Claude takes over** on the right. It works in small steps and checks in with the person ("Shall I break this
    down by ward?"). It offers a chart when one would help.
-8. **A chart** opens on the right, beside Claude, as a live chart: hover, zoom, click a part for "Where did this come
-   from?", right-click "Copy to Claude" to bring that part and its sources into Claude's prompt. They switch back to
-   Claude or keep typing to it.
+8. **A chart** appears in the left chat (the "binder"), in order, under the line "Chart from Claude: <title>". It is
+   live: hover, click a part for "Where did this come from?", right-click "Copy to Claude" to bring that part and its
+   sources into Claude's prompt. **Enlarge** shows it in a large window over the app.
 9. **Pin.** Every chart has a Pin button. Pinned charts go into the Mini; unpinned ones don't.
-10. **Saving a Mini.** After about ten exchanges Claude offers, or the person types `/mini` at any time. Claude
-    writes the Mini and opens it on the right as an editable page:
-    - a title and a short story of what was found (their "essay");
-    - the pinned charts;
-    - the questions the Mini can answer, each with its options (ward, months, ...), tested on the current files;
-    - where the code and data live.
-    The person can edit any text, remove a question or a chart, then press **Save**.
-11. **A new cartridge** appears under the chat box. It carries everything: the story, the charts, the code, the
-    questions and their options. This is the Mini's "API".
+10. **Making the Mini.** After about ten exchanges Claude offers, or the person types `/mini` at any time. Claude
+    builds the questions, runs every one, and puts the **draft in the left chat**, under the charts. The draft is the
+    Mini exactly as colleagues will see it when they open it (one page, `lib/mini-card.html`), not a form:
+    - the title, the source file, then the author's text and the pinned charts in one column;
+    - "You can ask": the questions, each with its options in italics (ward, months, ...), tested on the current files.
+    The author arranges it like a short document:
+    - click any text to change it (simple Markdown: `### heading`, `- list`, `**bold**`); click the title or a
+      question to reword it;
+    - **Add text** adds their own explanation; text and charts can be dragged up or down by **Move** (or moved with
+      the arrow keys on Move);
+    - **Remove** takes out a chart, a text or a question, with **Undo**;
+    - **Enlarge** opens the same draft in a large window. Changes are kept as they are made, so the large copy and
+      the one in the chat stay the same;
+    - **Save Mini** (or **Add to <Mini>** when it grew out of one). Options themselves (choices, defaults) are not
+      edited here.
+11. **A new cartridge** appears under the chat box. It carries everything: the page as arranged, the charts, the code,
+    the questions and their options. This is the Mini's "API".
 
 ## B. Using a Mini (the only place the local model works)
 
-1. **Opening.** The person clicks a cartridge. The left chat becomes that Mini and shows exactly what the author
-   left: the story, the live charts, the questions it answers and their options. No model has run yet.
+1. **Opening.** The person clicks a cartridge. The left chat shows the Mini's page: the same page the author arranged
+   and saved, with live charts, read only. No model has run yet.
 2. **Asking.** The person asks in their own words. Now the local model maps the question to one of the Mini's
-   questions and options, shows which one it chose, and the Mini's own code answers.
-3. **Out of scope.** If no question fits, Idli says so and offers a card: *"This Mini can't answer that. Send your
-   question to Claude, with the Mini's files masked? Claude will see: <the masked question>."* Yes -> the same Claude
-   flow as Part A, with the Mini's files and code as context.
-4. **Growing the Mini.** At the end, Claude offers to **add** what they found to this Mini, or **save a new Mini**.
+   questions and options, shows which one it chose, and the Mini's own code answers. A question maps only when it is
+   the same question: "where does Cestrum grow?" is not "where are Cestrum's big trees?" (the saved question counts
+   trees above a DBH cut-off only).
+3. **Out of scope: the query service, with consent.** If no question fits, Idli first shows a card with exactly what
+   an external query service would get: the question with private values as codes, and the first lines of the
+   column list (sheet and column names, types, number ranges, and for short text columns the list of their values,
+   as codes when private). Never rows. Choices:
+   - **Send**: the service writes one read-only query, which runs on this computer. It may ask back which of two or
+     three exact questions was meant (which sheet, what counts as big); picking one sends that one.
+   - **Ask Claude**: the Claude card below.
+   - **Not yet**: nothing is sent.
+   Limits: a short reply, a capped column list and 200 questions a day per computer; past that, only Claude is
+   offered.
+4. **Claude.** *"This Mini can't answer that. Claude can work on the Mini's files with private values as codes.
+   Masked question: <the masked question>."* Switch to Claude -> the same Claude flow as Part A, with the Mini's files
+   and code as context.
+5. **Growing the Mini.** At the end, Claude offers to **add** what they found to this Mini, or **save a new Mini**.
+
+## C. Start here: what was sent
+
+Under the Start here heading are two entries, so neither gets lost the way a tab can:
+- **Logins**: the setup chat (Google and Claude sign-in checks), with the Minis tab.
+- **Privacy**: the "Sent to Claude" log, shown in the chat. Everything Idli's privacy guard sent to Claude in the last
+  7 days, newest first, labelled by app (Drivey, ...). Private values show as codes. Type a name or a word to search:
+  for a private name it says which code it went as (for example "Ramtekdi is private. It went to Claude only as
+  PLACE_005"). Requests the guard stopped show only the codes that stopped them. Paseo lists the two entries by most
+  recent use, so Privacy can sit above Logins.
 
 ## What runs where
 - Left chat: Paseo's chat. Its replies outside a Mini are written by code; inside a Mini, the 9B only picks a
   question and options, and the Mini's script writes the answer.
 - Right: Claude Code CLI, launched through Idli's masking proxy, with Idli's tool server (charts, Minis) and Idli's
   instructions.
-- Idli's local server serves the pages shown inside the panes: privacy review, charts, the Mini editor.
+- Idli's local server serves the pages shown inside the chats and panes: privacy review, charts, the Mini page (draft
+  and saved), the Sent to Claude log. Paseo shows them inside a chat (patch P19, build idli22).
+- The query service: any OpenAI-compatible endpoint (today DeepSeek through OpenRouter, providers that keep no data).
+  It gets only what the consent card shows.
