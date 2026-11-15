@@ -20,8 +20,8 @@
 - `mini_open` shows that page (`/mini-card?mini=<id>&embed=1`) instead of writing Markdown.
 - **Query service consent.** An unmatched question first calls `mini_ask` with `preview: true`:
   `minisql.preview` builds exactly what would be sent (masked question, first 14 lines of the column list, how many
-  more) without calling the service or counting against the daily limit. Card: Send / Ask Claude / Not yet. Send
-  calls the service with the same text (`minisql.prepare` is shared).
+  more) without calling the service or counting against the daily limit. Card: Yes / No (updated later the same day;
+  columns that list their values come first). Yes calls the service with the same text (`minisql.prepare` is shared).
 - **Privacy entry.** Start here now has two workspaces: Logins (the old Start here workspace, renamed) and Privacy.
   The Privacy chat is written by code (`modes.privacy_chat_route`, first message "Show what Idli sent to Claude"):
   it calls `wire_page` and shows `/wire?embed=1` from Drivey's page server; anything typed searches the log. The

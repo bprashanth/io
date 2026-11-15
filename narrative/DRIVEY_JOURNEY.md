@@ -69,11 +69,11 @@ the person feel they did something wrong.
 3. **Out of scope: the query service, with consent.** If no question fits, Idli first shows a card with exactly what
    an external query service would get: the question with private values as codes, and the first lines of the
    column list (sheet and column names, types, number ranges, and for short text columns the list of their values,
-   as codes when private). Never rows. Choices:
-   - **Send**: the service writes one read-only query, which runs on this computer. It may ask back which of two or
-     three exact questions was meant (which sheet, what counts as big); picking one sends that one.
-   - **Ask Claude**: the Claude card below.
-   - **Not yet**: nothing is sent.
+   as codes when private), columns that list their values first. Never rows. Yes or No:
+   - **Yes**: the service writes one read-only query, which runs on this computer. It may ask back which of two or
+     three exact questions was meant (which sheet, what counts as big); picking one sends that one. That card also
+     offers Claude.
+   - **No**: nothing is sent.
    Limits: a short reply, a capped column list and 200 questions a day per computer; past that, only Claude is
    offered.
 4. **Claude.** *"This Mini can't answer that. Claude can work on the Mini's files with private values as codes.
@@ -90,6 +90,41 @@ Under the Start here heading are two entries, so neither gets lost the way a tab
   for a private name it says which code it went as (for example "Ramtekdi is private. It went to Claude only as
   PLACE_005"). Requests the guard stopped show only the codes that stopped them. Paseo lists the two entries by most
   recent use, so Privacy can sit above Logins.
+
+## D. Making a team (planned, PoC: the Insights team)
+
+A **team** is a heading in the sidebar (its "office space") made from a short talk with Claude. The PoC models one
+case: a manager makes an **Insights** team, and what comes out is exactly today's Drivey (same flow, same panes, same
+tools), named Insights. Drivey itself stays as it is.
+
+1. **Start here > Teams > New team.** Idli asks "What's your team called?" -> Insights. Claude opens on the right:
+   "I'll ask a few questions about your team's work, then suggest how to set up Insights." Claude sees this talk
+   through the masking proxy like everything else.
+2. **Claude asks about the work**, one question at a time, stopping when it has enough:
+
+   | Claude asks | What it sets |
+   |---|---|
+   | What does your team work towards? | The outcome, shown on the heading and on each Mini |
+   | How do you know it's going well? What do you count or track? | The first Mini suggestions |
+   | Where is that kept? | Sources: Drive sheets mean tables, so DuckDB and SQL |
+   | Who needs the answers? Who makes the sheets? | Makers get the two panes with Claude; others use Minis only |
+   | Does it have names, villages, phone numbers? | How strict the codes are (codes stay on in the PoC) |
+   | When someone asks something new, can the question and column names go to an outside service, as codes? | Query service on or off, asks each time, daily limit |
+
+3. **Pick one file you use often** (optional). Claude sees the masked copy and makes the Mini suggestions concrete.
+   If the file has names the manager said it wouldn't, Idli says so and keeps codes on.
+4. **The proposal card: "Your office space: Insights".** Plain lines, each backed by a part of Drivey: the heading;
+   ask on the left and Claude helps on the right; names become codes before Claude sees them; files are read from
+   Drive when picked and stay on this computer; everyday questions are answered on this computer (the 9B picks a
+   saved Mini question); new questions can go to the query service, asking each time; a maker can ask Claude to build
+   a new Mini; three Minis to start. **Set it up** or **Change something** (back to Claude).
+5. **Setup.** A short progress list, then the Insights heading appears and its first chat offers the suggested Minis.
+   A "Map your Drive?" card is offered later, once the Drive scan exists.
+
+Under the hood Claude fills a team description through one tool (`propose_team`): name, outcome, sources, data
+shape, layout, privacy, query service, roles, suggested Minis. Idli checks it, draws the card from it and installs
+from it with the same steps the bootstrap uses for Drivey. Claude never edits setup files itself. For a class there
+is also "Use an example team", which fills in Insights with the sample households file.
 
 ## What runs where
 - Left chat: Paseo's chat. Its replies outside a Mini are written by code; inside a Mini, the 9B only picks a
