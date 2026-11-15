@@ -49,17 +49,22 @@ index f3c3f139..63d89d4d 100644
 +  return openedMiniName(agent?.title ?? "") ?? agent?.title ?? null;
 +}
 diff --git a/packages/app/src/agent-stream/view.tsx b/packages/app/src/agent-stream/view.tsx
-index 72923b42..2c9f61ca 100644
+index 72923b42..349154c0 100644
 --- a/packages/app/src/agent-stream/view.tsx
 +++ b/packages/app/src/agent-stream/view.tsx
-@@ -1,3 +1,6 @@
-+import { driveyVisibleItems, openedMiniName } from "@/utils/idli-drivey";
+@@ -1,3 +1,11 @@
++import {
++  driveyVisibleItems,
++  isIdliPlain as isIdliPlainAgent,
++  openedMiniName,
++  plainVisibleItems,
++} from "@/utils/idli-drivey";
 +import { IdliMiniCartridges } from "@/components/idli-mini-cartridges";
 +import { shouldShowIdliMinis } from "@/utils/idli-minis";
  import { ChatFind, ChatFindExpansion } from "@/agent-stream/chat-find";
  import { LoadingSpinner } from "@/components/ui/loading-spinner";
  import React, {
-@@ -116,13 +119,24 @@ function renderLiveAuxiliaryNode(input: {
+@@ -116,13 +124,24 @@ function renderLiveAuxiliaryNode(input: {
    pendingPermissions: ReactNode;
    turnFooter: ReactNode;
    bottomOverlayInset: number;
@@ -85,7 +90,7 @@ index 72923b42..2c9f61ca 100644
        {input.pendingPermissions ? (
          <View style={stylesheet.contentWrapper}>
            <View style={stylesheet.listHeaderContent}>{input.pendingPermissions}</View>
-@@ -142,6 +156,7 @@ function BottomOverlayInset({ height }: { height: number }) {
+@@ -142,6 +161,7 @@ function BottomOverlayInset({ height }: { height: number }) {
  
  function renderPendingPermissionsNode(input: {
    pendingPermissions: PendingPermission[];
@@ -93,7 +98,7 @@ index 72923b42..2c9f61ca 100644
    client: DaemonClient | null;
  }): ReactNode {
    if (input.pendingPermissions.length === 0) {
-@@ -150,7 +165,12 @@ function renderPendingPermissionsNode(input: {
+@@ -150,7 +170,12 @@ function renderPendingPermissionsNode(input: {
    return (
      <View style={stylesheet.permissionsContainer}>
        {input.pendingPermissions.map((permission) => (
@@ -107,30 +112,35 @@ index 72923b42..2c9f61ca 100644
        ))}
      </View>
    );
-@@ -381,6 +401,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -381,6 +406,16 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
      const sessionStreamHead = useSessionStore((state) =>
        state.sessions[resolvedServerId]?.agentStreamHead?.get(agentId),
      );
 +    const isIdliLeft = useSessionStore((state) => {
 +      const session = state.sessions[resolvedServerId];
 +      const agent = session?.agents.get(agentId) ?? session?.agentDetails.get(agentId);
-+      return agent?.labels?.["idli.left"] === "1";
++      return agent?.labels?.["idli.left"] === "1" || agent?.labels?.["idli.plain"] === "1";
 +    });
++    const isIdliPlain = useSessionStore((state) => {
++      const session = state.sessions[resolvedServerId];
++      return isIdliPlainAgent(session?.agents.get(agentId) ?? session?.agentDetails.get(agentId));
++    });
++    const visibleItems = isIdliPlain ? plainVisibleItems : driveyVisibleItems;
      const streamHead = providedStreamHead ?? sessionStreamHead;
      const forkAgent = useForkAgent({ serverId: resolvedServerId, toast, readOnly });
      const supportsAgentForkContextCursor = useSessionStore(
-@@ -524,13 +549,21 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -524,13 +559,21 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
      const effectiveTurnPresentation = useRetainedValue(turnPresentation, isActive);
      const isTurnActive = effectiveTurnPresentation.isActive;
      const presentStream = useMemo(() => createStreamPresentation(), []);
 +    const presentationTail = useMemo(
-+      () => (isIdliLeft ? driveyVisibleItems(effectiveStreamItems) : effectiveStreamItems),
-+      [isIdliLeft, effectiveStreamItems],
++      () => (isIdliLeft ? visibleItems(effectiveStreamItems) : effectiveStreamItems),
++      [isIdliLeft, visibleItems, effectiveStreamItems],
 +    );
 +    const presentationHead = useMemo(() => {
 +      const head = effectiveStreamHead ?? EMPTY_STREAM_HEAD;
-+      return isIdliLeft ? driveyVisibleItems(head) : head;
-+    }, [isIdliLeft, effectiveStreamHead]);
++      return isIdliLeft ? visibleItems(head) : head;
++    }, [isIdliLeft, visibleItems, effectiveStreamHead]);
      const presentation = useMemo(
        () =>
          presentStream({
@@ -144,7 +154,7 @@ index 72923b42..2c9f61ca 100644
            autoExpandReasoning,
            expandedTurnHostIds,
            isTurnActive,
-@@ -538,8 +571,9 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -538,8 +581,9 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
          }),
        [
          presentStream,
@@ -156,7 +166,7 @@ index 72923b42..2c9f61ca 100644
          transformTimelineItem,
          chatDisplay,
          autoExpandReasoning,
-@@ -714,6 +748,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -714,6 +758,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
  
      const setToolCallGroupExpanded = toolCallExpansion.setGroupExpanded;
  
@@ -168,7 +178,7 @@ index 72923b42..2c9f61ca 100644
      const renderUserMessageItem = useCallback(
        (layoutItem: StreamLayoutItem, item: Extract<StreamItem, { kind: "user_message" }>) => {
          const collapsedTurn = getCollapsedTurn(item.id);
-@@ -722,7 +761,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -722,7 +771,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
              serverId={resolvedServerId}
              agentId={agentId}
              messageId={item.messageId}
@@ -181,7 +191,7 @@ index 72923b42..2c9f61ca 100644
              sender={item.sender}
              images={item.images}
              attachments={item.attachments}
-@@ -749,6 +792,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -749,6 +802,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
        },
        [
          context.capabilities,
@@ -190,7 +200,7 @@ index 72923b42..2c9f61ca 100644
          agentId,
          client,
          getCollapsedTurn,
-@@ -776,6 +821,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -776,6 +831,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
                    message={item.text}
                    timestamp={item.timestamp.getTime()}
                    workspaceRoot={workspaceRoot}
@@ -199,7 +209,7 @@ index 72923b42..2c9f61ca 100644
                    serverId={resolvedServerId}
                    client={client}
                    spacing={layoutItem.assistantSpacing}
-@@ -786,7 +833,16 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -786,7 +843,16 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
            </AssistantFileLinkResolverProvider>
          );
        },
@@ -217,7 +227,7 @@ index 72923b42..2c9f61ca 100644
      );
  
      const renderThoughtItem = useCallback(
-@@ -993,6 +1049,12 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -993,6 +1059,12 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
      const renderStreamItem = useCallback(
        (layoutItem: StreamLayoutItem) => {
          const content = renderStreamItemContent(layoutItem);
@@ -230,7 +240,7 @@ index 72923b42..2c9f61ca 100644
          return renderStreamItemWithTurnFooter({
            content,
            layoutItem,
-@@ -1004,6 +1066,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -1004,6 +1076,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
        },
        [
          getTurnIndent,
@@ -238,7 +248,7 @@ index 72923b42..2c9f61ca 100644
          handleForkAssistantTurn,
          readOnly,
          renderStreamItemContent,
-@@ -1021,34 +1084,36 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -1021,34 +1094,36 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
        () =>
          renderPendingPermissionsNode({
            pendingPermissions: pendingPermissionItems,
@@ -300,7 +310,7 @@ index 72923b42..2c9f61ca 100644
      const renderModel = useMemo<AgentStreamRenderModel>(() => {
        return {
          ...baseRenderModel,
-@@ -1133,6 +1198,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -1133,6 +1208,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
            renderStreamItem,
          }),
      );
@@ -316,7 +326,7 @@ index 72923b42..2c9f61ca 100644
      const renderLiveAuxiliary = useCallback<StreamSegmentRenderers["renderLiveAuxiliary"]>(() => {
        const existingTailSpacing =
          auxiliary.turnFooter && !auxiliary.pendingPermissions ? TURN_FOOTER_BOTTOM_SPACING : 0;
-@@ -1144,8 +1218,23 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -1144,8 +1228,23 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
          pendingPermissions: auxiliary.pendingPermissions,
          turnFooter: auxiliary.turnFooter,
          bottomOverlayInset,
@@ -341,7 +351,7 @@ index 72923b42..2c9f61ca 100644
  
      const renderers = useMemo<StreamSegmentRenderers>(
        () => ({
-@@ -1514,9 +1603,11 @@ function PermissionActionButton({
+@@ -1514,9 +1613,11 @@ function PermissionActionButton({
  function PermissionRequestCard({
    permission,
    client,
@@ -353,7 +363,7 @@ index 72923b42..2c9f61ca 100644
  }) {
    const { t } = useTranslation();
    const isMobile = useIsCompactFormFactor();
-@@ -1655,6 +1746,7 @@ function PermissionRequestCard({
+@@ -1655,6 +1756,7 @@ function PermissionRequestCard({
      return (
        <QuestionFormCard
          permission={permission}
@@ -361,7 +371,7 @@ index 72923b42..2c9f61ca 100644
          onRespond={handleResponse}
          isResponding={isResponding}
          responseError={responseError}
-@@ -1735,6 +1827,7 @@ function PermissionRequestCard({
+@@ -1735,6 +1837,7 @@ function PermissionRequestCard({
  }
  
  const stylesheet = StyleSheet.create((theme) => ({
@@ -4082,10 +4092,10 @@ index 00000000..3d0c926b
 +}
 diff --git a/packages/app/src/utils/idli-drivey.ts b/packages/app/src/utils/idli-drivey.ts
 new file mode 100644
-index 00000000..91c1f2f2
+index 00000000..41d04e02
 --- /dev/null
 +++ b/packages/app/src/utils/idli-drivey.ts
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,68 @@
 +import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 +import type { StreamItem } from "@/types/stream";
 +
@@ -4140,18 +4150,34 @@ index 00000000..91c1f2f2
 +export function driveyVisibleItems(items: StreamItem[]): StreamItem[] {
 +  return items.filter((item) => item.kind !== "tool_call" && item.kind !== "thought");
 +}
++
++// Start here's Teams and Privacy chats are written by code: they look like Drivey's left chat (one-click cards, no
++// tool rows) without being part of a split workspace. Their first message is Idli's, not the person's.
++export const IDLI_SETUP_PROMPTS: ReadonlySet<string> = new Set(["Teams", "Show what Idli sent to Claude"]);
++
++export function isIdliPlain(agent: Pick<Agent, "labels"> | null | undefined): boolean {
++  return agent?.labels["idli.plain"] === "1";
++}
++
++export function plainVisibleItems(items: StreamItem[]): StreamItem[] {
++  return driveyVisibleItems(items).filter(
++    (item) => !(item.kind === "user_message" && IDLI_SETUP_PROMPTS.has(item.text)),
++  );
++}
 diff --git a/packages/app/src/utils/idli-minis.test.ts b/packages/app/src/utils/idli-minis.test.ts
 new file mode 100644
-index 00000000..cdd7007b
+index 00000000..c790d19c
 --- /dev/null
 +++ b/packages/app/src/utils/idli-minis.test.ts
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,182 @@
 +import {
 +  isDriveyLeft,
 +  isDriveyProject,
 +  isIdliDashboardUrl,
 +  openedMiniName,
 +  driveyVisibleItems,
++  isIdliPlain,
++  plainVisibleItems,
 +} from "./idli-drivey";
 +import { describe, expect, it } from "vitest";
 +import type { StreamItem } from "@/types/stream";
@@ -4311,6 +4337,19 @@ index 00000000..cdd7007b
 +      },
 +    };
 +    expect(driveyVisibleItems([...opening, tool, thought])).toEqual(opening);
++  });
++});
++
++describe("Start here chats written by code", () => {
++  it("hide tool rows and Idli's own first message, keep the person's words", () => {
++    const items: StreamItem[] = [
++      { kind: "user_message", id: "a", text: "Teams", timestamp },
++      { kind: "assistant_message", id: "b", text: "What's your team called?", timestamp },
++      { kind: "user_message", id: "c", text: "Insights", timestamp },
++    ];
++    expect(plainVisibleItems(items).map((i) => i.id)).toEqual(["b", "c"]);
++    expect(isIdliPlain({ labels: { "idli.plain": "1" } })).toBe(true);
++    expect(isIdliPlain({ labels: {} })).toBe(false);
 +  });
 +});
 diff --git a/packages/app/src/utils/idli-minis.ts b/packages/app/src/utils/idli-minis.ts

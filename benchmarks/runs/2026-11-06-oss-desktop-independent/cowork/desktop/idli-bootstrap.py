@@ -222,6 +222,18 @@ def chat(ws_id, folder, title, prompt, provider=START_PROVIDER, label=None):
     return (out or {}).get("agentId")
 
 
+def plain_chat(agent_id):
+    """Teams and Privacy are written by code: Paseo (P20) shows them like Drivey's left chat (one-click cards, no tool
+    rows, Idli's first message hidden) when they carry idli.plain=1."""
+    if not agent_id or DRY:
+        return
+    agent = next((a for a in paseo("ls", "--global") if a.get("id") == agent_id), None)
+    labels = (agent or {}).get("labels") or {}
+    if labels.get("idli.plain") != "1":
+        say("show this chat like Drivey's left chat")
+        paseo("agent", "update", agent_id, "--label", "idli.plain=1", parse=False, change=True)
+
+
 OPENED = os.path.join(IDLI, "config", "bootstrap-tabs.json")  # tabs opened once: Paseo lists only the tabs of the
 #                                                              workspace on screen, so we can't look for them later
 
@@ -379,8 +391,9 @@ def main():
     retire_claude_workspace()
     one_idli_workspace()
     agent = start_chat(ids.get("Start here"))
-    chat(ids.get(PRIVACY), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
-    chat(ids.get(TEAMS), FOLDER["Start here"], TEAMS, TEAMS, label="idli.role=setup")
+    for title, prompt in ((PRIVACY, PRIVACY_PROMPT), (TEAMS, TEAMS)):
+        cid = chat(ids.get(title), FOLDER["Start here"], title, prompt, label="idli.role=setup")
+        plain_chat(cid)
     learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
     chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on

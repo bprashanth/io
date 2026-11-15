@@ -436,9 +436,16 @@ def _events(messages):
                     ev.append(("tool", _short(name), inp, res))
                 elif b.get("type") == "text":
                     t = _strip_reminders(b.get("text"))
-                    if t and m.get("role") == "user":
+                    mid = MID_TURN.match(t or "")
+                    if mid and mid.group(1).strip():  # typed while a card was open (Claude Code passes it this way)
+                        ev.append(("said", mid.group(1).strip()))
+                    elif t and m.get("role") == "user":
                         ev.append(("said", t))
     return ev
+
+
+MID_TURN = re.compile(r"\s*The user sent a new message while you were working:\n(.*?)\n\nThis is how Claude Code surfaces",
+                      re.S)
 
 
 QUESTION = re.compile(r"(?i)\?|\b(how|what|which|who|where|when|why|average|mean|total|sum|count|share|percent|"

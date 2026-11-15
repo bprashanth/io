@@ -84,10 +84,13 @@ class Chat:
     def typed_over_card(self, text):
         """Typed in the chat box while a card is open: Claude Code answers the card as dismissed."""
         tid, q = self.card
+        # What Claude Code sends (laptop, 2026-11-15): the card is refused and the words come as a system note.
         self.messages.append({'role': 'user', 'content': [{'type': 'tool_result', 'tool_use_id': tid, 'is_error': True,
-                                                           'content': "The user doesn't want to proceed with this tool use."}]})
+                              'content': 'The user answered with a message instead of approving. Their message follows.'}]})
         self.card = None
-        self.messages.append({'role': 'user', 'content': [{'type': 'text', 'text': text}]})
+        self.messages.append({'role': 'system', 'content': [{'type': 'text', 'text':
+                              'The user sent a new message while you were working:\n' + text + '\n\nThis is how Claude '
+                              'Code surfaces messages the user sends mid-turn. Address the message above.'}]})
         self.shown.append(('you', text))
         self.run()
         return self

@@ -126,10 +126,24 @@ def read_name(text):
     return {'name': name, 'trying': trying or bool(out and out.get('trying_out'))}
 
 
+FILLER = re.compile(r"(?i)^(?:ok(?:ay)?|so|well|actually|um+|hmm+|basically|honestly|yes|yeah|i think|i guess|"
+                    r"it'?s|it is|we(?:'re| are)|our team|the team|we)\b[\s,:;.-]*")
+
+
+def _unfill(t):
+    """Drop spoken lead-ins: "ok so: actually it's helping..." -> "helping..."."""
+    for _ in range(6):
+        cut = FILLER.sub('', t, count=1)
+        if cut == t or not cut.strip():
+            break
+        t = cut
+    return t[:1].upper() + t[1:] if t else t
+
+
 @functools.lru_cache(maxsize=512)
 def read_goal(text):
     """{'goal': str|None, 'trying': bool} from what they typed for what the team works towards."""
-    t = ' '.join(str(text).split())
+    t = _unfill(' '.join(str(text).split()))
     trying = bool(TRYING.search(t))
     vague = re.search(r"(?i)\b(not sure|don'?t know|dunno|no idea|skip|later|nothing|n/?a|none)\b", t)
     if not trying and not vague and t.strip(' .!?').lower() not in NOT_NAMES and re.search(r'\w\w', t):
@@ -434,7 +448,7 @@ def route(events, card_answers, has_tools):
         if st.get('no_name') and not st.get('wants_name'):
             first = 'No problem. ' if st.get('trying') else ''
             return ('card', 'Name', first + 'What should we call the team? Insights is fine for a try-out.',
-                    [('Insights', 'You can make more teams later.'), ('Something else', 'Type the name.')], lead or None)
+                    [('Insights', 'You can make more teams later.'), ('Something else', 'Type it in the box below.')], lead or None)
         return ('say', lead + ("Type the team's name." if st.get('wants_name') else ASK_NAME))
     if step == 'goal':
         if st.get('no_goal'):
@@ -544,7 +558,7 @@ def check(name, projects=None):
     names = {str(p.get('name', '')).lower() for p in projects or []}
     folder = os.path.join(_idli(), 'teams', slug(clean))
     if taken or clean.lower() in names or os.path.exists(os.path.join(folder, 'team.json')):
-        return {'ok': False, 'error': f'There is already a {clean} in your sidebar. Pick another name.'}
+        return {'ok': False, 'error': f'{clean} is already in your sidebar. Pick another name.'}
     return {'ok': True, 'name': clean}
 
 

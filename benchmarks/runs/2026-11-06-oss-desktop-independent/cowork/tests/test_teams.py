@@ -172,3 +172,10 @@ def test_team_work_folder_is_beside_drivey(tmp_path, monkeypatch):
     (folder / 'team.json').write_text('{"name": "Insights"}')
     assert str(home.work_dir(str(folder))) == str((tmp_path / 'claude-masked-insights').resolve())
     assert home.work_dir(str(tmp_path / 'cowork-real')).name == 'claude-masked'
+
+
+def test_spoken_lead_ins_are_dropped_from_the_goal():
+    from lib import teams
+    assert teams.read_goal("ok so: actually it's helping women's groups get out of debt")['goal'] == \
+        "Helping women's groups get out of debt"
+    assert teams.read_goal('we help 300 farmers sell at fair prices')['goal'] == 'Help 300 farmers sell at fair prices'
