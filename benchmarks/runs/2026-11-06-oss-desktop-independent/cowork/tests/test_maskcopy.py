@@ -112,11 +112,18 @@ def test_reveal_shows_the_value_in_the_copy(shola, monkeypatch):
 def test_sandbox_settings_hide_private_folders(shola):
     data, work = shola
     (work.parent / 'cowork-real').mkdir()
+    (work.parent / 'Claude-masked').mkdir()  # differs only in case: denying it would hide Claude's own folder
+    stale = str((work.parent / 'Claude-masked').resolve())
+    (work / '.claude').mkdir()
+    (work / '.claude/settings.json').write_text(json.dumps({'permissions': {'deny': [f'Read(/{stale}/**)', 'Bash(rm:*)']},
+                                                            'sandbox': {'filesystem': {'denyRead': [stale]}}}))
     launchsettings.merge(work, data)
     s = json.loads((work / '.claude/settings.json').read_text())
     deny = s['sandbox']['filesystem']['denyRead']
     assert str(data.resolve()) in deny and str((work.parent / 'cowork-real').resolve()) in deny
     assert str(work.resolve()) not in deny
+    assert stale not in deny and f'Read(/{stale}/**)' not in s['permissions']['deny']
+    assert 'Bash(rm:*)' in s['permissions']['deny']  # other rules are kept
     assert s['sandbox']['enabled'] and s['sandbox']['allowUnsandboxedCommands'] is False
     assert f'Read(/{data.resolve()}/**)' in s['permissions']['deny']
     assert 'mcp__idli__unmask' in s['permissions']['ask']
@@ -149,3 +156,72 @@ def test_count_columns_are_suggested_visible_ids_are_not(tmp_path, monkeypatch):
     rows = {r['column']: r for r in privacy._suggest(path, None)}
     assert rows['household_size']['mask'] is False
     assert rows['Phone']['mask'] and rows['hh_id']['mask'] and rows['Head']['mask']
+
+
+def test_species_key_and_unnamed_column_stay_contextual(tmp_path, monkeypatch):
+    """Laptop 2026-11-15: "Species name expanded" read as a person's name, and the same species in a column without
+    a heading (column_22) counted as personal, so a species reveal was refused."""
+    monkeypatch.setenv('IDLI_SCANNER', 'http://127.0.0.1:9/none')
+    data = tmp_path / 'data'
+    data.mkdir()
+    import openpyxl
+    book = openpyxl.Workbook()
+    trees = book.active
+    trees.title = 'Trees'
+    for row in [['sppnam', 'gbh', None], ['syzden', 120, 'Syzygium densiflorum'], ['rapcap', 30, None],
+                ['syzden', 95, None], ['rapcap', 41, None]]:
+        trees.append(row)
+    key = book.create_sheet('Read me')
+    for row in [['Species name expanded', 'Recorder'], ['Syzygium densiflorum', 'Meena Raghavan'],
+                ['Rapanea capitellata', 'Arjun Bellie']]:
+        key.append(row)
+    book.save(data / 'f.xlsx')
+    sheets, _ = filekit.raw_sheets(str(data / 'f.xlsx'))
+    assert any(str(c).startswith('column_') for c in sheets['Trees'].columns), list(sheets['Trees'].columns)
+    columns = {str(c): True for f in sheets.values() for c in f.columns}
+    privacy.set(data, 'f.xlsx', mode='mask', review='ask', columns=columns)
+    vault = privacy.session_vault(data)
+    index = privacy.code_index(data, vault)
+    assert index[vault.forward[privacy.normalise('Syzygium densiflorum')]]['class'] == 'contextual'
+    assert index[vault.forward[privacy.normalise('syzden')]]['class'] == 'contextual'
+    assert index[vault.forward[privacy.normalise('Meena Raghavan')]]['class'] == 'personal'
+    # An older vault coded a species key as NAME_; one such code must not make its whole column personal.
+    old = vault.token('Ilex wightiana', 'person_name')
+    book = openpyxl.load_workbook(data / 'f.xlsx')
+    book['Read me'].append(['Ilex wightiana', 'Kavya Shenoy'])
+    book.save(data / 'f.xlsx')
+    privacy._save(vault)
+    vault = privacy.session_vault(data)
+    index = privacy.code_index(data, vault)
+    assert old.startswith('NAME_') and index[old]['class'] == 'contextual'
+    assert index[vault.forward[privacy.normalise('Syzygium densiflorum')]]['class'] == 'contextual'
+    assert index[vault.forward[privacy.normalise('Kavya Shenoy')]]['class'] == 'personal'
+
+
+def test_old_heading_codes_no_longer_hide_headings(shola):
+    """An older vault coded the repeated header "sppnam" as a value; the copy then showed the heading as a code."""
+    data, work = shola
+    vault = privacy.session_vault(data)
+    junk = vault.token('sppnam', 'value')
+    book = __import__('openpyxl').load_workbook(data / REL)
+    book['Read me'].append(['sppnam', 'is the species code'])  # also a cell, in a column without a heading
+    book.save(data / REL)
+    person = vault.token('Recorder', 'person_name')  # a NAME_ code stays masked whatever it stands for
+    privacy._save(vault)
+    maskcopy.build(data, work)
+    copy = pd.read_excel(work / REL, sheet_name='Raw 10x10m Data')
+    assert junk.startswith('VALUE_') and 'sppnam' in copy.columns
+    assert 'Recorder' not in copy.columns and person in copy.columns
+    assert copy['sppnam'].str.match(r'^[A-Z]+_\d{3}$').all()  # the species themselves stay hidden
+
+
+def test_product_words_never_masked_even_if_an_old_vault_has_them():
+    """Laptop 2026-11-15: an old scanner false positive left NAME_007 = "Claude" in the vault; the close-match step
+    turned Claude's folder path into ~/idli-insights/NAME_007-masked and Claude wrote files there."""
+    vault = privacy.PseudonymMap()
+    vault.token('Claude', 'person_name')
+    vault.token('Meena Raghavan', 'person_name')
+    text = 'cd /home/x/idli-insights/claude-masked && python3 q.py  # Meena Raghavan'
+    out = privacy._redact(text, vault, lambda t: [])[0]
+    assert '/claude-masked' in out and 'Meena' not in out
+    assert privacy.known_leaks(out, vault) == []

@@ -215,11 +215,24 @@ class Scanner:
             return []
 
 
+LAND = re.compile(r'(^|_)(species|spp\w*|sp|taxon|genus|plants?|trees?|crops?|birds?|animals?|habit)($|_)')
+ABOUT_A_PERSON = re.compile(r'owner|farmer|worker|recorder|collector|observer|surveyor|enumerator|head|member|person|'
+                            r'staff|contact')
+
+
+def _about_land(column):
+    """A heading about plants, animals or crops ("Species name expanded"), not about a person who recorded them."""
+    c = re.sub(r'[^a-z0-9]+', '_', str(column).casefold()).strip('_')
+    return bool(LAND.search(c)) and not ABOUT_A_PERSON.search(c)
+
+
 def _class(column):
     c = str(column).casefold()
     people = r'beneficiary|employee|(^|_|\s)head($|_|\s)|owner|respondent|farmer|guardian|father|mother|spouse|husband|wife|contact_person'
     if re.search(people, c):
         return 'person_name'
+    if _about_land(column):
+        return 'value'
     # A district_name or organisation_name is a contextual label, not a person's name.
     if re.search(r'ward|village|town|place|district|block|organi[sz]ation|programme|program|scheme|categor|company|institution|agency', c):
         return 'village'
@@ -235,12 +248,13 @@ def column_class(column, series=None):
     c = re.sub(r'[^a-z0-9]+', '_', str(column).casefold()).strip('_')
     if re.search(r'phone|mobile|email|address|aadhaar|aadhar|voter|account|ifsc|upi|(^|_)(pan|ration|bank|id|lat|latitude|lon|lng|longitude|gps|coordinates?)($|_)', c):
         return 'personal'
+    # Plants, animals and crops are about the land, not about people ("Species name expanded" is not a person's
+    # name), unless the heading is about a person who recorded or owns them.
+    if _about_land(column):
+        return 'contextual'
     if _class(c) == 'person_name':
         return 'personal'
     if re.search(r'ward|village|district|block|town|place|organi[sz]ation|programme|program|scheme|categor|company|institution|agency', c):
-        return 'contextual'
-    # Plants, animals and crops are about the land, not about people.
-    if re.search(r'species|(^|_)spp?($|_)|spp|taxon|genus|plant|tree|crop|bird|animal|habit', c):
         return 'contextual'
     # This also covers the names backstop. No unrecognised column is revealable.
     return 'personal'
@@ -252,7 +266,7 @@ def code_index(data_dir, vault=None):
     vault = vault or session_vault(data_dir)
     path = Path(data_dir) / 'privacy.json'
     settings = json.loads(path.read_text()) if path.exists() else {}
-    out = {}
+    out, rank = {}, {}
     for file, options in sorted(settings.items()):
         if options.get('mode') != 'mask':
             continue
@@ -260,13 +274,24 @@ def code_index(data_dir, vault=None):
         for frame in sheets.values():
             for column in frame.columns:
                 info = {'file': file, 'column': str(column), 'class': column_class(column, frame[column])}
+                # A column without a heading (column_22) says nothing about what it holds: a named column decides.
+                # Among named columns personal wins.
+                named = not re.fullmatch(r'column_\d+|unnamed(: ?\d+)?|\d+', str(column).strip().casefold())
+                info['named'] = named
+                r = (2 if info['class'] == 'personal' else 1) if named else 0
+                heading = normalise(str(column))
                 for value in frame[column]:
+                    if normalise(str(value)) == heading:
+                        continue  # the heading repeated inside the sheet
                     code = vault.forward.get(normalise(str(value)))
-                    if code and (code not in out or info['class'] == 'personal'):
-                        out[code] = info
-    for code, info in out.items():
-        if re.match(r'^(NAME|PHONE|EMAIL|AADHAAR|PAN|VOTER|RATION|ACCOUNT|IFSC|UPI|ADDRESS|GPS)_', code):
-            info['class'] = 'personal'
+                    if code and (code not in out or r > rank[code]):
+                        out[code], rank[code] = info, r
+    for code, info in list(out.items()):
+        # Identifier codes are personal wherever they sit. NAME_ too, except in a column about plants or animals: an
+        # older rule coded "Species name expanded" as names. Copy, since one record is shared by a column's codes.
+        if (re.match(r'^(PHONE|EMAIL|AADHAAR|PAN|VOTER|RATION|ACCOUNT|IFSC|UPI|ADDRESS|GPS)_', code)
+                or (code.startswith('NAME_') and not _about_land(info['column']))):
+            out[code] = {**info, 'class': 'personal'}
     return out
 
 
@@ -275,7 +300,8 @@ def code_info(data_dir, code):
     vault = session_vault(data_dir)
     if code not in vault.display:
         return None
-    return code_index(data_dir, vault).get(code, {'file': '', 'column': '', 'class': 'personal'})
+    info = code_index(data_dir, vault).get(code, {'file': '', 'column': '', 'class': 'personal'})
+    return {k: info[k] for k in ('file', 'column', 'class')}
 
 
 @locked
@@ -294,6 +320,21 @@ def revealed_values(data_dir, vault=None, index=None):
             and r.get('value') == vault.display[r['code']]}
 
 
+def heading_codes(data_dir, vault, index):
+    """VALUE_ codes that only ever stood for a hidden column's own heading (or turn up only in columns without one). Older versions coded a header row
+    repeated inside the sheet ("sppnam" under sppnam) as a private value, and every heading then reached Claude as a
+    code (laptop, 2026-11-15). A code also found in a real cell, or with a name, phone or ID prefix, is kept."""
+    path = Path(data_dir) / 'privacy.json'
+    settings = json.loads(path.read_text()) if path.exists() else {}
+    # (privacy.set is this module's own function, so no set() here)
+    headings = {normalise(c) for options in settings.values() if options.get('mode') == 'mask'
+                for c, on in options.get('columns', {}).items() if on}
+    # Seen elsewhere only in columns without a heading (a side table's own header, a note in a Read me): still a
+    # heading word.
+    return {c for c, v in vault.display.items()
+            if c.startswith('VALUE_') and normalise(v) in headings and not index.get(c, {}).get('named')}
+
+
 @locked
 def proxy_vault(data_dir, full=None):
     """Reveals can exempt contextual values only. Personal values remain guarded even if switched off."""
@@ -301,9 +342,10 @@ def proxy_vault(data_dir, full=None):
     index = code_index(data_dir, full)
     active = active_vault(data_dir, full)
     allowed = revealed_values(data_dir, full, index)
+    junk = heading_codes(data_dir, full, index)
     active.display.update({c: v for c, v in full.display.items()
-                           if index.get(c, {}).get('class', 'personal') == 'personal'})
-    active.display = {c: v for c, v in active.display.items() if c not in allowed}
+                           if index.get(c, {}).get('class', 'personal') == 'personal' and c not in junk})
+    active.display = {c: v for c, v in active.display.items() if c not in allowed and c not in junk}
     active.forward = {normalise(v): c for c, v in active.display.items()}
     active.refresh()
     return active, allowed
@@ -537,6 +579,8 @@ def _redact(text, vault, scanner):
                 for code, real in _cores(vault):
                     if len(real) < 5 or abs(len(real) - len(fragment)) > 2:
                         continue
+                    if not matched_in_text(real) or fragment.casefold() in NEVER_PRIVATE:
+                        continue  # "claude" in Claude's own folder path became NAME_007-masked (laptop, 2026-11-15)
                     ratio = difflib.SequenceMatcher(None, fragment.casefold(), real.casefold()).ratio()
                     if ratio >= .85 and code not in [c for c, _ in matches]:
                         matches.append((code, real))

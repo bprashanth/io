@@ -1,5 +1,6 @@
 """The query service path: only masked text leaves, only one read-only SELECT runs, real values come back locally."""
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -95,3 +96,29 @@ def test_repeated_header_rows_dropped_and_numbers_typed(shola):
     frame = tables['2x2m_seedlings_and_saplings'][1]
     assert 'sppnam' not in set(frame['sppnam'].astype(str))
     assert str(frame['numsee'].dtype).startswith(('int', 'float', 'Int', 'Float'))
+
+
+def test_private_value_in_a_heading_or_sheet_name(tmp_path, monkeypatch):
+    """Laptop 2026-11-15: a heading equal to a hidden value went out as VALUE_010 and the service's query named the
+    column "VALUE_010"; Idli now puts the real heading back. Sheet names are masked the same way."""
+    monkeypatch.setenv('IDLI_SCANNER', 'http://127.0.0.1:9/none')
+    data = tmp_path / 'data'
+    (data / 'drive').mkdir(parents=True)
+    import pandas as pd
+    path = data / 'drive/plots.xlsx'
+    with pd.ExcelWriter(path) as w:
+        pd.DataFrame({'Recorder': ['Meena Raghavan', 'Arjun Bellie', 'Meena Raghavan'],
+                      'Meena Raghavan': [3, 4, 5]}).to_excel(w, sheet_name='Arjun Bellie', index=False)
+    privacy.set(data, 'drive/plots.xlsx', mode='mask', review='ask', columns={'Recorder': True, 'Meena Raghavan': False})
+    vault = privacy.session_vault(data)
+    meena, arjun = (vault.forward[privacy.normalise(v)] for v in ('Meena Raghavan', 'Arjun Bellie'))
+    seen = []
+    def call(body):
+        seen.append(body)
+        text = body['messages'][1]['content']
+        name = re.search(r'Table "([^"]+)"', text).group(1)
+        return {'sql': f'SELECT SUM("{meena}") AS n FROM "{name}" WHERE "Recorder" = \'{meena}\'', 'title': 't'}
+    r = minisql.answer(data, ['drive/plots.xlsx'], 'how many for the first recorder?', call=call)
+    sent = json.dumps(seen[0])
+    assert 'Meena' not in sent and 'Arjun' not in sent and arjun in sent
+    assert int(r['frame']['n'][0]) == 8

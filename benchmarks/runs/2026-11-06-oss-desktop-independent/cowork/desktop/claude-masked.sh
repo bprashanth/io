@@ -20,6 +20,10 @@ done
 # Project commands live beside the checked scripts.
 mkdir -p "$WORK/.claude/commands" || exit 1
 cp "$COWORK/idli/claude-commands/mini.md" "$WORK/.claude/commands/mini.md" || exit 1
+# The name scanner: a local one if this computer runs it (port 8899), otherwise Idli's default.
+if [ -z "$IDLI_SCANNER" ] && curl -s -m 2 -o /dev/null http://127.0.0.1:8899/health 2>/dev/null; then
+  export IDLI_SCANNER=http://127.0.0.1:8899/scan
+fi
 # Idli's local server too (Idli home, charts, Minis): Drivey's "+" opens Idli home beside this terminal
 (cd "$COWORK" && "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import formserver, drivestubs; formserver.ensure(sys.argv[1]); drivestubs.refresh(sys.argv[1])" "$DATA") >/dev/null 2>&1 || true
 (cd "$COWORK" && IDLI_CLAUDE_WORK="$WORK" "$COWORK/.venv/bin/python" -I -c "import sys; sys.path.insert(0, '.'); from lib import maskcopy; maskcopy.build(sys.argv[1], sys.argv[2])" "$DATA" "$WORK") >/dev/null 2>&1 || {

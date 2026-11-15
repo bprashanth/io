@@ -192,7 +192,14 @@ class Transformer:
         # them ("pip", "mine") matched short values of masked columns and blocked every request (2026-11-14).
         if isinstance(body, dict) and any(k in body for k in CONTENT_FIELDS):  # a whole request
             body = {k: body[k] for k in CONTENT_FIELDS if k in body}
-        return any(privacy.known_leaks(text, self.vault) for text in strings(body))
+        # Values the person revealed are shown whole, even when a hidden value is a word inside one ("fern" inside
+        # "Fern sp."; laptop, 2026-11-15). Masking shields them, so the check must too.
+        shield = [re.compile(privacy._value_pattern(v), re.I) for v in sorted(self.allowed.values(), key=len, reverse=True)]
+        def unshielded(text):
+            for pattern in shield:
+                text = pattern.sub(' ', text)
+            return text
+        return any(privacy.known_leaks(unshielded(text), self.vault) for text in strings(body))
 
     def where(self, body):
         """For the log when a request is refused: which codes leaked and under which top-level field (never the

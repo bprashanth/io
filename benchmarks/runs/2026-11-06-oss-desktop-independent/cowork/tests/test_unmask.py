@@ -262,3 +262,17 @@ def test_gps_map_groups_labels_and_orders_colour_bands():
     assert point['encoding']['color']['scale']['domain'] == ['Under 3 months', '3 to 6 months', 'Over 6 months']
     assert point['encoding']['tooltip'] == [{'field': 'ward'}] and 'color' not in point['mark']
     assert text['transform'][-1]['groupby'] == ['ward']
+
+
+def test_revealed_value_holding_a_hidden_word_is_not_a_leak(data):
+    """Laptop 2026-11-15: the species code "fern" stayed hidden while "Fern sp." was revealed; every request that
+    showed the revealed name was refused as a leak."""
+    pd.DataFrame({'Ward':['Yerawada','Hill Ward']}).to_csv(data/'wards.csv',index=False)
+    privacy.set(data,'wards.csv',mode='mask',columns={'Ward':True})
+    approve(data)  # reveals "Yerawada Ward"; "Yerawada" alone stays hidden
+    transformer=ccproxy.Transformer(data)
+    out,_=transformer.outbound(request('Yerawada Ward has 3 plots'))
+    assert out['messages'][0]['content']=='Yerawada Ward has 3 plots'
+    assert not transformer.leaks(out)
+    assert transformer.leaks(request('Yerawada has 3 plots'))
+    assert 'Yerawada has' not in str(transformer.outbound(request('Yerawada has 3 plots'))[0])

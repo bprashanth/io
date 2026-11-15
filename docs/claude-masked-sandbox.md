@@ -56,7 +56,10 @@ In `~/idli-insights/claude-masked/.claude/settings.json`, merged into whatever i
 }
 ```
 
-- `permissions.deny` covers Claude Code's own Read, Edit and search tools.
+- `permissions.deny` covers Claude Code's own Read, Edit and search tools. Claude Code matches these paths without
+  regard to case, so a blocked sibling named `Claude-masked` would also block `claude-masked` and Claude's own
+  `CLAUDE.md` (it then starts with "Instruction file not loaded"). `private_paths` leaves out any folder that matches
+  the work folder that way, and `merge` drops older rules that do.
 - `sandbox` covers every shell command (bubblewrap on Linux, Seatbelt on macOS). `autoAllowBashIfSandboxed` means
   the person isn't asked about each command, which is fine because the command can't reach anything private.
   `allowUnsandboxedCommands: false` removes Claude's way to retry a command outside the sandbox.
@@ -89,6 +92,23 @@ Rule from 2026-11-15 (`privacy.matched_in_text`):
   like an identifier (id, phone, number, Aadhaar, PAN, account, card and similar).
 - The scanner never tags a bare number.
 
+## Leftovers in an older vault
+
+Earlier versions put things in the vault that shouldn't be there. The proxy and the copies now ignore them:
+- Product words ("claude", "idli", "paseo"...) are never matched, including by the close-match step. An old scanner
+  false positive (`NAME_007` = "Claude") turned Claude's folder path into `NAME_007-masked`, and Claude wrote files
+  to a folder of that name, since tool inputs keep codes.
+- Headings coded as values (a header row repeated mid-sheet, coded as `sppnam`) are not masked when they only ever
+  stood for a hidden column's own heading (`privacy.heading_codes`). Name, phone and ID codes are always masked.
+- A species key heading such as "Species name expanded" counts as contextual, not as a person's name. A column
+  without a heading (`column_22`) doesn't decide a value's class when a named column holds it too.
+
+## Reveals and the leak check
+
+A revealed value can contain a hidden one as a word ("Fern sp." revealed, the species code "fern" hidden). Masking
+leaves the revealed value whole, and the leak check skips revealed values the same way. Before that fix every
+request refused with a 403 and Claude stalled.
+
 ## What Claude is told
 
 `idli/CLAUDE-masked.md` (copied in as `CLAUDE.md`) and the `masked-data` skill say: the files are masked copies; use
@@ -111,6 +131,9 @@ People's names, phones, IDs and exact locations are never revealed.
   its copy and declined to read the private folder. `cat` and Read were refused by the permission rules; a Python
   script got "No such file" in the sandbox. Wire audit of 52 requests: no names or sites, no species before its
   reveal.
+- Laptop, owner's test account, real field_vars_indicators file, Paseo idli21, 2026-11-15: big-trees question,
+  whole-column reveal of the species key (44 names) through both consent steps, WebSearch with the real names,
+  chart. Wire audit of all 80 requests: none held any of the 229 hidden values (172 personal, 57 contextual).
 - Tests: `tests/test_maskcopy.py` (copies, rehydrated Mini scripts, reveals, settings, numbers),
   `lib/test_home.py` (launcher writes the sandbox block).
 

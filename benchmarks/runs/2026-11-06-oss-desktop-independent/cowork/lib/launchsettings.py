@@ -21,7 +21,12 @@ def private_paths(data_dir, work):
     parent = work.parent
     if parent != home and parent.name == 'idli-insights':
         paths += [p for p in parent.iterdir() if p.resolve() != work] if parent.exists() else []
-    return sorted({str(p.resolve()) for p in paths if p.resolve() != work and not work.is_relative_to(p.resolve())})
+    # Claude Code matches these rules without regard to case: a sibling "Claude-masked" would also hide
+    # "claude-masked" and Claude's own CLAUDE.md (laptop, 2026-11-15). Leave out anything that matches work that way.
+    def covers_work(p):
+        folded = Path(str(p.resolve()).casefold())
+        return folded == Path(str(work).casefold()) or Path(str(work).casefold()).is_relative_to(folded)
+    return sorted({str(p.resolve()) for p in paths if not covers_work(p)})
 
 
 def merge(work, data_dir=None):
@@ -32,14 +37,20 @@ def merge(work, data_dir=None):
     if data_dir:
         private = private_paths(data_dir, work)
         rules = [f'{tool}(/{p}/**)' for p in private for tool in ('Read', 'Edit')]
-        permissions['deny'] = list(dict.fromkeys(permissions.get('deny', []) + rules))
+        own = str(Path(work).resolve()).casefold()
+        def blocks_work(path):  # an older rule that covers Claude's own folder (see private_paths)
+            folded = path.casefold().rstrip('/')
+            return own == folded or own.startswith(folded + '/')
+        old = [r for r in permissions.get('deny', [])
+               if not (r.startswith(('Read(//', 'Edit(//')) and r.endswith('/**)') and blocks_work(r.split('(/', 1)[1][:-4]))]
+        permissions['deny'] = list(dict.fromkeys(old + rules))
         sandbox = settings.setdefault('sandbox', {})
         sandbox.update({'enabled': True, 'autoAllowBashIfSandboxed': True, 'allowUnsandboxedCommands': False})
         fs = sandbox.setdefault('filesystem', {})
         # Claude Code's own transcripts hold the person's real values (Claude's replies with codes put back). Claude
         # Code reads them itself; its shell must not.
         transcripts = str((Path.home() / '.claude/projects').resolve())
-        fs['denyRead'] = sorted(set(fs.get('denyRead', [])) | set(private) | {transcripts})
+        fs['denyRead'] = sorted({p for p in fs.get('denyRead', []) if not blocks_work(p)} | set(private) | {transcripts})
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp = tempfile.mkstemp(dir=path.parent)
     try:

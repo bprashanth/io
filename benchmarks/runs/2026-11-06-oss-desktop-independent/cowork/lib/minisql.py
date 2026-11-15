@@ -78,15 +78,16 @@ def _typed(frame):
     return frame.reset_index(drop=True)
 
 
-def load(data_dir, files):
-    """{table: (sheet label, typed DataFrame of real values)} for the Mini's files."""
+def load(data_dir, files, mask=lambda v: v):
+    """{table: (sheet label, typed DataFrame of real values)} for the Mini's files. Table names are made from the
+    masked sheet names, so a private value in a sheet name never reaches the service."""
     out, taken = {}, set()
     for rel in files:
         sheets, _ = filekit.raw_sheets(str(Path(data_dir) / rel))
         stem = Path(rel).stem
         for sheet, frame in sheets.items():
             label = sheet if len(files) == 1 else f'{stem} / {sheet}'
-            out[_table_name(sheet if len(files) == 1 else stem + ' ' + sheet, taken)] = (label, _typed(frame))
+            out[_table_name(mask(sheet if len(files) == 1 else stem + ' ' + sheet), taken)] = (label, _typed(frame))
     return out
 
 
@@ -143,10 +144,12 @@ def check_sql(sql):
 
 
 def put_back(sql, vault):
-    """Codes inside string literals become real values (quotes doubled for SQL)."""
-    def literal(m):
-        return TOKEN_RE.sub(lambda c: vault.display.get(c.group(), c.group()).replace("'", "''"), m.group())
-    return re.sub(r"'(?:[^']|'')*'", literal, sql)
+    """Codes inside string literals and quoted column names become real values (quotes doubled for SQL). A column
+    heading can hold a private value; the service saw it as a code and names the column by that code."""
+    def quoted(m):
+        q = m.group()[0]
+        return TOKEN_RE.sub(lambda c: vault.display.get(c.group(), c.group()).replace(q, q + q), m.group())
+    return re.sub(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"", quoted, sql)
 
 
 def run(tables, sql):
@@ -166,7 +169,6 @@ def run(tables, sql):
 
 def answer(data_dir, files, question, call=None):
     """{'kind': 'table', title, note, frame, sql} or {'kind': 'clarify', text, options}; masked text only leaves."""
-    tables = load(data_dir, files)
     with privacy.session_lock(data_dir):
         full = privacy.session_vault(data_dir)
         vault, _ = privacy.proxy_vault(data_dir, full)
@@ -178,6 +180,7 @@ def answer(data_dir, files, question, call=None):
         masked_q = privacy._redact(question, vault, people)[0]
         from lib import maskcopy
         mask = maskcopy._masker(vault)
+        tables = load(data_dir, files, lambda v: mask(str(v)))
         text = schema(tables, lambda v: mask(str(v)))
     def real(t):  # codes from the file, plus any the scanner gave to names typed in this question
         return full.rehydrate(vault.rehydrate(str(t)))
