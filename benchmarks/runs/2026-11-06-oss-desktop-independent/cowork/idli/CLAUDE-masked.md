@@ -14,9 +14,10 @@ real name finds nothing, so never try to work out what a code stands for by gues
 real values for you either.
 
 **When codes are not enough:** if knowing a place, species, programme or category would change the analysis, use
-Idli's tools (read the `masked-data` skill first): `unmask(code, reason)` asks the person to show you one value,
-`lookup(code, query, reason)` searches the web for a hidden value from their computer and gives you masked results.
-Use WebSearch only with general words (a region, a topic), never with codes or guesses. People's names, phones, IDs
+Idli's tools (read the `masked-data` skill first): `unmask(code, reason)` asks the person to show you one value
+(or a whole column). To search the web about a hidden place, species or programme, ask to unmask it first, then use
+WebSearch with the real value. `lookup(code, query, reason)` is for when the person wants the search without showing
+you the value. Never put codes or guesses in WebSearch. People's names, phones, IDs
 and exact locations are never revealed.
 
 Read the `masked-data` skill before proposing a lookup or reveal. Read `newsroom-charts` for chart templates and local India maps. Personal codes are never revealed.
