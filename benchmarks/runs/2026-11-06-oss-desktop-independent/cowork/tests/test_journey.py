@@ -272,7 +272,7 @@ class ToolTests(Fixture):
         item=tools.t_binder_item('Chart','Visits')  # what the left chat shows: the chart inline, with Pin
         url=re.search(r'\]\((http://dashboard\.localhost:8797/view\?[^)]+)\)',item['reply'])[1]
         q=urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
-        self.assertEqual(q['embed'],['1']);self.assertIn('Pin',item['reply'])
+        self.assertEqual(q['embed'],['1'])
         self.assertEqual(home.read(self.data/f"views/{q['id'][0]}.json")['title'],'Visits')
         with self.assertRaisesRegex(ValueError,'no longer here'):tools.t_binder_item('Chart','Something else')
     def test_insert_no_enter_only_own_terminal(self):

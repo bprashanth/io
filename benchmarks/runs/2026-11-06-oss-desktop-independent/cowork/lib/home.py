@@ -486,8 +486,8 @@ def binder_item(data_dir, kind, title, workspace=None):
                 break
         if not found:
             raise ValueError('That chart is no longer here. Ask Claude to show it again.')
-        url = journey.page_url(data_dir, 'view', id=found, embed='1', h='470')
-        return {'reply': f'[{title}]({url})\n\nPin keeps it for your Mini.'}
+        url = journey.page_url(data_dir, 'view', id=found, embed='1', h='520')
+        return {'reply': f'[{title}]({url})'}
     found = None
     for path in sorted((Path(data_dir) / '.idli/mini-drafts').glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True):
         try:

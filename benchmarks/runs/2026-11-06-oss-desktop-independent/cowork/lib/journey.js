@@ -1,6 +1,7 @@
 'use strict';
 const words=k=>{const t=String(k).replace(/_inr$/i,' (Rs)').replace(/_/g,' ').trim();return t.charAt(0).toUpperCase()+t.slice(1);};
-const postHeight=()=>parent.postMessage({type:'idli-height',px:Math.ceil(document.documentElement.scrollHeight)},'*');
+// A card that grows with its content reports its content's height; the page's own height never drops below the frame.
+const postHeight=()=>{const m=document.querySelector('main');const card=document.documentElement.classList.contains('card-page')&&m;parent.postMessage({type:'idli-height',px:Math.ceil(card?m.getBoundingClientRect().height+8:document.documentElement.scrollHeight)},'*');};
 new ResizeObserver(postHeight).observe(document.body);
 const retry=fn=>{$('retry').hidden=false;$('retry').onclick=()=>{$('retry').hidden=true;fn();};};
 const reasonText=row=>{
@@ -47,12 +48,14 @@ if(location.pathname==='/privacy-review'){
   };load();
 }
 if(location.pathname==='/mini-editor'||location.pathname==='/mini-card'){
-  if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('embed');
+  const CARD=new URLSearchParams(location.search).get('embed')==='1';
+  if(CARD)document.documentElement.classList.add('embed','card-page');
+  const grow=el=>{el.style.height='auto';el.style.height=(el.scrollHeight+2)+'px';};
   let draft,questions=[],charts=[];
   const renderQuestions=()=>{
     $('q-count').textContent=questions.length+' of 8';
-    $('questions').innerHTML=questions.map((q,i)=>`<article class="card"><div class="question-top"><label for="question-${i}">Question ${i+1}</label><button type="button" class="remove" data-remove-q="${i}" aria-label="Remove question ${i+1}">Remove</button></div><input id="question-${i}" data-question="${i}" value="${esc(q.question)}" required maxlength="1000">${Object.entries(q.params||{}).map(([key,d])=>`<div class="option"><div class="option-name">${esc(words(key))}</div>${d.type==='choice'?`<label>Choices <small>one per line</small><textarea data-choices="${esc(key)}" data-q="${i}" rows="${Math.min(6,d.choices.length)}" aria-label="Choices for ${esc(words(key))}">${esc(d.choices.join('\n'))}</textarea></label>`:''}<label>${d.type==='choice'?'Starts with':'Starts at'}<input data-default="${esc(key)}" data-q="${i}" type="${d.type==='number'?'number':'text'}" ${d.type==='number'?'step="any"':''} value="${esc(d.default)}" required></label></div>`).join('')}</article>`).join('')||'<p class="empty">Keep at least one question to save this Mini.</p>';
-    $('questions').querySelectorAll('[data-question]').forEach(el=>el.oninput=()=>{questions[Number(el.dataset.question)].question=el.value;});
+    $('questions').innerHTML=questions.map((q,i)=>`<article class="card"><div class="question-top"><label for="question-${i}">Question ${i+1}</label><button type="button" class="remove" data-remove-q="${i}" aria-label="Remove question ${i+1}">Remove</button></div><textarea id="question-${i}" class="qtext" data-question="${i}" rows="2" required maxlength="1000">${esc(q.question)}</textarea>${CARD&&Object.keys(q.params||{}).length?`<details class="opts"><summary>Options: ${esc(Object.keys(q.params).map(words).join(', '))}</summary>`:''}${Object.entries(q.params||{}).map(([key,d])=>`<div class="option"><div class="option-name">${esc(words(key))}</div>${d.type==='choice'?`<label>Choices <small>one per line</small><textarea data-choices="${esc(key)}" data-q="${i}" rows="${Math.min(6,d.choices.length)}" aria-label="Choices for ${esc(words(key))}">${esc(d.choices.join('\n'))}</textarea></label>`:''}<label>${d.type==='choice'?'Starts with':'Starts at'}<input data-default="${esc(key)}" data-q="${i}" type="${d.type==='number'?'number':'text'}" ${d.type==='number'?'step="any"':''} value="${esc(d.default)}" required></label></div>`).join('')}${CARD&&Object.keys(q.params||{}).length?'</details>':''}</article>`).join('')||'<p class="empty">Keep at least one question to save this Mini.</p>';
+    $('questions').querySelectorAll('[data-question]').forEach(el=>{grow(el);el.oninput=()=>{questions[Number(el.dataset.question)].question=el.value;grow(el);};});
     $('questions').querySelectorAll('[data-default]').forEach(el=>el.oninput=()=>{const d=questions[Number(el.dataset.q)].params[el.dataset.default];d.default=d.type==='number'?Number(el.value):el.value;});
     $('questions').querySelectorAll('[data-choices]').forEach(el=>el.oninput=()=>{questions[Number(el.dataset.q)].params[el.dataset.choices].choices=el.value.split('\n').map(v=>v.trim()).filter(Boolean);});
     $('questions').querySelectorAll('[data-remove-q]').forEach(b=>b.onclick=()=>{questions.splice(Number(b.dataset.removeQ),1);renderQuestions();status('Question removed from this draft.');});
@@ -60,7 +63,7 @@ if(location.pathname==='/mini-editor'||location.pathname==='/mini-card'){
   };
   const renderCharts=()=>{
     $('chart-count').textContent=charts.length;
-    $('charts').innerHTML=charts.map((c,i)=>`<div class="card pinned-chart"><a href="${esc(link('/view?id='+encodeURIComponent(c.id)))}" target="_blank" rel="noopener">${esc(c.title)}</a><button type="button" class="remove" data-remove-chart="${i}" aria-label="Remove chart ${esc(c.title)}">Remove</button></div>`).join('')||'<p class="empty">No charts kept yet. You can go back to a chart and pin it before making another draft.</p>';
+    $('charts').innerHTML=charts.map((c,i)=>`<div class="card pinned-chart">${CARD?`<span>${esc(c.title)}</span>`:`<a href="${esc(link('/view?id='+encodeURIComponent(c.id)))}" target="_blank" rel="noopener">${esc(c.title)}</a>`}<button type="button" class="remove" data-remove-chart="${i}" aria-label="Remove chart ${esc(c.title)}">Remove</button></div>`).join('')||'<p class="empty">No charts kept yet. You can go back to a chart and pin it before making another draft.</p>';
     $('charts').querySelectorAll('button').forEach(b=>b.onclick=()=>{charts.splice(Number(b.dataset.removeChart),1);renderCharts();status('Chart removed from this draft.');});postHeight();
   };
   const save=async action=>{
@@ -69,13 +72,13 @@ if(location.pathname==='/mini-editor'||location.pathname==='/mini-card'){
     document.querySelectorAll('#editor button').forEach(b=>b.disabled=true);status('Checking and saving...');
     try{
       await api('/api/mini-save',{id:ID,action,name:$('name').value,goal:$('story').value,questions,charts:charts.map(c=>c.id)});
-      $('editor').hidden=true;$('saved').hidden=false;status('Saved.');$('saved').setAttribute('tabindex','-1');$('saved').focus();
+      $('editor').hidden=true;$('saved').hidden=false;status(CARD?'':'Saved.');$('saved').setAttribute('tabindex','-1');$('saved').focus();
     }catch(e){status(e.message,true);}finally{document.querySelectorAll('#editor button').forEach(b=>b.disabled=false);}
   };
   const load=async()=>{
     try{
       draft=await api('/api/mini-draft?id='+encodeURIComponent(ID));questions=structuredClone(draft.questions);charts=structuredClone(draft.charts||[]);
-      $('name').value=draft.name;$('story').value=draft.goal;$('code').textContent=draft.code||'Saved with this Mini';
+      $('name').value=draft.name;$('story').value=draft.goal;grow($('story'));$('story').oninput=()=>grow($('story'));$('code').textContent=draft.code||'Saved with this Mini';
       $('sources').textContent=(draft.files||[]).map(f=>f.local).join('\n')||'No files recorded';
       if(draft.source_id){$('add').hidden=false;$('add').textContent='Add to '+draft.source_name;$('save').textContent='Save as a new Mini';}
       $('editor').hidden=!!draft.saved_id;$('saved').hidden=!draft.saved_id;renderQuestions();renderCharts();status('');

@@ -12,7 +12,8 @@ Code setup. The older Codex setup (io) is in [sandboxing.md](sandboxing.md). Cur
 | Masking proxy | Real values in anything sent to Anthropic | `lib/ccproxy.py` |
 
 Plus Idli's own tools (MCP, `lib/idli_mcp.py`), which run outside the sandbox and are the only way from Claude to
-real values: `unmask` and `lookup` need the person's yes twice (Claude Code's ask prompt and Idli's consent page).
+real values: `unmask` needs the person's yes twice (Claude Code's ask prompt and Idli's consent page). `lookup` is withheld from
+Claude (2026-11-15): results about a value can't be masked reliably and are thinner than WebSearch after a reveal.
 
 ## The launch
 
@@ -44,7 +45,7 @@ In `~/idli-insights/claude-masked/.claude/settings.json`, merged into whatever i
 ```json
 {
   "permissions": {
-    "ask": ["mcp__idli__unmask", "mcp__idli__lookup"],
+    "ask": ["mcp__idli__unmask"],
     "deny": ["Read(//<each blocked folder>/**)", "Edit(//<each blocked folder>/**)"]
   },
   "sandbox": {
@@ -115,13 +116,30 @@ request refused with a 403 and Claude stalled.
 codes exactly as they appear; the real files aren't reachable and Claude must not look for them; never guess what a
 code stands for or ask the person to type real values. When a place, species, programme or category matters, ask
 with `unmask` (one value, or a whole column of up to 80 values for one reveal). To search the web about one, unmask
-it first and then use WebSearch. `lookup` only when the person wants the search without showing Claude the value.
+it first and then use WebSearch.
 People's names, phones, IDs and exact locations are never revealed.
+
+## Sent to Claude (the wire log)
+
+Every request the proxy sends to Anthropic is logged on this computer (`lib/wirelog.py`), always on:
+- one line per request in `~/idli-insights/wire/<day>.jsonl`, kept 7 days: time, app (from the launcher's
+  `X-Idli-App` header, which the proxy removes before forwarding), masked count, and only what was new in that request
+  (each request repeats the whole conversation). Codes stay codes; it is exactly what left.
+- a refused request keeps only the codes that stopped it, never its text.
+- the folder is outside Claude's work folder and in its sandbox deny list from the first launch.
+- Start here has a "Sent to Claude" tab (`/wire`): search a word or a real name (a known private value also finds its
+  code, with a line saying it went only as that code), and filter by app.
+- Cost: one small append per request. The 80-request laptop test was 12 MB as full bodies; new text only is a small
+  fraction of that.
+
+`--wire-log` on the proxy still writes full bodies to `ccproxy-wire/` for audits.
 
 ## How the person sees real values
 
 - Claude's text replies: the proxy puts real values back in place of codes.
 - Charts (`idli_show`) and Mini drafts (`idli_draft_mini`): Idli puts real values back in titles, data and scripts.
+  Both appear in the Drivey chat on the left (the binder): each chart inline with its headline and Pin, then the
+  editable Mini draft.
   Mini scripts get real values only inside string literals, so a saved Mini runs on the real file.
 - Commands and raw script output in the Claude pane show codes, because that is what Claude ran and saw.
 
