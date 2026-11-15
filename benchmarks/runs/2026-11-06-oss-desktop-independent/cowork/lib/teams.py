@@ -448,7 +448,7 @@ def route(events, card_answers, has_tools):
         if st.get('no_name') and not st.get('wants_name'):
             first = 'No problem. ' if st.get('trying') else ''
             return ('card', 'Name', first + 'What should we call the team? Insights is fine for a try-out.',
-                    [('Insights', 'You can make more teams later.'), ('Something else', 'Type it in the box below.')], lead or None)
+                    [('Insights', 'You can make more teams later.'), ('Something else', 'Then type it in the chat.')], lead or None)
         return ('say', lead + ("Type the team's name." if st.get('wants_name') else ASK_NAME))
     if step == 'goal':
         if st.get('no_goal'):
