@@ -4,6 +4,7 @@ Safe to rerun: it only adds what's missing.
 
   Start here       its own folder (~/idli-insights/setup), first in the sidebar
      Logins           the setup chat (sign-in checks; also answers "what has Idli learned")
+     Privacy          a chat showing what Idli's privacy guard sent to Claude (searchable, per app; written by code)
      Minis            a tab: the page listing the files Idli has learned (grows as Claude teaches it)
      Drive            a tab for signing in to Google
   Drivey       the private folder (~/idli-insights/cowork-real): Drive files, where the work happens; a "New chat"
@@ -52,11 +53,14 @@ SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 # Each chat sees only the tools its job needs (a `cowork.tools` allow-list per folder; a small model chooses better
 # from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
 TOOLSETS = {
-    "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import"],
+    "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import",
+                   "wire_page"],
     "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask", "binder_item"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name Start here)
+PRIVACY = "Privacy"  # the second chat in Start here: the "Sent to Claude" log
+PRIVACY_PROMPT = "Show what Idli sent to Claude"  # lib/modes.py PRIVACY_CHAT: the chat is written by code
 TABS = []  # the Drive tab opens only when the Logins check finds Google signed out (and closes once signed in)
 
 
@@ -179,7 +183,7 @@ def start_chat(ws_id):
     return (out or {}).get("agentId")
 
 
-def chat(ws_id, folder, title, prompt, provider=START_PROVIDER):
+def chat(ws_id, folder, title, prompt, provider=START_PROVIDER, label=None):
     """A chat that should always be there (made once; found again by its title). Returns its id."""
     old = next((a for a in paseo("ls", "--global") if a["name"] == title and same(a.get("cwd") or "", folder)), None)
     if old:
@@ -189,6 +193,8 @@ def chat(ws_id, folder, title, prompt, provider=START_PROVIDER):
     if DRY or not ws_id:
         return None
     extra = ["--thinking", "low"] if provider == START_PROVIDER else []
+    if label:
+        extra += ["--label", label]
     out = paseo("run", "--provider", provider, "--workspace", ws_id, "--mode", "bypassPermissions", *extra,
                 "--title", title, "--no-wait", prompt)
     return (out or {}).get("agentId")
@@ -245,8 +251,12 @@ def learned_tab(agent_id):
     if not browser:
         say("the app's browser isn't available; open Paseo and rerun to add the Minis tab")
         return
-    # Minis, and "Sent to Claude" (what the privacy guard sent, searchable by app and word).
-    for page, label, key in (("/skills", "Minis", "learned@"), ("/wire", "Sent to Claude", "wire@")):
+    # "Sent to Claude" was a tab until 2026-11-15; it is the Privacy chat now (a chat can't get lost).
+    for t in browser.tabs():
+        if urllib.parse.urlparse(t["url"]).path == "/wire":
+            say("close the old Sent to Claude tab (it is the Privacy chat now)")
+            browser.paseo("browser_close_tab", browserId=t["id"])
+    for page, label, key in (("/skills", "Minis", "learned@"),):
         url = f"http://dashboard.localhost:{port}{page}?t={token}"
         if opened(key + FOLDER["Start here"]) == url:
             say(f"{label} tab is open")
@@ -347,6 +357,7 @@ def main():
     retire_claude_workspace()
     one_idli_workspace()
     agent = start_chat(ids.get("Start here"))
+    chat(ids.get("Start here"), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
     learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
     chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on

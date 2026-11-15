@@ -133,16 +133,26 @@ class RouterTests(unittest.TestCase):
     def query_mini(self):
         t=Transcript();t.said('Open Mini: Visits [visits]')
         t.result({'id':'visits','files':FILES,'questions':[QUESTION],'can_query':True,'reply':'Our story'});return t
+    CONSENT={'masked_question':'Which ward had most visits in PLACE_001?','sample':'Table "visits" (sheet "Visits", 3 rows):\n  "ward": text, 2 different values: PLACE_001, PLACE_002','more':0,'columns':1,'service':'deepseek'}
+    def consent(self,t,question,answer='Send'):
+        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said(question)
+        self.assertEqual(t.tool()['input'],{'id':'visits','question':question,'preview':True})  # nothing sent yet
+        t.result({'question':question,'consent':self.CONSENT})
+        card=t.tool()['input']['questions'][0];self.assertEqual(card['header'],'Query service')
+        lead=t.r['content'][0]['text'];self.assertIn('PLACE_001',lead);self.assertIn('never gets rows',lead);self.assertIn('deepseek',lead)
+        t.choose(answer)
+    def test_mini_query_consent_not_yet_sends_nothing(self):
+        t=self.query_mini();self.consent(t,'Which ward had most visits in May?','Not yet')
+        self.assertIn('Nothing was sent',t.text())
+        t=self.query_mini();self.consent(t,'Which ward had most visits in May?','Ask Claude')
+        self.assertEqual(t.tool()['input']['mini_id'],'visits');self.assertTrue(t.tool()['input']['preview_only'])
     def test_mini_query_service_table(self):
-        t=self.query_mini()
-        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('Which ward had most visits in May?')
-        self.assertIn('external service',t.text());self.assertIn('codes',t.text())
+        t=self.query_mini();self.consent(t,'Which ward had most visits in May?')
         self.assertEqual(t.tool()['input'],{'id':'visits','question':'Which ward had most visits in May?'})
         t.result({'question':'q','reply':'**Visits in May**\n\n| Ward | Visits |\n|---|---|\n| Garden | 12 |','rows':1})
         self.assertIn('Visits in May',t.text())
     def test_mini_query_asks_back_then_answers(self):
-        t=self.query_mini()
-        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('big trees')
+        t=self.query_mini();self.consent(t,'big trees')
         t.result({'clarify':'What counts as big?','options':[{'label':'Girth over 100 cm','question':'Which species have trees over 100 cm girth?'},'Which are the 10 tallest trees?']})
         card=t.tool()['input']['questions'][0]
         self.assertEqual(card['header'],'Be specific');self.assertEqual(len(card['options']),3)
@@ -150,12 +160,10 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(card['options'][0]['label'],'Girth over 100 cm');t.choose(card['options'][0]['label'])
         self.assertEqual(t.tool()['input'],{'id':'visits','question':'Which species have trees over 100 cm girth?'})
     def test_mini_query_ask_claude_or_failure_offers_claude(self):
-        t=self.query_mini()
-        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('big trees')
+        t=self.query_mini();self.consent(t,'big trees')
         t.result({'clarify':'What counts as big?','options':['A?','B?']});t.choose('Ask Claude')
         self.assertEqual(t.tool()['input']['mini_id'],'visits');self.assertTrue(t.tool()['input']['preview_only'])
-        t=self.query_mini()
-        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('Predict Garden next year')
+        t=self.query_mini();self.consent(t,'Predict Garden next year')
         t.result({'error':'The query was not a single read-only question.'})
         self.assertEqual(t.tool()['input']['question'],'Predict Garden next year');self.assertEqual(t.tool()['input']['mini_id'],'visits')
     def test_claude_items_shown_in_chat_and_mini_kept(self):
@@ -169,6 +177,19 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(t.tool()['input']['id'],'visits')  # the open Mini is still the one being asked
         old=Transcript();old.said('Chart from Claude: X')  # an older laptop without the tool: no call to it
         self.assertNotEqual(old.tool()['input'].get('kind') if old.r['content'][-1]['type']=='tool_use' else None,'Chart')
+    def test_privacy_chat_shows_and_searches_the_log(self):
+        t=Transcript();t.j['tools']=[{'name':'mcp__cowork__'+n} for n in ('setup_check','show_skills','wire_page')]
+        t.said(modes.PRIVACY_CHAT);self.assertTrue(t.tool()['name'].endswith('wire_page'));self.assertEqual(t.tool()['input'],{})
+        t.result({'reply':'[Sent to Claude](http://dashboard.localhost:8797/wire?embed=1)'});self.assertIn('/wire?embed=1',t.text())
+        t.said('  Meena   Raghavan ');self.assertEqual(t.tool()['input'],{'q':'Meena Raghavan'})
+        other=Transcript();other.j['tools']=t.j['tools']  # the Logins chat has the tool too, but isn't this chat
+        with patch.object(modes,'nine',return_value={'content':[{'type':'text','text':'model'}]}):
+            self.assertIsNone(modes.privacy_chat_route({**other.j,'messages':[{'role':'user','content':'hello'}]}))
+    def test_wire_page_link_is_drivey_server_and_embeds(self):
+        with patch.object(tools.formserver,'ensure',return_value=(8797,'tok')) as ensure:
+            r=tools.t_wire_page('Asha')
+        self.assertTrue(ensure.call_args.args[0].endswith('cowork-real') or 'IDLI_DATA' in __import__('os').environ)
+        self.assertIn('http://dashboard.localhost:8797/wire?t=tok&embed=1',r['reply']);self.assertIn('q=Asha',r['reply'])
     def test_drive_mention_leaves_mini(self):
         t=self.mini();t.said('Compare @Drive/visits.xlsx');self.assertTrue(t.tool()['name'].endswith('drive_fetch'))
     def test_failed_mini_and_unknown_tool_never_fall_through(self):
@@ -303,8 +324,28 @@ class ToolTests(Fixture):
         self.assertEqual(len(home.read(home.object_path(self.data,'minis',saved['id']))['questions']),2)
     def test_mini_open_story_questions_charts_and_context(self):
         self.make_view(pinned=True);ident=self.make_draft(1);r=journey.save_draft(self.data,ident,self.edits(ident))
-        m=tools.t_mini_open(r['id']);self.assertIn('A simple view',m['reply']);self.assertIn('ward: Garden or all',m['reply']);self.assertIn('embed=1',m['reply']);self.assertIn('ws=ws-one',m['reply']);self.assertEqual(m['files'],FILES)
+        m=tools.t_mini_open(r['id']);self.assertIn('/mini-card?',m['reply']);self.assertIn('mini='+r['id'],m['reply']);self.assertIn('embed=1',m['reply']);self.assertIn('ws=ws-one',m['reply']);self.assertEqual(m['files'],FILES)
+        page=journey.card_data(self.data,mini=r['id']);self.assertEqual(page['mode'],'mini')
+        self.assertEqual(page['blocks'][0]['type'],'text');self.assertIn('A simple view',page['blocks'][0]['text'])
+        self.assertEqual([b['type'] for b in page['blocks']],['text','chart']);self.assertIn('ward: Garden or all',page['questions'][0]['options'])
         answer=tools.t_mini_ask(r['id'],'total-0',{'ward':'Garden'});self.assertIn('Answered with:',answer['reply']);self.assertIn('views/',answer['reply'])
+    def test_mini_page_arranged_kept_and_saved_in_order(self):
+        self.make_view(pinned=True);ident=self.make_draft(2);page=journey.card_data(self.data,draft=ident)
+        self.assertEqual(page['mode'],'draft');self.assertEqual([b['type'] for b in page['blocks']],['text','chart'])
+        qs=[{'id':q['id'],'question':q['question']} for q in page['questions']][::-1];qs[0]['question']='Which **ward** first?'
+        blocks=[page['blocks'][1],{'type':'text','text':'Why this matters\n\n- one\n- two'},page['blocks'][0],
+                {'type':'chart','id':'not-from-this-draft','title':'x'},{'type':'text','text':'   '}]
+        journey.edit_draft(self.data,ident,{'name':'Arranged','blocks':blocks,'questions':qs})
+        again=journey.card_data(self.data,draft=ident)  # the enlarged copy and the chat copy read the same
+        self.assertEqual(again['name'],'Arranged');self.assertEqual([b['type'] for b in again['blocks']],['chart','text','text'])
+        self.assertEqual(again['questions'][0]['question'],'Which **ward** first?')
+        r=journey.save_draft(self.data,ident,{'name':'Arranged','blocks':again['blocks'],'questions':again['questions']})
+        m=home.read(home.object_path(self.data,'minis',r['id']))
+        self.assertEqual([b['type'] for b in m['blocks']],['chart','text','text']);self.assertEqual(m['goal'],'Why this matters\n\n- one\n- two\n\n'+page['blocks'][0]['text'])
+        self.assertEqual([c['id'] for c in m['charts']],['chart-one']);self.assertEqual([q['params'] for q in m['questions']],[q['params'] for q in journey.draft_data(self.data,ident)['questions']][::-1])
+        self.assertEqual(journey.card_data(self.data,draft=ident)['mode'],'saved')
+        with self.assertRaisesRegex(ValueError,'few words'):
+            other=self.make_draft(1);journey.save_draft(self.data,other,{'name':'Only a chart','blocks':[],'questions':journey.card_data(self.data,draft=other)['questions']})
     def test_draft_tool_and_bad_script_fail_before_editor(self):
         with patch.object(uiswitch,'open_url',return_value={'ok':True}) as op:
             r=idli_mcp.idli_draft_mini('Visits','Story',[QUESTION],'Scripts');self.assertTrue(r['shown'])

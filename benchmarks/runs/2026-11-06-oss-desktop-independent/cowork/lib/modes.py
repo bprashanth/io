@@ -922,9 +922,28 @@ def _asked(messages, head):
                for m in messages for b in _blocks(m.get("content")))
 
 
+PRIVACY_CHAT = 'Show what Idli sent to Claude'  # the Privacy chat's first message (desktop/idli-bootstrap.py)
+
+
+def privacy_chat_route(j):
+    """Start here's Privacy chat is written by code: it shows the "Sent to Claude" log, and anything typed searches it."""
+    msgs, tools, model = j.get("messages") or [], j.get("tools") or [], j.get("model", "")
+    if not _tool_name(tools, "wire_page"):
+        return None
+    ev = _events(msgs)
+    if not ev or ev[0] != ("said", PRIVACY_CHAT):
+        return None
+    last = ev[-1]
+    if last[0] == "tool":
+        res = last[3]
+        return message(model, [_text(res.get("reply") or res.get("error") or "The log could not open. Send any word to try again.")])
+    q = "" if last[1] == PRIVACY_CHAT else " ".join(last[1].split())[:200]
+    return message(model, [_tool_use(_tool_name(tools, "wire_page"), {"q": q} if q else {})])
+
+
 def privacy_route(j):
     msgs, tools, model = j.get("messages") or [], j.get("tools") or [], j.get("model", "")
-    drivey = drivey_route(j)
+    drivey = drivey_route(j) or privacy_chat_route(j)
     if drivey:
         return drivey
     fa = _tool_name(tools, "file_ask")
@@ -1035,8 +1054,18 @@ def _drivey_question(msgs):
 DRIVEY_TOOLS = frozenset(('drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask'))
 DRIVEY_EXTRA = frozenset(('binder_item',))  # newer laptops; older ones route the same without it
 PICK_FILES = 'Add files or a folder with @ and send again.'
-ASKING_SERVICE = ('None of this Mini\'s questions fit, so I\'m asking an external service to write a query. '
-                  'It sees your question with private values as codes and the column names. Not your data.')
+ASKING_SERVICE = 'Asking the query service...'
+SERVICE_CARD = ('Send this to the query service?')
+
+
+def _service_lead(c):
+    """The consent card's lead: exactly what the query service would get."""
+    more = f'\n...and {c["more"]} more lines' if c.get('more') else ''
+    return ("None of this Mini's questions fit. An external query service (" + str(c.get('service') or 'online') +
+            ') can write a query for it. The query then runs on this computer.\n\n'
+            'It would get your question and the list of columns, with private values as codes. It never gets rows.'
+            '\n\nQuestion: "' + str(c.get('masked_question', '')) + '"\n\nColumns (the first lines):\n```\n' +
+            str(c.get('sample', '')) + more + '\n```')
 
 
 def drivey_route(j):
@@ -1107,6 +1136,11 @@ def drivey_route(j):
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported'):
             return say('These files need spreadsheet copies before Idli can hide private values: ' +
                        ', '.join(res['unsupported']) + '. Save Excel or CSV copies in Drive, then pick them with @.')
+        if name == 'mini_ask' and inp.get('preview') and active and isinstance(res.get('consent'), dict):
+            return card('Query service', SERVICE_CARD,
+                        [('Send', 'Ask the query service. Nothing else leaves this computer.'),
+                         ('Ask Claude', "Claude works on the Mini's files with private values as codes."),
+                         ('Not yet', 'Nothing is sent.')], _service_lead(res['consent']))
         if name == 'mini_ask' and inp.get('question') and active:
             # The query service couldn't answer (or isn't set up): offer Claude, as before.
             if res.get('error') or not (res.get('reply') or (res.get('clarify') and res.get('options'))):
@@ -1154,6 +1188,14 @@ def drivey_route(j):
             head = (inp.get('questions') or [{}])[0].get('header')
             if head == 'Privacy' and answer in ('Check each file', "Accept Idli's choices"):
                 return preview(answer == 'Check each file')
+            if head == 'Query service' and active and asked:
+                if answer == 'Send':
+                    return message(model, [_text(ASKING_SERVICE),
+                                           _tool_use(_tool_name(tools, 'mini_ask'), {'id': active['id'], 'question': asked})])
+                if answer == 'Ask Claude' and active.get('files'):
+                    return call('privacy_review_open', files=active['files'], question=asked,
+                                preview_only=True, mini_id=active['id'])
+                return say('OK. Nothing was sent. Ask another way, or choose a question from the Mini.')
             if head == 'Be specific' and active and asked:
                 if answer == 'Ask Claude' or not answer:
                     if not active.get('files'):
@@ -1188,9 +1230,8 @@ def drivey_route(j):
         mapped = _lib('minimap').map_questions(active['questions'], said, NINE_URL)
         if mapped.get('qid'):
             return call('mini_ask', id=active['id'], qid=mapped['qid'], params=mapped['params'])
-        if active.get('can_query') and active.get('files'):
-            return message(model, [_text(ASKING_SERVICE),
-                                   _tool_use(_tool_name(tools, 'mini_ask'), {'id': active['id'], 'question': said})])
+        if active.get('can_query') and active.get('files'):  # ask first: show what the query service would get
+            return call('mini_ask', id=active['id'], question=said, preview=True)
         if not active.get('files'):
             return say("This Mini can't answer that. " + PICK_FILES)
         return call('privacy_review_open', files=active['files'], question=said, preview_only=True, mini_id=active['id'])

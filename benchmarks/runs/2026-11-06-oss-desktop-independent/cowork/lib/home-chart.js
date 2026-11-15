@@ -162,6 +162,7 @@ if(location.pathname==='/view') api('/api/view?id='+encodeURIComponent(ID)).then
   const pin=$('pin'),zoom=$('zoom');
   const pinLabel=()=>{pin.textContent=v.pinned?'Pinned':'Pin';pin.setAttribute('aria-pressed',String(!!v.pinned));};
   pin.disabled=false;zoom.disabled=false;pinLabel();
+  if(new URLSearchParams(location.search).get('pin')==='0')pin.hidden=true;  // a chart inside a Mini is already kept
   pin.onclick=async()=>{pin.disabled=true;try{const r=await api('/api/view/pin',{id:ID,pinned:!v.pinned});v.pinned=r.pinned;pinLabel();status(v.pinned?'Pinned. It goes in your next Mini.':'Unpinned.');}catch(e){status(e.message,true);}finally{pin.disabled=false;}};
   zoom.onclick=async()=>{bigger=!bigger;zoom.textContent=bigger?'Zoom: Bigger':'Zoom: Fit';zoom.setAttribute('aria-pressed',String(bigger));try{await draw(v.spec,v.data,v.agent,v.title,v);}catch(e){status('The chart could not draw. Choose Zoom to try again.',true);}};
   $('claude-back').onclick=async()=>{try{await api('/api/claude-back',{ws:WS});status('Claude is ready on the right.');}catch(e){status(e.message,true);}};

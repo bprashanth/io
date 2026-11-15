@@ -189,8 +189,9 @@ def run(tables, sql):
         con.close()
 
 
-def answer(data_dir, files, question, call=None):
-    """{'kind': 'table', title, note, frame, sql} or {'kind': 'clarify', text, options}; masked text only leaves."""
+def prepare(data_dir, files, question):
+    """Exactly what would go to the service, built on this computer: the masked question and the column list.
+    Shown to the person before anything is sent (preview), then sent unchanged (answer)."""
     with privacy.session_lock(data_dir):
         full = privacy.session_vault(data_dir)
         vault, _ = privacy.proxy_vault(data_dir, full)
@@ -206,10 +207,27 @@ def answer(data_dir, files, question, call=None):
         text = schema(tables, lambda v: mask(str(v)))
         if len(text) > MAX_SCHEMA_CHARS:  # a very wide file: column names and types only
             text = re.sub(r'(: text, \d+ different values): [^\n]*', r'\1', text)[:MAX_SCHEMA_CHARS]
-    def real(t):  # codes from the file, plus any the scanner gave to names typed in this question
-        return full.rehydrate(vault.rehydrate(str(t)))
     if privacy.known_leaks(masked_q + '\n' + text, vault):
         raise ValueError('A private value was still in the question. Nothing was sent.')
+    return {'masked_question': masked_q, 'schema': text, 'tables': tables, 'vault': vault, 'full': full}
+
+
+def preview(data_dir, files, question, lines=14):
+    """For the consent card: the masked question and the first lines of the column list, as the service gets them."""
+    p = prepare(data_dir, files, question)
+    rows = p['schema'].splitlines()
+    shown = [r[:160] + ('...' if len(r) > 160 else '') for r in rows[:lines]]
+    columns = sum(1 for r in rows if r.startswith('  "'))
+    return {'masked_question': p['masked_question'], 'sample': '\n'.join(shown),
+            'more': max(0, len(rows) - lines), 'columns': columns, 'service': MODEL.split('/')[0]}
+
+
+def answer(data_dir, files, question, call=None):
+    """{'kind': 'table', title, note, frame, sql} or {'kind': 'clarify', text, options}; masked text only leaves."""
+    p = prepare(data_dir, files, question)
+    masked_q, text, tables, vault, full = p['masked_question'], p['schema'], p['tables'], p['vault'], p['full']
+    def real(t):  # codes from the file, plus any the scanner gave to names typed in this question
+        return full.rehydrate(vault.rehydrate(str(t)))
     _count_call(data_dir)
     reply = ask_service(masked_q, text, call)
     if reply.get('clarify'):

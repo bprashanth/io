@@ -1444,13 +1444,28 @@ def t_mini_open(id):
     return home.mini_open(files().data_dir, id, home.chat_workspace())
 
 
+def t_wire_page(q=''):
+    """The Privacy chat in Start here: what Idli's privacy guard sent to Claude, searchable, shown in the chat. Served
+    by Drivey's page server (the one address Paseo shows inside a chat); the log is the same for every app."""
+    idli = os.environ.get('IDLI_HOME') or os.path.expanduser('~/idli-insights')
+    port, token = formserver.ensure(os.environ.get('IDLI_DATA') or os.path.join(idli, 'cowork-real'))
+    query = {'t': token, 'embed': '1', 'h': '640'}
+    if str(q).strip():
+        query['q'] = ' '.join(str(q).split())[:200]
+    url = f'http://dashboard.localhost:{port}/wire?' + urllib.parse.urlencode(query)
+    head = f'Sent to Claude, searched for "{query["q"]}"' if 'q' in query else 'Sent to Claude'
+    return {'reply': f'[{head}]({url})\n\nType a name or a word to search for it.'}
+
+
 def t_binder_item(kind, title):
     from lib import home
     return home.binder_item(files().data_dir, kind, title, home.chat_workspace())
 
 
-def t_mini_ask(id, qid=None, params=None, question=None):
+def t_mini_ask(id, qid=None, params=None, question=None, preview=False):
     from lib import home
+    if question and not qid and preview:
+        return home.mini_query_preview(files().data_dir, id, question)
     if question and not qid:
         return home.mini_query(files().data_dir, id, question, home.chat_workspace())
     return home.mini_ask(files().data_dir, id, qid, params or {}, home.chat_workspace())
@@ -1467,13 +1482,15 @@ TOOLS = {
          "mini_id": {"type": "string"}}, ["files", "question"]),
     "mini_open": (t_mini_open, "Open a saved Mini with its questions, options and example charts.",
                   {"id": {"type": "string"}}, ["id"]),
+    "wire_page": (t_wire_page, "Show what Idli's privacy guard sent to Claude, optionally searched for a name or word.",
+                  {"q": {"type": "string"}}, []),
     "binder_item": (t_binder_item, "Show Claude's latest chart or Mini draft with this title in this chat.",
                     {"kind": {"type": "string", "enum": ["Chart", "Mini draft"]}, "title": {"type": "string"}},
                     ["kind", "title"]),
     "mini_ask": (t_mini_ask, "Run one saved Mini question with validated parameters, or (with question instead of "
                  "qid) have the query service answer a question the saved ones don't cover.",
                  {"id": {"type": "string"}, "qid": {"type": "string"}, "params": {"type": "object"},
-                  "question": {"type": "string"}}, ["id"]),
+                  "question": {"type": "string"}, "preview": {"type": "boolean"}}, ["id"]),
     "file_get": (t_file_get, "Download the real spreadsheet from a Google Sheets or Drive link into this folder. The browser may show a Save "
                  "dialog; the user clicks Save. Then call file_open.",
                  {"link": {"type": "string", "description": "A docs.google.com/spreadsheets or drive.google.com link "

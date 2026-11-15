@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini - Idli</title>
+<script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('embed');</script>
+<link rel="stylesheet" href="/home.css?__TOKEN_QUERY__">
+<style>
+/* One page for a Mini: the draft Claude made (the author arranges it here) and the saved Mini colleagues open. */
+:root{--soft:#edf4ef;--hover:#0000000a;--danger:#a13832}
+@media(prefers-color-scheme:dark){:root{--soft:#263d32;--hover:#ffffff0d;--danger:#f1a69b}}
+html.embed,html.embed body{background:transparent;height:auto;overflow:visible}
+main{max-width:760px;padding:18px 18px 28px}
+.embed main{max-width:none;padding:6px 4px 10px}
+.note{font-size:12.5px;color:var(--muted);background:var(--soft);border-radius:8px;padding:7px 10px;margin:0 0 12px}
+h1{font-size:21px;line-height:1.25;margin:0 0 4px;letter-spacing:-.01em}
+.source{font-size:13px;color:var(--muted);margin:0 0 10px}
+.source b{color:var(--ink);font-weight:600}
+.blk{position:relative;border-radius:8px;margin:2px 0}
+.text{padding:2px 0}.text p{margin:8px 0}.text h3{font-size:15px;margin:14px 0 6px}.text ul{margin:6px 0;padding-left:22px}
+.chart{margin:10px 0}.chart iframe{display:block;width:100%;height:380px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+h2{font-size:15px;margin:18px 0 6px}
+ul.ask{margin:0;padding-left:22px}ul.ask li{margin:4px 0}ul.ask em{color:var(--muted)}
+.end{color:var(--muted);margin:8px 0 0}
+/* Editing (the draft only) */
+.edit .blk,.edit li.q{cursor:text}
+.edit .blk:hover,.edit .blk:focus-within,.edit li.q:hover{background:var(--hover);box-shadow:0 0 0 6px var(--hover)}
+.edit h1:hover,.edit h1:focus{background:var(--hover);box-shadow:0 0 0 4px var(--hover);border-radius:4px;outline:none}
+.tools{position:absolute;top:2px;right:2px;display:flex;gap:4px;opacity:0;transition:opacity .1s}
+.blk:hover .tools,.blk:focus-within .tools,li.q:hover .tools,li.q:focus-within .tools{opacity:1}
+.tools button,.add{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--panel)}
+.handle{cursor:grab}
+.chart .tools{top:8px;right:8px}
+li.q{position:relative;border-radius:4px}.edit li.q{padding-right:120px}
+li.q .words{outline:none}
+textarea.md{width:100%;min-height:70px;resize:none;font:inherit;line-height:1.5;padding:8px;background:var(--panel);overflow:hidden}
+.add{margin:6px 0 0;color:var(--muted)}
+.dragging iframe{pointer-events:none}
+.blk.drop-before{box-shadow:0 -3px 0 var(--accent)}.blk.drop-after{box-shadow:0 3px 0 var(--accent)}
+.blk.moving{opacity:.45}
+footer{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+footer .primary{margin:0}footer button{margin:0}
+#status{font-size:13px;color:var(--muted);flex:1;min-width:180px}#status.error{color:var(--danger)}
+#status button{font-size:12px;padding:1px 8px;margin-left:6px}
+.saved{background:var(--soft);border-radius:8px;padding:10px 12px;margin-top:14px}
+@media(hover:none){.tools{opacity:1}}
+</style>
+<main id="page" aria-busy="true">
+  <p class="note" id="note" hidden>Draft. This is how colleagues will see your Mini. Click any text to change it. Drag Move to reorder.</p>
+  <h1 id="name">Mini</h1>
+  <p class="source" id="source" hidden></p>
+  <div id="blocks"></div>
+  <button type="button" class="add" id="add-end" hidden>Add text</button>
+  <h2>You can ask</h2>
+  <ul class="ask" id="questions"></ul>
+  <p class="end">Ask in your own words.</p>
+  <footer id="actions" hidden><div id="status" role="status" aria-live="polite">Loading...</div>
+    <button type="button" id="add-to" hidden></button><button type="button" id="save" class="primary">Save Mini</button></footer>
+  <p class="saved" id="saved" hidden>Saved. Find it under Minis when you start a new Drivey chat. You and colleagues can ask it questions there.</p>
+</main>
+<script src="/home.js?__TOKEN_QUERY__"></script>
+<script>
+'use strict';
+const Q=new URLSearchParams(location.search), MINI=Q.get('mini')||'', WSQ=Q.get('ws')||'', EMBED=Q.get('embed')==='1';
+let card=null, editing=false, removed=null, dirty=0, sync=null;
+const channel='BroadcastChannel' in window?new BroadcastChannel('idli-mini-'+(MINI||ID)):null;
+const post=()=>{if(EMBED)parent.postMessage({type:'idli-height',px:Math.ceil($('page').getBoundingClientRect().height+12)},'*');};
+new ResizeObserver(post).observe(document.body);
+const say=(text,err=false,undo=false)=>{const s=$('status');s.textContent=text;s.className=err?'error':'';
+  if(undo){const b=document.createElement('button');b.textContent='Undo';b.onclick=()=>{if(!removed)return;removed.list.splice(removed.at,0,removed.item);removed=null;render();keep();say('Put back.');};s.appendChild(b);}};
+// Markdown the author writes: paragraphs, ### headings, - lists, **bold**, _italic_.
+function md(text){
+  const inline=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|\W)[_*](\S.*?\S|\S)[_*](?=\W|$)/g,'$1<em>$2</em>');
+  return String(text).trim().split(/\n\s*\n/).map(par=>{
+    const lines=par.split('\n');let head='';
+    if(/^#{1,4} /.test(lines[0]))head='<h3>'+inline(lines.shift().replace(/^#{1,4} /,''))+'</h3>';
+    if(!lines.length)return head;
+    if(lines.every(l=>/^\s*[-*] /.test(l)))return head+'<ul>'+lines.map(l=>'<li>'+inline(l.replace(/^\s*[-*] /,''))+'</li>').join('')+'</ul>';
+    return head+'<p>'+lines.map(inline).join('<br>')+'</p>';
+  }).join('');
+}
+const chartUrl=id=>link('/view?'+new URLSearchParams({id,embed:'1',h:'380',pin:'0',ws:WSQ||card.workspace||''}));
+const canEdit=()=>card&&card.mode==='draft';
+function tools(kind,i){
+  return `<div class="tools"><button type="button" class="handle" draggable="true" data-move="${i}" aria-label="Move this ${kind}. Arrow keys move it up or down.">Move</button>`+
+    `<button type="button" data-remove="${i}" aria-label="Remove this ${kind}">Remove</button></div>`;
+}
+function render(){
+  const edit=canEdit();document.body.classList.toggle('edit',edit);
+  $('name').textContent=card.name;$('name').contentEditable=edit?'plaintext-only':'false';
+  $('note').hidden=!edit;$('add-end').hidden=!edit;$('actions').hidden=!edit;$('saved').hidden=card.mode!=='saved';
+  const src=card.sources||[];$('source').hidden=!src.length;
+  $('source').innerHTML='Source: '+src.map(f=>`<b>${esc(f.name)}</b>${f.folder?` (${esc(f.folder)})`:''}`).join(', ');
+  $('blocks').innerHTML=card.blocks.map((b,i)=>b.type==='chart'
+    ?`<div class="blk chart" data-i="${i}">${edit?tools('chart',i):''}<iframe src="${esc(chartUrl(b.id))}" title="${esc(b.title)}" loading="lazy"></iframe></div>`
+    :`<div class="blk text" data-i="${i}" ${edit?'tabindex="0" role="button" aria-label="Edit this text"':''}>${edit?tools('text',i):''}<div class="body">${md(b.text)}</div></div>`).join('');
+  $('questions').innerHTML=card.questions.map((q,i)=>`<li class="q" data-q="${i}"><span class="words" ${edit?'contenteditable="plaintext-only" aria-label="Question '+(i+1)+'"':''}>${esc(q.question)}</span>${q.options?` <em>(${esc(q.options)})</em>`:''}${edit?tools('question',i).replace(/data-move/g,'data-qmove').replace(/data-remove/g,'data-qremove'):''}</li>`).join('')
+    ||'<li class="end">Keep at least one question to save this Mini.</li>';
+  if(card.source_name&&edit){$('add-to').hidden=false;$('add-to').textContent='Add to '+card.source_name;$('save').textContent='Save as a new Mini';}
+  if(edit)wire();
+  $('page').setAttribute('aria-busy','false');post();
+}
+// Keep changes as they are made, so the enlarged copy and the one in the chat stay the same.
+function keep(){
+  if(!canEdit())return;dirty++;clearTimeout(sync);
+  sync=setTimeout(async()=>{const n=dirty;try{await api('/api/mini-card-edit',{id:ID,name:card.name,blocks:card.blocks,questions:card.questions});
+    if(n===dirty&&channel)channel.postMessage('changed');}catch(e){say(e.message,true);}},500);
+}
+function editText(el){
+  const i=Number(el.dataset.i),b=card.blocks[i];if(!b||el.querySelector('textarea'))return;
+  editing=true;const ta=document.createElement('textarea');ta.className='md';ta.value=b.text;ta.setAttribute('aria-label','Text, in Markdown');
+  const grow=()=>{ta.style.height='auto';ta.style.height=(ta.scrollHeight+2)+'px';post();};
+  el.querySelector('.body').replaceWith(ta);grow();ta.focus();ta.oninput=grow;
+  ta.onkeydown=e=>{if(e.key==='Escape'){ta.value=b.text;ta.blur();}};
+  ta.onblur=()=>{editing=false;const t=ta.value.trim();
+    if(t){b.text=t;}else{removed={list:card.blocks,at:i,item:b};card.blocks.splice(i,1);say('Empty text removed.',false,true);}
+    render();keep();};
+}
+function move(list,from,to){if(to<0||to>=list.length||from===to)return;const [x]=list.splice(from,1);list.splice(to,0,x);render();keep();}
+function wire(){
+  const name=$('name');name.oninput=()=>{card.name=name.textContent.trim();keep();};
+  name.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();name.blur();}};
+  $('blocks').querySelectorAll('.blk.text').forEach(el=>{
+    el.onclick=e=>{if(!e.target.closest('.tools'))editText(el);};
+    el.onkeydown=e=>{if(e.key==='Enter'&&e.target===el){e.preventDefault();editText(el);}};
+  });
+  $('questions').querySelectorAll('li.q .words').forEach(w=>{
+    const i=Number(w.closest('li').dataset.q);
+    w.oninput=()=>{card.questions[i].question=w.textContent.trim();keep();};
+    w.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();w.blur();}};
+  });
+  const remove=(list,i,what)=>{removed={list,at:i,item:list[i]};list.splice(i,1);render();keep();say(what+' removed.',false,true);};
+  $('blocks').querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.remove);remove(card.blocks,i,card.blocks[i].type==='chart'?'Chart':'Text');});
+  $('questions').querySelectorAll('[data-qremove]').forEach(b=>b.onclick=()=>remove(card.questions,Number(b.dataset.qremove),'Question'));
+  // Drag a block (or a question) by its Move button; arrow keys on Move do the same.
+  const dnd=(sel,attr,list,itemSel)=>document.querySelectorAll(sel).forEach(h=>{
+    const from=Number(h.dataset[attr]);
+    h.onkeydown=e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();move(list,from,from+(e.key==='ArrowUp'?-1:1));
+      const again=document.querySelector(`[data-${attr}="${from+(e.key==='ArrowUp'?-1:1)}"]`);if(again)again.focus();}};
+    h.ondragstart=e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',attr+':'+from);document.body.classList.add('dragging');h.closest(itemSel).classList.add('moving');};
+    h.ondragend=()=>{document.body.classList.remove('dragging');document.querySelectorAll('.moving,.drop-before,.drop-after').forEach(x=>x.classList.remove('moving','drop-before','drop-after'));};
+    const item=h.closest(itemSel),to=Number(item.dataset.i??item.dataset.q);
+    item.ondragover=e=>{e.preventDefault();const r=item.getBoundingClientRect(),after=e.clientY>r.top+r.height/2;
+      item.classList.toggle('drop-after',after);item.classList.toggle('drop-before',!after);};
+    item.ondragleave=()=>item.classList.remove('drop-before','drop-after');
+    item.ondrop=e=>{e.preventDefault();const [kind,n]=e.dataTransfer.getData('text/plain').split(':'),src=Number(n),after=item.classList.contains('drop-after');
+      item.classList.remove('drop-before','drop-after');if(kind!==attr)return;
+      let dest=to+(after?1:0);if(src<dest)dest--;document.body.classList.remove('dragging');move(list,src,dest);};
+  });
+  dnd('#blocks [data-move]','move',card.blocks,'.blk');
+  dnd('#questions [data-qmove]','qmove',card.questions,'li.q');
+}
+$('add-end').onclick=()=>{card.blocks.push({type:'text',text:''});render();editText($('blocks').lastElementChild);};
+async function save(action){
+  if(!card.name){say('Add a title first. Click the heading to write one.',true);return;}
+  if(!card.questions.length){say('Keep at least one question before saving.',true);return;}
+  if(!card.blocks.some(b=>b.type==='text')){say('Add a few words about the Mini first. Choose Add text.',true);return;}
+  clearTimeout(sync);document.querySelectorAll('footer button').forEach(b=>b.disabled=true);say('Checking and saving...');
+  try{await api('/api/mini-save',{id:ID,action,name:card.name,blocks:card.blocks,questions:card.questions});
+    card.mode='saved';render();say('');if(channel)channel.postMessage('changed');}
+  catch(e){say(e.message,true);}finally{document.querySelectorAll('footer button').forEach(b=>b.disabled=false);}
+}
+$('save').onclick=()=>save('new');$('add-to').onclick=()=>save('add');
+async function load(){
+  try{card=await api('/api/mini-card?'+new URLSearchParams(MINI?{mini:MINI}:{id:ID}));render();if(canEdit())say('Changes are kept as you go. Save when it looks right.');}
+  catch(e){$('actions').hidden=false;say(e.message,true);}
+}
+if(channel)channel.onmessage=()=>{if(!editing&&!document.activeElement?.isContentEditable)load();};
+load();
+</script>
+</html>

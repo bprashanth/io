@@ -214,27 +214,98 @@ def draft_data(data_dir, ident):
     return home.read(path)
 
 
+def blocks_of(m):
+    """A Mini's page, top to bottom: the author's text and pinned charts in their order. Minis saved before blocks
+    existed read as their story, then their charts."""
+    if isinstance(m.get('blocks'), list) and m['blocks']:
+        return m['blocks']
+    out = [{'type': 'text', 'text': m['goal']}] if m.get('goal') else []
+    return out + [{'type': 'chart', 'id': c['id'], 'title': c.get('title', '')} for c in m.get('charts', [])]
+
+
+def _card_edits(draft, edits):
+    """The page as the author arranged it, checked: text is plain, charts and questions only from this draft."""
+    charts = {c['id']: c for c in draft['charts']}
+    blocks, seen = [], set()
+    for b in (edits.get('blocks') or [])[:60]:
+        if not isinstance(b, dict):
+            continue
+        if b.get('type') == 'text':
+            text = home.plain(str(b.get('text', ''))).strip()
+            if text:
+                blocks.append({'type': 'text', 'text': text[:6000]})
+        elif b.get('type') == 'chart' and b.get('id') in charts and b['id'] not in seen:
+            seen.add(b['id'])
+            blocks.append({'type': 'chart', 'id': b['id'], 'title': charts[b['id']]['title']})
+    known = {q['id'] for q in draft['questions']}
+    questions = [{'id': q['id'], 'question': home.plain(str(q.get('question', ''))).strip()[:1000]}
+                 for q in (edits.get('questions') or []) if isinstance(q, dict) and q.get('id') in known]
+    return {'name': home.plain(str(edits.get('name', ''))).strip()[:160], 'blocks': blocks, 'questions': questions}
+
+
+def edit_draft(data_dir, ident, edits):
+    """Keep the author's changes as they make them (the page in the chat and its enlarged copy stay the same)."""
+    with LOCK:
+        draft = draft_data(data_dir, ident)
+        if draft.get('saved_id'):
+            return {'saved': True}
+        path = home.inside(data_dir, f'.idli/drafts/{ident}/mini.json')
+        home.write(path, {**draft, 'edits': _card_edits(draft, edits)})
+        return {'kept': True}
+
+
+def card_data(data_dir, draft=None, mini=None):
+    """What the Mini page shows. The same page is the draft (editable) and the saved Mini (as colleagues see it)."""
+    if mini:
+        m = home.read(home.object_path(data_dir, 'minis', mini))
+        questions, mode = m['questions'], 'mini'
+        name, blocks = m['name'], blocks_of(m)
+    else:
+        m = draft_data(data_dir, draft)
+        e = m.get('edits') or {}
+        mode = 'saved' if m.get('saved_id') else 'draft'
+        name, blocks = e.get('name') or m['name'], e.get('blocks') or blocks_of(m)
+        by_id = {q['id']: q for q in m['questions']}
+        words = {q['id']: q['question'] for q in e.get('questions', [])}
+        order = [q['id'] for q in e.get('questions', [])] if e.get('questions') else list(by_id)
+        questions = [{**by_id[i], 'question': words.get(i) or by_id[i]['question']} for i in order if i in by_id]
+    return {'mode': mode, 'name': home.plain(name), 'blocks': blocks,
+            'questions': [{'id': q['id'], 'question': home.plain(q['question']),
+                           'options': '; '.join(home._option_words(k, d) for k, d in q.get('params', {}).items())}
+                          for q in questions],
+            'sources': home.file_labels(m.get('files', [])), 'workspace': m.get('workspace'),
+            'saved_id': m.get('saved_id'), 'source_id': m.get('source_id'), 'source_name': m.get('source_name')}
+
+
 def save_draft(data_dir, ident, edits, action='new'):
     with LOCK:
         draft = draft_data(data_dir, ident)
         if draft.get('saved_id'):
             return {'id': draft['saved_id'], 'saved': True}
         folder = home.inside(data_dir, f'.idli/drafts/{ident}/mini.json').parent
+        blocks = None
+        if 'blocks' in edits:  # the Mini page: text and charts in the author's order
+            card = _card_edits(draft, edits)
+            blocks = card['blocks']
+            edits = {**edits, 'name': card['name'],
+                     'goal': '\n\n'.join(b['text'] for b in blocks if b['type'] == 'text'),
+                     'charts': [b['id'] for b in blocks if b['type'] == 'chart']}
         name = home.plain(str(edits.get('name', '')).strip())
         story = home.plain(str(edits.get('goal', '')).strip())
         if not name or len(name) > 160 or not story or len(story) > 12000:
-            raise ValueError('Add a title and a short story before saving.')
+            raise ValueError('Add a title and a few words about the Mini before saving.')
         # Only edit the text/options of existing questions. Scripts are never taken from browser input.
         originals = {q['id']: q for q in draft['questions']}
         raw = edits.get('questions', [])
         if not isinstance(raw, list) or any(not isinstance(q, dict) or q.get('id') not in originals for q in raw):
             raise ValueError('Keep questions from this draft.')
         questions = questions_checked([{**originals[q['id']], 'question': q.get('question'),
-                                       'params': q.get('params', {})} for q in raw], folder)
+                                       'params': q.get('params', originals[q['id']].get('params', {}))}
+                                      for q in raw], folder)
         pins = edits.get('charts', [])
         if not isinstance(pins, list) or any(p not in [v['id'] for v in draft['charts']] for p in pins):
             raise ValueError('Keep charts from this draft.')
-        charts = [v for v in draft['charts'] if v['id'] in pins]
+        charts = [next(v for v in draft['charts'] if v['id'] == p) for p in pins]
         if action not in ('new', 'add') or (action == 'add' and not draft.get('source_id')):
             raise ValueError('Choose how to save this Mini.')
         target_id = draft['source_id'] if action == 'add' else (re.sub('[^a-z0-9]+', '-', name.lower()).strip('-') or 'mini')[:60] + '-' + uuid.uuid4().hex[:8]
@@ -259,7 +330,12 @@ def save_draft(data_dir, ident, edits, action='new'):
             link.symlink_to(Path(data_dir).resolve() / 'drive', target_is_directory=True)
         files = {f['local']: f for f in existing.get('files', []) + draft.get('files', [])}
         all_charts = {v['id']: v for v in existing.get('charts', []) + charts}
-        home.write(target, {**existing, 'id': target_id, 'name': name,
+        if blocks is None:
+            blocks = blocks_of({'goal': story, 'charts': charts})
+        if action == 'add':
+            blocks = blocks_of(existing) + [b for b in blocks if b['type'] == 'text' or
+                                            b['id'] not in {c['id'] for c in existing.get('charts', [])}]
+        home.write(target, {**existing, 'id': target_id, 'name': name, 'blocks': blocks,
                             'goal': existing['goal'] + '\n\n' + story if existing.get('goal') and existing['goal'] != story else story,
                             'heading': story.splitlines()[0][:140],
                             'questions': saved_questions,

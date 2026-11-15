@@ -500,7 +500,7 @@ def binder_item(data_dir, kind, title, workspace=None):
     if not found:
         raise ValueError('That draft is no longer here. Ask Claude to make it again.')
     url = journey.page_url(data_dir, 'mini-card', id=found, embed='1', h='900')
-    return {'reply': f'Your Mini draft. Change any words here, then save.\n\n[{title}]({url})'}
+    return {'reply': f'Your Mini draft, as colleagues will see it. Click any text to change it, drag to reorder, then save.\n\n[{title}]({url})'}
 
 
 def post_to_left(workspace, kind, title):
@@ -574,6 +574,16 @@ def _option_words(key, desc):
     return name + ': a number'
 
 
+def file_labels(files):
+    """A Mini's source files for people: name, and the Drive folder it sits in."""
+    out = []
+    for x in files or []:
+        parts = str(x.get('local') or x.get('title') or '').replace('drive/', '', 1).split('/')
+        name = x.get('title') or re.sub(r'\.(xlsx|xls|csv)$', '', parts[-1])
+        out.append({'name': plain(name), 'folder': plain(' / '.join(parts[:-1]))})
+    return out
+
+
 def mini_open(data_dir, ident, workspace=None):
     """Show what the author left: the story, the pinned charts (live), and what can be asked. No model, no scripts."""
     m = read(object_path(data_dir, 'minis', ident))
@@ -583,17 +593,10 @@ def mini_open(data_dir, ident, workspace=None):
             state.setdefault('workspace_files', {})[workspace] = m.get('files', [])
         update_state(data_dir, change)
     from lib import journey
-    files = []
-    for x in m.get('files', []):
-        parts = str(x.get('local') or x.get('title') or '').replace('drive/', '', 1).split('/')
-        name = x.get('title') or re.sub(r'\.(xlsx|xls|csv)$', '', parts[-1])
-        files.append('**' + name + '**' + (' (' + ' / '.join(parts[:-1]) + ')' if len(parts) > 1 else ''))
-    lines = ['## ' + m['name'], '', m['goal'], '',
-             'Source: ' + ', '.join(files) if files else '']
+    # The Mini page: the same page the author arranged and saved (lib/mini-card.html), with live charts.
+    lines = ['[' + plain(m['name']).replace('[', '').replace(']', '') + '](' + journey.page_url(
+        data_dir, 'mini-card', mini=ident, embed=1, h=700, ws=workspace or '') + ')']
     charts = m.get('charts', [])
-    for chart in charts:
-        lines += ['', '[' + plain(chart['title']) + '](' + journey.page_url(
-            data_dir, 'view', id=chart['id'], embed=1, ws=workspace or '') + ')']
     if not charts and m['questions']:
         try:
             example = run_mini(data_dir, ident, m['questions'][0]['id'], {})
@@ -602,11 +605,6 @@ def mini_open(data_dir, ident, workspace=None):
                                              example['sources'], example['script'], workspace)]
         except ValueError:
             pass
-    lines += ['', '**You can ask**']
-    for q in m['questions']:
-        opts = [_option_words(k, d) for k, d in q.get('params', {}).items()]
-        lines.append('- ' + q['question'] + (' _(' + '; '.join(opts) + ')_' if opts else ''))
-    lines += ['', 'Ask in your own words.']
     # can_query: questions outside the saved ones can go to the query service (lib/minisql.py).
     return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'can_query': True,
             'reply': plain('\n'.join(lines))}
@@ -614,6 +612,16 @@ def mini_open(data_dir, ident, workspace=None):
 
 QUERY_NOTE = ('_Asked an external service to write a query. It saw your question with private values as codes and '
               'the column names, not your data. The query ran on this computer._')
+
+
+def mini_query_preview(data_dir, ident, question):
+    """Before asking the query service: what it would get (masked question, first lines of the column list)."""
+    from lib import minisql
+    m = read(object_path(data_dir, 'minis', ident))
+    files = [f['local'] for f in m.get('files', []) if f.get('local')]
+    if not files:
+        raise ValueError('This Mini has no files to query.')
+    return {'question': question, 'consent': minisql.preview(data_dir, files, str(question)[:800])}
 
 
 def mini_query(data_dir, ident, question, workspace=None):

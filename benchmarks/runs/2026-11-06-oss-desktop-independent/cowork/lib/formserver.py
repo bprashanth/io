@@ -450,7 +450,8 @@ def make_handler(files, token):
                 return self._send(403, "Forbidden: open the form from Idli's chat.", "text/plain")
             try:
                 if u.path in ("/home", "/view", "/mini", "/privacy-review", "/mini-editor", "/mini-card", "/consent", "/reveals"):
-                    page = "mini-editor" if u.path == "/mini-card" else u.path[1:]  # the Mini draft inside the chat
+                    # One Mini page: the draft (in the chat or on the right) and the saved Mini look the same.
+                    page = "mini-card" if u.path == "/mini-editor" else u.path[1:]
                     with open(os.path.join(HERE, "lib", page + ".html"), encoding="utf-8") as f:
                         return self._send(200, f.read().replace("__TOKEN_QUERY__", urllib.parse.urlencode({"t": token})), "text/html")
                 if u.path in ("/home.css", "/home.js", "/home-chart.js", "/journey.css", "/journey.js", "/reveals.js"):
@@ -470,6 +471,9 @@ def make_handler(files, token):
                     return self._send(200, home.minis(files.data_dir))
                 if u.path == '/api/review':
                     return self._send(200, journey.review_data(files.data_dir, qs['id'][0]))
+                if u.path == '/api/mini-card':
+                    return self._send(200, journey.card_data(files.data_dir, draft=(qs.get('id') or [None])[0],
+                                                             mini=(qs.get('mini') or [None])[0]))
                 if u.path == '/api/mini-draft':
                     return self._send(200, journey.draft_data(files.data_dir, qs['id'][0]))
                 if u.path == "/api/view":
@@ -559,6 +563,8 @@ def make_handler(files, token):
                     terminal = home._claude_terminal(files.data_dir, body['ws'])
                     home.cli('terminal', 'send-keys', '-l', terminal, '\r')
                     return self._send(200, {'sent': True})
+                if u.path == '/api/mini-card-edit':
+                    return self._send(200, journey.edit_draft(files.data_dir, body['id'], body))
                 if u.path == '/api/mini-save':
                     return self._send(200, journey.save_draft(files.data_dir, body['id'], body, body.get('action', 'new')))
                 if u.path == "/api/home/prepare":

@@ -983,7 +983,7 @@ index 00000000..199cdb42
 +}));
 diff --git a/packages/app/src/components/markdown/idli-chart/markdown.test.ts b/packages/app/src/components/markdown/idli-chart/markdown.test.ts
 new file mode 100644
-index 00000000..48a73d20
+index 00000000..b3530033
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/markdown.test.ts
 @@ -0,0 +1,173 @@
@@ -996,13 +996,13 @@ index 00000000..48a73d20
 +const EMBED_URL = `http://dashboard.localhost:8797/view?id=${ID}&t=secret&embed=1&ws=workspace`;
 +
 +describe("Idli chart Markdown", () => {
-+  it.each(["privacy-review", "view", "mini-card"])(
++  it.each(["privacy-review", "view", "mini-card", "wire"])(
 +    "embeds %s links with any label and preserves page parameters",
 +    (page) => {
 +      const source = `Before\n\n[Open this](http://dashboard.localhost:8797/${page}?embed=1&a=left-agent&h=540&ws=wrong)\n\nAfter`;
 +      const segments = splitIdliChartMarkdown(source, "workspace");
 +      const embed = segments.find((segment) => segment.kind === "chart");
-+      expect(embed).toMatchObject({ height: 540, enlarge: page === "view" });
++      expect(embed).toMatchObject({ height: 540, enlarge: page === "view" || page === "mini-card" });
 +      const url = new URL(embed!.url);
 +      expect(url.searchParams.get("a")).toBe("left-agent");
 +      expect(url.searchParams.get("ws")).toBe("workspace");
@@ -1162,10 +1162,10 @@ index 00000000..48a73d20
 +});
 diff --git a/packages/app/src/components/markdown/idli-chart/markdown.ts b/packages/app/src/components/markdown/idli-chart/markdown.ts
 new file mode 100644
-index 00000000..b521ef9a
+index 00000000..9050c4d2
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/markdown.ts
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,210 @@
 +import { fromMarkdown } from "mdast-util-from-markdown";
 +import type { Definition, Nodes } from "mdast";
 +
@@ -1355,6 +1355,7 @@ index 00000000..b521ef9a
 +    ["/privacy-review", "Privacy review"],
 +    ["/view", "Chart"],
 +    ["/mini-card", "Mini"],
++    ["/wire", "Sent to Claude"],
 +  ]);
 +  const title = titles.get(target.pathname);
 +  if (
@@ -1371,7 +1372,7 @@ index 00000000..b521ef9a
 +    url: target.toString(),
 +    title,
 +    height,
-+    enlarge: target.pathname === "/view",
++    enlarge: target.pathname === "/view" || target.pathname === "/mini-card",
 +    page: true,
 +  };
 +}

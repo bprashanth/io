@@ -133,3 +133,19 @@ def test_daily_limit_and_reply_cap(shola, monkeypatch):
     with pytest.raises(ValueError, match='limit'):
         minisql.answer(shola, [REL], 'how many trees?', call=fake(reply, seen))
     assert len(seen) == 2 and seen[0]['max_tokens'] == minisql.MAX_REPLY_TOKENS
+
+
+def test_consent_preview_is_what_gets_sent(shola):
+    """The card shows the masked question and the first lines of the column list; the call sends exactly those."""
+    q = 'Which species have big trees at Avalanche?'
+    p = minisql.preview(shola, [REL], q, lines=6)
+    shown = p['masked_question'] + '\n' + p['sample']
+    for value in REAL:
+        assert value not in shown
+    assert 'Avalanche' not in p['masked_question'] and p['columns'] > 3 and p['more'] > 0
+    seen = []
+    minisql.answer(shola, [REL], q, call=fake({'sql': 'SELECT 1 AS one', 'title': 't'}, seen))
+    sent = seen[0]['messages'][1]['content']
+    assert sent.startswith(p['sample']) and sent.endswith('Question: ' + p['masked_question'])
+    usage = json.loads((shola / '.idli/query-usage.json').read_text())
+    assert sum(usage.values()) == 1  # the preview itself is not a call
