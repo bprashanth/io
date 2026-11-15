@@ -98,7 +98,9 @@ async function load() {
     </div>`).join("");
   list.querySelectorAll(".card").forEach(card => {
     const t = card.querySelector(".text");
-    if (t && t.scrollHeight > t.clientHeight + 4) {
+    // Decide by the text, not the layout: inside a chat the frame can still be sizing itself when this runs.
+    const raw = t ? t.textContent : "";
+    if (t && (raw.split("\n").length > 6 || raw.length > 360)) {
       const b = document.createElement("button"); b.textContent = "Show all";
       b.onclick = () => { card.classList.toggle("open"); b.textContent = card.classList.contains("open") ? "Show less" : "Show all"; };
       card.appendChild(b);

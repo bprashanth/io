@@ -129,6 +129,9 @@ class BrowserTests(Fixture):
             expect(p.locator('.blk')).to_have_count(2);expect(p.locator('.blk.chart iframe')).to_have_count(1)
             self.assertIn('pin=0',p.locator('.blk.chart iframe').get_attribute('src'))
             self.check_layout(p);self.shot(p,f'mini-card-draft-{scheme}-460.png')
+            narrow=self.page(scheme,width=220);narrow.goto(self.url('mini-card',id=ident,embed=1))  # a squeezed left pane
+            expect(narrow.locator('li.q')).to_have_count(2);narrow.locator('li.q').first.hover()
+            self.assertLess(narrow.locator('li.q .words').first.bounding_box()['height'],120);self.check_layout(narrow);narrow.close()
             title=p.locator('#name');title.click();p.keyboard.press('Control+A');p.keyboard.type('Visits we can plan around');p.keyboard.press('Enter')
             p.locator('.blk.text .body').first.click();ta=p.locator('textarea.md');expect(ta).to_be_visible()
             ta.fill('Garden had the **most** visits.\n\n- Start with Garden\n- Then River');p.locator('h2').click()

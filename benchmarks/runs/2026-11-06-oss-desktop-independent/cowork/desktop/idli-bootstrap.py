@@ -2,9 +2,10 @@
 """Idli first-run bootstrap: make a Paseo install look the way Idli should on first open.
 Safe to rerun: it only adds what's missing.
 
-  Start here       its own folder (~/idli-insights/setup), first in the sidebar
-     Logins           the setup chat (sign-in checks; also answers "what has Idli learned")
-     Privacy          a chat showing what Idli's privacy guard sent to Claude (searchable, per app; written by code)
+  Start here       its own folder (~/idli-insights/setup), first in the sidebar, with two entries (workspaces):
+     Logins           the setup chat (sign-in checks; also answers "what has Idli learned"), the Minis tab
+     Privacy          what Idli's privacy guard sent to Claude (searchable, per app; written by code). An entry of
+                      its own so it can't get lost the way a tab can.
      Minis            a tab: the page listing the files Idli has learned (grows as Claude teaches it)
      Drive            a tab for signing in to Google
   Drivey       the private folder (~/idli-insights/cowork-real): Drive files, where the work happens; a "New chat"
@@ -59,7 +60,8 @@ TOOLSETS = {
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name Start here)
-PRIVACY = "Privacy"  # the second chat in Start here: the "Sent to Claude" log
+PRIVACY = "Privacy"  # the second entry in Start here: the "Sent to Claude" log
+WS_TITLE = {"Start here": CHAT}  # the Start here workspace shows as "Logins" under the Start here heading
 PRIVACY_PROMPT = "Show what Idli sent to Claude"  # lib/modes.py PRIVACY_CHAT: the chat is written by code
 TABS = []  # the Drive tab opens only when the Logins check finds Google signed out (and closes once signed in)
 
@@ -143,21 +145,37 @@ def projects_and_workspaces():
             say(f"name project '{proj['name']}' -> '{heading}'")
             paseo("project", "rename", proj["projectId"], heading, parse=False, change=True)
         wss = [w for w in paseo("workspace", "ls") if same(w["cwd"], path)]
-        names = {n for n, _, _ in LAYOUT}
-        ws = next((w for w in wss if w["name"] == name), None) or \
+        names = {n for n, _, _ in LAYOUT} | set(WS_TITLE.values()) | {PRIVACY}
+        title = WS_TITLE.get(name, name)
+        ws = next((w for w in wss if w["name"] == title), None) or \
+            next((w for w in wss if w["name"] == name), None) or \
             next((w for w in wss if OLD_NAMES.get(w["name"]) == name), None) or \
             next((w for w in wss if w["name"] not in names), None)
         if not ws and proj:
-            say(f"create workspace '{name}'")
+            say(f"create workspace '{title}'")
             paseo("workspace", "create", "--isolation", "local", "--project", proj["projectId"], "--path", path,
-                  "--title", name, parse=False, change=True)
-            ws = next((w for w in (paseo("workspace", "ls") or []) if same(w["cwd"], path) and w["name"] == name),
+                  "--title", title, parse=False, change=True)
+            ws = next((w for w in (paseo("workspace", "ls") or []) if same(w["cwd"], path) and w["name"] == title),
                       None) if not DRY else None
-        elif ws and ws["name"] != name:
-            say(f"name workspace '{ws['name']}' -> '{name}'")
-            paseo("workspace", "rename", ws["workspaceId"], name, parse=False, change=True)
+        elif ws and ws["name"] != title:
+            say(f"name workspace '{ws['name']}' -> '{title}'")
+            paseo("workspace", "rename", ws["workspaceId"], title, parse=False, change=True)
         ids[name] = ws["workspaceId"] if ws else None
+        if name == "Start here" and proj:  # its second entry
+            ids[PRIVACY] = second_workspace(proj, path, PRIVACY, wss)
     return ids
+
+
+def second_workspace(proj, path, title, wss):
+    ws = next((w for w in wss if w["name"] == title), None)
+    if ws:
+        return ws["workspaceId"]
+    say(f"create workspace '{title}'")
+    paseo("workspace", "create", "--isolation", "local", "--project", proj["projectId"], "--path", path,
+          "--title", title, parse=False, change=True)
+    ws = next((w for w in (paseo("workspace", "ls") or []) if same(w["cwd"], path) and w["name"] == title),
+              None) if not DRY else None
+    return ws["workspaceId"] if ws else None
 
 
 def start_chat(ws_id):
@@ -357,7 +375,7 @@ def main():
     retire_claude_workspace()
     one_idli_workspace()
     agent = start_chat(ids.get("Start here"))
-    chat(ids.get("Start here"), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
+    chat(ids.get(PRIVACY), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
     learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
     chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on
