@@ -1034,6 +1034,8 @@ def _drivey_question(msgs):
 
 DRIVEY_TOOLS = frozenset(('drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask'))
 PICK_FILES = 'Add files or a folder with @ and send again.'
+ASKING_SERVICE = ('None of this Mini\'s questions fit, so I\'m asking an external service to write a query. '
+                  'It sees your question with private values as codes and the column names. Not your data.')
 
 
 def drivey_route(j):
@@ -1058,7 +1060,7 @@ def drivey_route(j):
         content.append(_tool_use('AskUserQuestion', {'questions': [{'header': header, 'multiSelect': False,
             'question': _lib('minimap').plain(text), 'options': [{'label': a, 'description': b} for a, b in options]}]}))
         return message(model, content)
-    active, pending = None, None
+    active, pending, asked = None, None, None
     for e in ev:
         if e[0] == 'said':
             if e[1] != 'Privacy checked':
@@ -1068,6 +1070,8 @@ def drivey_route(j):
         if name == 'mini_open':
             active = res if res.get('id') and res.get('questions') else None
             pending = None
+        elif name == 'mini_ask' and inp.get('question'):
+            asked = inp['question']
         elif name == 'drive_fetch':
             active = None
             pending = {**res, 'question': inp.get('question', '')}
@@ -1102,6 +1106,22 @@ def drivey_route(j):
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported'):
             return say('These files need spreadsheet copies before Idli can hide private values: ' +
                        ', '.join(res['unsupported']) + '. Save Excel or CSV copies in Drive, then pick them with @.')
+        if name == 'mini_ask' and inp.get('question') and active:
+            # The query service couldn't answer (or isn't set up): offer Claude, as before.
+            if res.get('error') or not (res.get('reply') or (res.get('clarify') and res.get('options'))):
+                if not active.get('files'):
+                    return say("This Mini can't answer that. " + PICK_FILES)
+                return call('privacy_review_open', files=active['files'], question=inp['question'],
+                            preview_only=True, mini_id=active['id'])
+            if res.get('clarify'):
+                options = []
+                for o in res.get('options', [])[:3]:
+                    o = o if isinstance(o, dict) else {'label': str(o)[:48], 'question': str(o)}
+                    label = o.get('label') or o.get('question', '')[:48]
+                    if label and label not in [a for a, _ in options] and label != 'Ask Claude':
+                        options.append((label, o.get('question') or label))
+                return card('Be specific', res['clarify'], options +
+                            [('Ask Claude', "Claude works on the Mini's files with private values as codes.")])
         if res.get('error') and name in ('mini_open', 'mini_ask'):
             return say('Could not open this Mini. Click its cartridge to try again.')
         if res.get('error') or (not res.get('files') and name in ('drive_fetch', 'privacy_review_open')):
@@ -1131,6 +1151,15 @@ def drivey_route(j):
             head = (inp.get('questions') or [{}])[0].get('header')
             if head == 'Privacy' and answer in ('Check each file', "Accept Idli's choices"):
                 return preview(answer == 'Check each file')
+            if head == 'Be specific' and active and asked:
+                if answer == 'Ask Claude' or not answer:
+                    if not active.get('files'):
+                        return say("This Mini can't answer that. " + PICK_FILES)
+                    return call('privacy_review_open', files=active['files'], question=asked,
+                                preview_only=True, mini_id=active['id'])
+                chosen = next((o['description'] for q in inp.get('questions', []) for o in q.get('options', [])
+                               if o.get('label') == answer), answer)
+                return call('mini_ask', id=active['id'], question=chosen)
             if head == 'Claude' and answer == 'Switch to Claude' and pending:
                 return call('claude_handoff', files=pending['files'], question=pending['question'],
                             **({'mini_id': pending['mini_id']} if pending.get('mini_id') else {}))
@@ -1153,6 +1182,9 @@ def drivey_route(j):
         mapped = _lib('minimap').map_questions(active['questions'], said, NINE_URL)
         if mapped.get('qid'):
             return call('mini_ask', id=active['id'], qid=mapped['qid'], params=mapped['params'])
+        if active.get('can_query') and active.get('files'):
+            return message(model, [_text(ASKING_SERVICE),
+                                   _tool_use(_tool_name(tools, 'mini_ask'), {'id': active['id'], 'question': said})])
         if not active.get('files'):
             return say("This Mini can't answer that. " + PICK_FILES)
         return call('privacy_review_open', files=active['files'], question=said, preview_only=True, mini_id=active['id'])

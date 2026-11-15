@@ -1444,8 +1444,10 @@ def t_mini_open(id):
     return home.mini_open(files().data_dir, id, home.chat_workspace())
 
 
-def t_mini_ask(id, qid, params=None):
+def t_mini_ask(id, qid=None, params=None, question=None):
     from lib import home
+    if question and not qid:
+        return home.mini_query(files().data_dir, id, question, home.chat_workspace())
     return home.mini_ask(files().data_dir, id, qid, params or {}, home.chat_workspace())
 
 
@@ -1460,9 +1462,10 @@ TOOLS = {
          "mini_id": {"type": "string"}}, ["files", "question"]),
     "mini_open": (t_mini_open, "Open a saved Mini with its questions, options and example charts.",
                   {"id": {"type": "string"}}, ["id"]),
-    "mini_ask": (t_mini_ask, "Run exactly one saved Mini question with validated parameters.",
-                 {"id": {"type": "string"}, "qid": {"type": "string"}, "params": {"type": "object"}},
-                 ["id", "qid", "params"]),
+    "mini_ask": (t_mini_ask, "Run one saved Mini question with validated parameters, or (with question instead of "
+                 "qid) have the query service answer a question the saved ones don't cover.",
+                 {"id": {"type": "string"}, "qid": {"type": "string"}, "params": {"type": "object"},
+                  "question": {"type": "string"}}, ["id"]),
     "file_get": (t_file_get, "Download the real spreadsheet from a Google Sheets or Drive link into this folder. The browser may show a Save "
                  "dialog; the user clicks Save. Then call file_open.",
                  {"link": {"type": "string", "description": "A docs.google.com/spreadsheets or drive.google.com link "

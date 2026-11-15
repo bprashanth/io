@@ -129,6 +129,34 @@ class RouterTests(unittest.TestCase):
         self.assertIn("This Mini can't answer that",t.tool()['input']['questions'][0]['question'])
         self.assertIn('PLACE_001',t.tool()['input']['questions'][0]['question'])
         t.choose('Switch to Claude');self.assertEqual(t.tool()['input']['mini_id'],'visits')
+    def query_mini(self):
+        t=Transcript();t.said('Open Mini: Visits [visits]')
+        t.result({'id':'visits','files':FILES,'questions':[QUESTION],'can_query':True,'reply':'Our story'});return t
+    def test_mini_query_service_table(self):
+        t=self.query_mini()
+        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('Which ward had most visits in May?')
+        self.assertIn('external service',t.text());self.assertIn('codes',t.text())
+        self.assertEqual(t.tool()['input'],{'id':'visits','question':'Which ward had most visits in May?'})
+        t.result({'question':'q','reply':'**Visits in May**\n\n| Ward | Visits |\n|---|---|\n| Garden | 12 |','rows':1})
+        self.assertIn('Visits in May',t.text())
+    def test_mini_query_asks_back_then_answers(self):
+        t=self.query_mini()
+        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('big trees')
+        t.result({'clarify':'What counts as big?','options':[{'label':'Girth over 100 cm','question':'Which species have trees over 100 cm girth?'},'Which are the 10 tallest trees?']})
+        card=t.tool()['input']['questions'][0]
+        self.assertEqual(card['header'],'Be specific');self.assertEqual(len(card['options']),3)
+        self.assertEqual(card['options'][-1]['label'],'Ask Claude')
+        self.assertEqual(card['options'][0]['label'],'Girth over 100 cm');t.choose(card['options'][0]['label'])
+        self.assertEqual(t.tool()['input'],{'id':'visits','question':'Which species have trees over 100 cm girth?'})
+    def test_mini_query_ask_claude_or_failure_offers_claude(self):
+        t=self.query_mini()
+        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('big trees')
+        t.result({'clarify':'What counts as big?','options':['A?','B?']});t.choose('Ask Claude')
+        self.assertEqual(t.tool()['input']['mini_id'],'visits');self.assertTrue(t.tool()['input']['preview_only'])
+        t=self.query_mini()
+        with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('Predict Garden next year')
+        t.result({'error':'The query was not a single read-only question.'})
+        self.assertEqual(t.tool()['input']['question'],'Predict Garden next year');self.assertEqual(t.tool()['input']['mini_id'],'visits')
     def test_drive_mention_leaves_mini(self):
         t=self.mini();t.said('Compare @Drive/visits.xlsx');self.assertTrue(t.tool()['name'].endswith('drive_fetch'))
     def test_failed_mini_and_unknown_tool_never_fall_through(self):

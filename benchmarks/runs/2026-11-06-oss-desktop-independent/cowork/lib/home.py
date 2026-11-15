@@ -561,7 +561,42 @@ def mini_open(data_dir, ident, workspace=None):
         opts = [_option_words(k, d) for k, d in q.get('params', {}).items()]
         lines.append('- ' + q['question'] + (' _(' + '; '.join(opts) + ')_' if opts else ''))
     lines += ['', 'Ask in your own words.']
-    return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'reply': plain('\n'.join(lines))}
+    # can_query: questions outside the saved ones can go to the query service (lib/minisql.py).
+    return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'can_query': True,
+            'reply': plain('\n'.join(lines))}
+
+
+QUERY_NOTE = ('_Asked an external service to write a query. It saw your question with private values as codes and '
+              'the column names, not your data. The query ran on this computer._')
+
+
+def mini_query(data_dir, ident, question, workspace=None):
+    """A question the Mini's saved questions don't cover: a query written by the external service, run here."""
+    from lib import minisql
+    m = read(object_path(data_dir, 'minis', ident))
+    files = [f['local'] for f in m.get('files', []) if f.get('local')]
+    if not files:
+        raise ValueError('This Mini has no files to query.')
+    r = minisql.answer(data_dir, files, str(question)[:800])
+    if r['kind'] == 'clarify':
+        return {'clarify': plain(r['text']), 'question': question,
+                'options': [{'label': plain(o['label']), 'question': plain(o['question'])} for o in r['options']]}
+    frame = r['frame']
+    if frame.empty:
+        table = 'No rows match.'
+    else:
+        shown = frame.head(15).astype(object).where(frame.head(15).notna(), '')
+        cell = lambda v: str(v).replace('|', '/').replace('\n', ' ')
+        md = ['| ' + ' | '.join(cell(c) for c in shown.columns) + ' |', '|' + '---|' * len(shown.columns)]
+        md += ['| ' + ' | '.join(cell(v) for v in row) + ' |' for row in shown.itertuples(index=False)]
+        table = tidy_answer('\n'.join(md), max_rows=15)
+        if len(frame) > 15:
+            table += f'\n\n{len(frame) - 15} more rows not shown.'
+    lines = ['**' + plain(r['title']) + '**', '', table]
+    if r['note']:
+        lines += ['', plain(r['note'])]
+    lines += ['', QUERY_NOTE]
+    return {'question': question, 'reply': plain('\n'.join(lines)), 'rows': len(frame)}
 
 
 def mini_ask(data_dir, ident, qid, params, workspace=None):
