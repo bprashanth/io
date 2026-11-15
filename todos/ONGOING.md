@@ -33,6 +33,10 @@ Noted 2026-11-15.
 - **Open:** the 2026-11-10 decision dropped the upfront Drive index because it picked the wrong file. An
   opt-in index that only draws a map and suggests Minis is a different job.
 
+- **Query service for Minis (built 2026-11-15):** unmatched questions go to an external service for one SQL query
+  from the masked question and column list; it can ask back with specific questions. Next: "Keep this question"
+  so good answers become Mini questions.
+
 ## 3. Marketplace
 - **Flow:** Start here, then sign in to Google and Claude, then the marketplace. Each app is a card with
   Install.
