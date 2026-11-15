@@ -91,7 +91,10 @@ class BrowserTests(Fixture):
             mark.click();expect(p.get_by_role('button',name='Where did this come from?',exact=True)).to_be_visible()
             p.get_by_role('button',name='Where did this come from?',exact=True).click()
             expect(p.locator('#pop')).to_contain_text('drive/visits.xlsx');expect(p.locator('#pop')).to_contain_text('Garden')
-            self.shot(p,f'chart-source-{scheme}-360.png');p.keyboard.press('Escape')
+            self.shot(p,f'chart-source-{scheme}-360.png');p.get_by_role('button',name='Close',exact=True).click();expect(p.locator('#pop')).to_be_hidden()
+            mark.click();expect(p.locator('#pop')).to_be_visible()
+            box=p.locator('#viz svg').bounding_box();p.mouse.click(box['x']+3,box['y']+3);expect(p.locator('#pop')).to_be_hidden()
+            mark.click();expect(p.locator('#pop')).to_be_visible();p.keyboard.press('Escape');expect(p.locator('#pop')).to_be_hidden()
             mark.click(button='right');expect(p.get_by_role('menuitem',name='Copy to Claude',exact=True)).to_be_visible()
             p.get_by_role('menuitem',name='Copy to Claude',exact=True).click();expect(p.locator('#pop')).to_be_hidden()
             context=[c for c in self.calls() if c[:2]==['terminal','send-keys']][-1]

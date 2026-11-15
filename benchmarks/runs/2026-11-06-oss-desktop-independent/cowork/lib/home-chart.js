@@ -47,6 +47,7 @@ function fields(datum) {
 }
 function showPop(ev, role='dialog') {
   const el=$('pop');el.setAttribute('role',role);el.hidden=false;document.body.classList.add('popping');
+  closeButton(el);
   el.style.left=Math.max(16,Math.min((ev?.clientX||40)+8,innerWidth-el.offsetWidth-16))+'px';
   el.style.top=Math.max(16,Math.min((ev?.clientY||120)+8,innerHeight-el.offsetHeight-16))+'px';
 }
@@ -88,6 +89,7 @@ function provenance(datum) {
   el.innerHTML=`<div class="what">Where did this come from?</div><p>Source: ${from}. Claude saw ${files.length>1?'them':'it'} with codes.</p>`+
     (made?`<p>${made}</p>`:'')+detail+
     (paths.length?`<details><summary>File details</summary><pre>${esc(paths.join('\n'))}</pre></details>`:'');
+  closeButton(el);
 }
 function contextText(datum) {
   const one=value=>String(value??'').replace(/\s+/g,' ').trim();
@@ -107,7 +109,7 @@ function contextMenu(ev,datum) {
   showPop(ev,'menu');
 }
 function pop(ev,datum) {
-  if(!datum)return;
+  if(!datum)return unpop();
   const el=$('pop'),keys=fields(datum);
   const nums=keys.filter(k=>typeof datum[k]==='number'),labs=keys.filter(k=>!nums.includes(k));
   const what=labs.map(k=>datum[k]).join(' / ')||'this point';
@@ -128,9 +130,16 @@ function pop(ev,datum) {
   });
   showPop(ev);
 }
+function closeButton(el){
+  if(el.querySelector(':scope>.x'))return;
+  const x=document.createElement('button');x.className='x';x.type='button';x.setAttribute('aria-label','Close');x.textContent='\u00d7';x.onclick=unpop;el.prepend(x);
+}
 function unpop(){ $('pop').hidden=true;document.body.classList.remove('popping'); }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')unpop();});
-document.addEventListener('mousedown',e=>{if(!e.target.closest('#pop,#viz'))unpop();});
+// Close on a click anywhere outside the popup (a click on another mark opens that mark's popup), and when the
+// person clicks outside this page (the chart is often embedded in a chat).
+document.addEventListener('mousedown',e=>{if(!e.target.closest('#pop'))unpop();});
+window.addEventListener('blur',()=>{if(!$('pop').hidden)unpop();});
 
 function answerHTML(text) {
   const lines=String(text).split('\n'),out=[];
