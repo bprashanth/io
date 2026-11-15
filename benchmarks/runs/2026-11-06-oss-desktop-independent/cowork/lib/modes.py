@@ -1064,7 +1064,7 @@ def _service_lead(c):
     return ("None of this Mini's questions fit. An external query service (" + str(c.get('service') or 'online') +
             ') can write a query for it. The query then runs on this computer.\n\n'
             'It would get your question and the list of columns, with private values as codes. It never gets rows.'
-            '\n\nQuestion: "' + str(c.get('masked_question', '')) + '"\n\nColumns (the first lines):\n```\n' +
+            '\n\nQuestion: "' + str(c.get('masked_question', '')) + '"\n\nColumns (a sample):\n```\n' +
             str(c.get('sample', '')) + more + '\n```')
 
 
@@ -1138,9 +1138,8 @@ def drivey_route(j):
                        ', '.join(res['unsupported']) + '. Save Excel or CSV copies in Drive, then pick them with @.')
         if name == 'mini_ask' and inp.get('preview') and active and isinstance(res.get('consent'), dict):
             return card('Query service', SERVICE_CARD,
-                        [('Send', 'Ask the query service. Nothing else leaves this computer.'),
-                         ('Ask Claude', "Claude works on the Mini's files with private values as codes."),
-                         ('Not yet', 'Nothing is sent.')], _service_lead(res['consent']))
+                        [('Yes', 'Send it. Nothing else leaves this computer.'),
+                         ('No', 'Nothing is sent.')], _service_lead(res['consent']))
         if name == 'mini_ask' and inp.get('question') and active:
             # The query service couldn't answer (or isn't set up): offer Claude, as before.
             if res.get('error') or not (res.get('reply') or (res.get('clarify') and res.get('options'))):
@@ -1189,12 +1188,9 @@ def drivey_route(j):
             if head == 'Privacy' and answer in ('Check each file', "Accept Idli's choices"):
                 return preview(answer == 'Check each file')
             if head == 'Query service' and active and asked:
-                if answer == 'Send':
+                if answer == 'Yes':
                     return message(model, [_text(ASKING_SERVICE),
                                            _tool_use(_tool_name(tools, 'mini_ask'), {'id': active['id'], 'question': asked})])
-                if answer == 'Ask Claude' and active.get('files'):
-                    return call('privacy_review_open', files=active['files'], question=asked,
-                                preview_only=True, mini_id=active['id'])
                 return say('OK. Nothing was sent. Ask another way, or choose a question from the Mini.')
             if head == 'Be specific' and active and asked:
                 if answer == 'Ask Claude' or not answer:

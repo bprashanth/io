@@ -216,10 +216,14 @@ def preview(data_dir, files, question, lines=14):
     """For the consent card: the masked question and the first lines of the column list, as the service gets them."""
     p = prepare(data_dir, files, question)
     rows = p['schema'].splitlines()
-    shown = [r[:160] + ('...' if len(r) > 160 else '') for r in rows[:lines]]
+    # Columns that list their values first (the part that is data, as codes when private), in file order.
+    valued = [i for i, r in enumerate(rows) if re.search(r': text, \d+ different values: ', r)]
+    pick = sorted(set(valued[:lines]) | set(i for i in range(len(rows)) if rows[i].startswith('Table ')))
+    pick = sorted(pick + [i for i in range(len(rows)) if i not in pick][:max(0, lines - len(pick))])
+    shown = [rows[i][:160] + ('...' if len(rows[i]) > 160 else '') for i in pick]
     columns = sum(1 for r in rows if r.startswith('  "'))
     return {'masked_question': p['masked_question'], 'sample': '\n'.join(shown),
-            'more': max(0, len(rows) - lines), 'columns': columns, 'service': MODEL.split('/')[0]}
+            'more': max(0, len(rows) - len(shown)), 'columns': columns, 'service': MODEL.split('/')[0]}
 
 
 def answer(data_dir, files, question, call=None):

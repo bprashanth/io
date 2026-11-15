@@ -134,18 +134,17 @@ class RouterTests(unittest.TestCase):
         t=Transcript();t.said('Open Mini: Visits [visits]')
         t.result({'id':'visits','files':FILES,'questions':[QUESTION],'can_query':True,'reply':'Our story'});return t
     CONSENT={'masked_question':'Which ward had most visits in PLACE_001?','sample':'Table "visits" (sheet "Visits", 3 rows):\n  "ward": text, 2 different values: PLACE_001, PLACE_002','more':0,'columns':1,'service':'deepseek'}
-    def consent(self,t,question,answer='Send'):
+    def consent(self,t,question,answer='Yes'):
         with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said(question)
         self.assertEqual(t.tool()['input'],{'id':'visits','question':question,'preview':True})  # nothing sent yet
         t.result({'question':question,'consent':self.CONSENT})
         card=t.tool()['input']['questions'][0];self.assertEqual(card['header'],'Query service')
+        self.assertEqual([o['label'] for o in card['options']],['Yes','No'])
         lead=t.r['content'][0]['text'];self.assertIn('PLACE_001',lead);self.assertIn('never gets rows',lead);self.assertIn('deepseek',lead)
         t.choose(answer)
-    def test_mini_query_consent_not_yet_sends_nothing(self):
-        t=self.query_mini();self.consent(t,'Which ward had most visits in May?','Not yet')
+    def test_mini_query_consent_no_sends_nothing(self):
+        t=self.query_mini();self.consent(t,'Which ward had most visits in May?','No')
         self.assertIn('Nothing was sent',t.text())
-        t=self.query_mini();self.consent(t,'Which ward had most visits in May?','Ask Claude')
-        self.assertEqual(t.tool()['input']['mini_id'],'visits');self.assertTrue(t.tool()['input']['preview_only'])
     def test_mini_query_service_table(self):
         t=self.query_mini();self.consent(t,'Which ward had most visits in May?')
         self.assertEqual(t.tool()['input'],{'id':'visits','question':'Which ward had most visits in May?'})

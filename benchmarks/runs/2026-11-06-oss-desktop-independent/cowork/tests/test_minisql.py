@@ -143,9 +143,11 @@ def test_consent_preview_is_what_gets_sent(shola):
     for value in REAL:
         assert value not in shown
     assert 'Avalanche' not in p['masked_question'] and p['columns'] > 3 and p['more'] > 0
+    first = p['sample'].splitlines()[1]
+    assert re.search(r'different values: ', first)  # columns with values (as codes) come first
     seen = []
     minisql.answer(shola, [REL], q, call=fake({'sql': 'SELECT 1 AS one', 'title': 't'}, seen))
     sent = seen[0]['messages'][1]['content']
-    assert sent.startswith(p['sample']) and sent.endswith('Question: ' + p['masked_question'])
+    assert all(line in sent for line in p['sample'].splitlines()) and sent.endswith('Question: ' + p['masked_question'])
     usage = json.loads((shola / '.idli/query-usage.json').read_text())
     assert sum(usage.values()) == 1  # the preview itself is not a call
