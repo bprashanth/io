@@ -9,7 +9,7 @@ from pathlib import Path
 import os
 import tempfile
 
-ASK = ['mcp__idli__unmask', 'mcp__idli__lookup']
+ASK = ['mcp__idli__unmask']
 
 
 def private_paths(data_dir, work):

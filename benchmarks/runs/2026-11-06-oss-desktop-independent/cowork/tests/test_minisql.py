@@ -122,3 +122,14 @@ def test_private_value_in_a_heading_or_sheet_name(tmp_path, monkeypatch):
     sent = json.dumps(seen[0])
     assert 'Meena' not in sent and 'Arjun' not in sent and arjun in sent
     assert int(r['frame']['n'][0]) == 8
+
+
+def test_daily_limit_and_reply_cap(shola, monkeypatch):
+    monkeypatch.setattr(minisql, 'DAILY_LIMIT', 2)
+    seen = []
+    reply = {'sql': 'SELECT COUNT(*) AS n FROM "raw_10x10m_data"', 'title': 't'}
+    for _ in range(2):
+        minisql.answer(shola, [REL], 'how many trees?', call=fake(reply, seen))
+    with pytest.raises(ValueError, match='limit'):
+        minisql.answer(shola, [REL], 'how many trees?', call=fake(reply, seen))
+    assert len(seen) == 2 and seen[0]['max_tokens'] == minisql.MAX_REPLY_TOKENS

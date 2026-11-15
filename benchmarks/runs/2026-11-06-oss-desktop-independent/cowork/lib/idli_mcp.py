@@ -134,10 +134,12 @@ TOOLS['idli_draft_mini'] = (idli_draft_mini, 'After checking every script, open 
      'code': {'type': 'string', 'description': 'Where the checked scripts live.'}}, ['title', 'story', 'questions', 'code'])
 
 
+# lookup (a search from this computer with masked results) is withheld from Claude: pages about a value bring in
+# names and facts Idli doesn't know, so the results can't be masked reliably, and they are thinner than WebSearch after
+# a reveal. The code stays for the local 9B, which sees real values anyway (owner decision 2026-11-15).
 for name, fn, description in [
         ('unmask', unmask, 'Ask the person to reveal one contextual code, or with whole_column every code in its column '
-                           '(for short category or species codes). Personal data is never revealed.'),
-        ('lookup', lookup, 'Ask to search from this computer with one contextual code. Search results stay masked.')]:
+                           '(for short category or species codes). Personal data is never revealed.')]:
     props = {'code': {'type': 'string'}, 'reason': {'type': 'string'}}
     if name == 'lookup':
         props['query'] = {'type': 'string', 'description': 'Search text containing {value}.'}

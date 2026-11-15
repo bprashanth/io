@@ -332,7 +332,7 @@ class ToolTests(Fixture):
         request=json.dumps({'jsonrpc':'2.0','id':1,'method':'tools/list'})+'\n'
         result=subprocess.run([sys.executable,'-I',str(ROOT/'lib/idli_mcp.py')],input=request,text=True,capture_output=True,check=True)
         offered={t['name'] for t in json.loads(result.stdout)['result']['tools']}
-        self.assertEqual(offered,{'idli_show','idli_draft_mini','unmask','lookup'})
+        self.assertEqual(offered,{'idli_show','idli_draft_mini','unmask'})  # lookup withheld from Claude
     def test_launcher_installs_command(self):
         self.assertIn('.claude/commands/mini.md',(ROOT/'desktop/claude-masked.sh').read_text())
         self.assertIn('idli_draft_mini',(ROOT/'idli/claude-commands/mini.md').read_text())

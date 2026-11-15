@@ -24,6 +24,12 @@ from lib.privacy_engine.pseudonymize import TOKEN_RE
 URL = os.environ.get('IDLI_SQL_URL', 'https://openrouter.ai/api/v1/chat/completions')
 MODEL = os.environ.get('IDLI_SQL_MODEL', 'deepseek/deepseek-v4.1-flash')
 MAX_ROWS = 200
+# Cost bounds: one call per question (plus one per pick from an ask-back), a short reply, a capped column list and a
+# daily limit per computer. Past the limit the person gets the Claude option instead.
+MAX_REPLY_TOKENS = 700
+MAX_SCHEMA_CHARS = 12000
+DAILY_LIMIT = int(os.environ.get('IDLI_SQL_DAILY_LIMIT', '200'))
+LIMIT_REACHED = "Today's limit of questions for the query service is used up. Claude can still answer this."
 SERVICE = 'an external service'
 
 SYSTEM = """You turn a person's question about their spreadsheets into one DuckDB SQL query.
@@ -111,8 +117,24 @@ def schema(tables, mask):
     return '\n\n'.join(parts)
 
 
+def _count_call(data_dir):
+    """Count today's calls on this computer; refuse past DAILY_LIMIT."""
+    import datetime as dt
+    path = Path(data_dir) / '.idli' / 'query-usage.json'
+    today = dt.date.today().isoformat()
+    try:
+        usage = json.loads(path.read_text())
+    except (OSError, ValueError):
+        usage = {}
+    n = usage.get(today, 0)
+    if n >= DAILY_LIMIT:
+        raise ValueError(LIMIT_REACHED)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({today: n + 1}))
+
+
 def ask_service(question, schema_text, call=None):
-    body = {'model': MODEL, 'temperature': 0, 'response_format': {'type': 'json_object'},
+    body = {'model': MODEL, 'temperature': 0, 'max_tokens': MAX_REPLY_TOKENS, 'response_format': {'type': 'json_object'},
             'messages': [{'role': 'system', 'content': SYSTEM},
                          {'role': 'user', 'content': schema_text + '\n\nQuestion: ' + question}]}
     if 'openrouter.ai' in URL:
@@ -182,10 +204,13 @@ def answer(data_dir, files, question, call=None):
         mask = maskcopy._masker(vault)
         tables = load(data_dir, files, lambda v: mask(str(v)))
         text = schema(tables, lambda v: mask(str(v)))
+        if len(text) > MAX_SCHEMA_CHARS:  # a very wide file: column names and types only
+            text = re.sub(r'(: text, \d+ different values): [^\n]*', r'\1', text)[:MAX_SCHEMA_CHARS]
     def real(t):  # codes from the file, plus any the scanner gave to names typed in this question
         return full.rehydrate(vault.rehydrate(str(t)))
     if privacy.known_leaks(masked_q + '\n' + text, vault):
         raise ValueError('A private value was still in the question. Nothing was sent.')
+    _count_call(data_dir)
     reply = ask_service(masked_q, text, call)
     if reply.get('clarify'):
         options = []

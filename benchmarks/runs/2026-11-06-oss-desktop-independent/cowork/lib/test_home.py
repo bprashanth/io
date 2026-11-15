@@ -395,7 +395,7 @@ Path(os.environ['LAUNCH_RECORD']).write_text(json.dumps({'args':sys.argv[1:],'cw
     config = home.read(work / '.idli-mcp.json')['mcpServers']['idli']
     assert config['args'] == ['-I', str(clone / 'lib/idli_mcp.py')]
     assert (work / '.idli-mcp.json').stat().st_mode & 0o777 == 0o600
-    assert home.read(work / '.claude/settings.json')['permissions']['ask'] == ['mcp__idli__unmask', 'mcp__idli__lookup']
+    assert home.read(work / '.claude/settings.json')['permissions']['ask'] == ['mcp__idli__unmask']
     # drive/ holds masked copies (none yet: nothing reviewed), never a link to the real downloads.
     assert (work / 'drive').is_dir() and not (work / 'drive').is_symlink()
     settings = home.read(work / '.claude/settings.json')
