@@ -336,6 +336,9 @@ def _code_frame(frame, columns, vault):
     return result
 
 
+ID_HEADING = re.compile(r'\b(id|ids|phone|mobile|contact|aadha?r|pan|account|acct|ifsc|pin|pincode|no|number|ration|voter|card)\b|_id\b', re.I)
+
+
 NAME_LIKE = re.compile(r"^[A-Z][a-z'.-]+(?: [A-Z][a-z'.-]*){1,3}$")
 
 
@@ -395,11 +398,17 @@ def _suggest(path, tab):
         reason = info['rule']
         if info['rule'] in ('no-model', 'span-coverage', 'categorical') and _class(c) != 'value':
             mask, reason = True, 'identifier column heading'
-        if re.search(r'income|amount|salary|revenue|expense|price|cost|balance', str(c), re.I):
-            values = frame[c].replace('', None).dropna()
-            import pandas as pd
-            if len(values) and pd.to_numeric(values, errors='coerce').notna().mean() >= .95:
+        values = frame[c].replace('', None).dropna()
+        import pandas as pd
+        numbers = pd.to_numeric(values, errors='coerce')
+        if len(values) and numbers.notna().mean() >= .95:
+            if re.search(r'income|amount|salary|revenue|expense|price|cost|balance', str(c), re.I):
                 mask, reason = False, 'numeric measure'
+            elif ID_HEADING.search(str(c)):
+                mask, reason = True, 'identifier column heading'
+            elif (
+                  not any(matched_in_text(str(v)) for v in values.astype(str).head(500))):
+                mask, reason = False, 'counts or measures (small numbers)'
         if not mask and _looks_like_names(frame[c]):
             mask, reason = True, 'looks like people\'s names'
         choices[str(c)] = mask
@@ -437,6 +446,22 @@ URL = re.compile(r'https?://[^\s"\'<>)\]\\]+')
 NEVER_PRIVATE = {'idli', 'claude', 'drivey', 'paseo', 'mini', 'minis', 'anthropic', 'codex'}
 
 
+def matched_in_text(value):
+    """Whether a known value is looked for in free text (messages, scripts, script output, other cells).
+
+    A short number (up to three digits, like 6, 52 or 4.5) is not: it is common, says nothing about a person on its
+    own, and masking it everywhere turns counts into codes, so Claude can't read its own results. Numbers with four or
+    more digits (amounts, phones, Aadhaar, PIN codes) and precise decimals (GPS: four or more places) still are. Cells
+    of a column the person chose to hide are coded whatever they hold."""
+    v = value.strip()
+    if not v or v.casefold() in NEVER_PRIVATE:
+        return False
+    m = re.fullmatch(r'[+-]?(\d+)(?:\.(\d+))?', v)
+    if not m:
+        return True
+    return len(m[1]) + len(m[2] or '') >= 4 or len(m[2] or '') >= 4
+
+
 def _value_pattern(value):
     """A known value as a whole word; decimals also with trailing zeros (73.7354 printed as 73.73540)."""
     if re.fullmatch(r'[+-]?\d+(?:\.\d+)?', value):
@@ -464,8 +489,8 @@ def _code_for(vault, found):
 
 
 def _known(text, vault):
-    # Include short and numeric values too; avoid matching numbers inside code suffixes.
-    values = sorted((v for v in vault.display.values() if v.strip().casefold() not in NEVER_PRIVATE), key=len, reverse=True)
+    # Long numbers count, short plain numbers don't (matched_in_text); never match numbers inside code suffixes.
+    values = sorted((v for v in vault.display.values() if matched_in_text(v)), key=len, reverse=True)
     if not values:
         return text, []
     pattern = re.compile('|'.join(_value_pattern(v) for v in values), re.I)
@@ -526,12 +551,13 @@ def _redact(text, vault, scanner):
             end = b
     for a, b, code in reversed(selected):
         text = text[:a] + code + text[b:]
-    text, events = redact_text(text, vault, regex_engine)
+    kept = {v.strip().casefold() for v in vault.display.values() if not matched_in_text(v)}
+    text, events = redact_text(text, vault, regex_engine, kept=kept)
     found += [{'real': e['text'], 'code': e['token'], 'why': 'regex validator'} for e in events]
     # The scanner gets only the remaining text: blank out existing codes first.
     remaining = TOKEN_RE.sub(lambda m: ' ' * len(m.group()), text)
     spans = [s for s in scanner(remaining) if remaining[s[0]:s[1]].strip().casefold() not in NEVER_PRIVATE]
-    text, events = redact_text(text, vault, lambda _: spans)
+    text, events = redact_text(text, vault, lambda _: spans, kept=kept)
     found += [{'real': e['text'], 'code': e['token'], 'why': 'scanner'} for e in events]
     return text, found
 
@@ -577,7 +603,7 @@ def known_leaks(outgoing, vault):
     text = TOKEN_RE.sub('', outgoing)
     text = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m[1], 16)), text)
     urls = ' '.join(URL.findall(text))
-    return [v for v in vault.display.values() if v.strip().casefold() not in NEVER_PRIVATE
+    return [v for v in vault.display.values() if matched_in_text(v)
             and (re.search(_value_pattern(v), text, re.I) or re.search(_url_pattern(v), urls, re.I))]
 
 

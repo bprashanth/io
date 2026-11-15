@@ -28,7 +28,7 @@ MANIFEST = '.idli-masked.json'
 
 def _masker(vault):
     """One compiled matcher for every known value (the same rules as the proxy's _known)."""
-    values = sorted((v for v in vault.display.values() if v.strip() and v.strip().casefold() not in privacy.NEVER_PRIVATE),
+    values = sorted((v for v in vault.display.values() if privacy.matched_in_text(v)),
                     key=len, reverse=True)
     if not values:
         return lambda text: text

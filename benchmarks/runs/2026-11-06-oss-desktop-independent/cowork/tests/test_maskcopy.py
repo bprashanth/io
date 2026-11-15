@@ -126,3 +126,26 @@ def test_species_columns_are_contextual():
     assert privacy.column_class('sppnam') == 'contextual'
     assert privacy.column_class('species') == 'contextual'
     assert privacy.column_class('Recorder') == 'personal'
+
+
+def test_short_numbers_are_not_matched_in_text():
+    vault = privacy.PseudonymMap()
+    for real in ('6', '120', '1200', '9876543210', '11.41234', 'Asha Rao'):
+        vault.token(real, 'value')
+    out, found = privacy._known('Asha Rao: 6 trees, 120 cm, Rs 1200, call 9876543210 at 11.41234', vault)
+    assert '6 trees' in out and '120 cm' in out  # counts stay readable for Claude
+    assert 'Rs 1200' not in out
+    assert 'Asha Rao' not in out and '9876543210' not in out and '11.41234' not in out
+    assert privacy.known_leaks('6 trees and 120 cm', vault) == []
+    assert privacy.known_leaks('call 9876543210', vault) == ['9876543210']
+
+
+def test_count_columns_are_suggested_visible_ids_are_not(tmp_path, monkeypatch):
+    monkeypatch.setenv('IDLI_SCANNER', 'http://127.0.0.1:9/none')
+    path = tmp_path / 'hh.csv'
+    path.write_text('household_size,Phone,hh_id,Head\n' + ''.join(
+        f'{n % 7 + 1},98765432{n:02d},{n},{name}\n' for n, name in enumerate(
+            ['Asha Rao', 'Ravi Kumar', 'Meena Iyer', 'John Mathew', 'Lakshmi Devi'])))
+    rows = {r['column']: r for r in privacy._suggest(path, None)}
+    assert rows['household_size']['mask'] is False
+    assert rows['Phone']['mask'] and rows['hh_id']['mask'] and rows['Head']['mask']
