@@ -27,12 +27,20 @@ def inside(root, name, exists=True):
     return path
 
 
-def work_dir():
-    return Path(os.environ.get('IDLI_CLAUDE_WORK', '~/idli-insights/claude-masked')).expanduser().resolve()
+def work_dir(data_dir=None):
+    """Claude's folder of masked copies. A team (Start here > Teams) has its own, beside Drivey's (lib/teams.py)."""
+    if os.environ.get('IDLI_CLAUDE_WORK'):
+        return Path(os.environ['IDLI_CLAUDE_WORK']).expanduser().resolve()
+    if data_dir is not None:
+        from lib import teams
+        team = teams.team_dir(data_dir)
+        if team:
+            return Path(teams.claude_work(team)).resolve()
+    return Path('~/idli-insights/claude-masked').expanduser().resolve()
 
 
 def allowed_path(data_dir, name):
-    for root in (work_dir(), Path(data_dir).resolve()):
+    for root in (work_dir(data_dir), Path(data_dir).resolve()):
         try:
             return inside(root, name)
         except ValueError:
@@ -150,7 +158,7 @@ def prepare(data_dir, files, question):
                   'warning': privacy.review_warning(data_dir, [x['local'] for x in chosen])}
     # Claude's folder gets masked copies of the reviewed files (never the real ones).
     from lib import maskcopy
-    maskcopy.build(data_dir, work_dir())
+    maskcopy.build(data_dir, work_dir(data_dir))
     return result
 
 
@@ -606,7 +614,9 @@ def mini_open(data_dir, ident, workspace=None):
         except ValueError:
             pass
     # can_query: questions outside the saved ones can go to the query service (lib/minisql.py).
-    return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'can_query': True,
+    # A team set up without the outside service (Start here > Teams) leaves this file in its folder (lib/teams.py).
+    can_query = not os.path.exists(os.path.join(data_dir, 'no-query-service'))
+    return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'can_query': can_query,
             'reply': plain('\n'.join(lines))}
 
 

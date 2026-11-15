@@ -1457,6 +1457,28 @@ def t_wire_page(q=''):
     return {'reply': f'[{head}]({url})\n\nType a name or a word to search for it.'}
 
 
+def t_team_page():
+    """Start here > Teams: the Make a team button, shown in the chat (Drivey's page server, like the Privacy log)."""
+    idli = os.environ.get('IDLI_HOME') or os.path.expanduser('~/idli-insights')
+    port, token = formserver.ensure(os.environ.get('IDLI_DATA') or os.path.join(idli, 'cowork-real'))
+    url = f'http://dashboard.localhost:{port}/teams?' + urllib.parse.urlencode({'t': token, 'embed': '1', 'h': '96'})
+    return {'reply': f'[Teams]({url})'}
+
+
+def t_team_check(name):
+    from lib import teams
+    return teams.check(str(name)[:80])
+
+
+def t_team_create(name, goal='', data='', people='', private='', outside=False, trying=False, notes=None):
+    from lib import teams
+    try:
+        return teams.create({'name': name, 'goal': goal, 'data': data, 'people': people, 'private': private,
+                             'outside': outside, 'trying': trying, 'notes': notes or []}, HERE)
+    except Exception as e:
+        return {'ok': False, 'error': ' '.join(str(e).split())[:200] or 'Could not set it up.'}
+
+
 def t_binder_item(kind, title):
     from lib import home
     return home.binder_item(files().data_dir, kind, title, home.chat_workspace())
@@ -1484,6 +1506,13 @@ TOOLS = {
                   {"id": {"type": "string"}}, ["id"]),
     "wire_page": (t_wire_page, "Show what Idli's privacy guard sent to Claude, optionally searched for a name or word.",
                   {"q": {"type": "string"}}, []),
+    "team_page": (t_team_page, "Show the Make a team button in the Teams chat.", {}, []),
+    "team_check": (t_team_check, "Check a new team's name is free.", {"name": {"type": "string"}}, ["name"]),
+    "team_create": (t_team_create, "Set up a team: its folder and its sidebar heading.",
+                    {"name": {"type": "string"}, "goal": {"type": "string"}, "data": {"type": "string"},
+                     "people": {"type": "string"}, "private": {"type": "string"}, "outside": {"type": "boolean"},
+                     "trying": {"type": "boolean"}, "notes": {"type": "array", "items": {"type": "string"}}},
+                    ["name"]),
     "binder_item": (t_binder_item, "Show Claude's latest chart or Mini draft with this title in this chat.",
                     {"kind": {"type": "string", "enum": ["Chart", "Mini draft"]}, "title": {"type": "string"}},
                     ["kind", "title"]),

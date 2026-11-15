@@ -6,6 +6,8 @@ Safe to rerun: it only adds what's missing.
      Logins           the setup chat (sign-in checks; also answers "what has Idli learned"), the Minis tab
      Privacy          what Idli's privacy guard sent to Claude (searchable, per app; written by code). An entry of
                       its own so it can't get lost the way a tab can.
+     Teams            the Make a team button; a few questions, then a team heading that works like Drivey with its
+                      own folder (~/idli-insights/teams/<name>) and Minis (lib/teams.py; written by code).
      Minis            a tab: the page listing the files Idli has learned (grows as Claude teaches it)
      Drive            a tab for signing in to Google
   Drivey       the private folder (~/idli-insights/cowork-real): Drive files, where the work happens; a "New chat"
@@ -55,7 +57,7 @@ SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 # from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
 TOOLSETS = {
     "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import",
-                   "wire_page"],
+                   "wire_page", "team_page", "team_check", "team_create"],
     "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask", "binder_item"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
@@ -63,6 +65,7 @@ CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name St
 PRIVACY = "Privacy"  # the second entry in Start here: the "Sent to Claude" log
 WS_TITLE = {"Start here": CHAT}  # the Start here workspace shows as "Logins" under the Start here heading
 PRIVACY_PROMPT = "Show what Idli sent to Claude"  # lib/modes.py PRIVACY_CHAT: the chat is written by code
+TEAMS = "Teams"  # the third entry in Start here; its first message is lib/teams.py TEAMS_CHAT
 TABS = []  # the Drive tab opens only when the Logins check finds Google signed out (and closes once signed in)
 
 
@@ -145,7 +148,7 @@ def projects_and_workspaces():
             say(f"name project '{proj['name']}' -> '{heading}'")
             paseo("project", "rename", proj["projectId"], heading, parse=False, change=True)
         wss = [w for w in paseo("workspace", "ls") if same(w["cwd"], path)]
-        names = {n for n, _, _ in LAYOUT} | set(WS_TITLE.values()) | {PRIVACY}
+        names = {n for n, _, _ in LAYOUT} | set(WS_TITLE.values()) | {PRIVACY, TEAMS}
         title = WS_TITLE.get(name, name)
         ws = next((w for w in wss if w["name"] == title), None) or \
             next((w for w in wss if w["name"] == name), None) or \
@@ -161,8 +164,9 @@ def projects_and_workspaces():
             say(f"name workspace '{ws['name']}' -> '{title}'")
             paseo("workspace", "rename", ws["workspaceId"], title, parse=False, change=True)
         ids[name] = ws["workspaceId"] if ws else None
-        if name == "Start here" and proj:  # its second entry
+        if name == "Start here" and proj:  # its second and third entries
             ids[PRIVACY] = second_workspace(proj, path, PRIVACY, wss)
+            ids[TEAMS] = second_workspace(proj, path, TEAMS, wss)
     return ids
 
 
@@ -376,6 +380,7 @@ def main():
     one_idli_workspace()
     agent = start_chat(ids.get("Start here"))
     chat(ids.get(PRIVACY), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
+    chat(ids.get(TEAMS), FOLDER["Start here"], TEAMS, TEAMS, label="idli.role=setup")
     learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
     chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on

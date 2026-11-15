@@ -7,6 +7,17 @@
 COWORK="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"   # follow ~/idli-insights/bin/claude-masked
 DATA=${IDLI_DATA:-$HOME/idli-insights/cowork-real}
 WORK=${IDLI_CLAUDE_WORK:-$HOME/idli-insights/claude-masked}
+# A team made in Start here > Teams (lib/teams.py) works like Drivey in its own folder: Paseo starts this in that
+# folder. Its masked copies get their own work folder, and the Privacy log names the team.
+TEAM_DIR=$(pwd -P)
+if [ -z "$IDLI_DATA" ] && [ "$(dirname "$TEAM_DIR")" = "$(cd "$HOME/idli-insights/teams" 2>/dev/null && pwd -P)" ] \
+   && [ -f "$TEAM_DIR/team.json" ]; then
+  DATA=$TEAM_DIR
+  TEAM_SLUG=$(basename "$TEAM_DIR")
+  [ -n "$IDLI_CLAUDE_WORK" ] || WORK="$HOME/idli-insights/claude-masked-$TEAM_SLUG"
+  [ -n "$IDLI_APP" ] || IDLI_APP=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["name"][:40])' \
+    "$TEAM_DIR/team.json" 2>/dev/null || echo "$TEAM_SLUG")
+fi
 mkdir -p "$WORK"
 # Masked copies only (an older install linked drive/ to the real downloads).
 [ -L "$WORK/drive" ] && rm "$WORK/drive"

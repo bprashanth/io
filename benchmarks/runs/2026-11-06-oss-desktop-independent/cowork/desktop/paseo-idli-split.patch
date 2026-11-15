@@ -49,7 +49,7 @@ index f3c3f139..63d89d4d 100644
 +  return openedMiniName(agent?.title ?? "") ?? agent?.title ?? null;
 +}
 diff --git a/packages/app/src/agent-stream/view.tsx b/packages/app/src/agent-stream/view.tsx
-index 72923b42..e72117c7 100644
+index 72923b42..2c9f61ca 100644
 --- a/packages/app/src/agent-stream/view.tsx
 +++ b/packages/app/src/agent-stream/view.tsx
 @@ -1,3 +1,6 @@
@@ -316,12 +316,17 @@ index 72923b42..e72117c7 100644
      const renderLiveAuxiliary = useCallback<StreamSegmentRenderers["renderLiveAuxiliary"]>(() => {
        const existingTailSpacing =
          auxiliary.turnFooter && !auxiliary.pendingPermissions ? TURN_FOOTER_BOTTOM_SPACING : 0;
-@@ -1144,8 +1218,18 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -1144,8 +1218,23 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
          pendingPermissions: auxiliary.pendingPermissions,
          turnFooter: auxiliary.turnFooter,
          bottomOverlayInset,
 +        minis: showMinis ? (
-+          <IdliMiniCartridges key={agentId} serverId={resolvedServerId} agentId={agentId} />
++          <IdliMiniCartridges
++            key={agentId}
++            serverId={resolvedServerId}
++            agentId={agentId}
++            dir={context.cwd}
++          />
 +        ) : null,
        });
 -    }, [auxiliary.pendingPermissions, auxiliary.turnFooter, bottomOverlayTailClearance]);
@@ -336,7 +341,7 @@ index 72923b42..e72117c7 100644
  
      const renderers = useMemo<StreamSegmentRenderers>(
        () => ({
-@@ -1514,9 +1598,11 @@ function PermissionActionButton({
+@@ -1514,9 +1603,11 @@ function PermissionActionButton({
  function PermissionRequestCard({
    permission,
    client,
@@ -348,7 +353,7 @@ index 72923b42..e72117c7 100644
  }) {
    const { t } = useTranslation();
    const isMobile = useIsCompactFormFactor();
-@@ -1655,6 +1741,7 @@ function PermissionRequestCard({
+@@ -1655,6 +1746,7 @@ function PermissionRequestCard({
      return (
        <QuestionFormCard
          permission={permission}
@@ -356,7 +361,7 @@ index 72923b42..e72117c7 100644
          onRespond={handleResponse}
          isResponding={isResponding}
          responseError={responseError}
-@@ -1735,6 +1822,7 @@ function PermissionRequestCard({
+@@ -1735,6 +1827,7 @@ function PermissionRequestCard({
  }
  
  const stylesheet = StyleSheet.create((theme) => ({
@@ -571,10 +576,10 @@ index 00000000..5abd1255
 +});
 diff --git a/packages/app/src/components/idli-mini-cartridges.tsx b/packages/app/src/components/idli-mini-cartridges.tsx
 new file mode 100644
-index 00000000..661e28e7
+index 00000000..65069fab
 --- /dev/null
 +++ b/packages/app/src/components/idli-mini-cartridges.tsx
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,187 @@
 +import { useCallback, useMemo, useRef, useState } from "react";
 +import { Text, View } from "react-native";
 +import { StyleSheet } from "react-native-unistyles";
@@ -583,7 +588,7 @@ index 00000000..661e28e7
 +import { useHostRuntimeClient } from "@/runtime/host-runtime";
 +import { useToast } from "@/contexts/toast-context";
 +import {
-+  IDLI_MINIS_URL,
++  idliMinisUrl,
 +  IdliMinisSchema,
 +  miniDate,
 +  miniDisplayText,
@@ -594,14 +599,25 @@ index 00000000..661e28e7
 +interface MiniListProps {
 +  onSubmit: (text: string) => Promise<void>;
 +  disabled?: boolean;
++  dir?: string | null;
 +}
 +
-+export function IdliMiniCartridges(props: MiniListProps | { serverId: string; agentId: string }) {
++export function IdliMiniCartridges(
++  props: MiniListProps | { serverId: string; agentId: string; dir?: string | null },
++) {
 +  if ("onSubmit" in props) return <MiniCartridgeList {...props} />;
 +  return <AgentMiniCartridges {...props} />;
 +}
 +
-+function AgentMiniCartridges({ serverId, agentId }: { serverId: string; agentId: string }) {
++function AgentMiniCartridges({
++  serverId,
++  agentId,
++  dir,
++}: {
++  serverId: string;
++  agentId: string;
++  dir?: string | null;
++}) {
 +  const client = useHostRuntimeClient(serverId);
 +  const submit = useCallback(
 +    async (text: string) => {
@@ -610,17 +626,17 @@ index 00000000..661e28e7
 +    },
 +    [client, agentId],
 +  );
-+  return <MiniCartridgeList onSubmit={submit} />;
++  return <MiniCartridgeList onSubmit={submit} dir={dir} />;
 +}
 +
-+function MiniCartridgeList({ onSubmit, disabled = false }: MiniListProps) {
++function MiniCartridgeList({ onSubmit, disabled = false, dir }: MiniListProps) {
 +  const toast = useToast();
 +  const sending = useRef(false);
 +  const [selectedId, setSelectedId] = useState<string | null>(null);
 +  const minis = useFetchQuery({
-+    queryKey: ["idli-minis-public"],
++    queryKey: ["idli-minis-public", dir ?? ""],
 +    queryFn: async ({ signal }) => {
-+      const response = await fetch(IDLI_MINIS_URL, { signal, credentials: "omit" });
++      const response = await fetch(idliMinisUrl(dir), { signal, credentials: "omit" });
 +      if (!response.ok) throw new Error("Could not load Minis");
 +      return IdliMinisSchema.parse(await response.json());
 +    },
@@ -983,10 +999,10 @@ index 00000000..199cdb42
 +}));
 diff --git a/packages/app/src/components/markdown/idli-chart/markdown.test.ts b/packages/app/src/components/markdown/idli-chart/markdown.test.ts
 new file mode 100644
-index 00000000..b3530033
+index 00000000..00a4d8ad
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/markdown.test.ts
-@@ -0,0 +1,173 @@
+@@ -0,0 +1,174 @@
 +import { describe, expect, it } from "vitest";
 +import { splitIdliChartMarkdown } from "./markdown";
 +
@@ -1081,7 +1097,8 @@ index 00000000..b3530033
 +  it.each([
 +    LINK.replace(ID, "f".repeat(32)),
 +    LINK.replace("http:", "https:"),
-+    LINK.replace(":8797", ":8798"),
++    LINK.replace(":8797", ":8796"),
++    LINK.replace(":8797", ":8820"),
 +    LINK.replace("dashboard.localhost", "dashboard.localhost.evil.test"),
 +    LINK.replace("dashboard.localhost", "user@dashboard.localhost"),
 +    LINK.replace("/view?", "/other?"),
@@ -1162,14 +1179,14 @@ index 00000000..b3530033
 +});
 diff --git a/packages/app/src/components/markdown/idli-chart/markdown.ts b/packages/app/src/components/markdown/idli-chart/markdown.ts
 new file mode 100644
-index 00000000..9050c4d2
+index 00000000..8c89e0ae
 --- /dev/null
 +++ b/packages/app/src/components/markdown/idli-chart/markdown.ts
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,211 @@
 +import { fromMarkdown } from "mdast-util-from-markdown";
 +import type { Definition, Nodes } from "mdast";
 +
-+const DASHBOARD = "http://dashboard.localhost:8797";
++import { isIdliDashboardOrigin } from "@/utils/idli-drivey";
 +
 +interface MarkdownSegment {
 +  kind: "markdown";
@@ -1212,12 +1229,12 @@ index 00000000..9050c4d2
 +  } catch {
 +    return null;
 +  }
-+  const trusted = target.origin === DASHBOARD && target.pathname === "/view";
++  const trusted = isIdliDashboardOrigin(target.origin) && target.pathname === "/view";
 +  const id = target.searchParams.get("id");
 +  const token = target.searchParams.get("t");
 +  if (!trusted || target.username || target.password || !id || !token) return null;
 +  if (!/^[a-f\d]{32}$/i.test(id)) return null;
-+  const url = new URL("/view", DASHBOARD);
++  const url = new URL("/view", target.origin);
 +  url.searchParams.set("id", id);
 +  url.searchParams.set("t", token);
 +  url.searchParams.set("embed", "1");
@@ -1286,7 +1303,7 @@ index 00000000..9050c4d2
 +  failedUrls: ReadonlySet<string> = new Set(),
 +): (MarkdownSegment | IdliChartSegment)[] {
 +  const plain: MarkdownSegment[] = [{ kind: "markdown", key: "0", source }];
-+  if (!source.includes("views/") && !source.includes("dashboard.localhost:8797")) return plain;
++  if (!source.includes("views/") && !source.includes("dashboard.localhost:")) return plain;
 +  const document = chartDocument(source);
 +  const links = chartLinks(document, workspaceId);
 +  const replacements = chartImages({ ...document, links, failedUrls });
@@ -1356,10 +1373,11 @@ index 00000000..9050c4d2
 +    ["/view", "Chart"],
 +    ["/mini-card", "Mini"],
 +    ["/wire", "Sent to Claude"],
++    ["/teams", "Teams"],
 +  ]);
 +  const title = titles.get(target.pathname);
 +  if (
-+    target.origin !== DASHBOARD ||
++    !isIdliDashboardOrigin(target.origin) ||
 +    target.username ||
 +    target.password ||
 +    !title ||
@@ -2089,11 +2107,12 @@ index 8ff81963..82af5db4 100644
      padding: theme.spacing[3],
      borderRadius: theme.spacing[2],
 diff --git a/packages/app/src/components/sidebar-workspace-list.tsx b/packages/app/src/components/sidebar-workspace-list.tsx
-index 8697a4b2..1528b7ed 100644
+index 8697a4b2..97932fad 100644
 --- a/packages/app/src/components/sidebar-workspace-list.tsx
 +++ b/packages/app/src/components/sidebar-workspace-list.tsx
-@@ -1,3 +1,25 @@
+@@ -1,3 +1,26 @@
 +import { createDriveyWorkspace, createRawClaudeWorkspace } from "@/utils/idli-claude-workspace";
++import { isIdliTeamDir } from "@/utils/idli-drivey";
 +import { placeTabOnSide } from "@/utils/idli-side-pane";
 +
 +// Wait for navigation to hydrate the chat tab before splitting off Claude.
@@ -2118,7 +2137,7 @@ index 8697a4b2..1528b7ed 100644
  import { LoadingSpinner } from "@/components/ui/loading-spinner";
  import {
    View,
-@@ -782,6 +804,44 @@ function NewWorktreeButton({
+@@ -782,6 +805,46 @@ function NewWorktreeButton({
    );
  }
  
@@ -2126,7 +2145,8 @@ index 8697a4b2..1528b7ed 100644
 +  const pending = useRef(false);
 +  const toast = useToast();
 +  return useMemo(() => {
-+    if (!target || (displayName !== "Drivey" && displayName !== "Claude Code")) return null;
++    const team = isIdliTeamDir(target?.iconWorkingDir);
++    if (!target || (displayName !== "Drivey" && displayName !== "Claude Code" && !team)) return null;
 +    return () => {
 +      if (pending.current) return;
 +      const client = getHostRuntimeStore().getClient(target.serverId);
@@ -2145,9 +2165,10 @@ index 8697a4b2..1528b7ed 100644
 +        navigate: navigateToWorkspace,
 +      };
 +      const launch =
-+        displayName === "Drivey"
++        displayName === "Drivey" || team
 +          ? createDriveyWorkspace({
 +              ...input,
++              title: displayName,
 +              openClaude: openIdliClaude,
 +            })
 +          : createRawClaudeWorkspace(input);
@@ -2163,7 +2184,7 @@ index 8697a4b2..1528b7ed 100644
  function NewWorkspaceGhostRow({
    project,
    displayName,
-@@ -794,8 +854,13 @@ function NewWorkspaceGhostRow({
+@@ -794,8 +857,13 @@ function NewWorkspaceGhostRow({
    onWorkspacePress?: () => void;
  }) {
    const { t } = useTranslation();
@@ -2177,7 +2198,7 @@ index 8697a4b2..1528b7ed 100644
      router.navigate(
        buildNewWorkspaceRoute({
          serverId: worktreeTarget.serverId,
-@@ -804,7 +869,7 @@ function NewWorkspaceGhostRow({
+@@ -804,7 +872,7 @@ function NewWorkspaceGhostRow({
          projectId: worktreeTarget.projectId,
        }) as Href,
      );
@@ -2186,7 +2207,18 @@ index 8697a4b2..1528b7ed 100644
    const rowStyle = useCallback(
      ({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
        styles.newWorkspaceGhostRow,
-@@ -878,11 +943,16 @@ function ProjectHeaderRow({
+@@ -841,7 +909,9 @@ function NewWorkspaceGhostRow({
+             }
+             numberOfLines={1}
+           >
+-            {t("sidebar.workspace.actions.newWorkspace")}
++            {rawClaudeLaunch && displayName !== "Claude Code"
++              ? "New chat"
++              : t("sidebar.workspace.actions.newWorkspace")}
+           </Text>
+         </>
+       )}
+@@ -878,11 +948,16 @@ function ProjectHeaderRow({
    const localDaemonServerId = useLocalDaemonServerId();
    const projectPath = resolveSidebarProjectLocalPath(project, localDaemonServerId);
    const settingsTarget = project.hosts[0] ?? null;
@@ -2203,7 +2235,7 @@ index 8697a4b2..1528b7ed 100644
      router.navigate(
        buildNewWorkspaceRoute({
          serverId: worktreeTarget.serverId,
-@@ -891,7 +961,7 @@ function ProjectHeaderRow({
+@@ -891,7 +966,7 @@ function ProjectHeaderRow({
          projectId: worktreeTarget.projectId,
        }) as Href,
      );
@@ -2591,10 +2623,10 @@ index b7ec157e..db4efe40 100644
    useEffect(() => {
 diff --git a/packages/app/src/composer/draft/surface.tsx b/packages/app/src/composer/draft/surface.tsx
 new file mode 100644
-index 00000000..a0ff64d8
+index 00000000..1e55e643
 --- /dev/null
 +++ b/packages/app/src/composer/draft/surface.tsx
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,96 @@
 +import type { ReactNode } from "react";
 +import { ScrollView, Text, View } from "react-native";
 +import { StyleSheet } from "react-native-unistyles";
@@ -2610,6 +2642,7 @@ index 00000000..a0ff64d8
 +  error: string;
 +  onOpenMini: (text: string) => Promise<void>;
 +  minisDisabled: boolean;
++  dir?: string | null;
 +  children: [ReactNode, ReactNode];
 +}
 +
@@ -2620,6 +2653,7 @@ index 00000000..a0ff64d8
 +  error,
 +  onOpenMini,
 +  minisDisabled,
++  dir,
 +  children: [content, composer],
 +}: WorkspaceDraftSurfaceProps) {
 +  if (isDrivey && !isSubmitting && !fullscreen) {
@@ -2644,7 +2678,7 @@ index 00000000..a0ff64d8
 +          <View>{composer}</View>
 +          <View style={styles.driveyMinis}>
 +            <Text style={styles.driveyMiniTitle}>Minis</Text>
-+            <IdliMiniCartridges onSubmit={onOpenMini} disabled={minisDisabled} />
++            <IdliMiniCartridges onSubmit={onOpenMini} disabled={minisDisabled} dir={dir} />
 +          </View>
 +        </ScrollView>
 +      </FileDropZone>
@@ -2690,7 +2724,7 @@ index 00000000..a0ff64d8
 +  errorText: { color: theme.colors.destructive },
 +}));
 diff --git a/packages/app/src/composer/draft/workspace-tab.tsx b/packages/app/src/composer/draft/workspace-tab.tsx
-index c4ef45cb..09ca3722 100644
+index c4ef45cb..66312cb0 100644
 --- a/packages/app/src/composer/draft/workspace-tab.tsx
 +++ b/packages/app/src/composer/draft/workspace-tab.tsx
 @@ -1,13 +1,12 @@
@@ -2801,7 +2835,7 @@ index c4ef45cb..09ca3722 100644
    );
    const dockContent = (
      <View style={styles.contentContainer}>
-@@ -629,47 +639,62 @@ export function WorkspaceDraftAgentTab({
+@@ -629,47 +639,63 @@ export function WorkspaceDraftAgentTab({
      </View>
    );
  
@@ -2891,6 +2925,7 @@ index c4ef45cb..09ca3722 100644
 +      error={formErrorMessage}
 +      onOpenMini={openMini}
 +      minisDisabled={!draftInput.isHydrated || !isConnected}
++      dir={workspaceDirectory}
 +    >
 +      {dockContent}
 +      {composer}
@@ -3896,10 +3931,10 @@ index 00000000..cecfaf15
 +});
 diff --git a/packages/app/src/utils/idli-claude-workspace.ts b/packages/app/src/utils/idli-claude-workspace.ts
 new file mode 100644
-index 00000000..303770b1
+index 00000000..3d0c926b
 --- /dev/null
 +++ b/packages/app/src/utils/idli-claude-workspace.ts
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,145 @@
 +import { openedMiniName } from "./idli-drivey";
 +import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 +import { normalizeWorkspaceDescriptor } from "@/stores/session-store";
@@ -3971,6 +4006,7 @@ index 00000000..303770b1
 +}
 +
 +export async function createDriveyWorkspace(input: {
++  title?: string;
 +  client: Pick<DaemonClient, "createWorkspace" | "createTerminal">;
 +  serverId: string;
 +  projectId: string;
@@ -3990,10 +4026,10 @@ index 00000000..303770b1
 +}) {
 +  const result = await input.client.createWorkspace({
 +    source: { kind: "directory", path: input.path, projectId: input.projectId },
-+    title: "Drivey",
++    title: input.title || "Drivey",
 +  });
 +  if (result.error || !result.workspace)
-+    throw new Error(result.error ?? "Could not create Drivey workspace");
++    throw new Error(result.error ?? `Could not create ${input.title || "Drivey"} workspace`);
 +  const workspace = normalizeWorkspaceDescriptor(result.workspace);
 +  input.accept(workspace);
 +  // The draft identity survives layout persistence without creating an agent or sending a turn.
@@ -4046,10 +4082,10 @@ index 00000000..303770b1
 +}
 diff --git a/packages/app/src/utils/idli-drivey.ts b/packages/app/src/utils/idli-drivey.ts
 new file mode 100644
-index 00000000..91e2d750
+index 00000000..91c1f2f2
 --- /dev/null
 +++ b/packages/app/src/utils/idli-drivey.ts
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,54 @@
 +import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 +import type { StreamItem } from "@/types/stream";
 +
@@ -4059,20 +4095,38 @@ index 00000000..91e2d750
 +  return agent?.labels["idli.left"] === "1";
 +}
 +
++// A team made in Start here > Teams lives in ~/idli-insights/teams/<name> and works like Drivey.
++const IDLI_TEAM_DIR = /[\\/]idli-insights[\\/]teams[\\/][^\\/]+[\\/]?$/;
++
++export function isIdliTeamDir(dir: string | null | undefined): boolean {
++  return !!dir && IDLI_TEAM_DIR.test(dir);
++}
++
 +export function isDriveyProject(
 +  workspace:
-+    | Pick<WorkspaceDescriptor, "projectDisplayName" | "projectCustomName">
++    | (Pick<WorkspaceDescriptor, "projectDisplayName" | "projectCustomName"> &
++        Partial<Pick<WorkspaceDescriptor, "workspaceDirectory" | "projectRootPath">>)
 +    | null
 +    | undefined,
 +): boolean {
-+  return (workspace?.projectCustomName ?? workspace?.projectDisplayName) === "Drivey";
++  return (
++    (workspace?.projectCustomName ?? workspace?.projectDisplayName) === "Drivey" ||
++    isIdliTeamDir(workspace?.workspaceDirectory) ||
++    isIdliTeamDir(workspace?.projectRootPath)
++  );
++}
++
++// Drivey's page server is on 8797; each team's gets the next free port (lib/formserver.py ensure).
++export function isIdliDashboardOrigin(origin: string): boolean {
++  const port = /^http:\/\/dashboard\.localhost:(\d{4})$/.exec(origin)?.[1];
++  return !!port && Number(port) >= 8797 && Number(port) <= 8819;
 +}
 +
 +export function isIdliDashboardUrl(url: string): boolean {
 +  try {
 +    const target = new URL(url);
 +    return (
-+      target.origin === "http://dashboard.localhost:8797" && !target.username && !target.password
++      isIdliDashboardOrigin(target.origin) && !target.username && !target.password
 +    );
 +  } catch {
 +    return false;
@@ -4088,10 +4142,10 @@ index 00000000..91e2d750
 +}
 diff --git a/packages/app/src/utils/idli-minis.test.ts b/packages/app/src/utils/idli-minis.test.ts
 new file mode 100644
-index 00000000..99df2bc4
+index 00000000..cdd7007b
 --- /dev/null
 +++ b/packages/app/src/utils/idli-minis.test.ts
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,167 @@
 +import {
 +  isDriveyLeft,
 +  isDriveyProject,
@@ -4105,6 +4159,7 @@ index 00000000..99df2bc4
 +  hasOnlyDriveyOpening,
 +  IDLI_DRIVEY_OPENING,
 +  IdliMinisSchema,
++  idliMinisUrl,
 +  miniDate,
 +  miniDisplayText,
 +  miniMessage,
@@ -4124,7 +4179,7 @@ index 00000000..99df2bc4
 +    expect(
 +      hasOnlyDriveyOpening([
 +        ...opening.slice(0, 1),
-+        { kind: "assistant_message", id: "partial", text: "Ask about", timestamp },
++        { kind: "assistant_message", id: "partial", text: "Type @", timestamp },
 +      ]),
 +    ).toBe(true);
 +    expect(hasOnlyDriveyOpening([])).toBe(false);
@@ -4196,13 +4251,34 @@ index 00000000..99df2bc4
 +    expect(isDriveyProject({ projectDisplayName: "Drivey" })).toBe(true);
 +    expect(isDriveyProject({ projectDisplayName: "Claude Code" })).toBe(false);
 +  });
++  it("treats a team folder as Drivey, whatever the team is called", () => {
++    const team = "/home/a/idli-insights/teams/insights";
++    expect(isDriveyProject({ projectDisplayName: "Insights", workspaceDirectory: team })).toBe(true);
++    expect(isDriveyProject({ projectDisplayName: "Insights", projectRootPath: team + "/" })).toBe(true);
++    expect(
++      isDriveyProject({ projectDisplayName: "Insights", workspaceDirectory: team + "/sub" }),
++    ).toBe(false);
++    expect(
++      isDriveyProject({ projectDisplayName: "WhatsAppy", workspaceDirectory: "/home/a/idli-insights/whatsappy" }),
++    ).toBe(false);
++    expect(idliMinisUrl(team)).toBe(
++      "http://dashboard.localhost:8797/api/minis-public?dir=%2Fhome%2Fa%2Fidli-insights%2Fteams%2Finsights",
++    );
++    expect(idliMinisUrl("/home/a/idli-insights/cowork-real")).toBe(
++      "http://dashboard.localhost:8797/api/minis-public",
++    );
++  });
 +  it("matches only dashboard pages at the exact Idli origin", () => {
 +    expect(isIdliDashboardUrl("http://dashboard.localhost:8797/view?id=mini")).toBe(true);
++    expect(isIdliDashboardUrl("http://dashboard.localhost:8800/mini-card?embed=1")).toBe(true);
 +    for (const url of [
 +      "https://dashboard.localhost:8797/view",
 +      "http://dashboard.localhost.evil:8797/view",
 +      "http://user@dashboard.localhost:8797/view",
 +      "invalid",
++      "http://dashboard.localhost:8796/view",
++      "http://dashboard.localhost:8820/view",
++      "http://dashboard.localhost:80/view",
 +    ]) {
 +      expect(isIdliDashboardUrl(url)).toBe(false);
 +    }
@@ -4239,14 +4315,21 @@ index 00000000..99df2bc4
 +});
 diff --git a/packages/app/src/utils/idli-minis.ts b/packages/app/src/utils/idli-minis.ts
 new file mode 100644
-index 00000000..afa0afa1
+index 00000000..4591a447
 --- /dev/null
 +++ b/packages/app/src/utils/idli-minis.ts
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,82 @@
 +import { z } from "zod";
 +import type { StreamItem } from "@/types/stream";
 +
++import { isIdliTeamDir } from "./idli-drivey";
++
 +export const IDLI_MINIS_URL = "http://dashboard.localhost:8797/api/minis-public";
++
++/** A team's own Minis (Drivey's page server answers for any team folder); Drivey's without a team folder. */
++export function idliMinisUrl(dir?: string | null): string {
++  return dir && isIdliTeamDir(dir) ? `${IDLI_MINIS_URL}?dir=${encodeURIComponent(dir)}` : IDLI_MINIS_URL;
++}
 +export const IDLI_DRIVEY_OPENING =
 +  "Type @ to add a file or folder. Or open a Mini below.";
 +
@@ -4885,3 +4968,124 @@ index c55208fc..d563db4d 100644
          launch: launchSelection(BUILT_IN_SELECTIONS.agent),
        },
        terminal: {
+diff --git a/packages/desktop/src/features/browser-downloads.test.ts b/packages/desktop/src/features/browser-downloads.test.ts
+new file mode 100644
+index 00000000..64da434b
+--- /dev/null
++++ b/packages/desktop/src/features/browser-downloads.test.ts
+@@ -0,0 +1,28 @@
++import { describe, expect, test } from "vitest";
++import { browserDownloadDir, installBrowserDownloads, safeDownloadName, uniqueDownloadPath } from "./browser-downloads.js";
++
++describe("browser downloads", () => {
++  test("uses PASEO_BROWSER_DOWNLOAD_DIR, else the Downloads folder", () => {
++    expect(browserDownloadDir({ PASEO_BROWSER_DOWNLOAD_DIR: "/tmp/dl" }, "/home/u/Downloads")).toBe("/tmp/dl");
++    expect(browserDownloadDir({}, "/home/u/Downloads")).toBe("/home/u/Downloads");
++  });
++
++  test("keeps file names inside the folder", () => {
++    expect(safeDownloadName("../../etc/passwd")).toBe("passwd");
++    expect(safeDownloadName("a:b?.xlsx")).toBe("a_b_.xlsx");
++    expect(safeDownloadName("")).toBe("download");
++  });
++
++  test("never overwrites an existing file", () => {
++    const taken = new Set(["/d/report.xlsx", "/d/report (1).xlsx"]);
++    expect(uniqueDownloadPath("/d", "report.xlsx", (p) => taken.has(p))).toBe("/d/report (2).xlsx");
++  });
++
++  test("sets the save path so no dialog is shown", () => {
++    let listener: ((e: unknown, item: { getFilename(): string; setSavePath(p: string): void }) => void) | undefined;
++    installBrowserDownloads({ on: (_e, l) => { listener = l; } }, { env: { PASEO_BROWSER_DOWNLOAD_DIR: "/tmp/paseo-dl-test" }, downloadsPath: "/x" });
++    let saved = "";
++    listener?.({}, { getFilename: () => "sheet.xlsx", setSavePath: (p) => { saved = p; } });
++    expect(saved.startsWith("/tmp/paseo-dl-test/sheet")).toBe(true);
++  });
++});
+diff --git a/packages/desktop/src/features/browser-downloads.ts b/packages/desktop/src/features/browser-downloads.ts
+new file mode 100644
+index 00000000..1d8154ad
+--- /dev/null
++++ b/packages/desktop/src/features/browser-downloads.ts
+@@ -0,0 +1,57 @@
++import path from "node:path";
++import { existsSync, mkdirSync } from "node:fs";
++
++/**
++ * Downloads from Paseo's built-in browser go straight to a folder, without a Save dialog.
++ *
++ * Without a `will-download` handler Electron shows a native Save dialog. Its title is the download URL,
++ * it can open behind the app window, and an agent driving the browser can't answer it, so a download an
++ * agent starts (for example a spreadsheet export) never lands. With this handler the file is saved to
++ * PASEO_BROWSER_DOWNLOAD_DIR, or the user's Downloads folder, under a name that never overwrites an
++ * existing file.
++ */
++export interface BrowserDownloadItem {
++  getFilename(): string;
++  setSavePath(savePath: string): void;
++}
++
++export interface BrowserDownloadSession {
++  on(event: "will-download", listener: (event: unknown, item: BrowserDownloadItem) => void): unknown;
++}
++
++export function browserDownloadDir(env: NodeJS.ProcessEnv, downloadsPath: string): string {
++  const dir = env.PASEO_BROWSER_DOWNLOAD_DIR?.trim();
++  return dir ? path.resolve(dir) : downloadsPath;
++}
++
++export function safeDownloadName(name: string): string {
++  const base = path.basename(name || "").replace(/[\u0000-\u001f<>:"/\\|?*]+/g, "_").trim();
++  return base && base !== "." && base !== ".." ? base.slice(0, 200) : "download";
++}
++
++export function uniqueDownloadPath(dir: string, name: string, exists: (p: string) => boolean = existsSync): string {
++  const ext = path.extname(name);
++  const stem = name.slice(0, name.length - ext.length);
++  let candidate = path.join(dir, name);
++  for (let n = 1; exists(candidate); n++) {
++    candidate = path.join(dir, `${stem} (${n})${ext}`);
++  }
++  return candidate;
++}
++
++export function installBrowserDownloads(
++  profileSession: BrowserDownloadSession,
++  options: { env: NodeJS.ProcessEnv; downloadsPath: string; log?: (message: string) => void },
++): void {
++  profileSession.on("will-download", (_event, item) => {
++    const dir = browserDownloadDir(options.env, options.downloadsPath);
++    try {
++      mkdirSync(dir, { recursive: true });
++    } catch {
++      return; // fall back to Electron's own Save dialog
++    }
++    const target = uniqueDownloadPath(dir, safeDownloadName(item.getFilename()));
++    item.setSavePath(target);
++    options.log?.(`[browser-downloads] saving to ${target}`);
++  });
++}
+diff --git a/packages/desktop/src/main.ts b/packages/desktop/src/main.ts
+index 072f96a2..cc22f0f2 100644
+--- a/packages/desktop/src/main.ts
++++ b/packages/desktop/src/main.ts
+@@ -102,6 +102,7 @@ import {
+ } from "./daemon/quit-lifecycle.js";
+ import { runDesktopStartup } from "./desktop-startup.js";
+ import { registerBrowserAutomationIpc } from "./features/browser-automation/ipc.js";
++import { installBrowserDownloads } from "./features/browser-downloads.js";
+ import { BrowserKeyboard } from "./features/browser-keyboard/index.js";
+ import { installAppUpdateOnQuit } from "./features/auto-updater.js";
+ import {
+@@ -973,6 +974,11 @@ async function bootstrap(): Promise<void> {
+   ipcMain.handle("paseo:opener:openUrl", (_event, value: unknown) => openExternalUrl(value));
+   registerEditorTargetHandlers();
+   registerBrowserAutomationIpc();
++  installBrowserDownloads(session.fromPartition(PASEO_BROWSER_PROFILE_PARTITION), {
++    env: process.env,
++    downloadsPath: app.getPath("downloads"),
++    log: (message) => log.info(message),
++  });
+ 
+   // In-app "Open in new window": opens a window that lands on the given project
+   // via the same open-project flow as a CLI launch (no move, no ownership).

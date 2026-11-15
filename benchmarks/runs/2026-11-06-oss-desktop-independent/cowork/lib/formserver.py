@@ -431,7 +431,12 @@ def make_handler(files, token):
                 return
             if u.path == '/api/minis-public':
                 keys = ('id', 'name', 'heading', 'date', 'author')
-                return self._send(200, [{k: m[k] for k in keys} for m in home.minis(files.data_dir)])
+                # A team's own Minis (Paseo P20 asks Drivey's server with the team's folder); only team folders.
+                from lib import teams
+                folder = teams.team_dir((qs.get('dir') or [''])[0]) if qs.get('dir') else files.data_dir
+                if not folder:
+                    return self._send(200, [])
+                return self._send(200, [{k: m[k] for k in keys} for m in home.minis(folder)])
             if u.path == "/health":
                 return self._send(200, {"ok": True})
             if u.path.startswith('/geo/'):
@@ -498,6 +503,9 @@ def make_handler(files, token):
                     from lib import driveindex as di
                     st = di.status()
                     return self._send(200, {"status": st, "line": di.progress_line(st)})
+                if u.path == '/api/team-start':  # the Make a team button: it says Make a team in the Teams chat
+                    from lib import teams
+                    return self._send(200, teams.start())
                 if u.path == '/api/consent':
                     return self._send(200, reveals.consent_data(files.data_dir, qs['id'][0]))
                 if u.path == '/api/reveals':
@@ -515,6 +523,9 @@ def make_handler(files, token):
                     from lib import wirelog
                     return self._send(200, wirelog.search((qs.get("q") or [""])[0][:200], (qs.get("app") or [""])[0][:40],
                                                           vault_for=lambda d: privacy.session_vault(d)))
+                if u.path == "/teams":  # Start here > Teams: the Make a team button
+                    with open(os.path.join(HERE, "lib", "teams.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
                 if u.path == "/skills":
                     with open(os.path.join(HERE, "lib", "skills.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
@@ -537,12 +548,15 @@ def make_handler(files, token):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(min(n, 100000))
                                   or b"{}")
+                if u.path == '/api/team-start':  # the Make a team button: it says Make a team in the Teams chat
+                    from lib import teams
+                    return self._send(200, teams.start())
                 if u.path == '/api/consent':
                     return self._send(200, reveals.decide(files.data_dir, body['id'], body['approve']))
                 if u.path == '/api/reveals/hide':
                     hidden = reveals.hide(files.data_dir, body['code'], body['workspace'], body['at'])
                     from lib import maskcopy
-                    maskcopy.build(files.data_dir, home.work_dir())  # the code goes back into Claude's copies
+                    maskcopy.build(files.data_dir, home.work_dir(files.data_dir))  # the code goes back into Claude's copies
                     return self._send(200, hidden)
                 if u.path == '/api/reveals/more':
                     return self._send(200, reveals.allow_more(files.data_dir, body['workspace']))

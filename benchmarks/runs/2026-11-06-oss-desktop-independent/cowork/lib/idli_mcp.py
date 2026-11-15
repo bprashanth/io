@@ -70,7 +70,7 @@ def unmask(code, reason, whole_column=False):
         return result
     # The masked copies in Claude's folder now show the values too, so its commands keep matching the data.
     from lib import maskcopy
-    maskcopy.build(data_dir(), home.work_dir())
+    maskcopy.build(data_dir(), home.work_dir(data_dir()))
     if result.get('values'):
         return {'column': result['column'], 'values': {v['code']: v['value'] for v in result['values']},
                 'note': 'Your copies in drive/ now show these values instead of the codes.'}
@@ -108,7 +108,7 @@ def mini_author():
 
 def idli_save_mini(name, goal, questions):
     """Older callers also get the editable draft; only the person can publish it."""
-    return idli_draft_mini(name, goal, questions, str(home.work_dir()))
+    return idli_draft_mini(name, goal, questions, str(home.work_dir(data_dir())))
 
 
 def idli_draft_mini(title, story, questions, code=''):

@@ -941,9 +941,36 @@ def privacy_chat_route(j):
     return message(model, [_tool_use(_tool_name(tools, "wire_page"), {"q": q} if q else {})])
 
 
+def teams_chat_route(j):
+    """Start here's Teams chat: make a team by answering a few questions (lib/teams.py). Written by code; the local 9B
+    only reads answers typed instead of clicked. Nothing here goes to Claude."""
+    msgs, tools, model = j.get("messages") or [], j.get("tools") or [], j.get("model", "")
+    if not _tool_name(tools, "team_page"):
+        return None
+    teams = _lib("teams")
+    ev = _events(msgs)
+    if not ev or ev[0] != ("said", teams.TEAMS_CHAT):
+        return None
+    have = {_short(t.get("name", "")) for t in tools}
+    step = teams.route(ev, _card_answers, have)
+    if not step:
+        return None
+    if step[0] == "say":
+        return message(model, [_text(step[1])])
+    if step[0] == "call":
+        _, name, args, lead = step
+        if not _tool_name(tools, name):
+            return message(model, [_text("This computer cannot set up teams yet. Ask whoever set up Idli to update it.")])
+        return message(model, ([_text(lead)] if lead else []) + [_tool_use(_tool_name(tools, name), args)])
+    _, header, question, options, lead = step
+    return message(model, ([_text(lead.rstrip())] if lead else []) + [_tool_use("AskUserQuestion", {"questions": [{
+        "header": header, "multiSelect": False, "question": question,
+        "options": [{"label": a, "description": b} for a, b in options]}]})])
+
+
 def privacy_route(j):
     msgs, tools, model = j.get("messages") or [], j.get("tools") or [], j.get("model", "")
-    drivey = drivey_route(j) or privacy_chat_route(j)
+    drivey = drivey_route(j) or privacy_chat_route(j) or teams_chat_route(j)
     if drivey:
         return drivey
     fa = _tool_name(tools, "file_ask")
