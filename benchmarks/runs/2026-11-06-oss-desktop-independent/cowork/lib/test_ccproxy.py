@@ -307,8 +307,9 @@ def test_leak_decodes_json_values(book):
     assert transform.leaks({ward: 'key'})
 
 
-def test_fake_upstream_roundtrip_and_refusal(book):
+def test_fake_upstream_roundtrip_and_refusal(book, monkeypatch, tmp_path):
     root, name, ward = book
+    monkeypatch.setenv('IDLI_WIRE_DIR', str(tmp_path / 'wire'))
     seen = []
     auth_ok = []
     proxy = None
@@ -323,6 +324,7 @@ def test_fake_upstream_roundtrip_and_refusal(book):
             auth_ok.append(self.headers.get('Authorization') == 'Bearer synthetic-local-fixture')
             assert name not in raw.decode() and ward not in raw.decode()
             assert self.headers.get('anthropic-version') == '2023-06-01'
+            assert self.headers.get('X-Idli-App') is None  # Idli's app tag stays on this computer
             name_code = code(proxy.transformer.vault, name)
             ward_code = code(proxy.transformer.vault, ward)
             if 'count_tokens' in self.path:
@@ -367,7 +369,7 @@ def test_fake_upstream_roundtrip_and_refusal(book):
         proxy = cc.Proxy(root, f'http://127.0.0.1:{upstream.server_port}', wire_log=True)
         with running(proxy.handler()) as server:
             headers = {'Authorization': 'Bearer synthetic-local-fixture', 'Content-Type': 'application/json',
-                       'anthropic-version': '2023-06-01'}
+                       'anthropic-version': '2023-06-01', 'X-Idli-App': 'Drivey'}
             body = request(name + ' in ' + ward)
             status, _, data = call(server.server_port, body, path='/v1/messages?beta=true', headers=headers)
             assert status == 200
@@ -408,6 +410,18 @@ def test_fake_upstream_roundtrip_and_refusal(book):
         text = path.read_text()
         assert name not in text and ward not in text and 'Authorization' not in text and 'synthetic-local-fixture' not in text
         assert path.stat().st_mode & 0o777 == 0o600
+    # The always-on log for the person: what went out, per app, new text only, codes for a refusal.
+    lines = [json.loads(x) for p in (tmp_path / 'wire').glob('*.jsonl') for x in p.read_text().splitlines()]
+    sent = [e for e in lines if not e['refused']]
+    refused = [e for e in lines if e['refused']]
+    assert len(sent) == 3 and len(refused) == 1 and sent[0]['app'] == 'Drivey'
+    assert code(proxy.transformer.vault, name) in sent[0]['text'] and sent[1]['text'] == ''  # repeats aren't stored again
+    assert 'text' not in refused[0] and refused[0]['codes']
+    assert name not in json.dumps(lines) and ward not in json.dumps(lines)
+    from lib import wirelog
+    found = wirelog.search(name, vault_for=lambda d: proxy.transformer.full)
+    assert found['codes'] == [code(proxy.transformer.full, name)] and found['entries']  # a name finds where its code went
+    assert wirelog.search('', app='Other')['entries'] == [] and 'Drivey' in wirelog.search()['apps']
 
 
 def test_bad_json_encoding_and_upstream_failure(book):

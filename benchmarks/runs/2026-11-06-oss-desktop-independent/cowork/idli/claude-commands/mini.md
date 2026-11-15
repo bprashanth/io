@@ -11,6 +11,6 @@ then call idli_draft_mini straight away (do not ask again: the editor page is wh
 params (names mapped to {type: "choice"|"number", choices?, default}), and asks: 3 to 5 ways a colleague
 might ask it in their own words ("who is most stretched in <a ward>", "top 3 debtors in <a ward>"). A small local
 model matches people's questions to these, so cover the everyday words for each measure and option. code is the folder containing the scripts.
-Idli adds only this workspace's pinned charts and opens an editable page on the right. The person edits and saves
-there. If this conversation started from a Mini, the page offers Add to that Mini or Save as a new Mini.
-Do not call idli_save_mini: the person saves from the editor. Offer Back to Claude when they want to keep working.
+Idli adds only this workspace's pinned charts and shows the editable draft in the Drivey chat on the left, under the
+charts. The person edits and saves there. If this conversation started from a Mini, the page offers Add to that Mini or Save as a new Mini.
+Do not call idli_save_mini: the person saves from the editor.

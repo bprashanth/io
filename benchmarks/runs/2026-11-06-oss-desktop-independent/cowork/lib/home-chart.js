@@ -22,7 +22,7 @@ async function draw(spec, data, agent, title, meta={}) {
   const composite=local.facet||local.concat||local.hconcat||local.vconcat||local.repeat;
   if(!composite)local.width=EMBED?Math.max(140,innerWidth-16):Math.max(140,Math.min(760,$('viz').clientWidth-64))*(bigger?1.6:1);
   if(!EMBED&&!composite){local.height=bigger?420:260;local.autosize={type:'fit',contains:'padding',resize:true};}
-  if(EMBED&&!composite){local.height=Math.max(100,innerHeight-16);local.autosize={type:'fit',contains:'padding',resize:true};}
+  if(EMBED&&!composite){local.height=Math.max(100,innerHeight-62);local.autosize={type:'fit',contains:'padding',resize:true};}
   const style=getComputedStyle(document.body),ink=style.color,line=style.getPropertyValue('--line').trim(),accent=style.getPropertyValue('--accent').trim();
   local.background='transparent';
   local.config={...local.config,background:'transparent',range:{category:[accent,'#719c8d','#b5a379','#8b8fa8','#b37f72']},axis:{...local.config?.axis,labelColor:ink,titleColor:ink,gridColor:line,domainColor:line,tickColor:line},legend:{...local.config?.legend,labelColor:ink,titleColor:ink},header:{...local.config?.header,labelColor:ink,titleColor:ink},title:{...local.config?.title,color:ink,subtitleColor:ink},text:{...local.config?.text,color:ink},geoshape:{fill:line,stroke:ink,strokeWidth:0.4,strokeOpacity:0.45,...local.config?.geoshape}};
@@ -31,7 +31,7 @@ async function draw(spec, data, agent, title, meta={}) {
   if(EMBED||composite){
     // Facets and concatenated charts do not support Vega-Lite's fit autosize.
     const svg=$('viz').querySelector('svg'),w=Number(svg.getAttribute('width')),h=Number(svg.getAttribute('height'));
-    const scale=EMBED?Math.min(1,(innerWidth-16)/w,(innerHeight-16)/h):Math.min(1,Math.max(140,$('viz').clientWidth-16)/w)*(bigger?1.6:1);
+    const scale=EMBED?Math.min(1,(innerWidth-16)/w,(innerHeight-62)/h):Math.min(1,Math.max(140,$('viz').clientWidth-16)/w)*(bigger?1.6:1);
     svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('width',w*scale);svg.setAttribute('height',h*scale);
   }
   chartView.addEventListener('click',(ev,item)=>pop(ev,markDatum(item&&item.datum)));

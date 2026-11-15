@@ -449,8 +449,9 @@ def make_handler(files, token):
             if not self._ok(qs):
                 return self._send(403, "Forbidden: open the form from Idli's chat.", "text/plain")
             try:
-                if u.path in ("/home", "/view", "/mini", "/privacy-review", "/mini-editor", "/consent", "/reveals"):
-                    with open(os.path.join(HERE, "lib", u.path[1:] + ".html"), encoding="utf-8") as f:
+                if u.path in ("/home", "/view", "/mini", "/privacy-review", "/mini-editor", "/mini-card", "/consent", "/reveals"):
+                    page = "mini-editor" if u.path == "/mini-card" else u.path[1:]  # the Mini draft inside the chat
+                    with open(os.path.join(HERE, "lib", page + ".html"), encoding="utf-8") as f:
                         return self._send(200, f.read().replace("__TOKEN_QUERY__", urllib.parse.urlencode({"t": token})), "text/html")
                 if u.path in ("/home.css", "/home.js", "/home-chart.js", "/journey.css", "/journey.js", "/reveals.js"):
                     with open(os.path.join(HERE, "lib", u.path[1:]), encoding="utf-8") as f:
@@ -503,6 +504,13 @@ def make_handler(files, token):
                     return self._send(200, files.meta(qs["file"][0]))
                 if u.path == "/api/chart":
                     return self._send(200, files.chart(qs["file"][0], qs["name"][0]))
+                if u.path == "/wire":  # Start here: what the privacy guard sent to Claude
+                    with open(os.path.join(HERE, "lib", "wire.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/wire":
+                    from lib import wirelog
+                    return self._send(200, wirelog.search((qs.get("q") or [""])[0][:200], (qs.get("app") or [""])[0][:40],
+                                                          vault_for=lambda d: privacy.session_vault(d)))
                 if u.path == "/skills":
                     with open(os.path.join(HERE, "lib", "skills.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")

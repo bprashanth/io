@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import urllib.parse
 
@@ -48,6 +49,14 @@ def idli_show(title, vega_lite, data_csv, sources=None, script=None):
     markdown = home.chart_markdown(data_dir(), title, {'vega_lite': vega_lite, 'data': rows}, agent,
                                    sources, script, workspace)
     url = re.search(r'\n\[Open interactive\]\(([^)]+)\)', markdown)[1]
+    # The chart goes into the Drivey chat on the left, the person's running binder of what goes into a Mini.
+    if workspace:
+        try:
+            home.post_to_left(workspace, 'Chart', title)
+            return {'shown': True, 'message': 'The chart is in the Drivey chat on the left, where the person can pin '
+                                              'it for a Mini. Say so in one short line.'}
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
     from lib import uiswitch
     opened = uiswitch.open_url(workspace, url, side='right', focus=True)
     return {'shown': bool(opened.get('ok')), 'url': url,
@@ -106,6 +115,12 @@ def idli_draft_mini(title, story, questions, code=''):
     from lib import journey, uiswitch
     workspace = os.environ.get('IDLI_WORKSPACE')
     ident = journey.draft_mini(data_dir(), title, story, questions, code, workspace, mini_author())
+    try:  # the draft shows in the Drivey chat, under the charts it collected
+        home.post_to_left(workspace, 'Mini draft', journey.draft_data(data_dir(), ident)['name'])
+        return {'draft': ident, 'shown': True, 'message': 'The draft is in the Drivey chat on the left. The person '
+                'can change the words there and save. Say so in one short line.'}
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
     url = journey.page_url(data_dir(), 'mini-editor', id=ident, ws=workspace or '')
     opened = uiswitch.open_url(workspace, url, side='right', focus=True)
     return {'draft': ident, 'url': url, 'opened': bool(opened.get('ok')),

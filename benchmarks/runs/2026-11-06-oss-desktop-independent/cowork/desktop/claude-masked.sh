@@ -62,6 +62,8 @@ PY
 cd "$WORK" || exit 1
 unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CONFIG_DIR
 export ANTHROPIC_BASE_URL="http://127.0.0.1:$PORT"
+# Which app this Claude belongs to, for the "Sent to Claude" log in Start here (the proxy drops the header).
+export ANTHROPIC_CUSTOM_HEADERS="X-Idli-App: ${IDLI_APP:-Drivey}"
 CLAUDE_BIN=${CLAUDE_BIN:-$(command -v claude || echo "$HOME/.local/bin/claude")}
 # --mcp-config takes several files, so give it as one --flag=value: a prompt after it would be read as another file
 exec "$CLAUDE_BIN" "--mcp-config=$WORK/.idli-mcp.json" "$@"

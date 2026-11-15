@@ -2,6 +2,7 @@
 Run: python -m unittest discover -s tests -p 'test_journey.py' -v
 """
 import json
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -157,6 +158,17 @@ class RouterTests(unittest.TestCase):
         with patch.object(minimap,'map_questions',return_value={'qid':None}):t.said('Predict Garden next year')
         t.result({'error':'The query was not a single read-only question.'})
         self.assertEqual(t.tool()['input']['question'],'Predict Garden next year');self.assertEqual(t.tool()['input']['mini_id'],'visits')
+    def test_claude_items_shown_in_chat_and_mini_kept(self):
+        t=Transcript();t.j['tools'].append({'name':'mcp__cowork__binder_item'})
+        t.said('Open Mini: Visits [visits]');t.result({'id':'visits','files':FILES,'questions':[QUESTION],'reply':'Our story'})
+        t.said('Chart from Claude: Big trees by species')
+        self.assertEqual(t.tool()['input'],{'kind':'Chart','title':'Big trees by species'})
+        t.result({'reply':'[Big trees by species](http://dashboard.localhost:8797/view?id=a&embed=1)\n\nPin keeps it for your Mini.'})
+        self.assertIn('embed=1',t.text())
+        with patch.object(minimap,'map_questions',return_value={'qid':'total','params':{}}):t.said('Visits?')
+        self.assertEqual(t.tool()['input']['id'],'visits')  # the open Mini is still the one being asked
+        old=Transcript();old.said('Chart from Claude: X')  # an older laptop without the tool: no call to it
+        self.assertNotEqual(old.tool()['input'].get('kind') if old.r['content'][-1]['type']=='tool_use' else None,'Chart')
     def test_drive_mention_leaves_mini(self):
         t=self.mini();t.said('Compare @Drive/visits.xlsx');self.assertTrue(t.tool()['name'].endswith('drive_fetch'))
     def test_failed_mini_and_unknown_tool_never_fall_through(self):
@@ -252,11 +264,17 @@ class ToolTests(Fixture):
                                ['terminal','send-keys','-l','term-one','\r']])
         uiswitch.show_terminal.assert_called_once_with('ws-one','term-one','right')
         with self.assertRaises(ValueError):home.send(self.data,FILES,'Question','wrong-workspace')
-    def test_show_opens_right_never_left(self):
+    def test_show_goes_to_the_left_binder(self):
         with patch.object(uiswitch,'open_url',return_value={'ok':True}) as op:
             r=idli_mcp.idli_show('Visits',SPEC,str(self.work/'chart.csv'),['drive/visits.xlsx'],str(self.work/'analysis.py'))
-        self.assertTrue(r['shown']);op.assert_called_once_with('ws-one',r['url'],side='right',focus=True)
-        self.assertFalse(any(c[0]=='send' for c in self.calls()))
+        self.assertTrue(r['shown']);op.assert_not_called();self.assertIn('left',r['message'])
+        self.assertEqual([c for c in self.calls() if c[0]=='send'],[['send','--no-wait','left-one','Chart from Claude: Visits']])
+        item=tools.t_binder_item('Chart','Visits')  # what the left chat shows: the chart inline, with Pin
+        url=re.search(r'\]\((http://dashboard\.localhost:8797/view\?[^)]+)\)',item['reply'])[1]
+        q=urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+        self.assertEqual(q['embed'],['1']);self.assertIn('Pin',item['reply'])
+        self.assertEqual(home.read(self.data/f"views/{q['id'][0]}.json")['title'],'Visits')
+        with self.assertRaisesRegex(ValueError,'no longer here'):tools.t_binder_item('Chart','Something else')
     def test_insert_no_enter_only_own_terminal(self):
         home.claude_insert(self.data,'ws-one','About this chart: ward = Garden ')
         self.assertEqual([c for c in self.calls() if c[:2]==['terminal','send-keys']],
@@ -288,8 +306,12 @@ class ToolTests(Fixture):
         m=tools.t_mini_open(r['id']);self.assertIn('A simple view',m['reply']);self.assertIn('ward: Garden or all',m['reply']);self.assertIn('embed=1',m['reply']);self.assertIn('ws=ws-one',m['reply']);self.assertEqual(m['files'],FILES)
         answer=tools.t_mini_ask(r['id'],'total-0',{'ward':'Garden'});self.assertIn('Answered with:',answer['reply']);self.assertIn('views/',answer['reply'])
     def test_draft_tool_and_bad_script_fail_before_editor(self):
-        with patch.object(uiswitch,'open_url',return_value={'ok':True}):
-            r=idli_mcp.idli_draft_mini('Visits','Story',[QUESTION],'Scripts');self.assertTrue(r['opened'])
+        with patch.object(uiswitch,'open_url',return_value={'ok':True}) as op:
+            r=idli_mcp.idli_draft_mini('Visits','Story',[QUESTION],'Scripts');self.assertTrue(r['shown'])
+        op.assert_not_called()
+        self.assertIn(['send','--no-wait','left-one','Mini draft from Claude: Visits'],self.calls())
+        item=tools.t_binder_item('Mini draft','Visits')
+        self.assertIn('/mini-card?',item['reply']);self.assertIn('embed=1',item['reply']);self.assertIn(r['draft'],item['reply'])
         (self.work/'analysis.py').write_text('raise RuntimeError("private internal detail")')
         with self.assertRaisesRegex(ValueError,'Ask Claude'):self.make_draft(1)
     def test_bad_edits_and_paths(self):
@@ -340,7 +362,7 @@ class ToolTests(Fixture):
         import ast
         tree=ast.parse((ROOT/'desktop/idli-bootstrap.py').read_text())
         value=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='TOOLSETS' for t in n.targets))
-        self.assertEqual(set(value['Drivey']),modes.DRIVEY_TOOLS)
+        self.assertEqual(set(value['Drivey']),modes.DRIVEY_TOOLS|modes.DRIVEY_EXTRA)
 
 
 if __name__=='__main__':unittest.main()

@@ -1033,6 +1033,7 @@ def _drivey_question(msgs):
 
 
 DRIVEY_TOOLS = frozenset(('drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask'))
+DRIVEY_EXTRA = frozenset(('binder_item',))  # newer laptops; older ones route the same without it
 PICK_FILES = 'Add files or a folder with @ and send again.'
 ASKING_SERVICE = ('None of this Mini\'s questions fit, so I\'m asking an external service to write a query. '
                   'It sees your question with private values as codes and the column names. Not your data.')
@@ -1048,7 +1049,7 @@ def drivey_route(j):
     msgs, tools, model = j.get('messages') or [], j.get('tools') or [], j.get('model', '')
     names = {_short(t.get('name', '')) for t in tools
              if t.get('name', '').startswith('mcp__cowork__') or _short(t.get('name', '')) in DRIVEY_TOOLS}
-    if names != DRIVEY_TOOLS:
+    if not DRIVEY_TOOLS <= names <= DRIVEY_TOOLS | DRIVEY_EXTRA:
         return None
     ev = _events(msgs)
     def say(text):
@@ -1146,6 +1147,8 @@ def drivey_route(j):
             return say(res.get('reply') or 'Claude could not open yet. Send your question again to retry.')
         if name in ('mini_open', 'mini_ask'):
             return say(res.get('reply') or 'I could not open this Mini. Open it again, or pick its files with @ to ask Claude.')
+        if name == 'binder_item':
+            return say(res.get('reply') or res.get('error') or 'That is no longer here. Ask Claude to show it again.')
         if name == 'AskUserQuestion':
             answer = (_card_answers(inp, res.get('text', '')) or [None])[0]
             head = (inp.get('questions') or [{}])[0].get('header')
@@ -1173,6 +1176,9 @@ def drivey_route(j):
     opened = re.fullmatch(r'Open Mini: .+ \[([\w-]{1,100})\]', said)
     if opened:
         return call('mini_open', id=opened[1])
+    posted = re.fullmatch(r'(Chart|Mini draft) from Claude: (.{1,160})', said.strip())
+    if posted and 'binder_item' in names:  # Claude's chart or Mini draft, shown in this chat (the binder)
+        return call('binder_item', kind=posted[1], title=posted[2])
     paths = _lib('minimap').mentions(said)
     if paths:
         question = _lib('minimap').without_mentions(said, paths)

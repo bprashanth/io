@@ -53,7 +53,7 @@ SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 # from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
 TOOLSETS = {
     "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import"],
-    "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask"],
+    "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask", "binder_item"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name Start here)
@@ -241,22 +241,24 @@ def learned_tab(agent_id):
         say("the page server didn't start: " + r.stderr.strip()[-200:])
         return
     port, token = json.loads(r.stdout)
-    url = f"http://dashboard.localhost:{port}/skills?t={token}"
     browser = browser_as(agent_id)
     if not browser:
         say("the app's browser isn't available; open Paseo and rerun to add the Minis tab")
         return
-    if opened("learned@" + FOLDER["Start here"]) == url:
-        say("Minis tab is open")
-        return
-    old = next((t for t in browser.tabs() if "/skills" in t["url"]), None)  # only if that workspace is on screen
-    if old:
-        say("point the Minis tab at the current server")
-        browser.paseo("browser_navigate", browserId=old["id"], url=url)
-    else:
-        say("open the Minis tab")
-        browser.paseo("browser_new_tab", url=url)
-    opened("learned@" + FOLDER["Start here"], url)
+    # Minis, and "Sent to Claude" (what the privacy guard sent, searchable by app and word).
+    for page, label, key in (("/skills", "Minis", "learned@"), ("/wire", "Sent to Claude", "wire@")):
+        url = f"http://dashboard.localhost:{port}{page}?t={token}"
+        if opened(key + FOLDER["Start here"]) == url:
+            say(f"{label} tab is open")
+            continue
+        old = next((t for t in browser.tabs() if urllib.parse.urlparse(t["url"]).path == page), None)
+        if old:
+            say(f"point the {label} tab at the current server")
+            browser.paseo("browser_navigate", browserId=old["id"], url=url)
+        else:
+            say(f"open the {label} tab")
+            browser.paseo("browser_new_tab", url=url)
+        opened(key + FOLDER["Start here"], url)
 
 
 def start_tabs(agent_id):

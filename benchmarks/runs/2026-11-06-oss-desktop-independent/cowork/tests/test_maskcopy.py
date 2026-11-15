@@ -124,6 +124,7 @@ def test_sandbox_settings_hide_private_folders(shola):
     assert str(work.resolve()) not in deny
     assert stale not in deny and f'Read(/{stale}/**)' not in s['permissions']['deny']
     assert 'Bash(rm:*)' in s['permissions']['deny']  # other rules are kept
+    assert str((work.parent / 'wire').resolve()) in deny  # the Sent to Claude log, even before it exists
     assert s['sandbox']['enabled'] and s['sandbox']['allowUnsandboxedCommands'] is False
     assert f'Read(/{data.resolve()}/**)' in s['permissions']['deny']
     assert 'mcp__idli__unmask' in s['permissions']['ask']

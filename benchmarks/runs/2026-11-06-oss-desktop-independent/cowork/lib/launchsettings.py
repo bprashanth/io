@@ -15,8 +15,9 @@ ASK = ['mcp__idli__unmask']
 def private_paths(data_dir, work):
     home = Path.home()
     work = Path(work).resolve()
+    from lib import wirelog  # the "Sent to Claude" log, even before it exists
     paths = [Path(data_dir).resolve(), home / '.cache/idli', home / '.paseo', home / '.config/Paseo',
-             home / '.config/paseo', home / '.config/idlisseus']
+             home / '.config/paseo', home / '.config/idlisseus', wirelog.folder()]
     # Everything else Idli keeps beside Claude's folder (other workspaces, downloads, settings).
     parent = work.parent
     if parent != home and parent.name == 'idli-insights':

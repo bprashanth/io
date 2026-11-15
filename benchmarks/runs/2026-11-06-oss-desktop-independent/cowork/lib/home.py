@@ -465,6 +465,52 @@ def chart_markdown(data_dir, title, chart, agent=None, sources=None, script=None
     return f'![{label}]({out})\n[Open interactive]({url})'
 
 
+BINDER_KINDS = {'Chart': 'view', 'Mini draft': 'mini-card'}
+
+
+def binder_item(data_dir, kind, title, workspace=None):
+    """The newest chart or Mini draft from Claude with this title, as a page the left chat shows inline (its "binder":
+    charts in order, each with Pin, then the editable Mini draft)."""
+    from lib import journey
+    if kind not in BINDER_KINDS:
+        raise ValueError('Unknown item')
+    def key(t):
+        return ' '.join(plain(str(t)).split())[:160]
+    title = key(title)
+    if kind == 'Chart':
+        found = None
+        for path in sorted((Path(data_dir) / 'views').glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True):
+            view = read(path)
+            if key(view.get('title', '')) == title and (not workspace or view.get('workspace') in (workspace, None)):
+                found = path.stem
+                break
+        if not found:
+            raise ValueError('That chart is no longer here. Ask Claude to show it again.')
+        url = journey.page_url(data_dir, 'view', id=found, embed='1', h='470')
+        return {'reply': f'[{title}]({url})\n\nPin keeps it for your Mini.'}
+    found = None
+    for path in sorted((Path(data_dir) / '.idli/mini-drafts').glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            draft = journey.draft_data(data_dir, path.stem)
+        except (OSError, ValueError):
+            continue
+        if key(draft.get('name', '')) == title and (not workspace or draft.get('workspace') == workspace):
+            found = path.stem
+            break
+    if not found:
+        raise ValueError('That draft is no longer here. Ask Claude to make it again.')
+    url = journey.page_url(data_dir, 'mini-card', id=found, embed='1', h='900')
+    return {'reply': f'Your Mini draft. Change any words here, then save.\n\n[{title}]({url})'}
+
+
+def post_to_left(workspace, kind, title):
+    """Put Claude's chart or Mini draft into this workspace's left chat. The line is short (no link or token): the chat
+    asks Idli for the page itself."""
+    if kind not in BINDER_KINDS:
+        raise ValueError('Unknown item')
+    cli('send', '--no-wait', left_chat(workspace), f'{kind} from Claude: ' + ' '.join(plain(str(title)).split())[:160])
+
+
 def _human(key):
     t = re.sub(r'_inr$', ' (Rs)', str(key), flags=re.I)
     t = re.sub(r'_?1to10$', ' (1 to 10)', t, flags=re.I).replace('_', ' ').strip()

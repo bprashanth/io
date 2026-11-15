@@ -46,7 +46,8 @@ if(location.pathname==='/privacy-review'){
     catch(e){status(e.message,true);$('done').disabled=false;}finally{busy=false;}
   };load();
 }
-if(location.pathname==='/mini-editor'){
+if(location.pathname==='/mini-editor'||location.pathname==='/mini-card'){
+  if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('embed');
   let draft,questions=[],charts=[];
   const renderQuestions=()=>{
     $('q-count').textContent=questions.length+' of 8';

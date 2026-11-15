@@ -1444,6 +1444,11 @@ def t_mini_open(id):
     return home.mini_open(files().data_dir, id, home.chat_workspace())
 
 
+def t_binder_item(kind, title):
+    from lib import home
+    return home.binder_item(files().data_dir, kind, title, home.chat_workspace())
+
+
 def t_mini_ask(id, qid=None, params=None, question=None):
     from lib import home
     if question and not qid:
@@ -1462,6 +1467,9 @@ TOOLS = {
          "mini_id": {"type": "string"}}, ["files", "question"]),
     "mini_open": (t_mini_open, "Open a saved Mini with its questions, options and example charts.",
                   {"id": {"type": "string"}}, ["id"]),
+    "binder_item": (t_binder_item, "Show Claude's latest chart or Mini draft with this title in this chat.",
+                    {"kind": {"type": "string", "enum": ["Chart", "Mini draft"]}, "title": {"type": "string"}},
+                    ["kind", "title"]),
     "mini_ask": (t_mini_ask, "Run one saved Mini question with validated parameters, or (with question instead of "
                  "qid) have the query service answer a question the saved ones don't cover.",
                  {"id": {"type": "string"}, "qid": {"type": "string"}, "params": {"type": "object"},

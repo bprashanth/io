@@ -32,7 +32,8 @@ don't estimate. Say plainly when the file can't answer something (e.g. no date c
 script into a CSV in this folder, then call `idli_show(title, vega_lite, data_csv, sources, script)`.
 Always pass `sources` (the list of source file paths under `drive/`) and `script` (the path of the Python script
 that wrote the CSV). Use field names from the CSV and do not put data URLs in the spec: Idli loads the CSV locally.
-The chart opens on the right. Its Pin button keeps it for a Mini. A chart's popover shows its sources and saved
+The chart appears in the Drivey chat on the left, which is the person's running binder of what goes into a Mini.
+Its Pin button keeps it for a Mini. Tell them in one short line where it is. A chart's popover shows its sources and saved
 CSV rows directly. Other left-click questions come back to this Claude prompt;
 right-click copies context here for the person to finish their question. Answer from the script and real rows.
 Never call `idli_show` before their consent.
@@ -52,8 +53,9 @@ current files with its default parameters, show the results for the person to ch
 colleagues: Idli puts the real values back into your scripts' string literals and into the title, story, questions and
 choices. So write each code whole inside a string (`SPECIES = "VALUE_094"`), never built from pieces. Each question has `id`, `question`, `script` (the .py path), `params`
 (mapping names to `{type: "choice"|"number", choices?, default}`), and optionally `chart`. Draft only once
-they have checked the questions and results. `code` is the folder holding the scripts. The editor opens on the right
-with this workspace's pinned charts. The person can edit and Save there. When building on a Mini, they can Add to
+they have checked the questions and results. `code` is the folder holding the scripts. The draft appears in the Drivey
+chat on the left, under the charts, with this workspace's pinned charts. The person can change the words and Save
+there. When building on a Mini, they can Add to
 that Mini or Save as a new Mini. Use `/mini` for these steps. Do not save a Mini directly with idli_save_mini.
 
 **Mini scripts** run with Idli's own Python (it has pandas), in strict `-I` mode. If your `python3` can't import

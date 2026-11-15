@@ -24,7 +24,7 @@ from urllib.request import urlopen
 HERE = Path(__file__).resolve().parent.parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
-from lib import privacy  # noqa: E402
+from lib import privacy, wirelog  # noqa: E402
 from lib.privacy_engine.pseudonymize import PseudonymMap, TOKEN_RE, normalise  # noqa: E402
 
 CONTENT_PATHS = {'/v1/messages', '/v1/messages/count_tokens'}
@@ -416,9 +416,13 @@ class Proxy:
                     with self.lock, privacy.session_lock(self.data_dir):
                         obj, stats = self.transformer.outbound(obj)
                         entry.update(stats)
+                        app = h.headers.get('X-Idli-App', 'Claude')
                         if self.transformer.leaks(obj):
                             entry.update(status=403, refused=True, leaks=self.transformer.where(obj))
+                            wirelog.record(app, None, 'refused', entry.get('masked', 0), True,
+                                           [c for _, c in entry['leaks']], self.data_dir)
                             return self.error(h, 403, 'Refused: private values remain in the outgoing body')
+                        wirelog.record(app, obj, 'sent', entry.get('masked', 0), data_dir=self.data_dir)
                         body = json.dumps(obj, ensure_ascii=False, separators=(',', ':')).encode()
                         # Each response retains the vault for its own request, including during concurrent requests.
                         vault = copy.deepcopy(self.transformer.full)
@@ -431,7 +435,7 @@ class Proxy:
                 except (ValueError, KeyError, TypeError, AttributeError, OSError):
                     entry.update(status=400, refused=True)
                     return self.error(h, 400, 'Could not prepare the masked request')
-            blocked = HOP | {'host', 'content-length', 'accept-encoding'}
+            blocked = HOP | {'host', 'content-length', 'accept-encoding', 'x-idli-app'}
             blocked |= {v.strip().lower() for v in h.headers.get('Connection', '').split(',')}
             headers = {k: v for k, v in h.headers.items() if k.lower() not in blocked}
             headers['Accept-Encoding'] = 'identity'
