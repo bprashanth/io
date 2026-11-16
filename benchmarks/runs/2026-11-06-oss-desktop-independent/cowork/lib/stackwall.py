@@ -304,6 +304,7 @@ class ModelDoor:
 
 LAUNCH = r"""
 import os, socket, subprocess, sys, threading
+os.makedirs(os.environ.get("HOME", "/tmp/home"), exist_ok=True)
 doors = [d.split('=', 1) for d in os.environ.pop('IDLI_DOORS', '').split(',') if d]
 def pipe(a, b):
     try:
