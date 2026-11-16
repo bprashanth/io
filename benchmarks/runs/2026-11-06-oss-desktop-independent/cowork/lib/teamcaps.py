@@ -430,6 +430,8 @@ def describe(data_dir, team):
     if missing:
         lines += ['', f"{team} can't read these yet: " + ', '.join(missing) + '.']
     lines += ['',
+              "This list was written when you started, and the Builder may have added to it since. Before you say the "
+              "team can't do something, call `team_capabilities` for the list as it is now. "
               "If the person asks for something outside this list (a new kind of file, a new tool, a site the team "
               "hasn't learned), don't improvise a one-off. Say plainly that the team can't do it yet, and ask with "
               "AskUserQuestion whether to open the Builder, which adds it to the team. On yes, call `builder_open` "

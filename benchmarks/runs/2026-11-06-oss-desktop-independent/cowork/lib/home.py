@@ -143,15 +143,21 @@ def _read_by_extension(data_dir, rel):
 
 
 def _marks_or_numbers(frame, column):
-    """Numbers, or short marks such as P / A / Y / N, which are safe to leave visible."""
+    """Numbers (92.8%, 1,236, Rs 500, 2005), or short marks such as P / A / Y / N, which are safe to leave visible.
+    Up to three heading cells at the top of a column ("1990", "Non SC/ST") don't count against it."""
     try:
         values = [str(v).strip() for v in frame[column].tolist() if str(v).strip() not in ('', 'nan', 'None')]
     except KeyError:
         return False
-    body = values[1:] if values and not values[0].replace('.', '').isdigit() else values  # a heading row
+
+    def number(v):
+        v = re.sub(r'^(?:rs\.?|inr|₹)\s*|\s*%$', '', v.lower()).replace(',', '').replace(' ', '')
+        return bool(re.fullmatch(r'[-+]?\d+(?:\.\d+)?', v))
+
     def ok(v):
-        return len(v) <= 2 or v.replace('.', '', 1).replace('-', '', 1).isdigit()
-    return bool(body) and all(ok(v) for v in body)
+        return len(v) <= 2 or number(v)
+    bad = [i for i, v in enumerate(values) if not ok(v)]  # heading cells may only sit in the first three rows
+    return bool(values) and all(i < 3 for i in bad) and len(bad) * 2 < len(values)
 
 
 def prepare(data_dir, files, question):

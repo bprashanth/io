@@ -243,6 +243,15 @@ def app_open(capability):
             shown.get('ok') else f"{cap['title']} is running. Open {page['url']} in the browser."}
 
 
+def team_capabilities():
+    """What this team can do now (the Builder may have added abilities since you started)."""
+    from lib import teamcaps
+    return teamcaps.describe(str(data_dir()), teamcaps.team_name(str(data_dir())))
+
+
+TOOLS['team_capabilities'] = (team_capabilities, "What this team knows how to do right now, including what its "
+                              "Builder added after you started. Check it before saying the team can't do something.",
+                              {}, [])
 TOOLS['team_run'] = (team_run, "Run one of this team's tested tools (your instructions list them) on the original "
                      'files, on this computer. Only file names and a short result come back.',
                      {'capability': {'type': 'string'},
