@@ -96,22 +96,47 @@ def ensure(data_dir):
     if not (d / 'README.md').exists():
         (d / 'README.md').write_text(README)
     ignore = d / '.gitignore'
-    if not ignore.exists():
-        ignore.write_text('.claude/\n.idli-*\n__pycache__/\n*.pyc\n.mcp.json\nCLAUDE.local.md\n')
+    have = ignore.read_text().splitlines() if ignore.exists() else []
+    missing = [ln for ln in IGNORED if ln not in have]
+    if missing:
+        ignore.write_text('\n'.join([*have, *missing]).strip('\n') + '\n')
     if not (d / '.git').exists():
         _git(d, 'init', '-q', '-b', 'main')
         checkpoint(data_dir, 'Start')
     return d
 
 
+# Never in a team's history: settings, scratch, and what a stack install put on disk (it is rebuilt from the locks)
+IGNORED = ['.claude/', '.idli-*', '__pycache__/', '*.pyc', '.mcp.json', 'CLAUDE.local.md', 'stack/.pixi/',
+           'stack/models/', 'stack/repos/', 'stack/.cache/', 'stack/.install.log', 'stack/.installed.json']
+
+
 def checkpoint(data_dir, message):
     """Save the extensions as they are now. Returns the version id, or None when nothing changed."""
     d = ext_dir(data_dir)
+    ensure_ignores(d)
+    lock = d / '.git' / 'index.lock'
+    if lock.exists() and time.time() - lock.stat().st_mtime > 300:  # left by a git that was stopped
+        lock.unlink()
     _git(d, 'add', '-A')
     if not _git(d, 'status', '--porcelain').strip() and _git(d, 'rev-parse', '--verify', '-q', 'HEAD', check=False):
         return None
     _git(d, 'commit', '-q', '--allow-empty', '-m', ' '.join(str(message).split())[:120] or 'Checkpoint')
     return _git(d, 'rev-parse', '--short', 'HEAD').strip()
+
+
+def ensure_ignores(d):
+    """Keep installed stack files out of git, and untrack any that got in (they made a team's history gigabytes)."""
+    ignore = d / '.gitignore'
+    have = ignore.read_text().splitlines() if ignore.exists() else []
+    missing = [ln for ln in IGNORED if ln not in have]
+    if missing:
+        ignore.write_text('\n'.join([*have, *missing]).strip('\n') + '\n')
+    tracked = _git(d, 'ls-files', '--', 'stack/.pixi', 'stack/models', 'stack/repos', 'stack/.cache',
+                   check=False).strip()
+    if tracked:
+        _git(d, 'rm', '-r', '-q', '--cached', '--ignore-unmatch', '--', 'stack/.pixi', 'stack/models',
+             'stack/repos', 'stack/.cache')
 
 
 def versions(data_dir):

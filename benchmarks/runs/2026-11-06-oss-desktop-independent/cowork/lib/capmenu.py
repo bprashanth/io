@@ -15,15 +15,19 @@ MENU = {
     'ocr': [
         {'tier': 'local', 'name': 'Tesseract', 'how': 'capmenu.ocr_text(path) / capmenu.ocr_words(path)',
          'check': lambda: bool(shutil.which('tesseract'))},
-        {'tier': 'private model', 'name': 'Muse (vision)', 'how': 'platform request: not open to extensions yet',
-         'check': lambda: False},
+        {'tier': 'private model', 'name': 'the 9B with vision (reads photos, scans and handwriting, Hindi too)',
+         'how': 'a stack with "model": true sends the image to $IDLI_MODEL_URL/chat/completions as an OpenAI '
+                'image_url (base64), with "chat_template_kwargs": {"enable_thinking": false}',
+         'check': lambda: _nine_has('vision')},
         {'tier': 'outside', 'name': 'Consultant, on masked text after OCR', 'how': 'automatic, after a yes',
          'check': lambda: False},
     ],
     'speech-to-text': [
         {'tier': 'local', 'name': 'faster-whisper', 'how': 'capmenu.transcribe(path)',
          'check': lambda: importlib.util.find_spec('faster_whisper') is not None},
-        {'tier': 'private model', 'name': 'Muse on the transcript', 'how': 'platform request', 'check': lambda: False},
+        {'tier': 'private model', 'name': 'the 9B on the transcript (fill columns, summarise, translate)',
+         'how': 'a stack with "model": true calls $IDLI_MODEL_URL/chat/completions',
+         'check': lambda: _nine_has(None)},
     ],
     'text-to-speech': [
         {'tier': 'local', 'name': 'Kokoro', 'how': 'capmenu.speak(text, out_wav)',
@@ -41,6 +45,18 @@ MENU = {
          'check': lambda: importlib.util.find_spec('pandas') is not None},
     ],
 }
+
+
+def _nine_has(modality):
+    """Whether the private model (the 9B) answers, and has this modality (its /props), right now."""
+    import json
+    import urllib.request
+    url = os.environ.get('IDLI_9B_URL', 'http://127.0.0.1:8291').rstrip('/')
+    try:
+        props = json.load(urllib.request.urlopen(url + '/props', timeout=3))
+    except Exception:
+        return False
+    return True if modality is None else bool((props.get('modalities') or {}).get(modality))
 
 
 class Missing(RuntimeError):

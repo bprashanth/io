@@ -345,6 +345,7 @@ def serve_in(path, port):
         c, _ = srv.accept()
         try:
             t = socket.create_connection(('127.0.0.1', int(port)), 10)
+            t.settimeout(None)  # the 10 s was for connecting; a page may take minutes to answer
         except OSError:
             c.close()
             continue

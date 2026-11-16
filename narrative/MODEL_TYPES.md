@@ -65,6 +65,13 @@ It knows the surface it builds on from three things:
 Extension code runs in the sandbox Idli already uses for chart code (no network, read-only), with the platform's
 pinned packages. **Nothing ever runs pip install.**
 
+**Updated 2026-11-17: a team can bring its own tools.** See [TEAM_STACKS.md](TEAM_STACKS.md). A team's
+`extensions/stack/` lists packages (conda-forge, PyPI), GitHub repos and model downloads. Idli installs them inside
+an install wall that reaches only package and code hosts, after the person says yes to a summary Idli writes, and
+pins every version. They run in a wall with no internet (and, if declared, a door to the private model only). The
+rule "nothing installs" becomes "nothing installs outside the wall, unpinned, or without the person's yes". The
+menu below is now what the platform gives for free; the stack is where everything else goes.
+
 ### The capability menu (platform-owned)
 
 Each kind of work has three options, cheapest first. "Outside" is only ever reached after a yes, and only with
@@ -72,7 +79,7 @@ masked text. Media is turned into text on this computer first.
 
 | Need | Local code | Private model | Outside, after unmasking, as text |
 |---|---|---|---|
-| Reading images and scans (OCR) | Tesseract, with Hindi and Marathi packs | Muse, with vision (to verify that Muse loads its image model) | Consultant |
+| Reading images and scans (OCR) | Tesseract, with Hindi and Marathi packs (RapidOCR agreed, 2026-11-16) | The 9B with its vision file (live since 2026-11-17; Muse stays off images) | Consultant |
 | Speech to text | faster-whisper | Muse on the text | Consultant |
 | Text to speech | Kokoro | none | none |
 | Video | ffmpeg | none | none |

@@ -158,7 +158,7 @@ fetch-models = "python tools/fetch_models.py"   # optional; runs once at install
 
 | Need | Local (default) | Private model | Outside |
 |---|---|---|---|
-| OCR | `capmenu.ocr_text(path)`, `capmenu.ocr_words(path)` (Tesseract; words with position, line and confidence) | Muse vision: platform request | masked text after OCR, automatic |
+| OCR | `capmenu.ocr_text(path)`, `capmenu.ocr_words(path)` (Tesseract; words with position, line and confidence) | The 9B with vision, from a stack with `"model": true` (best on handwriting and Hindi; tested 2026-11-17) | masked text after OCR, automatic |
 | Speech to text | `capmenu.transcribe(path)` (faster-whisper) | platform request | masked text, automatic |
 | Text to speech | `capmenu.speak(text, out_wav)` (Kokoro) | none | none |
 | Video | `capmenu.ffmpeg(args)` | none | none |
