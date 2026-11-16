@@ -126,7 +126,9 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
             for t in tables:
                 local = str(Path(target).parent / t.name)
                 home.write(str(t) + '.source.json', {**item, 'sheet': False, 'read_by': reader['id']})
-                result.append({**item, 'title': (item.get('title') or rel) + (' (read as a table)'),
+                part = t.name[len(dest.name):].strip('.').rsplit('.', 1)[0]  # photo.png.table.csv -> table
+                kind = {'lines': 'text, line by line', 'text': 'text', 'table': 'table'}.get(part, part or 'table')
+                result.append({**item, 'title': (item.get('title') or rel) + f' (read as {kind})',
                                'file': local, 'local': local, 'read_by': reader['id']})
             continue
         result.append({**item, 'file': target, 'local': target})

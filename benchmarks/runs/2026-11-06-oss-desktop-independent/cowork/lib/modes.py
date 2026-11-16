@@ -1182,7 +1182,7 @@ def drivey_route(j):
         _, name, inp, res = last
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported') and 'builder_open' in names:
             return card('Builder', _build_card_text(res.get('team'), res.get('labels')), [BUILD_IT, NOT_NOW],
-                        'Downloaded nothing yet: ' + ', '.join(res['unsupported'][:6]) + '.')
+                        'Not opened: ' + ', '.join(res['unsupported'][:6]) + '.')
         if name == 'builder_open' and inp.get('preview'):
             if not res.get('missing'):
                 return say(PICK_FILES)
