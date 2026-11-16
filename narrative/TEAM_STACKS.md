@@ -121,6 +121,65 @@ A teammate's install uses the same files, checks every repo commit and download 
 rather than install something different. Their own install prompt shows the same summary. **Not built yet:**
 sharing the bundle through silo and the "join a team" flow.
 
-## Results
+## Results (2026-11-17, DGX)
 
-(Filled in below after the overnight runs.)
+**Method.**
+- Two development requests (D1, D2) were used while building.
+- The code was then frozen (commit `50a33a05`). Five held-out requests, written before any code
+  (`benchmarks/runs/2026-11-17-team-stacks/requests.md`), each ran once through the real Builder, Claude Code in
+  tmux. I played a non-technical person: plain answers, "do what you think is right", and yes to every install
+  prompt.
+- Every result was then checked on files the Builder never made: public recordings from Wikimedia Commons, or
+  documents and forms I wrote.
+
+| | Request | What the Builder chose | Install prompts | Build time | On real files |
+|---|---|---|---|---|---|
+| D1 | Cut silences and empty stage from event videos, no faces or voices | Silero VAD, YAMNet (speech vs music), EfficientDet-Lite0 (people by position) via LiteRT. A timeline reader plus a cut tool. "Save back to Drive" went to platform requests | 8 (most from my proxy bugs, fixed) | about 30 min with my bugs | 10 min of real conference video: the timeline matched the footage (it kept talks and cut the stage-wide transition and the music break). 14 s to read; cut 600 s to 479 s |
+| D2 | Type out Hindi and Marathi voice notes into a table | faster-whisper large-v3-turbo, plus the 9B for the columns. Test voices from Piper | 1 | 5.5 min | Real recorded Hindi and Marathi speech: good transcripts with small spelling slips, and the topic and problems right. 45 to 57 s per 75 s note |
+| H1 | A Hindi voice chatbot about our scheme | Whisper, the FAQ read from a .docx, the 9B answering only from the FAQ, Kokoro speaking. A practice **page**. Phone and WhatsApp went to platform requests | 2 | 8.8 min | My own FAQ: eligibility answered right, an off-topic question went to "staff will call back", a real recording got "please repeat". **One wrong fact** (June instead of July). The spoken reply round-trips through Whisper word for word. About 30 s per voice question |
+| H2 | Translate the monthly report into Hindi and Marathi | IndicTrans2 first, but its weights need a Hugging Face login, so it used NLLB-200 (licence CC-BY-NC; the Builder said so). A .docx tool that keeps the layout | 1 | 6.5 min | My own report: the layout, the table and every number kept, 17 s. Three meaning slips a reviewer would catch ("tailoring" became "embroidery"; Marathi dropped "anaemia"; "households with water" became "household appliances") |
+| H3 | Leads: email, then calendar, then hot or cold in the sheet | No install: the person's own rule (money, a date, or a known foundation) as a tool. Reading Gmail, creating Calendar events and writing to the Sheet went to 3 platform requests | 0 | 2 min | My own sheet of 6 leads: all marked by the rule, with a "Why" column, and an existing mark kept |
+| H4 | Short Hindi-subtitled training clips for WhatsApp | faster-whisper (word timings), Noto Sans Devanagari, ffmpeg with burned-in subtitles. WhatsApp sending went to platform requests | 3 | about 15 min, plus 10 min to fix speed | A real 3:15 Hindi screencast tutorial. First run: no result after 22 min. With all 20 cores as threads, Whisper ran 25 times slower. Told "it's too slow", the Builder found the cause itself: now 150 s. The quick transcript (Whisper small) is rough. The clip tool re-transcribes the chosen part with a better model: a 28 s clip, readable burned-in Hindi subtitles, 0.6 MB, fits WhatsApp |
+| H5 | Photos of handwritten Hindi survey forms into a spreadsheet | A Hindi OCR stack (ONNX), page straightening, tick-box ink measurement. It did not use the 9B's vision: my menu still said the private model couldn't read images | 2 | 9.5 min | My two photographed forms: 11 of 14 fields right. Every number and every tick right. Both names were partly wrong but flagged "check". One village line was missed, unflagged. The 9B's vision on the same photos: 13 of 14, 7.5 s each |
+
+**Teammate install.** Event Media's definitions were cloned into a fresh team folder and installed from the locks
+alone:
+- 41 s;
+- identical repo commits and download sha256;
+- both tests pass;
+- a byte-identical cut list for the same video.
+
+**Attacks.**
+- A lock with a wrong sha256 was refused.
+- A setup step that tried example.com, pastebin.com, plain HTTP and a raw socket was refused on all four, with
+  each host logged. It saw no home folders.
+- The run wall had no network, no API keys and no write access to the stack, and could reach only the 9B's chat
+  endpoint.
+
+**Bugs the held-out runs found, fixed after the freeze (platform bugs, not tuning):**
+- the page door kept a 10 s read timeout (voice questions died at 10 s);
+- `team_save` committed the installed stack (up to 2.2 GB of models and package caches) into team git, and left a
+  stale lock when git timed out;
+- the capability menu said the private model can't read images, after the 9B got its vision;
+- Whisper with every core as threads ran 25 times slower on the DGX's mixed cores. The wall now sets
+  `IDLI_THREADS` and `OMP_NUM_THREADS`, and the skill says to use them.
+
+**What the Builders did well, across requests:**
+- one question at a time, about the work;
+- plans in the person's words, with where each step runs;
+- purpose-built models over home-made rules;
+- licences and sizes stated up front;
+- platform needs logged, never worked around;
+- honest caveats ("check the names before printing", "tested only on a fake video").
+
+**What still needs work:**
+- **Readers pass their own fake-sample tests and can still fail on real files.** D2's first real file and H5's
+  missed village line are examples. The p1 exit-test todo (the person judges the first real result) is the fix.
+- **Speech to text on CPU is slow** (about 0.6 to 4 times real time). Whisper should probably be a platform
+  private-model service on the GPU, like the 9B, with stacks calling it through a door.
+- **The 9B's facts:** H1's wrong month came from the 9B, with the FAQ in front of it. An answer page should quote
+  the FAQ line it used.
+- **Tool outputs** (a marked leads sheet, a transcript) land in `outputs/`. They don't yet go through the privacy
+  review to become masked copies the Analyst can use.
+- **Not built:** the WSL2 image, the Mac VM, sharing the bundle through silo and joining a team, and the laptop run
+  (its git fetch from the DGX hit a Tailscale browser check only the owner can pass).

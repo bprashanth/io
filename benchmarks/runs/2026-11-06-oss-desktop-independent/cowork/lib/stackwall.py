@@ -407,9 +407,18 @@ def _cache(d):
     return d / '.cache'
 
 
+def threads():
+    """A sensible thread count for one job. Asking for every core oversubscribes some CPUs badly (on the DGX's mixed
+    fast and slow cores, Whisper with 20 threads ran 25 times slower than with 4)."""
+    n = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else (os.cpu_count() or 4)
+    return max(2, min(8, n // 2))
+
+
 def _env_vars(d, proxy):
     c = _cache(d)
-    env = {'PIXI_HOME': str(c / 'pixi-home'), 'RATTLER_CACHE_DIR': str(c / 'rattler'),
+    n = str(threads())
+    env = {'IDLI_THREADS': n, 'OMP_NUM_THREADS': n, 'OPENBLAS_NUM_THREADS': n, 'MKL_NUM_THREADS': n,
+           'CT2_INTER_THREADS': '1', 'NUMEXPR_MAX_THREADS': n,'PIXI_HOME': str(c / 'pixi-home'), 'RATTLER_CACHE_DIR': str(c / 'rattler'),
            'UV_CACHE_DIR': str(c / 'uv'), 'XDG_CACHE_HOME': str(c / 'xdg'), 'HF_HOME': str(d / 'models' / 'hf'),
            'PIXI_NO_UPDATE_CHECK': '1', 'GIT_TERMINAL_PROMPT': '0', 'PIP_NO_INPUT': '1',
            'HF_HUB_DISABLE_TELEMETRY': '1', 'DO_NOT_TRACK': '1'}

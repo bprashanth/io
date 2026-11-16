@@ -150,6 +150,8 @@ fetch-models = "python tools/fetch_models.py"   # optional; runs once at install
   `stack/repos/<name>`, downloads where `to` says, Hugging Face's cache in `stack/models/hf` (offline). With
   `"model": true`, `$IDLI_MODEL_URL` reaches the private model and nothing else.
 - **Try:** `stack_run` runs a command from `stack/` in the run wall (`python tools/x.py ../samples/a.wav`).
+- **Threads:** use `$IDLI_THREADS` for any thread count (`cpu_threads=int(os.environ.get('IDLI_THREADS', 4))`).
+  Never all cores: on some computers that runs many times slower.
 - **Size:** say roughly how big it is before installing if it is large (deep-learning packages are 1 to 3 GB).
 - **Logins and sending:** a stack never logs in to accounts and never sends messages. That is the platform's:
   `platform_request`.
