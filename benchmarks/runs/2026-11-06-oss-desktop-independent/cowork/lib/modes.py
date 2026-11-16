@@ -1086,9 +1086,18 @@ def _drivey_question(msgs):
 
 
 DRIVEY_TOOLS = frozenset(('drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask'))
-DRIVEY_EXTRA = frozenset(('binder_item',))  # newer laptops; older ones route the same without it
+DRIVEY_EXTRA = frozenset(('binder_item', 'builder_open'))  # newer laptops; older ones route the same without it
 PICK_FILES = 'Add files or a folder with @ and send again.'
 ASKING_SERVICE = 'Asking the query service...'
+ASKING_SERVICE_AUTO = 'Asking the query service. Only masked data is sent...'
+BUILD_IT = ('Build it', 'The Builder adds this to the team on the right. Your files are not sent.')
+NOT_NOW = ('Not now', 'Nothing changes.')
+
+
+def _build_card_text(team, labels):
+    team = team or 'This team'
+    what = ', '.join(labels) if labels else 'this'
+    return f"{team} can't read {what} yet. The Builder can add that to {team}. Build it with the Builder?"
 SERVICE_CARD = ('Send this to the query service?')
 
 
@@ -1124,7 +1133,7 @@ def drivey_route(j):
         content.append(_tool_use('AskUserQuestion', {'questions': [{'header': header, 'multiSelect': False,
             'question': _lib('minimap').plain(text), 'options': [{'label': a, 'description': b} for a, b in options]}]}))
         return message(model, content)
-    active, pending, asked = None, None, None
+    active, pending, asked, build = None, None, None, None
     for e in ev:
         if e[0] == 'said':
             if e[1] != 'Privacy checked':
@@ -1133,12 +1142,16 @@ def drivey_route(j):
         _, name, inp, res = e
         if name == 'mini_open':
             active = res if res.get('id') and res.get('questions') else None
-            pending = None
+            pending = build = None
         elif name == 'mini_ask' and inp.get('question'):
             asked = inp['question']
         elif name == 'drive_fetch':
             active = None
             pending = {**res, 'question': inp.get('question', '')}
+            build = ({'request': inp.get('question', ''), 'kinds': res.get('missing') or [], 'files': res['unsupported']}
+                     if res.get('unsupported') else None)
+        elif name == 'builder_open' and inp.get('preview'):
+            build = {'request': inp.get('request', ''), 'kinds': res.get('missing') or [], 'files': []}
         elif name == 'privacy_review_open' and res.get('files'):
             pending = {**res, 'question': inp.get('question', ''), 'mini_id': inp.get('mini_id')}
         elif name == 'AskUserQuestion' and 'Not yet' in (_card_answers(inp, res.get('text', '')) or []):
@@ -1167,6 +1180,13 @@ def drivey_route(j):
     last = ev[-1]
     if last[0] == 'tool':
         _, name, inp, res = last
+        if name == 'drive_fetch' and not res.get('files') and res.get('unsupported') and 'builder_open' in names:
+            return card('Builder', _build_card_text(res.get('team'), res.get('labels')), [BUILD_IT, NOT_NOW],
+                        'Downloaded nothing yet: ' + ', '.join(res['unsupported'][:6]) + '.')
+        if name == 'builder_open' and inp.get('preview'):
+            if not res.get('missing'):
+                return say(PICK_FILES)
+            return card('Builder', _build_card_text(res.get('team'), res.get('labels')), [BUILD_IT, NOT_NOW])
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported'):
             return say('These files need spreadsheet copies before Idli can hide private values: ' +
                        ', '.join(res['unsupported']) + '. Save Excel or CSV copies in Drive, then pick them with @.')
@@ -1198,7 +1218,10 @@ def drivey_route(j):
             labels = ', '.join(f.get('title') or f.get('local', '') for f in res['files'])
             lead = 'Downloaded: ' + labels + '.'
             if res.get('unsupported'):
-                lead += ' To use these too, save spreadsheet copies in Drive and pick them with @: ' + ', '.join(res['unsupported']) + '.'
+                lead += (f" {res.get('team') or 'This team'} can't read " + ', '.join(res.get('labels') or ['these']) +
+                         ' yet: ' + ', '.join(res['unsupported']) + '. Type "build it" to ask the Builder to add that.'
+                         if 'builder_open' in names else
+                         ' To use these too, save spreadsheet copies in Drive and pick them with @: ' + ', '.join(res['unsupported']) + '.')
             if res.get('errors'):
                 lead += ' Some files could not be downloaded. Pick them again to retry, or continue with these files.'
             return card('Privacy', "Review what Claude will see or accept Idli's choices?",
@@ -1216,11 +1239,18 @@ def drivey_route(j):
             return say(res.get('reply') or 'I could not open this Mini. Open it again, or pick its files with @ to ask Claude.')
         if name == 'binder_item':
             return say(res.get('reply') or res.get('error') or 'That is no longer here. Ask Claude to show it again.')
+        if name == 'builder_open':
+            return say(res.get('reply') or 'The Builder could not open. Try again.')
         if name == 'AskUserQuestion':
             answer = (_card_answers(inp, res.get('text', '')) or [None])[0]
             head = (inp.get('questions') or [{}])[0].get('header')
             if head == 'Privacy' and answer in ('Check each file', "Accept Idli's choices"):
                 return preview(answer == 'Check each file')
+            if head == 'Builder':
+                if answer == BUILD_IT[0] and build:
+                    return call('builder_open', request=build['request'] or 'Read these files',
+                                kinds=build['kinds'], files=build['files'])
+                return say('OK. Nothing changes.')
             if head == 'Query service' and active and asked:
                 if answer == 'Yes':
                     return message(model, [_text(ASKING_SERVICE),
@@ -1251,6 +1281,14 @@ def drivey_route(j):
     posted = re.fullmatch(r'(Chart|Mini draft) from Claude: (.{1,160})', said.strip())
     if posted and 'binder_item' in names:  # Claude's chart or Mini draft, shown in this chat (the binder)
         return call('binder_item', kind=posted[1], title=posted[2])
+    if 'builder_open' in names and re.match(r'(?i)\s*(please\s+)?(open|start|go to)\s+the\s+builder\b', said):
+        rest = re.sub(r'(?i)^\s*(please\s+)?(open|start|go to)\s+the\s+builder\W*', '', said).strip()
+        return call('builder_open', request=rest or (build or {}).get('request') or 'The person opened the Builder. '
+                    'Ask what the team should be able to do.', kinds=(build or {}).get('kinds') or [],
+                    files=(build or {}).get('files') or [])
+    if build and 'builder_open' in names and said.strip().lower().rstrip('.!') in ('build it', 'yes build it', 'ask the builder'):
+        return call('builder_open', request=build['request'] or 'Read these files', kinds=build['kinds'],
+                    files=build['files'])
     paths = _lib('minimap').mentions(said)
     if paths:
         question = _lib('minimap').without_mentions(said, paths)
@@ -1260,9 +1298,14 @@ def drivey_route(j):
         mapped = _lib('minimap').map_questions(active['questions'], said, NINE_URL)
         if mapped.get('qid'):
             return call('mini_ask', id=active['id'], qid=mapped['qid'], params=mapped['params'])
+        if active.get('can_query') and active.get('files') and active.get('query_auto'):  # Yes at setup: no card
+            return message(model, [_text(ASKING_SERVICE_AUTO),
+                                   _tool_use(_tool_name(tools, 'mini_ask'), {'id': active['id'], 'question': said})])
         if active.get('can_query') and active.get('files'):  # ask first: show what the query service would get
             return call('mini_ask', id=active['id'], question=said, preview=True)
         if not active.get('files'):
             return say("This Mini can't answer that. " + PICK_FILES)
         return call('privacy_review_open', files=active['files'], question=said, preview_only=True, mini_id=active['id'])
+    if 'builder_open' in names and _lib('teamcaps').kinds_in_words(said):  # "can you read photos?": ask the team
+        return call('builder_open', request=said, preview=True)
     return say(PICK_FILES)

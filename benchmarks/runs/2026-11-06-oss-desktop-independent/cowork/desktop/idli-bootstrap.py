@@ -57,7 +57,8 @@ SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 TOOLSETS = {
     "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import",
                    "wire_page", "team_page", "team_check", "team_create"],
-    "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask", "binder_item"],
+    "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask", "binder_item",
+               "builder_open"],
 }
 START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
 CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name Start here)
@@ -382,6 +383,16 @@ def retire_old_start_here():
             paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
 
 
+def refresh_teams():
+    """Teams made before a tool was added (builder_open, 2026-11-16) get the same tools as Drivey."""
+    if DRY:
+        return
+    sys.path.insert(0, COWORK)
+    from lib import teams
+    for folder in teams.refresh_team_tools():
+        say(f"write {folder}/cowork.tools")
+
+
 def retire_teams_chat():
     """Until 2026-11-16 Teams was a chat; it is a page now (lib/teams_page.html), which Paseo (P21) opens as the Teams
     workspace's tab. Delete the old chat."""
@@ -402,6 +413,7 @@ def main():
     cid = chat(ids.get(PRIVACY), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
     plain_chat(cid)
     retire_teams_chat()
+    refresh_teams()
     learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
     if not split_mode():  # split mode: Drivey's New chat row opens the two halves (Paseo P20); nothing waits

@@ -797,3 +797,12 @@ def review_warning(data_dir, files=None):
     if len(masked) > 10 and any(v.get('review', 'ask') == 'ask' for v in masked):
         return f'{len(masked)} files are masked for this question. Reviewing each one may take time. Consider switching review to Auto.'
     return ''
+
+
+@locked
+def mask_free_text(data_dir, text):
+    """Mask text that isn't tied to one file (a request for the Builder) with this folder's known values, the regex
+    rules and the name scanner. New codes are not saved: nothing else needs them back."""
+    vault = active_vault(data_dir, _session_map(data_dir))
+    masked, _ = _redact(str(text), vault, Scanner())
+    return masked

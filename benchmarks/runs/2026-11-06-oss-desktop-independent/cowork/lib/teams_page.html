@@ -58,6 +58,13 @@ input[type=text] { width: 100%; font: inherit; font-size: 17px; padding: 12px 14
 .plan li { margin: 4px 0; }
 .help { background: var(--soft); border-radius: 10px; padding: 10px 14px; font-size: 14px; margin-top: 10px; }
 .confirm { font-size: 14px; }
+.added { color: var(--ink); font-size: 13px; margin-top: 6px; }
+.vlist { border-top: 1px solid var(--line); padding-top: 8px; font-size: 14px; }
+.vhead { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+.vrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid var(--line); }
+.vrow:last-child { border-bottom: 0; }
+.vrow .back { white-space: nowrap; }
 [hidden] { display: none !important; }
 </style>
 </head>
@@ -109,11 +116,29 @@ function card(t) {
   const el = document.createElement("div");
   el.className = "card" + (t.id === fresh ? " fresh" : "");
   el.innerHTML = `${t.id === fresh ? '<span class="tag">New</span>' : ""}<h3>${esc(t.name)}</h3>
-    <div class="goal">${esc(t.goal || "")}</div>
+    <div class="goal">${esc(t.goal || "")}${(t.added || []).length ? `<div class="added">Added: ${(t.added).map(esc).join(". ")}</div>` : ""}</div>
     <div class="row acts"><button type="button" class="primary open">Open</button>
+    ${t.versions > 1 ? '<button type="button" class="vers">Versions</button>' : ""}
     ${t.builtin ? "" : '<button type="button" class="del">Delete</button>'}</div>
+    <div class="vlist" hidden></div>
     <div class="msg"></div>`;
   const msg = el.querySelector(".msg"), acts = el.querySelector(".acts");
+  const vers = el.querySelector(".vers"), vlist = el.querySelector(".vlist");
+  if (vers) vers.onclick = async () => {
+    if (!vlist.hidden) { vlist.hidden = true; return; }
+    const out = await api("/api/team-versions", {id: t.id});
+    if (!out.ok) { msg.className = "msg err"; msg.textContent = out.error; return; }
+    vlist.innerHTML = '<div class="vhead">Go back to an earlier version of what was added to this team. Your files and Minis stay as they are.</div>' +
+      out.versions.map((v, n) => `<div class="vrow"><span><b>${esc(v.message)}</b><br><span class="msg">${esc(v.when)}</span></span>
+        ${n === 0 ? '<span class="msg">Now</span>' : `<button type="button" class="link back" data-v="${esc(v.id)}">Go back</button>`}</div>`).join("");
+    vlist.hidden = false;
+    for (const b of vlist.querySelectorAll(".back")) b.onclick = async () => {
+      b.disabled = true; msg.className = "msg"; msg.textContent = "Going back...";
+      const r = await api("/api/team-restore", {id: t.id, version: b.dataset.v});
+      if (r.ok) showDash(`${t.name} went back to an earlier version.`);
+      else { msg.className = "msg err"; msg.textContent = r.error; b.disabled = false; }
+    };
+  };
   el.querySelector(".open").onclick = async (e) => {
     e.target.disabled = true; msg.className = "msg"; msg.textContent = "Opening...";
     const out = await api("/api/team-open", {id: t.id});
@@ -153,7 +178,7 @@ const STEPS = [
     ["Not sure", "Idli checks each file for you."]]},
   {key: "outside", kind: "pick", q: () => "When a Mini can't answer a question, may Idli ask an outside service?",
    help: "A service online that writes a query for a new question. It gets the question and column names, never rows. The query runs on this computer.",
-   opts: [["Yes, ask me each time", "It gets the question and column names. Never rows."],
+   opts: [["Yes", "Only masked data is sent."], ["Ask me each time", "Only masked data is sent."],
           ["No", "Questions stay on this computer."]]},
   {key: "plan", kind: "plan", q: (a) => `Set up ${a.name}?`},
 ];
@@ -200,6 +225,7 @@ function render() {
       a.private === "No" ? "Idli still checks each file. Any names go to Claude as codes."
         : "Names, places and phone numbers go to Claude as codes.",
       a.outside === "No" ? "Minis answer on this computer. New questions stay here too."
+        : a.outside === "Yes" ? "Minis answer on this computer. New questions go to an outside service. Only masked data is sent."
         : "Minis answer on this computer. New questions go to an outside service only if you say yes.",
       a.people === "Just me" ? "For you for now. Others can join later."
         : "For your team. Each person uses their own Google login."];
@@ -227,7 +253,7 @@ async function next() {
     $("next").disabled = true; $("back").disabled = true;
     say(`Setting up ${a.name}...`);
     const out = await api("/api/team-create", {name: a.name, goal: a.goal || "", data: a.data, people: a.people,
-      private: a.private, outside: a.outside !== "No"});
+      private: a.private, outside: {"Yes": "always", "Ask me each time": "ask"}[a.outside] || false});
     $("back").disabled = false;
     if (!out.ok) { $("next").disabled = false; return say(out.error || "Could not set it up. Try again.", true); }
     fresh = out.id;

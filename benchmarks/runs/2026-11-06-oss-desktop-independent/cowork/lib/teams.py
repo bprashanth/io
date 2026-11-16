@@ -9,6 +9,7 @@ Two halves:
                         the sidebar heading. Its "New chat" row opens the two halves (Paseo patch P20).
 """
 import functools
+import glob
 import json
 import os
 import re
@@ -20,7 +21,8 @@ TEAMS_CHAT = 'Teams'  # the Teams chat's first message (desktop/idli-bootstrap.p
 MAKE = 'Make a team'  # what the Make a team button sends (lib/teams.html)
 EXAMPLE_GOAL = 'Lower household debt in 12 villages'
 # Drivey's tools (desktop/idli-bootstrap.py TOOLSETS["Drivey"]): a team is a Drivey clone
-TEAM_TOOLS = ['drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask', 'binder_item']
+TEAM_TOOLS = ['drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask', 'binder_item',
+              'builder_open']
 SITES = 'google\nfiles\n'
 RESERVED = {'start here', 'drivey', 'whatsappy', 'canvay', 'claude', 'claude code', 'logins', 'privacy', 'teams'}
 
@@ -562,6 +564,42 @@ def check(name, projects=None):
     return {'ok': True, 'name': clean}
 
 
+def outside_choice(value):
+    """The outside query service: 'always' (Yes), 'ask' (Ask me each time) or False (No). Older answers were True."""
+    if value in ('always', 'Yes'):
+        return 'always'
+    if value is True or value in ('ask', 'Ask me each time', 'Yes, ask me each time'):
+        return 'ask'
+    return False
+
+
+def set_outside(folder, choice):
+    """Marker files the Mini code reads (lib/home.py mini_open): none means ask each time."""
+    never, always = os.path.join(folder, 'no-query-service'), os.path.join(folder, 'query-service-always')
+    for path in (never, always):
+        if os.path.exists(path):
+            os.unlink(path)
+    if choice is False:
+        with open(never, 'w') as f:
+            f.write('Set up without the outside query service.\n')
+    elif choice == 'always':
+        with open(always, 'w') as f:
+            f.write('Minis ask the outside query service without a card. Only masked data is sent.\n')
+
+
+def refresh_team_tools(root=None):
+    """Teams made before a tool was added get it too (the bootstrap calls this)."""
+    want = '\n'.join(TEAM_TOOLS) + '\n'
+    changed = []
+    for folder in sorted(glob.glob(os.path.join(root or os.path.join(_idli(), 'teams'), '*', 'team.json'))):
+        tools = os.path.join(os.path.dirname(folder), 'cowork.tools')
+        if not os.path.exists(tools) or open(tools).read() != want:
+            with open(tools, 'w') as f:
+                f.write(want)
+            changed.append(os.path.dirname(folder))
+    return changed
+
+
 def create(spec, cowork):
     """Make the team: its folder (instructions, tools, team.json) and its sidebar heading. Safe to run again for the
     same team (it finishes what is missing)."""
@@ -583,7 +621,7 @@ def create(spec, cowork):
     os.makedirs(folder, exist_ok=True)
     record = {'name': name, 'kind': 'insights', 'goal': str(spec.get('goal') or '')[:200],
               'data': spec.get('data'), 'people': spec.get('people'), 'private': spec.get('private'),
-              'outside': bool(spec.get('outside')), 'trying': bool(spec.get('trying')),
+              'outside': outside_choice(spec.get('outside')), 'trying': bool(spec.get('trying')),
               'notes': [str(n)[:200] for n in (spec.get('notes') or [])][:6]}
     with open(meta, 'w') as f:
         json.dump(record, f, indent=2)
@@ -592,9 +630,7 @@ def create(spec, cowork):
         f.write('\n'.join(TEAM_TOOLS) + '\n')
     with open(os.path.join(folder, 'cowork.sites'), 'w') as f:
         f.write(SITES)
-    if not record['outside']:
-        with open(os.path.join(folder, 'no-query-service'), 'w') as f:
-            f.write('Set up without the outside query service.\n')
+    set_outside(folder, record['outside'])
     proj = next((p for p in _paseo('project', 'ls') if _same(p.get('path'), folder)), None)
     if not proj:
         _paseo('project', 'create', folder, parse=False)
@@ -637,10 +673,39 @@ def list_teams(projects=None):
             continue
         found.append((os.path.getmtime(os.path.join(folder, 'team.json')), {
             'id': os.path.basename(folder), 'name': meta.get('name') or d, 'goal': meta.get('goal') or '',
-            'people': meta.get('people') or '', 'outside': bool(meta.get('outside')),
-            'ready': any(_same(p.get('path'), folder) for p in projects)}))
+            'people': meta.get('people') or '', 'outside': outside_choice(meta.get('outside')),
+            'ready': any(_same(p.get('path'), folder) for p in projects), **_extended(folder)}))
     cards += [c for _, c in sorted(found, key=lambda x: -x[0])]
     return {'teams': cards}
+
+
+def _extended(folder):
+    """What the Builder added (tested capabilities) and how many versions there are to go back to."""
+    from lib import teamcaps
+    if not os.path.isdir(os.path.join(folder, 'extensions')):
+        return {'added': [], 'versions': 0}
+    added = [c['title'] for c in teamcaps.capabilities(folder) if c not in teamcaps.BASE]
+    return {'added': added, 'versions': len(teamcaps.versions(folder))}
+
+
+def team_versions(team_id):
+    from lib import teamcaps
+    folder = _team_folder(team_id)
+    if not folder:
+        return {'ok': False, 'error': 'That team is gone. Reload the page.'}
+    return {'ok': True, 'versions': teamcaps.versions(folder)}
+
+
+def team_restore(team_id, rev):
+    from lib import teamcaps
+    folder = _team_folder(team_id)
+    if not folder:
+        return {'ok': False, 'error': 'That team is gone. Reload the page.'}
+    try:
+        teamcaps.restore(folder, rev)
+    except (ValueError, RuntimeError) as exc:
+        return {'ok': False, 'error': str(exc)[:200]}
+    return {'ok': True, **_extended(folder)}
 
 
 def _team_folder(team_id):

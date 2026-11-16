@@ -133,6 +133,27 @@ def selected(data_dir, files, fetch=False):
     return out
 
 
+def _read_by_extension(data_dir, rel):
+    """A table a team's reader made from a photo, recording or document (lib/teamcaps.py): its column names say
+    little about what the columns hold, so every text column starts hidden (narrative/MODEL_TYPES.md)."""
+    try:
+        return bool(read(Path(data_dir) / (rel + '.source.json')).get('read_by'))
+    except (OSError, ValueError):
+        return False
+
+
+def _marks_or_numbers(frame, column):
+    """Numbers, or short marks such as P / A / Y / N, which are safe to leave visible."""
+    try:
+        values = [str(v).strip() for v in frame[column].tolist() if str(v).strip() not in ('', 'nan', 'None')]
+    except KeyError:
+        return False
+    body = values[1:] if values and not values[0].replace('.', '').isdigit() else values  # a heading row
+    def ok(v):
+        return len(v) <= 2 or v.replace('.', '', 1).replace('-', '', 1).isdigit()
+    return bool(body) and all(ok(v) for v in body)
+
+
 def prepare(data_dir, files, question):
     chosen = selected(data_dir, files, fetch=True)
     with privacy.session_lock(data_dir):
@@ -141,9 +162,11 @@ def prepare(data_dir, files, question):
             if privacy.get(data_dir, rel)['mode'] != 'mask':
                 sheets, _ = filekit.raw_sheets(str(Path(data_dir) / rel))
                 columns = {}
+                strict = _read_by_extension(data_dir, rel)
                 for tab in sheets:
                     for row in privacy.suggest(Path(data_dir) / rel, tab):
-                        columns[row['column']] = columns.get(row['column'], False) or row['mask']
+                        mask = row['mask'] or (strict and not _marks_or_numbers(sheets[tab], row['column']))
+                        columns[row['column']] = columns.get(row['column'], False) or mask
                 privacy.set(data_dir, rel, mode='mask', review='ask', columns=columns)
         # Seed all files before masking: the namespace and the question span every workbook.
         privacy.session_vault(data_dir)
@@ -616,7 +639,10 @@ def mini_open(data_dir, ident, workspace=None):
     # can_query: questions outside the saved ones can go to the query service (lib/minisql.py).
     # A team set up without the outside service (Start here > Teams) leaves this file in its folder (lib/teams.py).
     can_query = not os.path.exists(os.path.join(data_dir, 'no-query-service'))
+    # Yes at setup (query-service-always): no card each time; only masked data is sent, as with the card.
+    query_auto = can_query and os.path.exists(os.path.join(data_dir, 'query-service-always'))
     return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'can_query': can_query,
+            **({'query_auto': True} if query_auto else {}),
             'reply': plain('\n'.join(lines))}
 
 
@@ -637,6 +663,8 @@ def mini_query_preview(data_dir, ident, question):
 def mini_query(data_dir, ident, question, workspace=None):
     """A question the Mini's saved questions don't cover: a query written by the external service, run here."""
     from lib import minisql
+    if os.path.exists(os.path.join(data_dir, 'no-query-service')):  # the team said No at setup: code refuses too
+        raise ValueError('This team was set up without the outside query service.')
     m = read(object_path(data_dir, 'minis', ident))
     files = [f['local'] for f in m.get('files', []) if f.get('local')]
     if not files:

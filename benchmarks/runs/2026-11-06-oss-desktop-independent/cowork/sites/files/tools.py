@@ -1421,6 +1421,10 @@ def t_drive_fetch(paths, question='Help me understand these files.'):
     data_dir = files().data_dir
     journey.invalidate_review(data_dir, os.environ.get('PASEO_AGENT_ID'))
     fetched = drivestubs.fetch(data_dir, paths, home.chat_workspace(), spreadsheets_only=True)
+    if fetched.get('unsupported'):
+        from lib import teamcaps
+        fetched['team'] = teamcaps.team_name(data_dir)
+        fetched['labels'] = [teamcaps.label(k) if k != 'other' else 'these files' for k in fetched.get('missing', [])]
     if fetched.get('files'):
         prepared = home.prepare(data_dir, fetched['files'], question)
         fetched.update(masked_question=prepared['masked_question'])
@@ -1493,7 +1497,23 @@ def t_mini_ask(id, qid=None, params=None, question=None, preview=False):
     return home.mini_ask(files().data_dir, id, qid, params or {}, home.chat_workspace())
 
 
+def t_builder_open(request, kinds=None, files=None, preview=False):
+    from lib import builder, home
+    if preview:
+        return builder.check(files_dir(), request, kinds)
+    return builder.open_builder(files_dir(), request, home.chat_workspace(), kinds, files)
+
+
+def files_dir():
+    return files().data_dir
+
+
 TOOLS = {
+    "builder_open": (t_builder_open, "Open the team's Builder on the right with the person's request, after they said "
+                     "yes. With preview, only say what the team can't do yet.",
+                     {"request": {"type": "string"}, "kinds": {"type": "array", "items": {"type": "string"}},
+                      "files": {"type": "array", "items": {"type": "string"}}, "preview": {"type": "boolean"}},
+                     ["request"]),
     "drive_fetch": (t_drive_fetch, "Fetch @Drive paths; a folder path ends in / and includes every file below it.",
                     {"paths": {"type": "array", "items": {"type": "string"}}, "question": {"type": "string"}}, ["paths", "question"]),
     "privacy_review_open": (t_privacy_review_open, "Prepare privacy choices locally. Open a review, or preview the masked question only.",

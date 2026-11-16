@@ -164,6 +164,57 @@ for name, fn, description in [
     TOOLS[name] = (fn, description, props, required)
 
 
+def builder_open(request):
+    """The Analyst was asked for something outside the team's capabilities and the person said yes."""
+    from lib import builder
+    return builder.open_builder(str(data_dir()), request, os.environ.get('IDLI_WORKSPACE', ''))
+
+
+TOOLS['builder_open'] = (builder_open, "After the person says yes, open this team's Builder with their request: for "
+                         "something the team can't do yet (a new kind of file, tool or site). Not for Mini changes.",
+                         {'request': {'type': 'string', 'description': 'What the team should be able to do, in one or '
+                                                                       'two plain sentences.'}}, ['request'])
+
+
+# ---- the Builder's tools (IDLI_ROLE=builder, desktop/claude-builder.sh): it never gets the Analyst's ----
+
+def team_check():
+    """Check the manifest and run every capability's test in Idli's wall. Only passing ones count."""
+    from lib import teamcaps
+    out = teamcaps.run_tests(str(data_dir()))
+    out['team_can_now'] = [c['title'] for c in teamcaps.capabilities(str(data_dir()))]
+    return out
+
+
+def team_save(summary):
+    """Save a checkpoint (the team card's Versions) after the tests pass."""
+    from lib import teamcaps
+    out = teamcaps.run_tests(str(data_dir()))
+    failing = [k for k, v in out['results'].items() if not v['ok']]
+    if failing or out['problems']:
+        raise ValueError('Fix these first: ' + '; '.join(failing + out['problems'])[:280])
+    rev = teamcaps.checkpoint(str(data_dir()), summary)
+    return {'saved': bool(rev), 'version': rev, 'message': 'Saved. The team uses this from the next message.'}
+
+
+def platform_request(need, why):
+    """Something only the platform can add (a package, a model, a Paseo change). Never install it yourself."""
+    from lib import teamcaps
+    return teamcaps.platform_request(str(data_dir()), f'{need}: {why}')
+
+
+BUILDER_TOOLS = {
+    'team_check': (team_check, 'Run every capability test of this team in Idli\'s sandbox and list what the team can do.',
+                   {}, []),
+    'team_save': (team_save, 'After team_check passes, save a version with a one-line summary for the person.',
+                  {'summary': {'type': 'string'}}, ['summary']),
+    'platform_request': (platform_request, 'Record a platform feature request (a package or model the menu lacks).',
+                         {'need': {'type': 'string'}, 'why': {'type': 'string'}}, ['need', 'why']),
+}
+if os.environ.get('IDLI_ROLE') == 'builder':
+    TOOLS = BUILDER_TOOLS
+
+
 def main():
     for line in sys.stdin:
         try:

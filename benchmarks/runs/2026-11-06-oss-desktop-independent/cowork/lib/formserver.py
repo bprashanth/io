@@ -559,7 +559,7 @@ def make_handler(files, token):
                 body = json.loads(self.rfile.read(min(n, 100000))
                                   or b"{}")
                 if u.path in ('/api/team-check', '/api/team-goal', '/api/team-create', '/api/team-open',
-                              '/api/team-delete'):  # Start here > Teams (lib/teams_page.html)
+                              '/api/team-delete', '/api/team-versions', '/api/team-restore'):  # Start here > Teams (lib/teams_page.html)
                     from lib import teams
                     if u.path == '/api/team-check':
                         return self._send(200, teams.name_from(body.get('name')))
@@ -569,8 +569,12 @@ def make_handler(files, token):
                         return self._send(200, teams.open_team(str(body.get('id'))))
                     if u.path == '/api/team-delete':
                         return self._send(200, teams.delete_team(str(body.get('id'))))
+                    if u.path == '/api/team-versions':
+                        return self._send(200, teams.team_versions(str(body.get('id'))))
+                    if u.path == '/api/team-restore':
+                        return self._send(200, teams.team_restore(str(body.get('id')), str(body.get('version'))))
                     spec = {k: body.get(k) for k in ('name', 'goal', 'data', 'people', 'private', 'outside')}
-                    spec['outside'] = spec['outside'] is True
+                    spec['outside'] = spec['outside'] if spec['outside'] in ('always', 'ask') else False
                     out = teams.create(spec, HERE)
                     if out.get('ok'):
                         out['id'] = os.path.basename(out['folder'])

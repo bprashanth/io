@@ -61,3 +61,52 @@ def merge(work, data_dir=None):
     finally:
         if os.path.exists(temp):
             os.unlink(temp)
+
+
+def builder_private(data_dir, ext):
+    """What the Builder must not read: everything of the team except extensions/, every other team and Idli folder,
+    Idli's caches and settings, Paseo's data and Claude Code's transcripts (narrative/MODEL_TYPES.md)."""
+    home = Path.home()
+    data, ext = Path(data_dir).resolve(), Path(ext).resolve()
+    paths = [p for p in data.iterdir() if p.resolve() != ext] if data.exists() else []
+    idli = (home / 'idli-insights').resolve()
+    if idli.exists():
+        for p in idli.iterdir():
+            r = p.resolve()
+            if r == data:
+                continue
+            if data.is_relative_to(r):  # teams/: every other team
+                paths += [q for q in r.iterdir() if q.resolve() != data]
+                continue
+            paths.append(p)
+    from lib import wirelog
+    paths += [home / '.cache/idli', home / '.paseo', home / '.config/Paseo', home / '.config/paseo',
+              home / '.config/idlisseus', wirelog.folder(), home / '.claude/projects']
+    return sorted({str(Path(p).resolve()) for p in paths})
+
+
+def merge_builder(ext, data_dir, platform):
+    """The Builder's settings: Claude Code's sandbox on, reads denied as above, edits only inside extensions/ (the
+    platform source is reference, read only)."""
+    path = Path(ext) / '.claude/settings.json'
+    settings = json.loads(path.read_text()) if path.exists() else {}
+    private = builder_private(data_dir, ext)
+    permissions = settings.setdefault('permissions', {})
+    deny = [f'{tool}(/{p}/**)' for p in private for tool in ('Read', 'Edit')]
+    deny += [f'Edit(/{Path(platform).resolve()}/**)']
+    permissions['deny'] = sorted(set(deny))
+    # Claude Code's own scratch folder (it crops and previews sample images there): a working folder, so no prompt
+    scratch = str(Path(tempfile.gettempdir()) / f'claude-{os.getuid()}')
+    permissions['additionalDirectories'] = sorted(set(permissions.get('additionalDirectories', []) + [scratch]))
+    permissions['allow'] = sorted(set(permissions.get('allow', []) + [
+        f'Read(/{Path(platform).resolve()}/**)', 'mcp__idli__team_check', 'mcp__idli__team_save', 'mcp__idli__platform_request']))
+    sandbox = settings.setdefault('sandbox', {})
+    sandbox.update({'enabled': True, 'autoAllowBashIfSandboxed': True, 'allowUnsandboxedCommands': False})
+    sandbox.setdefault('filesystem', {})['denyRead'] = private
+    # The team folder's CLAUDE.md is the left chat's (and is denied): skip it rather than warn at every start
+    settings['claudeMdExcludes'] = [str((Path(data_dir).resolve() / 'CLAUDE.md'))]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp = tempfile.mkstemp(dir=path.parent)
+    with os.fdopen(fd, 'w') as out:
+        json.dump(settings, out, indent=2)
+    os.replace(temp, path)

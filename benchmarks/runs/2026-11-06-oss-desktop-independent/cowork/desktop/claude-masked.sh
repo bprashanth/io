@@ -29,6 +29,23 @@ for skill in "$COWORK"/idli/claude-skills/*; do
   cp -R "$skill" "$WORK/.claude/skills/" || exit 1
 done
 # Project commands live beside the checked scripts.
+# What this team knows how to do (its tested capabilities, lib/teamcaps.py) goes after Idli's instructions, and the
+# Analyst skills its extensions declare are added beside the platform's (narrative/MODEL_TYPES.md).
+"$COWORK/.venv/bin/python" -I - "$COWORK" "$DATA" "$WORK" "${IDLI_APP:-Drivey}" <<'PYCAPS' || true
+import shutil, sys
+from pathlib import Path
+root, data, work, team = sys.argv[1:5]
+sys.path.insert(0, root)
+from lib import teamcaps
+with open(Path(work) / 'CLAUDE.md', 'a') as f:
+    f.write('\n' + teamcaps.describe(data, team))
+skills = Path(work) / '.claude/skills'
+for old in skills.glob('team-*'):
+    shutil.rmtree(old, ignore_errors=True)
+for cap in teamcaps.capabilities(data):
+    if cap.get('skill'):
+        shutil.copytree(teamcaps.ext_dir(data) / 'skills' / cap['skill'], skills / ('team-' + cap['skill']))
+PYCAPS
 mkdir -p "$WORK/.claude/commands" || exit 1
 cp "$COWORK/idli/claude-commands/mini.md" "$WORK/.claude/commands/mini.md" || exit 1
 # The name scanner: a local one if this computer runs it (port 8899), otherwise Idli's default.
@@ -42,13 +59,16 @@ fi
 PORT=$("$COWORK/.venv/bin/python" -I "$COWORK/lib/ccproxy.py" ensure --data-dir "$DATA") || {
   echo "Idli's privacy proxy didn't start; not starting Claude (nothing was sent)." >&2; exit 1; }
 # Pass the workspace explicitly so the MCP can find its left chat.
-export IDLI_DATA="$DATA" IDLI_CLAUDE_WORK="$WORK"
+export IDLI_DATA="$DATA" IDLI_CLAUDE_WORK="$WORK" IDLI_APP="${IDLI_APP:-Drivey}"
 "$COWORK/.venv/bin/python" -I - "$COWORK" "$WORK/.idli-mcp.json" <<'PYCONFIG'
 import json, os, sys
 root, target = sys.argv[1:]
 sys.path.insert(0, root)
 from lib.launchsettings import merge
+from lib import rolelabels
 merge(os.path.dirname(target), os.environ['IDLI_DATA'])
+rolelabels.apply(os.path.join(os.path.dirname(target), '.claude', 'settings.json'), 'analyst',
+                 os.environ.get('IDLI_APP') or 'Drivey')
 fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
     json.dump({'mcpServers': {'idli': {'command': root + '/.venv/bin/python',
@@ -77,4 +97,7 @@ export ANTHROPIC_BASE_URL="http://127.0.0.1:$PORT"
 export ANTHROPIC_CUSTOM_HEADERS="X-Idli-App: ${IDLI_APP:-Drivey}"
 CLAUDE_BIN=${CLAUDE_BIN:-$(command -v claude || echo "$HOME/.local/bin/claude")}
 # --mcp-config takes several files, so give it as one --flag=value: a prompt after it would be read as another file
+# The tab says Analyst (Claude Code would otherwise set its own title).
+export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
+printf '\033]0;Analyst\007'
 exec "$CLAUDE_BIN" "--mcp-config=$WORK/.idli-mcp.json" "$@"

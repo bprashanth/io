@@ -81,15 +81,23 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
         if not hits:
             raise ValueError('No indexed files at ' + name)
         chosen.update(hits)
-    result, errors, unsupported = [], [], []
+    result, errors, unsupported, missing = [], [], [], []
+    from lib import teamcaps
     for rel, item in chosen.items():
         sheet = item['kind'] in ('Google Sheets', 'application/vnd.google-apps.spreadsheet')
         extension = '.xlsx' if sheet else ('.' + drivefetch.EXPORTS[item['kind']][1]
                                            if item['kind'] in drivefetch.EXPORTS else '')
         target = 'drive/' + rel + (extension if extension and not rel.lower().endswith(extension) else '')
-        if spreadsheets_only and Path(target).suffix.lower() not in ('.xlsx', '.csv'):
-            unsupported.append(item.get('title') or rel)
-            continue
+        kind = teamcaps.kind_of(target)
+        reader = None
+        if spreadsheets_only and kind != 'spreadsheet':
+            # A team extension may read this kind into tables (narrative/MODEL_TYPES.md); otherwise the Builder can add it
+            reader = teamcaps.reader_for(data_dir, kind) if kind else None
+            if not reader:
+                unsupported.append(item.get('title') or rel)
+                if (kind or 'other') not in missing:
+                    missing.append(kind or 'other')
+                continue
         dest = home.inside(data_dir, target, exists=False)
         try:
             data = (drivefetch.fetch(item['id'], sheet=sheet, kind=item['kind']) if item['kind'] in drivefetch.EXPORTS
@@ -109,6 +117,18 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
             if os.path.exists(tmp):
                 os.unlink(tmp)
         home.write(str(dest) + '.source.json', {**item, 'sheet': sheet})
+        if reader:
+            try:
+                tables = teamcaps.run_reader(data_dir, reader, dest)
+            except (ValueError, OSError, RuntimeError) as exc:
+                errors.append({'path': 'Drive/' + rel, 'error': str(exc)})
+                continue
+            for t in tables:
+                local = str(Path(target).parent / t.name)
+                home.write(str(t) + '.source.json', {**item, 'sheet': False, 'read_by': reader['id']})
+                result.append({**item, 'title': (item.get('title') or rel) + (' (read as a table)'),
+                               'file': local, 'local': local, 'read_by': reader['id']})
+            continue
         result.append({**item, 'file': target, 'local': target})
     workspace = workspace or os.environ.get('IDLI_WORKSPACE')
     def change(state):
@@ -118,4 +138,4 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
             state.setdefault('workspace_minis', {})[workspace] = None
     home.update_state(data_dir, change)
     return {'files': result, **({'errors': errors} if errors else {}),
-            **({'unsupported': unsupported} if unsupported else {})}
+            **({'unsupported': unsupported, 'missing': missing} if unsupported else {})}

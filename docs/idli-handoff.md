@@ -1,6 +1,6 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-16 (~11:00 IST), DGX. Overwrite this page whenever the state changes. Keep `chronology/` (one
+Last updated 2026-11-16 (~21:00 IST), DGX. Overwrite this page whenever the state changes. Keep `chronology/` (one
 file per step since 2026-11-13) and the narratives in step with it.
 
 ## Checkpoint 2026-11-16: read this first, then the narratives
@@ -17,7 +17,14 @@ cards, UI as API, credentials and ops, but not about the product.
    - B: use it with the 9B, the query service and escalation;
    - C: Start here, Privacy and Logins;
    - D: Teams.
-3. `chronology/2026-11-13*` to `chronology/2026-11-16*`, oldest first: what was built, tried and fixed, step by
+3. [narrative/MODEL_TYPES.md](../narrative/MODEL_TYPES.md): the four kinds of model and the platform boundaries:
+   - the **Assistant** (the 9B, on the left);
+   - the **Consultant** (DeepSeek);
+   - the **Analyst** (masked Claude, on the right);
+   - the **Builder**, which extends a team in `<team>/extensions/` with tests and git versions.
+
+   It covers where each runs, what it sees, its sandbox and what it can change.
+4. `chronology/2026-11-13*` to `chronology/2026-11-16*`, oldest first: what was built, tried and fixed, step by
    step.
 
 **The product now (on the laptop, Paseo build idli25).**
@@ -72,7 +79,15 @@ cards, UI as API, credentials and ops, but not about the product.
 - **Archived:** test teams, Insights and Canvay are in `~/idli-insights/archive/`.
 
 **Open, in rough priority.**
-- **The owner's test of New team -> Open -> Delete.** Wait for their report.
+- **The Builder, on the laptop.** Built and tested on the DGX on 2026-11-16 (see MODEL_TYPES, "Built and tested").
+  The laptop run is next:
+  - the Builder tab opened by Paseo;
+  - the left chat's Builder card on a real Drive photo;
+  - Versions on a real team;
+  - the labels in Paseo's terminals.
+
+  The owner brings up the tunnel. The DGX test team is `~/idli-insights/teams/field-photos` (synthetic data only).
+- **The owner's test of New team -> Open -> Delete:** reported working on 2026-11-16.
 - **The Drivey split race.** It is repaired on display (P21), not prevented. The repair is in
   `utils/idli-side-pane.ts repairDriveySplit` in the Paseo checkout.
 - **Small items:**

@@ -109,7 +109,8 @@ questions are written by code. Nothing here goes to Claude.
      plan then says to put a copy in Drive).
    - **Who will use Insights?** Just me / A few of us / The whole team.
    - **Do the files have names, places or phone numbers?** Yes / No / Not sure. Codes stay on whatever the answer.
-   - **When a Mini can't answer a question, may Idli ask an outside service?** Yes, ask me each time / No, with a
+   - **When a Mini can't answer a question, may Idli ask an outside service?** Yes / Ask me each time (both: "Only
+     masked data is sent") / No. Yes skips the card in the Mini. Shown with a
      "What is this?" line. No leaves the team without the query service (its Minis offer Claude instead).
 3. **"Set up Insights?"** The plan: its own heading (ask on the left, Claude helps on the right); files come from
    Google Drive and stay on this computer; names, places and phone numbers go to Claude as codes; Minis answer on
@@ -131,6 +132,24 @@ tool list, and the team's downloads, Minis and privacy codes. Claude's masked co
 `~/idli-insights/claude-masked-<name>`. The team's page server takes the next free port after 8797 (Paseo trusts
 8797-8819); Drivey's server lists a team's Minis for Paseo (`/api/minis-public?dir=`). The Privacy log labels the
 team's requests with its name.
+
+## E. When the team can't do something: the Builder (2026-11-16)
+
+The four kinds of model and their boundaries are in [MODEL_TYPES.md](MODEL_TYPES.md). In the journey:
+1. **A file the team can't read.** The person picks a file with @, for example a photo, and the team has nothing
+   that reads photos. Idli's card says: "Insights can't read images yet. The Builder can add that to Insights.
+   Build it with the Builder?" The options are Build it and Not now. Typed questions such as "can you read photos
+   of our registers?" get the same card. Typing "open the Builder" opens it directly.
+2. **Build it.** A Builder tab opens on the right with the request, masked, as its first message. It is the
+   person's own Claude Code with an amber BUILDER label. It never sees the team's files.
+3. **The Builder works.** It says in a sentence what it will add, and chooses the cheapest option itself
+   (Tesseract on this computer for photos). It tests on fake samples it makes, and saves a version. On the next
+   message the team reads that kind of file. The person picks the photo again with @, and the usual flow follows:
+   the privacy review, then the Analyst.
+4. **Inside a Mini** a question the Mini can't answer still goes to the outside service, then to the Analyst
+   (extending a Mini is the Analyst's job). The Analyst offers the Builder only for things outside the team's
+   tested capabilities.
+5. **Versions** on the team card lists what was added. Go back undoes it. Files and Minis are not affected.
 
 ## What runs where
 - Left chat: Paseo's chat. Its replies outside a Mini are written by code; inside a Mini, the 9B only picks a
