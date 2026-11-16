@@ -10,6 +10,8 @@
     one table per tab.
   - [Installers and the demo gaps](p1/deployment_strategy.md): D1-D11, with Pyodide as row 21.
   - [Paseo patches](p1/paseo_patches.md): P1, P3 and P12 for the demo.
+  - [The Builder's exit test](p1/builder_acceptance_tests.md): the failing request becomes the person's test;
+    on No, the next option on the capability menu.
 - **p2/**: measured speed-ups, not integrated yet.
   - [Free tier capacity for ~100 people on one DGX (E11)](p2/capacity_free_tier.md): moved here because E7
     held up (the local 9B with the split matched Muse on fresh chats); test the 9B only.
