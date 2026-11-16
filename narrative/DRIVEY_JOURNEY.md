@@ -91,41 +91,40 @@ Under the Start here heading are two entries, so neither gets lost the way a tab
   PLACE_005"). Requests the guard stopped show only the codes that stopped them. Paseo lists the two entries by most
   recent use, so Privacy can sit above Logins.
 
-## D. Making a team (built 2026-11-15, PoC: the Insights team)
+## D. Making a team (chat built 2026-11-15; a page since 2026-11-16. PoC: the Insights team)
 
 A **team** is a heading in the sidebar for one kind of work, made by answering a few questions in Start here. The
 PoC makes one kind of team: what comes out is exactly today's Drivey (same flow, panes, tools and pages) under the
 team's name, with its own folder and its own Minis. Drivey itself stays as it is. **Idli asks, not Claude**: the
-questions are written by code and the local 9B only reads answers typed instead of clicked. Nothing in this talk
-goes to Claude.
+questions are written by code. Nothing here goes to Claude.
 
-1. **Start here > Teams.** The chat shows one button: **Make a team**.
-2. **"What's your team called?"** Typed. "Insights", "call it Insights" and "we are the M&E team" all work.
-   "I'm from IT, just testing" or "hello" gets a card: "What should we call the team? Insights is fine for a
-   try-out." A name already in the sidebar (Drivey, or a team made before) asks for another.
-3. **"What does Insights work towards? One line is enough."** Typed. Lead-ins ("ok so, actually it's...") are
-   dropped. "No idea, I'm not on that team" gets "Use an example goal for now?" (Lower household debt in 12 villages)
-   or Leave it blank.
-4. **Cards**, each with its own box for a typed answer:
-   - Where does the team keep its data? Google Drive / On this computer / Somewhere else. Anything but Drive gets
-     "Insights reads files from Google Drive for now. Put a copy there and it works the same."
-   - Who will use Insights? Just me / A few of us / The whole team. "My team will use this from next week, I'm
-     testing now" gets "Fine. Set it up now and others can join when they are ready."
-   - Do the files have names, places or phone numbers? Yes / No / Not sure. Codes stay on whatever the answer.
-   - When a Mini can't answer a question, may Idli ask an outside service? Yes, ask me each time / No. No leaves
-     the team without the query service (its Minis offer Claude instead).
-5. **The plan**, then **Set it up** or **Change something** (name, goal, outside service, who uses it):
-   its own heading (ask on the left, Claude helps on the right); files come from Google Drive and stay on this
-   computer; names, places and phone numbers go to Claude as codes; Minis answer on this computer, new questions go
-   to the outside service only if you say yes; for you for now, or for your team.
-6. **"Insights is ready. It is in your sidebar."** The Insights heading has a **New chat** row. It opens the two
-   halves exactly like Drivey's "+": Idli on the left with Insights' own (empty) Minis, Claude on the right working in
-   Insights' own masked folder. Next: type @ to pick a sheet and ask a question; a good answer becomes the team's
-   first Mini. (Concept for later: end team creation with a guided first Mini from a sample file.)
+1. **Start here > Teams** is a page (`lib/teams_page.html`), not a chat: a card per team and a **New team** card.
+   Drivey has a card too (Open only: it is built in).
+2. **New team** opens one question per panel, with Back, Cancel and "Step 2 of 6":
+   - **"What's your team called?"** Typed, with an **Insights** shortcut ("Insights is fine for a try-out").
+     "call it Field M&E" gives Field M&E. A name already in the sidebar, or not a name ("hello", "test"), asks again.
+   - **"What does Insights work towards?"** Typed, one line, with **Use an example** (Lower household debt in 12
+     villages). Lead-ins ("ok so we help...") are dropped. It can be left blank.
+   - **Where does the team keep its data?** Google Drive / On this computer / Somewhere else (one click each; the
+     plan then says to put a copy in Drive).
+   - **Who will use Insights?** Just me / A few of us / The whole team.
+   - **Do the files have names, places or phone numbers?** Yes / No / Not sure. Codes stay on whatever the answer.
+   - **When a Mini can't answer a question, may Idli ask an outside service?** Yes, ask me each time / No, with a
+     "What is this?" line. No leaves the team without the query service (its Minis offer Claude instead).
+3. **"Set up Insights?"** The plan: its own heading (ask on the left, Claude helps on the right); files come from
+   Google Drive and stay on this computer; names, places and phone numbers go to Claude as codes; Minis answer on
+   this computer, new questions go to the outside service only if you say yes; for you for now, or for your team.
+4. **Set it up** goes back to the cards, with the new team's card marked New: "Insights is ready. Click Open to
+   start."
+5. **Open** goes to the team's latest workspace, or makes its first one in two halves exactly like Drivey's New chat
+   row: Idli on the left with the team's own (empty) Minis, Claude on the right in the team's own masked folder.
+   **Delete** asks "Delete Insights and its chats?" (Delete / Keep): the heading, its workspaces and chats go from
+   Paseo; the folder and Claude's masked copies move to `~/idli-insights/archive/teams/` (nothing is lost).
+6. Next: type @ to pick a sheet and ask a question; a good answer becomes the team's first Mini. (Concept for later:
+   end team creation with a guided first Mini from a sample file.)
 
-Anywhere in the talk: a question ("what is a team?", "what is the outside service?", "how long does this take?")
-gets a one-line answer and the same question again; "cancel" stops with nothing set up; "start over" starts again;
-typing in the chat box while a card is open answers the card.
+The chat version (2026-11-15, `lib/teams.py route`, with typed answers read by rules and the local 9B) is still in
+the code but no chat uses it: buttons leave far fewer odd answers than typing did.
 
 **Where things live.** `~/idli-insights/teams/<name>/` holds `team.json` (the answers), Drivey's instructions and
 tool list, and the team's downloads, Minis and privacy codes. Claude's masked copies go in

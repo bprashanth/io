@@ -604,3 +604,133 @@ def create(spec, cowork):
     if proj.get('name') != name:
         _paseo('project', 'rename', proj['projectId'], name, parse=False)
     return {'ok': True, 'name': name, 'folder': folder}
+
+
+# ---------------------------------------------------------------- the Teams page (lib/teams_page.html)
+def _projects():
+    try:
+        out = _paseo('project', 'ls')
+        return out if isinstance(out, list) else []
+    except Exception:
+        return []
+
+
+def list_teams(projects=None):
+    """The team cards: Drivey first (built in, it can't be deleted), then each team folder, newest first."""
+    projects = _projects() if projects is None else projects
+    cards = []
+    drivey = os.path.join(_idli(), 'cowork-real')
+    proj = next((p for p in projects if _same(p.get('path'), drivey)), None)
+    if proj:
+        cards.append({'id': 'drivey', 'name': proj.get('name') or 'Drivey', 'goal': 'Ask questions about Drive files.',
+                      'builtin': True, 'ready': True})
+    root = os.path.join(_idli(), 'teams')
+    found = []
+    for d in os.listdir(root) if os.path.isdir(root) else []:
+        folder = team_dir(os.path.join(root, d))
+        if not folder:
+            continue
+        try:
+            with open(os.path.join(folder, 'team.json')) as f:
+                meta = json.load(f)
+        except (OSError, ValueError):
+            continue
+        found.append((os.path.getmtime(os.path.join(folder, 'team.json')), {
+            'id': os.path.basename(folder), 'name': meta.get('name') or d, 'goal': meta.get('goal') or '',
+            'people': meta.get('people') or '', 'outside': bool(meta.get('outside')),
+            'ready': any(_same(p.get('path'), folder) for p in projects)}))
+    cards += [c for _, c in sorted(found, key=lambda x: -x[0])]
+    return {'teams': cards}
+
+
+def _team_folder(team_id):
+    if team_id == 'drivey':
+        return os.path.join(_idli(), 'cowork-real')
+    if not re.fullmatch(r'[a-z0-9-]{1,40}', str(team_id)):
+        return None
+    return team_dir(os.path.join(_idli(), 'teams', team_id))
+
+
+def open_team(team_id):
+    """Open: the team's latest workspace, or its first one in two halves (Paseo P21 window.__idliOpenTeam)."""
+    folder = _team_folder(team_id)
+    if not folder:
+        return {'ok': False, 'error': 'That team is gone. Reload the page.'}
+    proj = next((p for p in _projects() if _same(p.get('path'), folder)), None)
+    if not proj:
+        return {'ok': False, 'error': 'The team is not in your sidebar. Delete it and make it again.'}
+    from lib import uiswitch
+    try:
+        page = next(t for t in uiswitch._targets() if t.get('type') == 'page'
+                    and str(t.get('url', '')).startswith('paseo://app'))
+        args = {'serverId': uiswitch.server_id(), 'projectId': proj['projectId'], 'path': folder,
+                'title': proj.get('name') or 'Team'}
+        got = uiswitch._ws_eval(page['webSocketDebuggerUrl'],
+                                "(async () => { if (typeof window.__idliOpenTeam !== 'function') return 'old'; "
+                                "try { return await window.__idliOpenTeam(" + json.dumps(args) + "); } "
+                                "catch (e) { return 'error: ' + e.message; } })()", timeout=30)
+    except Exception:
+        got = None
+    if isinstance(got, str) and got.startswith('wks_'):
+        return {'ok': True}
+    if got == 'old':
+        return {'ok': False, 'error': 'This Paseo is too old to open teams from here. Click the team in the sidebar.'}
+    return {'ok': False, 'error': f'Could not open {proj.get("name") or "the team"}. Click it in the sidebar.'}
+
+
+def _stop_page_server(folder):
+    """A team's own page server (lib/formserver.py ensure) stops with the team."""
+    try:
+        with open(os.path.join(folder, '.idli', 'form-server.json')) as f:
+            pid = int(json.load(f).get('pid'))
+        with open(f'/proc/{pid}/cmdline', 'rb') as f:
+            cmd = f.read().replace(b'\0', b' ').decode(errors='replace')
+        if 'formserver.py' in cmd and folder in cmd:
+            os.kill(pid, 15)
+    except (OSError, ValueError, TypeError):
+        pass
+
+
+def delete_team(team_id):
+    """Delete: the heading (its workspaces and chats) goes from Paseo; the folder and Claude's masked copies move to
+    ~/idli-insights/archive/teams, so nothing is lost by a wrong click."""
+    if team_id == 'drivey':
+        return {'ok': False, 'error': 'Drivey is built in. It stays.'}
+    folder = _team_folder(team_id)
+    if not folder:
+        return {'ok': False, 'error': 'That team is gone. Reload the page.'}
+    try:
+        chats = _paseo('ls', '--global')
+        chats = chats.get('agents', []) if isinstance(chats, dict) else chats or []
+        for c in chats:
+            if _same(c.get('cwd') or '', folder):
+                _paseo('delete', c.get('id') or c['agentId'], parse=False)
+        for p in _projects():
+            if _same(p.get('path'), folder):
+                _paseo('project', 'delete', p['projectId'], parse=False)
+    except Exception:
+        return {'ok': False, 'error': 'Paseo could not remove the heading. Try again.'}
+    _stop_page_server(folder)
+    import time
+    dest = os.path.join(_idli(), 'archive', 'teams')
+    os.makedirs(dest, exist_ok=True)
+    stamp = time.strftime('%Y%m%d-%H%M%S')
+    for src in (folder, claude_work(folder)):
+        if os.path.exists(src):
+            shutil.move(src, os.path.join(dest, f'{os.path.basename(src)}-{stamp}'))
+    return {'ok': True}
+
+
+def name_from(text):
+    """The Teams page's name box: "call it Field M&E" or "we are the M&E team" give the name (rules only, no 9B)."""
+    t = ' '.join(str(text or '').split())[:80]
+    m = re.search(r"(?i)\b(?:call(?:ed)? (?:it|us|this|the team)?|name(?:d)? (?:it|is)?|we'?re(?: called)?|"
+                  r"we are(?: called)?|team is)\s+[\"']?([\w][\w &'.-]{0,29}?)[\"']?\s*(?:team)?[.!]?$", t)
+    return check(m.group(1) if m else t)
+
+
+def goal_from(text):
+    """The Teams page's goal box, without spoken lead-ins ("ok so we help..." gives "Help...")."""
+    t = _unfill(' '.join(str(text or '').split()))
+    t = re.sub(r"(?i)^(help|reduc|improv|increas|lower|track|support)(s|es)\b", r"\1", t)
+    return t[:140].rstrip(' .')

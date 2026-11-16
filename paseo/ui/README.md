@@ -31,7 +31,8 @@ Paths below are relative to `benchmarks/runs/2026-11-06-oss-desktop-independent/
 - **Build** (UI only; Electron's main process is unchanged):
   `cd packages/app && PASEO_WEB_PLATFORM=electron npx expo export --platform web`, then tar the output as
   `~/idli-builds/paseo-app-dist-0.15.2-idliN.tgz` on the DGX, with the matching `paseo-idli-split-idliN.patch`.
-  **The laptop runs idli24** (2026-11-15: teams work like Drivey and Start here chats look like Drivey's, P20;
+  **The laptop runs idli25** (2026-11-16: the Teams page and the Drivey split repair, P21; idli24: teams work like
+  Drivey and Start here chats look like Drivey's, P20;
   idli22 added Idli pages inside chats, P19). The tables below still describe idli7.
 - **Install on a laptop:** `cowork/desktop/install-paseo-ui.sh`, which uses `BUILD` (default idli7) or
   `FILE=<build.tgz>` for a local file.

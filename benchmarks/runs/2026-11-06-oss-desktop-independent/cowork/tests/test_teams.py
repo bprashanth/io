@@ -179,3 +179,45 @@ def test_spoken_lead_ins_are_dropped_from_the_goal():
     assert teams.read_goal("ok so: actually it's helping women's groups get out of debt")['goal'] == \
         "Helping women's groups get out of debt"
     assert teams.read_goal('we help 300 farmers sell at fair prices')['goal'] == 'Help 300 farmers sell at fair prices'
+
+
+def test_page_reads_names_and_goals():
+    from lib import teams
+    assert teams.name_from('call it Field M&E', )['name'] == 'Field M&E'
+    assert teams.name_from('Drivey')['ok'] is False
+    assert teams.name_from('hello')['ok'] is False
+    assert teams.goal_from("ok so we help women's groups get out of debt") == "Help women's groups get out of debt"
+
+
+def test_page_lists_and_deletes_teams(tmp_path, monkeypatch):
+    from lib import teams
+    monkeypatch.setenv('IDLI_HOME', str(tmp_path))
+    (tmp_path / 'cowork-real').mkdir()
+    projects = [{'projectId': 'pd', 'path': str(tmp_path / 'cowork-real'), 'name': 'Drivey'}]
+    calls = []
+
+    def fake(*args, parse=True):
+        calls.append(args)
+        if args[:2] == ('project', 'ls'):
+            return projects
+        if args[:2] == ('project', 'create'):
+            projects.append({'projectId': 'p1', 'path': args[2], 'name': os.path.basename(args[2])})
+        if args[:2] == ('project', 'rename'):
+            projects[-1]['name'] = args[3]
+        if args[:2] == ('project', 'delete'):
+            projects[:] = [p for p in projects if p['projectId'] != args[2]]
+        if args[:1] == ('ls',):
+            return [{'id': 'a1', 'cwd': str(tmp_path / 'teams' / 'insights'), 'name': 'x'}]
+        return ''
+    monkeypatch.setattr(teams, '_paseo', fake)
+    teams.create({'name': 'Insights', 'goal': 'Debt', 'outside': True}, HERE)
+    (tmp_path / 'claude-masked-insights').mkdir()
+    cards = teams.list_teams()['teams']
+    assert [c['id'] for c in cards] == ['drivey', 'insights'] and cards[1]['ready'] and cards[0]['builtin']
+    assert teams.delete_team('drivey')['ok'] is False
+    assert teams.delete_team('../etc')['ok'] is False
+    assert teams.delete_team('insights') == {'ok': True}
+    assert ('delete', 'a1') in calls and ('project', 'delete', 'p1') in calls
+    assert not (tmp_path / 'teams' / 'insights').exists() and not (tmp_path / 'claude-masked-insights').exists()
+    assert len(list((tmp_path / 'archive' / 'teams').iterdir())) == 2
+    assert [c['id'] for c in teams.list_teams()['teams']] == ['drivey']

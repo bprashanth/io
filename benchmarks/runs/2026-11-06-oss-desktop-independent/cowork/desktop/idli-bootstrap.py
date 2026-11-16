@@ -6,16 +6,16 @@ Safe to rerun: it only adds what's missing.
      Logins           the setup chat (sign-in checks; also answers "what has Idli learned"), the Minis tab
      Privacy          what Idli's privacy guard sent to Claude (searchable, per app; written by code). An entry of
                       its own so it can't get lost the way a tab can.
-     Teams            the Make a team button; a few questions, then a team heading that works like Drivey with its
-                      own folder (~/idli-insights/teams/<name>) and Minis (lib/teams.py; written by code).
+     Teams            a page of team cards (Open, Delete) and New team: a few questions, one per panel, then a team
+                      heading that works like Drivey with its own folder (~/idli-insights/teams/<name>) and Minis (lib/teams.py; written by code).
      Minis            a tab: the page listing the files Idli has learned (grows as Claude teaches it)
      Drive            a tab for signing in to Google
   Drivey       the private folder (~/idli-insights/cowork-real): Drive files, where the work happens; a "New chat"
      Drivey    is always waiting there on its first card (clean up a file / analyse a file). Its chats get the split
                panel (the private model on the left, Claude beside it).
   WhatsAppy    ~/idli-insights/whatsappy: chats open straight to Claude (the person's own subscription), no split.
-  Canvay       ~/idli-insights/canvay: the same. Both are open spaces to try out Minis beyond Drive
-               (narrative/IDLI_DESKTOP.md).
+               An open space to try out Minis beyond Drive (narrative/IDLI_DESKTOP.md). Canvay was a second one
+               until 2026-11-16 (removed; teams take its place).
   Claude      this cowork/ folder: Claude teaches Idli a file, from fake data only
      Claude
 
@@ -44,7 +44,6 @@ LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md
 ]
 CLAUDE_SPACES = [  # (workspace name, folder): chats run plain Claude Code; no Idli tools, no split (the split follows
     ("WhatsAppy", os.path.join(IDLI, "whatsappy")),  # the private model's provider, Paseo patch P15)
-    ("Canvay", os.path.join(IDLI, "canvay")),
 ]
 CLAUDE_PROVIDER = os.environ.get("IDLI_CLAUDE_PROVIDER", "claude")
 LAYOUT += [(n, f, None) for n, f in CLAUDE_SPACES]
@@ -65,7 +64,7 @@ CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name St
 PRIVACY = "Privacy"  # the second entry in Start here: the "Sent to Claude" log
 WS_TITLE = {"Start here": CHAT}  # the Start here workspace shows as "Logins" under the Start here heading
 PRIVACY_PROMPT = "Show what Idli sent to Claude"  # lib/modes.py PRIVACY_CHAT: the chat is written by code
-TEAMS = "Teams"  # the third entry in Start here; its first message is lib/teams.py TEAMS_CHAT
+TEAMS = "Teams"  # the third entry in Start here: the team page (lib/teams_page.html, opened by Paseo P21)
 TABS = []  # the Drive tab opens only when the Logins check finds Google signed out (and closes once signed in)
 
 
@@ -383,6 +382,15 @@ def retire_old_start_here():
             paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
 
 
+def retire_teams_chat():
+    """Until 2026-11-16 Teams was a chat; it is a page now (lib/teams_page.html), which Paseo (P21) opens as the Teams
+    workspace's tab. Delete the old chat."""
+    for a in paseo("ls", "--global") or []:
+        if a["name"] == TEAMS and same(a.get("cwd") or "", FOLDER["Start here"]):
+            say("delete the old Teams chat (Teams is a page now)")
+            paseo("delete", a["id"], parse=False, change=True)
+
+
 def main():
     folders()
     ids = projects_and_workspaces()
@@ -391,15 +399,16 @@ def main():
     retire_claude_workspace()
     one_idli_workspace()
     agent = start_chat(ids.get("Start here"))
-    for title, prompt in ((PRIVACY, PRIVACY_PROMPT), (TEAMS, TEAMS)):
-        cid = chat(ids.get(title), FOLDER["Start here"], title, prompt, label="idli.role=setup")
-        plain_chat(cid)
+    cid = chat(ids.get(PRIVACY), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
+    plain_chat(cid)
+    retire_teams_chat()
     learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
-    chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on
+    if not split_mode():  # split mode: Drivey's New chat row opens the two halves (Paseo P20); nothing waits
+        chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on
     for name, folder in CLAUDE_SPACES:  # one Claude chat waiting in each
         chat(ids.get(name), folder, "New chat", "hi", provider=CLAUDE_PROVIDER)
-    say("done. Heading order: Start here, Drivey, WhatsAppy, Canvay (drag once until Paseo patch P2).")
+    say("done. Heading order: Start here, Drivey, WhatsAppy (drag once until Paseo patch P2).")
 
 
 if __name__ == "__main__":

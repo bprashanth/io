@@ -422,12 +422,13 @@ index 551e3b60..42e3ac3f 100644
    const handleRetry = useCallback(() => {
      if (resolution.kind === "lookupError") {
 diff --git a/packages/app/src/app/h/[serverId]/workspace/[workspaceId]/index.tsx b/packages/app/src/app/h/[serverId]/workspace/[workspaceId]/index.tsx
-index 2ea41196..127a21fe 100644
+index 2ea41196..d7ab3185 100644
 --- a/packages/app/src/app/h/[serverId]/workspace/[workspaceId]/index.tsx
 +++ b/packages/app/src/app/h/[serverId]/workspace/[workspaceId]/index.tsx
-@@ -1,4 +1,5 @@
+@@ -1,4 +1,6 @@
  import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 +import "@/utils/idli-side-pane"; // P17: registers window.__idliPlaceTab
++import "@/utils/idli-team-open"; // P21: registers window.__idliOpenTeam
  import { useNavigation } from "expo-router/react-navigation";
  import { StyleSheet, View } from "react-native";
  import { useLocalSearchParams } from "expo-router";
@@ -3086,25 +3087,26 @@ index f85d09ca..a23dbddb 100644
  
    useEffect(() => {
 diff --git a/packages/app/src/desktop/browser/pane/index.electron.tsx b/packages/app/src/desktop/browser/pane/index.electron.tsx
-index c728c5cd..1310c00f 100644
+index c728c5cd..776bf83b 100644
 --- a/packages/app/src/desktop/browser/pane/index.electron.tsx
 +++ b/packages/app/src/desktop/browser/pane/index.electron.tsx
 @@ -1,3 +1,5 @@
 +import { useDriveyWorkspace } from "@/hooks/use-drivey-workspace";
-+import { isIdliDashboardUrl } from "@/utils/idli-drivey";
++import { isIdliDashboardUrl, isIdliTeamsPageUrl } from "@/utils/idli-drivey";
  import {
    useCallback,
    useEffect,
-@@ -597,6 +599,8 @@ export function BrowserPane({
+@@ -597,6 +599,9 @@ export function BrowserPane({
    const { theme } = useUnistyles();
    const { t } = useTranslation();
    const browser = useBrowserStore((state) => state.browsersById[browserId] ?? null);
 +  const isDrivey = useDriveyWorkspace(serverId, workspaceId);
-+  const quietChrome = isDrivey && isIdliDashboardUrl(browser?.url ?? "");
++  const quietChrome =
++    (isDrivey && isIdliDashboardUrl(browser?.url ?? "")) || isIdliTeamsPageUrl(browser?.url ?? "");
    const updateBrowser = useBrowserStore((state) => state.updateBrowser);
    const setBrowserViewport = useBrowserStore((state) => state.setBrowserViewport);
    const browserViewport = browser?.viewport ?? RESPONSIVE_BROWSER_VIEWPORT;
-@@ -1436,22 +1440,26 @@ export function BrowserPane({
+@@ -1436,22 +1441,26 @@ export function BrowserPane({
      <View style={styles.container}>
        <View style={styles.chromeRow}>
          <View style={styles.chromeLeft}>
@@ -3147,7 +3149,7 @@ index c728c5cd..1310c00f 100644
            <ToolbarButton
              label={
                browser?.isLoading
-@@ -1464,69 +1472,75 @@ export function BrowserPane({
+@@ -1464,69 +1473,75 @@ export function BrowserPane({
              <RotateCw size={16} color={theme.colors.foregroundMuted} />
            </ToolbarButton>
          </View>
@@ -3366,16 +3368,23 @@ index ef144477..f0c22168 100644
        mode,
 diff --git a/packages/app/src/hooks/use-drivey-workspace.ts b/packages/app/src/hooks/use-drivey-workspace.ts
 new file mode 100644
-index 00000000..b0995c5c
+index 00000000..a54cfa6c
 --- /dev/null
 +++ b/packages/app/src/hooks/use-drivey-workspace.ts
-@@ -0,0 +1,35 @@
-+import { useMemo } from "react";
+@@ -0,0 +1,69 @@
++import { useEffect, useMemo } from "react";
++import { ensureTeamsPage, repairDriveySplit } from "@/utils/idli-side-pane";
 +import { useSessionStore } from "@/stores/session-store";
 +import { collectAllTabs, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 +import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 +import { isDriveyDraft } from "@/utils/idli-claude-workspace";
-+import { isDriveyLeft, isDriveyProject } from "@/utils/idli-drivey";
++import {
++  IDLI_TEAMS_PAGE,
++  isDriveyLeft,
++  isDriveyProject,
++  isIdliTeamsPageUrl,
++  isIdliTeamsWorkspace,
++} from "@/utils/idli-drivey";
 +
 +export function useDriveyWorkspace(serverId: string, workspaceId: string): boolean {
 +  const workspace = useSessionStore((state) =>
@@ -3404,6 +3413,33 @@ index 00000000..b0995c5c
 +    );
 +  }, [layout]);
 +  return matchesSession || hasDraft;
++}
++
++/** P21: keep a Drivey or team workspace in two halves while it is shown (see repairDriveySplit). */
++export function useDriveySplitRepair(serverId: string, workspaceId: string, isDrivey: boolean): void {
++  const key = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
++  const layout = useWorkspaceLayoutStore((state) => (key ? state.layoutByWorkspace[key] : undefined));
++  useEffect(() => {
++    if (!isDrivey || !layout) return;
++    const timer = setTimeout(() => repairDriveySplit(serverId, workspaceId), 400);
++    return () => clearTimeout(timer);
++  }, [isDrivey, layout, serverId, workspaceId]);
++}
++
++/** P21: Start here > Teams is the team dashboard page, opened as the workspace's tab. */
++export function useIdliTeamsPage(serverId: string, workspaceId: string): void {
++  const workspace = useSessionStore((state) => state.sessions[serverId]?.workspaces.get(workspaceId));
++  const isTeams = isIdliTeamsWorkspace(workspace);
++  const key = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
++  const hydrated = useWorkspaceLayoutStore((state) => Boolean(key && state.layoutByWorkspace[key]));
++  useEffect(() => {
++    if (!isTeams) return;
++    const timer = setTimeout(
++      () => ensureTeamsPage(serverId, workspaceId, IDLI_TEAMS_PAGE, isIdliTeamsPageUrl),
++      hydrated ? 300 : 1500,
++    );
++    return () => clearTimeout(timer);
++  }, [isTeams, hydrated, serverId, workspaceId]);
 +}
 diff --git a/packages/app/src/panels/agent-panel-descriptor.test.tsx b/packages/app/src/panels/agent-panel-descriptor.test.tsx
 index ac577781..022169d4 100644
@@ -3546,24 +3582,26 @@ index bf957a27..a9db94dc 100644
    if (tab.target.kind === "setup") {
      return labels.setup;
 diff --git a/packages/app/src/screens/workspace/workspace-screen.tsx b/packages/app/src/screens/workspace/workspace-screen.tsx
-index dd806e1f..f8afe9fb 100644
+index dd806e1f..51231dc4 100644
 --- a/packages/app/src/screens/workspace/workspace-screen.tsx
 +++ b/packages/app/src/screens/workspace/workspace-screen.tsx
 @@ -1,3 +1,5 @@
-+import { useDriveyWorkspace } from "@/hooks/use-drivey-workspace";
++import { useDriveySplitRepair, useDriveyWorkspace, useIdliTeamsPage } from "@/hooks/use-drivey-workspace";
 +import { isRawClaudeWorkspace, rawClaudeProfile } from "@/utils/idli-claude-cli";
  import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
  import { useHostFeature } from "@/runtime/host-features";
  import {
-@@ -1038,6 +1040,7 @@ function WorkspaceScreenContent({
+@@ -1038,6 +1040,9 @@ function WorkspaceScreenContent({
      () => resolveWorkspaceRouteId({ routeWorkspaceId: workspaceId }) ?? "",
      [workspaceId],
    );
 +  const isDriveyWorkspace = useDriveyWorkspace(normalizedServerId, normalizedWorkspaceId);
++  useDriveySplitRepair(normalizedServerId, normalizedWorkspaceId, isDriveyWorkspace);
++  useIdliTeamsPage(normalizedServerId, normalizedWorkspaceId);
    const workspaceDescriptor = useWorkspace(normalizedServerId, normalizedWorkspaceId);
    useEffect(() => {
      if (!normalizedServerId || !normalizedWorkspaceId || workspaceDescriptor) return;
-@@ -1778,11 +1781,22 @@ function WorkspaceScreenContent({
+@@ -1778,11 +1783,22 @@ function WorkspaceScreenContent({
      : t("workspace.tabs.explorerSidebar.open");
  
    const activeTabKey = useMemo(() => activeTabId ?? "", [activeTabId]);
@@ -3587,7 +3625,7 @@ index dd806e1f..f8afe9fb 100644
    );
  
    const handleCreateTerminal = useStableEvent((input?: { paneId?: string }) => {
-@@ -1840,6 +1854,10 @@ function WorkspaceScreenContent({
+@@ -1840,6 +1856,10 @@ function WorkspaceScreenContent({
          return;
        }
        if (selection.kind === "agent") {
@@ -3598,7 +3636,7 @@ index dd806e1f..f8afe9fb 100644
          openTarget({
            kind: "draft",
            draftId: generateDraftId(),
-@@ -1856,7 +1874,13 @@ function WorkspaceScreenContent({
+@@ -1856,7 +1876,13 @@ function WorkspaceScreenContent({
        const { browserId } = createWorkspaceBrowser();
        openTarget({ kind: "browser", browserId });
      },
@@ -3613,7 +3651,7 @@ index dd806e1f..f8afe9fb 100644
    );
  
    const handleOpenUrlInBrowserTab = useCallback(
-@@ -3208,7 +3232,9 @@ function WorkspaceScreenContent({
+@@ -3208,7 +3234,9 @@ function WorkspaceScreenContent({
          ) : null}
          {workspaceDirectory ? (
            <>
@@ -3624,7 +3662,7 @@ index dd806e1f..f8afe9fb 100644
              <WorkspaceHeaderExplorerToggle
                owner={explorerToggleOwner}
                onPress={handleToggleExplorerSidebar}
-@@ -3223,6 +3249,7 @@ function WorkspaceScreenContent({
+@@ -3223,6 +3251,7 @@ function WorkspaceScreenContent({
        </View>
      ),
      [
@@ -3632,7 +3670,7 @@ index dd806e1f..f8afe9fb 100644
        workspaceDescriptor,
        normalizedServerId,
        normalizedWorkspaceId,
-@@ -3275,6 +3302,7 @@ function WorkspaceScreenContent({
+@@ -3275,6 +3304,7 @@ function WorkspaceScreenContent({
        showBrowser: showCreateBrowserTab,
        terminalDisabled: createTerminalDisabled,
        launch: launchWorkspaceTab,
@@ -3640,7 +3678,7 @@ index dd806e1f..f8afe9fb 100644
      }),
      [
        createTerminalDisabled,
-@@ -3282,6 +3310,7 @@ function WorkspaceScreenContent({
+@@ -3282,6 +3312,7 @@ function WorkspaceScreenContent({
        isGitCheckout,
        launchWorkspaceTab,
        showCreateBrowserTab,
@@ -4092,10 +4130,10 @@ index 00000000..3d0c926b
 +}
 diff --git a/packages/app/src/utils/idli-drivey.ts b/packages/app/src/utils/idli-drivey.ts
 new file mode 100644
-index 00000000..41d04e02
+index 00000000..3a710a1b
 --- /dev/null
 +++ b/packages/app/src/utils/idli-drivey.ts
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,88 @@
 +import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 +import type { StreamItem } from "@/types/stream";
 +
@@ -4141,6 +4179,26 @@ index 00000000..41d04e02
 +  } catch {
 +    return false;
 +  }
++}
++
++// P21: Start here > Teams is a page on Drivey's page server (lib/teams_page.html). /teams-open hands it its token.
++export const IDLI_TEAMS_PAGE = "http://dashboard.localhost:8797/teams-open";
++
++export function isIdliTeamsPageUrl(url: string): boolean {
++  if (!isIdliDashboardUrl(url)) return false;
++  const path = new URL(url).pathname;
++  return path === "/teams" || path === "/teams-open";
++}
++
++/** Start here's Teams workspace (the setup folder, named Teams). */
++export function isIdliTeamsWorkspace(
++  workspace: Pick<WorkspaceDescriptor, "name" | "workspaceDirectory"> | null | undefined,
++): boolean {
++  return (
++    !!workspace &&
++    (workspace.name === "Teams") &&
++    /[\\/]idli-insights[\\/]setup[\\/]?$/.test(workspace.workspaceDirectory ?? "")
++  );
 +}
 +
 +export function openedMiniName(text: string): string | null {
@@ -4779,10 +4837,10 @@ index 00000000..8fb07ce2
 +});
 diff --git a/packages/app/src/utils/idli-side-pane.ts b/packages/app/src/utils/idli-side-pane.ts
 new file mode 100644
-index 00000000..1c3badd9
+index 00000000..03107830
 --- /dev/null
 +++ b/packages/app/src/utils/idli-side-pane.ts
-@@ -0,0 +1,198 @@
+@@ -0,0 +1,247 @@
 +// Idli P13: place a chat on one side of a two-pane workspace and give it focus, from the agent deep link
 +// (paseo://h/<server>/agent/<id>~right or ~left: the desktop shell drops a link's query string, and rewriting the
 +// shell means rebuilding app.asar, so the side rides on the agent id; the app strips it). Idli opens Claude's teaching chat on the right and comes back to
@@ -4980,6 +5038,132 @@ index 00000000..1c3badd9
 +    placeTabOnSideSoon(input);
 +    return true;
 +  };
++}
++
++/** P21: a Drivey or team workspace whose Claude terminal ended up in the chat's pane (the split after creating it can
++ * lose a race with the workspace's first layout) gets split again: chat on the left, Claude on the right. */
++export function repairDriveySplit(serverId: string, workspaceId: string): boolean {
++  const store = useWorkspaceLayoutStore.getState();
++  const key = workspaceKeyFor(serverId, workspaceId);
++  const layout = key ? store.layoutByWorkspace[key] : undefined;
++  if (!key || !layout) return false;
++  const explorerId = store.explorerSidebarPaneIdByWorkspace[key];
++  const mains = collectAllPanes(layout.root).filter((p) => !p.hidden && p.id !== explorerId);
++  if (mains.length !== 1) return false;
++  const tabs = collectAllTabs(layout.root);
++  const left = tabs.some((t) => t.target.kind === "draft" || t.target.kind === "agent");
++  const terminal = tabs.find((t) => t.target.kind === "terminal");
++  if (!left || !terminal || terminal.target.kind !== "terminal") return false;
++  return placeTabOnSide({
++    serverId,
++    workspaceId,
++    kind: "terminal",
++    id: terminal.target.terminalId,
++    side: "right",
++    focus: false,
++  });
++}
++
++/** P21: Start here > Teams shows its page (the team dashboard) as its tab. Opens it when it is missing. */
++export function ensureTeamsPage(serverId: string, workspaceId: string, url: string, isTeamsPage: (url: string) => boolean): void {
++  const key = workspaceKeyFor(serverId, workspaceId) ?? `${serverId}:${workspaceId}`;
++  const store = useWorkspaceLayoutStore.getState();
++  const layout = store.layoutByWorkspace[key];
++  const browsers = useBrowserStore.getState().browsersById;
++  const have = layout
++    ? collectAllTabs(layout.root).find(
++        (t) => t.target.kind === "browser" && isTeamsPage(browsers[t.target.browserId]?.url ?? ""),
++      )
++    : undefined;
++  if (have) return;
++  const { browserId } = createWorkspaceBrowser({ initialUrl: url });
++  const tabId = store.openTab({
++    workspaceKey: key,
++    target: { kind: "browser", browserId },
++    intent: "background",
++  });
++  if (!tabId) {
++    useBrowserStore.getState().removeBrowser(browserId);
++    return;
++  }
++  useWorkspaceLayoutStore.getState().focusTab(key, tabId);
++}
+diff --git a/packages/app/src/utils/idli-team-open.ts b/packages/app/src/utils/idli-team-open.ts
+new file mode 100644
+index 00000000..2375f6b0
+--- /dev/null
++++ b/packages/app/src/utils/idli-team-open.ts
+@@ -0,0 +1,71 @@
++// Idli P21: Start here > Teams is a page (Drivey's page server, /teams). Its Open button asks the page server, which
++// calls window.__idliOpenTeam over DevTools (lib/teams.py open_team): go to the team's most recent workspace, or make
++// its first one in two halves (Idli on the left, Claude on the right) like the heading's New chat row.
++import { isWeb } from "@/constants/platform";
++import { getHostRuntimeStore } from "@/runtime/host-runtime";
++import { useSessionStore } from "@/stores/session-store";
++import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
++import { createDriveyWorkspace } from "@/utils/idli-claude-workspace";
++import { placeTabOnSide } from "@/utils/idli-side-pane";
++
++export interface IdliOpenTeamInput {
++  serverId: string;
++  projectId: string;
++  path: string;
++  title: string;
++}
++
++function placeHalves(
++  input: { serverId: string; workspaceId: string; draftId: string; terminalId: string },
++  tries = 60,
++) {
++  const left = placeTabOnSide({ ...input, kind: "draft", id: input.draftId, side: "left" });
++  if (
++    left &&
++    placeTabOnSide({ ...input, kind: "terminal", id: input.terminalId, side: "right", focus: false })
++  )
++    return;
++  if (tries > 0) setTimeout(() => placeHalves(input, tries - 1), 150);
++}
++
++function time(d: Date | null | undefined): number {
++  return d instanceof Date ? d.getTime() : 0;
++}
++
++export async function openIdliTeam(input: IdliOpenTeamInput): Promise<string> {
++  const session = useSessionStore.getState().sessions[input.serverId];
++  const mine = [...(session?.workspaces.values() ?? [])].filter(
++    (w) => w.projectId === input.projectId && !w.archivingAt,
++  );
++  mine.sort(
++    (a, b) =>
++      Math.max(time(b.lastUserMessageAt), time(b.createdAt)) -
++      Math.max(time(a.lastUserMessageAt), time(a.createdAt)),
++  );
++  const latest = mine[0];
++  if (latest) {
++    navigateToWorkspace({ serverId: input.serverId, workspaceId: latest.id });
++    return latest.id;
++  }
++  const client = getHostRuntimeStore().getClient(input.serverId);
++  if (!client) throw new Error("Paseo is not connected. Try again.");
++  let made = "";
++  await createDriveyWorkspace({
++    title: input.title,
++    client,
++    serverId: input.serverId,
++    projectId: input.projectId,
++    path: input.path,
++    accept: (workspace) => {
++      made = workspace.id;
++      getHostRuntimeStore().acceptWorkspaceSnapshots(input.serverId, [workspace]);
++    },
++    navigate: navigateToWorkspace,
++    openClaude: placeHalves,
++  });
++  return made;
++}
++
++if (isWeb && typeof window !== "undefined") {
++  (window as unknown as { __idliOpenTeam?: unknown }).__idliOpenTeam = openIdliTeam;
 +}
 diff --git a/packages/app/src/workspace-tabs/launcher/index.tsx b/packages/app/src/workspace-tabs/launcher/index.tsx
 index c55208fc..d563db4d 100644

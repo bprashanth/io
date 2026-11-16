@@ -416,6 +416,16 @@ def make_handler(files, token):
         def do_GET(self):
             u = urllib.parse.urlparse(self.path)
             qs = urllib.parse.parse_qs(u.query)
+            if u.path == "/teams-open":  # Paseo's UI (P21) opens Start here > Teams here: hand the page its token
+                if self.headers.get("Sec-Fetch-Site") not in (None, "none", "same-origin"):
+                    return self._send(403, {"error": "forbidden"})
+                self.send_response(302)
+                self.send_header("Location", "/teams?" + urllib.parse.urlencode({"t": token}))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             if u.path == "/home-open":  # Paseo's UI (P18) opens Idli home here: hand the page its token
                 # only for a top-level open (the app's own tab), never for a fetch from another site
                 if self.headers.get("Sec-Fetch-Site") not in (None, "none", "same-origin"):
@@ -503,9 +513,9 @@ def make_handler(files, token):
                     from lib import driveindex as di
                     st = di.status()
                     return self._send(200, {"status": st, "line": di.progress_line(st)})
-                if u.path == '/api/team-start':  # the Make a team button: it says Make a team in the Teams chat
+                if u.path == '/api/teams':
                     from lib import teams
-                    return self._send(200, teams.start())
+                    return self._send(200, teams.list_teams())
                 if u.path == '/api/consent':
                     return self._send(200, reveals.consent_data(files.data_dir, qs['id'][0]))
                 if u.path == '/api/reveals':
@@ -523,8 +533,8 @@ def make_handler(files, token):
                     from lib import wirelog
                     return self._send(200, wirelog.search((qs.get("q") or [""])[0][:200], (qs.get("app") or [""])[0][:40],
                                                           vault_for=lambda d: privacy.session_vault(d)))
-                if u.path == "/teams":  # Start here > Teams: the Make a team button
-                    with open(os.path.join(HERE, "lib", "teams.html"), encoding="utf-8") as f:
+                if u.path == "/teams":  # Start here > Teams: the team cards and the New team panels
+                    with open(os.path.join(HERE, "lib", "teams_page.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
                 if u.path == "/skills":
                     with open(os.path.join(HERE, "lib", "skills.html"), encoding="utf-8") as f:
@@ -548,9 +558,24 @@ def make_handler(files, token):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(min(n, 100000))
                                   or b"{}")
-                if u.path == '/api/team-start':  # the Make a team button: it says Make a team in the Teams chat
+                if u.path in ('/api/team-check', '/api/team-goal', '/api/team-create', '/api/team-open',
+                              '/api/team-delete'):  # Start here > Teams (lib/teams_page.html)
                     from lib import teams
-                    return self._send(200, teams.start())
+                    if u.path == '/api/team-check':
+                        return self._send(200, teams.name_from(body.get('name')))
+                    if u.path == '/api/team-goal':
+                        return self._send(200, {'goal': teams.goal_from(body.get('text'))})
+                    if u.path == '/api/team-open':
+                        return self._send(200, teams.open_team(str(body.get('id'))))
+                    if u.path == '/api/team-delete':
+                        return self._send(200, teams.delete_team(str(body.get('id'))))
+                    spec = {k: body.get(k) for k in ('name', 'goal', 'data', 'people', 'private', 'outside')}
+                    spec['outside'] = spec['outside'] is True
+                    out = teams.create(spec, HERE)
+                    if out.get('ok'):
+                        out['id'] = os.path.basename(out['folder'])
+                        out.pop('folder', None)
+                    return self._send(200, out)
                 if u.path == '/api/consent':
                     return self._send(200, reveals.decide(files.data_dir, body['id'], body['approve']))
                 if u.path == '/api/reveals/hide':
