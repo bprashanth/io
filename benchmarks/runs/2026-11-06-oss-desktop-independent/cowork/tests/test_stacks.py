@@ -243,3 +243,26 @@ class Wall(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Onboarding(unittest.TestCase):
+    def test_setup_answers_go_to_the_builder(self):
+        from unittest.mock import patch
+        from lib import builder, teams
+        d = Path(tempfile.mkdtemp(prefix='idli-onboard-'))
+        (d / 'team.json').write_text(json.dumps({'name': 'Helpline', 'goal': 'Help families in Ramtekdi',
+                                                 'data': 'Google Drive', 'people': 'A few of us', 'private': 'Yes',
+                                                 'outside': 'ask'}))
+        with patch('lib.privacy.mask_free_text', side_effect=lambda dd, t: t.replace('Ramtekdi', 'PLACE_001')):
+            text = builder.setup_prompt(d)
+        for want in ('New team: Helpline', 'PLACE_001', 'A few of us', 'ask each time', 'setup-team'):
+            self.assertIn(want, text)
+        self.assertNotIn('Ramtekdi', text)
+        with patch.object(teams, '_team_folder', return_value=str(d)), \
+                patch.object(teams, 'open_team', return_value={'ok': True, 'workspace': 'wks_1'}), \
+                patch.object(builder, 'open_setup', return_value={'focused': True}) as opened:
+            self.assertEqual(teams.setup_with_builder('helpline'), {'ok': True, 'focused': True})
+        opened.assert_called_once_with(str(d), 'wks_1')
+        with patch.object(teams, '_team_folder', return_value=str(d)), \
+                patch.object(teams, 'open_team', return_value={'ok': False, 'error': 'x'}):
+            self.assertFalse(teams.setup_with_builder('helpline')['ok'])

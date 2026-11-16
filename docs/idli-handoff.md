@@ -1,7 +1,48 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-16 (~21:00 IST), DGX. Overwrite this page whenever the state changes. Keep `chronology/` (one
+Last updated 2026-11-17 (~03:00 IST), DGX. Overwrite this page whenever the state changes. Keep `chronology/` (one
 file per step since 2026-11-13) and the narratives in step with it.
+
+## Checkpoint 2026-11-17: team stacks (overnight)
+
+New since the checkpoint below:
+- **Read [narrative/TEAM_STACKS.md](../narrative/TEAM_STACKS.md)** after the three narratives listed below. A team
+  can bring its own open-source tools:
+  - the Builder writes `extensions/stack/` (pixi.toml, stack.json);
+  - Idli installs it inside a wall that reaches only package and code hosts, after the person's yes;
+  - every version is pinned;
+  - the stack runs with no internet (and an optional door to the 9B).
+  
+  New capability kinds are **tool** (Analyst `team_run`) and **app** (a page, `app_open`). New team setup ends in
+  the Builder (`setup-team` skill). The results of 2 development and 5 held-out requests are at the end of the
+  narrative. The chronology is `chronology/2026-11-17T0200-team-stacks-overnight.md`.
+- **Code:**
+  - `cowork/lib/stackwall.py`;
+  - `desktop/idli-stack-consent.py` (the PreToolUse hook);
+  - `teamcaps` (tool, app, stack, ignores);
+  - `idli_mcp` (`stack_install`, `stack_run`, `team_run`, `app_open`);
+  - `builder.setup_prompt` and `open_setup`, `teams.setup_with_builder`, `/api/team-setup`;
+  - `tests/test_stacks.py`.
+
+  Local commits `ebb0a58c`..`536427a1` (plus this checkpoint) are on `oss-desktop-eval`. **Not pushed.**
+- **Production changes on the DGX:**
+  - the 9B (`idli-9b`) was recreated with `--mmproj .../mmproj-F16.gguf` (vision on, as the owner agreed on
+    2026-11-16);
+  - the old container is kept stopped as `idli-9b-novision` for rollback;
+  - pixi 0.84.2 is in `~/idli-insights/platform/bin`;
+  - Muse was untouched and gets no images.
+- **Security fix:** the account's claude.ai connectors (Drive, Gmail and Calendar, all signed in on the DGX) loaded
+  in the Analyst and the Builder, around masking. Both launchers now set `ENABLE_CLAUDEAI_MCP_SERVERS=false`. Check
+  the laptop's account after the next sync.
+- **Test teams on the DGX** (`~/idli-insights/teams/`), each with a stack and a test file from Wikimedia Commons or
+  written by me:
+  - event-media and event-media-mate (the teammate test);
+  - field-notes, helpline, comms, leads, training and survey.
+
+  Their Builder sessions are in tmux (`b1`, `b2`, `h1` to `h5`).
+- **Laptop:** not synced. `git fetch dgx` from the laptop asked for a Tailscale browser check, which only the owner
+  can pass. After that, sync, install pixi (x86_64) into `~/idli-insights/platform/bin`, and rerun the Teams page
+  New team flow there.
 
 ## Checkpoint 2026-11-16: read this first, then the narratives
 
