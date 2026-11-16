@@ -5,6 +5,8 @@ private folder (the real files, the vault, privacy choices), Idli's caches or th
 and search tools get the same limits as permission rules. Idli's own tools (MCP) run outside the sandbox.
 """
 import json
+import sys
+import shlex
 from pathlib import Path
 import os
 import tempfile
@@ -99,7 +101,12 @@ def merge_builder(ext, data_dir, platform):
     scratch = str(Path(tempfile.gettempdir()) / f'claude-{os.getuid()}')
     permissions['additionalDirectories'] = sorted(set(permissions.get('additionalDirectories', []) + [scratch]))
     permissions['allow'] = sorted(set(permissions.get('allow', []) + [
-        f'Read(/{Path(platform).resolve()}/**)', 'mcp__idli__team_check', 'mcp__idli__team_save', 'mcp__idli__platform_request']))
+        f'Read(/{Path(platform).resolve()}/**)', 'mcp__idli__team_check', 'mcp__idli__team_save',
+        'mcp__idli__platform_request', 'mcp__idli__stack_run']))
+    # Its own settings and the installed stack are Idli's, not the Builder's to change
+    permissions['deny'] = sorted(set(permissions['deny'] + [
+        f'Edit(/{Path(ext).resolve()}/.claude/**)', f'Edit(/{Path(ext).resolve()}/stack/.pixi/**)',
+        f'Edit(/{Path(ext).resolve()}/stack/stack-lock.json)']))
     sandbox = settings.setdefault('sandbox', {})
     sandbox.update({'enabled': True, 'autoAllowBashIfSandboxed': True, 'allowUnsandboxedCommands': False})
     sandbox.setdefault('filesystem', {})['denyRead'] = private
@@ -110,3 +117,17 @@ def merge_builder(ext, data_dir, platform):
     with os.fdopen(fd, 'w') as out:
         json.dump(settings, out, indent=2)
     os.replace(temp, path)
+
+
+def builder_hooks(data_dir, platform):
+    """The Builder's hooks, in a settings file outside extensions/ (passed with --settings): installs ask the person,
+    with a summary Idli writes."""
+    path = Path(data_dir).resolve() / '.idli' / 'builder-settings.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    hook = str(Path(platform).resolve() / 'desktop' / 'idli-stack-consent.py')
+    settings = {'hooks': {'PreToolUse': [{'matcher': 'mcp__idli__stack_install',
+                                          'hooks': [{'type': 'command', 'timeout': 30, 'command': ' '.join(
+                                              shlex.quote(x) for x in (sys.executable, '-I', hook,
+                                                                       str(Path(data_dir).resolve())))}]}]}}
+    path.write_text(json.dumps(settings, indent=2))
+    return path

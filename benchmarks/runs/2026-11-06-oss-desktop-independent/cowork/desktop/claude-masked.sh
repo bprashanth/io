@@ -100,4 +100,6 @@ CLAUDE_BIN=${CLAUDE_BIN:-$(command -v claude || echo "$HOME/.local/bin/claude")}
 # The tab says Analyst (Claude Code would otherwise set its own title).
 export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
 printf '\033]0;Analyst\007'
+# The account's claude.ai connectors (Drive, Gmail, Calendar) would reach real data around Idli's masking: off.
+export ENABLE_CLAUDEAI_MCP_SERVERS=false
 exec "$CLAUDE_BIN" "--mcp-config=$WORK/.idli-mcp.json" "$@"

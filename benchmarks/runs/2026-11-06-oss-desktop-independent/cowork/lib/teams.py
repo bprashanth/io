@@ -737,10 +737,27 @@ def open_team(team_id):
     except Exception:
         got = None
     if isinstance(got, str) and got.startswith('wks_'):
-        return {'ok': True}
+        return {'ok': True, 'workspace': got}
     if got == 'old':
         return {'ok': False, 'error': 'This Paseo is too old to open teams from here. Click the team in the sidebar.'}
     return {'ok': False, 'error': f'Could not open {proj.get("name") or "the team"}. Click it in the sidebar.'}
+
+
+def setup_with_builder(team_id):
+    """After the setup questions: open the new team and start its Builder with the answers
+    (narrative/TEAM_STACKS.md). The Builder talks through the team's work and builds the first pieces."""
+    folder = _team_folder(team_id)
+    if not folder or team_id == 'drivey':
+        return {'ok': False, 'error': 'That team is gone. Reload the page.'}
+    opened = open_team(team_id)
+    if not opened.get('ok'):
+        return opened
+    from lib import builder
+    try:
+        out = builder.open_setup(folder, opened['workspace'])
+    except ValueError as exc:
+        return {'ok': False, 'error': str(exc)}
+    return {'ok': True, 'focused': out.get('focused')}
 
 
 def _stop_page_server(folder):

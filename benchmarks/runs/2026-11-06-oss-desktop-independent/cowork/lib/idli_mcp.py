@@ -176,6 +176,85 @@ TOOLS['builder_open'] = (builder_open, "After the person says yes, open this tea
                                                                        'two plain sentences.'}}, ['request'])
 
 
+def _original(name):
+    """The original file behind a name the Analyst knows (a masked copy, a table read from it, or the file)."""
+    from lib import teamcaps
+    base = data_dir()
+    rel = str(name).strip().lstrip('/')
+    rel = rel[6:] if rel.startswith('Drive/') else rel
+    for cand in (rel, 'drive/' + rel):
+        p = (base / cand).resolve()
+        while p.is_relative_to(base) and p != base:
+            if p.is_file() and teamcaps.kind_of(p) and not p.name.endswith('.csv') or (
+                    p.is_file() and p.suffix == '.csv' and not p.name.count('.') > 1):
+                return p
+            if p.suffix:
+                p = p.with_name(p.stem)  # talk.mp4.table.csv -> talk.mp4.table -> talk.mp4
+            else:
+                break
+    raise ValueError(f'{name} is not one of the files in this workspace.')
+
+
+def _masked(obj, depth=0):
+    """A tool's short result, with free text masked the way Claude's requests are (lib/privacy.mask_free_text)."""
+    from lib import privacy
+    if depth > 4:
+        return None
+    if isinstance(obj, str):
+        return ' '.join(privacy.mask_free_text(str(data_dir()), obj[:500]).split())
+    if isinstance(obj, (int, float, bool)) or obj is None:
+        return obj
+    if isinstance(obj, dict):
+        return {str(k)[:60]: _masked(v, depth + 1) for k, v in list(obj.items())[:40]}
+    if isinstance(obj, (list, tuple)):
+        return [_masked(v, depth + 1) for v in list(obj)[:40]]
+    return None
+
+
+def team_run(capability, files, instructions=None):
+    """Run one of the team's tools on the original files, on this computer."""
+    from lib import teamcaps
+    cap = next((c for c in teamcaps.tools(str(data_dir())) if c['id'] == capability), None)
+    if not cap:
+        raise ValueError('That is not one of this team\'s tested tools. See the list in your instructions.')
+    instructions = home.rehydrate(data_dir(), [instructions or {}])[0]  # codes back to real values, locally
+    res = teamcaps.run_tool(str(data_dir()), cap, [_original(f) for f in (files or [])], instructions)
+    rel = Path(res['folder']).relative_to(data_dir())
+    return {'done': True, 'folder': str(rel), 'files': res['files'],
+            'result': _masked(res['result']),
+            'tell_person': f'The result is in {rel}. Open it from the team folder.'}
+
+
+def app_open(capability):
+    """Open a page the team serves (an app capability) in the person's browser tab, on this computer."""
+    from lib import stackwall, teamcaps, uiswitch
+    cap = next((c for c in teamcaps.capabilities(str(data_dir())) if c.get('kind') == 'app' and
+                c['id'] == capability), None)
+    if not cap:
+        raise ValueError('That is not one of this team\'s tested pages.')
+    page = stackwall.serve(str(data_dir()), cap['serve'], data_dir() / 'apps' / cap['id'])
+    shown = {}
+    if os.environ.get('IDLI_WORKSPACE'):
+        try:
+            shown = uiswitch.open_url(os.environ['IDLI_WORKSPACE'], page['url'], side='left')
+        except Exception:
+            shown = {}
+    return {'opened': bool(shown.get('ok')), 'tell_person': f"{cap['title']} is open in a tab on the left." if
+            shown.get('ok') else f"{cap['title']} is running. Open {page['url']} in the browser."}
+
+
+TOOLS['team_run'] = (team_run, "Run one of this team's tested tools (your instructions list them) on the original "
+                     'files, on this computer. Only file names and a short result come back.',
+                     {'capability': {'type': 'string'},
+                      'files': {'type': 'array', 'items': {'type': 'string'},
+                                'description': 'Files as you know them in this workspace (a table read from a video '
+                                               'names that video).'},
+                      'instructions': {'type': 'object', 'description': 'What the tool asks for (its line in your '
+                                       'instructions says).'}}, ['capability', 'files'])
+TOOLS['app_open'] = (app_open, "Open one of this team's pages (apps) for the person, on this computer.",
+                     {'capability': {'type': 'string'}}, ['capability'])
+
+
 # ---- the Builder's tools (IDLI_ROLE=builder, desktop/claude-builder.sh): it never gets the Analyst's ----
 
 def team_check():
@@ -203,13 +282,70 @@ def platform_request(need, why):
     return teamcaps.platform_request(str(data_dir()), f'{need}: {why}')
 
 
+def stack_install():
+    """Install the stack (stack/pixi.toml, stack/stack.json) inside Idli's install wall. Claude Code asks the person
+    first, with a summary Idli writes from the files (a PreToolUse hook), so Claude can't word the consent."""
+    # A separate process: a long install never holds this server, and it always runs the platform's current code
+    code = ('import json, sys; sys.path.insert(0, sys.argv[1]); from lib import stackwall; '
+            'print(json.dumps(stackwall.install(sys.argv[2])))')
+    p = subprocess.run([sys.executable, '-I', '-c', code, str(HERE), str(data_dir())], capture_output=True,
+                       text=True, timeout=4000)
+    try:
+        res = json.loads(p.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        raise ValueError('The install stopped: ' + (p.stderr or '').strip()[-400:]) from None
+    blocked = [h['host'] for h in res['hosts'] if not h['allowed']]
+    out = {'ok': res['ok'], 'steps': res['steps'], 'size': res['size'],
+           'hosts_used': [h['host'] for h in res['hosts'] if h['allowed']]}
+    if blocked:
+        out['blocked_hosts'] = blocked
+        out['note'] = ('These hosts were refused. If one is needed, add it to "hosts" in stack.json; the person sees '
+                       'it at the next install.')
+    if not res['ok']:
+        out['log_tail'] = res.get('log_tail', '')[-1800:]
+    return out
+
+
+def stack_run(command, timeout=600):
+    """Run a command in the installed stack, inside the run wall (no internet), from stack/, with samples/ readable.
+    Files it writes to $IDLI_OUT come back in extensions/.idli-out/ for you to look at."""
+    import shlex
+    import shutil
+    from lib import stackwall, teamcaps
+    ext = teamcaps.ext_dir(str(data_dir()))
+    out = ext / '.idli-out'
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir()
+    cmd = shlex.split(str(command))
+    if not cmd:
+        raise ValueError('Give a command, for example: python tools/vad.py ../samples/talk.wav')
+    code = ('import json, sys; sys.path.insert(0, sys.argv[1]); from lib import stackwall; '
+            'print(json.dumps(stackwall.run(sys.argv[2], json.loads(sys.argv[3]), out_dir=sys.argv[4], '
+            'timeout=int(sys.argv[5]), extra_ro=json.loads(sys.argv[6]))))')
+    p = subprocess.run([sys.executable, '-I', '-c', code, str(HERE), str(data_dir()), json.dumps(cmd), str(out),
+                        str(min(int(timeout), 3600)), json.dumps([str(ext), str(teamcaps.ROOT / 'lib')])],
+                       capture_output=True, text=True, timeout=3700)
+    try:
+        res = json.loads(p.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        raise ValueError((p.stderr or 'The stack did not run.').strip()[-400:]) from None
+    return {'ok': res['ok'], 'seconds': res['seconds'], 'output': res['output'][-3000:],
+            'files_in_.idli-out': res['files'][:50], 'model_calls': res['model_calls']}
+
+
 BUILDER_TOOLS = {
     'team_check': (team_check, 'Run every capability test of this team in Idli\'s sandbox and list what the team can do.',
                    {}, []),
     'team_save': (team_save, 'After team_check passes, save a version with a one-line summary for the person.',
                   {'summary': {'type': 'string'}}, ['summary']),
-    'platform_request': (platform_request, 'Record a platform feature request (a package or model the menu lacks).',
+    'platform_request': (platform_request, 'Record a platform feature request: something the platform must give '
+                         '(a login or an action on an account, sending messages, a change to the app).',
                          {'need': {'type': 'string'}, 'why': {'type': 'string'}}, ['need', 'why']),
+    'stack_install': (stack_install, 'Install stack/ (pixi.toml packages, stack.json repos and downloads) inside '
+                      "Idli's install wall. The person is asked first. Pins everything on the first install.", {}, []),
+    'stack_run': (stack_run, 'Run a command in the installed stack inside the run wall (no internet), from stack/. '
+                  'samples/ is at ../samples. Files written to $IDLI_OUT come back in .idli-out/.',
+                  {'command': {'type': 'string'}, 'timeout': {'type': 'integer'}}, ['command']),
 }
 if os.environ.get('IDLI_ROLE') == 'builder':
     TOOLS = BUILDER_TOOLS

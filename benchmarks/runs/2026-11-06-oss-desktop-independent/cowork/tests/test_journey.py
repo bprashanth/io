@@ -394,9 +394,9 @@ class ToolTests(Fixture):
         request=json.dumps({'jsonrpc':'2.0','id':1,'method':'tools/list'})+'\n'
         result=subprocess.run([sys.executable,'-I',str(ROOT/'lib/idli_mcp.py')],input=request,text=True,capture_output=True,check=True)
         offered={t['name'] for t in json.loads(result.stdout)['result']['tools']}
-        self.assertEqual(offered,{'idli_show','idli_draft_mini','unmask','builder_open'})  # lookup withheld from Claude
+        self.assertEqual(offered,{'idli_show','idli_draft_mini','unmask','builder_open','team_run','app_open'})  # lookup withheld from Claude
         builder=subprocess.run([sys.executable,'-I',str(ROOT/'lib/idli_mcp.py')],input=request,text=True,capture_output=True,check=True,env={**os.environ,'IDLI_ROLE':'builder'})
-        self.assertEqual({t['name'] for t in json.loads(builder.stdout)['result']['tools']},{'team_check','team_save','platform_request'})
+        self.assertEqual({t['name'] for t in json.loads(builder.stdout)['result']['tools']},{'team_check','team_save','platform_request','stack_install','stack_run'})
     def test_launcher_installs_command(self):
         self.assertIn('.claude/commands/mini.md',(ROOT/'desktop/claude-masked.sh').read_text())
         self.assertIn('idli_draft_mini',(ROOT/'idli/claude-commands/mini.md').read_text())

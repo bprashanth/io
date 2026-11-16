@@ -172,8 +172,17 @@ def manifest(data_dir):
             if not str(c.get('title', '')).strip():
                 raise ValueError('a title is missing')
             kind = c.get('kind', 'reader')
-            if kind not in ('reader', 'skill'):
-                raise ValueError('kind is reader or skill')
+            if kind not in ('reader', 'skill', 'tool', 'app'):
+                raise ValueError('kind is reader, skill, tool or app')
+            if (c.get('stack') or kind == 'app') and not (d / 'stack' / 'pixi.toml').is_file():
+                raise ValueError('it uses the stack, but stack/pixi.toml is missing')
+            if kind == 'tool':
+                takes = c.get('takes') or []
+                if not takes or any(t not in KINDS and t != 'none' for t in takes):
+                    raise ValueError('takes lists file kinds (' + ', '.join(KINDS) + ') or none')
+                _entry(d, c.get('entry', ''))
+            if kind == 'app' and not re.fullmatch(r'[\w-]{1,40}', str(c.get('serve', ''))):
+                raise ValueError('serve names a task in stack/pixi.toml that starts the page')
             if kind == 'reader':
                 reads = c.get('reads') or []
                 if not reads or any(r not in KINDS or r == 'spreadsheet' for r in reads):
@@ -183,7 +192,7 @@ def manifest(data_dir):
                 if not (d / 'skills' / str(c['skill']) / 'SKILL.md').is_file():
                     raise ValueError('skills/' + str(c['skill']) + '/SKILL.md is missing')
             _entry(d, c.get('test', ''))
-            good.append({**c, 'kind': kind})
+            good.append({**c, 'kind': kind, 'stack': bool(c.get('stack') or kind == 'app')})
         except (ValueError, KeyError) as exc:
             problems.append(f"{c.get('id', '?') if isinstance(c, dict) else '?'}: {exc}")
     return good, problems
@@ -200,7 +209,16 @@ def _fingerprint(d, cap):
         h.update(rel.encode() + b'\0' + (p.read_bytes() if p.is_file() else b'') + b'\0')
     for p in sorted(d.glob('*.py')):  # helpers next to the entries
         h.update(p.name.encode() + p.read_bytes())
+    if cap.get('stack'):  # the stack's definition and its code, not what got installed
+        st = d / 'stack'
+        for p in sorted(st.rglob('*')):
+            rel = p.relative_to(st)
+            if p.is_file() and rel.parts[0] not in STACK_INSTALLED and not rel.name.startswith('.'):
+                h.update(str(rel).encode() + b'\0' + p.read_bytes())
     return h.hexdigest()[:16]
+
+
+STACK_INSTALLED = ('.pixi', 'repos', 'models', '.cache')
 
 
 def _tested(data_dir):
@@ -252,17 +270,30 @@ def _wall(cmd, reads, writes):
     return chartkit.wall(cmd, reads=reads, writes=writes)
 
 
-def run_reader(data_dir, cap, src, timeout=300):
+def _in_stack(data_dir, code, argv, inputs=(), out=None, timeout=1800, cwd=None):
+    """Run platform glue code with the stack's Python, inside the stack's run wall (lib/stackwall.py)."""
+    from lib import stackwall
+    if not stackwall.installed(data_dir):
+        raise ValueError('The stack is not installed. The Builder installs it with stack_install.')
+    return stackwall.run(data_dir, ['python', '-I', '-c', code, *map(str, argv)], inputs=inputs, out_dir=out,
+                         timeout=timeout, cwd=cwd, extra_ro=[ROOT / 'lib', ext_dir(data_dir)])
+
+
+def run_reader(data_dir, cap, src, timeout=1800):
     """Turn one file into CSV tables with the team's reader, inside the wall. Returns the CSV paths (next to src)."""
     d = ext_dir(data_dir)
     src = Path(src).resolve()
     entry = _entry(d, cap['entry'])
     with tempfile.TemporaryDirectory(prefix='idli-read-') as out:
-        cmd = _wall([_python(), '-I', '-c', RUN_READER, str(ROOT), str(entry), str(src), out],
-                    reads=[str(ROOT / 'lib'), str(ROOT / '.venv'), str(d), str(src)], writes=[out])
-        run = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=out)
+        if cap.get('stack'):
+            r = _in_stack(data_dir, RUN_READER, [ROOT, entry, src, out], inputs=[src], out=out, timeout=timeout)
+            failed = not r['ok']
+        else:
+            cmd = _wall([_python(), '-I', '-c', RUN_READER, str(ROOT), str(entry), str(src), out],
+                        reads=[str(ROOT / 'lib'), str(ROOT / '.venv'), str(d), str(src)], writes=[out])
+            failed = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=out).returncode
         tables = sorted(Path(out).glob('*.csv'))
-        if run.returncode or not tables:
+        if failed or not tables:
             raise ValueError(f"{cap['title']} could not read this file.")
         made = []
         for i, t in enumerate(tables[:20]):
@@ -287,6 +318,14 @@ def run_tests(data_dir, timeout=300):
     caps, problems = manifest(data_dir)
     results = {}
     for c in caps:
+        if c.get('stack'):
+            try:
+                r = _in_stack(data_dir, RUN_TEST, [ROOT, _entry(d, c['test'])], cwd=d, timeout=timeout)
+                ok, out = r['ok'], r['output'][-1500:]
+            except ValueError as exc:
+                ok, out = False, str(exc)
+            results[c['id']] = {'ok': ok, 'fingerprint': _fingerprint(d, c), 'at': int(time.time()), 'output': out}
+            continue
         with tempfile.TemporaryDirectory(prefix='idli-test-') as tmp:
             cmd = _wall([_python(), '-I', '-c', RUN_TEST, str(ROOT), str(_entry(d, c['test']))],
                         reads=[str(ROOT / 'lib'), str(ROOT / '.venv'), str(d)], writes=[tmp])
@@ -301,6 +340,57 @@ def run_tests(data_dir, timeout=300):
     return {'results': {k: {'ok': v['ok'], 'output': v['output']} for k, v in results.items()}, 'problems': problems}
 
 
+RUN_TOOL = r"""
+import importlib.util, json, sys
+root, entry, out, args = sys.argv[1:5]
+inputs = sys.argv[5:]
+sys.path.insert(0, root + '/lib')
+spec = importlib.util.spec_from_file_location('tool', entry)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+res = mod.run(inputs, json.loads(args), out)
+print('IDLI_RESULT ' + json.dumps(res if isinstance(res, dict) else {}, default=str)[:4000])
+"""
+
+
+def tools(data_dir):
+    return [c for c in capabilities(data_dir) if c.get('kind') == 'tool']
+
+
+def run_tool(data_dir, cap, inputs, args, timeout=3600):
+    """Run a tool on the original files with the Analyst's instructions (JSON). Its files go to the team's
+    outputs/ folder, which the person opens; the Analyst gets back only file names and the tool's short result."""
+    d = ext_dir(data_dir)
+    inputs = [Path(p).resolve() for p in inputs]
+    takes = cap.get('takes') or []
+    for p in inputs:
+        if kind_of(p) not in takes and kind_of(p) != 'spreadsheet':
+            raise ValueError(f"{cap['title']} takes {', '.join(label(k) for k in takes if k in KINDS)}.")
+    out = Path(data_dir).resolve() / 'outputs' / (time.strftime('%Y-%m-%d %H%M%S ') + cap['id'])
+    out.mkdir(parents=True, exist_ok=True)
+    entry = _entry(d, cap['entry'])
+    argv = [ROOT, entry, out, json.dumps(args or {}), *inputs]
+    if cap.get('stack'):
+        r = _in_stack(data_dir, RUN_TOOL, argv, inputs=inputs, out=out, timeout=timeout)
+        ok, text = r['ok'], r['output']
+    else:
+        cmd = _wall([_python(), '-I', '-c', RUN_TOOL, *map(str, argv)],
+                    reads=[str(ROOT / 'lib'), str(ROOT / '.venv'), str(d), *map(str, inputs)], writes=[str(out)])
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(out))
+        ok, text = p.returncode == 0, p.stdout + p.stderr
+    result = {}
+    for line in text.splitlines():
+        if line.startswith('IDLI_RESULT '):
+            try:
+                result = json.loads(line[12:])
+            except ValueError:
+                pass
+    if not ok:
+        raise ValueError(f"{cap['title']} did not finish on this file.")
+    return {'folder': str(out), 'files': sorted(str(p.relative_to(out)) for p in out.rglob('*') if p.is_file()),
+            'result': result}
+
+
 # ---- what each model is told ----
 
 def describe(data_dir, team):
@@ -308,7 +398,9 @@ def describe(data_dir, team):
     lines = [f'# What {team} knows how to do', '',
              f'These are the tested capabilities of the {team} team. Work only within them:']
     for c in capabilities(data_dir):
-        lines.append(f"- {c['title']}" + (f" ({c.get('analyst', '')})" if c.get('analyst') else ''))
+        how = {'tool': f" (tool `{c['id']}`: call team_run)", 'app': f" (a page: call app_open with `{c['id']}`)"}
+        lines.append(f"- {c['title']}" + (f" ({c.get('analyst', '')})" if c.get('analyst') else '')
+                     + how.get(c.get('kind'), ''))
     missing = [label(k) for k in KINDS if k not in readable(data_dir)]
     if missing:
         lines += ['', f"{team} can't read these yet: " + ', '.join(missing) + '.']

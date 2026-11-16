@@ -559,12 +559,14 @@ def make_handler(files, token):
                 body = json.loads(self.rfile.read(min(n, 100000))
                                   or b"{}")
                 if u.path in ('/api/team-check', '/api/team-goal', '/api/team-create', '/api/team-open',
-                              '/api/team-delete', '/api/team-versions', '/api/team-restore'):  # Start here > Teams (lib/teams_page.html)
+                              '/api/team-delete', '/api/team-versions', '/api/team-restore', '/api/team-setup'):  # Start here > Teams (lib/teams_page.html)
                     from lib import teams
                     if u.path == '/api/team-check':
                         return self._send(200, teams.name_from(body.get('name')))
                     if u.path == '/api/team-goal':
                         return self._send(200, {'goal': teams.goal_from(body.get('text'))})
+                    if u.path == '/api/team-setup':
+                        return self._send(200, teams.setup_with_builder(str(body.get('id'))))
                     if u.path == '/api/team-open':
                         return self._send(200, teams.open_team(str(body.get('id'))))
                     if u.path == '/api/team-delete':

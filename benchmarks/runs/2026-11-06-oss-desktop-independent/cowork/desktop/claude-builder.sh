@@ -18,8 +18,10 @@ teamcaps.checkpoint(data, ('Before: ' + request.split('"')[1] if request.count('
 team = teamcaps.team_name(data)
 claude = ext / '.claude'
 (claude / 'skills').mkdir(parents=True, exist_ok=True)
-shutil.rmtree(claude / 'skills' / 'build-team', ignore_errors=True)
-shutil.copytree(Path(root) / 'idli/builder-skills/build-team', claude / 'skills' / 'build-team')
+for sk in sorted((Path(root) / 'idli/builder-skills').iterdir()):
+    if (sk / 'SKILL.md').is_file():
+        shutil.rmtree(claude / 'skills' / sk.name, ignore_errors=True)
+        shutil.copytree(sk, claude / 'skills' / sk.name)
 caps, problems = teamcaps.manifest(data)
 active = [c['title'] for c in teamcaps.capabilities(data)]
 text = (Path(root) / 'idli/CLAUDE-builder.md').read_text().replace('{team}', team).replace('{platform}', root)
@@ -29,6 +31,7 @@ if problems:
 text += '\n## The capability menu on this computer\n' + capmenu.describe() + '\n'
 (claude / 'CLAUDE.md').write_text(text)
 launchsettings.merge_builder(ext, data, root)
+launchsettings.builder_hooks(data, root)
 rolelabels.apply(claude / 'settings.json', 'builder', team)
 mcp = {'mcpServers': {'idli': {'command': root + '/.venv/bin/python', 'args': ['-I', root + '/lib/idli_mcp.py'],
        'env': {'IDLI_ROLE': 'builder', 'IDLI_DATA': str(Path(data).resolve())}}}}
@@ -54,4 +57,7 @@ unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CONFIG_DIR ANTHROPIC_BASE_UR
 CLAUDE_BIN=${CLAUDE_BIN:-$(command -v claude || echo "$HOME/.local/bin/claude")}
 export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
 printf '\033]0;Builder\007'
-exec "$CLAUDE_BIN" "--mcp-config=$EXT/.claude/idli-mcp.json" "$@"
+# The account's claude.ai connectors (Drive, Gmail, Calendar) would reach real data around Idli's masking: off.
+export ENABLE_CLAUDEAI_MCP_SERVERS=false
+export MCP_TOOL_TIMEOUT=${MCP_TOOL_TIMEOUT:-3600000}
+exec "$CLAUDE_BIN" "--mcp-config=$EXT/.claude/idli-mcp.json" --settings "$DATA/.idli/builder-settings.json" "$@"

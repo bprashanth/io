@@ -72,3 +72,37 @@ def open_builder(data_dir, request, workspace='', kinds=None, files=None):
     return {'terminal': tid, 'focused': bool(shown.get('ok')),
             'reply': f'The Builder has your request on the right. It works on {team} itself, with fake samples. '
                      'Your files are not sent.'}
+
+
+def setup_prompt(data_dir):
+    """The new team's answers, as the Builder's first message (the goal is the person's own words, so masked)."""
+    from lib import privacy
+    try:
+        meta = json.loads((Path(data_dir) / 'team.json').read_text())
+    except (OSError, ValueError):
+        meta = {}
+    name = meta.get('name') or teamcaps.team_name(data_dir)
+    goal = ' '.join(privacy.mask_free_text(data_dir, meta.get('goal') or '').split())[:300]
+    outside = {'always': 'yes (only masked data is sent)', 'ask': 'ask each time (only masked data is sent)'}.get(
+        meta.get('outside'), 'no')
+    lines = [f'New team: {name}. Setup answers:',
+             f'- Works towards: {goal or "(left blank)"}',
+             f'- Data kept in: {meta.get("data") or "not said"}',
+             f'- Used by: {meta.get("people") or "not said"}',
+             f'- Files have names, places or phone numbers: {meta.get("private") or "not said"}',
+             f'- Outside service when a Mini cannot answer: {outside}',
+             'Read the setup-team skill, then start the conversation.']
+    return ' '.join(lines)
+
+
+def open_setup(data_dir, workspace):
+    """Start the Builder in a new team's first workspace with its setup answers."""
+    from lib import uiswitch
+    teamcaps.ensure(data_dir)
+    prompt = setup_prompt(data_dir)
+    try:
+        tid = _terminal(workspace) or _start(workspace, data_dir, prompt)
+        shown = uiswitch.show_terminal(workspace, tid, 'right')
+    except (OSError, ValueError, json.JSONDecodeError, subprocess.SubprocessError):
+        raise ValueError('Idli could not open the Builder. Open the team and type "open the Builder".') from None
+    return {'terminal': tid, 'focused': bool(shown.get('ok'))}

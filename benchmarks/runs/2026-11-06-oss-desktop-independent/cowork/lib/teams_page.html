@@ -228,7 +228,8 @@ function render() {
         : a.outside === "Yes" ? "Minis answer on this computer. New questions go to an outside service. Only masked data is sent."
         : "Minis answer on this computer. New questions go to an outside service only if you say yes.",
       a.people === "Just me" ? "For you for now. Others can join later."
-        : "For your team. Each person uses their own Google login."];
+        : "For your team. Each person uses their own Google login.",
+      "Next, the Builder asks about your work and sets up the team with you."];
     body.innerHTML = `<h2>${esc(s.q(a))}</h2><div class="plan"><b>${name}</b>${a.goal ? `<div class="msg">Works towards: ${esc(a.goal)}</div>` : ""}
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>`;
   }
@@ -257,7 +258,10 @@ async function next() {
     $("back").disabled = false;
     if (!out.ok) { $("next").disabled = false; return say(out.error || "Could not set it up. Try again.", true); }
     fresh = out.id;
-    return showDash(`${out.name} is ready. Click Open to start.`);
+    say(`Opening ${out.name} and its Builder...`);
+    const setup = await api("/api/team-setup", {id: out.id});
+    return showDash(setup.ok ? `${out.name} is ready. Its Builder is waiting for you on the right.`
+      : `${out.name} is ready. Click Open, then type "open the Builder" to set it up with the Builder.`);
   }
 }
 $("next").onclick = next;
