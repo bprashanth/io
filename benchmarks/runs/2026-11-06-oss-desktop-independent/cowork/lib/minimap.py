@@ -120,7 +120,9 @@ def mentions(text):
     file names are resolved against the index by fetch(), using the longest match.
     """
     # Paseo's @ picker inserts a path with spaces quoted and without the @: "Drive/My Drive/x.xlsx"
-    pattern = r'(?:@?"Drive/([^"\n]+)"|@?\'Drive/([^\'\n]+)\'|@Drive/([^@\n<>"\'`]+))'
+    # The picker also lists the team's downloaded copies ("drive/My Drive/x.png", "...x.png.csv"): those mean the
+    # Drive original, so they are read again from Drive.
+    pattern = r'(?:@?"[Dd]rive/([^"\n]+)"|@?\'[Dd]rive/([^\'\n]+)\'|@[Dd]rive/([^@\n<>"\'`]+))'
     paths = []
     for match in re.finditer(pattern, str(text)):
         quoted = match[1] or match[2]
@@ -129,8 +131,16 @@ def mentions(text):
             end = re.search(r'/\s|\.[A-Za-z0-9]{1,10}(?=[\s,;!?)]|$)', tail)
             if end:
                 tail = tail[:end.start() + 1] if end.group().startswith('/') else tail[:end.end()]
-        paths.append('Drive/' + tail.strip().rstrip('.,;!?'))
+        paths.append('Drive/' + _original(tail.strip().rstrip('.,;!?')))
     return list(dict.fromkeys(paths))
+
+
+def _original(rel):
+    """A downloaded copy's name back to its Drive file: x.png.csv, x.png.table.csv, x.xlsx.source.json -> x.png ..."""
+    rel = re.sub(r'\.source\.json$', '', rel)
+    m = re.match(r'(.+\.(?:png|jpe?g|webp|tiff?|bmp|heic|pdf|docx?|pptx|txt|mp3|m4a|wav|ogg|opus|aac|amr|mp4|mov|avi|'
+                 r'mkv|webm|3gp|xlsx))(?:\.[\w-]+)?\.csv$', rel, re.I)
+    return m.group(1) if m else rel
 
 
 def without_mentions(text, paths):
@@ -138,4 +148,5 @@ def without_mentions(text, paths):
         text = text.replace('@"' + path + '"', '').replace("@'" + path + "'", '')
         text = text.replace('"' + path + '"', '').replace("'" + path + "'", '')
         text = text.replace('@' + path, '').replace('@' + path.replace(' ', '\\ '), '')
+    text = re.sub(r'@?"drive/[^"\n]+"|@?\'drive/[^\'\n]+\'', '', text)  # downloaded copies (see mentions)
     return ' '.join(text.split()).strip(' ,:;') or 'Help me understand these files.'

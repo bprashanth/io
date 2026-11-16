@@ -1080,7 +1080,7 @@ def _drivey_question(msgs):
             continue
         own = [t for t in (_strip_reminders(b.get('text', '')).strip() for b in blocks if b.get('type') == 'text') if t]
         if own:
-            q = re.sub(r'@?"Drive/[^"]+"|@?\'Drive/[^\']+\'|@Drive/\S+', 'this file', own[-1])
+            q = re.sub(r'@?"[Dd]rive/[^"]+"|@?\'[Dd]rive/[^\']+\'|@[Dd]rive/\S+', 'this file', own[-1])
             return ' '.join(q.split())
     return None
 
