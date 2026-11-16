@@ -54,3 +54,16 @@ result on files the Builder never made: public recordings from Wikimedia Commons
 - installed stacks were committed to team git (up to 2.2 GB);
 - a stale git lock was left behind;
 - the capability menu still said the private model can't read images.
+
+**Laptop run (03:00-, test account), "verify like a real human":**
+- **Sync.** `git fetch dgx` still needs the owner's Tailscale browser check. Instead, the changed cowork files went
+  to the laptop through its Paseo terminal, in base64 chunks (md5 checked). The laptop's copies were first checked
+  to equal the last synced versions. Committed on the laptop as `9e3b4c10 sync from DGX (team stacks)`. pixi 0.84.2
+  (x86_64) is in `~/idli-insights/platform/bin`.
+- **Tests on x86:** `tests/test_stacks.py` passes there, including the slow ones (a real install through the
+  proxy, then the no-network run).
+- **Teams > New team in the app,** clicked through as a person ("Field Media", Google Drive, A few of us, Yes, Ask
+  me each time). Set it up opened the new workspace: Idli on the left, the Builder on the right with the setup
+  answers. Rough edges:
+  - the tab header reads "Analyst" while the Builder is shown (its own tab is only an icon);
+  - Claude Code's banner shows the account email.
