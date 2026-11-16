@@ -67,3 +67,40 @@ result on files the Builder never made: public recordings from Wikimedia Commons
   answers. Rough edges:
   - the tab header reads "Analyst" while the Builder is shown (its own tab is only an icon);
   - Claude Code's banner shows the account email.
+- **The Builder, as a person** ("We keep screenshots of tables from reports in Drive... turn them into
+  spreadsheets... Do what you think is right"). It built a reader with Tesseract and img2table in 10 min, with one
+  install prompt. In the laptop's narrow right pane, the prompt showed only "For: ..." and "(+25 more lines)": the
+  person couldn't see what was installed. **Fixed:** the prompt now starts with "Adds: ..." and "Runs on this
+  computer with no internet".
+- **The 9B wasn't offered.** On the laptop the private model is reached through silo, but the menu and the stack's
+  model door only knew the DGX's `127.0.0.1:8291`. **Fixed:**
+  - `stackwall.model_upstream()` uses silo with Cloudflare Access when it is set up, and forces model `idli-9b`;
+  - the door accepts only JSON chat, so nothing can reach Muse;
+  - the router has `/idli/9b/props`;
+  - the Builder has a live `capability_menu` tool.
+- **Left chat, @ finance_caste_table.png.** The table's shape was right, but numbers were wrong (2.5% read as 25%,
+  4.5% as 45%, 2005 as 200). Told so, as a person, the Builder added a second OCR reader: two readers must agree,
+  otherwise the cell is flagged. Retried, every number was right and the one doubtful cell was flagged.
+- **Bugs a person hit, all fixed:**
+  - the @ picker offers the team's downloaded copies (`drive/...png`, `.png.csv`, even `.source.json`), and Idli
+    answered "Add files with @". A copy now means its Drive original;
+  - "(read as csv)" now reads "(read as table)";
+  - "Accept Idli's choices" hid every number. A reader's table hid all text columns, and "92.8%" counted as text.
+    Numbers, percentages, amounts and years now count as numbers. Phone and ID digit strings never do;
+  - the name detector hid number columns under a person-sounding heading ("Caste category of enterprise owner").
+    In a reader's table, a column of numbers stays visible;
+  - a percentage or year hidden once stayed masked in every file (free-text matching). Percentages and years are
+    no longer matched in free text;
+  - the Analyst said the team "can't read images": its list was written before the Builder added the reader. It
+    now has `team_capabilities`, and its instructions say to check it first.
+- **End of the journey:**
+  - in the review, the person switched the label and number columns on, then Done and Switch to Claude;
+  - the Analyst gave three correct figures (% firms with institutional finance, Rural: 3.6%, 2.5%, 3.3%), with
+    where each came from, and asked the person to check them against the picture.
+- **Still rough:**
+  - row labels ("Rural", "SC") stay coded, because the second screenshot's all-hidden choice marks them private.
+    The person sees real words in replies, but Claude works blind on labels;
+  - the @ picker matches loosely ("@caste_tab" picked finance_caste_table.png.csv);
+  - the "+" in the left pane opens a menu, and "Agent" didn't start a new chat;
+  - Claude Code shows the account email in its banner;
+  - the Builder's tab title is only an icon.
