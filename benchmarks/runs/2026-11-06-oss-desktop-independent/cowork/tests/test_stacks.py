@@ -74,7 +74,7 @@ class Spec(unittest.TestCase):
                  TOML + '\n[pypi-dependencies]\nsilero-vad = "==5.1.2"\n')
         text = stackwall.summary(d)
         for want in ('For: Cut videos', 'silero-vad', 'From GitHub: a/b at v1 (MIT)',
-                     'Also allowed while installing: storage.googleapis.com', 'private model'):
+                     'Also reaches while installing: storage.googleapis.com', 'private model', 'Adds: silero-vad, b'):
             self.assertIn(want, text)
         self.assertNotIn('python', text.split('Packages:')[1].split('\n')[0])
 
@@ -136,17 +136,18 @@ class Doors(unittest.TestCase):
         finally:
             p.stop()
 
-    def test_model_door_passes_chat_only(self):
+    def test_model_door_passes_json_chat_only_and_sets_the_model(self):
         hits = []
 
         class Fake(http.server.BaseHTTPRequestHandler):
             def do_POST(self):
-                hits.append(self.path)
-                body = b'{"ok": true}'
+                body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                hits.append((self.path, body['model'], body['stream']))
+                out = b'{"ok": true}'
                 self.send_response(200)
-                self.send_header('Content-Length', str(len(body)))
+                self.send_header('Content-Length', str(len(out)))
                 self.end_headers()
-                self.wfile.write(body)
+                self.wfile.write(out)
             do_GET = do_POST
 
             def log_message(self, *a):
@@ -154,15 +155,25 @@ class Doors(unittest.TestCase):
         srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Fake)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         door = stackwall.ModelDoor(self.tmp / 'm.sock', f'http://127.0.0.1:{srv.server_address[1]}').start()
+
+        def ask(head, body=b''):
+            c = socket.socket(socket.AF_UNIX)
+            c.settimeout(30)
+            c.connect(str(self.tmp / 'm.sock'))
+            c.sendall(head.encode() + f'\r\nContent-Length: {len(body)}\r\n\r\n'.encode() + body)
+            got = c.recv(300).decode('latin-1')
+            c.close()
+            return got
         try:
-            ok = connect(self.tmp / 'm.sock', 'POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 0')
-            self.assertIn('200', ok)
-            self.assertIn('403', connect(self.tmp / 'm.sock', 'GET /slots HTTP/1.1'))
-            self.assertIn('403', connect(self.tmp / 'm.sock', 'POST /v1/completions/../../props HTTP/1.1'))
+            body = json.dumps({'model': 'muse', 'stream': True, 'messages': []}).encode()
+            self.assertIn('200', ask('POST /v1/chat/completions HTTP/1.1', body))
+            self.assertIn('403', ask('POST /v1/chat/completions HTTP/1.1', b'not json'))
+            self.assertIn('403', ask('GET /slots HTTP/1.1'))
+            self.assertIn('403', ask('POST /v1/completions/../../props HTTP/1.1', body))
         finally:
             door.stop()
             srv.shutdown()
-        self.assertEqual(hits, ['/v1/chat/completions'])
+        self.assertEqual(hits, [('/v1/chat/completions', 'qwen3.5-9b', False)])
 
 
 class Manifest(unittest.TestCase):

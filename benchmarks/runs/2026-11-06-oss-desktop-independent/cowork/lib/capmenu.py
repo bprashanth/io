@@ -48,15 +48,13 @@ MENU = {
 
 
 def _nine_has(modality):
-    """Whether the private model (the 9B) answers, and has this modality (its /props), right now."""
-    import json
-    import urllib.request
-    url = os.environ.get('IDLI_9B_URL', 'http://127.0.0.1:8291').rstrip('/')
+    """Whether the private model (the 9B) answers, and has this modality, right now (on the DGX or through silo)."""
     try:
-        props = json.load(urllib.request.urlopen(url + '/props', timeout=3))
-    except Exception:
+        from lib import stackwall
+        props = stackwall.model_props()
+    except Exception:  # inside the wall: no platform modules, and no network anyway
         return False
-    return True if modality is None else bool((props.get('modalities') or {}).get(modality))
+    return props is not None and (modality is None or bool(props.get(modality)))
 
 
 class Missing(RuntimeError):

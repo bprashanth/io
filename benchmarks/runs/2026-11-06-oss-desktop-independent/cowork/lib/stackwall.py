@@ -142,11 +142,19 @@ def summary(data_dir, for_consent=False):
     d = stack_dir(data_dir)
     s, problems = spec(data_dir)
     conda, pypi = _packages(d)
-    lines = []
+    names = [p for p in conda if p != 'python'] + pypi + [r['name'] for r in s.get('repos', [])] + [
+        f['to'].rsplit('/', 1)[-1] for f in s.get('downloads', [])]
+    extra = [h for h in s.get('hosts', []) if not _allowed(h, INSTALL_HOSTS)]
+    # Narrow panes show only the first few lines: what is added, and what it can do, come first
+    lines = ['Adds: ' + (', '.join(names[:8]) + (f' and {len(names) - 8} more' if len(names) > 8 else '')
+                         if names else 'nothing new'),
+             'Runs on this computer with no internet' + (', may ask the private model' if s.get('model') else '')
+             + '. Sees only the files you pick.']
+    if extra:
+        lines.append('Also reaches while installing: ' + ', '.join(extra))
     if s.get('why'):
         lines.append('For: ' + s['why'][:200])
-    if s.get('setup'):
-        lines.append(f"After installing, it runs its setup step ({s['setup']}) with the same internet limits.")
+    lines.append('Details:')
     if conda or pypi:
         lines.append('Packages: ' + ', '.join([p for p in conda if p != 'python'] + pypi)[:400])
     for r in s.get('repos', []):
@@ -154,14 +162,11 @@ def summary(data_dir, for_consent=False):
                      + (f" ({r['license']})" if r['license'] else ''))
     for f in s.get('downloads', []):
         lines.append('Download: ' + f['url'].split('/')[2] + '/.../' + f['url'].rsplit('/', 1)[-1][:60])
-    extra = [h for h in s.get('hosts', []) if not _allowed(h, INSTALL_HOSTS)]
-    if extra:
-        lines.append('Also allowed while installing: ' + ', '.join(extra))
+    if s.get('setup'):
+        lines.append(f"After installing, it runs its setup step ({s['setup']}) with the same internet limits.")
     if (d / '.pixi').exists() and not for_consent:
         lines.append('Space used now: ' + _human(_size(d / '.pixi') + _size(d / 'repos') + _size(d / 'models')))
-    lines.append('These install inside the team folder only. They run on this computer without internet and see '
-                 'only the files you pick.' + (' They may ask the private model on this computer.' if s.get('model')
-                                               else ''))
+    lines.append('Everything installs inside the team folder only.')
     if problems:
         lines.append('Problems: ' + '; '.join(problems))
     return '\n'.join(lines)
@@ -245,46 +250,88 @@ class EgressProxy:
         self.loop.call_soon_threadsafe(self.loop.stop)
 
 
+def model_upstream():
+    """Where the private model is, as (base url, headers, model name). The DGX calls its 9B directly; a laptop goes
+    through silo (Cloudflare Access) with model "idli-9b", which the router sends only to the 9B, never to Muse.
+    The Access secret stays here: the stack never sees it."""
+    if os.environ.get('IDLI_9B_URL'):
+        return os.environ['IDLI_9B_URL'].rstrip('/'), {}, 'qwen3.5-9b'
+    try:
+        sys.path.insert(0, str(ROOT))
+        from lib import muse
+        if muse.access():
+            return muse.base_url(), muse.headers(), 'idli-9b'
+    except Exception:
+        pass
+    return 'http://127.0.0.1:8291', {}, 'qwen3.5-9b'
+
+
+def model_props():
+    """The private model's modalities ({'vision': True, ...}), or None when it doesn't answer."""
+    import urllib.request
+    base, headers, name = model_upstream()
+    path = '/props' if name == 'qwen3.5-9b' else '/idli/9b/props'
+    try:
+        with urllib.request.urlopen(urllib.request.Request(base + path, headers=headers), timeout=5) as r:
+            return json.load(r).get('modalities') or {}
+    except Exception:
+        return None
+
+
 class ModelDoor:
-    """The private model's chat endpoint on a unix socket: POST /v1/chat/completions and GET /v1/models only."""
+    """The private model's chat endpoint on a unix socket: POST /v1/chat/completions (JSON) and GET /v1/models only.
+    Each request is read whole, its model is set to the private model's, and it is sent on without streaming."""
 
     PATHS = {('POST', '/v1/chat/completions'), ('GET', '/v1/models')}
 
-    def __init__(self, sock_path, url=NINE_URL, log=None):
+    def __init__(self, sock_path, url=None, log=None):
         self.sock_path, self.log = str(sock_path), log if log is not None else []
-        m = re.match(r'http://([^:/]+):(\d+)', url)
-        self.host, self.port = m.group(1), int(m.group(2))
+        self.base, self.headers, self.name = (url.rstrip('/'), {}, 'qwen3.5-9b') if url else model_upstream()
         self.loop = asyncio.new_event_loop()
         self.ready = threading.Event()
 
+    def _forward(self, method, path, body):
+        import urllib.error
+        import urllib.request
+        req = urllib.request.Request(self.base + path, data=body, method=method,
+                                     headers={**self.headers, 'Content-Type': 'application/json'})
+        try:
+            with urllib.request.urlopen(req, timeout=900) as r:
+                return r.status, r.read()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read()
+        except OSError:
+            return 502, b'{"error": "the private model did not answer"}'
+
     async def _handle(self, r, w):
+        async def send(code, data):
+            w.write(f'HTTP/1.1 {code} X\r\nContent-Type: application/json\r\nContent-Length: {len(data)}\r\n'
+                    f'Connection: close\r\n\r\n'.encode() + data)
+            await w.drain()
+            w.close()
         try:
             head = await asyncio.wait_for(r.readuntil(b'\r\n\r\n'), 60)
             method, path = head.split(b'\r\n', 1)[0].decode('latin-1').split()[:2]
+            n = int(m.group(1)) if (m := re.search(rb'(?i)\r\ncontent-length:\s*(\d+)', head)) else 0
+            body = await asyncio.wait_for(r.readexactly(n), 120) if n else b''
         except Exception:
             w.close()
             return
-        ok = (method, path.split('?')[0]) in self.PATHS
+        path = path.split('?')[0]
+        ok = (method, path) in self.PATHS
+        if ok and method == 'POST':
+            try:
+                j = json.loads(body)
+                assert isinstance(j, dict)
+                j['model'], j['stream'] = self.name, False
+                body = json.dumps(j).encode()
+            except (ValueError, AssertionError):
+                ok = False
         self.log.append({'model': path, 'allowed': ok, 'at': int(time.time())})
         if not ok:
-            w.write(b'HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n')
-            await w.drain()
-            w.close()
-            return
-        # one request per connection: rewrite the head so the model server closes when done
-        lines = [ln for ln in head.decode('latin-1').split('\r\n') if ln and not ln.lower().startswith(
-            ('connection:', 'host:', 'keep-alive:'))]
-        lines[1:1] = [f'Host: {self.host}:{self.port}', 'Connection: close']
-        try:
-            ur, uw = await asyncio.open_connection(self.host, self.port)
-        except OSError:
-            w.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n')
-            await w.drain()
-            w.close()
-            return
-        uw.write(('\r\n'.join(lines) + '\r\n\r\n').encode('latin-1'))
-        await uw.drain()
-        await asyncio.gather(_pipe(r, uw), _pipe(ur, w))
+            return await send(403, b'{"error": "only JSON chat requests to the private model"}')
+        code, data = await self.loop.run_in_executor(None, self._forward, method, path, body if body else None)
+        await send(code, data)
 
     def start(self):
         def run():
@@ -606,13 +653,13 @@ def run(data_dir, cmd, inputs=(), out_dir=None, timeout=1800, cwd=None, extra_ro
     sd = None
     if s.get('model'):
         sd = _sockdir()
-        door = ModelDoor(sd / 'model.sock', NINE_URL, log).start()
+        door = ModelDoor(sd / 'model.sock', log=log).start()
         doors[MODEL_PORT] = sd / 'model.sock'
     env = _env_vars(d, proxy=False)
     env.update({'IDLI_OUT': str(out_dir), 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1',
                 'PIXI_FROZEN': 'true', 'IDLI_STACK': str(d)})
     if s.get('model'):
-        env.update({'IDLI_MODEL_URL': f'http://127.0.0.1:{MODEL_PORT}/v1', 'IDLI_MODEL': 'qwen3.5-9b'})
+        env.update({'IDLI_MODEL_URL': f'http://127.0.0.1:{MODEL_PORT}/v1', 'IDLI_MODEL': 'private'})
     # The stack is read-only at run time; its caches get a scratch copy-on-nothing tmpfs.
     px = pixi()
     ro = [str(d), str(Path(px).parent), *[str(Path(p).resolve()) for p in inputs], *map(str, extra_ro)]
@@ -717,7 +764,7 @@ def serve(data_dir, task, state_dir, wait=120):
     sd = _sockdir()
     doors, door = {}, None
     if s.get('model'):
-        door = ModelDoor(sd / 'model.sock', NINE_URL).start()
+        door = ModelDoor(sd / 'model.sock').start()
         doors[MODEL_PORT] = sd / 'model.sock'
     insock = sd / 'in' / 'page.sock'
     insock.parent.mkdir()
@@ -726,7 +773,7 @@ def serve(data_dir, task, state_dir, wait=120):
                 'IDLI_STACK': str(d), 'PORT': str(APP_PORT), 'GRADIO_SERVER_PORT': str(APP_PORT),
                 'GRADIO_ANALYTICS_ENABLED': 'False', 'IDLI_INDOORS': f'{insock}={APP_PORT}'})
     if s.get('model'):
-        env.update({'IDLI_MODEL_URL': f'http://127.0.0.1:{MODEL_PORT}/v1', 'IDLI_MODEL': 'qwen3.5-9b'})
+        env.update({'IDLI_MODEL_URL': f'http://127.0.0.1:{MODEL_PORT}/v1', 'IDLI_MODEL': 'private'})
     px = pixi()
     Path(state_dir).mkdir(parents=True, exist_ok=True)
     args = _wall([px, 'run', '--frozen', '--manifest-path', str(d / 'pixi.toml'), task],

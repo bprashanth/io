@@ -333,7 +333,16 @@ def stack_run(command, timeout=600):
             'files_in_.idli-out': res['files'][:50], 'model_calls': res['model_calls']}
 
 
+def capability_menu():
+    """What the platform offers on this computer right now (it can change while you work: check before choosing)."""
+    from lib import capmenu
+    return capmenu.describe()
+
+
 BUILDER_TOOLS = {
+    'capability_menu': (capability_menu, 'The platform\'s capability menu as it is on this computer now (local '
+                        'tools, the private model with or without vision). Check it before choosing how to build.',
+                        {}, []),
     'team_check': (team_check, 'Run every capability test of this team in Idli\'s sandbox and list what the team can do.',
                    {}, []),
     'team_save': (team_save, 'After team_check passes, save a version with a one-line summary for the person.',

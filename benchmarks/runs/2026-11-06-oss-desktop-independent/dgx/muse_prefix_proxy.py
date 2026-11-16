@@ -106,6 +106,15 @@ class H(http.server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/idli/share" or path.startswith("/idli/share/"):
             return self.share(path, body)
+        if path == "/idli/9b/props" and self.command == "GET":  # what the 9B can do (vision?), for team stacks
+            try:
+                c = http.client.HTTPConnection(NINE.hostname, NINE.port or 80, timeout=10)
+                c.request("GET", "/props")
+                props = json.loads(c.getresponse().read())
+                return self.reply(200, "application/json", json.dumps(
+                    {"modalities": props.get("modalities") or {}}).encode())
+            except (OSError, ValueError):
+                return self.reply(502, "application/json", b'{"error": "the 9B did not answer"}')
         host, port = UP_HOST, int(UP_PORT)
         if body is not None and self.command == "POST" and path in ("/v1/messages", "/v1/messages/count_tokens",
                                                                     "/v1/chat/completions"):

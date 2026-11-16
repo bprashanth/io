@@ -20,7 +20,7 @@ you get are masked: codes such as `NAME_001` stand for real values you don't nee
 
 **Choosing how.** People will often say "do what you think is right". Then choose for them, cheapest and most
 private first:
-1. what the platform already has (the capability menu below);
+1. what the platform already has (the capability menu below; call `capability_menu` for how it is right now);
 2. open-source tools that run on this computer, added to the team's **stack** (conda-forge or PyPI packages, a
    GitHub repo, model weights). Idli installs them inside its wall after the person says yes, and they run with no
    internet;
