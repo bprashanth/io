@@ -498,6 +498,9 @@ def matched_in_text(value):
     v = value.strip()
     if not v or v.casefold() in NEVER_PRIVATE:
         return False
+    if re.fullmatch(r'(?:19|20)\d\d', v):  # a year (1990, 2005) says nothing about a person
+        return False
+    v = re.sub(r'\s*%$', '', v)  # a percentage counts like its number: 92.6% is as common as 92.6
     m = re.fullmatch(r'[+-]?(\d+)(?:\.(\d+))?', v)
     if not m:
         return True
