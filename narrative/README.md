@@ -13,6 +13,8 @@ Current note:
 - [Seeing what the user sees, on a 30B model](2026-11-07-cowork-ui-as-api-field-note.md)
 - [One journey: clean a file, then talk to it](2026-11-09-one-journey-field-note.md)
 - [One file at a time, and what a 9B can do](2026-11-10-one-file-at-a-time-field-note.md)
+- [Idli Desktop: an operating layer for NGOs (teams, Minis, building blocks)](IDLI_DESKTOP.md)
+- [Drivey: the journey](DRIVEY_JOURNEY.md)
 
 When the result is mature, Remembrancer should import a snapshot of
 `../chronology/`, copy the smallest useful evidence cut from `../benchmarks/`,

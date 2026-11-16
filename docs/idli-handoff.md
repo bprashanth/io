@@ -1,7 +1,102 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-11 (~23:30 IST), DGX. Overwrite this page whenever the state changes, and keep the chronology
-(`docs/cowork-poc.md`, "What changed") and the latest field note in step with it.
+Last updated 2026-11-16 (~11:00 IST), DGX. Overwrite this page whenever the state changes. Keep `chronology/` (one
+file per step since 2026-11-13) and the narratives in step with it.
+
+## Checkpoint 2026-11-16: read this first, then the narratives
+
+**Read the narratives before anything else.** Most of the sections further down describe the product as it was on
+2026-11-11 (one file at a time, forms, cleaning, Mission control). They are still accurate about mechanisms such as
+cards, UI as API, credentials and ops, but not about the product.
+1. [narrative/IDLI_DESKTOP.md](../narrative/IDLI_DESKTOP.md) covers:
+   - what we are doing: an operating layer for NGOs;
+   - what a Team and a Mini are, and why data Minis and workflow Minis share one shape;
+   - the building blocks, each marked built, tested or idea.
+2. [narrative/DRIVEY_JOURNEY.md](../narrative/DRIVEY_JOURNEY.md): the journey step by step:
+   - A: make a Mini with masked Claude;
+   - B: use it with the 9B, the query service and escalation;
+   - C: Start here, Privacy and Logins;
+   - D: Teams.
+3. `chronology/2026-11-13*` to `chronology/2026-11-16*`, oldest first: what was built, tried and fixed, step by
+   step.
+
+**The product now (on the laptop, Paseo build idli25).**
+- **Start here:**
+  - **Teams page:** cards with Open and Delete, and New team (six panels);
+  - **Privacy:** the log of what was sent to Claude;
+  - **Logins.**
+- **Drivey:** the built-in team.
+  - Each workspace is two halves: Idli on the left (the 9B chat, `@` Drive files, Mini cartridges) and the
+    person's own Claude Code on the right, through the masking proxy (`lib/ccproxy.py`, `desktop/claude-masked.sh`)
+    on masked copies.
+  - Minis are saved from Claude's work and answered by the 9B mapping a question to a saved script.
+  - When no saved question fits, the query service is offered with a yes; then Claude.
+- **Teams made from the page:** exact clones of Drivey under a new heading (`~/idli-insights/teams/<name>/`).
+- **WhatsAppy:** an empty plain Claude space. Owner rule: nothing is ever sent, by anyone.
+- **Gone:** Canvay and the Teams chat. The bootstrap no longer recreates them.
+
+**Code.**
+- Everything is under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`:
+  - teams: `lib/teams.py` and `lib/teams_page.html`;
+  - the page server and its routes: `lib/formserver.py`;
+  - the Idli chat router: `lib/modes.py`;
+  - Minis: `lib/minimap.py` and `lib/mini-card.html`;
+  - the query service: `lib/minisql.py`;
+  - sidebar setup: `desktop/idli-bootstrap.py`.
+- **Paseo patches:** `desktop/paseo-idli-split.patch` (P13-P21). Each patch is listed in
+  `todos/idli-insights/p1/paseo_patches.md`. Builds and patch copies are in `~/idli-builds/`. Rebuild before
+  taking any Paseo update.
+- **Tests:**
+  - `/tmp/idli-journey-venv/bin/python -m pytest -q tests/ --ignore=tests/check_journey_browser.py`. The cowork
+    `.venv` has no pytest; system python has no duckdb.
+  - Headless page checks use system `python3` with Playwright.
+
+**Git.**
+- Branch `oss-desktop-eval`, last commits `bed5c05d` (Teams page, idli25) and the commit that wrote this
+  checkpoint.
+- **Not pushed.** Before any push: `bash -ic 'declaude origin/main'`, then `--force-with-lease`, with 0 Claude
+  trailers.
+- **Laptop:** at its own commit `7919ac9f` ("sync from DGX").
+- **Code reaches the laptop as tarballs:** served from the session scratchpad at `http://100.82.28.38:8851/` and
+  pulled by commands typed into the laptop's Paseo terminal. The app is driven over DevTools (port 49333) when the
+  owner's tunnel is up. See "Ops" below.
+
+**Laptop state (test Google account; the owner is about to test the new team flow).**
+- **Backup:** Paseo's agents and projects were backed up first, to
+  `~/idli-insights/archive/paseo-agents-projects-20261116-0918.tgz`.
+- **What's left:**
+  - Start here (Teams, Privacy, Logins);
+  - Drivey (one empty workspace, five Minis);
+  - WhatsAppy;
+  - the Claude Code heading (no chats).
+- **Archived:** test teams, Insights and Canvay are in `~/idli-insights/archive/`.
+
+**Open, in rough priority.**
+- **The owner's test of New team -> Open -> Delete.** Wait for their report.
+- **The Drivey split race.** It is repaired on display (P21), not prevented. The repair is in
+  `utils/idli-side-pane.ts repairDriveySplit` in the Paseo checkout.
+- **Small items:**
+  - a reload strip shows above the Teams page;
+  - the old chat-based team flow (`teams.route`, `modes.teams_chat_route`) is unused and can go.
+- **Concepts, not built:**
+  - a guided first Mini from a sample file at the end of making a team;
+  - workflow Minis (see IDLI_DESKTOP section 3);
+  - teams across computers.
+- **Open questions:**
+  - whether Claude's subscription terms allow the masking proxy (if not, use Codex on the right);
+  - Google's terms for browser search (`lookup` is PoC only).
+
+**Owner rules that came up in this run (on top of "Rules that always hold" below).**
+- **Plain UI copy:** no flowery phrasing, few commas, no arrows or "·".
+- **Who asks:** Idli asks, not Claude. Say "Idli" on screen.
+- **No jargon:** NGO staff are not technical.
+- **Testing:** default to the 9B; take screenshots.
+- **The laptop:**
+  - it is a test account and may be read for dev;
+  - use its Paseo shell only for dev, never in front of the user;
+  - back up and read git status before any reset.
+- **WhatsAppy:** nothing is ever sent.
+- **Muse:** client only; never restart it.
 
 ## What we are building now
 **Idli is a Drive helper for people at NGOs who keep their data in spreadsheets.** It helps them clean a file and
@@ -294,7 +389,7 @@ Everything lives under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowor
 - `desktop/setup-laptop.py`: Paseo providers.
 - `desktop/muse-connect.py`: points Idli at silo.
 
-## State right now (checkpoint 2026-11-11 ~23:30 IST): read this to resume
+## Earlier checkpoint (2026-11-11 ~23:30 IST, history: see the 2026-11-16 checkpoint at the top)
 Everything below is in git or on disk; nothing depends on a live session. Branch `oss-desktop-eval` (DGX, not
 pushed to GitHub), last commit is the one that updated this page.
 

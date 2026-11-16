@@ -1,152 +1,284 @@
-# Idli Desktop: owning the journey from "I want this" to "my whole org uses it"
+# Idli Desktop: an operating layer for NGOs
 
-2026-11-13. A strategy brief to brainstorm from. It mixes things that are built and tested with ideas that are not.
-Each claim is marked **[built]**, **[tested]**, **[idea]** or **[untested]**. Design detail is in
-[docs/idli-design.md](../docs/idli-design.md), and sharing as built is in
-[proposals/idli-sharing.md](../proposals/idli-sharing.md).
-
----
-
-## 1. The one-paragraph version
-
-Non-technical people at NGOs (and small orgs generally) can now get real work done with AI agents: Claude Code,
-Codex, Cursor, MCP tools. But they drop off along the way, and for a few predictable reasons: switching between
-tools, privacy, results they can't trust, and fear the agent will break something. Idli Desktop is a single app
-that takes a person from "I have a task" to "my whole org runs this", and removes each of those drop-off reasons.
-What it produces is a **Mini**: a small, shareable unit of learned work (an analysis, a dashboard, a cross-app
-workflow, a branded template). A smart frontier model writes a Mini using test or fake data. A small private model,
-or plain code, runs it on real data, as the person, in their own browser, and asks for approval before acting.
-Minis spread through an org by a share code.
+2026-11-16. Written after Teams became a page. It replaces the strategy brief of 2026-11-13 (still in git history:
+`git show 459eed69:narrative/IDLI_DESKTOP.md`). Each claim is marked **[built]** (in the code), **[tested]** (walked
+through in the app on the laptop's test account), **[idea]** or **[untested]**. How a person moves through Drivey and
+Teams, step by step, is in [DRIVEY_JOURNEY.md](DRIVEY_JOURNEY.md). The design reasoning is in
+[docs/idli-design.md](../docs/idli-design.md). Where the work stands is in
+[docs/idli-handoff.md](../docs/idli-handoff.md).
 
 ---
 
-## 2. Where people drop off, and what Idli does about each
+## 1. What we are doing
 
-| Drop-off reason | What it looks like | Idli's answer | Status |
-|---|---|---|---|
-| **Switching between tools** | "I did it in Claude, then had to open a terminal, then a different app for Drive, then copy results into a sheet." Every handoff loses people. | **Paseo as the aggregator.** One desktop app hosts many agent CLIs (Claude Code, Codex, cursor-agent, a local model) plus a browser with the person's logins, behind one chat. The person never picks a tool or sees a shell. | [built] in dev; shells hidden from the user |
-| **Privacy** | "I can't paste beneficiary data into ChatGPT." Many orgs stop right here, or keep going in secret. | **The student/teacher pattern.** The frontier "teacher" sees only fake stand-in data with the same shape and the same mess. It writes the scaffolding: a form, checks, charts, code. A private "worker" model (a local 9B, or Muse 30B on our hardware) runs it on the real file, which never leaves the machine. | [built], [tested] on synthetic fixtures and the owner's test Drive |
-| **Correctness** | "The AI said 412 households, and I can't tell if that's right." Without a way to check, one wrong answer ends trust. | **The form in every Mini.** Each Mini has explicit measures and checks: what counts as a household, which rows were dropped and why, which values look wrong. Every answer can be traced to rows and rules a person can read, not to the model's word. | [built] |
-| **Safe editing** | "What if it deletes my sheet?" People are rightly scared of agents with write access. | **Never overwrite, never delete.** Idli works on checked copies, writes through the Google tools people already use (a new tab, a new file), and asks before acting. The original stays untouched. | [built] for Drive files |
-| **"Can I do X too?"** (scope) | The person outgrows one app and leaves for a general tool. | **The baseline: everything Claude and Codex can do still works.** Idli doesn't fence people in. Canva through MCP on their own Claude subscription, any CLI task: it all still runs inside Paseo. Minis are extra, not a cage. | [built] (the CLIs run as-is) |
+People at NGOs run on spreadsheets, WhatsApp groups, email, funder portals and Google Drive. AI agents such as
+Claude Code can now do much of that work, but NGO staff stop using them for four reasons:
+- the data is about real people and can't be pasted into a chat;
+- every task means switching between tools;
+- they can't tell if an answer is right;
+- they're afraid the agent will break something.
 
-**The core claim to test:** switching tools is the biggest drop-off, and an aggregator fixes it. But an aggregator
-alone is a thin moat, since anyone can wrap CLIs. So **why go beyond aggregation?** Because the other three drop-offs
-(privacy, correctness, safe editing) are what actually stop an NGO from using AI on its *real* work, and fixing them
-needs an opinion about how work is learned, checked and run. That opinion is the Mini.
+On top of that, frontier models cost money that a programme budget doesn't have.
 
----
+**Idli Desktop is meant to be the operating layer between an NGO's people and AI.** The goal is that an NGO can use
+AI first, for its real work, at a cost it can manage and without giving up the privacy of the people it serves. It
+should be able to keep what it builds this way, and pass it on to the rest of the team.
 
-## 3. What a Mini is
+It works by splitting each job between two kinds of model:
+- **A large model learns once, on stand-ins.** It sees fake or masked copies of the data, or test accounts. It
+  writes code, scripts and an explanation.
+- **A small model runs that work every day.** It runs on the real data, on the person's own computer, as the
+  person. It makes only small choices; code does the arithmetic and the actions.
 
-A Mini is a **learned, reusable, shareable piece of an org's work**. It has:
+The person sees each hand-off between the two and says yes to it. What the large model leaves behind is kept as a
+**Mini**, and Minis are kept and shared inside a **Team**.
 
-- **What was learned:** code, form definitions, checks, chart specs, prompts, branding assets, step scripts.
-- **What it acts on (optional):** one specific Google Drive file, an app reached through the browser, or nothing.
-- **Who runs it:** a small private model, plain code, or the person's own Claude/Codex subscription.
-- **How it spreads:** a share code (`IDLI-XXXX-XXXX`). Whoever receives it says Yes, and it appears in their Minis
-  list. **[built]**
-
-Sharing is not data sharing. A Mini carries the workflow, never the data rows. A shared Mini that points at a Drive
-file only works if the receiver's own Google account can open that file. **[tested]** on the owner's laptop with
-real Drive (fetch on open in 1.0 to 1.5 s); not yet tested across two different Google accounts.
-
-### The kinds of Mini, in increasing ambition
-
-**A. The Drive analysis Mini** **[built, the current focus]**
-A dashboard and Q&A for one spreadsheet (a household survey, a field programme tracker). It learns on a fake copy
-and fetches the real file from Drive every time it opens, so the numbers are always current. Shared means "the same
-dashboard on the same file". Cloning the workflow onto a different file of the same kind is parked (P3).
-
-**B. The org kit Mini** (for example "our Canva Mini") **[idea]**
-No Google login, possibly no local model at all. It is a bundle of what an org learns about doing a recurring task
-its way: brand colours and fonts, logo files, code snippets, prompt templates, "how we make the monthly
-newsletter in Canva through MCP". It is deployed without any web UI, just as a Mini; the person's own Claude
-subscription does the work.
-- **Revenue:** none. No hosting, no model calls on our side.
-- **Why do it:** it **owns the pipe**. The org's know-how lives in Idli and spreads through Idli. Every new member's
-  first experience of the org's AI practice goes through our app.
-
-**C. The "UI as API" Mini** (for example a funder reporting dashboard) **[idea, partially derived from A]**
-Many funders and partner systems have a web portal and no API. The pattern:
-1. **Teach:** the smart model works against a **test account** (fake grantee, fake numbers), explores the portal's
-   pages, and writes code that fills the forms, pulls the figures and builds the report.
-2. **Run:** on the person's own Idli, the small model reads the real data, drives that code in the app's browser
-   using **the person's own logged-in session**, and **stops for approval** before anything is submitted.
-3. **Extend:** more skills get added to the same Mini over time (quarterly report, budget variance, beneficiary
-   counts).
-
-The browser is the login. Idli never holds passwords, and every action is taken as the person, visible to them.
-
-**D. The cross-app Mini** **[idea, untested]**
-Log in to *n* services in the app's browser, then run one workflow across all of them. Same split: the smart model
-writes the code against test accounts; the small model reads the situation and decides which code to run on the
-real accounts. Example (untested): mirror WhatsApp Web messages tagged `#field` from five field-team groups into
-one coordination group, or into a sheet.
+The shell is **Paseo**, a desktop app that hosts agent CLIs (Claude Code, Codex, a local model) and a browser with
+the person's own logins. We patch it (build idli25 today), and the person never sees a terminal they didn't ask
+for. **[built]**
 
 ---
 
-## 4. The general idea underneath
+## 2. What a Team is
 
-> **If you can log in to it in a browser, there are DOM elements, and a model can operate them as you.**
-> **If privacy matters, a smart model teaches a small model to do that one job, through code, on fake data.**
-> **Once it works for you, ship it to your org as a Mini.**
+**A Team is a collection of Minis, the people who use them, and the rules they share, organised around one kind of
+work.** Examples are "Insights" (household survey analysis), "Field M&E" or "Livelihoods Wardha". In the sidebar a
+team is a heading. Under it are the team's workspaces. Each workspace is the two halves: Idli on the left and the
+person's own Claude on the right.
 
-Three moves, in order:
-1. **Masquerade.** The browser session already proves who you are. Acting through it needs no API keys, no OAuth
-   apps, no integrations team. It works for the long tail of portals NGOs live in: funder portals, government
-   MIS systems, WhatsApp Web, Google Workspace, Kobo, CommCare web UIs.
-2. **Distil.** The expensive, capable model is used once, to learn, on stand-ins. What it leaves behind is code plus
-   small decisions a 9B model can make. Cheap to run, private, repeatable.
-3. **Distribute.** The Mini is the unit of org knowledge. Share code, Yes/No, done.
+A team holds:
+- **Its Minis.** Each team has its own list, separate from other teams.
+- **Its folder.** `~/idli-insights/teams/<name>/` holds the answers given at setup (`team.json`), the instructions
+  and tools, downloads, and the privacy codes. Claude's masked copies sit beside it in `claude-masked-<name>`.
+- **Its rules, set by answering the setup questions:**
+  - where the data lives;
+  - who uses it;
+  - whether the files hold names, places or phone numbers (masking stays on whatever the answer);
+  - whether a Mini may ask an outside service when it can't answer.
+- **Its own trail.** The Privacy log labels every request with the team's name.
 
----
+A manager makes a team on the **Teams page** under Start here: New team, six questions with one panel each, then
+Set it up. The new team's card then has **Open** and **Delete**. Delete removes the team's chats and moves its
+folder to an archive, so a mistake loses nothing. **[built, tested 2026-11-16]**
 
-## 5. Business shape (to brainstorm)
+**Why a team and not an app:** what an NGO builds belongs to a group of people doing a job, not to one person's
+chat history. The team is where a Mini made by one person becomes something everyone else can use. It is also where
+rules belong that individuals shouldn't have to decide each time, such as "this team never uses the outside
+service". Drivey is the first team. It was built by hand, and the PoC's "make a team" produces exact copies of it
+under new names.
 
-| Mini kind | Who pays for compute | Our revenue | What we get |
-|---|---|---|---|
-| Baseline (any CLI task) | The person's Claude/Codex subscription | None | Daily use; the habit |
-| Org kit (B) | The person's subscription | None | Owning the pipe; org lock-in through accumulated Minis |
-| Drive analysis (A) | Local 9B (free) or hosted private model | Hosted private model (Muse), if not local | Trust through privacy and correctness |
-| UI as API / cross-app (C, D) | Teacher: frontier (theirs or ours). Worker: local or hosted | Teaching runs, hosted worker, maybe per-Mini | The highest value: replaces manual reporting hours |
-
-Questions this raises:
-- Is "own the pipe, monetise later" credible, and what is the later?
-- Do we charge orgs (seats, an org Mini library) rather than per model call?
-- Is there a marketplace: Minis for common funder portals, shared across NGOs (with clone, not share)?
-
----
-
-## 6. Risks and open questions
-
-- **Platform terms.** Automating WhatsApp Web, funder portals and Google through the browser may break their terms
-  of service, or trip bot detection. Which targets are safe, which need the official API, and is "the person is
-  watching and approves" enough?
-- **Brittleness.** DOM-driven code breaks when a site changes. Who repairs it? (Idea: the worker detects the
-  failure, and the teacher re-learns against the test account.)
-- **Test accounts.** Pattern C/D needs a sandbox or test account per target. Many funder portals don't have one.
-  Is a recorded session with the data faked enough?
-- **Trust in a shared Mini.** Anyone with a code can add it, and nothing shows who made it. A Mini that acts in a
-  browser is far more dangerous than a dashboard. Signing, an org allowlist, and approval on every write action
-  become necessary.
-- **Shipping the cookie read.** Fetching Drive as the person currently reads the app browser's session through
-  DevTools (on in dev builds). Shipping needs a small Paseo change, and a clear story about why that is safe.
-- **Sync.** A shared code is a frozen copy today. The proposal (one code per Mini for life, an update card, forks
-  never merged) is not built.
-- **Is the aggregator the product, or the wedge?** If the CLIs add their own desktop apps and connectors, what is
-  left? The hypothesis: privacy, correctness, safe editing and org distribution, which a single vendor's app won't
-  prioritise for NGOs.
+**Not built yet [idea]:**
+- membership across computers (a team today lives on one machine; its Minis travel by share code);
+- roles (who may make Minis and who only uses them);
+- team-wide settings beyond the four questions;
+- a team whose Minis are workflows rather than data (see section 3).
 
 ---
 
-## 7. What exists today (so the brainstorm stays grounded)
+## 3. What a Mini is, and whether the two kinds are the same thing
 
-- **Paseo desktop app:** Claude Code, Codex and a local model in one chat, with a built-in browser where the person
-  signs in to Google once. **[built]**
-- **Drive Minis:** teach on a fake copy; a form with measures and checks; charts; a Minis page; share by code; the
-  real file fetched as the person on every open. **[tested]** on the owner's laptop, real Drive, test account.
-- **Private worker:** Muse 30B on our DGX, or a local 9B; evals on synthetic planted-mess fixtures. **[built]**
-- **Not built:** org kit Minis, UI-as-API Minis, cross-app Minis, sync, clone, signing.
+A Mini is **a piece of work the large model learned once, saved so a small model and code can repeat it on demand,
+and shared with the team.**
 
-The current engineering focus remains the Drive Mini; the rest of this document is direction, not a plan.
+### The two kinds as they look today
+
+**The data Mini (Drivey) [built, tested]**
+- **Data:** one or more Drive files. These are fetched fresh as the person every time the Mini opens, so the numbers
+  are always current.
+- **Scripts:** one per saved question. Each has its options (ward, months, species).
+- **A narrative:** the author's own text and the pinned charts, arranged like a short document.
+- **Follow-up questions:**
+  1. The small model maps the person's words to one saved question and its options, and the script answers.
+  2. If nothing fits, the person can say yes to the outside query service.
+  3. If that doesn't work, the question goes to Claude, on masked copies.
+  4. Whatever Claude finds can be added back to the Mini.
+
+**The workflow Mini [idea; WhatsAppy is an empty space for it]**
+An example: log in to email, find emails with leads, add them to the Excel sheet, and schedule a call on the
+calendar. It has:
+- logins in the app's browser (email, Drive, calendar);
+- a sequence of steps, where each step is code that reads or writes one page, like a small API for that site;
+- a narrative of what the workflow does and when;
+- small decisions along the way: is this email a lead, which row is it, which free slot to pick.
+
+### Are these two patterns the same?
+
+**They have the same shape. What differs is the effects they have on the world.** Lay both Minis side by side and
+they have the same parts:
+
+| Part | Data Mini | Workflow Mini |
+|---|---|---|
+| **What it is bound to** | Drive files, read as the person | Logged-in sites, used as the person |
+| **What the large model learned on** | A fake or masked copy of the file | Test accounts, or recorded pages with fake data |
+| **Entry points** | Saved questions with options | Named actions with parameters ("find leads since Monday") |
+| **Code behind each entry point** | A script that reads the file | Step code that reads or writes pages |
+| **What the small model does** | Picks the question and options | Picks the action, and makes the small judgements in between (is this a lead?) |
+| **Narrative** | The author's page and charts | What it does, when, and what it will change |
+| **When it can't do something** | Query service with a yes, then Claude on masked copies | Same: ask, then send it to Claude on stand-ins, with a yes |
+| **How it grows** | Claude adds a question | Claude adds a step or an action |
+
+The data Mini is the read-only special case of the workflow Mini. One of its steps is "fetch the file" and the rest
+are "answer". **The building blocks are therefore shared** (section 4), and the team, the Minis list, the share code
+and the consent cards should serve both kinds.
+
+The differences are real, and all of them come from the workflow Mini being able to change things:
+- **Writes need a yes each time,** at least at first. A data Mini can't hurt anything. A workflow Mini sends emails
+  and books meetings. The rule already used for Drive applies: never overwrite, never delete, and a card before every
+  write. (On WhatsAppy the owner's rule today is that nothing is sent at all, by anyone, including the private 30B.)
+- **It runs over time.** It needs triggers ("every morning") and a log of what it did. A data Mini just answers when
+  asked.
+- **It is more fragile.** Sites change their pages, so step code breaks. The fix is in the same loop: the small model
+  notices that a step failed, and the large model re-learns that step on the test account.
+- **It needs more trust.** A shared Mini that acts in someone's browser is more dangerous than a shared dashboard.
+  It needs to show who made it and what it can change, before anyone says yes to it.
+
+There is a third kind, an **org kit Mini** **[idea]**: brand colours, templates and "how we make the newsletter in
+Canva". It has no small model and no data, only instructions and assets for the person's own Claude. It fits the
+same table with most rows empty. That is why the Mini, not the dashboard, is the right unit.
+
+---
+
+## 4. The building blocks
+
+Each block is one piece of the operating layer. Most were built for Drivey and are meant to be reused by every team
+and every kind of Mini.
+
+### 4.1 Small models
+- A **local 9B** (Qwen 3.5 9B) runs on the person's computer, free. **Muse 30B** runs on our own hardware for
+  heavier private work. Evals compare against Muse 30B on held-out sets. **[built]**
+- **What they do:** choose, not compose. They map a question to a saved script, choose its options, and decide which
+  card to show next. Code computes every number and writes every sentence that carries a number. When the 9B wrote
+  answers in its own words, it dropped a number in 13 of 53 turns; when code wrote them, none were dropped. Mapping
+  questions to a Mini's scripts with the 9B scored 84 of 85, including 20 of 20 correct "no match" answers.
+  **[tested]**
+- **Why it matters for cost:** the expensive model is used once to learn. The cheap model is used every day.
+
+### 4.2 Redaction (masking)
+- **What leaves the computer is masked:**
+  - the person's own Claude Code reaches Anthropic through Idli's masking proxy (`lib/ccproxy.py`);
+  - names, places, phone numbers and other private values become codes (`NAME_007`, `PLACE_005`) in every request;
+  - the replies are turned back into real values for the person. **[built, tested]**
+- **Claude works on masked copies of the files**, not the real ones, inside its own sandbox (it can't read Idli's
+  private folder). An earlier version showed why this matters: Claude found real species names by running scripts on
+  the real file. **[built, tested]**
+- **The person checks what will be hidden before anything leaves.** The privacy review shows a switch per column,
+  with real values next to their codes. **[built, tested]**
+- **Start here > Privacy** lists everything sent in the last 7 days, as codes, and can be searched by a real name.
+  **[built, tested]**
+- **Wire audits on the laptop found no real values in what was sent.** One example: 16 requests, 0 real names,
+  250 place codes. **[tested]**
+- **How it detects private values:** a vault of known values, close matches, regex rules, and a local name scanner
+  (GLiNER). **[built]**
+
+### 4.3 Large and small models working together
+- **Teacher and worker:** Claude teaches on stand-ins, and what it leaves behind is code (scripts, chart code, a
+  Mini). The private model drives that code on the real data. **[built]**
+- **The two halves on screen:** Idli (the small model and code) on the left, the person's own Claude on the right.
+  A bright border shows which side is in control, so a hand-off looks like the focus moving. The split now repairs
+  itself if Paseo loses it. **[built, tested]**
+- **Charts travel between them:** Claude's charts appear in Idli's chat, and a click on a bar can send that bar back
+  to Claude as a question. **[built, tested]**
+- **No new subscription:** Claude is the person's own Claude Code subscription. Idli doesn't resell it. (Open
+  question: the subscription terms may rule out a proxy that rewrites prompts. If so, the right side switches to
+  Codex.) **[open]**
+
+### 4.4 Escalation to larger models while the work runs, with consent
+Most questions never leave the computer. When a piece of the work is beyond the small model, that one piece goes up
+the ladder, and every step up has a yes or no card that shows exactly what will be sent:
+1. **The Mini's own scripts** answer, on this computer. **[built]**
+2. **The outside query service** comes next. It gets the masked question and the column list, never rows, and writes
+   one read-only query that runs locally. It may ask back which of two or three questions was meant. It is capped at
+   200 questions a day per computer. A team can turn it off at setup. **[built, tested]**
+3. **Claude on masked copies** is next. The person switches to the right half and Claude works there. **[built,
+   tested]**
+4. **Inside Claude:**
+   - `unmask` can reveal a contextual value (a place, a species), never a personal one. It needs two consents and
+     is limited to 3 reveals per workspace.
+   - `lookup` searches the web from this computer with the real value, and the results are masked before Claude
+     sees them. **[built, tested]**
+
+The rule throughout: **escalate the piece, not the whole job, and only with a yes.**
+
+### 4.5 Logins and the browser ("UI as API")
+- **No OAuth apps and no API keys for Google:**
+  - the person signs in once in Paseo's browser;
+  - Idli reads Drive with that session, and the cookies go only to Google;
+  - a shared Mini fetches its file with the receiver's own Google account. **[built, tested]**
+- **Site plugins:** narrow tools that read a page like an API. The large model writes them on a test account, and
+  the small model uses them on the real account. Only Google is built; it was first built for Gmail, Drive and
+  Sheets. **[built for Google]**
+- **Start here > Logins** checks Google, Claude and the private model, and helps the person sign in.
+  **[built, tested]**
+- **Open problems:**
+  - reading the session through DevTools needs a proper Paseo change before shipping;
+  - many sites' terms forbid automation;
+  - funder portals rarely have test accounts. **[open]**
+
+### 4.6 Sharing Minis
+- **How it works:**
+  - a Mini has a share code (`IDLI-XXXX-XXXX`);
+  - the receiver says yes, and the Mini appears in their list;
+  - the code carries the workflow and which file it points at, never data rows;
+  - the code bundle is stored at silo.idli.cc. **[built, tested on one account]**
+- **Not tested yet:** two different Google accounts.
+- **Not built:**
+  - updates to a shared Mini (a share is a frozen copy today);
+  - cloning a Mini onto a different file of the same kind;
+  - signing, so people can see who made a Mini. **[idea]**
+
+### 4.7 Organising Minis and workflows
+- **Today:**
+  - Teams are headings, and each team has its own Minis;
+  - Start here holds the Teams page, Privacy and Logins;
+  - in a workspace, Minis show as slim cartridges under the chat box. **[built, tested]**
+- **Next [idea]:**
+  - a team's Minis page that lists data and workflow Minis together;
+  - a Mini's entry points, as an index the small model can search across Minis;
+  - a library of common Minis (a funder's report format, a standard survey) that NGOs clone rather than share.
+
+---
+
+## 5. Cost
+
+| Who does the work | Who pays | How often |
+|---|---|---|
+| The small model (9B) on the person's computer | Nobody | Every day, most questions |
+| Muse 30B on our hardware | Us (could be a paid tier) | Heavier private work |
+| The outside query service (DeepSeek through OpenRouter) | Our OpenRouter key in the PoC; short replies, capped at 200 questions a day | Questions the Mini can't answer |
+| Claude | The person's own subscription | Learning, and new questions, with a yes |
+
+The design keeps the expensive model at the edges, for learning and for new questions, and the cheap model in the
+middle, for the daily work. As a team's Minis grow, it needs Claude less.
+
+---
+
+## 6. Open questions
+
+- **Subscription terms.** Can a person's Claude subscription go through a proxy that rewrites prompts? If not, the
+  right half becomes Codex.
+- **Workflow Minis that write.** How much approval is enough, how is a Mini made safe to share, and which sites can
+  be automated through the browser at all?
+- **Teams across computers.** A team is on one machine today. A real team needs shared membership, and a way to keep
+  Minis in step without a server that holds data.
+- **The first Mini.** A guided first Mini from a sample file, at the end of making a team, is still a concept.
+- **Is this a product or a wedge?** If the CLI makers add their own desktop apps, what stays ours: privacy,
+  cheap daily runs, and Minis organised by team for NGOs.
+
+---
+
+## 7. What exists today
+
+- **Paseo build idli25:**
+  - Start here: the Teams page, Privacy, Logins;
+  - Drivey: Idli on the left, the person's masked Claude on the right, Minis, and the query service;
+  - team headings made from the Teams page, as Drivey clones;
+  - WhatsAppy: an empty Claude space with no sending.
+- **Evidence:**
+  - tests, synthetic fixtures and evals against Muse 30B;
+  - laptop walk-throughs on a test Google account (chronology under `chronology/2026-11-1*`).
+- **Not built:**
+  - workflow Minis;
+  - org kit Minis;
+  - teams across computers;
+  - Mini updates, clones and signing;
+  - the guided first Mini.
