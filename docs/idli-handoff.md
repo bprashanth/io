@@ -40,9 +40,13 @@ New since the checkpoint below:
   - field-notes, helpline, comms, leads, training and survey.
 
   Their Builder sessions are in tmux (`b1`, `b2`, `h1` to `h5`).
-- **Laptop:** not synced. `git fetch dgx` from the laptop asked for a Tailscale browser check, which only the owner
-  can pass. After that, sync, install pixi (x86_64) into `~/idli-insights/platform/bin`, and rerun the Teams page
-  New team flow there.
+- **Laptop (04:10):** synced and tested as a person; see the chronology's "Laptop run". `git fetch dgx` still needs
+  the owner's Tailscale browser check, so code went over the Paseo terminal in base64 chunks (md5 checked; the laptop
+  commits "sync from DGX (...)"). The script is in the DGX scratchpad (`lapsync.sh FROM_DGX_REV MSG`); redo it as a
+  plain `git pull dgx` once Tailscale is approved.
+  - The test team "Field Media" is on the laptop (Builder `32f83373`, Analyst `a918b529`, chat `2b85cf8c`).
+  - The DGX router (`muse-prefix-proxy`) was restarted twice, for `/idli/9b/props` and the mention fix. Muse was
+    untouched.
 
 ## Checkpoint 2026-11-16: read this first, then the narratives
 
