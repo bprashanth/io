@@ -151,6 +151,8 @@ def _marks_or_numbers(frame, column):
         return False
 
     def number(v):
+        if re.fullmatch(r'\+?\d[\d -]{7,}', v):  # phone, Aadhaar and other ID numbers are never "safe numbers"
+            return False
         v = re.sub(r'^(?:rs\.?|inr|₹)\s*|\s*%$', '', v.lower()).replace(',', '').replace(' ', '')
         return bool(re.fullmatch(r'[-+]?\d+(?:\.\d+)?', v))
 
@@ -171,7 +173,9 @@ def prepare(data_dir, files, question):
                 strict = _read_by_extension(data_dir, rel)
                 for tab in sheets:
                     for row in privacy.suggest(Path(data_dir) / rel, tab):
-                        mask = row['mask'] or (strict and not _marks_or_numbers(sheets[tab], row['column']))
+                        # A reader's table: text columns start hidden, and a column of plain numbers or marks stays
+                        # visible even when its heading sounds like a person ("...of enterprise owner")
+                        mask = (not _marks_or_numbers(sheets[tab], row['column'])) if strict else row['mask']
                         columns[row['column']] = columns.get(row['column'], False) or mask
                 privacy.set(data_dir, rel, mode='mask', review='ask', columns=columns)
         # Seed all files before masking: the namespace and the question span every workbook.
