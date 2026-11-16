@@ -53,4 +53,26 @@ MODEL_TYPES.
   needs Paseo: that is the laptop test.
 - **Teams page,** headless: the three answers, Versions, and Go back.
 
-**Next:** the laptop run (the owner brings up the tunnel).
+**Laptop run (21:00-21:10, test account, the owner's own Insights team and images):**
+- **Setup.** Synced (laptop commits `3894e584` and `5e27efc9`; the laptop's own taught-skill changes were left
+  alone). Ran the bootstrap, which gave Drivey and Insights `builder_open`. Restarted the page servers and the DGX
+  router (`muse-prefix-proxy`; Muse itself untouched). The new tests pass on the laptop (19/19), including OCR in
+  the sandbox.
+- **The Builder card.** In Insights, "what does this table indicate? @finance_caste_table.png" (the image the owner
+  had tried earlier) got the card "Insights can't read images yet. ... Build it with the Builder?".
+- **Build it.** A Builder tab opened on the right with focus, with the amber BUILDER line, the banner and the masked
+  request. In 1 minute 8 seconds it built and tested "Read photos, scans and screenshots of tables" (Tesseract,
+  using the heading row as column names, with a confidence score per row) and saved a version.
+- **The same question again.** The image was downloaded and read into two tables; the privacy review opened with
+  every text column hidden (only confidence visible). Done, then Switch to Claude: the Analyst answered from the
+  masked table and warned plainly that the reading was poor.
+- **The finding.** Tesseract reads dense table screenshots badly (confidence 0 to 74, garbled cells). Muse's server
+  reports vision as on (`/props` modalities). The private-model option (Muse reading the image) is the fix. It has
+  to run through the platform, since readers have no network, and it isn't wired yet.
+- **Fixed on the way:**
+  - the two tables from one image had the same label;
+  - the card's lead now reads "Not opened: ...".
+- **Cleaned up.** A stray workspace my click had made was deleted.
+- **Rough edges:**
+  - the Builder tab's title shows "Claude Code" in Paseo, not "Builder";
+  - an Analyst terminal started before the sync keeps the old setup until it is restarted.

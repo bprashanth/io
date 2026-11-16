@@ -261,8 +261,15 @@ workspace to one folder. One window keeps the hand-off visible, and the colours 
 The Builder's settings now allow reading the platform source and Claude's own scratch folder, so a person isn't
 asked.
 
+**On the laptop (same evening):**
+- **The journey works end to end** on the owner's Insights team with a real image from the test Drive: card,
+  Builder tab with its label, a reader built in about a minute, the image read into a table, the privacy review,
+  the Analyst.
+- **But Tesseract reads dense table screenshots badly.** Muse's server has vision on, so the private-model option
+  is the next step. Details: `chronology/2026-11-16T2100-builder-analyst-model-types.md`.
+
 **Not done yet:**
-- the laptop run: Paseo opening the Builder tab, the left chat's Builder card on a real Drive photo, and Versions
-  on the real team;
+- Muse vision as a platform capability (a reader asks the platform; the platform calls Muse outside the sandbox);
+- the Builder tab's title in Paseo (it shows "Claude Code");
 - voice, video and PDF readers (on the menu, but not built by anyone yet);
 - Muse vision (to verify).
