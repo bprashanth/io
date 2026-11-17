@@ -157,7 +157,7 @@ class Cdp:
         rest = ws_url.split("://", 1)[1]
         hostport, path = rest.split("/", 1)
         host, port = hostport.split(":")
-        self.timeout, self.n, self.buf = timeout, 0, b""
+        self.timeout, self.n, self.buf, self.events = timeout, 0, b"", []
         self.s = sock or socket.create_connection((host, int(port)), timeout=timeout)
         self.s.settimeout(timeout)
         key = base64.b64encode(os.urandom(16)).decode()
@@ -182,14 +182,20 @@ class Cdp:
         out, self.buf = self.buf[:k], self.buf[k:]
         return out
 
-    def call(self, method, params=None):
-        """One CDP call; its result, or None if the browser answered with an error."""
+    def send(self, method, params=None):
+        """Send one CDP call without waiting; its id."""
         self.n += 1
         msg = json.dumps({"id": self.n, "method": method, "params": params or {}}).encode()
         mask, n = os.urandom(4), len(msg)
         hdr = bytes([0x81]) + (bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536
                                else bytes([0x80 | 127]) + struct.pack(">Q", n))
         self.s.sendall(hdr + mask + bytes(b ^ mask[k % 4] for k, b in enumerate(msg)))
+        return self.n
+
+    def call(self, method, params=None, on_event=None):
+        """One CDP call; its result, or None if the browser answered with an error. on_event(cdp, event) sees events
+        that arrive meanwhile (chromectl answers "Leave site?" boxes this way); it may raise to stop waiting."""
+        want = self.send(method, params)
         deadline = time.time() + self.timeout
         while time.time() < deadline:
             b1, b2 = self._need(2)
@@ -201,9 +207,37 @@ class Cdp:
             data = self._need(ln)
             if b1 & 0x0F == 1:
                 reply = json.loads(data)
-                if reply.get("id") == self.n:
+                if reply.get("id") == want:
                     return reply.get("result") if "error" not in reply else None
+                if "method" in reply:
+                    if len(self.events) < 200:
+                        self.events.append(reply)
+                    if on_event:
+                        on_event(self, reply)
         raise TimeoutError("no reply")
+
+    def drain(self, seconds, on_event=None):
+        """Read events for a moment (a box a click opens shows up just after the click)."""
+        end, old = time.time() + seconds, self.s.gettimeout()
+        try:
+            while time.time() < end:
+                self.s.settimeout(max(0.05, end - time.time()))
+                try:
+                    b1, b2 = self._need(2)
+                except (TimeoutError, socket.timeout):
+                    return
+                ln = b2 & 0x7F
+                if ln == 126:
+                    ln = struct.unpack(">H", self._need(2))[0]
+                elif ln == 127:
+                    ln = struct.unpack(">Q", self._need(8))[0]
+                data = self._need(ln)
+                if b1 & 0x0F == 1:
+                    msg = json.loads(data)
+                    if "method" in msg and on_event:
+                        on_event(self, msg)
+        finally:
+            self.s.settimeout(old)
 
     def close(self):
         try:

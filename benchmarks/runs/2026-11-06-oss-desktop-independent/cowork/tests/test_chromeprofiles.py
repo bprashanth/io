@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -272,6 +273,25 @@ class CdpRoundTrip(Base):
             (self.team / 'extensions/samples/pages/inbox-page.json').read_text())})
         replay.open(self.url)
         self.assertTrue(replay.find('search mail'))
+
+    def test_leave_site_and_alert_boxes_are_answered_question_boxes_are_not(self):
+        """Laptop, 2026-11-18: Sheets showed "Leave site?" and every browser tool hung until the person clicked."""
+        sys.path.insert(0, str(ROOT / 'lib'))
+        import idli_mcp as mcp
+        (self.home / 'site' / 'edit.html').write_text(
+            '<html><head><title>Sheet</title></head><body><button onclick="window.onbeforeunload=e=>{e.preventDefault();'
+            'e.returnValue=1;return 1}">Edit</button><button onclick="setTimeout(()=>alert(\'Saved\'),50)">Note'
+            '</button><button onclick="setTimeout(()=>confirm(\'Delete this sheet?\'),50)">Delete</button></body></html>')
+        edit = self.url.replace('index.html', 'edit.html')
+        mcp.browser_open('me-test', edit)
+        mcp.browser_click('me-test', text='Edit')  # the page now asks before it is left
+        self.assertEqual(mcp.browser_open('me-test', self.url)['title'], 'Inbox')
+        mcp.browser_open('me-test', edit)
+        mcp.browser_click('me-test', text='Note')
+        time.sleep(0.5)
+        self.assertIn('Note', mcp.browser_read('me-test')['text'])  # the alert was answered
+        with self.assertRaisesRegex(ValueError, 'Delete this sheet'):  # the person answers questions, not Idli
+            chromectl.Browser(port=cp.debug_port('me-test')).click(text='Delete')
 
     def test_site_tool_runs_through_its_door_on_the_test_profile(self):
         sys.path.insert(0, str(ROOT / 'lib'))

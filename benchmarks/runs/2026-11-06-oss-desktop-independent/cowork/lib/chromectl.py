@@ -173,9 +173,26 @@ class Browser:
     def _call(self, method, params=None, target=None):
         c = self._cdp(target)
         try:
-            return c.call(method, params or {})
+            c.call('Page.enable', on_event=self._answer)  # so a box that opens during the call is seen and answered
+            return c.call(method, params or {}, on_event=self._answer)
+        except TimeoutError:
+            raise TimeoutError('The page did not answer. A box may be open in the Chrome window (for example '
+                               '"Leave site?"): ask the person to close it, then go on.') from None
         finally:
             c.close()
+
+    @staticmethod
+    def _answer(cdp, event):
+        """A box the page shows while a call waits: "Leave site?" and alerts are answered (Leave, OK). A question box
+        (confirm, prompt) is the person's to answer, so the call stops and says what it asks."""
+        if event.get('method') != 'Page.javascriptDialogOpening':
+            return
+        p = event.get('params') or {}
+        if p.get('type') in ('beforeunload', 'alert'):
+            cdp.send('Page.handleJavaScriptDialog', {'accept': True})
+            return
+        raise ValueError(f'The page is asking: "{str(p.get("message") or "")[:200]}". Ask the person to answer it in '
+                         'the Chrome window, then go on.')
 
     def evaluate(self, js, target=None):
         """Run JavaScript in the current tab and return its value (JSON-able)."""
@@ -242,9 +259,11 @@ class Browser:
     def _mouse(self, x, y):
         c = self._cdp()
         try:
+            c.call('Page.enable', on_event=self._answer)
             for typ in ('mouseMoved', 'mousePressed', 'mouseReleased'):
                 c.call('Input.dispatchMouseEvent', {'type': typ, 'x': x, 'y': y, 'button': 'left',
-                                                    'clickCount': 0 if typ == 'mouseMoved' else 1})
+                                                    'clickCount': 0 if typ == 'mouseMoved' else 1}, on_event=self._answer)
+            c.drain(0.8, self._answer)
         finally:
             c.close()
 
@@ -272,12 +291,15 @@ class Browser:
             self.evaluate(CLEAR_JS % json.dumps(ref))
         c = self._cdp()
         try:
-            c.call('Input.insertText', {'text': str(text)})
+            c.call('Page.enable', on_event=self._answer)
+            c.call('Input.insertText', {'text': str(text)}, on_event=self._answer)
             if enter:
                 for typ in ('keyDown', 'keyUp'):
                     c.call('Input.dispatchKeyEvent', {'type': typ, 'key': 'Enter', 'code': 'Enter',
                                                       'windowsVirtualKeyCode': 13, 'nativeVirtualKeyCode': 13,
-                                                      **({'text': '\r'} if typ == 'keyDown' else {})})
+                                                      **({'text': '\r'} if typ == 'keyDown' else {})},
+                           on_event=self._answer)
+            c.drain(0.8, self._answer)
         finally:
             c.close()
         if enter:
