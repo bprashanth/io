@@ -396,7 +396,7 @@ class ToolTests(Fixture):
         offered={t['name'] for t in json.loads(result.stdout)['result']['tools']}
         self.assertEqual(offered,{'idli_show','idli_draft_mini','unmask','builder_open','team_run','app_open','team_capabilities'})  # lookup withheld from Claude
         builder=subprocess.run([sys.executable,'-I',str(ROOT/'lib/idli_mcp.py')],input=request,text=True,capture_output=True,check=True,env={**os.environ,'IDLI_ROLE':'builder'})
-        self.assertEqual({t['name'] for t in json.loads(builder.stdout)['result']['tools']},{'team_check','team_save','platform_request','stack_install','stack_run','capability_menu','catalog','catalog_request','profiles','profile_new','test_account_set','browser_open','browser_read','browser_click','browser_type','browser_shot','browser_tabs','rehearse'})
+        self.assertEqual({t['name'] for t in json.loads(builder.stdout)['result']['tools']},{'team_check','team_save','platform_request','stack_install','stack_run','capability_menu','catalog','catalog_request','profiles','profile_new','test_account_set','browser_open','browser_read','browser_click','browser_type','browser_shot','browser_tabs','rehearse','routine_check','routine_config_set','routine_rehearse'})
     def test_launcher_installs_command(self):
         self.assertIn('.claude/commands/mini.md',(ROOT/'desktop/claude-masked.sh').read_text())
         self.assertIn('idli_draft_mini',(ROOT/'idli/claude-commands/mini.md').read_text())

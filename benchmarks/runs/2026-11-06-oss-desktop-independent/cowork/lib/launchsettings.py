@@ -109,7 +109,8 @@ def merge_builder(ext, data_dir, platform):
         'mcp__idli__platform_request', 'mcp__idli__stack_run', 'mcp__idli__capability_menu',
         'mcp__idli__catalog', 'mcp__idli__catalog_request', 'mcp__idli__profiles', 'mcp__idli__profile_new',
         'mcp__idli__browser_open', 'mcp__idli__browser_read', 'mcp__idli__browser_click', 'mcp__idli__browser_type',
-        'mcp__idli__browser_shot', 'mcp__idli__browser_tabs', 'mcp__idli__rehearse']))
+        'mcp__idli__browser_shot', 'mcp__idli__browser_tabs', 'mcp__idli__rehearse', 'mcp__idli__routine_check', 'mcp__idli__routine_config_set',
+        'mcp__idli__routine_rehearse']))
     # test_account_set is never allowed here: Idli's hook asks the person every time (builder_hooks)
     permissions['allow'] = [a for a in permissions['allow'] if a != 'mcp__idli__test_account_set']
     # Its own settings and the installed stack are Idli's, not the Builder's to change

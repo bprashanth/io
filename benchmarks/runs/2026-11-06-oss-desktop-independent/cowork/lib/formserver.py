@@ -451,6 +451,55 @@ def tools_remove(body):
     return toolhome.remove(team, tool, teams._team_folder(team))
 
 
+# ---- a team's Runs page: its routines (lib/routines.py), Run now, what waits for the person's yes ----
+RUN_JOBS = {}  # (team, routine) -> {'state': 'running' | 'done' | 'failed', 'error'}
+
+
+def _routine_args(body):
+    from lib import teams
+    team = _team_arg(body)
+    folder = teams._team_folder(team)
+    if not folder:
+        raise ValueError('That team is gone. Reload the page.')
+    name = str(body.get('routine') or '')
+    if name and not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,40}', name):
+        raise ValueError('Not a routine.')
+    return team, folder, name
+
+
+def runs_overview(body):
+    from lib import routines
+    team, folder, _ = _routine_args(body)
+    return {'team': team, 'routines': routines.overview(folder),
+            'jobs': [{'routine': k[1], **v} for k, v in RUN_JOBS.items() if k[0] == team]}
+
+
+def runs_start(body):
+    import threading
+    from lib import routines
+    team, folder, name = _routine_args(body)
+    mode = 'real' if body.get('mode') == 'real' else 'test'
+    if RUN_JOBS.get((team, name), {}).get('state') == 'running':
+        return {'ok': True, 'running': True}
+    RUN_JOBS[(team, name)] = {'state': 'running'}
+
+    def go():
+        try:
+            log = routines.run(folder, name, mode)
+            RUN_JOBS[(team, name)] = {'state': 'done' if log.get('ok') else 'failed',
+                                      'error': next((s['note'] for s in log['steps'] if not s['ok']), '')}
+        except Exception as exc:
+            RUN_JOBS[(team, name)] = {'state': 'failed', 'error': str(exc)[:300]}
+    threading.Thread(target=go, daemon=True).start()
+    return {'ok': True, 'running': True}
+
+
+def runs_decide(body):
+    from lib import routines
+    team, folder, name = _routine_args(body)
+    return routines.decide(folder, name, str(body.get('key') or ''), bool(body.get('yes')))
+
+
 def make_handler(files, token):
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -610,6 +659,14 @@ def make_handler(files, token):
                 if u.path == "/teams":  # Start here > Teams: the team cards and the New team panels
                     with open(os.path.join(HERE, "lib", "teams_page.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
+                if u.path == "/runs":  # a team's Runs page (lib/runs_page.html)
+                    with open(os.path.join(HERE, "lib", "runs_page.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/runs":
+                    try:
+                        return self._send(200, runs_overview({'team': (qs.get('team') or [''])[0]}))
+                    except ValueError as exc:
+                        return self._send(400, {'error': str(exc)})
                 if u.path == "/api/tools":
                     return self._send(200, tools_overview())
                 if u.path == "/api/tools/usage":
@@ -669,6 +726,10 @@ def make_handler(files, token):
                     return self._send(200, tools_add(body))
                 if u.path == '/api/tools/remove':
                     return self._send(200, tools_remove(body))
+                if u.path == '/api/runs/run':
+                    return self._send(200, runs_start(body))
+                if u.path == '/api/runs/decide':
+                    return self._send(200, runs_decide(body))
                 if u.path == '/api/consent':
                     return self._send(200, reveals.decide(files.data_dir, body['id'], body['approve']))
                 if u.path == '/api/reveals/hide':

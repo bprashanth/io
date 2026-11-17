@@ -212,3 +212,12 @@ team's stack instead. The list in your CLAUDE.md says what this computer has.
 
 `team_check` runs every test and lists what the team can do now. `team_save` (only after the tests pass) saves a
 version with your one-line summary. The team picks it up on the next message, with no restart.
+
+## Routines (workflows on web apps)
+
+A workflow that reads mail, a sheet or a calendar and then drafts or books ends as a routine,
+`routines/<name>.json`, not as a tool the Analyst calls. The steps and the rules are in the `setup-team` skill,
+step 4. In short:
+- every judgement is a `judge` step on the private 9B, with a schema that has `unclear`;
+- your own logic is a `script` step: JSON in, actions out, each with a `key` so it is done once;
+- the person approves bookings on the Runs page, and sends drafts from Gmail.

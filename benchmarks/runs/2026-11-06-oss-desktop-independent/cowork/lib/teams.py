@@ -396,7 +396,7 @@ def plan_text(st):
         goal = st['goal']
         lines.append(f'Works towards: {goal[:1].upper() + goal[1:]}.')
     lines.append('')
-    lines.append(f'- Its own heading in your sidebar. Ask on the left, Claude helps on the right.')
+    lines.append(f'- Its own heading in your sidebar. The Builder sets it up with you. Runs shows what it does each day.')
     lines.append('- Files come from Google Drive and stay on this computer.')
     lines.append('- Names, places and phone numbers go to Claude as codes.' if st.get('private') != 'No' else
                  '- Idli still checks each file. Any names go to Claude as codes.')
@@ -683,9 +683,10 @@ def _extended(folder):
     """What the Builder added (tested capabilities) and how many versions there are to go back to."""
     from lib import teamcaps
     if not os.path.isdir(os.path.join(folder, 'extensions')):
-        return {'added': [], 'versions': 0}
+        return {'added': [], 'versions': 0, 'routines': []}
+    from lib import routines
     added = [c['title'] for c in teamcaps.capabilities(folder) if c not in teamcaps.BASE]
-    return {'added': added, 'versions': len(teamcaps.versions(folder))}
+    return {'added': added, 'versions': len(teamcaps.versions(folder)), 'routines': routines.names(folder)}
 
 
 def team_versions(team_id):

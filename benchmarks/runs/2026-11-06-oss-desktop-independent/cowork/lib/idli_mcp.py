@@ -594,6 +594,57 @@ BROWSER_TOOLS = {
 }
 
 
+# ---- routines: the workflow Idli runs every day (lib/routines.py, narrative/BUILDER_JOURNEY.md) ----
+
+def routine_check(name):
+    from lib import routines
+    problems = routines.check(str(data_dir()), name)
+    return {'ok': not problems, 'problems': problems,
+            'settings_for_test': sorted(routines.config(str(data_dir()), name, 'test'))}
+
+
+def routine_config_set(name, key, value):
+    """A setting of the routine for the TEST accounts (a sheet id, the calendar's secret iCal address). value
+    "@ical:<role>" makes Idli read that test account's secret calendar address itself."""
+    from lib import chromeprofiles, routines
+    value = str(value)
+    m = re.fullmatch(r'@ical:([a-z0-9-]{1,20})', value)
+    if m:
+        from lib import google_web
+        row = next((r for r in chromeprofiles.test_accounts(str(data_dir())) if r['role'] == m.group(1)), None)
+        if not row:
+            raise ValueError(f'No test account has the role {m.group(1)}.')
+        value = google_web.calendar_secret_ical(_test_browser(row['profile']), row['email'])
+        keys = routines.set_config(str(data_dir()), name, 'test', key, value)
+        return {'ok': True, 'set': key, 'note': 'Idli read the secret calendar address and keeps it to itself.',
+                'settings_for_test': keys}
+    return {'ok': True, 'settings_for_test': routines.set_config(str(data_dir()), name, 'test', key, value)}
+
+
+def routine_rehearse(name, approve_all=True, dry_run=False):
+    """Run the routine on the TEST accounts, with the private model, step by step. approve_all books without asking
+    (test accounts only), so the Builder can check the whole flow; the person's Runs page asks in real use."""
+    from lib import routines
+    log = routines.run(str(data_dir()), name, 'test', dry_run=bool(dry_run), approve_all=bool(approve_all))
+    return log
+
+
+ROUTINE_TOOLS = {
+    'routine_check': (routine_check, 'Check routines/<name>.json: the steps, the 9B judge (with "unclear"), the '
+                      'scripts, and which test settings are set.', {'name': {'type': 'string'}}, ['name']),
+    'routine_config_set': (routine_config_set, 'Set a routine setting for the TEST accounts, used as {config.<key>} '
+                           'in the routine (for example leads_sheet). value "@ical:me" reads that test account\'s '
+                           'secret calendar address for you.',
+                           {'name': {'type': 'string'}, 'key': {'type': 'string'}, 'value': {'type': 'string'}},
+                           ['name', 'key', 'value']),
+    'routine_rehearse': (routine_rehearse, 'Run a routine on the TEST accounts, as Idli will run it every day: each '
+                         'step\'s result, the private model\'s answers, the drafts and bookings it made. Run it '
+                         'again to check nothing is done twice.',
+                         {'name': {'type': 'string'}, 'approve_all': {'type': 'boolean'},
+                          'dry_run': {'type': 'boolean'}}, ['name']),
+}
+
+
 BUILDER_TOOLS = {
     'capability_menu': (capability_menu, 'The platform\'s capability menu as it is on this computer now (local '
                         'tools, the private model with or without vision). Check it before choosing how to build.',
@@ -626,6 +677,7 @@ BUILDER_TOOLS = {
                   {'command': {'type': 'string'}, 'timeout': {'type': 'integer'}}, ['command']),
 }
 BUILDER_TOOLS.update(BROWSER_TOOLS)
+BUILDER_TOOLS.update(ROUTINE_TOOLS)
 if os.environ.get('IDLI_ROLE') == 'builder':
     TOOLS = BUILDER_TOOLS
 

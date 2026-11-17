@@ -69,31 +69,42 @@ ask for a code on your phone. Type it there, then tell me." Then wait.
 Sending email between the team's own test accounts is fine. Never send to anyone else. Never send a WhatsApp message,
 from any account.
 
-## 4. Learn each app and write the team's site tools
+## 4. Learn each app, then write the workflow as a routine
 
-For each app in the steps, use it in the test profile with the browser tools (`browser_open`, `browser_read`,
-`browser_click`, `browser_type`, `browser_shot`, `browser_tabs`). Prefer stable addresses (a search URL, a sheet's
-export link) over long click paths.
+For each app in the steps, use it in the test profile with the browser tools to understand it. Then write the
+workflow as a **routine**: `routines/<name>.json`, which Idli runs the same way every time, never Claude. Its steps:
+- `sheet`: a Google Sheet's rows, by its id (`{config.leads_sheet}`). Find the id in the test sheet's address and
+  set it with `routine_config_set(name, "leads_sheet", "<id>")`.
+- `mail`: unread inbox mail, opened, kept only from senders listed in a sheet column (`"from_in": "leads.email"`).
+- `free`: open times from the calendar. `routine_config_set(name, "ical", "@ical:me")` lets Idli read the test
+  calendar's secret address itself.
+- `judge`: the private 9B reads each item and answers in a fixed shape (a JSON schema). Every judgement goes here
+  (did they agree, which time, is this a complaint), never in word rules. The schema must have `"unclear"`: Idli
+  sends unclear answers to the person.
+- `script`: your own Python (`routines/<file>.py`): JSON in on stdin (`context`, `memory`, `mode`), one JSON line
+  out with `actions` and the `memory` you want next time (for example the times you offered each lead).
+Actions are done once each, by their `key`: `draft_email` (a Gmail draft: the person presses Send),
+`book_event` (after the person's yes on the Runs page), `ask_person` (shown on the Runs page).
 
-Then write the team's own site tools, as the `build-team` skill says ("Site tools"):
-- the code in `sites/<app>/` (for example `sites/gmail/find_new_leads.py`), using `chromectl`;
-- pages you read, saved with `browser_read(save_as=...)` into `samples/pages/`, for its test;
-- a test that runs with no browser (`chromectl.Replay`);
-- a `manifest.json` entry of kind `tool` with `"profile": "<role>"`.
+`routine_check(name)` checks the file. Test the 9B prompt on several fake replies (yes, no, maybe, picks a time,
+picks a time you didn't offer, Hindi) with `routine_rehearse`.
 
-A new app is not a platform request. Use `platform_request` only for what only the platform can do (a change to the
-app, the private model doing something new, sending a WhatsApp message).
+Site tools (`sites/<app>/`, the `build-team` skill) are for apps the routine steps don't cover. A new app is not a
+platform request.
 
 ## 5. Rehearse end to end
 
-Run each tool on the test accounts with `rehearse(capability, instructions)`, in the order of the steps. Check the
-result in the test account itself (`browser_read`). Then show a short report, one line per step:
+Make the rehearsal data in the test accounts (step 3). Sending email between the team's two test accounts is fine;
+the lead's replies come from the lead's profile. Then `routine_rehearse(name)` runs the routine as Idli will, on the
+test accounts, and books without asking (test accounts only). Check each result in the test account itself
+(`browser_read`): the draft is in Drafts, the meeting is on both calendars. Run it again: nothing must happen twice.
+Then show a short report, one line per step:
 
 > Rehearsal on the test accounts:
-> 1. Find new lead emails: pass (found 2 of 2)
-> 2. Free slots next week: pass
-> 3. Draft the reply: pass (draft saved, not sent)
-> 4. Add to the sheet: fail (the sheet's columns moved). Fixing it now.
+> 1. Leads sheet: pass (3 leads)
+> 2. New replies: pass (1 from a lead, 4 others left alone)
+> 3. Private model: pass (agreed, picked Friday 2 pm)
+> 4. Booking: pass (on both calendars). Second run: nothing new, as it should.
 
 Fix what failed and rehearse again. `team_check` must pass, then `team_save` with a one-line summary.
 
@@ -105,6 +116,8 @@ In three or four plain lines:
   it before anything is sent or saved.
 - The private model on this computer reads the real emails and sheets. You designed those steps with fake data, so
   nothing real comes to you.
+- The person sees and runs it on the **Runs** page (Start here, Teams, the team's card, Runs): Run now, what waits
+  for their yes, what was done. Bookings wait for their yes there; emails wait in Gmail Drafts for them to send.
 - Connecting the real account is a later step in Idli. Until then the team runs on the test accounts only.
 
 Write the steps, the test accounts' roles (not their passwords), what's built and what's waiting in `TEAM.md`.
@@ -112,5 +125,4 @@ Write the steps, the test accounts' roles (not their passwords), what's built an
 ## Teams that are about files, not apps
 
 If the work is about files (photos, voice notes, videos, spreadsheets), skip steps 2 and 3: build readers and tools
-on fake samples as the `build-team` skill says, and tell the person how to try it ("Pick a video with @ on the left
-and ask: cut the silences").
+on fake samples as the `build-team` skill says, and tell the person how to try it.

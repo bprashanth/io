@@ -123,12 +123,15 @@ function card(t) {
   el.innerHTML = `${t.id === fresh ? '<span class="tag">New</span>' : ""}<h3>${esc(t.name)}</h3>
     <div class="goal">${esc(t.goal || "")}${(t.added || []).length ? `<div class="added">Added: ${(t.added).map(esc).join(". ")}</div>` : ""}</div>
     <div class="row acts"><button type="button" class="primary open">Open</button>
+    ${(t.routines || []).length ? '<button type="button" class="runs">Runs</button>' : ""}
     ${t.versions > 1 ? '<button type="button" class="vers">Versions</button>' : ""}
     ${t.builtin ? "" : '<button type="button" class="del">Delete</button>'}</div>
     <div class="vlist" hidden></div>
     <div class="msg"></div>`;
   const msg = el.querySelector(".msg"), acts = el.querySelector(".acts");
   const vers = el.querySelector(".vers"), vlist = el.querySelector(".vlist");
+  const runs = el.querySelector(".runs");
+  if (runs) runs.onclick = () => { location.href = "/runs?t=" + encodeURIComponent(T) + "&team=" + encodeURIComponent(t.id); };
   if (vers) vers.onclick = async () => {
     if (!vlist.hidden) { vlist.hidden = true; return; }
     const out = await api("/api/team-versions", {id: t.id});
@@ -224,7 +227,7 @@ function render() {
     setTimeout(() => box.querySelector(".opt.on, .opt")?.focus(), 0);
   } else {
     const name = esc(a.name), lines = [
-      "Its own heading in your sidebar. Ask on the left, Claude helps on the right.",
+      "Its own heading in your sidebar. The Builder sets it up with you. Runs shows what it does each day.",
       "Files come from Google Drive and stay on this computer." +
         (a.data && a.data !== "Google Drive" ? " Put a copy of your files in Drive." : ""),
       a.private === "No" ? "Idli still checks each file. Any names go to Claude as codes."
