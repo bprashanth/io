@@ -95,14 +95,50 @@ def setup_prompt(data_dir):
     return ' '.join(lines)
 
 
-def open_setup(data_dir, workspace):
-    """Start the Builder in a new team's first workspace with its setup answers."""
+BUILDER_CHAT = 'Builder'
+
+
+def setup_workspace(data_dir, project):
+    """The new team's one chat, titled "Builder", under the team's heading (a Paseo workspace holding only the
+    Builder's terminal: no Idli chat and no Analyst). Made once; found again by its title."""
+    folder = Path(data_dir).resolve()
+
+    def mine():
+        rows = json.loads(home.cli('workspace', 'ls', '--json') or '[]')
+        return next((w for w in rows if w.get('name') == BUILDER_CHAT and
+                     Path(w.get('cwd') or '.').expanduser().resolve() == folder), None)
+    found = mine()
+    if found:
+        return found['workspaceId']
+    out = home.cli('workspace', 'create', '--isolation', 'local', '--project', str(project), '--path', str(folder),
+                   '--title', BUILDER_CHAT, '--json')
+    try:
+        made = json.loads(out or '{}')
+        made = made.get('workspace', made) if isinstance(made, dict) else {}
+        wid = made.get('workspaceId') or made.get('id')
+    except ValueError:
+        wid = None
+    if not wid:
+        wid = (mine() or {}).get('workspaceId')
+    if not wid:
+        raise ValueError('Paseo did not make the Builder chat')
+    return wid
+
+
+def open_setup(data_dir, workspace=None, project=None):
+    """Start the Builder with a new team's setup answers, in one chat titled "Builder" under the team's heading
+    (narrative/BUILDER_JOURNEY.md). With a workspace (older callers), the Builder goes on its right as before."""
     from lib import uiswitch
     teamcaps.ensure(data_dir)
     prompt = setup_prompt(data_dir)
     try:
-        tid = _terminal(workspace) or _start(workspace, data_dir, prompt)
-        shown = uiswitch.show_terminal(workspace, tid, 'right')
+        if workspace:
+            tid = _terminal(workspace) or _start(workspace, data_dir, prompt)
+            shown = uiswitch.show_terminal(workspace, tid, 'right')
+        else:
+            workspace = setup_workspace(data_dir, project)
+            tid = _terminal(workspace) or _start(workspace, data_dir, prompt)
+            shown = uiswitch.show_alone(workspace, tid)
     except (OSError, ValueError, json.JSONDecodeError, subprocess.SubprocessError):
         raise ValueError('Idli could not open the Builder. Open the team and type "open the Builder".') from None
-    return {'terminal': tid, 'focused': bool(shown.get('ok'))}
+    return {'terminal': tid, 'workspace': workspace, 'focused': bool(shown.get('ok'))}

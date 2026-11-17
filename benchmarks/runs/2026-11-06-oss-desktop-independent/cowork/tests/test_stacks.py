@@ -269,11 +269,46 @@ class Onboarding(unittest.TestCase):
         for want in ('New team: Helpline', 'PLACE_001', 'A few of us', 'ask each time', 'setup-team'):
             self.assertIn(want, text)
         self.assertNotIn('Ramtekdi', text)
+        proj = [{'projectId': 'prj_1', 'path': str(d), 'name': 'Helpline'}]
         with patch.object(teams, '_team_folder', return_value=str(d)), \
-                patch.object(teams, 'open_team', return_value={'ok': True, 'workspace': 'wks_1'}), \
-                patch.object(builder, 'open_setup', return_value={'focused': True}) as opened:
-            self.assertEqual(teams.setup_with_builder('helpline'), {'ok': True, 'focused': True})
-        opened.assert_called_once_with(str(d), 'wks_1')
-        with patch.object(teams, '_team_folder', return_value=str(d)), \
-                patch.object(teams, 'open_team', return_value={'ok': False, 'error': 'x'}):
+                patch.object(teams, '_projects', return_value=proj), \
+                patch.object(teams, 'open_team', side_effect=AssertionError('no two halves for a new team')), \
+                patch.object(builder, 'open_setup', return_value={'focused': True, 'workspace': 'wks_b'}) as opened:
+            self.assertEqual(teams.setup_with_builder('helpline'), {'ok': True, 'focused': True, 'workspace': 'wks_b'})
+        opened.assert_called_once_with(str(d), project='prj_1')
+        with patch.object(teams, '_team_folder', return_value=str(d)), patch.object(teams, '_projects', return_value=[]):
             self.assertFalse(teams.setup_with_builder('helpline')['ok'])
+
+    def test_a_new_team_opens_one_chat_titled_builder(self):
+        from unittest.mock import patch
+        from lib import builder, home, uiswitch
+        d = Path(tempfile.mkdtemp(prefix='idli-onboard-'))
+        (d / 'team.json').write_text(json.dumps({'name': 'Leads', 'goal': 'Reply to leads'}))
+        calls, made = [], []
+
+        def cli(*args):
+            calls.append(list(args))
+            if args[:2] == ('workspace', 'ls'):
+                return json.dumps([{'workspaceId': 'wks_b', 'name': 'Builder', 'cwd': str(d)}] if made else
+                                  [{'workspaceId': 'wks_old', 'name': 'Drivey', 'cwd': '/elsewhere'}])
+            if args[:2] == ('workspace', 'create'):
+                made.append(1)
+                return json.dumps({'workspaceId': 'wks_b'})
+            if args[:2] == ('terminal', 'ls'):
+                return '[]'
+            if args[:2] == ('terminal', 'create'):
+                return json.dumps({'id': 'term_1'})
+            return ''
+        with patch.object(home, 'cli', side_effect=cli), \
+                patch('lib.privacy.mask_free_text', side_effect=lambda dd, t: t), \
+                patch.object(uiswitch, 'show_alone', return_value={'ok': True}) as alone, \
+                patch.object(uiswitch, 'show_terminal', side_effect=AssertionError('no right pane')):
+            out = builder.open_setup(d, project='prj_1')
+            self.assertEqual(out, {'terminal': 'term_1', 'workspace': 'wks_b', 'focused': True})
+            self.assertEqual(builder.setup_workspace(d, 'prj_1'), 'wks_b')  # found again, not made twice
+        create = next(c for c in calls if c[:2] == ['workspace', 'create'])
+        self.assertEqual(create[create.index('--title') + 1], 'Builder')
+        self.assertEqual(create[create.index('--project') + 1], 'prj_1')
+        self.assertEqual(len([c for c in calls if c[:2] == ['workspace', 'create']]), 1)
+        self.assertEqual(next(c for c in calls if c[:2] == ['terminal', 'create'])[-3:], ['--name', 'Builder', '--json'])
+        alone.assert_called_once_with('wks_b', 'term_1')

@@ -111,6 +111,26 @@ def show_terminal(workspace_id, terminal_id, side="right", focus=True):
         return {"ok": False, "why": type(e).__name__}
 
 
+def show_alone(workspace_id, terminal_id, wait=4):
+    """Go to a workspace and show one terminal there, in a single pane (a new team's Builder chat). Paseo opens a
+    terminal made from the CLI with ?open=terminal:<id>; P17's __idliPlaceTab then focuses it without splitting."""
+    try:
+        page = next(t for t in _targets() if t.get("type") == "page" and str(t.get("url", "")).startswith("paseo://app"))
+        srv = server_id()
+        route = f"paseo://app/h/{srv}/workspace/{workspace_id}?open=" + urllib.parse.quote(f"terminal:{terminal_id}")
+        _ws_eval(page["webSocketDebuggerUrl"], f"location.href = {json.dumps(route)}; true")
+        time.sleep(wait)
+        page = next(t for t in _targets() if t.get("type") == "page" and str(t.get("url", "")).startswith("paseo://app"))
+        got = _ws_eval(page["webSocketDebuggerUrl"],
+                       "typeof window.__idliPlaceTab === 'function' ? window.__idliPlaceTab(" + json.dumps(
+                           {"serverId": srv, "workspaceId": workspace_id, "kind": "terminal", "id": terminal_id,
+                            "side": "left", "focus": True}) + ") : 'no-p17'")
+        return {"ok": got in (True, "no-p17"), "why": None if got is True else got}
+    except (OSError, ValueError, KeyError, StopIteration, ConnectionError, TimeoutError,
+            subprocess.SubprocessError) as e:
+        return {"ok": False, "why": type(e).__name__}
+
+
 def open_url(workspace_id, url, side='right', focus=True):
     """Open a browser tab in the specified workspace using the P21 UI bridge."""
     if side not in ('left', 'right') or not isinstance(workspace_id, str) or not workspace_id:
