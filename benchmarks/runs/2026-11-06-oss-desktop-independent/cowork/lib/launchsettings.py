@@ -102,11 +102,12 @@ def merge_builder(ext, data_dir, platform):
     permissions['additionalDirectories'] = sorted(set(permissions.get('additionalDirectories', []) + [scratch]))
     permissions['allow'] = sorted(set(permissions.get('allow', []) + [
         f'Read(/{Path(platform).resolve()}/**)', 'mcp__idli__team_check', 'mcp__idli__team_save',
-        'mcp__idli__platform_request', 'mcp__idli__stack_run', 'mcp__idli__capability_menu']))
+        'mcp__idli__platform_request', 'mcp__idli__stack_run', 'mcp__idli__capability_menu',
+        'mcp__idli__catalog', 'mcp__idli__catalog_request']))
     # Its own settings and the installed stack are Idli's, not the Builder's to change
     permissions['deny'] = sorted(set(permissions['deny'] + [
         f'Edit(/{Path(ext).resolve()}/.claude/**)', f'Edit(/{Path(ext).resolve()}/stack/.pixi/**)',
-        f'Edit(/{Path(ext).resolve()}/stack/stack-lock.json)']))
+        f'Edit(/{Path(ext).resolve()}/stack/stack-lock.json)', f'Edit(/{Path(ext).resolve()}/stack/catalog.json)']))
     sandbox = settings.setdefault('sandbox', {})
     sandbox.update({'enabled': True, 'autoAllowBashIfSandboxed': True, 'allowUnsandboxedCommands': False})
     sandbox.setdefault('filesystem', {})['denyRead'] = private

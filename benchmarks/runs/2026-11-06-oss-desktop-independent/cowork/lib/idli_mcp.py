@@ -291,9 +291,46 @@ def platform_request(need, why):
     return teamcaps.platform_request(str(data_dir()), f'{need}: {why}')
 
 
-def stack_install():
-    """Install the stack (stack/pixi.toml, stack/stack.json) inside Idli's install wall. Claude Code asks the person
-    first, with a summary Idli writes from the files (a PreToolUse hook), so Claude can't word the consent."""
+def _catalog_install(tools):
+    """Catalog tools for this team (lib/toolhome.py), in a separate process like the old installs."""
+    code = ('import json, sys; sys.path.insert(0, sys.argv[1]); from lib import toolhome\n'
+            'try:\n    out = toolhome.install(sys.argv[2], json.loads(sys.argv[3]))\n'
+            'except ValueError as exc:\n    out = {"ok": False, "refused": str(exc)}\n'
+            'print(json.dumps(out))')
+    p = subprocess.run([sys.executable, '-I', '-c', code, str(HERE), str(data_dir()), json.dumps(tools)],
+                       capture_output=True, text=True, timeout=7200)
+    try:
+        res = json.loads(p.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        raise ValueError('The install stopped: ' + (p.stderr or '').strip()[-400:]) from None
+    if res.get('refused'):
+        return {'ok': False, 'refused': res['refused'],
+                'next': 'Tell the person plainly why, and offer a smaller tool from the catalog, a platform_request, '
+                        'or a catalog_request.'}
+    out = {k: res[k] for k in ('ok', 'tools', 'steps', 'size') if k in res}
+    if res.get('ok'):
+        out['use'] = ('Run your code with stack_run. Model files are at $IDLI_MODEL_<NAME> (and $IDLI_MODEL_PATHS, '
+                      'JSON). Call catalog with example=<id> for how to use a tool.')
+    else:
+        out['log_tail'] = res.get('log_tail', '')[-1800:]
+    return out
+
+
+def stack_install(tools=None):
+    """Install tools from Idli's catalog for this team (tools=[ids]); with no tools, reinstall what the team already
+    lists (a teammate), or an older hand-made stack. Claude Code asks the person first, with a summary Idli writes
+    (a PreToolUse hook), so Claude can't word the consent."""
+    from lib import toolhome
+    if tools:
+        if isinstance(tools, str):
+            tools = [tools]
+        return _catalog_install([str(t) for t in tools])
+    listed = toolhome.catalog_tools(str(data_dir()))
+    if listed:
+        return _catalog_install(listed)
+    if not (data_dir() / 'extensions' / 'stack' / 'pixi.toml').exists():
+        raise ValueError('Name the tools to install from the catalog: stack_install(tools=["<id>", ...]).')
+    # An older team's hand-made stack (before the catalog): installed as before.
     # A separate process: a long install never holds this server, and it always runs the platform's current code
     code = ('import json, sys; sys.path.insert(0, sys.argv[1]); from lib import stackwall; '
             'print(json.dumps(stackwall.install(sys.argv[2])))')
@@ -344,8 +381,41 @@ def stack_run(command, timeout=600):
 
 def capability_menu():
     """What the platform offers on this computer right now (it can change while you work: check before choosing)."""
-    from lib import capmenu
-    return capmenu.describe()
+    from lib import capmenu, catalog
+    return (capmenu.describe() + '\n\nThis computer:\n' + catalog.describe_computer() +
+            "\nTools from the internet come only from Idli's vetted catalog: call `catalog` to see what fits here, "
+            'and `catalog_request` when nothing does.')
+
+
+def catalog_tool(example=None):
+    """Idli's vetted tools that run on this computer's system, each with whether it fits here (disk, memory, GPU)."""
+    from lib import catalog, toolhome
+    cat = catalog.load()
+    if example:
+        return {'tool': example, 'example': catalog.example(example, cat)[:20000]}
+    team = toolhome.team_id(data_dir())
+    reg = toolhome.installs()
+    rows, other = catalog.fitting(cat, registry=reg)
+    have = {r['tool'] for r in reg if r['team'] == team}
+    for r in rows:
+        r['installed_for_this_team'] = r['id'] in have
+    res = catalog.resources()
+    return {'this_computer': catalog.describe_computer(res).strip(), 'platform': res['platform'], 'tools': rows,
+            'only_on_other_systems': other, 'catalog_updated': cat.get('updated'),
+            **({'note': 'The catalog server did not answer; this is the last copy Idli saw.'} if cat.get('stale')
+               else {}),
+            'how': 'Install with stack_install(tools=[ids]). Never install anything that is not here. If nothing '
+                   'fits, call catalog_request.'}
+
+
+def catalog_request(need, why, tools_considered=None):
+    """Ask Idli's team to vet a tool the catalog doesn't have. General words only, never the team's data."""
+    from lib import catalog, teamcaps, toolhome
+    out = catalog.request(need, why, tools_considered or [], toolhome.team_id(data_dir()))
+    teamcaps.platform_request(str(data_dir()), f'catalog request: {need}: {why}')
+    out['tell_person'] = ("Our team will look for a safe tool for this and add it to Idli's list. Meanwhile, say what "
+                          'you can do now.')
+    return out
 
 
 BUILDER_TOOLS = {
@@ -359,8 +429,22 @@ BUILDER_TOOLS = {
     'platform_request': (platform_request, 'Record a platform feature request: something the platform must give '
                          '(a login or an action on an account, sending messages, a change to the app).',
                          {'need': {'type': 'string'}, 'why': {'type': 'string'}}, ['need', 'why']),
-    'stack_install': (stack_install, 'Install stack/ (pixi.toml packages, stack.json repos and downloads) inside '
-                      "Idli's install wall. The person is asked first. Pins everything on the first install.", {}, []),
+    'stack_install': (stack_install, "Install tools from Idli's vetted catalog for this team (tools: catalog ids). "
+                      'Idli checks this computer first and refuses with reasons; then the person is asked. With no '
+                      'tools, reinstalls what the team already has.',
+                      {'tools': {'type': 'array', 'items': {'type': 'string'},
+                                 'description': 'Catalog tool ids, from the catalog tool.'}}, []),
+    'catalog': (catalog_tool, "Idli's vetted tools for this computer's system, with whether each fits here (disk, "
+                'memory, GPU) and why not. Pass example=<id> for that tool\'s example script.',
+                {'example': {'type': 'string', 'description': 'A tool id, to get its example script.'}}, []),
+    'catalog_request': (catalog_request, 'When no catalog tool fits a need: ask Idli\'s team to vet one. General '
+                        'words only (no names, places or team data).',
+                        {'need': {'type': 'string', 'description': 'What kind of tool, e.g. "speech to text for '
+                                                                   'Marathi voice notes"'},
+                         'why': {'type': 'string', 'description': 'What it is for, in general words'},
+                         'tools_considered': {'type': 'array', 'items': {'type': 'string'},
+                                              'description': 'Catalog ids or tool names you looked at'}},
+                        ['need', 'why']),
     'stack_run': (stack_run, 'Run a command in the installed stack inside the run wall (no internet), from stack/. '
                   'samples/ is at ../samples. Files written to $IDLI_OUT come back in .idli-out/.',
                   {'command': {'type': 'string'}, 'timeout': {'type': 'integer'}}, ['command']),

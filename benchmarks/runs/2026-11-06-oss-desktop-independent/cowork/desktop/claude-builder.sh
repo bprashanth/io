@@ -12,7 +12,7 @@ import json, os, shutil, sys
 from pathlib import Path
 root, data, request = sys.argv[1:4]
 sys.path.insert(0, root)
-from lib import capmenu, launchsettings, rolelabels, teamcaps
+from lib import capmenu, catalog, launchsettings, rolelabels, teamcaps
 ext = teamcaps.ensure(data)
 teamcaps.checkpoint(data, ('Before: ' + request.split('"')[1] if request.count('"') >= 2 else 'Before the Builder')[:100])
 team = teamcaps.team_name(data)
@@ -29,6 +29,7 @@ text += '\n## What ' + team + ' can do now (tested)\n' + '\n'.join('- ' + t for 
 if problems:
     text += '\nProblems in manifest.json: ' + '; '.join(problems) + '\n'
 text += '\n## The capability menu on this computer\n' + capmenu.describe() + '\n'
+text += '\n## This computer\n' + catalog.describe_computer()
 (claude / 'CLAUDE.md').write_text(text)
 launchsettings.merge_builder(ext, data, root)
 launchsettings.builder_hooks(data, root)
