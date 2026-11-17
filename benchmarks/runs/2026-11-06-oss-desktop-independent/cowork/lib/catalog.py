@@ -158,7 +158,7 @@ def resources(home=None):
 
 
 def gb(n):
-    return f'{n / GB:.1f} GB' if n >= GB / 10 else f'{max(n, 0) / 1024 ** 2:.0f} MB'
+    return f'{n / GB:.1f} GB' if n >= GB else f'{max(n, 0) / 1024 ** 2:.0f} MB'
 
 
 def describe_computer(res=None):
