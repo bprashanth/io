@@ -368,9 +368,9 @@ def request(need, why, tools_considered=(), team=None):
     need, why = ' '.join(str(need or '').split())[:300], ' '.join(str(why or '').split())[:600]
     if not need:
         raise ValueError('Say what is needed, in general words.')
+    # Only the fields silo takes (catalog/README.md): it refuses any other, and stamps the time itself.
     body = json.dumps({'need': need, 'why': why, 'tools_considered': [str(t)[:80] for t in tools_considered or []][:20],
-                       'team': str(team or '')[:60], 'platform': platform(), 'at': time.strftime('%Y-%m-%dT%H:%M:%S'),
-                       'version': 1}).encode()
+                       'team': str(team or '')[:40], 'platform': platform()}).encode()
     base, headers = source()
     req = urllib.request.Request(base + '/requests', data=body, method='POST',
                                  headers={**headers, 'Content-Type': 'application/json'})

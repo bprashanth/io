@@ -211,6 +211,8 @@ class Check(Base):
         self.assertEqual((got['need'], got['team'], got['tools_considered']),
                          ('speech to text for Marathi', 'field-notes', ['voice']))
         self.assertIn(got['platform'], catalog.PLATFORM_WORDS)
+        # silo answers 400 to any other field (trusted-catalog W4 on the DGX, 2026-11-17: 'at' and 'version')
+        self.assertLessEqual(set(got), {'need', 'why', 'platform', 'team', 'tools_considered'})
         with self.assertRaises(ValueError):
             catalog.request('', 'x')
 
