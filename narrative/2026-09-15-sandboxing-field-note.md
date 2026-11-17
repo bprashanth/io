@@ -160,3 +160,35 @@ or not made.
 Evidence for all of it is in `../chronology/2026-09-15T*.md`, `../chronology/2026-09-16T*.md`
 and `../chronology/2026-09-26T*.md`, from both the laptop and the DGX. Screenshots stay on the
 machines that took them, under `../benchmarks/runs/`.
+
+## Postscript, 2026-11-17: the same question, for a team's own tools
+
+Two months on, the wall had to cover something new. It was no longer only the assistant's commands, but software
+a team's Builder installs: speech to text, voices, OCR, translation, face blurring, small pages.
+[PAGES_AND_TOOLS.md](PAGES_AND_TOOLS.md) has the full record. In short:
+
+**On Linux the old lesson held.**
+- bwrap gave two walls cheaply:
+  - an install wall that reaches only package hosts, through a logging proxy;
+  - a run wall with no network except one door to the private model.
+- Every attack tried was refused.
+
+**Windows is still the weak platform, and nothing new fixes it.**
+- Claude Code doesn't sandbox on native Windows (it needs WSL2).
+- Antigravity's Windows sandbox needs a 2026 Windows 11 build, and rests on the same process-security technology
+  Microsoft doesn't yet call a boundary.
+- Our own September CI found that technology unavailable, and Codex's elevated sandbox leaking to local services.
+
+**What changed is where the risk sits.**
+- The packages themselves mostly don't need Linux: 11 of 12 test stacks solve for Windows and Mac.
+- The wall is what needs Linux. How much wall a tool needs depends on what it does:
+  - faces and voices, pickle weights, downloads at run time and listening pages need one;
+  - a rule over a spreadsheet doesn't.
+
+**The decision follows the field note's argument.** Make the weakest enforcement visible rather than pretend.
+- For the POC, teams pick only from a catalog of tools we vetted. The catalog is served from silo.
+- On Mac and Windows those tools run with plain pixi. The person is on their own wifi, and every tool is one we
+  chose and tested.
+- Linux keeps its walls.
+- Letting teams bring unvetted software waits until Mac (Seatbelt) and Windows (WSL2 or the DGX) have a wall that
+  passes the same attacks. See `todos/idli-insights/p1/sandboxing_later.md`.

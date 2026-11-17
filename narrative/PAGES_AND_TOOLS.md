@@ -365,6 +365,46 @@ such cap, but needs Tailscale on every laptop.
 - for video it is a real cost, unless the files already live in Drive;
 - local WSL2 or a VM wins exactly for the video and voice teams, which are also the ones that need the wall most.
 
+## Decision 2026-11-17: a catalog of trusted tools, plain pixi everywhere (POC)
+
+**Owner's call:**
+- Idli keeps a server of software we have vetted. The Builder picks from it.
+- The person is on wifi and the tools are vetted, so for the POC tools install with plain pixi on every platform.
+- Proper sandboxing is evaluated later (p1 todo `todos/idli-insights/p1/sandboxing_later.md`).
+
+**The catalog (on silo):**
+- It lives on the DGX at `/mnt/seagate/silo/idli-catalog/` and is served by the router (`muse_prefix_proxy.py`):
+  - `GET /idli/catalog/catalog.json` returns the list;
+  - `GET /idli/catalog/files/<path>` returns mirrored model files;
+  - `POST /idli/catalog/requests` appends a request for a new tool.
+- The laptop reaches it through silo.idli.cc with the same Cloudflare Access service token as the 9B.
+- Each tool entry has:
+  - `id`, `name`, `for` (plain words), `licence`, `vetted` (date);
+  - `pixi`: dependencies and PyPI dependencies, version-pinned;
+  - `platforms`: only those where `pixi lock` solved (linux-64, linux-aarch64, osx-arm64, win-64);
+  - `models`: each with `file` (path on silo), `source` (the public upstream URL), `sha256`, `bytes`;
+  - `needs`: `disk_gb`, `ram_gb`, `cores`, `gpu`;
+  - `example`: a short script showing the tool's use;
+  - `cautions`: for example "non-commercial licence".
+
+**The Builder's three steps:**
+1. Pick catalog tools for the team's workflows (`catalog` tool). It only offers tools that solve on this platform.
+2. Check resources before offering an install: free disk where tools go, RAM, cores, GPU, and platform. If the
+   computer can't run it, the Builder says so plainly and suggests a smaller option, or the platform, or a request.
+3. If nothing in the catalog fits, it sends a request (`catalog_request`): what is needed and why, in general
+   words, with no team data. Our team vets it and adds a tool.
+
+**Where installs go:**
+- One folder per computer, `IDLI_TOOLS_HOME`: by default `~/idli-insights/tools`, and on the DGX
+  `/mnt/seagate/idli-tools`. It holds each team's environment and a shared model folder, with each model stored
+  once.
+- `installs.json` records which team installed which tool, the size, the date and the platform.
+- **Mission control** has a page listing every install by team and size, with Remove and Add. Removing the last
+  team's use of a model frees it.
+
+**The wall:** on Linux the install and run walls stay, since they cost nothing there. On Mac and Windows tools run
+with plain pixi, for the POC.
+
 ## Log
 
 - **2026-11-17:**

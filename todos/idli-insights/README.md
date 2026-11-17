@@ -8,6 +8,7 @@
   - [One file at a time: index and graph built as files are learned](p1/file_by_file_index.md)
   - [Read every table on a tab (subtables, info blocks)](p1/subtables.md): the owner's decision; today Idli reads
     one table per tab.
+  - [Sandboxing team tools properly](p1/sandboxing_later.md): after the catalog POC; WSL2 test, Mac Seatbelt, risk tiers, DGX fallback.
   - [Installers and the demo gaps](p1/deployment_strategy.md): D1-D11, with Pyodide as row 21.
   - [Paseo patches](p1/paseo_patches.md): P1, P3 and P12 for the demo.
   - [The Builder's exit test](p1/builder_acceptance_tests.md): the failing request becomes the person's test;
