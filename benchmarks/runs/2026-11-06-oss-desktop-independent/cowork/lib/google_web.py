@@ -28,31 +28,41 @@ from email.utils import parseaddr, parsedate_to_datetime
 MAIL = 'https://mail.google.com/mail/u/0/'
 
 
-def _fetch_text(b, path):
-    """fetch() a same-origin path in the profile's current tab; returns (status, text)."""
-    res = b.evaluate("(async () => { const r = await fetch(%s, {credentials: 'include'}); "
-                     "return {s: r.status, t: await r.text()}; })()" % json.dumps(path))
+def _tab(b, origin, url):
+    """This profile's tab on a Google site (origin), opened at url if there is none. Every call below works in its
+    own site's tab, so a Gmail read never runs in the Calendar tab."""
+    for t in b._pages():
+        if str(t.get('url', '')).startswith(origin + '/'):
+            return b.pin(t)
+    t = b._http('/json/new?' + urllib.parse.quote(url, safe=':/?#[]@!$&\'()*+,;=%'), 'PUT')
+    for _ in range(60):
+        try:
+            if b.evaluate('document.readyState', target=t) == 'complete':
+                break
+        except (ValueError, OSError, TimeoutError, ConnectionError):
+            pass
+        time.sleep(0.5)
+    time.sleep(1)
+    return b.pin(t)
+
+
+def _fetch_text(b, path, target):
+    """fetch() a same-origin path in that tab; returns (status, text)."""
+    res = b.evaluate("(async () => { try { const r = await fetch(%s, {credentials: 'include'}); "
+                     "return {s: r.status, t: await r.text()}; } catch (e) { return {s: 0, t: String(e)}; } })()"
+                     % json.dumps(path), target=target)
     return int(res['s']), res['t']
-
-
-def _on(b, origin, url):
-    """Make sure the tab is on this origin (fetch must be same-origin)."""
-    try:
-        here = b.evaluate('location.origin')
-    except (ValueError, OSError, TimeoutError):
-        here = ''
-    if here != origin:
-        b.open(url)
 
 
 # ---- Gmail ----
 
 def _ik(b):
-    _on(b, 'https://mail.google.com', MAIL + '#inbox')
-    for _ in range(20):
-        ik = b.evaluate('(window.GLOBALS || [])[9] || null')
+    """Gmail's tab and its account key (ik)."""
+    t = _tab(b, 'https://mail.google.com', MAIL + '#inbox')
+    for _ in range(40):
+        ik = b.evaluate('(window.GLOBALS || [])[9] || null', target=t)
         if ik:
-            return ik
+            return t, ik
         time.sleep(0.5)
     raise ValueError('Gmail did not load in this profile. Is it signed in?')
 
@@ -79,8 +89,8 @@ def _unxml(s):
 
 def mail_feed(b):
     """Unread mail in the inbox (Gmail's feed lists only unread mail, at most 20)."""
-    _ik(b)
-    status, xml = _fetch_text(b, '/mail/u/0/feed/atom')
+    t, _ = _ik(b)
+    status, xml = _fetch_text(b, '/mail/u/0/feed/atom', t)
     if status != 200:
         raise ValueError(f'Gmail did not give its mail feed ({status}).')
     return parse_feed(xml)
@@ -116,8 +126,8 @@ def mail_message(b, msg_id):
     """One message by its Gmail id (from mail_feed), parsed."""
     if not re.fullmatch(r'[0-9a-f]{6,24}', str(msg_id)):
         raise ValueError('Not a Gmail message id.')
-    ik = _ik(b)
-    status, raw = _fetch_text(b, f'/mail/u/0/?ik={ik}&view=att&th={msg_id}&attid=0&disp=comp&safe=1&zw')
+    t, ik = _ik(b)
+    status, raw = _fetch_text(b, f'/mail/u/0/?ik={ik}&view=att&th={msg_id}&attid=0&disp=comp&safe=1&zw', t)
     if status != 200 or 'From:' not in raw[:20000]:
         raise ValueError(f'Gmail did not give that message ({status}).')
     return {'id': msg_id, **parse_message(raw.encode('utf-8', 'surrogateescape'))}
@@ -127,6 +137,7 @@ def compose_draft(b, to, subject, body, send=False):
     """Gmail's compose page, filled in, saved as a draft. send=True presses Send: only for rehearsals between a team's
     own test accounts (lib/routines.py checks that); a real account's mail is always left as a draft."""
     q = urllib.parse.urlencode({'view': 'cm', 'fs': '1', 'to': to, 'su': subject, 'body': body})
+    _tab(b, 'https://mail.google.com', MAIL + '#inbox')
     b.open(MAIL + '?' + q)
     for _ in range(30):  # the compose box needs a moment; Gmail saves a draft once it has a change to save
         if b.evaluate("!!document.querySelector('div[aria-label=\"Message Body\"], div[role=textbox]')"):
@@ -161,6 +172,7 @@ def compose_draft(b, to, subject, body, send=False):
 
 def drafts_count(b, subject):
     """How many drafts have this subject (Gmail's drafts search page, read by its result rows)."""
+    _tab(b, 'https://mail.google.com', MAIL + '#inbox')
     b.open(MAIL + '#search/' + urllib.parse.quote(f'in:drafts subject:"{subject}"'))
     time.sleep(2.5)
     return int(b.evaluate("document.querySelectorAll('div[role=main] tr.zA').length") or 0)
@@ -172,9 +184,10 @@ def sheet_rows(b, sheet_id, gid=None):
     """A Google Sheet's tab as a list of dicts (first row as headings), by its CSV export address."""
     if not re.fullmatch(r'[A-Za-z0-9_-]{20,80}', str(sheet_id)):
         raise ValueError('Not a Google Sheet id.')
-    _on(b, 'https://docs.google.com', f'https://docs.google.com/spreadsheets/d/{sheet_id}/edit')
-    path = f'/spreadsheets/d/{sheet_id}/export?format=csv' + (f'&gid={int(gid)}' if gid is not None else '')
-    status, text = _fetch_text(b, path)
+    t = _tab(b, 'https://docs.google.com', f'https://docs.google.com/spreadsheets/d/{sheet_id}/edit')
+    # gviz answers on docs.google.com itself; the export address redirects to another site, which fetch can't follow
+    path = f'/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv' + (f'&gid={int(gid)}' if gid is not None else '')
+    status, text = _fetch_text(b, path, t)
     if status != 200 or text.lstrip().startswith('<'):
         raise ValueError(f'Google Sheets did not give that sheet ({status}). Is it in this account?')
     return list(csv.DictReader(io.StringIO(text)))
@@ -186,6 +199,7 @@ def calendar_secret_ical(b, calendar_email):
     """The calendar's secret iCal address, read from its settings (Google shows a warning first: answered OK)."""
     import base64
     cid = base64.b64encode(calendar_email.encode()).decode().rstrip('=')
+    _tab(b, 'https://calendar.google.com', 'https://calendar.google.com/calendar/u/0/r')
     b.open('https://calendar.google.com/calendar/u/0/r/settings/calendar/' + cid)
     time.sleep(3)
     find = """(() => { const lab = [...document.querySelectorAll('*')].find(e => e.children.length === 0 &&
@@ -313,6 +327,7 @@ def calendar_event(b, title, start, minutes, guest, details=''):
     q = urllib.parse.urlencode({'action': 'TEMPLATE', 'text': title, 'details': details, 'add': guest,
                                 'dates': start.astimezone(dt.timezone.utc).strftime(f) + '/' +
                                 end.astimezone(dt.timezone.utc).strftime(f)})
+    _tab(b, 'https://calendar.google.com', 'https://calendar.google.com/calendar/u/0/r')
     b.open('https://calendar.google.com/calendar/render?' + q)
     for _ in range(30):
         if b.evaluate("[...document.querySelectorAll('button,[role=button]')].some(e => e.textContent.trim() === 'Save')"):

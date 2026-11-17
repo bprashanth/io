@@ -624,9 +624,16 @@ def routine_config_set(name, key, value):
 def routine_rehearse(name, approve_all=True, dry_run=False):
     """Run the routine on the TEST accounts, with the private model, step by step. approve_all books without asking
     (test accounts only), so the Builder can check the whole flow; the person's Runs page asks in real use."""
-    from lib import routines
-    log = routines.run(str(data_dir()), name, 'test', dry_run=bool(dry_run), approve_all=bool(approve_all))
-    return log
+    # in a fresh process: the run uses Idli's code as it is now, not as it was when this server started
+    code = ('import json, sys; from lib import routines; '
+            'print(json.dumps(routines.run(sys.argv[1], sys.argv[2], "test", dry_run=sys.argv[3] == "1", '
+            'approve_all=sys.argv[4] == "1"), default=str))')
+    res = subprocess.run([sys.executable, '-c', code, str(data_dir()), str(name), '1' if dry_run else '0',
+                          '1' if approve_all else '0'], cwd=str(Path(__file__).resolve().parent.parent),
+                         capture_output=True, text=True, timeout=1800)
+    if res.returncode != 0:
+        raise ValueError((res.stderr.strip().splitlines() or ['The rehearsal failed.'])[-1][:400])
+    return json.loads(res.stdout.strip().splitlines()[-1])
 
 
 ROUTINE_TOOLS = {

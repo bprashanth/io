@@ -158,8 +158,19 @@ class Browser:
         return [t for t in self._http('/json/list') if t.get('type') == 'page'
                 and not str(t.get('url', '')).startswith(('devtools://', 'chrome-extension://'))]
 
+    pinned = None  # a tab id: every call goes to that tab (lib/google_web.py pins one tab per Google site)
+
+    def pin(self, target):
+        self.pinned = target.get('id') if target else None
+        return target
+
     def _page(self):
         pages = self._pages()
+        if self.pinned:
+            t = next((p for p in pages if p.get('id') == self.pinned), None)
+            if t:
+                return t
+            self.pinned = None
         if pages:
             return pages[0]  # Chrome lists the most recently used tab first
         return self._http('/json/new?about:blank', 'PUT')
