@@ -50,7 +50,7 @@ jobs:
         continue-on-error: true
         shell: bash
         working-directory: benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
-        run: python -m unittest tests.test_catalog -v 2>&1 | tee "${{ runner.temp }}/catalog-ci/cowork-tests.txt"; exit ${PIPESTATUS[0]}
+        run: pip install -q duckdb && python -m unittest tests.test_catalog -v 2>&1 | tee "${{ runner.temp }}/catalog-ci/cowork-tests.txt"; exit ${PIPESTATUS[0]}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
@@ -106,10 +106,10 @@ jobs:
           r = json.loads(p.read_text(encoding='utf-8'))
           print(f"### {r['group']} on {r['platform']} ({r['pixi']}, ram {r['resources']['ram'] / 2**30:.1f} GB, "
                 f"{r['resources']['cores']} cores)\n")
-          print('| tool | install s | models s | run s | env MB | pass |\n|---|---|---|---|---|---|')
+          print('| tool | install s | models s | run s | env MB | pass | as is |\n|---|---|---|---|---|---|---|')
           for t in r['tools']:
               print(f"| {t['tool']} | {t.get('install_s')} | {t.get('models_s')} | {t.get('run_s')} | "
-                    f"{t.get('env_mb')} | {t.get('pass')} |")
+                    f"{t.get('env_mb')} | {t.get('pass')} | {t.get('as_is', 'ok')} |")
           for t in r['tools']:
               for c in t.get('checks', []):
                   print(f"- {t['tool']}: {'PASS' if c['ok'] else 'FAIL'} {c['check']}")

@@ -243,6 +243,29 @@ class Manifest(Base):
         self.assertEqual(t['pypi-dependencies']['python-docx'], '==1.1.2')
         with self.assertRaisesRegex(ValueError, 'different versions'):
             toolhome.manifest_text('x', [by['voice'], by['numpy-old']])
+        self.assertNotIn('system-requirements', text)
+
+    def test_system_requirements_pass_through(self):
+        """faster-whisper's av has Apple Silicon wheels for macOS 14 only (CI 2026-11-17): the catalog says so."""
+        import tomllib
+        whisper = tool('whisper', pixi={'dependencies': {'python': '3.11.*'}, 'pypi-dependencies': {'av': '*'},
+                                        'system-requirements': {'macos': '14.0'}})
+        newer = tool('newer', pixi={'dependencies': {}, 'system-requirements': {'macos': '15.1', 'bad key': '1'}})
+        t = tomllib.loads(toolhome.manifest_text('field-notes', [whisper]))
+        self.assertEqual(t['system-requirements'], {'macos': '14.0'})
+        t = tomllib.loads(toolhome.manifest_text('field-notes', [whisper, newer]))
+        self.assertEqual(t['system-requirements'], {'macos': '15.1'})
+
+    def test_plain_env_is_utf8(self):
+        """On Windows a tool printing Hindi to a pipe crashed in cp1252 (CI 2026-11-17)."""
+        with patch.dict(os.environ, {'SECRET_TOKEN': 'x'}):
+            env = toolhome._plain_env({'A': '1'})
+        self.assertEqual((env['PYTHONUTF8'], env['A']), ('1', '1'))
+        self.assertNotIn('SECRET_TOKEN', env)
+        out = subprocess.run([sys.executable, '-c', 'print("\\u0928\\u092e\\u0938\\u094d\\u0924\\u0947")'],
+                             capture_output=True, env={**env, 'PYTHONIOENCODING': ''}, timeout=60)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(out.stdout.decode('utf-8').strip(), '\u0928\u092e\u0938\u094d\u0924\u0947')
 
 
 class Registry(Base):

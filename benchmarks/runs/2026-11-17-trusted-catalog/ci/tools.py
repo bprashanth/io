@@ -13,6 +13,7 @@ fetch_model), with IDLI_TOOLS_HOME in a work folder and IDLI_CATALOG_URL pointin
 files, so fetch_model falls back to the public source the way it would when silo has no copy.
 """
 import argparse
+import copy
 import hashlib
 import http.server
 import json
@@ -132,7 +133,26 @@ class Tool:
         if not ok:
             self.r['notes'].append('pixi install failed: ' + tail[-1500:])
             print(tail, flush=True)
-            return False
+            if not (catalog.platform().startswith('osx') and 'Failed to build `av' in tail):
+                return False
+            # FINDING (2026-11-17): PyAV (faster-whisper's av) ships Apple Silicon wheels for macOS 14 only, and pixi
+            # assumes an older macOS, so uv builds av from source and fails. The catalog entry is installed as it is
+            # (above, recorded as a failure), then again with system-requirements macos 14.0, through the
+            # toolhome.system_requirements passthrough, to show that this is the whole fix.
+            self.r['as_is'] = 'FAIL: av has no wheel for the macOS pixi assumes; built from source and failed'
+            fixed = copy.deepcopy(self.cat)
+            t = catalog.tools_by_id(fixed)[self.id]
+            t['pixi']['system-requirements'] = {'macos': '14.0'}
+            (self.manifest().parent / 'pixi.lock').unlink(missing_ok=True)
+            toolhome.write_manifest(self.team, [self.id], fixed)
+            t0 = time.time()
+            with patch.object(toolhome, 'walled', return_value=False):
+                ok, tail, _ = toolhome.pixi_install(self.team, timeout=1500)
+            self.r['install_s_with_fix'] = round(time.time() - t0, 1)
+            self.r['notes'].append('with [system-requirements] macos = "14.0": pixi install ' + (
+                'worked' if ok else 'failed too: ' + tail[-800:]))
+            if not ok:
+                return False
         lock = self.manifest().parent / 'pixi.lock'
         self.r['lock_platforms'] = sorted(set(re.findall(r'^\s+(linux-64|linux-aarch64|osx-arm64|osx-64|win-64):\s*$',
                                                          lock.read_text(encoding='utf-8'), re.M)))
@@ -327,7 +347,8 @@ def main():
     Path(a.out).write_text(json.dumps(report, indent=1, ensure_ascii=False), encoding='utf-8')
     print(json.dumps(report, indent=1, ensure_ascii=True))
     srv.shutdown()
-    sys.exit(0 if rows and all(r.get('pass') for r in rows) else 1)
+    # a tool that only works with a fix to its catalog entry still fails the job: the catalog needs the change
+    sys.exit(0 if rows and all(r.get('pass') and not r.get('as_is') for r in rows) else 1)
 
 
 if __name__ == '__main__':
