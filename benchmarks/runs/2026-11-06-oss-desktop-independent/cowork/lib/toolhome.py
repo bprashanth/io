@@ -195,6 +195,23 @@ def purge_team(team, data_dir=None):
     return remove(team, None, data_dir)
 
 
+def purge_orphans(teams_root=None):
+    """Remove the tools of teams whose folder is gone (deleted or archived outside Idli). Drivey is never an orphan."""
+    root = Path(teams_root) if teams_root else catalog._idli() / 'teams'
+    freed = 0
+    for team in sorted({r['team'] for r in installs()}):
+        if team != 'drivey' and not (root / team).exists():
+            freed += remove(team)['freed']
+    return freed
+
+
+def usage():
+    """What tools use on this computer and what is free, for the one line on the Teams page."""
+    used = size(envs_home()) + size(models_dir()) + size(cache_dir())
+    free = catalog.resources(home())['disk_free']
+    return {'used': used, 'free': free, 'text': f'Tools use {catalog.gb(used)}. {catalog.gb(free)} free.'}
+
+
 def size(p):
     total = 0
     for root, _, files in os.walk(p):

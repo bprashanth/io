@@ -73,7 +73,7 @@ input[type=text] { width: 100%; font: inherit; font-size: 17px; padding: 12px 14
   <section id="dash">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
       <h1>Teams</h1>
-      <button class="link" id="toolslink" type="button">Installed tools</button>
+      <span class="sub" id="toolsline"></span>
     </div>
     <p class="sub" id="dashsub">Each team gets its own heading in your sidebar.</p>
     <div class="grid" id="grid"></div>
@@ -100,7 +100,8 @@ async function api(path, body) {
 }
 
 // ------------------------------------------------------------------ the dashboard
-$("toolslink").onclick = () => { location.href = "/tools?t=" + encodeURIComponent(T); };
+fetch("/api/tools/usage?t=" + encodeURIComponent(T)).then(r => r.ok ? r.json() : null)
+  .then(u => { if (u && u.text) $("toolsline").textContent = u.text; }).catch(() => {});
 let fresh = null;
 async function showDash(note) {
   $("wiz").hidden = true; $("dash").hidden = false;

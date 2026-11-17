@@ -610,11 +610,15 @@ def make_handler(files, token):
                 if u.path == "/teams":  # Start here > Teams: the team cards and the New team panels
                     with open(os.path.join(HERE, "lib", "teams_page.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
-                if u.path == "/tools":  # Start here > Teams > Installed tools (lib/tools_page.html)
-                    with open(os.path.join(HERE, "lib", "tools_page.html"), encoding="utf-8") as f:
-                        return self._send(200, f.read(), "text/html")
                 if u.path == "/api/tools":
                     return self._send(200, tools_overview())
+                if u.path == "/api/tools/usage":
+                    from lib import toolhome
+                    try:
+                        toolhome.purge_orphans()
+                    except Exception:
+                        pass
+                    return self._send(200, toolhome.usage())
                 if u.path == "/skills":
                     with open(os.path.join(HERE, "lib", "skills.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")

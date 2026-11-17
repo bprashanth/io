@@ -15,6 +15,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
+from unittest import mock
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -513,3 +514,54 @@ def _big_tmp():
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Cleanup(unittest.TestCase):
+    """2026-11-17 (owner): deleting a team removes its tools; tools of teams whose folder is gone are swept; the
+    Teams page shows one line of usage instead of the Installed tools page."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.env = mock.patch.dict(os.environ, {'IDLI_TOOLS_HOME': str(self.tmp / 'tools')})
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _install(self, team):
+        from lib import toolhome
+        (toolhome.env_dir(team)).mkdir(parents=True, exist_ok=True)
+        (toolhome.env_dir(team) / 'x').write_bytes(b'0' * 1000)
+        toolhome.record(team, team.title(), 'office-files', [], 1000)
+
+    def test_orphans_swept_and_usage_line(self):
+        from lib import toolhome
+        root = self.tmp / 'teams'
+        (root / 'leads').mkdir(parents=True)
+        self._install('leads')
+        self._install('gone')
+        toolhome.purge_orphans(root)
+        self.assertEqual({r['team'] for r in toolhome.installs()}, {'leads'})
+        self.assertFalse(toolhome.env_dir('gone').exists())
+        self.assertRegex(toolhome.usage()['text'], r'^Tools use .+\. .+ free\.$')
+
+    def test_delete_team_purges_tools(self):
+        from lib import teams, toolhome
+        folder = self.tmp / 'teams' / 'leads'
+        folder.mkdir(parents=True)
+        (folder / 'team.json').write_text('{"name": "Leads"}')
+        self._install('leads')
+        with mock.patch.object(teams, '_idli', return_value=str(self.tmp)), \
+                mock.patch.object(teams, '_team_folder', return_value=str(folder)), \
+                mock.patch.object(teams, '_paseo', return_value=[]), \
+                mock.patch.object(teams, '_projects', return_value=[]):
+            self.assertTrue(teams.delete_team('leads')['ok'])
+        self.assertEqual(toolhome.installs(), [])
+        self.assertFalse(toolhome.env_dir('leads').exists())
+
+    def test_teams_page_has_no_tools_page(self):
+        html = (Path(__file__).resolve().parents[1] / 'lib' / 'teams_page.html').read_text()
+        self.assertNotIn('Installed tools', html)
+        self.assertIn('/api/tools/usage', html)
+

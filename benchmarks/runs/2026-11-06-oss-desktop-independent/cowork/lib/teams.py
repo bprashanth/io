@@ -793,6 +793,11 @@ def delete_team(team_id):
     except Exception:
         return {'ok': False, 'error': 'Paseo could not remove the heading. Try again.'}
     _stop_page_server(folder)
+    try:  # the team's tools go with it (environment, and models no other team uses)
+        from lib import toolhome
+        toolhome.purge_team(toolhome.team_id(folder))
+    except Exception:
+        pass
     import time
     dest = os.path.join(_idli(), 'archive', 'teams')
     os.makedirs(dest, exist_ok=True)
