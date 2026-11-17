@@ -377,6 +377,80 @@ def skills_delete(sid):
     return {"deleted": sid, "kept_at": dest}
 
 
+# ---- Start here > Teams > Installed tools: catalog tools on this computer (lib/toolhome.py) ----
+TOOL_JOBS = {}  # (team, tool) -> {'state': 'installing' | 'failed', 'error'}
+
+
+def _team_arg(body):
+    team = str(body.get('team') or '')
+    if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,40}', team):
+        raise ValueError('Pick a team.')
+    return team
+
+
+def tools_overview():
+    from lib import catalog, teams, toolhome
+    out = toolhome.overview()
+    try:
+        out['teams'] = [{'id': t['id'], 'name': t['name']} for t in teams.list_teams().get('teams', [])]
+    except Exception:
+        out['teams'] = []
+    try:
+        rows, other = catalog.fitting(registry=toolhome.installs())
+        out['catalog'] = [{k: r[k] for k in ('id', 'name', 'for', 'size', 'fits', 'why_not', 'licence', 'cautions')}
+                          for r in rows]
+        out['catalog_other'] = other
+    except ValueError as exc:
+        out['catalog'], out['catalog_error'] = [], str(exc)
+    out['jobs'] = [{'team': k[0], 'tool': k[1], **v} for k, v in TOOL_JOBS.items()]
+    return out
+
+
+def tools_add(body):
+    """Check, then (with check_only false) install one catalog tool for a team. The person's click on Add, after
+    seeing the check and the summary, is their yes."""
+    from lib import teams, toolhome
+    team, tool = _team_arg(body), str(body.get('tool') or '')
+    folder = teams._team_folder(team)
+    if not folder:
+        raise ValueError('That team is gone. Reload the page.')
+    plan = toolhome.plan(folder, [tool])
+    t = plan['check']['tools'].get(tool, {})
+    verdict = {'ok': plan['ok'], 'reasons': plan['check']['reasons'] + plan['conflicts'],
+               'notes': t.get('notes', []), 'size': toolhome.catalog.gb(t.get('need_bytes', 0)),
+               'summary': toolhome.consent_summary(folder, [tool]) if plan['ok'] else ''}
+    if body.get('check_only') or not plan['ok']:
+        return verdict
+    key = (team, tool)
+    if (TOOL_JOBS.get(key) or {}).get('state') == 'installing':
+        return {'ok': True, 'started': True}
+
+    def work():
+        try:
+            res = toolhome.install(folder, [tool])
+            if res.get('ok'):
+                TOOL_JOBS.pop(key, None)
+            else:
+                TOOL_JOBS[key] = {'state': 'failed', 'error': 'The install did not finish. Try again later.'}
+            return res
+        except (ValueError, RuntimeError, OSError) as exc:
+            TOOL_JOBS[key] = {'state': 'failed', 'error': str(exc)[:300]}
+            return {'ok': False, 'error': str(exc)[:300]}
+    TOOL_JOBS[key] = {'state': 'installing'}
+    if body.get('wait'):
+        return work()
+    threading.Thread(target=work, daemon=True).start()
+    return {'ok': True, 'started': True}
+
+
+def tools_remove(body):
+    from lib import teams, toolhome
+    team = _team_arg(body)
+    tool = str(body['tool']) if body.get('tool') else None
+    TOOL_JOBS.pop((team, tool), None)
+    return toolhome.remove(team, tool, teams._team_folder(team))
+
+
 def make_handler(files, token):
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -416,11 +490,11 @@ def make_handler(files, token):
         def do_GET(self):
             u = urllib.parse.urlparse(self.path)
             qs = urllib.parse.parse_qs(u.query)
-            if u.path == "/teams-open":  # Paseo's UI (P21) opens Start here > Teams here: hand the page its token
+            if u.path in ("/teams-open", "/tools-open"):  # Paseo's UI (P21) opens Start here > Teams: hand the page its token
                 if self.headers.get("Sec-Fetch-Site") not in (None, "none", "same-origin"):
                     return self._send(403, {"error": "forbidden"})
                 self.send_response(302)
-                self.send_header("Location", "/teams?" + urllib.parse.urlencode({"t": token}))
+                self.send_header("Location", u.path[:-5] + "?" + urllib.parse.urlencode({"t": token}))
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("Referrer-Policy", "no-referrer")
                 self.send_header("Content-Length", "0")
@@ -536,6 +610,11 @@ def make_handler(files, token):
                 if u.path == "/teams":  # Start here > Teams: the team cards and the New team panels
                     with open(os.path.join(HERE, "lib", "teams_page.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
+                if u.path == "/tools":  # Start here > Teams > Installed tools (lib/tools_page.html)
+                    with open(os.path.join(HERE, "lib", "tools_page.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/tools":
+                    return self._send(200, tools_overview())
                 if u.path == "/skills":
                     with open(os.path.join(HERE, "lib", "skills.html"), encoding="utf-8") as f:
                         return self._send(200, f.read(), "text/html")
@@ -582,6 +661,10 @@ def make_handler(files, token):
                         out['id'] = os.path.basename(out['folder'])
                         out.pop('folder', None)
                     return self._send(200, out)
+                if u.path == '/api/tools/add':
+                    return self._send(200, tools_add(body))
+                if u.path == '/api/tools/remove':
+                    return self._send(200, tools_remove(body))
                 if u.path == '/api/consent':
                     return self._send(200, reveals.decide(files.data_dir, body['id'], body['approve']))
                 if u.path == '/api/reveals/hide':
