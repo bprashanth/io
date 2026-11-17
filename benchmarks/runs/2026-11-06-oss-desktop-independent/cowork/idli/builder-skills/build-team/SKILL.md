@@ -17,6 +17,7 @@ extensions/
   tests/test_<x>.py    one test per capability; it passes when it exits 0
   samples/             fake files to build and test with (never real ones)
   skills/<name>/SKILL.md   an Analyst skill (optional)
+  sites/<app>/         site tools for web apps, run in a Chrome profile (below)
   stack/               the team's tools from Idli's catalog (optional, below)
     catalog.json       the catalog tools the team uses (written by Idli)
     pixi.toml          made by Idli from those tools; pixi.lock pins them
@@ -109,6 +110,58 @@ assert any('Asha' in r['text'] for r in rows), rows
 Make the sample yourself with fake values (Pillow can draw a register; ffmpeg can make a short clip). Check
 something real about the output, not just that a file exists.
 
+## Site tools (web apps in a Chrome profile)
+
+A site tool is a `tool` that works in a web app (Gmail, Calendar, Sheets, a portal) in a Chrome profile. You learn
+the app on the team's test accounts with the browser tools, then write it here. Idli runs it: on the test accounts
+when you call `rehearse`, and later on the real account (a profile only Idli opens). You never touch the real one.
+
+```
+extensions/
+  sites/gmail/find_new_leads.py     the tool: run(inputs, args, out)
+  samples/pages/gmail-inbox.json    a page from the TEST account, saved with browser_read(save_as="gmail-inbox")
+  tests/test_find_new_leads.py      runs with no browser (chromectl.Replay)
+```
+
+```json
+{"id": "find-new-leads", "title": "Find new lead emails in Gmail", "kind": "tool", "takes": ["none"],
+ "profile": "me", "entry": "sites/gmail/find_new_leads.py", "test": "tests/test_find_new_leads.py",
+ "analyst": "args: {\"days\": 7}"}
+```
+
+```python
+import chromectl                         # the platform's helper (lib/chromectl.py)
+
+def leads(b, days):                      # the logic, written against a browser (real or Replay)
+    b.open(f'https://mail.google.com/mail/u/0/#search/newer_than%3A{int(days)}d')
+    page = b.read()                      # {'url','title','text','links':[{ref,text,href}],'controls':[{ref,kind,label}]}
+    return [a['text'] for a in page['links'] if 'Enquiry' in a['text']]
+
+def run(inputs, args, out):
+    found = leads(chromectl.Browser('me'), args.get('days', 7))   # 'me' is the role in "profile"
+    return {'count': len(found)}         # short: counts, ids. Real content stays on this computer.
+```
+
+```python
+# tests/test_find_new_leads.py
+import importlib.util, json, chromectl
+spec = importlib.util.spec_from_file_location('t', 'sites/gmail/find_new_leads.py')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+b = chromectl.Replay([json.load(open('samples/pages/gmail-inbox.json'))])
+assert m.leads(b, 7) == ['Enquiry about volunteering'], m.leads(b, 7)
+```
+
+- `chromectl.Browser(role)` has `open(url, new_tab=False)`, `read()`, `find(text)`, `click(ref=None, text=None)`,
+  `type(ref, text, enter=False, clear=False)`, `tabs()`, `use_tab(n)`, `evaluate(js)` and `shot(path)`: the same as
+  your browser tools.
+- `"profile"` is one role or a list (`["me", "lead"]`). Each role must be a confirmed test account (`profiles`).
+- It runs in Idli's wall with no network: the only way out is that profile's browser. No stack (`"stack"` stays off).
+- **Draft, don't send.** Tools prepare: a draft email, a calendar entry to confirm, a row to check. The person sends.
+  Never write a tool that sends WhatsApp messages.
+- Read pages by stable addresses and visible names (`aria-label`, button text), not by position. Google changes its
+  pages: the saved samples and tests show when a tool broke.
+- Return short results (counts, ids, yes/no). The Analyst and you never get real emails or names back.
+
 ## The stack: tools from Idli's catalog
 
 When the menu below doesn't have what the team needs, add tools from **Idli's vetted catalog**. Nothing else is
@@ -137,8 +190,8 @@ installed: no packages, repos or downloads you pick yourself.
 - **Try:** `stack_run` runs a command from `stack/` (`python tools/x.py ../samples/a.wav`).
 - **Threads:** use `$IDLI_THREADS` for any thread count (`cpu_threads=int(os.environ.get('IDLI_THREADS', 4))`).
   Never all cores: on some computers that runs many times slower.
-- **Logins and sending:** a stack never logs in to accounts and never sends messages. That is the platform's:
-  `platform_request`.
+- **Logins and sending:** a stack never logs in to accounts and never sends messages. Web apps are driven by site
+  tools (below), which run without the stack.
 - **Older teams** may have a hand-made `stack/pixi.toml` and `stack.json` from before the catalog. They keep
   working (`stack_install` with no tools reinstalls them). Don't add to them; new tools come from the catalog.
 
