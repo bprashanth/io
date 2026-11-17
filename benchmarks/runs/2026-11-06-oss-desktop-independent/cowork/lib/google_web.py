@@ -104,11 +104,15 @@ def mail_search(b, senders, days=7):
     for i in range(0, len(senders), 20):
         q = 'from:(' + ' OR '.join(senders[i:i + 20]) + f') newer_than:{int(days)}d'
         t, _ = _ik(b)
+        # the same search address twice doesn't search again: go to the inbox first, so Gmail asks its server anew
+        b.open(MAIL + '#inbox')
+        time.sleep(1)
         b.open(MAIL + '#search/' + urllib.parse.quote(q))
         rows, last = None, None
-        for _ in range(30):  # until the result list has drawn and stopped changing
+        for _ in range(40):  # until the result list has drawn and stopped changing
             time.sleep(0.5)
-            now = b.evaluate("""(() => { const main = document.querySelector('div[role=main]'); if (!main) return null;
+            now = b.evaluate("""(() => { const main = document.querySelector('div[role=main]');
+              if (!main || !/^Search results/.test(document.title)) return null;
               const r = [...main.querySelectorAll('tr.zA')].map(tr => { const s = tr.querySelector(
               '[data-legacy-last-non-draft-message-id]'); return s ? [s.getAttribute('data-legacy-last-non-draft-message-id'),
               s.getAttribute('data-legacy-thread-id')] : null; }).filter(Boolean);
