@@ -169,6 +169,8 @@ def mail_message(b, msg_id):
 def compose_draft(b, to, subject, body, send=False):
     """Gmail's compose page, filled in, saved as a draft. send=True presses Send: only for rehearsals between a team's
     own test accounts (lib/routines.py checks that); a real account's mail is always left as a draft."""
+    if not send and drafts_count(b, subject):  # a retry after a run that stopped: the draft is already there
+        return {'draft': True, 'already': True}
     q = urllib.parse.urlencode({'view': 'cm', 'fs': '1', 'to': to, 'su': subject, 'body': body})
     _tab(b, 'https://mail.google.com', MAIL + '#inbox')
     b.open(MAIL + '?' + q)
@@ -215,9 +217,11 @@ def compose_draft(b, to, subject, body, send=False):
     # "Draft saved" shows before Gmail has finished: leaving at once lost the draft (laptop, 2026-11-18). Wait, then
     # look in Drafts; if it isn't there, fail so the routine tries again next run instead of marking it done.
     time.sleep(5)
-    if not drafts_count(b, subject):
-        raise ValueError('The draft did not reach Drafts. It will be tried again on the next run.')
-    return {'draft': True}
+    for _ in range(6):  # Drafts' search catches up within seconds
+        if drafts_count(b, subject):
+            return {'draft': True}
+        time.sleep(4)
+    raise ValueError('The draft did not reach Drafts. It will be tried again on the next run.')
 
 
 def drafts_count(b, subject):
