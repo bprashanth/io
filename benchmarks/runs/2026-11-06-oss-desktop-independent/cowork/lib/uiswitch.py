@@ -132,12 +132,14 @@ def open_url(workspace_id, url, side='right', focus=True):
 
 # ---- a minimal DevTools (CDP) client over a websocket, standard library only
 class Cdp:
-    def __init__(self, ws_url, timeout=10):
+    def __init__(self, ws_url, timeout=10, sock=None):
+        # sock: an already connected socket (lib/chromectl.py reaches a profile's DevTools through a unix socket)
         rest = ws_url.split("://", 1)[1]
         hostport, path = rest.split("/", 1)
         host, port = hostport.split(":")
         self.timeout, self.n, self.buf = timeout, 0, b""
-        self.s = socket.create_connection((host, int(port)), timeout=timeout)
+        self.s = sock or socket.create_connection((host, int(port)), timeout=timeout)
+        self.s.settimeout(timeout)
         key = base64.b64encode(os.urandom(16)).decode()
         self.s.sendall((f"GET /{path} HTTP/1.1\r\nHost: {hostport}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                         f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
