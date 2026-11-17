@@ -8,6 +8,8 @@ The model menu on Idli's Paseo provider picks one (cowork/lib/modes.py has the d
   idli-9b                      → the local 9B (IDLI_9B_URL, default 127.0.0.1:8291) on a lean prompt, with guards.
   idli-steam                   → code runs the chat (no model), except one 9B call per question for the form's dials.
 POST /v1/chat/completions with model idli-9b (file_ask's split, from the MCP server) goes to the 9B as is.
+GET /idli/catalog/catalog.json, GET|HEAD /idli/catalog/files/<path>: the trusted tools catalog (IDLI_CATALOG_DIR, default
+  /mnt/seagate/silo/idli-catalog). POST /idli/catalog/requests asks for a new tool; GET lists the requests.
 POST /idli/share (an Idli skill bundle, a zip) -> {"code": "IDLI-XXXX-XXXX"}; GET /idli/share/<code> -> the bundle.
   Sharing what Idli learned by a short code (cowork/lib/share.py); bundles hold no rows of anyone's data.
 Everything else passes through to Muse unchanged, streamed.
@@ -20,7 +22,10 @@ import importlib.util
 import json
 import os
 import re
+import secrets
 import sys
+import threading
+import time
 import traceback
 import urllib.parse
 
@@ -49,6 +54,63 @@ def _new_code():
             return c
 
 
+CATALOG_DIR = os.environ.get("IDLI_CATALOG_DIR") or "/mnt/seagate/silo/idli-catalog"
+CATALOG_REQ_MAX = 16 * 1024
+CATALOG_REQ_FIELDS = {"need": 2000, "why": 4000, "platform": 40, "team": 40, "tools_considered": 2000}
+_catalog_lock = threading.Lock()
+
+
+def catalog_file(rel):
+    """The real path of a file under the catalog root for a URL path, or None. No '..', no absolute paths, no
+    directories, and no symlink that leads outside the root."""
+    rel = urllib.parse.unquote(rel)
+    if not rel or "\\" in rel or "\0" in rel or rel.startswith("/") or re.match(r"^[A-Za-z]:", rel):
+        return None
+    parts = rel.split("/")
+    if any(p in ("", ".", "..") for p in parts):
+        return None
+    root = os.path.realpath(CATALOG_DIR)
+    p = os.path.realpath(os.path.join(root, *parts))
+    if not p.startswith(root + os.sep) or not os.path.isfile(p):
+        return None
+    return p
+
+
+def catalog_request(body):
+    """Check a tool request. Returns (record, None) or (None, error)."""
+    try:
+        j = json.loads(body)
+    except ValueError:
+        return None, "not JSON"
+    if not isinstance(j, dict):
+        return None, "expected a JSON object"
+    extra = set(j) - set(CATALOG_REQ_FIELDS)
+    if extra:
+        return None, "unknown fields: " + ", ".join(sorted(extra))[:200]
+    rec = {}
+    for k, limit in CATALOG_REQ_FIELDS.items():
+        v = j.get(k)
+        if k == "tools_considered" and isinstance(v, list):
+            if not all(isinstance(x, str) for x in v):
+                return None, "tools_considered must be a list of names"
+            v = [x.strip()[:200] for x in v if x.strip()][:30]
+        elif v is not None and not isinstance(v, str):
+            return None, f"{k} must be text"
+        elif isinstance(v, str):
+            v = v.strip()
+            if len(v) > limit:
+                return None, f"{k} is too long (at most {limit} characters)"
+        rec[k] = v if v not in (None, "") else ([] if k == "tools_considered" else "")
+    if not rec["need"]:
+        return None, "need is required"
+    if rec["team"] and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}", rec["team"]):
+        return None, "team must be a short name (letters, digits, space, . _ -)"
+    ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    rec = {"id": "req-" + time.strftime("%Y%m%d-%H%M%S", time.gmtime()) + "-" + secrets.token_hex(3),
+           "received": ts, **rec}
+    return rec, None
+
+
 def rewrite(body):
     """Muse's request: today's tools, and no mid-conversation system messages."""
     try:
@@ -60,13 +122,6 @@ def rewrite(body):
 
 class H(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
-
-    def reply(self, status, ctype, data):
-        self.send_response(status)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
 
     def local(self, path, j):
         """The 9B and Steam modes, answered here."""
@@ -100,10 +155,92 @@ class H(http.server.BaseHTTPRequestHandler):
         with open(p, "rb") as f:
             return self.reply(200, "application/zip", f.read())
 
+    def send_file(self, p, ctype):
+        size = os.path.getsize(p)
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(size))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            with open(p, "rb") as f:
+                while True:
+                    chunk = f.read(1 << 20)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+
+    def catalog(self, path):
+        """The trusted tools catalog: read-only files, plus requests for new tools."""
+        if self.headers.get("content-length") and not (self.command == "POST" and path == "/idli/catalog/requests"):
+            self.close_connection = True  # a body we will not read must not be parsed as the next request
+        if path == "/idli/catalog/requests":
+            if self.command == "POST":
+                n = int(self.headers.get("content-length") or 0)
+                if n > CATALOG_REQ_MAX:
+                    self.close_connection = True
+                    return self.reply(413, "application/json", b'{"error": "request too large (16 KB at most)"}')
+                rec, err = catalog_request(self.rfile.read(n) if n else b"")
+                if err:
+                    return self.reply(400, "application/json", json.dumps({"error": err}).encode())
+                line = (json.dumps(rec, ensure_ascii=False) + "\n").encode()
+                with _catalog_lock:
+                    fd = os.open(os.path.join(CATALOG_DIR, "requests.jsonl"), os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+                                 0o644)
+                    try:
+                        os.write(fd, line)
+                    finally:
+                        os.close(fd)
+                return self.reply(200, "application/json", json.dumps({"ok": True, "id": rec["id"]}).encode())
+            if self.command in ("GET", "HEAD"):
+                out = []
+                try:
+                    with open(os.path.join(CATALOG_DIR, "requests.jsonl"), encoding="utf-8") as f:
+                        for ln in f:
+                            try:
+                                out.append(json.loads(ln))
+                            except ValueError:
+                                pass
+                except FileNotFoundError:
+                    pass
+                return self.reply(200, "application/json", json.dumps({"requests": out}, ensure_ascii=False).encode())
+            return self.reply(405, "application/json", b'{"error": "use GET or POST"}')
+        if self.command not in ("GET", "HEAD"):
+            return self.reply(405, "application/json", b'{"error": "the catalog is read-only"}')
+        if path == "/idli/catalog/catalog.json":
+            p = catalog_file("catalog.json")
+            ctype = "application/json"
+        elif path.startswith("/idli/catalog/files/"):
+            p = catalog_file("files/" + path[len("/idli/catalog/files/"):])
+            ctype = "application/octet-stream"
+            if p and p.endswith((".py", ".txt", ".md", ".json")):
+                ctype = "text/plain; charset=utf-8" if not p.endswith(".json") else "application/json"
+        else:
+            p = None
+        if not p:
+            return self.reply(404, "application/json", b'{"error": "not in the catalog"}')
+        return self.send_file(p, ctype)
+
+    def reply(self, status, ctype, data):
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(data)
+
     def handle_one(self):
+        path = self.path.split("?")[0]
+        if path.startswith("/idli/catalog/"):
+            return self.catalog(path)
+        if self.command == "HEAD":
+            return self.reply(405, "application/json", b'{"error": "HEAD is only for the catalog"}')
         n = int(self.headers.get("content-length") or 0)
         body = self.rfile.read(n) if n else None
-        path = self.path.split("?")[0]
         if path == "/idli/share" or path.startswith("/idli/share/"):
             return self.share(path, body)
         if path == "/idli/9b/props" and self.command == "GET":  # what the 9B can do (vision?), for team stacks
@@ -176,7 +313,7 @@ class H(http.server.BaseHTTPRequestHandler):
         finally:
             up.close()
 
-    do_GET = do_POST = do_PUT = do_DELETE = do_OPTIONS = handle_one
+    do_GET = do_POST = do_PUT = do_DELETE = do_OPTIONS = do_HEAD = handle_one
 
     def log_message(self, *a):
         pass
