@@ -289,6 +289,55 @@ Go with **D**, and test the risky part first.
   This changes the "real data stays local" promise, for tools only.
 - Is one admin prompt plus a reboot at Idli install acceptable on Windows?
 
+### As built (2026-11-17)
+
+**Catalog server.** The router serves `/idli/catalog/` from `/mnt/seagate/silo/idli-catalog/`. It refuses path
+tricks and doesn't list folders. Requests go to `requests.jsonl`. The repo copy and the vetting steps are in
+`benchmarks/runs/2026-11-17-trusted-catalog/catalog/`.
+
+**The 14 tools:**
+- media-ffmpeg;
+- speech-whisper-small and speech-whisper-turbo;
+- voice-piper and voice-kokoro;
+- translate-nllb (converted from Meta's pickle to CTranslate2 int8);
+- ocr-tesseract and ocr-rapidocr;
+- speech-vad;
+- sound-classes (YAMNet converted to ONNX, so it runs on Windows);
+- face-blur (YuNet);
+- voice-anonymise (Whisper, then Piper);
+- office-files;
+- page-server.
+
+All 14 solve on linux-64, linux-aarch64, osx-arm64 and win-64. On the DGX each was installed from its pins, and its
+example ran with no network. Mirrored files come to 3.3 GB.
+
+**Found while vetting:**
+- **Hindi subtitles:** burned-in Hindi subtitles are broken with ffmpeg's plain `subtitles` filter (vowel signs
+  misplaced, joined letters not joined). The vetted example converts to ASS with `shaping=complex`. The 2026-11-17
+  training clips were probably affected.
+- **RapidOCR:** its line-turning step flips Devanagari lines, so it is off, and photos must be the right way up.
+- **Tesseract tables** need the `configs/hocr` files beside the language data.
+- **Licences:** the Hindi Piper voice is CC-BY-NC-SA, and the English one comes from research-licence data. Kokoro
+  is the choice for public material.
+
+**Client.**
+- New files: `lib/catalog.py` (fetch, platform, resources, check, request) and `lib/toolhome.py` (the tools home and
+  `installs.json`).
+- `stack_install(tools=[ids])` checks this computer, then asks for consent ("From Idli's vetted list", with sizes
+  and cautions), then installs.
+- New Builder tools `catalog` and `catalog_request`.
+- An **Installed tools** page, linked from the top of Teams: installs by tool and by team, used and free disk,
+  Remove, Remove all, and Add with the check.
+
+**The DGX tools home is split:**
+- `/mnt/seagate` is exFAT and can't hold symlinks, which pixi environments need;
+- models go to `/mnt/seagate/idli-tools`, environments to `~/idli-insights/tools/envs` (about 1 GB per team, root
+  disk);
+- putting environments on the Seagate would need a reformat or a mounted ext4 image (root).
+
+**Known gap:** removing one tool rewrites the team's `pixi.toml`, but its packages stay on disk until the team's
+next install.
+
 ## Local Kubernetes (k3s, Rancher Desktop, minikube, kind)? (discussed 2026-11-17)
 
 On Windows and Mac every one of these still needs a Linux VM underneath, so each is "a VM plus more":
