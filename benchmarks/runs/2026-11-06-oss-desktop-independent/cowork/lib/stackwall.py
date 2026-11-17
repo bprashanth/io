@@ -891,7 +891,8 @@ def _run_plain(data_dir, cat, s, cmd, out_dir, timeout, cwd):
     t0 = time.time()
     try:
         r = subprocess.run([pixi(), 'run', '--frozen', '--manifest-path', str(cat['manifest']), *cmd],
-                           capture_output=True, text=True, timeout=timeout, env=env, cwd=cwd or stack_dir(data_dir))
+                           capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout, env=env,
+                           cwd=cwd or stack_dir(data_dir))
         ok, out = r.returncode == 0, (r.stdout + r.stderr)
     except subprocess.TimeoutExpired as exc:
         ok, out = False, f'took longer than {timeout} s\n' + str(exc.stdout or '')[-1000:]

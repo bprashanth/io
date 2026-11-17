@@ -250,6 +250,23 @@ def _plain(spec):
     return spec if isinstance(spec, str) else json.dumps(spec)
 
 
+def _version(v):
+    return tuple(int(x) for x in re.findall(r'\d+', str(v))[:3])
+
+
+def system_requirements(tools):
+    """The chosen tools' pixi `system-requirements` (for example {"macos": "14.0"}: PyAV's Apple Silicon wheels need
+    macOS 14, and pixi assumes an older macOS, so without it faster-whisper tries to build av from source and fails).
+    The highest version of each wins."""
+    out = {}
+    for t in tools:
+        for k, v in ((t.get('pixi') or {}).get('system-requirements') or {}).items():
+            if re.fullmatch(r'[a-z-]{1,20}', str(k)) and re.fullmatch(r'\d+(\.\d+){0,2}', str(v)) and (
+                    k not in out or _version(v) > _version(out[k])):
+                out[k] = str(v)
+    return out
+
+
 def team_tasks(data_dir):
     """Tasks the Builder declares in stack/stack.json ("tasks": {"serve": "python tools/page.py"}), for pages."""
     try:
@@ -273,6 +290,9 @@ def manifest_text(team, tools, tasks=None):
     lines += [f'{_toml_key(k)} = {_toml_value(v)}' for k, v in deps.items()]
     if pypi:
         lines += ['', '[pypi-dependencies]'] + [f'{_toml_key(k)} = {_toml_value(v)}' for k, v in pypi.items()]
+    sysreq = system_requirements(tools)
+    if sysreq:
+        lines += ['', '[system-requirements]'] + [f'{_toml_key(k)} = {_toml_value(v)}' for k, v in sysreq.items()]
     if tasks:
         lines += ['', '[tasks]'] + [f'{_toml_key(k)} = {_toml_value(v)}' for k, v in tasks.items()]
     text = '\n'.join(lines) + '\n'
@@ -505,6 +525,7 @@ def _plain_env(extra=None):
             'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'COMSPEC', 'PATHEXT', 'NUMBER_OF_PROCESSORS',
             'PROCESSOR_ARCHITECTURE', 'SSL_CERT_FILE')
     env = {k: v for k, v in os.environ.items() if k in keep}
+    env['PYTHONUTF8'] = '1'  # Windows: a tool printing Hindi to a pipe would otherwise crash in cp1252
     env.update(extra or {})
     return env
 
