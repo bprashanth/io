@@ -71,6 +71,10 @@ def builder_private(data_dir, ext):
     home = Path.home()
     data, ext = Path(data_dir).resolve(), Path(ext).resolve()
     paths = [p for p in data.iterdir() if p.resolve() != ext] if data.exists() else []
+    # Always, even before they exist: the team's own settings (test accounts, consent) and the Chrome profiles
+    # (their cookies are the test and real accounts' sign-ins). The Builder reaches profiles only through Idli's tools.
+    from lib import chromeprofiles
+    paths += [data / '.idli', home / 'idli-insights' / 'browsers', chromeprofiles.root()]
     idli = (home / 'idli-insights').resolve()
     if idli.exists():
         for p in idli.iterdir():
@@ -103,7 +107,11 @@ def merge_builder(ext, data_dir, platform):
     permissions['allow'] = sorted(set(permissions.get('allow', []) + [
         f'Read(/{Path(platform).resolve()}/**)', 'mcp__idli__team_check', 'mcp__idli__team_save',
         'mcp__idli__platform_request', 'mcp__idli__stack_run', 'mcp__idli__capability_menu',
-        'mcp__idli__catalog', 'mcp__idli__catalog_request']))
+        'mcp__idli__catalog', 'mcp__idli__catalog_request', 'mcp__idli__profiles', 'mcp__idli__profile_new',
+        'mcp__idli__browser_open', 'mcp__idli__browser_read', 'mcp__idli__browser_click', 'mcp__idli__browser_type',
+        'mcp__idli__browser_shot', 'mcp__idli__browser_tabs', 'mcp__idli__rehearse']))
+    # test_account_set is never allowed here: Idli's hook asks the person every time (builder_hooks)
+    permissions['allow'] = [a for a in permissions['allow'] if a != 'mcp__idli__test_account_set']
     # Its own settings and the installed stack are Idli's, not the Builder's to change
     permissions['deny'] = sorted(set(permissions['deny'] + [
         f'Edit(/{Path(ext).resolve()}/.claude/**)', f'Edit(/{Path(ext).resolve()}/stack/.pixi/**)',
@@ -125,10 +133,12 @@ def builder_hooks(data_dir, platform):
     with a summary Idli writes."""
     path = Path(data_dir).resolve() / '.idli' / 'builder-settings.json'
     path.parent.mkdir(parents=True, exist_ok=True)
-    hook = str(Path(platform).resolve() / 'desktop' / 'idli-stack-consent.py')
-    settings = {'hooks': {'PreToolUse': [{'matcher': 'mcp__idli__stack_install',
-                                          'hooks': [{'type': 'command', 'timeout': 30, 'command': ' '.join(
-                                              shlex.quote(x) for x in (sys.executable, '-I', hook,
-                                                                       str(Path(data_dir).resolve())))}]}]}}
+    def hook(matcher, script):
+        cmd = ' '.join(shlex.quote(x) for x in (sys.executable, '-I', str(Path(platform).resolve() / 'desktop' / script),
+                                                 str(Path(data_dir).resolve())))
+        return {'matcher': matcher, 'hooks': [{'type': 'command', 'timeout': 30, 'command': cmd}]}
+    # installs, and test accounts (narrative/BUILDER_JOURNEY.md): the person says yes to words Idli writes
+    settings = {'hooks': {'PreToolUse': [hook('mcp__idli__stack_install', 'idli-stack-consent.py'),
+                                         hook('mcp__idli__test_account_set', 'idli-test-account-consent.py')]}}
     path.write_text(json.dumps(settings, indent=2))
     return path

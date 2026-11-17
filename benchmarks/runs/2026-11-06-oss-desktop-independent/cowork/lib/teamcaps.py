@@ -206,6 +206,11 @@ def manifest(data_dir):
                 if not takes or any(t not in KINDS and t != 'none' for t in takes):
                     raise ValueError('takes lists file kinds (' + ', '.join(KINDS) + ') or none')
                 _entry(d, c.get('entry', ''))
+                if c.get('profile') is not None:
+                    if not profile_roles(c):
+                        raise ValueError('profile names the account role(s) the tool works in, such as "me"')
+                    if c.get('stack'):
+                        raise ValueError('a tool that works in a browser profile runs without the stack')
             if kind == 'app' and not re.fullmatch(r'[\w-]{1,40}', str(c.get('serve', ''))):
                 raise ValueError('serve names a task in stack/pixi.toml that starts the page')
             if kind == 'reader':
@@ -378,20 +383,40 @@ print('IDLI_RESULT ' + json.dumps(res if isinstance(res, dict) else {}, default=
 """
 
 
+ROLE = re.compile(r'[a-z][a-z0-9-]{0,19}')
+
+
+def profile_roles(cap):
+    """The account roles a site tool works in ("profile": "me" or ["me", "lead"]), or [] if it uses no browser."""
+    p = cap.get('profile')
+    roles = [p] if isinstance(p, str) else p if isinstance(p, list) else []
+    return [r for r in roles if isinstance(r, str) and ROLE.fullmatch(r)] if len(roles) <= 4 else []
+
+
 def tools(data_dir):
     return [c for c in capabilities(data_dir) if c.get('kind') == 'tool']
 
 
-def run_tool(data_dir, cap, inputs, args, timeout=3600):
+def run_tool(data_dir, cap, inputs, args, timeout=3600, browsers=None, out=None):
     """Run a tool on the original files with the Analyst's instructions (JSON). Its files go to the team's
-    outputs/ folder, which the person opens; the Analyst gets back only file names and the tool's short result."""
+    outputs/ folder, which the person opens; the Analyst gets back only file names and the tool's short result.
+
+    browsers: {role: DevTools port} for a site tool ("profile" in the manifest). The caller picks the profiles: test
+    profiles for the Builder's rehearse, the real account's for team_run. The tool gets one unix-socket door per
+    role (lib/chromectl.Door), in IDLI_BROWSER_<ROLE>, and still no network."""
     d = ext_dir(data_dir)
+    roles = profile_roles(cap)
+    if cap.get('profile') is not None and not roles:
+        raise ValueError(f"{cap['title']} names no account role.")
+    missing = [r for r in roles if r not in (browsers or {})]
+    if missing:
+        raise ValueError(f"{cap['title']} needs the browser for: {', '.join(missing)}.")
     inputs = [Path(p).resolve() for p in inputs]
     takes = cap.get('takes') or []
     for p in inputs:
         if kind_of(p) not in takes and kind_of(p) != 'spreadsheet':
             raise ValueError(f"{cap['title']} takes {', '.join(label(k) for k in takes if k in KINDS)}.")
-    out = Path(data_dir).resolve() / 'outputs' / (time.strftime('%Y-%m-%d %H%M%S ') + cap['id'])
+    out = Path(out) if out else Path(data_dir).resolve() / 'outputs' / (time.strftime('%Y-%m-%d %H%M%S ') + cap['id'])
     out.mkdir(parents=True, exist_ok=True)
     entry = _entry(d, cap['entry'])
     argv = [ROOT, entry, out, json.dumps(args or {}), *inputs]
@@ -399,10 +424,25 @@ def run_tool(data_dir, cap, inputs, args, timeout=3600):
         r = _in_stack(data_dir, RUN_TOOL, argv, inputs=inputs, out=out, timeout=timeout)
         ok, text = r['ok'], r['output']
     else:
-        cmd = _wall([_python(), '-I', '-c', RUN_TOOL, *map(str, argv)],
-                    reads=[str(ROOT / 'lib'), str(ROOT / '.venv'), str(d), *map(str, inputs)], writes=[str(out)])
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(out))
-        ok, text = p.returncode == 0, p.stdout + p.stderr
+        doors, env, sockdir = [], dict(os.environ), None
+        try:
+            if roles:
+                from lib import chromectl
+                sockdir = tempfile.mkdtemp(prefix='idli-door-', dir='/tmp' if os.path.isdir('/tmp') else None)
+                for role in roles:
+                    path = os.path.join(sockdir, role + '.sock')
+                    doors.append(chromectl.Door(path, browsers[role]))
+                    env['IDLI_BROWSER_' + re.sub(r'[^A-Z0-9]', '_', role.upper())] = path
+            cmd = _wall([_python(), '-I', '-c', RUN_TOOL, *map(str, argv)],
+                        reads=[str(ROOT / 'lib'), str(ROOT / '.venv'), str(d), *map(str, inputs)],
+                        writes=[str(out)] + ([sockdir] if sockdir else []))
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(out), env=env)
+            ok, text = p.returncode == 0, p.stdout + p.stderr
+        finally:
+            for door in doors:
+                door.stop()
+            if sockdir:
+                shutil.rmtree(sockdir, ignore_errors=True)
     result = {}
     for line in text.splitlines():
         if line.startswith('IDLI_RESULT '):
@@ -411,7 +451,9 @@ def run_tool(data_dir, cap, inputs, args, timeout=3600):
             except ValueError:
                 pass
     if not ok:
-        raise ValueError(f"{cap['title']} did not finish on this file.")
+        err = ValueError(f"{cap['title']} did not finish on this file.")
+        err.output = text[-1500:]  # for the Builder's rehearse (test data only); never shown to the Analyst
+        raise err
     return {'folder': str(out), 'files': sorted(str(p.relative_to(out)) for p in out.rglob('*') if p.is_file()),
             'result': result}
 

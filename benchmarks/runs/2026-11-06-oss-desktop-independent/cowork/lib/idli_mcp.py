@@ -218,7 +218,15 @@ def team_run(capability, files, instructions=None):
     if not cap:
         raise ValueError('That is not one of this team\'s tested tools. See the list in your instructions.')
     instructions = home.rehydrate(data_dir(), [instructions or {}])[0]  # codes back to real values, locally
-    res = teamcaps.run_tool(str(data_dir()), cap, [_original(f) for f in (files or [])], instructions)
+    browsers = None
+    if teamcaps.profile_roles(cap):
+        # A site tool works in the REAL account's Chrome profile, opened by Idli; the Builder never drives it.
+        # TODO(real accounts): chromeprofiles.real_profile_for_role refuses until the real-account step is built.
+        from lib import chromeprofiles
+        browsers = {r: chromeprofiles.open_for_work(chromeprofiles.real_profile_for_role(str(data_dir()), r))
+                    for r in teamcaps.profile_roles(cap)}
+    res = teamcaps.run_tool(str(data_dir()), cap, [_original(f) for f in (files or [])], instructions,
+                            browsers=browsers)
     rel = Path(res['folder']).relative_to(data_dir())
     return {'done': True, 'folder': str(rel), 'files': res['files'],
             'result': _masked(res['result']),
@@ -418,6 +426,174 @@ def catalog_request(need, why, tools_considered=None):
     return out
 
 
+# ---- the Builder's browser: real Chrome profiles signed in to TEST accounts (narrative/BUILDER_JOURNEY.md) ----
+
+def _test_browser(profile):
+    """The profile's Chrome with DevTools on, after checking that every Google account in it is a confirmed test
+    account of this team. Checked again at every call."""
+    from lib import chromectl, chromeprofiles
+    chromeprofiles.check_test_profile(str(data_dir()), profile)
+    return chromectl.Browser(port=chromeprofiles.open_for_work(profile))
+
+
+def profiles():
+    """Chrome profiles on this computer, and which are confirmed test accounts of this team. Emails are shown only
+    for confirmed profiles: for the others, ask the person which email is signed in."""
+    from lib import chromeprofiles
+    team = chromeprofiles.test_accounts(str(data_dir()))
+    rows = []
+    for p in chromeprofiles.list_profiles():
+        if p['kind'] == 'real':
+            continue  # the real account's profile is Idli's alone
+        mine = [a for a in team if a['profile'] == p['profile']]
+        ok = bool(p['emails']) and all(any(a['email'] == e for a in team) for e in p['emails'])
+        row = {'profile': p['profile'], 'label': p['label'], 'signed_in_accounts': len(p['emails']),
+               'confirmed_test_account': ok, 'open': p['running']}
+        if ok:
+            row['emails'] = p['emails']
+            row['roles'] = [a['role'] for a in mine]
+        elif p['emails']:
+            row['next'] = 'Ask the person which email is signed in here, then call test_account_set.'
+        else:
+            row['next'] = 'Nobody is signed in yet. Ask the person to sign in in this profile\'s window.'
+        rows.append(row)
+    return {'profiles': rows, 'how': 'Use only confirmed test accounts. Make a new one with profile_new.'}
+
+
+def profile_new(label):
+    from lib import chromeprofiles
+    label = ' '.join(str(label or '').split())[:60]
+    if not label:
+        raise ValueError('Give the profile a short name, such as "Leads test me".')
+    slug = chromeprofiles.slug_for(label)
+    chromeprofiles.create(slug, label)
+    chromeprofiles.open_for_sign_in(slug)
+    return {'profile': slug, 'label': label,
+            'tell_person': f'A new Chrome window opened for "{label}". Sign in there with a TEST Google account, not '
+                           'your real one. If you need a new test account, make it in that window. Then tell me the '
+                           'email you signed in with.',
+            'next': 'When the person gives the email, call test_account_set with this profile, the email and a role.'}
+
+
+def test_account_set(profile, email, role):
+    """Idli asks the person first (a PreToolUse hook Idli words: desktop/idli-test-account-consent.py)."""
+    from lib import chromeprofiles
+    rows = chromeprofiles.set_test_account(str(data_dir()), profile, email, role)
+    return {'saved': True, 'test_accounts': [{'role': r['role'], 'email': r['email'], 'profile': r['profile']}
+                                             for r in rows]}
+
+
+def browser_open(profile, url, new_tab=False):
+    return _test_browser(profile).open(url, bool(new_tab))
+
+
+def browser_read(profile, save_as=None):
+    page = _test_browser(profile).read()
+    if save_as:  # a page from the TEST account, kept as a sample for a site plugin's test (chromectl.Replay)
+        from lib import teamcaps
+        name = re.sub(r'[^a-z0-9-]+', '-', str(save_as).lower()).strip('-')[:40]
+        if not name:
+            raise ValueError('save_as is a short name such as gmail-inbox.')
+        dest = teamcaps.ensure(str(data_dir())) / 'samples' / 'pages' / (name + '.json')
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(json.dumps(page, indent=1))
+        page = {**page, 'saved_as': f'samples/pages/{name}.json'}
+    return page
+
+
+def browser_click(profile, ref=None, text=None):
+    if not ref and not text:
+        raise ValueError('Give a ref from browser_read, or the text on the button or link.')
+    return _test_browser(profile).click(ref=ref, text=text)
+
+
+def browser_type(profile, ref, text, enter=False, clear=False):
+    return _test_browser(profile).type(ref, text, enter=bool(enter), clear=bool(clear))
+
+
+def browser_shot(profile):
+    from lib import teamcaps
+    folder = teamcaps.ensure(str(data_dir())) / '.idli-shots'
+    folder.mkdir(exist_ok=True)
+    for old in sorted(folder.glob('*.png'))[:-10]:  # keep the last few
+        old.unlink(missing_ok=True)
+    import time as _time
+    path = folder / (_time.strftime('%Y%m%d-%H%M%S') + '.png')
+    _test_browser(profile).shot(path)
+    return {'path': str(path), 'next': 'Read this file to see the page.'}
+
+
+def browser_tabs(profile, use=None):
+    b = _test_browser(profile)
+    return {'tabs': b.use_tab(int(use)) if use is not None else b.tabs(),
+            'note': 'Tab 0 is the one the browser tools act on.'}
+
+
+def rehearse(capability, instructions=None, files=None):
+    """Run one of the team's tools on the TEST accounts (each role it declares gets the confirmed test profile for
+    that role) and on samples, so the Builder can check a workflow end to end. Output stays in .idli-out/."""
+    import shutil as _shutil
+    from lib import chromeprofiles, teamcaps
+    caps, problems = teamcaps.manifest(str(data_dir()))
+    cap = next((c for c in caps if c['id'] == capability and c['kind'] == 'tool'), None)
+    if not cap:
+        raise ValueError('That is not a tool in manifest.json. ' + '; '.join(problems)[:200])
+    ext = teamcaps.ext_dir(str(data_dir()))
+    inputs = []
+    for f in files or []:
+        p = (ext / str(f)).resolve()
+        if not p.is_relative_to(ext / 'samples') or not p.is_file():
+            raise ValueError('Rehearse with files in samples/ only.')
+        inputs.append(p)
+    browsers = {r: chromeprofiles.open_for_work(chromeprofiles.profile_for_role(str(data_dir()), r))
+                for r in teamcaps.profile_roles(cap)}
+    out = ext / '.idli-out'
+    _shutil.rmtree(out, ignore_errors=True)
+    try:
+        res = teamcaps.run_tool(str(data_dir()), cap, inputs, instructions or {}, timeout=900, browsers=browsers,
+                                out=out)
+    except ValueError as exc:
+        return {'ok': False, 'error': str(exc), 'output': getattr(exc, 'output', '')}
+    return {'ok': True, 'result': res['result'], 'files_in_.idli-out': res['files'][:50]}
+
+
+BROWSER_TOOLS = {
+    'profiles': (profiles, 'Chrome profiles on this computer and which are confirmed test accounts of this team.',
+                 {}, []),
+    'profile_new': (profile_new, 'Make a Chrome profile for one test account and open it for the person to sign in. '
+                    'One profile per account.',
+                    {'label': {'type': 'string', 'description': 'A short name the person will recognise, such as '
+                                                                '"Leads test me"'}}, ['label']),
+    'test_account_set': (test_account_set, 'After the person tells you the email signed in to a profile: record it '
+                         'as a TEST account of this team with a role (me, lead). Idli asks the person to confirm.',
+                         {'profile': {'type': 'string'}, 'email': {'type': 'string'},
+                          'role': {'type': 'string', 'description': 'A short lowercase role, such as me or lead'}},
+                         ['profile', 'email', 'role']),
+    'browser_open': (browser_open, 'Open a web address in a test profile\'s Chrome (tab 0, or a new tab).',
+                     {'profile': {'type': 'string'}, 'url': {'type': 'string'}, 'new_tab': {'type': 'boolean'}},
+                     ['profile', 'url']),
+    'browser_read': (browser_read, 'Read the page in a test profile: visible text, links and controls with refs '
+                     '(e12). save_as keeps the page in samples/pages/ for a plugin test.',
+                     {'profile': {'type': 'string'}, 'save_as': {'type': 'string'}}, ['profile']),
+    'browser_click': (browser_click, 'Click a link or control in a test profile, by ref from browser_read or by '
+                      'its text.', {'profile': {'type': 'string'}, 'ref': {'type': 'string'},
+                                    'text': {'type': 'string'}}, ['profile']),
+    'browser_type': (browser_type, 'Type into a field in a test profile (ref from browser_read). enter presses '
+                     'Enter; clear empties the field first.',
+                     {'profile': {'type': 'string'}, 'ref': {'type': 'string'}, 'text': {'type': 'string'},
+                      'enter': {'type': 'boolean'}, 'clear': {'type': 'boolean'}}, ['profile', 'ref', 'text']),
+    'browser_shot': (browser_shot, 'A picture of the page in a test profile. Returns a PNG path to Read.',
+                     {'profile': {'type': 'string'}}, ['profile']),
+    'browser_tabs': (browser_tabs, 'List a test profile\'s tabs, or switch with use=<n>.',
+                     {'profile': {'type': 'string'}, 'use': {'type': 'integer'}}, ['profile']),
+    'rehearse': (rehearse, 'Run one of the team\'s tools on the test accounts and samples (each role it declares '
+                 'gets that role\'s test profile). For checking a workflow end to end.',
+                 {'capability': {'type': 'string'}, 'instructions': {'type': 'object'},
+                  'files': {'type': 'array', 'items': {'type': 'string'}, 'description': 'Files in samples/'}},
+                 ['capability']),
+}
+
+
 BUILDER_TOOLS = {
     'capability_menu': (capability_menu, 'The platform\'s capability menu as it is on this computer now (local '
                         'tools, the private model with or without vision). Check it before choosing how to build.',
@@ -449,6 +625,7 @@ BUILDER_TOOLS = {
                   'samples/ is at ../samples. Files written to $IDLI_OUT come back in .idli-out/.',
                   {'command': {'type': 'string'}, 'timeout': {'type': 'integer'}}, ['command']),
 }
+BUILDER_TOOLS.update(BROWSER_TOOLS)
 if os.environ.get('IDLI_ROLE') == 'builder':
     TOOLS = BUILDER_TOOLS
 
