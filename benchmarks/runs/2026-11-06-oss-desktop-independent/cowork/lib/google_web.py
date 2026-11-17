@@ -400,25 +400,18 @@ def calendar_event(b, title, start, minutes, guest, details=''):
         time.sleep(0.5)
     else:
         raise ValueError('Calendar did not open its new-event page.')
-    _close_tips(b)
-    _press(b, 'Save')
-    for _ in range(20):  # "Send invitation emails to Google Calendar guests?"
-        if _press(b, 'Send', must=False):
-            break
-        if not b.evaluate("location.href.includes('eventedit')"):
-            break
-        time.sleep(0.5)
-    time.sleep(2)
-    if b.evaluate("location.href.includes('eventedit')") and _close_tips(b):  # a tip came up over Save: once more
-        _press(b, 'Save')
-        for _ in range(20):
+    time.sleep(2)  # the page keeps drawing (the Meet link) for a moment; a Save pressed too soon is lost
+    for attempt in range(4):  # Save, answer "Send invitations?", and check the page closed; a tip can eat a click
+        _close_tips(b)
+        _press(b, 'Save', must=False)
+        for _ in range(16):
             if _press(b, 'Send', must=False) or not b.evaluate("location.href.includes('eventedit')"):
                 break
             time.sleep(0.5)
         time.sleep(2)
-    if b.evaluate("location.href.includes('eventedit')"):
-        raise ValueError('Calendar did not save the event.')
-    return {'saved': True}
+        if not b.evaluate("location.href.includes('eventedit')"):
+            return {'saved': True}
+    raise ValueError('Calendar did not save the event.')
 
 
 TIPS = ('Got it', 'Dismiss', 'No thanks', 'Not now')
