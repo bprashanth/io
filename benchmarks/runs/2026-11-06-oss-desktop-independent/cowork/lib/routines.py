@@ -217,19 +217,27 @@ class Run:
             return f'{len(rows)} rows'
         if t == 'mail':
             b = self.browser(s['role'])
-            feed = g.mail_feed(b)
             allow = None
             if s.get('from_in'):
                 src, col = s['from_in'].split('.', 1)
                 allow = {str(r.get(col, '')).strip().lower() for r in self.context.get(src, [])} - {''}
-            msgs, skipped = [], 0
-            for m in feed:
-                if allow is not None and m['from'] not in allow:
-                    skipped += 1
+            # with a list of senders: Gmail's search, read or unread; else the unread inbox
+            found = g.mail_search(b, sorted(allow), s.get('days', 7)) if allow else ([] if allow is not None
+                                                                                     else g.mail_feed(b))
+            msgs, skipped, old = [], 0, 0
+            seen = self.state.setdefault('seen', {})
+            for m in found:
+                if m['id'] in seen and not s.get('reread'):
+                    old += 1
                     continue
-                msgs.append(g.mail_message(b, m['id']))
+                msg = g.mail_message(b, m['id'])
+                if allow is not None and msg['from'] not in allow:
+                    skipped += 1  # the thread's last message is someone else's (often your own reply)
+                    continue
+                msgs.append(msg)
+            self._new_seen = [m['id'] for m in msgs]  # marked seen only when the whole run went through
             self.context[key] = msgs
-            return f'{len(msgs)} new from the list, {skipped} other unread left alone'
+            return f'{len(msgs)} new from the list, {old} seen before, {skipped} last answered by someone else'
         if t == 'free':
             busy = g.ical_busy(_fill(s['ical'], self.cfg))
             slots = g.free_slots(busy, days=s.get('days', 5), hours=s.get('hours', '10:00-17:00'),
@@ -345,6 +353,9 @@ class Run:
                                           'note': note, 'seconds': round(time.time() - t0, 1)})
             else:
                 self.log['ok'] = True
+                if not self.dry_run:
+                    for mid in getattr(self, '_new_seen', []):
+                        self.state.setdefault('seen', {})[mid] = _now()
         finally:
             self.log['finished'] = _now()
             self.save()

@@ -96,6 +96,35 @@ def mail_feed(b):
     return parse_feed(xml)
 
 
+def mail_search(b, senders, days=7):
+    """Mail threads with a message from any of these senders in the last `days`, read or unread, as
+    [{"id": <the thread's last message>, "thread"}]. Gmail's own search, read from its result rows' message ids."""
+    senders = [x for x in dict.fromkeys(str(x).strip().lower() for x in senders) if re.fullmatch(r'[^\s()"]+@[^\s()"]+', x)]
+    out, seen = [], set()
+    for i in range(0, len(senders), 20):
+        q = 'from:(' + ' OR '.join(senders[i:i + 20]) + f') newer_than:{int(days)}d'
+        t, _ = _ik(b)
+        b.open(MAIL + '#search/' + urllib.parse.quote(q))
+        rows, last = None, None
+        for _ in range(30):  # until the result list has drawn and stopped changing
+            time.sleep(0.5)
+            now = b.evaluate("""(() => { const main = document.querySelector('div[role=main]'); if (!main) return null;
+              const r = [...main.querySelectorAll('tr.zA')].map(tr => { const s = tr.querySelector(
+              '[data-legacy-last-non-draft-message-id]'); return s ? [s.getAttribute('data-legacy-last-non-draft-message-id'),
+              s.getAttribute('data-legacy-thread-id')] : null; }).filter(Boolean);
+              const empty = /No messages matched/i.test(main.innerText); return {r, empty}; })()""")
+            if now and (now['r'] or now['empty']):
+                if now == last:
+                    rows = now['r']
+                    break
+                last = now
+        for mid, th in rows or (last or {}).get('r', []):
+            if mid and mid not in seen:
+                seen.add(mid)
+                out.append({'id': mid, 'thread': th})
+    return out
+
+
 QUOTE = re.compile(r'(?im)^(on .{0,200}wrote:\s*$|-{2,} ?original message|from: .*\n(sent|date): )')
 
 
@@ -335,6 +364,7 @@ def calendar_event(b, title, start, minutes, guest, details=''):
         time.sleep(0.5)
     else:
         raise ValueError('Calendar did not open its new-event page.')
+    _close_tips(b)
     _press(b, 'Save')
     for _ in range(20):  # "Send invitation emails to Google Calendar guests?"
         if _press(b, 'Send', must=False):
@@ -343,9 +373,28 @@ def calendar_event(b, title, start, minutes, guest, details=''):
             break
         time.sleep(0.5)
     time.sleep(2)
+    if b.evaluate("location.href.includes('eventedit')") and _close_tips(b):  # a tip came up over Save: once more
+        _press(b, 'Save')
+        for _ in range(20):
+            if _press(b, 'Send', must=False) or not b.evaluate("location.href.includes('eventedit')"):
+                break
+            time.sleep(0.5)
+        time.sleep(2)
     if b.evaluate("location.href.includes('eventedit')"):
         raise ValueError('Calendar did not save the event.')
     return {'saved': True}
+
+
+TIPS = ('Got it', 'Dismiss', 'No thanks', 'Not now')
+
+
+def _close_tips(b):
+    """Google's one-time tips ("Manage Meet call settings ... Got it") dim the page and swallow the next click."""
+    closed = False
+    for label in TIPS:
+        while _press(b, label, must=False):
+            closed = True
+    return closed
 
 
 def _press(b, label, must=True):

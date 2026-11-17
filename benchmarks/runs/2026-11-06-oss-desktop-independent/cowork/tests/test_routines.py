@@ -83,8 +83,8 @@ class Running(unittest.TestCase):
         tz = dt.datetime.now().astimezone().tzinfo
         slots = [dt.datetime(2026, 11, 19 + i, 10, 0, tzinfo=tz) for i in range(3)]
         self.p = [mock.patch.object(google_web, 'sheet_rows', return_value=[{'Name': 'L', 'Email': 'Lead@example.org'}]),
-                  mock.patch.object(google_web, 'mail_feed', side_effect=lambda b: [{'id': m['id'], 'from': m['from']}
-                                                                                    for m in self.inbox]),
+                  mock.patch.object(google_web, 'mail_search', side_effect=lambda b, senders, days=7: [
+                      {'id': m['id']} for m in self.inbox]),
                   mock.patch.object(google_web, 'mail_message', side_effect=lambda b, i: next(
                       m for m in self.inbox if m['id'] == i)),
                   mock.patch.object(google_web, 'ical_busy', return_value=[]),
@@ -116,6 +116,7 @@ class Running(unittest.TestCase):
         self.assertTrue(log['ok'], log)
         self.assertEqual([d[0] for d in self.did], ['draft'])  # the non-lead mail was left alone
         self.assertIn('1 new from the list', log['steps'][1]['note'])
+        self.assertIn('1 last answered by someone else', log['steps'][1]['note'])
         self.go()
         self.assertEqual(len(self.did), 1)  # done once
         # the lead picks the second time
@@ -144,3 +145,17 @@ class Running(unittest.TestCase):
     def test_real_runs_never_skip_the_yes(self):
         with self.assertRaises(ValueError):
             routines.run(self.d, 'leads', 'real', approve_all=True)
+
+    def test_a_failed_run_reads_the_mail_again(self):
+        def boom(b, *a):
+            raise ValueError('Calendar did not save the event.')
+        self.inbox[0]['new_text'] = 'pick2'
+        self.verdicts['pick2'] = {'agreed': True, 'picked': 2, 'unclear': False}
+        with mock.patch.object(google_web, 'calendar_event', side_effect=boom):
+            log = self.go(approve_all=True)
+        self.assertEqual(routines._read(routines.state_dir(self.d, 'leads') / 'state.json', {}).get('seen', {}), {})
+        log = self.go(approve_all=True)
+        self.assertTrue(log['ok'], log)
+        self.assertEqual([d[0] for d in self.did], ['book'])
+        self.assertIn('aa11', routines._read(routines.state_dir(self.d, 'leads') / 'state.json', {})['seen'])
+
