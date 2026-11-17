@@ -1,0 +1,127 @@
+# Representative tools from Idli's trusted catalog, installed with plain pixi and run on macOS, Windows and Linux.
+# Scripts: benchmarks/runs/2026-11-17-trusted-catalog/ci/ (tools.py, test_catalog_lib.py). No secrets: models come
+# from each catalog entry's public source and are checked against the catalog's sha256.
+name: catalog-tools
+
+on:
+  push:
+    branches: [catalog-ci]
+    paths:
+      - .github/workflows/catalog-tools.yml
+      - benchmarks/runs/2026-11-17-trusted-catalog/ci/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog-tools-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI_DIR: benchmarks/runs/2026-11-17-trusted-catalog/ci
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  lib:
+    name: lib ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, platform: linux-64 }
+          - { os: macos-14, platform: osx-arm64 }
+          - { os: windows-latest, platform: win-64 }
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - name: lib/catalog.py on this computer
+        shell: bash
+        env:
+          EXPECT_PLATFORM: ${{ matrix.platform }}
+          CATALOG_CI_WORK: ${{ runner.temp }}/catalog-ci
+        run: python "$CI_DIR/test_catalog_lib.py" -v
+      - name: cowork's own catalog tests (informational)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        working-directory: benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
+        run: python -m unittest tests.test_catalog -v 2>&1 | tee "${{ runner.temp }}/catalog-ci/cowork-tests.txt"; exit ${PIPESTATUS[0]}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: lib-${{ matrix.platform }}
+          path: ${{ runner.temp }}/catalog-ci/
+          if-no-files-found: ignore
+
+  tools:
+    name: ${{ matrix.group }} ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+        group: [speech, ocr, face]
+    steps:
+      - name: Work folder
+        shell: bash
+        run: echo "CATALOG_CI_WORK=${{ runner.temp }}/catalog-ci" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
+        with:
+          pixi-version: v0.84.2
+          run-install: false
+          cache: false
+      - name: Cache model files and pixi packages
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ${{ env.CATALOG_CI_WORK }}/files
+            ${{ env.CATALOG_CI_WORK }}/tools/models
+            ${{ env.CATALOG_CI_WORK }}/tools/.cache/rattler
+            ${{ env.CATALOG_CI_WORK }}/tools/.cache/uv
+          key: catalog-${{ matrix.group }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('benchmarks/runs/2026-11-17-trusted-catalog/catalog/catalog.json') }}
+          restore-keys: catalog-${{ matrix.group }}-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install and run ${{ matrix.group }}
+        shell: bash
+        run: python "$CI_DIR/tools.py" ${{ matrix.group }} --out "$CATALOG_CI_WORK/results-${{ matrix.group }}.json"
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json, os, pathlib
+          p = pathlib.Path(os.environ['CATALOG_CI_WORK']) / 'results-${{ matrix.group }}.json'
+          if not p.exists():
+              print('no results'); raise SystemExit
+          r = json.loads(p.read_text(encoding='utf-8'))
+          print(f"### {r['group']} on {r['platform']} ({r['pixi']}, ram {r['resources']['ram'] / 2**30:.1f} GB, "
+                f"{r['resources']['cores']} cores)\n")
+          print('| tool | install s | models s | run s | env MB | pass |\n|---|---|---|---|---|---|')
+          for t in r['tools']:
+              print(f"| {t['tool']} | {t.get('install_s')} | {t.get('models_s')} | {t.get('run_s')} | "
+                    f"{t.get('env_mb')} | {t.get('pass')} |")
+          for t in r['tools']:
+              for c in t.get('checks', []):
+                  print(f"- {t['tool']}: {'PASS' if c['ok'] else 'FAIL'} {c['check']}")
+              for n in t.get('notes', []):
+                  print(f"- {t['tool']} note: {n[:400]}")
+          EOF
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: results-${{ matrix.group }}-${{ runner.os }}
+          path: |
+            ${{ env.CATALOG_CI_WORK }}/results-*.json
+            ${{ env.CATALOG_CI_WORK }}/out/
+            ${{ env.CATALOG_CI_WORK }}/tools/envs/*/pixi.lock
+            ${{ env.CATALOG_CI_WORK }}/tools/envs/*/.install.log
+          if-no-files-found: ignore
