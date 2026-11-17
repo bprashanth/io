@@ -242,9 +242,14 @@ class Browser:
         url = str(url or '').strip()
         if not re.match(r'https?://', url):
             raise ValueError('Open a web address (https://...).')
-        if new_tab:
-            t = self._http('/json/new?' + urllib.parse.quote(url, safe=':/?#[]@!$&\'()*+,;=%'), 'PUT')
+        if new_tab:  # a blank tab, then the address: /json/new cuts an address at its first "&"
+            t = self._http('/json/new?about:blank', 'PUT')
             self._http('/json/activate/' + t['id'])
+            if self.pinned:
+                self.pinned = t['id']
+            res = self._call('Page.navigate', {'url': url}, target=t) or {}
+            if res.get('errorText'):
+                raise ValueError('The page did not open: ' + str(res['errorText'])[:80])
         else:
             res = self._call('Page.navigate', {'url': url}) or {}
             if res.get('errorText'):

@@ -35,7 +35,8 @@ def _tab(b, origin, url):
         if str(t.get('url', '')).startswith(origin + '/'):
             b._http('/json/activate/' + t['id'])  # clicks only land in the tab in front
             return b.pin(t)
-    t = b._http('/json/new?' + urllib.parse.quote(url, safe=':/?#[]@!$&\'()*+,;=%'), 'PUT')
+    t = b._http('/json/new?about:blank', 'PUT')  # /json/new cuts an address at its first "&"
+    b._call('Page.navigate', {'url': url}, target=t)
     for _ in range(60):
         try:
             if b.evaluate('document.readyState', target=t) == 'complete':

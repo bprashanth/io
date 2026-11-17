@@ -265,6 +265,9 @@ class CdpRoundTrip(Base):
         self.assertEqual(shot.read_bytes()[:8], b'\x89PNG\r\n\x1a\n')
         self.assertEqual(mcp.browser_click('me-test', text='Open the reply')['title'], 'Reply')
         self.assertEqual(mcp.browser_tabs('me-test')['tabs'][0]['title'], 'Reply')
+        # a new tab keeps the whole address, "&" and all (Chrome's /json/new cut it at the first "&")
+        opened = mcp.browser_open('me-test', self.url + '?a=1&team=x', new_tab=True)
+        self.assertTrue(opened['url'].endswith('?a=1&team=x'), opened)
         port = cp.debug_port('me-test')
         self.assertTrue(port)
         self.assertEqual(cp.open_for_work('me-test'), port)  # reused, not restarted
