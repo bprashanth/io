@@ -95,3 +95,25 @@ All under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`:
 - The real-account step: a separate profile marked real, mapped to a role in `<team>/.idli/real-accounts.json`.
   `team_run` refuses a site tool until then.
 - Signing in to sites without Google (only Google emails are checked today).
+
+## Tested 2026-11-17/18 (laptop, as a person)
+
+Results: [benchmarks/runs/2026-11-17-builder-journey/README.md](../benchmarks/runs/2026-11-17-builder-journey/README.md).
+
+**What happened.** The owner's own leads request was typed into a new team's Builder, which:
+- confirmed the two test profiles, after the person's yes;
+- made the fake sheet, emails and busy times itself;
+- learned Gmail, Calendar and Sheets;
+- built two team site tools;
+- rehearsed end to end, in about 38 minutes.
+
+**Checked independently:** the call is on both test calendars (Fri 20 Nov, 2 pm, the lead's copy "Needs RSVP"),
+the thread and the invitation are in the lead's inbox, and the sheet is in Drive. All seven laptop checks pass.
+
+**Fixed on the way:** a "Leave site?" box hung every browser call. Leave-page boxes and alerts are now answered,
+and question boxes are left to the person.
+
+**Next:**
+- let site tools ask the private 9B, which is what the Builder asked for, to judge replies;
+- a place for daily runs and approvals, now that a new team has no left chat;
+- update the "left chat" and "left and right" wording.
