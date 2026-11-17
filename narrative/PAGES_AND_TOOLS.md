@@ -289,6 +289,82 @@ Go with **D**, and test the risky part first.
   This changes the "real data stays local" promise, for tools only.
 - Is one admin prompt plus a reboot at Idli install acceptable on Windows?
 
+## Local Kubernetes (k3s, Rancher Desktop, minikube, kind)? (discussed 2026-11-17)
+
+On Windows and Mac every one of these still needs a Linux VM underneath, so each is "a VM plus more":
+- **kind** is Kubernetes inside Docker: Docker Desktop first, then a control-plane container.
+- **minikube** runs on a driver: Docker, Hyper-V or VirtualBox (Hyper-V and VirtualBox need admin), by default a
+  2 CPU / 2 GB VM.
+- **k3s** is Linux only. On a laptop it runs inside WSL2 or a VM.
+- **Rancher Desktop** packages that: WSL2 on Windows, Lima on Mac, with k3s and containerd inside. It is free
+  (Apache 2.0) and Kubernetes can be switched off.
+
+Overhead on top of plain Docker, roughly:
+- the API server, datastore, kubelet, CoreDNS and an ingress use about 0.5 to 1 GB of RAM at idle;
+- startup is slower (tens of seconds);
+- more parts can break: certificates, networking, image pulls.
+
+Isolation is the same as plain containers. Kubernetes adds scheduling across machines, which one person's tools on
+one laptop don't need.
+
+Ranking by weight on a laptop, lightest first:
+1. pixi with no wall;
+2. WSL2 or a VM with bwrap and pixi;
+3. Docker;
+4. local Kubernetes.
+
+**Decision:** no local Kubernetes. On the DGX, k3s could later manage many per-user containers. For a POC, the V1
+gateway's plain Docker is enough.
+
+## The DGX for the POC: sign-in and files (discussed 2026-11-17)
+
+### Sign-in
+
+- **silo** (the 9B and Muse) uses one Cloudflare Access **service token**. It is a client id and secret in a file
+  on the laptop, sent as `CF-Access-Client-Id` and `CF-Access-Client-Secret`.
+- **io.idli.cc** (the V1 gateway) expects a **person**. `app/io/gateway/identity.py` requires a signed Access token
+  with `sub` and `email`, and of type `app`. It maps that person to their own workspace container. A service token
+  has no person in it, so the gateway refuses it as written.
+
+Options:
+- **Reuse the silo token:**
+  - Access lets one service token be allowed on several applications, or the router could carry a path for stack
+    runs, as it already does for `/idli/9b`;
+  - the gateway would key the workspace on the token's name instead of a person;
+  - it's quick, but one secret means one shared identity, and anyone holding the laptop's file is that workspace;
+  - fine for a POC on the test account; one token per person would make it per-person.
+- **Sign in as a person** (email code in a browser window, as V1 built): proper per-person workspaces. One more
+  sign-in, and the Access session expires.
+
+### Files
+
+The DGX can't see the laptop's disk, so every input goes up and every output comes down.
+
+| Recipe | Typical input | Over a 20 Mbps home upload |
+|---|---|---|
+| Table and form OCR | 0.1 to 3 MB photos | instant |
+| Voice notes | 1 MB per minute | seconds |
+| Report translation | under 1 MB | instant |
+| Event video (10 min, 1080p) | 300 to 600 MB | 2 to 4 minutes |
+| An hour of video | 2 to 4 GB | 15 to 30 minutes |
+
+**Request size:** Cloudflare's proxy caps one request body at 100 MB on the Free and Pro plans (more on higher
+plans). Big files through silo or io.idli.cc would need chunked, resumable uploads. Tailscale goes direct and has no
+such cap, but needs Tailscale on every laptop.
+
+**Drive-backed teams:**
+- their files are already in Drive, so the DGX could fetch them from Drive itself, without using the laptop's
+  upload;
+- that means a Drive sign-in held on the server, which is a new trust step;
+- today the laptop's copies come from Drive anyway.
+
+**Outputs:** mostly small (tables, a 0.6 MB clip, a .docx). Cut video is the exception.
+
+**Takeaway:**
+- the DGX is easy for documents, photos and audio;
+- for video it is a real cost, unless the files already live in Drive;
+- local WSL2 or a VM wins exactly for the video and voice teams, which are also the ones that need the wall most.
+
 ## Log
 
 - **2026-11-17:**
@@ -299,3 +375,5 @@ Go with **D**, and test the risky part first.
 - 2026-11-17 (later): added the recipes from the test runs; solved every stack for win-64 and osx-arm64 (11 of 12
   solve, LiteRT has no Windows build); sorted the recipes by how much wall they need (none needed Docker; only the
   leads rule clearly runs without a wall).
+- 2026-11-17 (later): local Kubernetes options and their overhead; DGX sign-in (silo service token vs the
+  gateway's per-person Access) and moving files over the network.
