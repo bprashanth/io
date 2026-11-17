@@ -256,6 +256,20 @@ class Manifest(Base):
         t = tomllib.loads(toolhome.manifest_text('field-notes', [whisper, newer]))
         self.assertEqual(t['system-requirements'], {'macos': '15.1'})
 
+    def test_page_tasks_run_from_the_stack_folder(self):
+        """pixi runs a task from its manifest's folder (the tools home), so a page task names the team's stack
+        folder; else `python tools/page.py` isn't found (trusted-catalog W2 on the DGX, 2026-11-17)."""
+        import tomllib
+        d = self.team()
+        (d / 'extensions' / 'stack').mkdir()
+        (d / 'extensions' / 'stack' / 'stack.json').write_text(json.dumps(
+            {'tasks': {'serve': 'python tools/page.py', 'bad key': 'x', 'multi': 'a\nb'}}))
+        tasks = toolhome.team_tasks(d)
+        stack = str((d / 'extensions' / 'stack').resolve())
+        self.assertEqual(tasks, {'serve': {'cmd': 'python tools/page.py', 'cwd': stack}})
+        t = tomllib.loads(toolhome.manifest_text('field-notes', [tool('office-files')], tasks))
+        self.assertEqual(t['tasks']['serve'], {'cmd': 'python tools/page.py', 'cwd': stack})
+
     def test_plain_env_is_utf8(self):
         """On Windows a tool printing Hindi to a pipe crashed in cp1252 (CI 2026-11-17)."""
         with patch.dict(os.environ, {'SECRET_TOKEN': 'x'}):

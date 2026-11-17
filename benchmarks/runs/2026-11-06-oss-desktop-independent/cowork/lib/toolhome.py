@@ -268,14 +268,17 @@ def system_requirements(tools):
 
 
 def team_tasks(data_dir):
-    """Tasks the Builder declares in stack/stack.json ("tasks": {"serve": "python tools/page.py"}), for pages."""
+    """Tasks the Builder declares in stack/stack.json ("tasks": {"serve": "python tools/page.py"}), for pages.
+    The environment's pixi.toml lives in the tools home, and pixi runs a task from the folder of its manifest, so
+    each task names the team's stack folder as its cwd (where `tools/page.py` is)."""
+    stack = Path(data_dir).resolve() / 'extensions' / 'stack'
     try:
-        s = json.loads((Path(data_dir).resolve() / 'extensions' / 'stack' / 'stack.json').read_text())
+        s = json.loads((stack / 'stack.json').read_text())
         tasks = s.get('tasks') or {}
     except (OSError, ValueError, AttributeError):
         return {}
-    return {k: v for k, v in tasks.items() if re.fullmatch(r'[\w-]{1,40}', str(k)) and isinstance(v, str)
-            and v.strip() and '\n' not in v} if isinstance(tasks, dict) else {}
+    return {k: {'cmd': v, 'cwd': str(stack)} for k, v in tasks.items() if re.fullmatch(r'[\w-]{1,40}', str(k))
+            and isinstance(v, str) and v.strip() and '\n' not in v} if isinstance(tasks, dict) else {}
 
 
 def manifest_text(team, tools, tasks=None):
