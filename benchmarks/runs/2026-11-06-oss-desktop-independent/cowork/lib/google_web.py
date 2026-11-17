@@ -178,11 +178,21 @@ def compose_draft(b, to, subject, body, send=False):
         time.sleep(0.5)
     else:
         raise ValueError('Gmail did not open its compose box.')
-    if send:
-        b.read()
-        b.click(text='Send')
-        time.sleep(3)
-        return {'sent': True}
+    if send:  # Ctrl+Enter in the body is Gmail's own send; then wait for "Message sent"
+        b.evaluate("""(() => { const box = document.querySelector('div[aria-label="Message Body"], div[role=textbox]');
+          box.focus(); })()""")
+        c = b._cdp()
+        try:
+            for typ in ('keyDown', 'keyUp'):
+                c.call('Input.dispatchKeyEvent', {'type': typ, 'key': 'Enter', 'code': 'Enter', 'modifiers': 2,
+                                                  'windowsVirtualKeyCode': 13, 'nativeVirtualKeyCode': 13})
+        finally:
+            c.close()
+        for _ in range(30):
+            if re.search(r'(?i)message sent', b.evaluate('document.body.innerText') or ''):
+                return {'sent': True}
+            time.sleep(0.5)
+        raise ValueError('Gmail did not say the message was sent.')
     # Gmail saves a prefilled message once it is edited: add and remove a space at the end of the body
     b.evaluate("""(() => { const box = document.querySelector('div[aria-label="Message Body"], div[role=textbox]');
       box.focus(); const sel = getSelection(); sel.selectAllChildren(box); sel.collapseToEnd(); })()""")
