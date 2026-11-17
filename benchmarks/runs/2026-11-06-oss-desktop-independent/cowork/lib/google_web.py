@@ -33,6 +33,7 @@ def _tab(b, origin, url):
     own site's tab, so a Gmail read never runs in the Calendar tab."""
     for t in b._pages():
         if str(t.get('url', '')).startswith(origin + '/'):
+            b._http('/json/activate/' + t['id'])  # clicks only land in the tab in front
             return b.pin(t)
     t = b._http('/json/new?' + urllib.parse.quote(url, safe=':/?#[]@!$&\'()*+,;=%'), 'PUT')
     for _ in range(60):
