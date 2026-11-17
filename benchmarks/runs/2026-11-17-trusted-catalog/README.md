@@ -139,3 +139,82 @@ Summary:
 
 Tests after both fixes: 213 passed, 3 skipped (baseline 210 passed and 3 skipped, plus the coordinator's CI tests
 and the new ones).
+
+### Laptop (person, in the app), 2026-11-17
+
+**Setup:**
+- Pop!_OS laptop, x86_64: 15 GB RAM, 12 cores, no GPU, home disk 91% full (32 GB free at the start).
+- The catalog came from silo.idli.cc.
+- Each workflow ran in the Paseo app as a person:
+  - Teams > New team, the six cards, then Set it up;
+  - the request typed into the Builder in the right pane;
+  - plain answers ("do what you think is right");
+  - yes only to install prompts headed "From Idli's vetted list";
+  - then Teams > Installed tools, and Remove (which asks "Sure?").
+
+**Checking the built thing:** each reader or tool ran through the platform (`teamcaps.run_reader` or `stackwall.run`,
+the run wall) on a sample the Builder never saw:
+- W1: a real 20 s Hindi recording;
+- W4: a 10 s clip of a public-domain photo of a face, with that Hindi audio;
+- W6: a rendered table with commas, percentages and a total row.
+
+| | Team | Tools picked | Install prompts | Build | Disk: before, installed, after Remove | On my sample | C1 C2 C3 C4 C5 |
+|---|---|---|---|---|---|---|---|
+| W1 | Field Voice | Whisper large-v3-turbo, Kokoro (only for fake test notes) | 1 | 11:45 to 2:05, of which about 2 h was a Claude usage-limit pause; about 20 min of work | 32 GB, 28.6 GB, 31.8 GB | 20 s of real Hindi read in 24 s on CPU. A good transcript with small spelling slips. Language Hindi (0.92) | P P n/a P P |
+| W4 | Event Media | face-blur (YuNet), page-server, Whisper turbo, Kokoro | 1 | 15 min | 31.8 GB, 26.7 GB, 30.7 GB (fixed below) | The one face was found and pixelated in every frame (frame at 3 s checked by eye). The voice was replaced: median pitch 262 Hz to 200 Hz, waveform correlation -0.01. 20 s in all | P P P P P |
+| W6 | Report Tables | ocr-tesseract (Tesseract, img2table) | 1 | 9 min | 30.7 GB, 28.2 GB, 32.2 GB | All 20 numbers right, commas, percentages and the total row included, in 2.8 s. The title was kept as text outside the table | P P n/a P P |
+
+**What the Builders did well:**
+- **W1.** It picked Whisper turbo (it fits 15 GB of RAM). It said Whisper mishears names and numbers, and marks
+  lines to "check by ear".
+- **W4:**
+  - it chose Kokoro over Piper because Kokoro's voices are free for public posts;
+  - it built a page: tick each face, mark who to re-voice, check their words, then get the clip;
+  - it said plainly that a new voice hides how someone sounds, not what they say;
+  - it said name tags, banners and backgrounds can still identify someone. My frame shows exactly that: the badge
+    is readable;
+  - it filed a catalog request for "who speaks when" (speaker diarization). The request reached silo, in general
+    words, with no team data.
+- **W6.**
+  - It asked one question first (typed or handwritten, English or Hindi).
+  - It picked the one catalog OCR tool that fits.
+  - It offered the private model's vision for handwriting, with no install.
+  - It added confidence per cell and a check that the total row matches the sum of the rows.
+
+**Bug found and fixed (platform):**
+- Remove left pixi's package cache (`~/idli-insights/tools/.cache`) on disk. After W4 that was 1.5 GB not returned,
+  on a 91% full disk. "Used by tools" didn't count it.
+- Fixed in `c16fa3d9`: the cache counts in Used by tools, and goes when the last tool on the computer is removed.
+- Test: `test_package_cache_counts_and_goes_with_the_last_tool`. Suite: 214 passed, 3 skipped.
+- Checked live: after the fix the page showed the leftover 1.4 GB. W6's Remove freed 3.1 GB, and the disk ended
+  above where it started.
+- The cache stays while any tool is installed, because other teams install from it.
+
+**Rough edges a person hit:**
+- **The app window shrank to 720 px** during W1 (cause unknown, perhaps the update banner). The Builder pane wrapped
+  at 26 columns, and its footer read "Field Voice…". See `laptop-shots/w1-builder-done-narrow-pane.png`.
+- **The right pane's tab says "Analyst" while the Builder is showing** (as before).
+- **The Builder hit Claude's 5-hour usage limit mid-build.** It resumed by itself at the reset, but a person sees
+  "Usage limit reached" and a wait of about 2 h.
+- **Sizes differ in three places:**
+  - the install prompt and Add list use catalog estimates (Whisper turbo "4.1 GB");
+  - the page shows what's on disk (1.8 GB);
+  - the disk dropped by 3.4 GB, the difference being the package cache, now counted.
+- **Claude Code fills the input box with a suggested reply** ("Some are handwritten too, please add that", "Can it
+  also blur name tags and banners?"). A person could send it by pressing Enter without meaning to.
+- **"Text from images and tables" for W6 doesn't read handwriting.** The Builder offered the 9B for that, after
+  the build.
+
+**Screenshots** are in `laptop-shots/`:
+- `w1-installed-tools.png`
+- `w1-builder-done-narrow-pane.png`
+- `w4-installed-by-team.png`
+- `w4-shared-frame-3s.png` (face pixelated, badge readable)
+- `w6-installed-tools.png`
+- `w6-after-remove.png`
+
+**Laptop left with:**
+- no tools installed (`installs.json` is `[]`, the tools folder is 40 KB) and 32.2 GB free;
+- the team folders field-voice, event-media and report-tables (definitions only, 1 to 2 MB each);
+- the samples in `~/lapcat`;
+- a branch at `c16fa3d9`.
