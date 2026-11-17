@@ -214,11 +214,22 @@ def compose_draft(b, to, subject, body, send=False):
 
 
 def drafts_count(b, subject):
-    """How many drafts have this subject (Gmail's drafts search page, read by its result rows)."""
+    """How many drafts have this subject (for checks). Gmail's search ignores a leading "Re:"."""
+    subject = re.sub(r'(?i)^\s*(re|fwd?):\s*', '', subject)
     _tab(b, 'https://mail.google.com', MAIL + '#inbox')
+    b.open(MAIL + '#inbox')
+    time.sleep(1)
     b.open(MAIL + '#search/' + urllib.parse.quote(f'in:drafts subject:"{subject}"'))
-    time.sleep(2.5)
-    return int(b.evaluate("document.querySelectorAll('div[role=main] tr.zA').length") or 0)
+    last = None
+    for _ in range(20):
+        time.sleep(0.5)
+        if not str(b.evaluate('document.title')).startswith('Search results'):
+            continue
+        n = int(b.evaluate("document.querySelectorAll('div[role=main] tr.zA').length") or 0)
+        if n == last:
+            return n
+        last = n
+    return last or 0
 
 
 # ---- Sheets ----
