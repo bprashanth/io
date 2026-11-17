@@ -178,6 +178,9 @@ def remove(team, tool=None, data_dir=None):
             freed += size(env)
             _rm(env)
         freed += _purge_models(rows)
+        if not rows:  # no tool left on this computer: pixi's package cache goes too (it can be gigabytes)
+            freed += size(cache_dir())
+            _rm(cache_dir())
     if left and env.exists():  # the environment keeps only the tools that are left (best effort; next install too)
         try:
             write_manifest(team, left, catalog.load(), team_tasks(data_dir) if data_dir else None)
@@ -653,7 +656,7 @@ def overview(cat=None):
             'installs'].append(item)
         by_team.setdefault(r['team'], {'team': r['team'], 'team_name': r.get('team_name') or r['team'],
                                        'installs': []})['installs'].append(item)
-    used = size(envs_home()) + size(models_dir())
+    used = size(envs_home()) + size(models_dir()) + size(cache_dir())
     res = catalog.resources(home())
     return {'home': str(home()), 'envs': str(envs_home()), 'platform': res['platform'], 'used': used, 'used_text': catalog.gb(used),
             'free': res['disk_free'], 'free_text': catalog.gb(res['disk_free']),

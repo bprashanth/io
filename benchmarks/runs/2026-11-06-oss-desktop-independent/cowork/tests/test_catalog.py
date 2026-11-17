@@ -333,6 +333,22 @@ class Registry(Base):
         self.assertEqual(toolhome.installs(), [])
         self.assertEqual(list((self.tmp / 'tools/models').iterdir()), [])
 
+    def test_package_cache_counts_and_goes_with_the_last_tool(self):
+        # Laptop, 2026-11-17: removing every tool left pixi's package cache (1.5 GB) on a nearly full disk, unseen
+        a, b = self.team('field-notes'), self.team('comms')
+        self.install(a, ['office-files'])
+        self.install(b, ['office-files'])
+        cache = toolhome.cache_dir() / 'rattler'
+        cache.mkdir(parents=True, exist_ok=True)
+        (cache / 'pkg.conda').write_bytes(b'p' * 5000)
+        self.assertGreaterEqual(toolhome.overview(CATALOG)['used'], 5000)
+        toolhome.purge_team('field-notes', a)
+        self.assertTrue((cache / 'pkg.conda').exists())  # another team still installs from it
+        out = toolhome.purge_team('comms', b)
+        self.assertFalse(toolhome.cache_dir().exists())
+        self.assertGreaterEqual(out['freed'], 5000)
+        self.assertEqual(toolhome.overview(CATALOG)['used'], 0)
+
     def test_refuses_with_reasons(self):
         a = self.team()
         with self.assertRaisesRegex(ValueError, 'needs 100000 GB of memory'):
