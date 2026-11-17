@@ -53,4 +53,89 @@ W1 to W8 should pass using only the catalog. W9 tests the request path. W10 test
 
 ## Results
 
-To be filled in by the runs.
+### DGX, 2026-11-17 (real Builder: Claude Code in tmux, Opus 5.5)
+
+How it was run:
+- Each team was made with the setup cards' answers (Google Drive, "A few of us", Yes, ask each time). The request
+  was typed word for word. Follow-up questions were answered plainly, with "do what you think is right" where
+  there was a choice. The person never named a tool.
+- Install prompts were approved only when they said "From Idli's vetted list". None asked for anything else.
+- At most two Builders ran at once. Each team's tools were removed (`toolhome.remove`, the code behind Installed
+  tools > Remove) once its workflow was checked.
+- "Works on sample" means two things. The team's own tests passed (`teamcaps.run_tests`). The reader or tool also
+  ran through the platform (`run_reader`, `run_tool`, `stackwall.serve`) on a sample I made myself, not the
+  Builder's sample:
+  - a real 20 s Hindi speech recording;
+  - an English monthly report (.docx);
+  - a public-domain NASA portrait (`skimage` astronaut) panned into a video with Hindi speech;
+  - a rendered 5 by 6 table;
+  - two handwritten Hindi survey forms with known answers;
+  - a 27 s recording: speech, 5 s of silence, 8 s of music, then speech.
+- Build time runs from the person's "yes" to `team_save`.
+- Transcripts are in `transcripts/W<n>.txt`, taken from Claude Code's session logs, with tool output shortened.
+- Criteria (C1 to C5) are the five pass criteria above. n/a means the criterion didn't come up.
+
+| # | Tools picked (all from the catalog) | Install prompts | Build | Works on sample | C1 catalog | C2 checks computer | C3 asks | C4 works | C5 visible, removable | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| W1 | speech-whisper-turbo, office-files; voice-kokoro only to make test notes | 2 | 4 min | Yes. A WhatsApp-named .opus in Hindi gave a Hindi transcript. The date came from the file name, and the 9B wrote the main problem | Pass | Pass. Picked turbo, which fits the DGX | n/a | Pass | Pass. Removing W1 left the turbo and Kokoro models in place, because W2 and W5 used them. Only the environment was freed (622 MB) | Didn't need media-ffmpeg: Whisper's PyAV decodes .opus. Said WhatsApp fetching needs the platform but didn't file a platform_request |
+| W2 | page-server, speech-whisper-turbo, voice-kokoro | 1 | 7 min, plus 2 min for .docx | Yes, after fix 1. The page served through the platform. My English FAQ .docx went in, and two spoken Hindi questions got correct Hindi answers from it, spoken back (6.6 s .wav). A question outside the FAQ got "I don't know, call the helpline" | Pass | Pass | n/a. Phone and WhatsApp went to platform_request | Fail, then pass after fix 1. Before it, the page never started from the platform | Pass | The first build took notes as .txt, .pdf or pasted text. When the person said the FAQ was in Word, it added .docx with the standard library, with no new install (not office-files) |
+| W3 | translate-nllb, office-files | 1 | 2 min | Yes. Hindi and Marathi .docx came back with the same 11 paragraphs, styles (title, headings, bullets) and table. Every number was kept. Marathi switched some numbers to Devanagari digits, and one paragraph was flagged yellow | Pass | Pass | n/a | Pass | Pass | Gave the non-commercial licence in its plan, before installing. Translation slips a fluent reader would catch: Marathi said "blood pressure" twice for "anaemia and blood pressure", and Hindi turned tailoring into embroidery |
+| W4 | face-blur, speech-whisper-turbo, voice-kokoro | 1 | 8 min | Yes. The face was pixelated in frames at 3 s and 7.5 s while the camera moved. The voice went from about 258 Hz (a woman) to about 123 Hz (a synthetic man), with correlation about 0 against the original. A "new words to check" file was written | Pass | Pass | Partial. It filed a catalog_request in general words for matching faces across clips, but fix 2's bug stopped it reaching silo | Pass | Pass | Built its own voice changer from Whisper and Kokoro (words retyped, then said again) instead of voice-anonymise. Its reason: Kokoro is Apache-2.0, and voice-anonymise's Hindi Piper voice is non-commercial, while these clips are posted publicly. Consent works through a numbered face sheet that the person checks against the paper list, because nobody is recognised. Said plainly that names spoken aloud are still heard and that small faces can be missed. Didn't use speech-vad or media-ffmpeg |
+| W5 | media-ffmpeg, speech-whisper-turbo; voice-kokoro only to make a test video | 2 | 4 min | Yes. A 20 s Hindi video gave a timed transcript, and a 12 s clip came out with burned-in Devanagari, shaped correctly (frame checked), as h264/aac at 0.15 MB | Pass | Pass | n/a. Sending on WhatsApp went to platform_request | Pass | Pass | |
+| W6 | ocr-tesseract | 1 | 4.5 min | Yes on the rendered table: 25 of 25 numbers right, and Indian commas made plain (16,54,890 became 1654890). On a 55% blurry JPEG of the same table the columns fell apart. Most bad cells were flagged, but 2 were wrong without a flag | Pass | Pass | n/a | Pass, on the rendered table | Pass | It also checks that Total rows add up. It didn't use ocr-rapidocr or the 9B |
+| W7 | the 9B's vision, plus office-files (410 MB) | 1 | 3.5 min | Yes. Two handwritten Hindi forms gave 13 of 14 fields right, and every number was right. One surname was misread (जाधव as नाथव) without a flag. One unreadable ration card colour was flagged | Pass | Pass | n/a | Pass | Pass | Preferred the platform model as expected. It reads number boxes twice (Hindi ४ against 8) instead of checking with ocr-rapidocr |
+| W8 | sound-classes, media-ffmpeg; voice-kokoro only for test audio | 2 | 7 min | Yes. Speech 0 to 7.5 s, quiet 7.5 to 11.7 s, music 11.7 to 19.5 s and speech 19.5 to 27 s were all found within 0.5 s of where they really are. The 27 s cut came out at 15.8 s | Pass | Pass. Both tools list win-64, and there's no LiteRT. Not run on Windows here | n/a | Pass | Pass | Said that applause counts as neither speech nor music, so it gets cut too, and offered to keep it |
+| W9 | none fits. Filed `catalog_request`, then installed face-blur only for its OpenCV, to check and prepare photos | 1 | 3 min | Yes. Its tests pass (photo check with the 9B, and shop-ready resize and border) | Pass. Nothing unvetted was offered | Pass | Pass. `req-20261117-055453-a6eb75` reached `GET /idli/catalog/requests` in general words with no team data. The person was told, and offered what can be done now. Left in the queue for vetting | Pass | Pass | Called face-blur (922 MB) "one small add-on". Using a privacy tool's environment just for its packages works, but a plain image tool in the catalog (Pillow and OpenCV) would be clearer |
+| W10 | speech-whisper-small (turbo didn't fit) | 1 | 3.5 min | Yes. A 20 s Hindi .mp3 gave 3 timed lines with confidence. It makes more mistakes than turbo, as it warned | Pass | Pass. The tools home was a 5 GB tmpfs (see below). It never tried turbo. It said "needs about 4.1 GB, Idli keeps 2 GB spare, 5.0 GB free", asked whether 2 GB could be freed, and offered the quick tool meanwhile | n/a. The whole-folder background job went to platform_request | Pass | Pass. Removed from the small home, which was empty afterwards | Made its fake test clip by loading the system's libespeak-ng with ctypes in its own shell. That was for the sample only and installed nothing, but it is outside the catalog |
+
+Summary:
+- All ten Builders picked only catalog tools, and every install prompt said "From Idli's vetted list". None
+  offered a tool for another system.
+- Eight of the ten request rows are full passes (W1, W3, W5, W6, W7, W8, W9, W10).
+- W2 passes after fix 1. W4 passes except that its catalog request failed (fix 2).
+- Removal always freed the team's environment. A model was freed only when no other team used it.
+
+**How W10 was run.** `lib/catalog.py` has no fake for free disk or memory (`IDLI_FAKE_FREE_GB` and
+`IDLI_FAKE_RAM_GB` don't exist).
+- I mounted a 5 GB tmpfs and pointed `~/idli-insights/config/tools.json` `home` at it, with environments still on
+  the root disk. `resources()` reports the smaller of the two disks, so the computer read as 5.0 GB free.
+- `catalog.check(['speech-whisper-turbo'])` refused: "needs about 4.1 GB, and 5.0 GB is free where tools go (Idli
+  keeps 2 GB spare)". Whisper small fitted.
+- Memory can't be shrunk this way, so the memory path was not exercised.
+- Afterwards I restored `tools.json` exactly and unmounted the tmpfs.
+
+**Other findings (not fixed):**
+- **Example scripts and model paths don't match.** The catalog examples read `$IDLI_FILES/models/<file>`, but
+  `toolhome.fetch_model` stores each model at `<home>/models/<sha16>/<model name>` (a file named like
+  "Kokoro v1.0 (82M) ONNX"), and nothing sets `IDLI_FILES`. Every Builder that copied an example had to find
+  `$IDLI_MODEL_PATHS` itself (W1, W5 "the model files are in a slightly different place than expected", W4, W10).
+  This cost a few tool calls each time and blocked nothing.
+- **Shared models are counted in full.** The consent text says "about 4.1 GB" for turbo even when its model is
+  already on the computer, and `installs.json` counts the full model for each team. The disk check and Remove
+  handle sharing correctly.
+- **Pixi 0.84 warning.** It warns that the `[system-requirements]` table (added for macOS 14) is deprecated in
+  favour of virtual packages on `platforms`. It is only a warning: the task still ran.
+- **Turns not taken.** Several Builders ended by offering a next step: a supporters' summary (W3), Drive sync
+  (W2), a whole folder at once (W7), stock and orders (W9). These were not followed.
+
+### Bugs found and fixed
+
+1. **A catalog team's page never started** (`ef3428c9`).
+   - pixi runs a task from the folder its manifest is in. A catalog team's `pixi.toml` lives in the tools home
+     (`envs/<team>/`), so `serve = "python tools/helpline_bot.py"` looked for `tools/` there.
+   - The page died at start with "can't open file". The Builder's own test imported the module directly, so it
+     passed anyway.
+   - Fix: `toolhome.team_tasks` now writes each task as `{ cmd = ..., cwd = "<team>/extensions/stack" }`. pixi
+     0.84 accepts an absolute `cwd` (checked).
+   - Test: `test_page_tasks_run_from_the_stack_folder`. After the fix, W2's page served and answered through
+     `stackwall.serve`.
+2. **Every catalog_request failed** (`009e0940`).
+   - The client also sent `at` and `version`. The router refuses unknown fields with a 400, so W4's request was
+     only noted on the computer.
+   - Fix: `catalog.request` now sends only `need`, `why`, `platform`, `team` (cut to the router's 40 characters)
+     and `tools_considered`.
+   - Test: `test_request_posts_general_words` now checks the fields.
+   - After the fix, W9's request reached silo.
+
+Tests after both fixes: 213 passed, 3 skipped (baseline 210 passed and 3 skipped, plus the coordinator's CI tests
+and the new ones).
