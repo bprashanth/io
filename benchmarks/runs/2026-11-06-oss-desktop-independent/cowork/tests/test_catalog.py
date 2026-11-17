@@ -424,7 +424,8 @@ class RealCatalog(unittest.TestCase):
     def test_install_a_tiny_real_tool(self):
         try:
             with patch.dict(os.environ, {'IDLI_TOOLS_HOME': tempfile.mkdtemp(prefix='idli-real-tools-',
-                                                                               dir=_big_tmp())}):
+                                                                               dir=_big_tmp()),
+                                         'IDLI_TOOLS_ENVS': tempfile.mkdtemp(prefix='idli-real-envs-')}):
                 cat = catalog.load(refresh=True)
                 ids = [t['id'] for t in cat['tools']]
         except ValueError:
@@ -433,10 +434,11 @@ class RealCatalog(unittest.TestCase):
         if not tid:
             self.skipTest('no small tool in the real catalog')
         home = tempfile.mkdtemp(prefix='idli-real-tools-', dir=_big_tmp())
-        d = Path(tempfile.mkdtemp(prefix='idli-real-team-', dir=_big_tmp())) / 'real-test'
+        d = Path(tempfile.mkdtemp(prefix='idli-real-team-')) / 'real-test'
         (d / 'extensions/stack').mkdir(parents=True)
         (d / 'team.json').write_text('{"name": "Real test"}')
-        with patch.dict(os.environ, {'IDLI_TOOLS_HOME': home}):
+        envs = tempfile.mkdtemp(prefix='idli-real-envs-')  # symlinks: never on an exFAT disk
+        with patch.dict(os.environ, {'IDLI_TOOLS_HOME': home, 'IDLI_TOOLS_ENVS': envs + '/envs'}):
             try:
                 out = toolhome.install(d, [tid])
                 self.assertTrue(out['ok'], out)
@@ -446,8 +448,8 @@ class RealCatalog(unittest.TestCase):
                 self.assertTrue(r['ok'], r['output'])
             finally:
                 toolhome.purge_team('real-test', d)
-                shutil.rmtree(home, ignore_errors=True)
-                shutil.rmtree(d.parent, ignore_errors=True)
+                for p in (home, envs, d.parent):
+                    shutil.rmtree(p, ignore_errors=True)
 
 
 def _big_tmp():
