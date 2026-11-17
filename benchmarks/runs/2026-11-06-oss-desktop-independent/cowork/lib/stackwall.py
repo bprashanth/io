@@ -285,7 +285,9 @@ class ModelDoor:
     PATHS = {('POST', '/v1/chat/completions'), ('GET', '/v1/models')}
 
     def __init__(self, sock_path, url=None, log=None):
-        self.sock_path, self.log = str(sock_path), log if log is not None else []
+        # sock_path None: listen on 127.0.0.1 (a free port, self.port) for tools run without a wall (macOS, Windows)
+        self.sock_path, self.log = (str(sock_path) if sock_path else None), log if log is not None else []
+        self.port = None
         self.base, self.headers, self.name = (url.rstrip('/'), {}, 'qwen3.5-9b') if url else model_upstream()
         self.loop = asyncio.new_event_loop()
         self.ready = threading.Event()
@@ -336,7 +338,11 @@ class ModelDoor:
     def start(self):
         def run():
             asyncio.set_event_loop(self.loop)
-            self.loop.run_until_complete(asyncio.start_unix_server(self._handle, self.sock_path))
+            if self.sock_path:
+                self.loop.run_until_complete(asyncio.start_unix_server(self._handle, self.sock_path))
+            else:
+                srv = self.loop.run_until_complete(asyncio.start_server(self._handle, '127.0.0.1', 0))
+                self.port = srv.sockets[0].getsockname()[1]
             self.ready.set()
             self.loop.run_forever()
         threading.Thread(target=run, daemon=True).start()
@@ -629,6 +635,9 @@ def _done(ok, steps, log, d, out_log):
 
 
 def installed(data_dir):
+    from lib import toolhome
+    if toolhome.is_catalog_team(data_dir):
+        return toolhome.installed(data_dir)
     d = stack_dir(data_dir)
     try:
         return json.loads((d / '.installed.json').read_text()).get('ok') and (d / '.pixi').exists()
@@ -649,6 +658,9 @@ def run(data_dir, cmd, inputs=(), out_dir=None, timeout=1800, cwd=None, extra_ro
     s, _ = spec(data_dir)
     out_dir = Path(out_dir or tempfile.mkdtemp(prefix='idli-out-'))
     out_dir.mkdir(parents=True, exist_ok=True)
+    cat = _catalog_setup(data_dir)
+    if cat and not cat['walled']:
+        return _run_plain(data_dir, cat, s, cmd, out_dir, timeout, cwd)
     doors, log, door = {}, [], None
     sd = None
     if s.get('model'):
@@ -663,9 +675,14 @@ def run(data_dir, cmd, inputs=(), out_dir=None, timeout=1800, cwd=None, extra_ro
     # The stack is read-only at run time; its caches get a scratch copy-on-nothing tmpfs.
     px = pixi()
     ro = [str(d), str(Path(px).parent), *[str(Path(p).resolve()) for p in inputs], *map(str, extra_ro)]
-    args = _wall([px, 'run', '--frozen', '--manifest-path', str(d / 'pixi.toml'), *cmd],
-                 binds_rw=[str(out_dir)], binds_ro=ro, doors=doors, env=env, cwd=cwd or d,
-                 scratch=[p for p in (_cache(d) / 'xdg', _cache(d) / 'uv') if p.is_dir()])
+    manifest = d / 'pixi.toml'
+    scratch = [p for p in (_cache(d) / 'xdg', _cache(d) / 'uv') if p.is_dir()]
+    if cat:  # catalog tools: the team's environment and the shared models, read-only
+        manifest, ro = cat['manifest'], ro + cat['ro']
+        env.update(cat['env'])
+        scratch = [p for p in cat['scratch'] if p.is_dir()]
+    args = _wall([px, 'run', '--frozen', '--manifest-path', str(manifest), *cmd],
+                 binds_rw=[str(out_dir)], binds_ro=ro, doors=doors, env=env, cwd=cwd or d, scratch=scratch)
     t0 = time.time()
     try:
         r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
@@ -761,6 +778,9 @@ def serve(data_dir, task, state_dir, wait=120):
         raise ValueError('The stack is not installed yet.')
     d = stack_dir(data_dir)
     s, _ = spec(data_dir)
+    cat = _catalog_setup(data_dir)
+    if cat and not cat['walled']:
+        return _serve_plain(data_dir, cat, s, task, state_dir, wait, key)
     sd = _sockdir()
     doors, door = {}, None
     if s.get('model'):
@@ -776,9 +796,15 @@ def serve(data_dir, task, state_dir, wait=120):
         env.update({'IDLI_MODEL_URL': f'http://127.0.0.1:{MODEL_PORT}/v1', 'IDLI_MODEL': 'private'})
     px = pixi()
     Path(state_dir).mkdir(parents=True, exist_ok=True)
-    args = _wall([px, 'run', '--frozen', '--manifest-path', str(d / 'pixi.toml'), task],
-                 binds_rw=[str(state_dir), str(insock.parent)], binds_ro=[str(d), str(Path(px).parent)],
-                 doors=doors, env=env, cwd=d, scratch=[p for p in (_cache(d) / 'xdg', _cache(d) / 'uv') if p.is_dir()])
+    manifest, ro = d / 'pixi.toml', [str(d), str(Path(px).parent)]
+    scratch = [p for p in (_cache(d) / 'xdg', _cache(d) / 'uv') if p.is_dir()]
+    if cat:
+        manifest, ro = cat['manifest'], ro + cat['ro']
+        env.update(cat['env'])
+        scratch = [p for p in cat['scratch'] if p.is_dir()]
+    args = _wall([px, 'run', '--frozen', '--manifest-path', str(manifest), task],
+                 binds_rw=[str(state_dir), str(insock.parent)], binds_ro=ro,
+                 doors=doors, env=env, cwd=d, scratch=scratch)
     # LAUNCH reads IDLI_INDOORS; the socket folder is bound writable above
     log = open(Path(state_dir) / '.page.log', 'w')
     proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
@@ -819,3 +845,88 @@ def stop(data_dir, task, proc=None):
             (a[k].close if k == 'door' else a[k].stop)()
     if a.get('sd'):
         shutil.rmtree(a['sd'], ignore_errors=True)
+
+
+# ---- catalog tools (lib/toolhome.py): the team's environment lives in the tools home, models are shared ----
+
+def _catalog_setup(data_dir):
+    """For a team with catalog tools: its manifest, what the run must see read-only, and the env vars that point at
+    its models. None for a team with a hand-made stack."""
+    from lib import catalog, toolhome
+    tools = toolhome.catalog_tools(data_dir)
+    if tools is None:
+        return None
+    team = toolhome.team_id(data_dir)
+    env_dir = toolhome.env_dir(team)
+    try:
+        cat = catalog.load()
+        menv = toolhome.model_env(tools, cat)
+        if (env_dir / 'pixi.toml').exists():  # the Builder's tasks (pages) as they are now; packages unchanged
+            toolhome.write_manifest(team, tools, cat, toolhome.team_tasks(data_dir))
+    except (ValueError, OSError):
+        menv = {'IDLI_MODELS': str(toolhome.models_dir())}
+    cache = toolhome.cache_dir()
+    return {'manifest': env_dir / 'pixi.toml', 'ro': [str(env_dir), str(toolhome.models_dir()), str(cache)],
+            'env': {**toolhome._pixi_env(cache), **menv}, 'scratch': [cache / 'xdg', cache / 'uv'],
+            'walled': toolhome.walled()}
+
+
+def _plain_setup(data_dir, cat, s, extra):
+    """macOS and Windows (the POC): no wall. A clean environment, offline model hubs, and the private model through a
+    door on 127.0.0.1 so its access token never reaches the tool."""
+    from lib import toolhome
+    n = str(threads())
+    env = toolhome._plain_env({**cat['env'], 'IDLI_THREADS': n, 'OMP_NUM_THREADS': n, 'HF_HUB_OFFLINE': '1',
+                               'TRANSFORMERS_OFFLINE': '1', 'PIXI_FROZEN': 'true',
+                               'IDLI_STACK': str(stack_dir(data_dir)), **extra})
+    door = None
+    if s.get('model'):
+        door = ModelDoor(None).start()
+        env.update({'IDLI_MODEL_URL': f'http://127.0.0.1:{door.port}/v1', 'IDLI_MODEL': 'private'})
+    return env, door
+
+
+def _run_plain(data_dir, cat, s, cmd, out_dir, timeout, cwd):
+    env, door = _plain_setup(data_dir, cat, s, {'IDLI_OUT': str(out_dir)})
+    t0 = time.time()
+    try:
+        r = subprocess.run([pixi(), 'run', '--frozen', '--manifest-path', str(cat['manifest']), *cmd],
+                           capture_output=True, text=True, timeout=timeout, env=env, cwd=cwd or stack_dir(data_dir))
+        ok, out = r.returncode == 0, (r.stdout + r.stderr)
+    except subprocess.TimeoutExpired as exc:
+        ok, out = False, f'took longer than {timeout} s\n' + str(exc.stdout or '')[-1000:]
+    finally:
+        if door:
+            door.stop()
+    return {'ok': ok, 'output': out[-4000:], 'seconds': round(time.time() - t0, 1), 'out_dir': str(out_dir),
+            'files': sorted(str(p.relative_to(out_dir)) for p in Path(out_dir).rglob('*') if p.is_file())[:200],
+            'model_calls': len(door.log) if door else 0}
+
+
+def _serve_plain(data_dir, cat, s, task, state_dir, wait, key):
+    import urllib.request
+    with socket.socket() as so:
+        so.bind(('127.0.0.1', 0))
+        port = so.getsockname()[1]
+    Path(state_dir).mkdir(parents=True, exist_ok=True)
+    env, door = _plain_setup(data_dir, cat, s, {'IDLI_OUT': str(state_dir), 'PORT': str(port),
+                                                'GRADIO_SERVER_PORT': str(port), 'GRADIO_ANALYTICS_ENABLED': 'False'})
+    log = open(Path(state_dir) / '.page.log', 'w')
+    proc = subprocess.Popen([pixi(), 'run', '--frozen', '--manifest-path', str(cat['manifest']), task],
+                            stdout=log, stderr=subprocess.STDOUT, env=env, cwd=stack_dir(data_dir))
+    url, t0 = f'http://127.0.0.1:{port}/', time.time()
+    while time.time() - t0 < wait:
+        if proc.poll() is not None:
+            raise ValueError('The page stopped while starting: ' + (Path(state_dir) / '.page.log').read_text()[-600:])
+        try:
+            urllib.request.urlopen(url, timeout=3)
+            break
+        except Exception as exc:
+            if getattr(exc, 'code', None):
+                break
+            time.sleep(1)
+    else:
+        stop(data_dir, task, proc=proc)
+        raise ValueError(f'The page did not answer within {wait} s.')
+    _apps[key] = {'proc': proc, 'url': url, 'model': door}
+    return {'url': url, 'pid': proc.pid}
