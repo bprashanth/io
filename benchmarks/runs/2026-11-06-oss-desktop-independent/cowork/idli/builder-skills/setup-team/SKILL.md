@@ -25,7 +25,10 @@ Write the plan as a short list the person can read, one line per step, saying fo
 - what Idli does, in their words;
 - where it happens: "on this computer", "the private model on this computer", "Claude, with names as codes", or
   "needs a platform feature" (a login, sending, a new account action);
-- anything new from the internet, by name, with its size if large.
+- anything new from the internet, by name, with its size if large. It comes only from Idli's vetted catalog
+  (`catalog`), and only tools that fit this computer. If a step needs a tool the catalog doesn't have, or one this
+  computer can't run, say so in the plan, offer what can be done now, and send a `catalog_request` (general words,
+  no team data): "Our team will check a safe tool for this and add it to Idli's list."
 
 Then ask: "Shall I set this up?" On yes, build. Keep a copy in `TEAM.md` (goal, workflows, the plan, what's built,
 what's waiting for the platform): later Builders read it.

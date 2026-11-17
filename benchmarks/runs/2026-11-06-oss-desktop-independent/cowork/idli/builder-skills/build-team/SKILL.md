@@ -17,9 +17,11 @@ extensions/
   tests/test_<x>.py    one test per capability; it passes when it exits 0
   samples/             fake files to build and test with (never real ones)
   skills/<name>/SKILL.md   an Analyst skill (optional)
-  stack/               the team's own tools from the internet (optional, below)
-    pixi.toml          packages and tasks; pixi.lock pins them at the first install
-    stack.json         GitHub repos, downloads, extra hosts, private model use
+  stack/               the team's tools from Idli's catalog (optional, below)
+    catalog.json       the catalog tools the team uses (written by Idli)
+    pixi.toml          made by Idli from those tools; pixi.lock pins them
+    stack.json         optional: {"model": true} if your code asks the private model, and
+                       {"tasks": {"serve": "python tools/page.py"}} for a page
     tools/             your code that uses the stack
 ```
 
@@ -40,7 +42,7 @@ extensions/
     document, an audio reply). The Analyst runs it with `team_run`, after working out what to do from masked
     tables. Needs `takes` (file kinds, or `none`) and an `entry` with `run(inputs, args, out)`;
   - `app`: a page the person uses in a browser tab (a voice chatbot, a form). Needs `serve`, a task in
-    stack/pixi.toml that serves the page on `127.0.0.1:$PORT`;
+    `"tasks"` of stack/stack.json that serves the page on `127.0.0.1:$PORT`;
   - `skill`: only teaches the Analyst something.
 - `stack` (optional, true): the entry and test run with the stack's Python and packages, in the stack's wall.
 - `reads` (readers): one or more of `images`, `audio`, `video`, `pdf`, `documents`.
@@ -107,54 +109,38 @@ assert any('Asha' in r['text'] for r in rows), rows
 Make the sample yourself with fake values (Pillow can draw a register; ffmpeg can make a short clip). Check
 something real about the output, not just that a file exists.
 
-## The stack: tools from the internet, inside Idli's wall
+## The stack: tools from Idli's catalog
 
-When the menu below doesn't have what the team needs, add open-source tools to `stack/`:
+When the menu below doesn't have what the team needs, add tools from **Idli's vetted catalog**. Nothing else is
+installed: no packages, repos or downloads you pick yourself.
 
-```toml
-# stack/pixi.toml
-[workspace]
-name = "team-stack"
-channels = ["conda-forge"]
-platforms = ["linux-64", "linux-aarch64"]
+1. **Pick.** `catalog` lists the tools built for this computer's system (Linux, Mac or Windows; never install one
+   for another system). Each has what it is for, its licence, cautions (for example a non-commercial licence), its
+   size, and what it needs (disk, memory, cores, GPU). `catalog(example="<id>")` shows a short script using it.
+2. **Check.** Each tool says whether it fits this computer and, if not, why. If it doesn't fit, tell the person
+   plainly and offer a smaller tool, the platform (`platform_request`), or a request (step 3). Say the size and any
+   caution before installing.
+3. **Ask.** If nothing fits, `catalog_request(need, why, tools_considered)` in general words, with no names, places,
+   files or anything from the team. Tell the person our team will check a safe tool and add it. Meanwhile, offer
+   what can be done now.
 
-[dependencies]          # conda-forge first: it has ffmpeg, opencv, onnxruntime and most science packages
-python = "3.11.*"
-ffmpeg = "*"
-
-[pypi-dependencies]     # only what conda-forge lacks
-silero-vad = "==5.1.2"
-
-[tasks]
-fetch-models = "python tools/fetch_models.py"   # optional; runs once at install, with the install wall's internet
-```
-
-```json
-// stack/stack.json
-{"why": "Find speech and people in event videos",
- "repos": [{"url": "https://github.com/owner/repo", "ref": "v1.2.0", "license": "MIT", "why": "..."}],
- "downloads": [{"url": "https://huggingface.co/.../model.onnx", "to": "models/model.onnx"}],
- "setup": "fetch-models",
- "hosts": [],
- "model": false}
-```
-
-- **Choosing a tool:** well known and maintained, a permissive licence (MIT, Apache, BSD), runs on a normal laptop
-  CPU, as small as will do. Prefer a package over a repo, and a repo's release tag over a branch. Say in `why`
-  what each one is for.
-- **Install:** `stack_install`. Idli asks the person first, with a summary it writes from these files. The install
-  wall reaches only package and code hosts (conda-forge, PyPI, GitHub, Hugging Face). Anything else must be listed
-  in `hosts`, and the person sees it. Model weights are fetched now, by `downloads` or the `setup` task, never at
-  run time. The first install pins everything (pixi.lock, stack-lock.json); teammates get exactly the same.
-- **Run:** no internet at all. The stack is read only; write to `$IDLI_OUT` or a temp folder. Repos are in
-  `stack/repos/<name>`, downloads where `to` says, Hugging Face's cache in `stack/models/hf` (offline). With
-  `"model": true`, `$IDLI_MODEL_URL` reaches the private model and nothing else.
-- **Try:** `stack_run` runs a command from `stack/` in the run wall (`python tools/x.py ../samples/a.wav`).
+- **Install:** `stack_install(tools=["<id>", ...])`. Idli checks this computer again and refuses with the reasons,
+  or asks the person with a summary it writes from the catalog. Tools add to what the team has. Idli writes
+  `stack/catalog.json`, `stack/pixi.toml` and `stack/pixi.lock` (don't edit them); teammates get the same.
+  The environment and the models live in Idli's tools folder, shared between teams. The person can remove tools on
+  the Installed tools page (in Teams).
+- **Your code** goes in `stack/tools/`. Model files are at `$IDLI_MODEL_<NAME>` (the model's name in capitals,
+  other characters as `_`), all of them in `$IDLI_MODEL_PATHS` (JSON), under `$IDLI_MODELS`. Hugging Face and
+  transformers run offline: load from those paths, never by a hub name.
+- **Run:** no internet at all (on Linux inside Idli's wall). The stack is read only; write to `$IDLI_OUT` or a temp
+  folder. With `"model": true` in `stack/stack.json`, `$IDLI_MODEL_URL` reaches the private model and nothing else.
+- **Try:** `stack_run` runs a command from `stack/` (`python tools/x.py ../samples/a.wav`).
 - **Threads:** use `$IDLI_THREADS` for any thread count (`cpu_threads=int(os.environ.get('IDLI_THREADS', 4))`).
   Never all cores: on some computers that runs many times slower.
-- **Size:** say roughly how big it is before installing if it is large (deep-learning packages are 1 to 3 GB).
 - **Logins and sending:** a stack never logs in to accounts and never sends messages. That is the platform's:
   `platform_request`.
+- **Older teams** may have a hand-made `stack/pixi.toml` and `stack.json` from before the catalog. They keep
+  working (`stack_install` with no tools reinstalls them). Don't add to them; new tools come from the catalog.
 
 ## The capability menu (cheapest first)
 
@@ -166,7 +152,7 @@ fetch-models = "python tools/fetch_models.py"   # optional; runs once at install
 | Video | `capmenu.ffmpeg(args)` | none | none |
 | PDF | `capmenu.pdf_text(path)` (pdftotext) | platform request | masked text, automatic |
 
-A function raises `capmenu.Missing` when this computer doesn't have the tool: then add a tool for it to the
+A function raises `capmenu.Missing` when this computer doesn't have the tool: then add a catalog tool for it to the
 team's stack instead. The list in your CLAUDE.md says what this computer has.
 
 ## Finishing
