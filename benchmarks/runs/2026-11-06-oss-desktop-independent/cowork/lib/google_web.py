@@ -208,9 +208,16 @@ def compose_draft(b, to, subject, body, send=False):
     for _ in range(30):
         txt = b.evaluate('document.body.innerText') or ''
         if re.search(r'(?i)draft saved|saved to drafts', txt):
-            return {'draft': True}
+            break
         time.sleep(0.5)
-    raise ValueError('Gmail did not say the draft was saved.')
+    else:
+        raise ValueError('Gmail did not say the draft was saved.')
+    # "Draft saved" shows before Gmail has finished: leaving at once lost the draft (laptop, 2026-11-18). Wait, then
+    # look in Drafts; if it isn't there, fail so the routine tries again next run instead of marking it done.
+    time.sleep(5)
+    if not drafts_count(b, subject):
+        raise ValueError('The draft did not reach Drafts. It will be tried again on the next run.')
+    return {'draft': True}
 
 
 def drafts_count(b, subject):
