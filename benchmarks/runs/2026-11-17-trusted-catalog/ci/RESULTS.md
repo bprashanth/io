@@ -19,27 +19,28 @@ Workflow: `.github/workflows/catalog-tools.yml` (branch `catalog-ci`). Scripts: 
 | [44021722417](https://github.com/bprashanth/io/actions/runs/44021722417) | first try | macos-14 refused by GitHub; OCR test image unreadable (test bug); harness print crashed on Windows (test bug) |
 | [44022490136](https://github.com/bprashanth/io/actions/runs/44022490136) | macos-15, OCR test fixed | 11/12 green; whisper fails to install on macOS; Hindi transcript crashes on Windows |
 | [44022985402](https://github.com/bprashanth/io/actions/runs/44022985402) | lib fixes (UTF-8, system-requirements) | 11/12 green; `speech macos-15` red on purpose: the catalog entry needs `macos = "14.0"` (passes with it) |
+| [44023586989](https://github.com/bprashanth/io/actions/runs/44023586989) | catalog.json from oss-desktop-eval ca338b17 (`macos = "14.0"` for the Whisper tools), CI-side retry removed | **12/12 green** |
 
 ## Per OS and tool
 
-Install = `pixi install` seconds, cold (empty package cache: the first run that reached the tool) / warm (run 3,
-cache restored). Models = download and sha256 check, cold. Run = the tool's checks in run 3. Env = the environment
+Install = `pixi install` seconds, cold (empty package cache: the first run that reached the tool) / warm (final
+run 44023586989, cache restored). Models = download and sha256 check, cold. Run = the tool's checks in the final run. Env = the environment
 on disk.
 
 | OS | Tool | Install cold / warm | Models | Run | Env | Result |
 |---|---|---|---|---|---|---|
-| Linux | voice-piper | 2.4 / 1.0 s | 1.0 s | 1.5 s | 316 MB | pass |
-| Linux | speech-whisper-small | 2.3 / 0.8 s | 4.3 s | 3.1 s | 551 MB | pass |
-| Linux | ocr-tesseract | 4.4 / 0.9 s | 2.8 s | 1.8 s | 1013 MB | pass |
-| Linux | face-blur | 4.5 / 1.2 s | 0.6 s | 0.8 s | 1015 MB | pass |
-| macOS | voice-piper | 2.8 / 3.3 s | 3.4 s | 2.6 s | 269 MB | pass |
-| macOS | speech-whisper-small | fails as is; 0.9 s with the fix | 15.1 s | 5.9 s | 261 MB | **FAIL as is** (pass with `macos = "14.0"`) |
-| macOS | ocr-tesseract | 8.3 / 5.3 s | 3.2 s | 3.2 s | 811 MB | pass |
-| macOS | face-blur | 9.8 / 4.3 s | 0.6 s | 2.5 s | 646 MB | pass |
-| Windows | voice-piper | 3.2 / 0.7 s | 3.2 s | 2.5 s | 274 MB | pass |
-| Windows | speech-whisper-small | 2.0 / 0.8 s | 6.1 s | 3.5 s | 385 MB | pass (Hindi needed the UTF-8 fix) |
-| Windows | ocr-tesseract | 5.4 / 1.8 s | 4.3 s | 3.0 s | 1394 MB | pass |
-| Windows | face-blur | 5.9 / 1.7 s | 1.0 s | 1.6 s | 1112 MB | pass |
+| Linux | voice-piper | 2.4 / 0.9 s | 1.0 s | 1.9 s | 316 MB | pass |
+| Linux | speech-whisper-small | 2.3 / 0.8 s | 4.3 s | 3.5 s | 551 MB | pass |
+| Linux | ocr-tesseract | 4.4 / 1.0 s | 2.8 s | 2.3 s | 1013 MB | pass |
+| Linux | face-blur | 4.5 / 1.3 s | 0.6 s | 0.9 s | 1015 MB | pass |
+| macOS | voice-piper | 2.8 / 5.1 s | 3.4 s | 3.0 s | 269 MB | pass |
+| macOS | speech-whisper-small | 2.1 s (with `macos = "14.0"` in the catalog) | 12.7 s | 9.8 s | 261 MB | pass (failed before the catalog fix) |
+| macOS | ocr-tesseract | 8.3 / 2.3 s | 3.2 s | 5.7 s | 811 MB | pass |
+| macOS | face-blur | 9.8 / 4.9 s | 0.6 s | 2.7 s | 646 MB | pass |
+| Windows | voice-piper | 3.2 / 1.1 s | 3.2 s | 3.4 s | 274 MB | pass |
+| Windows | speech-whisper-small | 2.0 / 1.0 s | 6.1 s | 5.4 s | 385 MB | pass (Hindi needed the UTF-8 fix) |
+| Windows | ocr-tesseract | 5.4 / 1.2 s | 4.3 s | 3.2 s | 1394 MB | pass |
+| Windows | face-blur | 5.9 / 1.4 s | 1.0 s | 2.4 s | 1112 MB | pass |
 
 What each check does:
 - speech: Piper says "The quick brown fox jumps over the lazy dog near the river bank." (lessac) and a Hindi sentence
@@ -75,13 +76,14 @@ doesn't install.
    av 18.1.0, whose only Apple Silicon wheel is `macosx_14_0_arm64`. pixi assumes an older macOS, so uv builds av
    from source and fails (`pkg-config could not find libraries ['avformat', ...]`). `pixi lock` solved, so the
    catalog lists osx-arm64, but the install fails. With `[system-requirements] macos = "14.0"` in the pixi.toml
-   it installs in 0.9 s and works. The same applies to speech-whisper-turbo and voice-anonymise (same package).
-   Fix: catalog entries get `"system-requirements": {"macos": "14.0"}` in their `pixi` section, and toolhome
-   writes it into the team's pixi.toml (the lib change below). A Mac older than 14 then can't install these.
+   it installs and works. The same applies to speech-whisper-turbo and voice-anonymise (same package).
+   **Fixed** (oss-desktop-eval ca338b17): those three catalog entries now have `"system-requirements": {"macos":
+   "14.0"}` in `pixi` (plus a caution), and toolhome writes it into the team's pixi.toml (the lib change below).
+   The final run installed the catalog as it is, with no CI-side retry. A Mac older than 14 can't install these.
 2. **Windows: tools that print Hindi crashed.** Unwalled runs (`toolhome._plain_env`) gave Python no UTF-8
    setting, so `print()` of Devanagari to a pipe raised `UnicodeEncodeError` (cp1252); the whisper example exited
    1 on the Hindi recording (run 2). Fix in lib: `PYTHONUTF8=1` in `_plain_env`, and `stackwall._run_plain`
-   decodes the tool's output as UTF-8. Run 3: Devanagari out on Windows.
+   decodes the tool's output as UTF-8. **Fixed** (ca338b17); Devanagari out on Windows since run 3.
 3. **Whisper's model can't come from its public source.** `models/whisper-small.tar` is our own archive; its
    `source` is a Hugging Face folder page, so `toolhome.fetch_model` without silo downloads HTML and throws it away
    (sha256 mismatch, as designed). CI fetched the four files at the pinned revision instead, checked against the
@@ -90,14 +92,14 @@ doesn't install.
    (for example `models/piper/en_US-lessac-medium.onnx`); `toolhome.fetch_model` stores
    `<home>/models/<sha16>/<model name>` (for example `.../Piper English voice lessac (medium)`) and passes
    `IDLI_MODEL_*` variables. Nothing sets `IDLI_FILES`. CI copied files into the examples' layout. A Builder that
-   runs the examples as written will not find the models.
+   runs the examples as written will not find the models. (Open: with the workflows agent.)
 5. **OCR quality (same on all three OSes):** the example's default languages `hin+mar+eng` read English print with
    2 of 6 numbers wrong (124 as 24, 713 as 773); `-l eng` got all six. Tesseract's plain page mode (psm 6) read
    nothing from a ruled table, and img2table missed the table with 3 px rules and 32-40 px text (found it with
    1-2 px rules). Tables in phone photos will need checking.
 6. GitHub no longer runs `macos-14`; `macos-15` is the oldest Apple Silicon image there.
 
-## Lib change (on branch catalog-ci)
+## Lib change (applied on oss-desktop-eval as ca338b17)
 
 `lib/toolhome.py`: `_plain_env` sets `PYTHONUTF8=1`; new `system_requirements(tools)` (highest version per key
 from each tool's `pixi.system-requirements`) and `manifest_text` writes a `[system-requirements]` section.
