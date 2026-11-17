@@ -544,6 +544,11 @@ class Cleanup(unittest.TestCase):
         toolhome.purge_orphans(root)
         self.assertEqual({r['team'] for r in toolhome.installs()}, {'leads'})
         self.assertFalse(toolhome.env_dir('gone').exists())
+        toolhome.remove('leads')
+        toolhome.cache_dir().mkdir(parents=True, exist_ok=True)
+        (toolhome.cache_dir() / 'pkg').write_bytes(b'0' * 100)
+        toolhome.purge_orphans(root)
+        self.assertFalse(toolhome.cache_dir().exists())
         self.assertRegex(toolhome.usage()['text'], r'^Tools use .+\. .+ free\.$')
 
     def test_delete_team_purges_tools(self):

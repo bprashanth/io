@@ -202,6 +202,9 @@ def purge_orphans(teams_root=None):
     for team in sorted({r['team'] for r in installs()}):
         if team != 'drivey' and not (root / team).exists():
             freed += remove(team)['freed']
+    if not installs() and cache_dir().exists():  # nothing installed: pixi's download cache is only waste
+        freed += size(cache_dir())
+        _rm(cache_dir())
     return freed
 
 
