@@ -188,11 +188,12 @@ def compose_draft(b, to, subject, body, send=False):
                                                   'windowsVirtualKeyCode': 13, 'nativeVirtualKeyCode': 13})
         finally:
             c.close()
-        for _ in range(30):
-            if re.search(r'(?i)message sent', b.evaluate('document.body.innerText') or ''):
+        for _ in range(30):  # "Message sent" shows briefly; the compose box going away says the same
+            if re.search(r'(?i)message sent', b.evaluate('document.body.innerText') or '') or not b.evaluate(
+                    "!!document.querySelector('div[aria-label=\"Message Body\"]')"):
                 return {'sent': True}
-            time.sleep(0.5)
-        raise ValueError('Gmail did not say the message was sent.')
+            time.sleep(0.3)
+        raise ValueError('Gmail did not send the message.')
     # Gmail saves a prefilled message once it is edited: add and remove a space at the end of the body
     b.evaluate("""(() => { const box = document.querySelector('div[aria-label="Message Body"], div[role=textbox]');
       box.focus(); const sel = getSelection(); sel.selectAllChildren(box); sel.collapseToEnd(); })()""")
