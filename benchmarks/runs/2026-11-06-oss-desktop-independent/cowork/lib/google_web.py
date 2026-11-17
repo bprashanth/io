@@ -178,21 +178,20 @@ def compose_draft(b, to, subject, body, send=False):
         time.sleep(0.5)
     else:
         raise ValueError('Gmail did not open its compose box.')
-    if send:  # Ctrl+Enter in the body is Gmail's own send; then wait for "Message sent"
-        b.evaluate("""(() => { const box = document.querySelector('div[aria-label="Message Body"], div[role=textbox]');
-          box.focus(); })()""")
-        c = b._cdp()
-        try:
-            for typ in ('keyDown', 'keyUp'):
-                c.call('Input.dispatchKeyEvent', {'type': typ, 'key': 'Enter', 'code': 'Enter', 'modifiers': 2,
-                                                  'windowsVirtualKeyCode': 13, 'nativeVirtualKeyCode': 13})
-        finally:
-            c.close()
-        for _ in range(30):  # "Message sent" shows briefly; the compose box going away says the same
-            if re.search(r'(?i)message sent', b.evaluate('document.body.innerText') or '') or not b.evaluate(
-                    "!!document.querySelector('div[aria-label=\"Message Body\"]')"):
-                return {'sent': True}
-            time.sleep(0.3)
+    if send:  # rehearsals between test accounts only: press Gmail's Send, then make sure it went
+        for attempt in range(3):
+            time.sleep(1.5)
+            spot = b.evaluate("""(() => { const o = [...document.querySelectorAll('div[role=button]')].find(e =>
+              /^Send/.test(e.getAttribute('aria-label') || e.getAttribute('data-tooltip') || '') &&
+              e.getBoundingClientRect().width > 0); if (!o) return null; const r = o.getBoundingClientRect();
+              return {x: r.x + r.width / 2, y: r.y + r.height / 2}; })()""")
+            if spot:
+                b._mouse(spot['x'], spot['y'])
+            for _ in range(20):
+                if re.search(r'(?i)message sent', b.evaluate('document.body.innerText') or '') or not b.evaluate(
+                        "!!document.querySelector('div[aria-label=\"Message Body\"]')"):
+                    return {'sent': True}
+                time.sleep(0.3)
         raise ValueError('Gmail did not send the message.')
     # Gmail saves a prefilled message once it is edited: add and remove a space at the end of the body
     b.evaluate("""(() => { const box = document.querySelector('div[aria-label="Message Body"], div[role=textbox]');
