@@ -270,3 +270,25 @@ never real data; Sandbox Claude sees masked data and only the blocks plugged in.
   - Drivey last: answered by the Mini (shot 20).
   - Suites: laptop and DGX 340 passed, 5 skipped, the same 11 known failures.
   - Docs: SANDBOXES.md "Three levels", UX.md, ONGOING 4. Gallery: http://100.82.28.38:8768/.
+
+## 7. The chain for Mini questions: no free 9B (2026-11-18, in progress)
+
+The owner's explorations in the leads sandbox gave random answers. Two finds:
+- **The sheet link:** a sandbox chat with no Mini open sent "show my list of leads" to the 9B with its account tools,
+  and the 9B made up a sheet link (`1BxiMVs0...`, Google's own sample sheet from its API docs) and got a 404. It
+  never knew the leads sheet: only the Mini's script holds it.
+- **"Here is what it found." with nothing under it:** in the Mini chat, "show me the list of leads" was sorted as a
+  preview, the whole Mini ran, and the 9B's summary of its output came back empty, so the reply was only the lead
+  line and the footer.
+
+Owner's rules (built in phase 1, commit b46249da):
+- The 9B answers a workflow Mini only where a question maps cleanly (explain, the whole preview, run, turn on, run
+  step N). Anything else is mapped, not answered freely: to the Mini's named steps and the sandbox's read blocks (a
+  sheet the Mini reads, a Gmail search, meetings between two days, free times). Writes are never on the menu.
+- Who maps: the outside service (minisql's endpoint) with the person's consent (the card shows the masked question
+  and the menu), or, on No or when the sandbox was made without it, the 9B with the same menu. Idli runs the choice
+  on the real accounts in preview and shows its output as code wrote it.
+- What can't be mapped ends at a Fork card: Claude gets a copy and the masked question.
+- A sandbox question with no Mini open goes to Sandbox Claude, masked, to build it in steps (`blocks.run_steps`).
+- PDFs that come with spreadsheets go to Claude too, as masked text (`lib/docmask.py`).
+- New `blocks.meetings` (titles, guests, declined) under the calendar block.
