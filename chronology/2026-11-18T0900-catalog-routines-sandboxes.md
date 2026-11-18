@@ -167,3 +167,14 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
   - Found while testing: opening an action Mini ran it once for real (an "example" run meant for chart Minis).
     Drafts and bookings are keyed, so nothing doubled, but opening must not act: fixed. Checks before saving a
     draft now run in preview too.
+- **Laptop checks of the Minis.**
+  - Opening the Mini shows the new line.
+  - "How are leads picked? Which file?": the 9B named the sheet and the two-week window, but not the
+    classification.
+  - "Show me the draft you'd write": the preview ran and wrote nothing. It found no draft to write, because every
+    reply was already handled.
+  - 88 then sent a fresh "yes", but the laptop's reverse tunnel (49333 and 46767) dropped at about 16:42 IST.
+    Turning the Mini on, Fork end to end, the draft shown in full and the final Drivey regression were not run on
+    the laptop. Unit tests cover them.
+  - The owner needs to run `desktop/laptop-up.sh start` on the laptop.
+  - Results so far are in `benchmarks/runs/2026-11-18-builder-minis/README.md`.

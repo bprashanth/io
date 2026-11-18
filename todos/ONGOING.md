@@ -70,15 +70,22 @@ Noted 2026-11-15.
   scripts on redacted questions).
 - **Removed:** Teams page, New team wizard, per-team Builder, Installed tools page.
 - **Unchanged:** Drivey, Start here.
-- **Testing now:**
-  - Drivey regression;
-  - Builder `/sandbox` for insights and for leads (87profligate as me, 88profligate as a lead);
-  - a gap case (Instagram).
-
-  Results will be in `benchmarks/runs/2026-11-18-sandboxes/`.
+- **Tested:** Drivey regression, Builder `/sandbox` for insights and leads, a gap case
+  (`benchmarks/runs/2026-11-18-sandboxes/`).
+- **Owner round, 2026-11-18 afternoon** (`benchmarks/runs/2026-11-18-builder-minis/`):
+  - the Builder is Claude Code first (one pane, Opus by default, Idli 9B and 30B only without Claude Code, a
+    /sandbox hint). Careful and Auto are off the menu;
+  - @ a folder works, and a folder with no spreadsheets gets a plain gap;
+  - the privacy page says "<column> entirely withheld";
+  - an action Mini can be asked (the 9B explains from its code), previewed on the real accounts with nothing
+    written, run, turned on for an account from today, or forked into Sandbox Claude. A fork's runs show on the
+    left and it saves as a new Mini.
+  - Laptop checks for turn on and Fork are still to do (the laptop link dropped).
 - **Open:**
   - redaction for account data (email bodies, senders, calendar titles) at the same standard as files;
-  - what a Mini is for an action workflow (a script with 9B calls), and how the person edits it;
-  - connecting the person's real account, with a "start from today" choice;
+  - escalating a Mini question the 9B can't place (masked, to an outside model) is not built; the 9B places
+    every question today;
+  - running a turned-on Mini on a schedule (a gap: no block);
+  - connecting the person's real account (turn on binds an account from today; test accounts only so far);
   - where the earlier work fits: team stacks, the trusted catalog, test-account Chrome profiles. These become
     blocks, or the Builder's tools, not team features.

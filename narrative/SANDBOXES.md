@@ -71,6 +71,28 @@ per-team Builder. Drivey is unchanged.
   idli, then Select all, then Continue.
 - **Labels:** the right pane is titled "Sandbox Claude", with a teal SANDBOX CLAUDE status line.
 
+## Saved action Minis: ask, turn on, fork (2026-11-18, owner)
+
+A saved Mini is frozen. The person builds trust by asking it things, then turns it on, or forks it to change it.
+
+- **Ask** (left chat, `mini_talk`, `lib/minitalk.py`). Anything typed while an action Mini is open goes to the 9B
+  with the Mini's steps and code. It picks one:
+  - explain: it answers from the code;
+  - preview: Idli runs the Mini on the real accounts with `IDLI_PREVIEW=1`. Reading works as usual, but drafts
+    and bookings are only collected. The 9B answers from the output, and drafts are shown in full. Nothing is
+    drafted, booked or sent;
+  - run: it runs for real (never twice);
+  - turn on or off: binds the Mini to an account from today (`IDLI_SINCE` adds `after:` to Gmail searches).
+    Running on a schedule is a gap;
+  - change: points to Fork.
+
+  Opening an action Mini never runs it.
+- **Fork** (button on the Mini card, `lib/minifork.py`). The scripts are copied, values coded again, to Sandbox
+  Claude's `forks/<id>/` with FORK.md. Sandbox Claude opens on the right with the current flow and asks how to
+  change it. Its `script_try` runs in preview by default. The real output shows on the left as "Run from Claude:
+  <title>", and Claude gets it masked. Saving makes a new Mini with `forked_from`; the original never changes.
+- **Not built:** escalating a Mini question the 9B can't place, masked, to an outside model.
+
 ## Tested
 
-See `benchmarks/runs/2026-11-18-sandboxes/README.md`, which has screenshots for each step.
+See `benchmarks/runs/2026-11-18-sandboxes/README.md` and `benchmarks/runs/2026-11-18-builder-minis/README.md`, which have screenshots for each step.
