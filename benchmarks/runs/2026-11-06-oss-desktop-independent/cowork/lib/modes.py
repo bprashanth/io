@@ -1202,8 +1202,10 @@ def drivey_route(j):
         elif name == 'claude_handoff' and inp.get('preview') and not inp.get('files'):
             askclaude, pending = {'question': inp.get('question', '')}, None
         elif name == 'drive_fetch':
+            was = active if active and active.get('files') and 'mini_talk' in names else None
             active = blockctx = askclaude = None
-            pending = {**res, 'question': inp.get('question', '')}
+            # In a sandbox, files added while a data Mini is open extend that Mini: Claude gets its name and story
+            pending = {**res, 'question': inp.get('question', ''), **({'mini_id': was['id']} if was else {})}
             build = ({'request': inp.get('question', ''), 'kinds': res.get('missing') or [], 'files': res['unsupported']}
                      if res.get('unsupported') else None)
         elif name == 'builder_open' and inp.get('preview'):
