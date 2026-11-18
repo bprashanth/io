@@ -244,3 +244,18 @@ never real data; Sandbox Claude sees masked data and only the blocks plugged in.
 - **Timing on the DGX 9B** (6 text PDFs, some of 400 pages): 25 s the first time, 12 s for the next question.
   One summary is about 2 s with two at a time. 18 PDFs should take about 50 s the first time.
 - Tests: `tests/test_transforms.py` (13). DGX suite: 338 passed, 5 skipped, the same 11 known failures.
+- **Phase 2, on the laptop (as a person):**
+  - Drivey first: the Household debt Mini answered "which ward owes the most?" with the ward table (shot 02).
+  - Builder, a new chat: "can you add PDF reading to the drivecharts sandbox?". It called `block_kit`, said
+    "Example fits as is; copying it", checked it and called `block_add`. The approval card came up 23 s after the
+    question; added at 43 s (shots 05 to 07).
+  - drivecharts, a new chat: `"Drive/My Drive/Strategy Classics" what are the main themes...`. The first run
+    failed: one damaged PDF raised pypdf's PdfReadError and stopped the block. Fixed in the example (a bad page or
+    file is skipped and named), and the person's error line went to the Builder, which fixed the block and added it
+    again in 38 s (shots 10, 11).
+  - Then the themes question answered in **63 s** the first time (18 PDFs downloaded, 17 read, one scan named,
+    summaries two at a time, one answer naming the papers in brackets), and a follow-up ("which talk about CEO
+    succession?") in **20 s** from the kept summaries (shots 12, 13).
+  - Paseo's approval card shows the tool's input as JSON, so `block_add` now carries Idli's card text (checked by
+    the hook and the tool) and the person reads "Add block: Read PDFs. Uses pypdf. Reads PDFs you give it. Sends
+    nothing." in it. Paseo doesn't show the hook's own reason.
