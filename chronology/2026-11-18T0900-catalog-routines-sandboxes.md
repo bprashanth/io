@@ -214,7 +214,7 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
   so the laptop couldn't exercise it. Left as a rough edge.
 - Gallery: http://100.82.28.38:8766/ (30 shots).
 
-## 6. Transform blocks the Builder writes (2026-11-18, in progress)
+## 6. Transform blocks the Builder writes (2026-11-18)
 
 The owner's drivecharts sandbox couldn't read 18 PDFs, and the Builder refused to add PDF reading: the "fixed list"
 rule was written too strictly. Owner's decision: three levels.
@@ -259,3 +259,14 @@ never real data; Sandbox Claude sees masked data and only the blocks plugged in.
   - Paseo's approval card shows the tool's input as JSON, so `block_add` now carries Idli's card text (checked by
     the hook and the tool) and the person reads "Add block: Read PDFs. Uses pypdf. Reads PDFs you give it. Sends
     nothing." in it. Paseo doesn't show the hook's own reason.
+- **Phase 3, the rest on the laptop:**
+  - Builder, "add a block that emails these summaries every Monday": refused (sending and a schedule are actions),
+    request noted, drivecharts unchanged (shot 14). It had passed `read_pdfs` to `sandbox_create` as a "gap";
+    fixed: a transform the Builder wrote is not a gap.
+  - A block importing `requests` and calling a website: the Builder refused on its own. Pushed to add it, Idli's
+    check listed the untrusted import and the web address (shots 15, 16). A failing block now gets no card.
+  - Leads sandbox, a new chat: Lead replies previewed the full draft and wrote nothing (shot 18).
+  - Sandbox Claude used `block_run` and got the answer masked (shot 19).
+  - Drivey last: answered by the Mini (shot 20).
+  - Suites: laptop and DGX 340 passed, 5 skipped, the same 11 known failures.
+  - Docs: SANDBOXES.md "Three levels", UX.md, ONGOING 4. Gallery: http://100.82.28.38:8768/.

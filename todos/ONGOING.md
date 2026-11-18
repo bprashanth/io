@@ -81,7 +81,18 @@ Noted 2026-11-15.
     written, run, turned on for an account from today, or forked into Sandbox Claude. A fork's runs show on the
     left and it saves as a new Mini.
   - all checked on the laptop (preview with the full draft, turn on, Fork to a new Mini, Drivey unchanged).
+- **Transform blocks** (`benchmarks/runs/2026-11-18-transform-blocks/`, design in SANDBOXES.md "Three levels"):
+  - three levels: actions (ours), transforms (the Builder writes them), pages and servers (undecided);
+  - the trusted imports are baked in; Idli checks a block once (about 0.1 s) and the person approves one card;
+  - `block_run` is in every sandbox; the first block is `read_pdfs`;
+  - Mini scripts get the same scan;
+  - checked on the laptop: 18 PDFs answered in 63 s, then 20 s; actions and a bad import refused; Drivey and the
+    leads Mini unchanged.
 - **Open:**
+  - Paseo's approval card shows JSON, not the hook's words (a Paseo patch);
+  - the Builder's hook lives in its own folder (move it outside);
+  - a block's cached Drive download ignores later edits to the file;
+  - pages and servers: local or on silo;
   - redaction for account data (email bodies, senders, calendar titles) at the same standard as files;
   - escalating a Mini question the 9B can't place (masked, to an outside model) is not built; the 9B places
     every question today;

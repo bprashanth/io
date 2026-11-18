@@ -104,6 +104,18 @@ change it.
 - The privacy screen names what is withheld plainly: when a whole column is held back, it says
   `<column> entirely withheld`, never "Notes -> empty".
 
+## Transforms the Builder can add (owner, 2026-11-18)
+
+- **Three levels:**
+  - actions (anything that writes, sends or posts) are built by our team;
+  - transforms (read PDFs or Word files, summarise, ask the private model) are written by the Builder;
+  - pages and servers are not decided yet.
+- **For the person it is one ask and one card.** "Can you add PDF reading to the drivecharts sandbox?" The
+  Builder copies or adapts a working example, Idli checks it in about a second, and the person approves "Add
+  block: Read PDFs. Uses pypdf. Reads PDFs you give it. Sends nothing." Then `@` a folder of PDFs in that sandbox
+  and ask.
+- A missing action is still a gap, stated plainly. Design in [SANDBOXES.md](SANDBOXES.md), "Three levels".
+
 ## Accounts
 
 - Google access is by OAuth with Idli's own app. Sign-in happens once per account in a real browser (Google forbids
@@ -127,5 +139,6 @@ change it.
 | A Builder per team, inside the team | One Builder, outside |
 | The Builder writes each team's workflow and rehearses it | We build blocks. The person assembles and tests the workflow in the left chat |
 | Analyst | Sandbox Claude |
+| The Builder adds team readers and tools | The Builder writes transforms within the trusted list; actions are our team's |
 | Teams page, Installed tools | Gone |
 | Test accounts in Chrome profiles for the Builder to click through | OAuth plus the APIs. Chrome profiles only for sites with no API |
