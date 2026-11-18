@@ -278,8 +278,9 @@ def gmail_raw(email, msg_id):
 
 
 def _mime(sender, to, subject, body, in_reply_to=None, message_id=None):
+    from email.utils import formatdate
     m = EmailMessage()
-    m['To'], m['Subject'] = to, subject
+    m['To'], m['Subject'], m['Date'] = to, subject, formatdate(localtime=True)
     if sender:
         m['From'] = sender
     if in_reply_to:

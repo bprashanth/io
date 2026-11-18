@@ -47,6 +47,7 @@ class Parsers(unittest.TestCase):
         m = google_web.parse_message(RAW)
         self.assertEqual((m['from'], m['subject']), ('lead@example.org', 'Re: Meeting'))
         self.assertEqual(m['new_text'], 'Friday 2 pm works.')
+        self.assertEqual(m['date'], '2026-11-18T04:30:00+00:00')  # in UTC: dates from different zones compare as text
 
     def test_ics_and_free_slots(self):
         busy = google_web.parse_ics_busy(ICS)

@@ -149,7 +149,8 @@ def parse_message(raw):
     new = '\n'.join(l for l in new.splitlines() if not l.lstrip().startswith('>')).strip()
     name, addr = parseaddr(str(msg.get('From', '')))
     try:
-        date = parsedate_to_datetime(str(msg.get('Date'))).isoformat()
+        # in UTC, so dates from senders in different time zones compare correctly, even as text
+        date = parsedate_to_datetime(str(msg.get('Date'))).astimezone(dt.timezone.utc).isoformat()
     except (TypeError, ValueError):
         date = ''
     return {'from': addr.lower(), 'name': name, 'to': str(msg.get('To', '')), 'subject': str(msg.get('Subject', '')),
