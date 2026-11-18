@@ -18,7 +18,7 @@ cp "$WORK/$REL/laptop/claude-t4gc-settings.json" "$WORK/idli-kit/cowork/desktop/
 # Development-only material stays out of the kit.
 rm -rf "$WORK/idli-kit/cowork/tests" "$WORK/idli-kit/cowork/HOME_SHOTS" "$WORK/idli-kit/cowork"/*_DONE.md
 # Refuse to ship anything that looks like a credential.
-if grep -rIlE 'GOCSPX-|sk-ant-(api|oat)[0-9]{2}-[A-Za-z0-9_-]{10}|-----BEGIN [A-Z ]*PRIVATE KEY-----|"client_secret"\s*:\s*"[^"<]{8,}"' \
+if grep -rIlE --exclude=make-idli-kit.sh 'GOCSPX-|sk-ant-(api|oat)[0-9]{2}-[A-Za-z0-9_-]{10}|-----BEGIN [A-Z ]*PRIVATE KEY-----|"client_secret"\s*:\s*"[^"<]{8,}"' \
      "$WORK/idli-kit"; then
   echo "make-idli-kit: refusing, the files above look like credentials" >&2; exit 1
 fi
