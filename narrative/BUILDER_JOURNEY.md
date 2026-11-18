@@ -90,6 +90,103 @@ All under `benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`:
 - `tests/test_chromeprofiles.py`: includes a real round trip on Playwright's Chromium and a site tool through its
   door.
 
+## Routines: how a workflow runs every day (decided 2026-11-18)
+
+**The owner asked** for a flow that is reproducible and always works. Three options were weighed:
+
+| Option | Verdict |
+|---|---|
+| Idli's own browser | Google blocks sign-in there |
+| Claude driving Chrome every day | Not reproducible, and Claude would read real mail |
+| Download the mail, then the 9B | **Chosen** |
+
+**Steps, run by Idli, never by Claude on real data:** fetch, then filter, then judge (the 9B), then act, then
+approve, then record.
+
+**Fetch and act go through Google's APIs with OAuth** (`lib/google_api.py`, the owner's decision the same day). The
+first version drove Google's web pages through stable addresses (`lib/google_web.py`). It worked, uninterrupted, but
+only after twelve fixes for page quirks in one evening:
+- a read running in the wrong tab;
+- a redirecting export;
+- an unread feed that lags;
+- a search that didn't refresh;
+- a Save lost while the page drew;
+- a tip over Save;
+- background tabs ignoring clicks;
+- "Draft saved" shown before it was saved, and a Drafts search that lags;
+- a new tab cutting its address at "&".
+
+Each run took 60 to 80 s. Through the APIs a run takes 1.4 to 9 s and doesn't depend on how the page looks. The web
+version stays only as a fallback a step names (`"via": "web"`).
+[Results](../benchmarks/runs/2026-11-18-leads-routine/README.md).
+
+**Sign-in:**
+- **The app:** Idli's own OAuth client ("Desktop app", `~/.config/idlisseus/io_oauth_client_gcp.json`, never
+  shown). It is published, so tokens don't expire weekly, but it is not verified by Google. An unverified app can
+  have at most **100 users**, which is fine for a POC. Verification (with a security review for Gmail access) is the
+  step after.
+- **Where:** the consent page opens in the account's own Chrome profile (`login_hint`, PKCE, a one-time page on
+  127.0.0.1).
+- **What the person clicks:**
+  1. **Advanced** (on Google's "hasn't verified this app" page);
+  2. **Go to idli (unsafe)**;
+  3. **Select all**;
+  4. **Continue**.
+
+  The Builder says this first, in those words, and adds that it is our own app.
+- **Partial grants:** Idli refuses one (Google lets people untick boxes) and says to tick every box.
+- **Tokens** are kept per email in `~/.config/idlisseus/google-tokens/` (0600), a folder Claude and the Builder
+  can't read. A refused refresh stops the run with "Sign in to Google again for <email>". There is no silent
+  fallback.
+- **The Builder** connects only confirmed test accounts (`google_connect(role)`). A routine's real account is
+  mapped by the person.
+
+**What the APIs do:**
+- Sheets: the sheet's values.
+- Gmail:
+  - mail from the sheet's addresses, found by search, read or unread;
+  - each message is read once; after a run goes through, it gets the label `Idli/handled`;
+  - a draft is a proper reply in the lead's thread, and the person presses Send.
+- Calendar:
+  - free/busy gives the open times;
+  - a booking is inserted with guests and invitations;
+  - the event's id is fixed from the action's key, so a retry can never book twice.
+- Sending mail is only possible in a rehearsal between the team's test accounts, for the lead's simulated replies.
+
+**Judgement is a 9B step with a JSON schema.**
+- An answer the 9B marks `unclear` goes to the person.
+- Tested on fake replies: yes, no, maybe, a pick, another time, Hindi. All right, about 1 s each.
+- In the end-to-end rounds it read every pick right.
+- Mail dates are given in UTC, so scripts can compare them as text. A reply stamped -06:00 once looked older than
+  an offer stamped -05:00.
+
+**The routine file:**
+- The Builder writes `extensions/routines/<name>.json`: steps, plus `script` steps in its own Python (JSON in,
+  actions out).
+- Each action has a key and is done once: `draft_email`, `book_event` (needs the person's yes), `ask_person`.
+- State lives in `<team>/.idli/routines/<name>/`: done keys, what waits for the person, verdicts, the script's
+  memory, settings, and one log per run.
+
+**The person's side:** the **Runs** page (Start here, Teams, the team's card, Runs) has:
+- Run now;
+- what waits for them (Book it or Skip; replies to read);
+- what was done;
+- the last runs, step by step.
+
+Emails wait in Gmail Drafts.
+
+**The Builder's side:**
+- `google_connect`;
+- `routine_check`;
+- `routine_config_set`;
+- `routine_rehearse`: on the test accounts, booking without asking. Test accounts only; a real run can't skip the
+  person's yes.
+
+**Known limits:**
+- A first run reads 7 days of mail from the sheet's addresses. A real first run should start "from today".
+- The team's script runs as a plain process, not yet inside the Linux run wall.
+- The real-account mapping (`.idli/real-accounts.json`) is not built.
+
 ## Not built yet
 
 - The real-account step: a separate profile marked real, mapped to a role in `<team>/.idli/real-accounts.json`.
