@@ -101,11 +101,12 @@ def ask_claude(data_dir, question, workspace, preview=False):
     """A sandbox question that no Mini answers (owner, 2026-11-18): Sandbox Claude gets it masked, builds it with the
     sandbox's blocks as a workflow in steps, runs it through Idli (the real results show on the left) and offers to
     save it as a Mini. With preview: only what Claude would get, for the person's card."""
-    if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
-        raise ValueError('Open this question in its sandbox chat and try again.')
     masked = privacy.mask_account_text(str(data_dir), ' '.join(str(question).split())[:800])
     if preview:
         return {'preview_only': True, 'masked_question': masked}
+    if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
+        raise ValueError('Claude is not open beside this chat yet. Press Start Claude on the right, then send your '
+                         'question again.')
     prompt = ('A question from the chat on the left that no Mini answers yet (masked by Idli): "' + masked + '". '
               'Answer it with this sandbox\'s blocks: write a short script in named steps, run it with script_try '
               '(the person sees the real result on the left), and offer to save it as a Mini. If the blocks can\'t '

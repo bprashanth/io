@@ -1297,6 +1297,8 @@ def drivey_route(j):
                         options.append((label, o.get('question') or label))
                 return card('Be specific', res['clarify'], options +
                             [('Ask Claude', "Claude works on the Mini's files with private values as codes.")])
+        if res.get('error') and name in ('claude_handoff', 'mini_talk'):
+            return say(re.sub(r'^\w+Error: ', '', str(res['error'])))
         if res.get('error') and name in ('mini_open', 'mini_ask'):
             return say('Could not open this Mini. Click its cartridge to try again.')
         if res.get('error') or (not res.get('files') and name in ('drive_fetch', 'privacy_review_open')):
