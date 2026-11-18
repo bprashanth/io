@@ -111,8 +111,21 @@ def idli_save_mini(name, goal, questions):
     return idli_draft_mini(name, goal, questions, str(home.work_dir(data_dir())))
 
 
+def _script_problems(path):
+    """Inside a sandbox, a Mini script may use only trusted imports and the sandbox's blocks (lib/transforms.py)."""
+    from lib import transforms
+    problems = transforms.check_script(path)
+    if problems:
+        raise ValueError(f'{Path(path).name} uses something a sandbox does not allow: ' + '; '.join(problems[:4]) +
+                         '. Use only the trusted imports (transforms.trusted) and lib.blocks.')
+
+
 def idli_draft_mini(title, story, questions, code=''):
     from lib import journey, uiswitch
+    if _is_sandbox():
+        for q in questions or []:
+            if isinstance(q, dict) and q.get('script'):
+                _script_problems(home.inside(home.work_dir(data_dir()), q['script']))
     workspace = os.environ.get('IDLI_WORKSPACE')
     ident = journey.draft_mini(data_dir(), title, story, questions, code, workspace, mini_author())
     try:  # the draft shows in the Drivey chat, under the charts it collected
@@ -764,6 +777,7 @@ def script_try(script, args=None, preview=True, title=None):
     p = (work / str(script)).resolve()
     if not p.is_relative_to(work) or p.suffix != '.py' or not p.is_file():
         raise ValueError('Give a .py file in your folder.')
+    _script_problems(p)
     argv = [sys.executable, '-I', str(p)]
     for k, v in (args or {}).items():
         argv += ['--' + re.sub(r'[^a-z0-9_]', '', str(k).lower()), str(v)]
@@ -801,6 +815,31 @@ def script_try(script, args=None, preview=True, title=None):
                                           '". Point them there in one short line.') if shown else ''}
 
 
+def block_run(name, paths=None, question=''):
+    """Run one of this sandbox's transform blocks on the real files; you get the answer masked, and the person sees
+    the real one on the left."""
+    from lib import transforms
+    import time as _time
+    res = transforms.run(data_dir(), name, {'paths': paths or [], 'question': question or
+                                            'What are the main themes and ideas?'})
+    if res.get('error'):
+        raise ValueError(res['error'])
+    workspace = os.environ.get('IDLI_WORKSPACE')
+    title = f'{name} {_time.strftime("%H:%M:%S")}'
+    runs = Path(data_dir()) / '.idli' / 'runs'
+    runs.mkdir(parents=True, exist_ok=True)
+    home.write(runs / f'{int(_time.time() * 1000)}.json', {'title': title, 'workspace': workspace, 'preview': False,
+               'output': str(res.get('reply', ''))[-6000:], 'error': False, 'items': []})
+    shown = False
+    if workspace:
+        try:
+            home.post_to_left(workspace, 'Run', title)
+            shown = True
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+    return {'masked': True, 'result': _masked_account(res), 'shown_left': shown}
+
+
 def _is_sandbox():
     try:
         return json.loads((data_dir() / 'team.json').read_text()).get('kind') == 'sandbox'
@@ -813,6 +852,10 @@ if os.environ.get('IDLI_ROLE') not in ('builder', 'outside') and _is_sandbox():
                              'free_times, sheet_read). You get the content masked: codes stand for names, emails and '
                              'other private values.', {'block': {'type': 'string'}, 'args': {'type': 'object'}},
                              ['block'])
+    TOOLS['block_run'] = (block_run, "Run one of this sandbox's added transform blocks (see your instructions) on "
+                          'Drive paths, with a question. You get the answer masked; the person sees the real one on '
+                          'the left.', {'name': {'type': 'string'}, 'paths': {'type': 'array', 'items':
+                                        {'type': 'string'}}, 'question': {'type': 'string'}}, ['name'])
     TOOLS['script_try'] = (script_try, 'Run your script (a .py in your folder that imports lib.blocks) on the real '
                            'accounts and get its output masked; the person sees the real output on the left. '
                            'preview (default true) collects drafts and bookings without writing them. The person '
@@ -826,8 +869,10 @@ if os.environ.get('IDLI_ROLE') not in ('builder', 'outside') and _is_sandbox():
 
 def sandbox_blocks():
     from lib import blocks
-    return {'blocks': blocks.BLOCKS, 'note': 'A sandbox can use only these. Anything else is a gap: say so plainly '
-            'and pass it in gaps (no sandbox is made).'}
+    return {'blocks': blocks.BLOCKS, 'note': 'A sandbox can use only these, plus transforms you write and add with '
+            'block_kit, block_check and block_add (reading or summarising files, asking the private model). A missing '
+            'action (send, post, write to an account, a new website, a schedule) is a gap: say so plainly and pass it '
+            'in gaps (no sandbox is made).'}
 
 
 def sandbox_create(word, goal, blocks, accounts=None, private=True, outside='ask', gaps=None):
@@ -845,7 +890,67 @@ def sandbox_list():
     return {'sandboxes': sandboxes.list_all()}
 
 
+def _builder_blocks():
+    from lib import sandboxes
+    return Path(sandboxes.builder_dir()) / 'blocks'
+
+
+def block_kit():
+    """What a transform block may use, and a working example to adapt."""
+    from lib import transforms, transformkit
+    tpl = HERE / 'idli' / 'builder-outside' / 'block-template' / 'read_pdfs'
+    return {'write_to': str(_builder_blocks()) + '/<name>/  (manifest.json, block.py, test_block.py)',
+            'trusted_imports': transforms.trusted(), 'kinds_a_block_reads': transforms.KINDS,
+            'kit': transformkit.__doc__,
+            'rules': ['Transforms only: read files, change or summarise them, ask the private model. Nothing that '
+                      'writes to an account, sends, posts or calls a website: that is an action, built by our team.',
+                      'Only the trusted imports. No open(), os, sys, subprocess, network, eval or private (_) parts. '
+                      'Files come only from kit.files() and kit.read_bytes(f).',
+                      'The test uses fake data only (kit.add_fake_file, kit.fake_pdf); you never see real files.',
+                      'Use the example as is when it fits; change it only as much as the request needs.'],
+            'example': {f.name: f.read_text() for f in sorted(tpl.iterdir()) if f.is_file()}}
+
+
+def block_check(name):
+    """Check a block you wrote (about a second): the scan and its fake-data test."""
+    from lib import transforms
+    folder = (_builder_blocks() / str(name)).resolve()
+    if not folder.is_relative_to(_builder_blocks().resolve()) or not folder.is_dir():
+        raise ValueError(f'No block folder called {name} in blocks/.')
+    res = transforms.check(folder)
+    return {k: res[k] for k in ('ok', 'problems', 'card', 'seconds') if k in res}
+
+
+def _find_sandbox(sandbox):
+    from lib import sandboxes, teams
+    want = ' '.join(str(sandbox).split()).lower()
+    for sb in sandboxes.list_all():
+        name = str(sb.get('name') or '').lower()
+        if want in (sb['id'], name) or (want and (want == name.split(' ')[-1] or want in name)):
+            return Path(teams._idli()) / 'teams' / sb['id'], sb
+    raise ValueError(f'No sandbox called {sandbox}. Call sandbox_list.')
+
+
+def block_add(name, sandbox):
+    """Add a checked transform block to a sandbox. The person is asked first, with one plain card."""
+    from lib import transforms
+    folder, sb = _find_sandbox(sandbox)
+    res = transforms.add(folder, (_builder_blocks() / str(name)).resolve())
+    if not res.get('ok'):
+        return {'ok': False, 'problems': res.get('problems'), 'next': 'Fix these, call block_check, then add again.'}
+    return {'ok': True, 'added': res['title'], 'sandbox': sb.get('name'),
+            'tell_the_person': f'Added {res["title"]} to {sb.get("name")}. Open it, pick the files with @ and ask, '
+                               'for example "what are the main themes?".'}
+
+
 OUTSIDE_TOOLS = {
+    'block_kit': (block_kit, 'For a reader or transform a sandbox lacks (read PDFs, Word files, summarise): what a '
+                  'block may use, where to write it, and a working example.', {}, []),
+    'block_check': (block_check, 'Check a block you wrote in blocks/<name>/ (about a second).',
+                    {'name': {'type': 'string'}}, ['name']),
+    'block_add': (block_add, 'Add a checked block to a sandbox. Idli shows the person one card to approve.',
+                  {'name': {'type': 'string'}, 'sandbox': {'type': 'string', 'description': 'Its name or id'}},
+                  ['name', 'sandbox']),
     'sandbox_blocks': (sandbox_blocks, 'The building blocks a sandbox can have, with what each does.', {}, []),
     'sandbox_create': (sandbox_create, 'Make a sandbox with exactly these blocks and accounts, after the person agreed '
                        'to the plan. With gaps (needs no block covers), no sandbox is made and the gap is noted.',

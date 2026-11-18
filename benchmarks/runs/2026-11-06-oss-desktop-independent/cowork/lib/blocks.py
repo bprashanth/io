@@ -214,6 +214,15 @@ def nine_b(question, text, schema=None, data_dir=None):
     return routines.judge(f'{question}\n\n---\n{str(text)[:6000]}\n---', schema)
 
 
+def _transform_lines(data_dir):
+    """The transform blocks the Builder added (lib/transforms.py), for the instructions."""
+    try:
+        from lib import transforms
+        return [f'- {n} (added): {m.get("about") or m.get("title")}' for n, m in transforms.installed(data_dir).items()]
+    except Exception:  # noqa: BLE001
+        return []
+
+
 # ---- for the Builder ----
 
 def plan(blocks):
@@ -228,6 +237,7 @@ def describe(data_dir):
     lines = ['', '## This sandbox', '', f'Made for: {m.get("goal") or m.get("name")}.', '',
              'You can use only these blocks:']
     lines += [f'- {b}: {BLOCKS[b]}' for b in enabled(data_dir)]
+    lines += _transform_lines(data_dir)
     acc = accounts(data_dir)
     if acc:
         lines += ['', 'Accounts (role: email):'] + [f'- {r}: {e}' for r, e in acc.items()]
@@ -246,6 +256,10 @@ def claude_guide(data_dir):
     lines = ['', '## This is a sandbox', '', f'Made for: {m.get("goal") or m.get("name")}.',
              'Its blocks (nothing else is available here):']
     lines += [f'- {b}: {BLOCKS[b]}' for b in enabled(data_dir)]
+    lines += _transform_lines(data_dir)
+    if _transform_lines(data_dir):
+        lines += ['Run an added block with the `block_run` tool (name, @ Drive paths, question); you get its answer '
+                  'masked, and the person sees the real one on the left.']
     lines += ['', 'Accounts by role: ' + ', '.join(accounts(data_dir)) + '. You never see their emails or content; '
               'codes stand for them.',
               '',

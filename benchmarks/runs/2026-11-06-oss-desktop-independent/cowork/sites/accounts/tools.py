@@ -18,8 +18,25 @@ def _safe(fn):
     return run
 
 
+def _block_run(name, paths=None, question=''):
+    from lib import transforms
+    res = transforms.run(blocks.sandbox_dir(), name, {'paths': paths or [], 'question': question or
+                                                      'What are the main themes and ideas?'})
+    if res.get('error'):
+        return {'error': res['error']}
+    used, missed = res.get('used') or [], res.get('missed') or []
+    tail = f'\n\nRead {len(used)} file{"s" if len(used) != 1 else ""}.' if used else ''
+    if missed:
+        tail += ' Could not download: ' + ', '.join(missed[:5]) + '.'
+    return {'reply': str(res.get('reply') or '').strip() + tail, 'used': used}
+
+
 ROLE = {'role': {'type': 'string', 'description': 'Which account: a role like "me" (default) or "lead"'}}
 TOOLS = {
+    'block_run': (_safe(_block_run), "Run one of this sandbox's added blocks (for example read_pdfs) on Drive files "
+                  'picked with @, with the person\'s question.',
+                  {'name': {'type': 'string'}, 'paths': {'type': 'array', 'items': {'type': 'string'}},
+                   'question': {'type': 'string'}}, ['name']),
     'mail_search': (_safe(lambda query, role=None, limit=10: {'emails': blocks.gmail_search(query, role, limit)}),
                     'Find emails with a Gmail search, e.g. "from:asha@x.org" or "subject:meeting newer_than:7d".',
                     {'query': {'type': 'string'}, 'limit': {'type': 'integer'}, **ROLE}, ['query']),

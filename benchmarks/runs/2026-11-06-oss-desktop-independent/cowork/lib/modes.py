@@ -1106,7 +1106,7 @@ DRIVEY_EXTRA = frozenset(('binder_item', 'builder_open'))  # newer laptops; olde
 # A sandbox's account blocks (lib/blocks.LEFT_TOOLS, narrative/SANDBOXES.md): files, Minis and handoffs route as in
 # Drivey; a typed request with no @ file and no open Mini goes to the 9B, which calls these tools itself.
 ACCOUNT_TOOLS = frozenset(('mail_search', 'mail_read', 'mail_draft', 'free_times', 'book_meeting', 'sheet_rows'))
-SANDBOX_EXTRA = frozenset(('mini_talk',))  # a saved action Mini, asked, previewed or turned on (lib/minitalk.py)
+SANDBOX_EXTRA = frozenset(('mini_talk', 'block_run'))  # block_run: a transform block the Builder added  # a saved action Mini, asked, previewed or turned on (lib/minitalk.py)
 PICK_FILES = 'Add files or a folder with @ and send again.'
 KIND_WORDS = {'PDF': ('PDF', 'PDFs'), 'Image': ('image', 'images'), 'Google Docs': ('Google Doc', 'Google Docs'),
               'Google Slides': ('Google Slides file', 'Google Slides files'), 'Microsoft Word': ('Word file', 'Word files'),
@@ -1167,7 +1167,7 @@ def drivey_route(j):
         content.append(_tool_use('AskUserQuestion', {'questions': [{'header': header, 'multiSelect': False,
             'question': _lib('minimap').plain(text), 'options': [{'label': a, 'description': b} for a, b in options]}]}))
         return message(model, content)
-    active, pending, asked, build = None, None, None, None
+    active, pending, asked, build, blockctx = None, None, None, None, None
     for e in ev:
         if e[0] == 'said':
             if e[1] != 'Privacy checked':
@@ -1176,11 +1176,13 @@ def drivey_route(j):
         _, name, inp, res = e
         if name == 'mini_open':
             active = res if res.get('id') and res.get('questions') else None
-            pending = build = None
+            pending = build = blockctx = None
+        elif name == 'block_run' and not res.get('error'):
+            blockctx = {'name': inp.get('name'), 'paths': inp.get('paths') or []}
         elif name == 'mini_ask' and inp.get('question'):
             asked = inp['question']
         elif name == 'drive_fetch':
-            active = None
+            active = blockctx = None
             pending = {**res, 'question': inp.get('question', '')}
             build = ({'request': inp.get('question', ''), 'kinds': res.get('missing') or [], 'files': res['unsupported']}
                      if res.get('unsupported') else None)
@@ -1218,6 +1220,16 @@ def drivey_route(j):
             return None
         if name == 'mini_talk':
             return say(res.get('reply') or res.get('error') or 'The Mini could not answer. Ask again.')
+        if name == 'block_run':
+            return say(res.get('reply') or res.get('error') or 'The block could not answer. Ask again.')
+        if name == 'drive_fetch' and not res.get('files') and isinstance(res.get('block'), dict) and \
+                'block_run' in names:  # the sandbox has a transform block for these files (lib/transforms.py)
+            b = res['block']
+            return message(model, [_text(f'Reading {_kinds_words(res.get("skipped"))} with {b.get("title")}. The '
+                                         'first time takes about a minute; after that it is quick.'),
+                                   _tool_use(_tool_name(tools, 'block_run'),
+                                             {'name': b.get('name'), 'paths': inp.get('paths') or [],
+                                              'question': inp.get('question') or ''})])
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported') and 'builder_open' in names:
             return card('Builder', _build_card_text(res.get('team'), res.get('labels')), [BUILD_IT, NOT_NOW],
                         'Not opened: ' + ', '.join(res['unsupported'][:6]) + '.')
@@ -1341,6 +1353,9 @@ def drivey_route(j):
         question = _lib('minimap').without_mentions(said, paths)
         return message(model, [_text('Getting your files from Drive...'),
                                _tool_use(_tool_name(tools, 'drive_fetch'), {'paths': paths, 'question': question})])
+    if blockctx and not active and 'block_run' in names:  # a follow-up about the files a block just read
+        return message(model, [_text('Working on it...'),
+                               _tool_use(_tool_name(tools, 'block_run'), {**blockctx, 'question': said})])
     if active and active.get('actions') and 'mini_talk' in names:
         # A saved action Mini is frozen: questions about it are answered or previewed, never acted on, unless the
         # person says to run it or turn it on (lib/minitalk.py, owner 2026-11-18).

@@ -50,7 +50,7 @@ if [ -z "$AGENT" ]; then
 elif ! python3 -c 'import sys; sys.path.insert(0, "."); from lib.accounts import load_accounts; sys.exit(0 if load_accounts() else 1)'; then
   bad "no test-account file: copy the laptop's ~/idli-insights/config/accounts.json to the same path here (see docs/driving-desktop.md)"
 else
-  [ -x .venv/bin/python ] || { python3 -m venv .venv && .venv/bin/pip -q install duckdb pandas openpyxl; }
+  [ -x .venv/bin/python ] || { python3 -m venv .venv && .venv/bin/pip -q install duckdb pandas openpyxl pypdf python-docx; }
   # Browser tools need a LIVE caller agent (idle agents get closed) and new tabs only open in the
   # workspace the app is showing. Wake the agent (no model call) and show its workspace first.
   $P agent reload "$AGENT" >/dev/null 2>&1

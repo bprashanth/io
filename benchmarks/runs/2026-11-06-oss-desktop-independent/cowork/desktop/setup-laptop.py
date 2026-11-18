@@ -8,7 +8,7 @@ Idempotent; prints what it did.
 
 It:
   1. writes cowork.mcp.json with this checkout's absolute paths;
-  2. creates .venv (duckdb, pandas, openpyxl, matplotlib, vl-convert) with uv or python3 -m venv;
+  2. creates .venv (duckdb, pandas, openpyxl, matplotlib, vl-convert, pypdf, python-docx: the trusted imports in lib/transforms.py) with uv or python3 -m venv;
   3. merges into ~/.paseo/config.json (backup first): daemon.browserTools.enabled, pluginsEnabled,
      providers t4gc-cowork + diy-claude;
   4. creates ~/idli-insights/cowork-real (stand-in "real" workbook + cowork.sites) for the co-work workspace.
@@ -88,16 +88,20 @@ def main():
     if not os.path.exists(py):
         if shutil.which("uv"):
             run(["uv", "venv", "-q", ".venv", "--python", "3.12"], cwd=COWORK)
-            run(["uv", "pip", "install", "-q", "--python", py, "duckdb", "pandas", "openpyxl", "matplotlib", "vl-convert-python"], cwd=COWORK)
+            run(["uv", "pip", "install", "-q", "--python", py, "duckdb", "pandas", "openpyxl", "matplotlib", "vl-convert-python", "pypdf", "python-docx"], cwd=COWORK)
         else:
             run([sys.executable, "-m", "venv", ".venv"], cwd=COWORK)
-            run([py, "-m", "pip", "install", "-q", "duckdb", "pandas", "openpyxl", "matplotlib", "vl-convert-python"], cwd=COWORK)
+            run([py, "-m", "pip", "install", "-q", "duckdb", "pandas", "openpyxl", "matplotlib", "vl-convert-python", "pypdf", "python-docx"], cwd=COWORK)
     else:
         step(".venv exists")
         if subprocess.run([py, '-c', 'import vl_convert'], capture_output=True).returncode:
             command = (["uv", "pip", "install", "-q", "--python", py] if shutil.which("uv") else
                        [py, "-m", "pip", "install", "-q"])
             run(command + ["vl-convert-python"], cwd=COWORK)
+        if subprocess.run([py, '-c', 'import pypdf, docx'], capture_output=True).returncode:  # transform blocks
+            command = (["uv", "pip", "install", "-q", "--python", py] if shutil.which("uv") else
+                       [py, "-m", "pip", "install", "-q"])
+            run(command + ["pypdf", "python-docx"], cwd=COWORK)
 
     launcher = os.path.join(IDLI, 'bin', 'claude-masked')
     source = os.path.join(COWORK, 'desktop', 'claude-masked.sh')

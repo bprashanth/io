@@ -1425,6 +1425,13 @@ def t_drive_fetch(paths, question='Help me understand these files.'):
         from lib import teamcaps
         fetched['team'] = teamcaps.team_name(data_dir)
         fetched['labels'] = [teamcaps.label(k) if k != 'other' else 'these files' for k in fetched.get('missing', [])]
+        try:  # a sandbox's transform block that reads these (lib/transforms.py): the left chat runs it instead
+            from lib import transforms
+            name, m = transforms.for_kinds(data_dir, fetched.get('missing') or [])
+            if name:
+                fetched['block'] = {'name': name, 'title': m.get('title') or name}
+        except Exception:  # noqa: BLE001
+            pass
     if fetched.get('files'):
         prepared = home.prepare(data_dir, fetched['files'], question)
         fetched.update(masked_question=prepared['masked_question'])

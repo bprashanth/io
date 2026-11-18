@@ -20,7 +20,8 @@ NOUN = ['heron', 'mango', 'otter', 'lotus', 'kite', 'tiger', 'parrot', 'banyan',
         'jasmine', 'koel', 'neem', 'peacock', 'river', 'monsoon', 'sparrow', 'turtle', 'lantern']
 # The left chat's tools: Drivey's (files, Minis, Claude) and the sandbox's account blocks
 BASE_TOOLS = ['drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask', 'binder_item',
-              'mini_talk']  # mini_talk: ask, preview, run or turn on a saved action Mini (lib/minitalk.py)
+              'mini_talk',  # mini_talk: ask, preview, run or turn on a saved action Mini (lib/minitalk.py)
+              'block_run']  # block_run: the sandbox's transform blocks, added later by the Builder (lib/transforms.py)
 SITES = 'google\nfiles\naccounts\n'
 
 

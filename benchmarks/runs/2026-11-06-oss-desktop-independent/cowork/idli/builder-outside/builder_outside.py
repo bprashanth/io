@@ -6,6 +6,10 @@ import shutil
 import sys
 
 
+def _q(p):
+    return "'" + p.replace("'", "'\\''") + "'"
+
+
 def setup(folder, cowork):
     here = os.path.join(cowork, 'idli', 'builder-outside')
     os.makedirs(os.path.join(folder, '.claude', 'commands'), exist_ok=True)
@@ -21,7 +25,14 @@ def setup(folder, cowork):
     s['enableAllProjectMcpServers'] = True
     s['enabledMcpjsonServers'] = sorted(set(s.get('enabledMcpjsonServers', []) + ['idli']))
     perms = s.setdefault('permissions', {})
-    perms['allow'] = sorted(set(perms.get('allow', []) + ['mcp__idli__sandbox_blocks', 'mcp__idli__sandbox_list']))
+    perms['allow'] = sorted(set(perms.get('allow', []) + ['mcp__idli__sandbox_blocks', 'mcp__idli__sandbox_list',
+                                                          'mcp__idli__block_kit', 'mcp__idli__block_check']))
+    # block_add: Idli checks the block and asks the person with one card (desktop/idli-block-consent.py)
+    hook = {'matcher': 'mcp__idli__block_add', 'hooks': [{'type': 'command', 'command': ' '.join([
+        _q(os.path.join(cowork, '.venv', 'bin', 'python')), '-I',
+        _q(os.path.join(cowork, 'desktop', 'idli-block-consent.py'))])}]}
+    pre = [h for h in s.setdefault('hooks', {}).get('PreToolUse', []) if h.get('matcher') != hook['matcher']]
+    s['hooks']['PreToolUse'] = pre + [hook]
     with open(path, 'w') as f:
         json.dump(s, f, indent=2)
 

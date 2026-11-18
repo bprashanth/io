@@ -213,3 +213,34 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
   consent card that the "ask each time" setting promises, and this sandbox was made with the outside service off,
   so the laptop couldn't exercise it. Left as a rough edge.
 - Gallery: http://100.82.28.38:8766/ (30 shots).
+
+## 6. Transform blocks the Builder writes (2026-11-18, in progress)
+
+The owner's drivecharts sandbox couldn't read 18 PDFs, and the Builder refused to add PDF reading: the "fixed list"
+rule was written too strictly. Owner's decision: three levels.
+- **Actions** (account writes, sending, posting): our team builds them; the Builder still refuses.
+- **Transforms** (readers and transforms): the Builder writes them and adds them to a sandbox, existing ones too.
+- **Pages and servers**: undecided (local or on silo).
+No bwrap on Linux for now; every platform the same. The trust split: the Builder sees the trusted list and fake data,
+never real data; Sandbox Claude sees masked data and only the blocks plugged in.
+
+- **Phase 1, built (DGX):**
+  - `lib/transforms.py`: the trusted imports baked into the build (stdlib transforms, pandas, numpy, openpyxl,
+    pypdf, python-docx; silo's catalog may add `trusted_imports`); `scan` (AST: only trusted imports; no open, os,
+    sys, subprocess, network, eval, private `_` parts, web addresses or outside paths); `check` (scan plus the
+    block's fake-data test, about 0.1 s, once when added; the digest is kept and a run only compares it); `add`;
+    `run` (downloads the @ Drive files once, runs the block in its own process, the 9B through a door on
+    127.0.0.1 so silo's key stays in Idli).
+  - `lib/transformkit.py`: the kit a block gets (files, remember, ask, judge, summarise_all two at a time and kept,
+    answer, sample, fake_pdf for tests).
+  - The example and first block, `idli/builder-outside/block-template/read_pdfs` (pypdf; first 10 pages plus three
+    further in).
+  - `block_run` in every sandbox (left chat and Sandbox Claude, masked for Claude); the left chat sends @ PDFs to it
+    when the sandbox has a block that reads them, and follow-up questions too.
+  - Builder: `block_kit`, `block_check`, `block_add`; one card from Idli's hook (`desktop/idli-block-consent.py`),
+    which refuses a block that fails the check without asking.
+  - Sandbox Claude's Mini scripts get the same scan in `script_try` and when a Mini is saved.
+  - pypdf and python-docx join the build's venv (`setup-laptop.py`).
+- **Timing on the DGX 9B** (6 text PDFs, some of 400 pages): 25 s the first time, 12 s for the next question.
+  One summary is about 2 s with two at a time. 18 PDFs should take about 50 s the first time.
+- Tests: `tests/test_transforms.py` (13). DGX suite: 338 passed, 5 skipped, the same 11 known failures.
