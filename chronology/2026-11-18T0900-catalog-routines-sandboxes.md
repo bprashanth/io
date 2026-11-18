@@ -178,3 +178,8 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
     the laptop. Unit tests cover them.
   - The owner needs to run `desktop/laptop-up.sh start` on the laptop.
   - Results so far are in `benchmarks/runs/2026-11-18-builder-minis/README.md`.
+- **Laptop back (owner ran `laptop-up.sh`).** (1) Full draft preview: the earlier ask had gone through just as the
+  link dropped. "Show me the draft you'd write" for 88's fresh "yes" showed the whole reply draft (three times,
+  Thu 19 Nov 1 PM, Fri 20 Nov 1:30 PM, Mon 23 Nov 12:30 PM) with "Nothing was drafted, booked or sent". 87's Drafts
+  checked through the API: no draft for that thread. Pass (shot 19). The 9B's one-line summary above it came back
+  empty ("Here is what it found.").
