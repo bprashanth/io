@@ -13,7 +13,6 @@ from pathlib import Path
 
 from lib import home
 
-CHUNK = 3000            # the name scanner's piece size
 MAX_CHARS = 150_000     # about 50 pages; the rest is left out and the file says so
 
 
@@ -37,17 +36,46 @@ def pdf_text(path):
     return text
 
 
+class LineScanner:
+    """The name scanner, one line at a time and many lines at once. On a whole page it misses most names in a list
+    (its confidence drops with length: 11 authors on a report's first page gave 0 hits as one piece, 9 line by line)."""
+
+    def __init__(self, workers=16):
+        from concurrent.futures import ThreadPoolExecutor
+        from lib import privacy
+        self.scanner, self.pool = privacy.Scanner(), ThreadPoolExecutor(workers)
+
+    def __call__(self, text):
+        lines, at = [], 0
+        for line in str(text).split('\n'):
+            if len(line.strip()) > 2:
+                lines.append((at, line))
+            at += len(line) + 1
+        spans = []
+        for (off, _), got in zip(lines, self.pool.map(lambda x: self.scanner(x[1]), lines)):
+            spans += [(a + off, b + off, k, c) for a, b, k, c in got]
+        return spans
+
+    def close(self):
+        self.pool.shutdown(wait=False)
+
+
 def _mask(data_dir, text):
+    """Masked with the folder's known values, the rules and the name scanner (line by line); the new codes are kept,
+    as privacy.mask_account_text does, so Claude's replies show the person the real values."""
     from lib import privacy
-    parts, buf = [], ''
-    for para in re.split(r'(\n\s*\n)', text):
-        if len(buf) + len(para) > CHUNK and buf:
-            parts.append(buf)
-            buf = ''
-        buf += para
-    if buf:
-        parts.append(buf)
-    return ''.join(privacy.mask_account_text(str(data_dir), p) for p in parts)
+    full = privacy._session_map(str(data_dir))
+    vault = privacy.active_vault(str(data_dir), full)
+    scan = LineScanner()
+    try:
+        out = [privacy._redact(page, vault, scan)[0] for page in re.split(r'(?=\[page \d+)', text)]
+    finally:
+        scan.close()
+    full.forward.update(vault.forward)
+    full.display.update(vault.display)
+    full.counters.update(vault.counters)
+    privacy._save(full)
+    return ''.join(out)
 
 
 def prepare(data_dir, paths):
@@ -66,7 +94,12 @@ def prepare(data_dir, paths):
             missed.append(f['title'])  # a scan, with no text to read
             continue
         cut = len(text) > MAX_CHARS
-        body = _mask(data_dir, text[:MAX_CHARS])
+        kept = Path(str(f['path']) + '.masked.txt')  # masked once per file version (about a minute for 50 pages)
+        if kept.is_file() and kept.stat().st_mtime >= Path(f['path']).stat().st_mtime:
+            body = kept.read_text()
+        else:
+            body = _mask(data_dir, text[:MAX_CHARS])
+            kept.write_text(body)
         name = re.sub(r'[^\w .()-]+', '_', Path(f['title']).stem).strip(' .')[:80] or 'document'
         local = f'docs/{name}.txt'
         head = (f'Text of the PDF "{_mask(data_dir, f["title"])}", masked by Idli: codes stand for names, places '
