@@ -323,3 +323,18 @@ Owner's rules (built in phase 1, commit b46249da):
   Claude with the Mini as context (6dbab66e), which drew 2021 vs 2025 and saved "Fixity checks 2021 and 2025" as a
   new Mini; the first is unchanged. Drivey last: unchanged. Laptop suite: 356 passed, 5 skipped, the 11 known.
   Round complete; README and gallery in `benchmarks/runs/2026-11-18-mini-escalation/`.
+
+## 8. Alpha release prepared, not pushed (2026-11-18 night)
+
+- The owner asked for a commit, declaude, CI and Mac, Windows and Linux builds for an alpha. They will test and push
+  to origin themselves after review. The repo is public, so nothing was pushed, and GitHub CI waits for their push.
+- `.github/workflows/idli-alpha.yml`: tests on three OSes, then patched Paseo 0.15.2 and the Idli kit for each, a
+  cold start check, and a draft prerelease only on an `idli-v*` tag. Steps and gaps: `docs/idli-alpha-release.md`.
+- Built on the DGX: Linux arm64 (160 MB tar.gz), which started cold under a virtual display; the kit (1.2 MB)
+  installed into an empty home.
+- Fixed: Paseo's auto-updater would have replaced Idli's UI; the root `.gitignore` ignored every `lib/` folder (no
+  file was lost).
+- Audit of the unpushed commits: no file over 1 MB, no credentials, only test email addresses. New ignore rules for
+  builds, models, envs, OAuth and token files, Chrome profiles.
+- Gaps: the Windows installer (shell launchers), unsigned apps, each tester needs the DGX and a silo token.
+- Then `declaude origin/main` was run locally, with the unrelated changed PNGs stashed.
