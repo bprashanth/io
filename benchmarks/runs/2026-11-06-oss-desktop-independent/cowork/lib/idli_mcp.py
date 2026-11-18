@@ -931,11 +931,16 @@ def _find_sandbox(sandbox):
     raise ValueError(f'No sandbox called {sandbox}. Call sandbox_list.')
 
 
-def block_add(name, sandbox):
+def block_add(card, name, sandbox):
     """Add a checked transform block to a sandbox. The person is asked first, with one plain card."""
     from lib import transforms
     folder, sb = _find_sandbox(sandbox)
-    res = transforms.add(folder, (_builder_blocks() / str(name)).resolve())
+    block = (_builder_blocks() / str(name)).resolve()
+    if not block.is_relative_to(_builder_blocks().resolve()) or not block.is_dir():
+        raise ValueError(f'No block folder called {name} in blocks/.')
+    if ' '.join(str(card).split()) != transforms.card(block):
+        raise ValueError('Pass card exactly as block_check gave it: ' + transforms.card(block))
+    res = transforms.add(folder, block)
     if not res.get('ok'):
         return {'ok': False, 'problems': res.get('problems'), 'next': 'Fix these, call block_check, then add again.'}
     return {'ok': True, 'added': res['title'], 'sandbox': sb.get('name'),
@@ -948,9 +953,10 @@ OUTSIDE_TOOLS = {
                   'block may use, where to write it, and a working example.', {}, []),
     'block_check': (block_check, 'Check a block you wrote in blocks/<name>/ (about a second).',
                     {'name': {'type': 'string'}}, ['name']),
-    'block_add': (block_add, 'Add a checked block to a sandbox. Idli shows the person one card to approve.',
-                  {'name': {'type': 'string'}, 'sandbox': {'type': 'string', 'description': 'Its name or id'}},
-                  ['name', 'sandbox']),
+    'block_add': (block_add, 'Add a checked block to a sandbox. The person sees card and approves it.',
+                  {'card': {'type': 'string', 'description': 'Exactly the card block_check gave'},
+                   'name': {'type': 'string'}, 'sandbox': {'type': 'string', 'description': 'Its name or id'}},
+                  ['card', 'name', 'sandbox']),
     'sandbox_blocks': (sandbox_blocks, 'The building blocks a sandbox can have, with what each does.', {}, []),
     'sandbox_create': (sandbox_create, 'Make a sandbox with exactly these blocks and accounts, after the person agreed '
                        'to the plan. With gaps (needs no block covers), no sandbox is made and the gap is noted.',

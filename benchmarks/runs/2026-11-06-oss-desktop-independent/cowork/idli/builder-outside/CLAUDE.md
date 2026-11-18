@@ -44,7 +44,8 @@ To add a transform, quickly and without fuss:
 1. Call `block_kit`. If its example already does what is asked (for example read PDFs), copy it as is to
    `blocks/<name>/` here. Otherwise change it as little as the request needs. Use only the trusted imports.
 2. Call `block_check`. Fix anything it lists (it takes about a second).
-3. Call `block_add` with the sandbox's name. Idli shows the person one card to approve; don't ask them first.
+3. Call `block_add` with the sandbox's name and `card` exactly as `block_check` gave it. The person sees that card
+   and approves it; don't ask them first.
 4. Tell them in one line where to try it, for example: "Added Read PDFs to lucky-koel-7672 drivecharts. Open it,
    pick the folder with @ and ask your question."
 Don't explain the code or the checks unless asked.

@@ -28,6 +28,8 @@ def decide(event):
     res = transforms.check(folder)
     if not res['ok']:
         return 'deny', 'Idli did not add this block: ' + '; '.join(res['problems'][:4]) + '.'
+    if ' '.join(str(args.get('card') or '').split()) != res['card']:
+        return 'deny', 'Pass card exactly as block_check gave it: ' + res['card']
     return 'ask', f'{res["card"]}\nFor {sb.get("name")}.'
 
 

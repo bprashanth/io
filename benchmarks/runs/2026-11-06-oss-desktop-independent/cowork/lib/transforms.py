@@ -339,7 +339,9 @@ def run(sandbox, name, args=None, timeout=900):
     finally:
         door.stop()
     if not res.get('ok'):
-        return {'error': f'{m.get("title") or name} could not finish: {res.get("error") or "no reason given"}'}
+        why = ' '.join(str(res.get('error') or 'no reason given').split())
+        why = why if len(why) <= 120 else why[:117] + '...'
+        return {'error': f'{m.get("title") or name} could not finish ({why}). Ask the Builder to look at it.'}
     out = res['result'] if isinstance(res.get('result'), dict) else {'reply': str(res.get('result'))}
     return {**out, **({'missed': missed} if missed else {})}
 

@@ -112,6 +112,45 @@ class Blocks(unittest.TestCase):
         self.assertIn('changed after it was checked', transforms.run(self.sandbox, 'read_pdfs', {})['error'])
 
 
+class Consent(unittest.TestCase):
+    """desktop/idli-block-consent.py: Idli checks first; a bad block is refused without asking; a good one gets
+    Idli's card, which the Builder must pass unchanged."""
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        shutil.copytree(TEMPLATE, self.tmp / 'blocks' / 'read_pdfs')
+        sys.path.insert(0, str(ROOT / 'desktop'))
+        import importlib
+        self.hook = importlib.import_module('idli-block-consent')
+        self.p = [mock.patch('lib.sandboxes.builder_dir', return_value=str(self.tmp)),
+                  mock.patch('lib.sandboxes.list_all', return_value=[{'id': 'lucky-koel-7672',
+                                                                      'name': 'lucky-koel-7672 drivecharts'}])]
+        for p in self.p:
+            p.start()
+
+    def tearDown(self):
+        for p in self.p:
+            p.stop()
+        shutil.rmtree(self.tmp)
+
+    def decide(self, card):
+        return self.hook.decide({'tool_input': {'name': 'read_pdfs', 'sandbox': 'drivecharts', 'card': card}})
+
+    def test_good_block_asks_with_idlis_card(self):
+        card = transforms.card(self.tmp / 'blocks' / 'read_pdfs')
+        decision, text = self.decide(card)
+        self.assertEqual(decision, 'ask')
+        self.assertIn('Sends nothing.', text)
+        self.assertIn('lucky-koel-7672 drivecharts', text)
+        self.assertEqual(self.decide('Add block: harmless.')[0], 'deny')
+
+    def test_bad_block_is_refused_without_asking(self):
+        p = self.tmp / 'blocks' / 'read_pdfs' / 'block.py'
+        p.write_text('import requests\n' + p.read_text())
+        decision, text = self.decide(transforms.card(self.tmp / 'blocks' / 'read_pdfs'))
+        self.assertEqual(decision, 'deny')
+        self.assertIn('requests', text)
+
+
 class Router(unittest.TestCase):
     TOOLS = [{'name': 'mcp__cowork__' + t} for t in
              ('drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask', 'binder_item',
