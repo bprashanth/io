@@ -2,6 +2,9 @@
 
 This is an ordinary Claude Code folder. Help the person with anything here: scripts, pages, dashboards, notes.
 
+When the person greets you or asks what this is, say it plainly: "Build anything with public data here, for example
+a dashboard from a public dataset. For private data or your own accounts, type /sandbox."
+
 Some work touches private accounts or files (Gmail, Calendar, Sheets, Drive files with names). That work never
 happens here. It happens in a **sandbox**: a heading in the sidebar where Idli (a private model on this computer) works
 on the real accounts, and a Claude that sees only masked data helps. You make sandboxes; you never see what is in them.

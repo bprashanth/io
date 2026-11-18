@@ -779,9 +779,26 @@ def review(data_dir, file, path, tab=None, columns=None):
         preview = _code_frame(frame, choices, vault)
         if name == tab:
             coded = preview
+    frame = sheets[tab]
     for row in rows:
         row['mask'] = choices[row['column']]
-        row['as_sent'] = coded[row['column']].head(3).astype(str).tolist()
+        # Show rows that hold something (a notes column is often blank at the top), and say when every cell is
+        # blank or coded away: the page writes "<column> entirely withheld" (owner, 2026-11-18).
+        col = row['column'] if row['column'] in coded.columns else next(
+            (c for c in coded.columns if str(c) == row['column']), None)
+        if col is None:
+            row['as_sent'] = []
+            continue
+        filled = frame[col].astype(str).str.strip().replace({'nan': '', 'None': ''}) != '' if col in frame.columns \
+            else coded[col].astype(str).str.strip() != ''
+        idx = list(filled[filled].index[:3]) or list(coded.index[:3])
+        row['samples'] = frame.loc[idx, col].astype(str).tolist() if col in frame.columns else row['samples']
+        row['as_sent'] = coded.loc[idx, col].astype(str).tolist()
+        # Whole cells of text (notes, remarks) each turned into one code: Claude gets none of it.
+        whole = [a for a, b in zip(row['samples'], row['as_sent']) if a.strip() and len(a.split()) > 3 and
+                 re.fullmatch(r'[A-Z][A-Z_]*_\d+', b.strip() or 'x')]
+        row['withheld'] = bool(row['mask'] and (not filled.any() or whole and len(whole) == len(
+            [a for a in row['samples'] if a.strip()])))
     return {**settings, 'columns': choices, 'tabs': list(sheets), 'tab': tab, 'suggestions': rows, 'warning': review_warning(data_dir)}
 
 

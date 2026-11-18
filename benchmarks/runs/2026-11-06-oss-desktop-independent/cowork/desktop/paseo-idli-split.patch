@@ -2735,11 +2735,12 @@ index 00000000..1e55e643
 +  errorText: { color: theme.colors.destructive },
 +}));
 diff --git a/packages/app/src/composer/draft/workspace-tab.tsx b/packages/app/src/composer/draft/workspace-tab.tsx
-index c4ef45cb..66312cb0 100644
+index c4ef45cb..05d6266d 100644
 --- a/packages/app/src/composer/draft/workspace-tab.tsx
 +++ b/packages/app/src/composer/draft/workspace-tab.tsx
-@@ -1,13 +1,12 @@
+@@ -1,13 +1,13 @@
 +import { DRIVEY_PLACEHOLDER } from "@/utils/idli-drivey";
++import { IDLI_BUILDER_PLACEHOLDER, isIdliBuilderDir } from "@/utils/idli-builder";
  import { useCallback, useEffect, useMemo, useRef } from "react";
  import { Keyboard, ScrollView, StyleSheet as RNStyleSheet, Text, View } from "react-native";
  import { useTranslation } from "react-i18next";
@@ -2753,7 +2754,7 @@ index c4ef45cb..66312cb0 100644
  import { ComposerImportPill } from "@/composer/draft/import-pill";
  import { COMPOSER_PILL_CLEARANCE } from "@/composer/pill-styles";
  import { AgentStreamView } from "@/agent-stream/view";
-@@ -49,6 +48,8 @@ import {
+@@ -49,6 +49,8 @@ import {
  } from "@/workspace-tabs/model";
  import { openWorkspaceChanges } from "@/workspace-tabs/open-supporting-view";
  import { useSettings } from "@/hooks/use-settings";
@@ -2762,7 +2763,7 @@ index c4ef45cb..66312cb0 100644
  
  const EMPTY_PENDING_PERMISSIONS = new Map();
  const DRAFT_CAPABILITIES: AgentCapabilityFlags = {
-@@ -180,6 +181,7 @@ async function submitDraftCreateRequest(input: {
+@@ -180,6 +182,7 @@ async function submitDraftCreateRequest(input: {
      config,
      workspaceId,
      initialPrompt: text,
@@ -2770,7 +2771,7 @@ index c4ef45cb..66312cb0 100644
      clientMessageId: attempt.clientMessageId,
      ...(imagesData && imagesData.length > 0 ? { images: imagesData } : {}),
      ...(attachmentsArray && attachmentsArray.length > 0 ? { attachments: attachmentsArray } : {}),
-@@ -282,14 +284,15 @@ interface WorkspaceDraftAgentTabProps {
+@@ -282,14 +285,15 @@ interface WorkspaceDraftAgentTabProps {
    onOpenImportSheet?: () => void;
  }
  
@@ -2792,7 +2793,7 @@ index c4ef45cb..66312cb0 100644
  }
  
  export function WorkspaceDraftAgentTab({
-@@ -312,6 +315,7 @@ export function WorkspaceDraftAgentTab({
+@@ -312,6 +316,7 @@ export function WorkspaceDraftAgentTab({
    }));
    const workspaceDirectory = workspaceFields?.workspaceDirectory || null;
    const draftSetup = initialSetup ?? null;
@@ -2800,7 +2801,7 @@ index c4ef45cb..66312cb0 100644
    const draftWorkingDirectory = resolveDraftWorkingDirectory({
      workspaceDirectory,
      initialSetup: draftSetup,
-@@ -339,9 +343,7 @@ export function WorkspaceDraftAgentTab({
+@@ -339,9 +344,7 @@ export function WorkspaceDraftAgentTab({
      },
    });
    const composerState = draftInput.composerState;
@@ -2811,7 +2812,7 @@ index c4ef45cb..66312cb0 100644
  
    const draftProvider = composerState.selectedProvider;
    const draftProviderDefinitions = composerState.providerDefinitions;
-@@ -499,7 +501,7 @@ export function WorkspaceDraftAgentTab({
+@@ -499,7 +502,7 @@ export function WorkspaceDraftAgentTab({
    );
    useAgentControlCommandCenterActions({
      sourceId: `draft:${serverId}:${tabId}`,
@@ -2820,7 +2821,7 @@ index c4ef45cb..66312cb0 100644
      controls: {
        serverId,
        ownerKey: tabId,
-@@ -591,14 +593,22 @@ export function WorkspaceDraftAgentTab({
+@@ -591,14 +594,22 @@ export function WorkspaceDraftAgentTab({
    const handleDropdownCloseFocus = useCallback(() => {
      focusInputRef.current?.();
    }, []);
@@ -2846,7 +2847,7 @@ index c4ef45cb..66312cb0 100644
    );
    const dockContent = (
      <View style={styles.contentContainer}>
-@@ -629,47 +639,63 @@ export function WorkspaceDraftAgentTab({
+@@ -629,49 +640,69 @@ export function WorkspaceDraftAgentTab({
      </View>
    );
  
@@ -2923,10 +2924,10 @@ index c4ef45cb..66312cb0 100644
 +        agentControls={composerAgentControls}
 +        isCompactLayout={isCompactComposerLayout}
 +        isDrivey={isDrivey}
-+        placeholder={driveyPlaceholder(draftId)}
++        placeholder={driveyPlaceholder(draftId) ?? builderPlaceholder(composerState.workingDir)}
 +      />
 +    </View>
-   );
++  );
 +
 +  return (
 +    <WorkspaceDraftSurface
@@ -2941,14 +2942,20 @@ index c4ef45cb..66312cb0 100644
 +      {dockContent}
 +      {composer}
 +    </WorkspaceDraftSurface>
-+  );
+   );
+ }
+ 
++function builderPlaceholder(dir: string | null | undefined): string | undefined {
++  return isIdliBuilderDir(dir) ? IDLI_BUILDER_PLACEHOLDER : undefined;  // Idli P23
 +}
 +
 +function driveyPlaceholder(draftId: string): string | undefined {
 +  return isDriveyDraft(draftId) ? DRIVEY_PLACEHOLDER : undefined;
- }
- 
++}
++
  const animatedStaticStyles = RNStyleSheet.create({
+   inputAreaWrapper: {
+     width: "100%",
 diff --git a/packages/app/src/composer/index.tsx b/packages/app/src/composer/index.tsx
 index d6b4bae6..7664c4aa 100644
 --- a/packages/app/src/composer/index.tsx
@@ -3366,6 +3373,58 @@ index ef144477..f0c22168 100644
        isDraftContext,
        isVisible,
        mode,
+diff --git a/packages/app/src/hooks/use-agent-form-state.ts b/packages/app/src/hooks/use-agent-form-state.ts
+index 1522ce08..baf0c29f 100644
+--- a/packages/app/src/hooks/use-agent-form-state.ts
++++ b/packages/app/src/hooks/use-agent-form-state.ts
+@@ -38,6 +38,11 @@ import {
+ } from "@/provider-selection/resolve-agent-form";
+ import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+ import type { MaterializedAgentProfile } from "@/agent-profiles";
++import {
++  idliBuilderEntries,
++  idliBuilderInitialValues,
++  isIdliBuilderDir,
++} from "@/utils/idli-builder";
+ 
+ export type { FormInitialValues } from "@/provider-selection/resolve-agent-form";
+ 
+@@ -146,7 +151,8 @@ async function persistProviderPreferences(input: {
+ }
+ 
+ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFormStateResult {
+-  const { serverId, initialValues, workingDir, isVisible = true, isCreateFlow = true } = options;
++  const { serverId, workingDir, isVisible = true, isCreateFlow = true } = options;
++  const isBuilder = isIdliBuilderDir(workingDir);  // Idli P23
+ 
+   const { preferences, isLoading: isPreferencesLoading, updatePreferences } = useFormPreferences();
+   const preferenceOverlayRef = useRef(new OptimisticFormPreferences(preferences));
+@@ -179,7 +185,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
+   });
+ 
+   const {
+-    entries: snapshotEntries,
++    entries: rawSnapshotEntries,
+     isLoading: snapshotIsLoading,
+     isRefreshing: snapshotIsRefreshing,
+     error: snapshotError,
+@@ -188,6 +194,16 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
+   } = useProvidersSnapshot(serverId, { cwd: workingDir });
+ 
+   const isConnected = useHostRuntimeIsConnected(serverId ?? "");
++  // Idli P23: the Builder offers Claude (Opus first), or Idli 9B and 30B when Paseo has no Claude Code.
++  const snapshotEntries = useMemo(
++    () => (isBuilder ? idliBuilderEntries(rawSnapshotEntries) : rawSnapshotEntries),
++    [isBuilder, rawSnapshotEntries],
++  );
++  const initialValues = useMemo(
++    () =>
++      isBuilder ? idliBuilderInitialValues(snapshotEntries, options.initialValues) : options.initialValues,
++    [isBuilder, snapshotEntries, options.initialValues],
++  );
+ 
+   const allProviderEntries = useMemo(() => snapshotEntries ?? [], [snapshotEntries]);
+   const snapshotProviderDefinitions = useMemo(
 diff --git a/packages/app/src/hooks/use-drivey-workspace.ts b/packages/app/src/hooks/use-drivey-workspace.ts
 new file mode 100644
 index 00000000..a54cfa6c
@@ -3536,6 +3595,23 @@ index 3492c40c..26085c0f 100644
        cwd={workspaceDirectory}
        terminalId={target.terminalId}
        isWorkspaceFocused={isWorkspaceFocused}
+diff --git a/packages/app/src/screens/new-workspace-screen.tsx b/packages/app/src/screens/new-workspace-screen.tsx
+index 3cb01ae9..791d746b 100644
+--- a/packages/app/src/screens/new-workspace-screen.tsx
++++ b/packages/app/src/screens/new-workspace-screen.tsx
+@@ -1,3 +1,4 @@
++import { IDLI_BUILDER_PLACEHOLDER, isIdliBuilderDir } from "@/utils/idli-builder";
+ import type {
+   CreateAgentRequestOptions,
+   CreateWorkspaceRequestOptions,
+@@ -1576,6 +1577,7 @@ export function NewWorkspaceScreen({
+       onForgeChangeRequestDetected={handleForgeChangeRequestDetected}
+       onForgeChangeRequestAutoAttach={handleForgeChangeRequestAutoAttach}
+       cwd={selectedSourceDirectory ?? ""}
++      {...(isIdliBuilderDir(selectedSourceDirectory) ? { placeholder: IDLI_BUILDER_PLACEHOLDER } : {})}
+       clearDraft={handleClearDraft}
+       autoFocus
+       autoFocusKey={launchFocusKey}
 diff --git a/packages/app/src/screens/workspace/compact-workspace-header/tab-switcher.tsx b/packages/app/src/screens/workspace/compact-workspace-header/tab-switcher.tsx
 index 737e92b4..3d678527 100644
 --- a/packages/app/src/screens/workspace/compact-workspace-header/tab-switcher.tsx
@@ -3759,6 +3835,129 @@ index fe09b52f..f18745c0 100644
 +    return name.includes(lower) ? 1 : 2;
 +  }
 +  return [...entries].sort((left, right) => rank(left) - rank(right));
++}
+diff --git a/packages/app/src/utils/idli-builder.test.ts b/packages/app/src/utils/idli-builder.test.ts
+new file mode 100644
+index 00000000..c669e4d5
+--- /dev/null
++++ b/packages/app/src/utils/idli-builder.test.ts
+@@ -0,0 +1,54 @@
++import { describe, expect, it } from "vitest";
++import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
++import {
++  idliBuilderEntries,
++  idliBuilderInitialValues,
++  isIdliBuilderDir,
++} from "./idli-builder";
++
++const claude: ProviderSnapshotEntry = {
++  provider: "claude",
++  status: "ready",
++  enabled: true,
++  models: [
++    { provider: "claude", id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
++    { provider: "claude", id: "claude-opus-5-5", label: "Opus 5.5" },
++  ] as never,
++};
++const idli: ProviderSnapshotEntry = {
++  provider: "t4gc-cowork",
++  status: "ready",
++  enabled: true,
++  models: ["muse-glimmer-30b", "idli-9b", "idli-9b-careful", "idli-9b-auto"].map((id) => ({
++    provider: "t4gc-cowork",
++    id,
++    label: id,
++  })) as never,
++};
++const codex: ProviderSnapshotEntry = { provider: "codex", status: "ready", enabled: true };
++
++describe("Idli Builder (P23)", () => {
++  it("knows the Builder folder", () => {
++    expect(isIdliBuilderDir("/home/x/idli-insights/builder")).toBe(true);
++    expect(isIdliBuilderDir("/home/x/idli-insights/builder/")).toBe(true);
++    expect(isIdliBuilderDir("/home/x/idli-insights/teams/a")).toBe(false);
++    expect(isIdliBuilderDir(null)).toBe(false);
++  });
++  it("offers only Claude, with Opus first", () => {
++    const entries = idliBuilderEntries([codex, idli, claude]);
++    expect(entries?.map((e) => e.provider)).toEqual(["claude"]);
++    expect(idliBuilderInitialValues(entries, undefined)).toEqual({
++      provider: "claude",
++      model: "claude-opus-5-5",
++    });
++  });
++  it("falls back to Idli 9B and 30B without Claude Code, never careful or auto", () => {
++    const entries = idliBuilderEntries([codex, idli, { ...claude, status: "unavailable" }]);
++    expect(entries?.map((e) => e.provider)).toEqual(["t4gc-cowork"]);
++    expect(entries?.[0]?.models?.map((m) => m.id)).toEqual(["muse-glimmer-30b", "idli-9b"]);
++    expect(idliBuilderInitialValues(entries, undefined)).toEqual({
++      provider: "t4gc-cowork",
++      model: "idli-9b",
++    });
++  });
++});
+diff --git a/packages/app/src/utils/idli-builder.ts b/packages/app/src/utils/idli-builder.ts
+new file mode 100644
+index 00000000..16e51404
+--- /dev/null
++++ b/packages/app/src/utils/idli-builder.ts
+@@ -0,0 +1,57 @@
++// Idli P23: the Builder (~/idli-insights/builder) is plain Claude Code, like Antigravity: one pane, Claude with Opus by
++// default. Its model menu shows only Claude. When Paseo has no Claude Code, it falls back to Idli 9B and 30B.
++import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
++import type { FormInitialValues } from "@/provider-selection/resolve-agent-form";
++
++const BUILDER_DIR = /[\\/]idli-insights[\\/]builder[\\/]?$/;
++export const IDLI_BUILDER_CLAUDE = "claude";
++export const IDLI_BUILDER_FALLBACK = "t4gc-cowork";
++const FALLBACK_MODELS = new Set(["idli-9b", "muse-glimmer-30b"]);
++export const IDLI_BUILDER_PLACEHOLDER =
++  "Build with public data here. For private data or your own accounts, type /sandbox.";
++
++export function isIdliBuilderDir(dir: string | null | undefined): boolean {
++  return !!dir && BUILDER_DIR.test(dir);
++}
++
++function claudeEntry(entries: ProviderSnapshotEntry[]): ProviderSnapshotEntry | undefined {
++  return entries.find(
++    (e) => e.provider === IDLI_BUILDER_CLAUDE && e.enabled !== false && e.status !== "error" &&
++      e.status !== "unavailable",
++  );
++}
++
++/** The Builder's menu: Claude alone, or (no Claude Code) Idli 9B and 30B. */
++export function idliBuilderEntries(
++  entries: ProviderSnapshotEntry[] | undefined,
++): ProviderSnapshotEntry[] | undefined {
++  if (!entries) return entries;
++  const claude = claudeEntry(entries);
++  if (claude) return [claude];
++  const idli = entries.find((e) => e.provider === IDLI_BUILDER_FALLBACK);
++  if (!idli) return entries.filter((e) => e.provider === IDLI_BUILDER_CLAUDE);
++  return [{ ...idli, models: (idli.models ?? []).filter((m) => FALLBACK_MODELS.has(m.id)) }];
++}
++
++export function idliOpusModelId(entry: ProviderSnapshotEntry | undefined): string | null {
++  const models = entry?.models ?? [];
++  const opus = models.filter((m) => /opus/i.test(m.id) || /opus/i.test(m.label ?? ""));
++  return (opus.find((m) => m.isDefault) ?? opus[0])?.id ?? null;
++}
++
++/** New Builder chats start on Claude with Opus, or on Idli 9B when there is no Claude Code. */
++export function idliBuilderInitialValues(
++  entries: ProviderSnapshotEntry[] | undefined,
++  given: FormInitialValues | undefined,
++): FormInitialValues | undefined {
++  if (!entries) return given;
++  const claude = claudeEntry(entries);
++  if (claude) {
++    const model = idliOpusModelId(claude);
++    return { ...given, provider: IDLI_BUILDER_CLAUDE, ...(model ? { model } : {}) };
++  }
++  if (entries.some((e) => e.provider === IDLI_BUILDER_FALLBACK)) {
++    return { ...given, provider: IDLI_BUILDER_FALLBACK, model: "idli-9b" };
++  }
++  return given;
 +}
 diff --git a/packages/app/src/utils/idli-claude-cli.test.ts b/packages/app/src/utils/idli-claude-cli.test.ts
 new file mode 100644
@@ -4500,11 +4699,12 @@ index 00000000..4591a447
 +}
 diff --git a/packages/app/src/utils/idli-pairing.ts b/packages/app/src/utils/idli-pairing.ts
 new file mode 100644
-index 00000000..6c5b5269
+index 00000000..91e355bc
 --- /dev/null
 +++ b/packages/app/src/utils/idli-pairing.ts
-@@ -0,0 +1,168 @@
+@@ -0,0 +1,187 @@
 +import { isRawClaudeWorkspace } from "./idli-claude-cli";
++import { isIdliBuilderDir } from "./idli-builder";
 +// Idli P15: every Idli chat has its own Claude chat beside it. In a workspace whose chats run on the Idli provider,
 +// the layout keeps two panes: Idli's chats on the left, and on the right only the Claude chats paired with the Idli
 +// chat shown on the left (label idli.pair=<idli agent id>, set by Idli's teach_send). Switching Idli chats swaps the
@@ -4546,6 +4746,7 @@ index 00000000..6c5b5269
 +  const session = useSessionStore.getState().sessions[serverId];
 +  const workspace = Array.from(session?.workspaces.values() ?? []).find(w => normalizeWorkspaceOpaqueId(w.id) === normalizeWorkspaceOpaqueId(workspaceId));
 +  if (isRawClaudeWorkspace(workspace)) return false;
++  if (isIdliBuilderDir(workspace?.workspaceDirectory)) return false;  // P23: the Builder is one pane
 +  const agents = workspaceAgents(serverId, workspaceId);
 +  return !isSetup(agents) && !agents.some((a) => a.labels?.["idli.left"] === "1")
 +    && agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)));
@@ -4553,12 +4754,29 @@ index 00000000..6c5b5269
 +
 +let syncing = false;
 +
++/** Drop a side pane that holds nothing (only "New tab" placeholders), left over from an earlier split. */
++function closeEmptySidePane(workspaceKey: string): void {
++  const store = useWorkspaceLayoutStore.getState();
++  const layout = store.layoutByWorkspace[workspaceKey];
++  if (!layout) return;
++  const explorerId = store.explorerSidebarPaneIdByWorkspace[workspaceKey] ?? null;
++  const mains = collectAllPanes(layout.root).filter((p) => !p.hidden && p.id !== explorerId);
++  const side = mains.length >= 2 ? mains[mains.length - 1] : null;
++  if (!side) return;
++  const sideTabs = collectAllTabs(layout.root).filter((t) => side.tabIds.includes(t.tabId));
++  if (sideTabs.every((t) => t.target.kind === "new_tab")) store.closePane(workspaceKey, side.id);
++}
++
 +/** One idempotent pass; each store change triggers another, so it converges step by step. */
 +export function syncIdliPair(serverId: string, workspaceId: string, workspaceKey: string): void {
 +  if (syncing) return;
 +  const session = useSessionStore.getState().sessions[serverId];
 +  const workspace = Array.from(session?.workspaces.values() ?? []).find(w => normalizeWorkspaceOpaqueId(w.id) === normalizeWorkspaceOpaqueId(workspaceId));
 +  if (isRawClaudeWorkspace(workspace)) return;
++  if (isIdliBuilderDir(workspace?.workspaceDirectory)) {  // P23: the Builder is one pane
++    closeEmptySidePane(workspaceKey);
++    return;
++  }
 +  const agents = workspaceAgents(serverId, workspaceId);
 +  if (!agents.some((a) => IDLI_PROVIDERS.has(String(a.provider)))) return;
 +  // P19 Drivey workspaces keep the person's Claude CLI terminal on the right: no paired teaching chat

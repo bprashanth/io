@@ -70,6 +70,40 @@ line of tool usage goes away with it.
 We build the blocks, not each team's workflow. The person learns to test step by step, and the saved Mini is their
 workflow.
 
+## The Builder is Claude Code first (owner, 2026-11-18)
+
+- **The Builder opens like Antigravity:** Claude Code with a frontier model (Opus) is the default. Use it to build
+  a dashboard from public data. What we tell people: if all you use is public data and dashboards, stay here. The
+  moment there's private data, or an account you won't share with any model, type `/sandbox`.
+- **A new chat in the Builder is a single pane.** No split. The split belongs to sandboxes and Drivey only.
+- **Model menu in the Builder:** Claude Code's models (Opus first). If Paseo has no Claude Code connected, fall
+  back to Idli 9B and 30B. The "careful" and "auto" entries are gone.
+
+## Minis: ask, activate, fork (owner, 2026-11-18)
+
+A saved Mini is frozen. That's good. The person builds trust in it by asking, then turns it on, or forks it to
+change it.
+
+- **Ask (left chat, no Claude needed).** "How are leads picked?", "Show me the draft you'd write for the latest
+  lead", "Which replies would you book?". The 9B answers from the Mini's steps, or escalates a masked version of
+  the question to map it to a part of the Mini. Idli then runs that part on the real data in preview: drafts are
+  shown in the chat, not created, and nothing is booked or sent. Same pattern as insights: questions run on Idli,
+  never on Claude.
+- **Activate.** "Turn this on for my account" binds the Mini to the person's own account, starting from today.
+  Until then it runs on the test accounts. (Running on a schedule is still a gap.)
+- **Fork.** A Fork button on the Mini card. It makes a copy and opens Sandbox Claude on the right with the current
+  flow laid out, asking what to change. The person asks ("first explain how leads are picked"), changes a step,
+  and asks to see results. Claude edits the script on masked data. Idli runs it on the real data and shows the
+  results in the left pane, step by step. The original Mini is untouched; the fork saves as a new Mini.
+- **The rule.** Plain workflow Minis run without Claude. Questions about a Mini, including running part of it, go
+  through the 9B plus escalation. Changing, extending or adding logic needs a fork into Claude.
+
+## Insights details (owner, 2026-11-18)
+
+- `@` a folder and ask for insights must work, not only a single file.
+- The privacy screen names what is withheld plainly: when a whole column is held back, it says
+  `<column> entirely withheld`, never "Notes -> empty".
+
 ## Accounts
 
 - Google access is by OAuth with Idli's own app. Sign-in happens once per account in a real browser (Google forbids

@@ -17,7 +17,7 @@ if(location.pathname==='/privacy-review'){
   let data, busy=false;
   const render=next=>{
     data=next;$('reviews').setAttribute('aria-busy','false');
-    const row=(row,i)=>`<div class="col-row${row.mask?' hidden-col':''}"><input class="switch" role="switch" type="checkbox" aria-label="Hide ${esc(words(row.column))} in ${esc(data.reviews[i].title)}" data-file="${i}" data-col="${esc(row.column)}" ${row.mask?'checked':''} ${data.done?'disabled':''}><div class="col-text"><div class="column-name">${esc(words(row.column))}</div><div class="col-sample">${esc(row.samples[0]||'(blank)')}${row.mask?` <span class="dim">-></span> <code>${esc(row.as_sent[0]||'')}</code>`:''}</div>${row.mask?`<div class="reason">${esc(reasonText(row))}</div>`:''}</div></div>`;
+    const row=(row,i)=>`<div class="col-row${row.mask?' hidden-col':''}"><input class="switch" role="switch" type="checkbox" aria-label="Hide ${esc(words(row.column))} in ${esc(data.reviews[i].title)}" data-file="${i}" data-col="${esc(row.column)}" ${row.mask?'checked':''} ${data.done?'disabled':''}><div class="col-text"><div class="column-name">${esc(words(row.column))}</div><div class="col-sample">${row.mask&&row.withheld?esc(words(row.column))+' entirely withheld':esc(row.samples[0]||'(blank)')+(row.mask?` <span class="dim">-></span> <code>${esc(row.as_sent[0]||'')}</code>`:'')}</div>${row.mask?`<div class="reason">${esc(reasonText(row))}</div>`:''}</div></div>`;
     $('reviews').innerHTML=data.reviews.map((file,i)=>{
       const tabs=file.tabs.map(tab=>{
         const hid=tab.suggestions.filter(r=>r.mask),vis=tab.suggestions.filter(r=>!r.mask);

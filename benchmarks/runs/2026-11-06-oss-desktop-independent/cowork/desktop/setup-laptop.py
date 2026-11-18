@@ -38,12 +38,9 @@ COWORK_PROVIDER = {
     "command": [CLAUDE, "--mcp-config", os.path.join(COWORK, "cowork.mcp.json")],
     "env": {"CLAUDE_CONFIG_DIR": T4GC_CLAUDE, "ENABLE_TOOL_SEARCH": "false"},
     # Muse is the menu default; Paseo P19 explicitly selects idli-9b for the Drivey chat experiment.
-    # 2026-11-13: two grounded 9B modes to compare (benchmarks/runs/2026-11-13-grounded-9b): Careful asks first,
-    # Auto acts first; both describe only what was actually drawn.
+    # The Careful and Auto 9B modes (2026-11-13) left the menu on 2026-11-18 (owner): the router still serves them.
     "models": [{"id": "muse-glimmer-30b", "label": "Idli 30B", "isDefault": True},
-               {"id": "idli-9b", "label": "Idli 9B"},
-               {"id": "idli-9b-careful", "label": "Idli 9B - Careful (asks first)"},
-               {"id": "idli-9b-auto", "label": "Idli 9B - Auto (acts first)"}],
+               {"id": "idli-9b", "label": "Idli 9B"}],
     "disallowedTools": ["Bash", "BashOutput", "KillShell", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit",
                         "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite", "Skill", "mcp__paseo",
                         # unused built-ins: ~60k chars of tool schema = ~11k prompt tokens on Muse

@@ -6,7 +6,7 @@
 #                                                 build already on this machine)
 set -e
 DGX=${DGX:-beeps@gx10-0a47.tail5ef239.ts.net}
-BUILD=${BUILD:-paseo-app-dist-0.15.2-idli7}
+BUILD=${BUILD:-paseo-app-dist-0.15.2-idli26}
 RES=/opt/Paseo/resources
 OURS=${IDLI_HOME:-$HOME/idli-insights}/paseo/app-dist
 CFG=${IDLI_HOME:-$HOME/idli-insights}/config/ui.json

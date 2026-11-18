@@ -62,7 +62,7 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
     if not isinstance(paths, list) or not paths:
         raise ValueError('Choose at least one Drive path')
     entries = refresh(data_dir)
-    chosen = {}
+    chosen, folders = {}, []
     for name in paths:
         if not isinstance(name, str) or not name.startswith('Drive/'):
             raise ValueError('Use a Drive/ path')
@@ -71,6 +71,10 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
             continue
         folder = name.endswith('/')
         rel = _relative(name[6:].rstrip('/'))
+        if not folder and rel not in entries and any(p.startswith(rel + '/') for p in entries):
+            folder = True  # the @ picker writes a folder without its trailing slash (owner, 2026-11-18)
+        if folder:
+            folders.append(rel.rsplit('/', 1)[-1])
         if not folder and rel not in entries:
             matches = [p for p in entries if rel.startswith(p) and
                        (len(rel) == len(p) or rel[len(p)] in ' .,;!?')]
@@ -81,7 +85,7 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
         if not hits:
             raise ValueError('No indexed files at ' + name)
         chosen.update(hits)
-    result, errors, unsupported, missing = [], [], [], []
+    result, errors, unsupported, missing, skipped = [], [], [], [], {}
     from lib import teamcaps
     for rel, item in chosen.items():
         sheet = item['kind'] in ('Google Sheets', 'application/vnd.google-apps.spreadsheet')
@@ -95,6 +99,7 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
             reader = teamcaps.reader_for(data_dir, kind) if kind else None
             if not reader:
                 unsupported.append(item.get('title') or rel)
+                skipped[item.get('kind') or 'other'] = skipped.get(item.get('kind') or 'other', 0) + 1
                 if (kind or 'other') not in missing:
                     missing.append(kind or 'other')
                 continue
@@ -141,4 +146,5 @@ def fetch(data_dir, paths, workspace=None, spreadsheets_only=False):
             state.setdefault('workspace_minis', {})[workspace] = None
     home.update_state(data_dir, change)
     return {'files': result, **({'errors': errors} if errors else {}),
-            **({'unsupported': unsupported, 'missing': missing} if unsupported else {})}
+            **({'unsupported': unsupported, 'missing': missing, 'skipped': skipped} if unsupported else {}),
+            **({'folders': folders} if folders else {})}

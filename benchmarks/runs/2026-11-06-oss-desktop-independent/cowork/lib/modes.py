@@ -1107,6 +1107,19 @@ DRIVEY_EXTRA = frozenset(('binder_item', 'builder_open'))  # newer laptops; olde
 # Drivey; a typed request with no @ file and no open Mini goes to the 9B, which calls these tools itself.
 ACCOUNT_TOOLS = frozenset(('mail_search', 'mail_read', 'mail_draft', 'free_times', 'book_meeting', 'sheet_rows'))
 PICK_FILES = 'Add files or a folder with @ and send again.'
+KIND_WORDS = {'PDF': ('PDF', 'PDFs'), 'Image': ('image', 'images'), 'Google Docs': ('Google Doc', 'Google Docs'),
+              'Google Slides': ('Google Slides file', 'Google Slides files'), 'Microsoft Word': ('Word file', 'Word files'),
+              'Microsoft PowerPoint': ('PowerPoint file', 'PowerPoint files'), 'Video': ('video', 'videos')}
+
+
+def _kinds_words(skipped):
+    """{'PDF': 18, 'Image': 2} -> '18 PDFs and 2 images'."""
+    parts = []
+    for kind, n in sorted((skipped or {}).items(), key=lambda kv: -kv[1]):
+        one, many = KIND_WORDS.get(kind, ('other file', 'other files'))
+        parts.append(f'{n} {one if n == 1 else many}')
+    parts = parts or ['files']
+    return parts[0] if len(parts) == 1 else ', '.join(parts[:-1]) + ' and ' + parts[-1]
 ASKING_SERVICE = 'Asking the query service...'
 ASKING_SERVICE_AUTO = 'Asking the query service. Only masked data is sent...'
 BUILD_IT = ('Build it', 'The Builder adds this to the team on the right. Your files are not sent.')
@@ -1209,6 +1222,10 @@ def drivey_route(j):
             if not res.get('missing'):
                 return say(PICK_FILES)
             return card('Builder', _build_card_text(res.get('team'), res.get('labels')), [BUILD_IT, NOT_NOW])
+        if name == 'drive_fetch' and not res.get('files') and res.get('unsupported') and res.get('folders'):
+            return say(', '.join(res['folders']) + ' has ' + _kinds_words(res.get('skipped')) +
+                       ' and no spreadsheets. Idli answers questions from spreadsheets. Reading these files is not a '
+                       'building block yet: ask the Builder for it.')
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported'):
             return say('These files need spreadsheet copies before Idli can hide private values: ' +
                        ', '.join(res['unsupported']) + '. Save Excel or CSV copies in Drive, then pick them with @.')
@@ -1239,6 +1256,11 @@ def drivey_route(j):
         if name == 'drive_fetch':
             labels = ', '.join(f.get('title') or f.get('local', '') for f in res['files'])
             lead = 'Downloaded: ' + labels + '.'
+            if res.get('folders'):
+                lead = 'From ' + ', '.join(res['folders']) + ', using: ' + labels + '.'
+                if res.get('skipped'):
+                    lead += ' Skipped ' + _kinds_words(res['skipped']) + ': Idli reads spreadsheets.'
+                    res = {**res, 'unsupported': None}
             if res.get('unsupported'):
                 lead += (f" {res.get('team') or 'This team'} can't read " + ', '.join(res.get('labels') or ['these']) +
                          ' yet: ' + ', '.join(res['unsupported']) + '. Type "build it" to ask the Builder to add that.'
