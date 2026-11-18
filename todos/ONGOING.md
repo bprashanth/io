@@ -46,3 +46,39 @@ Noted 2026-11-15.
   for these files?" below it. The + button still opens the usual flow.
 - **An app is a description:** name, skills and tools to copy, the left-pane opening and a first-run step.
   Later apps (a search Mini) are one more card.
+- **2026-11-18:** the sandbox model ([narrative/UX.md](../narrative/UX.md)) may replace the marketplace. Installing
+  an app would mean `/sandbox` in the Builder picking its blocks. Decide once sandboxes are tested.
+
+## 4. Builder outside, sandboxes inside (2026-11-18, being built)
+- **Model:** [narrative/UX.md](../narrative/UX.md). The Builder is an ordinary Claude Code project. `/sandbox`
+  asks the old Teams questions, maps the request to building blocks, and refuses with a named gap when a block is
+  missing.
+- **A sandbox is a small VM:** only its blocks. A Drivey-style split, with Idli on the left and Sandbox Claude
+  (renamed from Analyst) on the right, on redacted data. The person assembles the workflow step by step in the left
+  chat and saves it as a Mini.
+- **Blocks today:**
+  - Drive files and Minis;
+  - Gmail search, read, draft;
+  - Calendar free times, book;
+  - Sheets read;
+  - the 9B judge;
+  - catalog tools.
+
+  Google through OAuth (Idli's own unverified app, project bitrot-in) and the APIs.
+- **Escalation:** [narrative/ESCALATION_MODELS.md](../narrative/ESCALATION_MODELS.md). A for action workflows
+  (Claude's script calls the 9B), B for insights (the 9B picks the Mini, as Drivey), C later (a stronger model picks
+  scripts on redacted questions).
+- **Removed:** Teams page, New team wizard, per-team Builder, Installed tools page.
+- **Unchanged:** Drivey, Start here.
+- **Testing now:**
+  - Drivey regression;
+  - Builder `/sandbox` for insights and for leads (87profligate as me, 88profligate as a lead);
+  - a gap case (Instagram).
+
+  Results will be in `benchmarks/runs/2026-11-18-sandboxes/`.
+- **Open:**
+  - redaction for account data (email bodies, senders, calendar titles) at the same standard as files;
+  - what a Mini is for an action workflow (a script with 9B calls), and how the person edits it;
+  - connecting the person's real account, with a "start from today" choice;
+  - where the earlier work fits: team stacks, the trusted catalog, test-account Chrome profiles. These become
+    blocks, or the Builder's tools, not team features.
