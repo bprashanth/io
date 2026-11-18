@@ -183,3 +183,6 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
   Thu 19 Nov 1 PM, Fri 20 Nov 1:30 PM, Mon 23 Nov 12:30 PM) with "Nothing was drafted, booked or sent". 87's Drafts
   checked through the API: no draft for that thread. Pass (shot 19). The 9B's one-line summary above it came back
   empty ("Here is what it found.").
+- (2) Turn on: "Activate this mini on my account" turned it on for 87profligate from today (18 Nov), and said that
+  a schedule is not a building block yet. `mini.json` has `active: {role: me, since: 2026-11-18}`. The card now
+  reads "On for 87profligate@gmail.com from 18 Nov." above the Fork button. Pass (shots 20, 21).
