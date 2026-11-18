@@ -159,7 +159,9 @@ def test_team_tools_match_drivey():
         sys.argv = old
     from lib import teams
     assert boot.TOOLSETS['Drivey'] == teams.TEAM_TOOLS
-    assert {'team_page', 'team_check', 'team_create'} <= set(boot.TOOLSETS['Start here'])
+    # 2026-11-18: Start here no longer makes teams (the Builder makes sandboxes); its old team tools are gone
+    assert not {'team_page', 'team_check', 'team_create'} & set(boot.TOOLSETS['Start here'])
+    assert 'Builder' in dict(boot.CLAUDE_SPACES)
     assert boot.TEAMS == teams.TEAMS_CHAT
 
 

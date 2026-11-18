@@ -39,6 +39,8 @@ sys.path.insert(0, root)
 from lib import teamcaps
 with open(Path(work) / 'CLAUDE.md', 'a') as f:
     f.write('\n' + teamcaps.describe(data, team))
+    from lib import blocks
+    f.write(blocks.claude_guide(data))
 skills = Path(work) / '.claude/skills'
 for old in skills.glob('team-*'):
     shutil.rmtree(old, ignore_errors=True)
@@ -67,7 +69,7 @@ sys.path.insert(0, root)
 from lib.launchsettings import merge
 from lib import rolelabels
 merge(os.path.dirname(target), os.environ['IDLI_DATA'])
-rolelabels.apply(os.path.join(os.path.dirname(target), '.claude', 'settings.json'), 'analyst',
+rolelabels.apply(os.path.join(os.path.dirname(target), '.claude', 'settings.json'), rolelabels.role_for(os.environ['IDLI_DATA']),
                  os.environ.get('IDLI_APP') or 'Drivey')
 fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as f:
@@ -99,7 +101,9 @@ CLAUDE_BIN=${CLAUDE_BIN:-$(command -v claude || echo "$HOME/.local/bin/claude")}
 # --mcp-config takes several files, so give it as one --flag=value: a prompt after it would be read as another file
 # The tab says Analyst (Claude Code would otherwise set its own title).
 export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
-printf '\033]0;Analyst\007'
+ROLE_TITLE=Analyst
+grep -q '"kind": "sandbox"' "$DATA/team.json" 2>/dev/null && ROLE_TITLE='Sandbox Claude'
+printf '\033]0;%s\007' "$ROLE_TITLE"
 # The account's claude.ai connectors (Drive, Gmail, Calendar) would reach real data around Idli's masking: off.
 export ENABLE_CLAUDEAI_MCP_SERVERS=false
 exec "$CLAUDE_BIN" "--mcp-config=$WORK/.idli-mcp.json" "$@"

@@ -440,6 +440,8 @@ def run_manifest(data_dir, manifest, qid, params):
     for key, value in values.items():
         args.extend(['--' + key, str(value)])
     env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_')}
+    # A sandbox's Mini may call its blocks (lib/blocks.py): it finds them through these
+    env.update({'IDLI_COWORK': str(Path(__file__).resolve().parent.parent), 'IDLI_SANDBOX': str(Path(data_dir))})
     try:
         r = subprocess.run(args, cwd=manifest.parent, env=env, capture_output=True, text=True, timeout=60,
                            stdin=subprocess.DEVNULL)

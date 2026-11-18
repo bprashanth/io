@@ -592,6 +592,11 @@ def refresh_team_tools(root=None):
     want = '\n'.join(TEAM_TOOLS) + '\n'
     changed = []
     for folder in sorted(glob.glob(os.path.join(root or os.path.join(_idli(), 'teams'), '*', 'team.json'))):
+        try:
+            if json.load(open(folder)).get('kind') == 'sandbox':  # a sandbox's tools are its blocks (lib/sandboxes.py)
+                continue
+        except (OSError, ValueError):
+            pass
         tools = os.path.join(os.path.dirname(folder), 'cowork.tools')
         if not os.path.exists(tools) or open(tools).read() != want:
             with open(tools, 'w') as f:

@@ -10,6 +10,8 @@ LABEL = Path(__file__).resolve().parent.parent / 'desktop' / 'idli-label.sh'
 WORDS = {
     'analyst': lambda team: f'Analyst for {team}. Private values reach me as codes. I work within what {team} '
                             'knows how to do.',
+    'sandbox': lambda team: f'Sandbox Claude for {team}. Private values, emails and calendar entries reach me as '
+                            'codes. I build steps from this sandbox\'s blocks; Idli runs them.',
     'builder': lambda team: f'Builder for {team}. I add new abilities to {team} with fake samples. I never see '
                             'your files.',
 }
@@ -31,3 +33,13 @@ def apply(settings_path, role, team):
 def title(role):
     """The terminal's title (Paseo shows it on the tab)."""
     return '\033]0;' + role.capitalize() + '\007'
+
+
+def role_for(data_dir):
+    """A sandbox's Claude is "Sandbox Claude"; Drivey's and the old teams' stay "Analyst"."""
+    try:
+        return 'sandbox' if json.loads((Path(data_dir) / 'team.json').read_text()).get('kind') == 'sandbox' \
+            else 'analyst'
+    except (OSError, ValueError):
+        return 'analyst'
+

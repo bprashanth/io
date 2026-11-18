@@ -713,6 +713,126 @@ if os.environ.get('IDLI_ROLE') == 'builder':
     TOOLS = BUILDER_TOOLS
 
 
+# ---- sandboxes (narrative/SANDBOXES.md) ----
+
+def _masked_account(obj, depth=0):
+    """Account content for Sandbox Claude: every string masked (lib/privacy.mask_account_text), codes kept."""
+    from lib import privacy
+    if depth > 5:
+        return None
+    if isinstance(obj, str):
+        return privacy.mask_account_text(str(data_dir()), obj[:4000])
+    if isinstance(obj, (int, float, bool)) or obj is None:
+        return obj
+    if isinstance(obj, dict):
+        return {str(k)[:60]: _masked_account(v, depth + 1) for k, v in list(obj.items())[:60]}
+    if isinstance(obj, (list, tuple)):
+        return [_masked_account(v, depth + 1) for v in list(obj)[:60]]
+    return None
+
+
+PEEK = {'gmail_search': lambda a: blocks_mod().gmail_search(a.get('query', ''), a.get('role'), a.get('limit', 10)),
+        'gmail_read': lambda a: blocks_mod().gmail_read(a['id'], a.get('role')),
+        'free_times': lambda a: blocks_mod().free_times(a.get('days', 5), a.get('minutes', 30), a.get('count', 3),
+                                                        role=a.get('role')),
+        'sheet_read': lambda a: blocks_mod().sheet_read(a['sheet'], role=a.get('role'))[:100]}
+
+
+def blocks_mod():
+    from lib import blocks
+    return blocks
+
+
+def account_peek(block, args=None):
+    """Read account content through one of this sandbox's read blocks, masked. Never real values."""
+    b = blocks_mod()
+    if block not in PEEK:
+        raise ValueError('account_peek reads only: ' + ', '.join(PEEK))
+    need = 'calendar_freebusy' if block == 'free_times' else block
+    if need not in b.enabled(data_dir()):
+        raise ValueError(f'This sandbox was made without {need}.')
+    return {'masked': True, 'result': _masked_account(PEEK[block](args or {}))}
+
+
+def script_try(script, args=None):
+    """Run one of your scripts (in your folder) on the sandbox's real accounts; you get its output masked. The
+    person is asked first: a script may write drafts or book meetings."""
+    work = Path(os.environ.get('IDLI_CLAUDE_WORK') or '.').resolve()
+    p = (work / str(script)).resolve()
+    if not p.is_relative_to(work) or p.suffix != '.py' or not p.is_file():
+        raise ValueError('Give a .py file in your folder.')
+    argv = [sys.executable, '-I', str(p)]
+    for k, v in (args or {}).items():
+        argv += ['--' + re.sub(r'[^a-z0-9_]', '', str(k).lower()), str(v)]
+    env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_')}
+    env.update({'IDLI_SANDBOX': str(data_dir()), 'IDLI_COWORK': str(Path(__file__).resolve().parent.parent)})
+    r = subprocess.run(argv, cwd=str(data_dir()), env=env, capture_output=True, text=True, timeout=120,
+                       stdin=subprocess.DEVNULL)
+    return {'exit': r.returncode, 'output': _masked_account(r.stdout[-4000:]),
+            'error': _masked_account(r.stderr[-1500:]) if r.returncode else ''}
+
+
+def _is_sandbox():
+    try:
+        return json.loads((data_dir() / 'team.json').read_text()).get('kind') == 'sandbox'
+    except (OSError, ValueError):
+        return False
+
+
+if os.environ.get('IDLI_ROLE') not in ('builder', 'outside') and _is_sandbox():
+    TOOLS['account_peek'] = (account_peek, "Read this sandbox's accounts through its blocks (gmail_search, gmail_read, "
+                             'free_times, sheet_read). You get the content masked: codes stand for names, emails and '
+                             'other private values.', {'block': {'type': 'string'}, 'args': {'type': 'object'}},
+                             ['block'])
+    TOOLS['script_try'] = (script_try, 'Run your script (a .py in your folder that imports lib.blocks) on the real '
+                           'accounts and get its output masked. The person is asked first.',
+                           {'script': {'type': 'string'}, 'args': {'type': 'object'}}, ['script'])
+
+
+# ---- the Builder outside every sandbox (IDLI_ROLE=outside, ~/idli-insights/builder) ----
+
+def sandbox_blocks():
+    from lib import blocks
+    return {'blocks': blocks.BLOCKS, 'note': 'A sandbox can use only these. Anything else is a gap: say so plainly '
+            'and pass it in gaps (no sandbox is made).'}
+
+
+def sandbox_create(word, goal, blocks, accounts=None, private=True, outside='ask', gaps=None):
+    from lib import sandboxes
+    return sandboxes.create(word, goal, blocks, accounts, private, outside, gaps)
+
+
+def sandbox_connect(email):
+    from lib import sandboxes
+    return sandboxes.connect(email)
+
+
+def sandbox_list():
+    from lib import sandboxes
+    return {'sandboxes': sandboxes.list_all()}
+
+
+OUTSIDE_TOOLS = {
+    'sandbox_blocks': (sandbox_blocks, 'The building blocks a sandbox can have, with what each does.', {}, []),
+    'sandbox_create': (sandbox_create, 'Make a sandbox with exactly these blocks and accounts, after the person agreed '
+                       'to the plan. With gaps (needs no block covers), no sandbox is made and the gap is noted.',
+                       {'word': {'type': 'string', 'description': 'One word for the workflow, e.g. leads'},
+                        'goal': {'type': 'string', 'description': 'The workflow in one plain sentence'},
+                        'blocks': {'type': 'array', 'items': {'type': 'string'}},
+                        'accounts': {'type': 'object', 'description': 'role: email, e.g. {"me": "x@gmail.com"}'},
+                        'private': {'type': 'boolean', 'description': 'Data has names, places or phone numbers'},
+                        'outside': {'type': 'string', 'enum': ['ask', 'never', 'always']},
+                        'gaps': {'type': 'array', 'items': {'type': 'string'}}},
+                       ['word', 'goal', 'blocks']),
+    'sandbox_connect': (sandbox_connect, "Connect a sandbox account to Google: opens Google's page in the person's "
+                        'browser. Tell them: click Advanced, then Go to idli, then Select all and Continue.',
+                        {'email': {'type': 'string'}}, ['email']),
+    'sandbox_list': (sandbox_list, 'The sandboxes made so far.', {}, []),
+}
+if os.environ.get('IDLI_ROLE') == 'outside':
+    TOOLS = OUTSIDE_TOOLS
+
+
 def main():
     for line in sys.stdin:
         try:

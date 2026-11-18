@@ -809,3 +809,18 @@ def mask_free_text(data_dir, text):
     vault = active_vault(data_dir, _session_map(data_dir))
     masked, _ = _redact(str(text), vault, Scanner())
     return masked
+
+
+def mask_account_text(data_dir, text):
+    """Account content (an email, a calendar entry, a sheet row) for a sandbox's Claude: masked with this folder's
+    known values, the regex rules and the name scanner, and the new codes saved, so Claude's replies show the person
+    the real values again (narrative/SANDBOXES.md)."""
+    full = _session_map(data_dir)
+    vault = active_vault(data_dir, full)
+    masked, _ = _redact(str(text), vault, Scanner())
+    full.forward.update(vault.forward)
+    full.display.update(vault.display)
+    full.counters.update(vault.counters)
+    _save(full)
+    return masked
+

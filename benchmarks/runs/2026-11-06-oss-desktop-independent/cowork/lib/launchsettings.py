@@ -11,7 +11,7 @@ from pathlib import Path
 import os
 import tempfile
 
-ASK = ['mcp__idli__unmask']
+ASK = ['mcp__idli__unmask', 'mcp__idli__script_try']
 
 
 def private_paths(data_dir, work):

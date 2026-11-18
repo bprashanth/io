@@ -42,9 +42,9 @@ LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md
     ("Drivey", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
     ("Claude", COWORK, None),
 ]
-CLAUDE_SPACES = [  # (workspace name, folder): chats run plain Claude Code; no Idli tools, no split (the split follows
-    ("WhatsAppy", os.path.join(IDLI, "whatsappy")),  # the private model's provider, Paseo patch P15)
-]
+CLAUDE_SPACES = [  # (workspace name, folder): chats run plain Claude Code; no split (the split follows the private
+    ("Builder", os.path.join(IDLI, "builder")),  # model's provider, Paseo patch P15). Builder: ordinary Claude Code,
+]  # plus /sandbox and Idli's sandbox tools (idli/builder-outside, narrative/SANDBOXES.md). WhatsAppy went 2026-11-18.
 CLAUDE_PROVIDER = os.environ.get("IDLI_CLAUDE_PROVIDER", "claude")
 LAYOUT += [(n, f, None) for n, f in CLAUDE_SPACES]
 FOLDER = {n: f for n, f, _ in LAYOUT}
@@ -56,7 +56,7 @@ SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
 # from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
 TOOLSETS = {
     "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import",
-                   "wire_page", "team_page", "team_check", "team_create"],
+                   "wire_page"],
     "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask", "binder_item",
                "builder_open"],
 }
@@ -164,9 +164,8 @@ def projects_and_workspaces():
             say(f"name workspace '{ws['name']}' -> '{title}'")
             paseo("workspace", "rename", ws["workspaceId"], title, parse=False, change=True)
         ids[name] = ws["workspaceId"] if ws else None
-        if name == "Start here" and proj:  # its second and third entries
+        if name == "Start here" and proj:  # its second entry (Teams went 2026-11-18: sandboxes are made by the Builder)
             ids[PRIVACY] = second_workspace(proj, path, PRIVACY, wss)
-            ids[TEAMS] = second_workspace(proj, path, TEAMS, wss)
     return ids
 
 
@@ -393,6 +392,32 @@ def refresh_teams():
         say(f"write {folder}/cowork.tools")
 
 
+def builder_folder():
+    """The Builder's Claude Code files: instructions, /sandbox, Idli's MCP server in the outside role."""
+    if DRY:
+        say("would write the Builder's /sandbox command and tools")
+        return
+    sys.path.insert(0, os.path.join(COWORK, "idli", "builder-outside"))
+    import builder_outside
+    builder_outside.setup(FOLDER["Builder"], COWORK)
+
+
+def retire_teams_page():
+    """Until 2026-11-18 Start here had a Teams entry (team cards and the New team questions). Sandboxes are made by
+    the Builder now: archive it."""
+    for w in paseo("workspace", "ls") or []:
+        if w["name"] == TEAMS and same(w["cwd"], FOLDER["Start here"]):
+            say("archive the Teams entry (the Builder makes sandboxes now)")
+            paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
+
+
+def retire_whatsappy():
+    for p in paseo("project", "ls") or []:
+        if same(p["path"], os.path.join(IDLI, "whatsappy")):
+            say("remove the WhatsAppy heading (its folder stays)")
+            paseo("project", "delete", p["projectId"], parse=False, change=True)
+
+
 def retire_teams_chat():
     """Until 2026-11-16 Teams was a chat; it is a page now (lib/teams_page.html), which Paseo (P21) opens as the Teams
     workspace's tab. Delete the old chat."""
@@ -413,6 +438,9 @@ def main():
     cid = chat(ids.get(PRIVACY), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
     plain_chat(cid)
     retire_teams_chat()
+    retire_teams_page()
+    retire_whatsappy()
+    builder_folder()
     refresh_teams()
     learned_tab(agent)  # Minis: a tab in Start here, next to the chat
     start_tabs(agent)
@@ -420,7 +448,7 @@ def main():
         chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on
     for name, folder in CLAUDE_SPACES:  # one Claude chat waiting in each
         chat(ids.get(name), folder, "New chat", "hi", provider=CLAUDE_PROVIDER)
-    say("done. Heading order: Start here, Drivey, WhatsAppy (drag once until Paseo patch P2).")
+    say("done. Heading order: Start here, Drivey, Builder, then sandboxes (drag once until Paseo patch P2).")
 
 
 if __name__ == "__main__":
