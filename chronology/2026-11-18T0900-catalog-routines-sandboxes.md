@@ -299,3 +299,12 @@ Owner's rules (built in phase 1, commit b46249da):
   9B mapped it to an email search, 18 s), "the draft for Asha" (the whole preview, 44 s), "step 2" (no steps:
   Fork card) all worked. The fork made "Lead replies in steps" (6 named steps, calendar notices skipped).
   The merry-parrot sandbox's outside setting was changed from Never to Ask for this test.
+- **More on the laptop:** "Lead replies in steps" ran step 1 (5 leads, 3 s) and step 3 (the 9B's reading of 10
+  replies, 71 s) on their own; "which leads agreed but have not picked a time?" was mapped by the outside service to
+  step 4 (the full draft shown, 94 s). "Post each booked meeting to Instagram" ended at the Fork card; in the fork,
+  Sandbox Claude said only the Builder can add an Instagram block, but it then opened the old per-team Builder beside
+  itself (a Teams leftover). Interrupted before it wrote anything; fixed: no `builder_open` for Sandbox Claude in a
+  sandbox. Opening a workflow Mini now says what it can see and lists its steps.
+- **Left:** the insights folder (public NDSA 2021 Fixity Survey: report PDF and data CSV, CC BY 4.0; the Dryad set
+  needs a login now), adding the 2025 data and extending the charts as a new Mini, Drivey last, README, gallery,
+  docs, suites.

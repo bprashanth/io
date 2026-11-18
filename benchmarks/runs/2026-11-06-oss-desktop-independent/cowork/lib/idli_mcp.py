@@ -848,6 +848,9 @@ def _is_sandbox():
 
 
 if os.environ.get('IDLI_ROLE') not in ('builder', 'outside') and _is_sandbox():
+    # In a sandbox the Builder is outside (the sidebar's Builder), never a team Builder beside Sandbox Claude: a
+    # missing block is for the person to ask there (owner, 2026-11-18; narrative/SANDBOXES.md).
+    TOOLS.pop('builder_open', None)
     TOOLS['account_peek'] = (account_peek, "Read this sandbox's accounts through its blocks (gmail_search, gmail_read, "
                              'free_times, sheet_read). You get the content masked: codes stand for names, emails and '
                              'other private values.', {'block': {'type': 'string'}, 'args': {'type': 'object'}},

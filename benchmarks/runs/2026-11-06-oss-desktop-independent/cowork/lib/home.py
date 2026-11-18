@@ -689,6 +689,14 @@ def mini_open(data_dir, ident, workspace=None):
     # Yes at setup (query-service-always): no card each time; only masked data is sent, as with the card.
     query_auto = can_query and os.path.exists(os.path.join(data_dir, 'query-service-always'))
     if actions:  # an action Mini (accounts, not files): ask it, preview it, run it or turn it on (lib/minitalk.py)
+        from lib import miniscope
+        mm = {**m, 'id': ident}
+        can = miniscope.uses(data_dir, mm)
+        named = miniscope.steps(data_dir, mm)
+        if can:
+            lines += ['', 'It ' + ', '.join(can[:-1]) + (' and ' if len(can) > 1 else '') + can[-1] + '.']
+        if named:
+            lines += ['', 'Its steps: ' + '; '.join(f'{n}. {t}' for n, t in named) + '. Say "run step 2" to see one.']
         lines += ['', minitalk.state(m) + ' Ask how it works, or "show me what you would draft". Nothing is written '
                   'until you say "run it". To change it, press Fork on its card.']
     return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'can_query': can_query,
