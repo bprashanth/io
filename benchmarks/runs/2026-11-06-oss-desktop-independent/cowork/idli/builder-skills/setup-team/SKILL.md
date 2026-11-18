@@ -71,20 +71,23 @@ from any account.
 
 ## 4. Learn each app, then write the workflow as a routine
 
-For each app in the steps, use it in the test profile with the browser tools to understand it. Then write the
-workflow as a **routine**: `routines/<name>.json`, which Idli runs the same way every time, never Claude. Its steps:
+For each app in the steps, use it in the test profile with the browser tools to understand it. Routines reach
+Gmail, Calendar and Sheets through **Google's APIs**, not the pages: connect each test account once with
+`google_connect(role)`. Tell the person first: Google shows "Google hasn't verified this app"; they click Advanced,
+then Go to Idli (unsafe), because it is our own app, then Continue. Then write the workflow as a **routine**: `routines/<name>.json`, which Idli runs the same way every time, never Claude. Its steps:
 - `sheet`: a Google Sheet's rows, by its id (`{config.leads_sheet}`). Find the id in the test sheet's address and
   set it with `routine_config_set(name, "leads_sheet", "<id>")`.
 - `mail`: unread inbox mail, opened, kept only from senders listed in a sheet column (`"from_in": "leads.email"`).
-- `free`: open times from the calendar. `routine_config_set(name, "ical", "@ical:me")` lets Idli read the test
-  calendar's secret address itself.
+- `free`: open times from the account's calendar (`"role": "me"`, `"days"`, `"hours"`, `"minutes"`, `"count"`).
 - `judge`: the private 9B reads each item and answers in a fixed shape (a JSON schema). Every judgement goes here
   (did they agree, which time, is this a complaint), never in word rules. The schema must have `"unclear"`: Idli
   sends unclear answers to the person.
 - `script`: your own Python (`routines/<file>.py`): JSON in on stdin (`context`, `memory`, `mode`), one JSON line
   out with `actions` and the `memory` you want next time (for example the times you offered each lead).
 Actions are done once each, by their `key`: `draft_email` (a Gmail draft: the person presses Send),
-`book_event` (after the person's yes on the Runs page), `ask_person` (shown on the Runs page).
+`book_event` (after the person's yes on the Runs page), `ask_person` (shown on the Runs page). A draft answers the
+lead's message in its thread: give `"reply_to": "<the message id>"` (or the same subject with "Re:"). Mail the
+routine has handled gets the Gmail label Idli/handled and isn't read again.
 
 `routine_check(name)` checks the file. Test the 9B prompt on several fake replies (yes, no, maybe, picks a time,
 picks a time you didn't offer, Hindi) with `routine_rehearse`.

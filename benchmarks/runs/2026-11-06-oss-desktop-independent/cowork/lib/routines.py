@@ -106,8 +106,8 @@ def check(data_dir, name):
             out.append(f'{where}: say which account ("role": "me").')
         if t == 'sheet' and not s.get('sheet'):
             out.append(f'{where}: "sheet" (a sheet id, or {{config.<key>}}).')
-        if t == 'free' and not s.get('ical'):
-            out.append(f'{where}: "ical" (usually {{config.ical}}).')
+        if t == 'free' and s.get('via') == 'web' and not s.get('ical'):
+            out.append(f'{where}: "ical" (usually {{config.ical}}), when it reads the calendar through the web.')
         if t == 'judge':
             if s.get('each') not in have:
                 out.append(f'{where}: "each" must name an earlier step\'s "as".')
@@ -132,6 +132,21 @@ def _profile(data_dir, role, mode):
     if mode == 'test':
         return chromeprofiles.profile_for_role(str(data_dir), role)
     return chromeprofiles.real_profile_for_role(str(data_dir), role)
+
+
+def _email(data_dir, role, mode):
+    """The Google account for a role: a confirmed test account in a rehearsal, the person's mapped account in real
+    runs. Its Google sign-in (lib/google_api.py) must exist."""
+    from lib import chromeprofiles
+    if mode == 'test':
+        chromeprofiles.profile_for_role(str(data_dir), role)  # checks the profile's accounts are all test accounts
+        row = next(r for r in chromeprofiles.test_accounts(str(data_dir)) if r['role'] == role)
+        return row['email']
+    raw = _read(Path(data_dir).resolve() / '.idli' / 'real-accounts.json', {})
+    row = next((r for r in raw.get('accounts') or [] if r.get('role') == role), None)
+    if not row or not row.get('email'):
+        raise ValueError('This routine runs on your real Google account, and that is not connected in Idli yet.')
+    return row['email']
 
 
 def config(data_dir, name, mode):
@@ -198,6 +213,7 @@ class Run:
             self.state.setdefault(k, {})
         self.browsers = browsers if browsers is not None else {}  # role -> Browser (tests pass fakes)
         self.judge_fn = judge_fn or judge
+        self.emails = {}
         self.log = {'routine': name, 'mode': mode, 'dry_run': dry_run, 'started': _now(), 'steps': [], 'actions': []}
         self.context = {}
 
@@ -208,9 +224,54 @@ class Run:
                                                                                               self.mode)))
         return self.browsers[role]
 
+    def email(self, role):
+        if role not in self.emails:
+            self.emails[role] = _email(self.data_dir, role, self.mode)
+        return self.emails[role]
+
     def step(self, s):
-        from lib import google_web as g
+        from lib import google_api as api, google_web as g
         t, key = s['type'], s.get('as')
+        web = s.get('via') == 'web'  # Google's web pages instead of its APIs: only when a step asks for it
+        if t == 'sheet' and not web:
+            rows = api.sheet_values(self.email(s['role']), _fill(s['sheet'], self.cfg), s.get('range', 'A:ZZ'))
+            self.context[key] = [{(k or '').strip().lower(): (v or '').strip() for k, v in r.items()} for r in rows]
+            return f'{len(rows)} rows'
+        if t == 'mail' and not web:
+            who = self.email(s['role'])
+            allow = None
+            if s.get('from_in'):
+                src, col = s['from_in'].split('.', 1)
+                allow = {str(r.get(col, '')).strip().lower() for r in self.context.get(src, [])} - {''}
+            q = f'newer_than:{int(s.get("days", 7))}d -label:{api.HANDLED.replace("/", "-")} -in:sent -in:drafts'
+            found = []
+            senders = sorted(allow or [])
+            for i in range(0, len(senders), 20) if allow is not None else [None]:
+                part = q if i is None else f'from:({" OR ".join(senders[i:i + 20])}) ' + q
+                found += [] if allow == set() else api.gmail_list(who, part, 100)
+            seen = self.state.setdefault('seen', {})
+            msgs, old, skipped = [], 0, 0
+            for m in {m['id']: m for m in found}.values():
+                if m['id'] in seen:
+                    old += 1
+                    continue
+                msg = api.gmail_raw(who, m['id'])
+                if allow is not None and msg['from'] not in allow:
+                    skipped += 1
+                    continue
+                msgs.append(msg)
+            msgs.sort(key=lambda m: m.get('date', ''))
+            self._new_seen = [m['id'] for m in msgs]
+            self._handled_by = who
+            self.context[key] = msgs
+            return f'{len(msgs)} new from the list, {old} seen before' + (f', {skipped} from others' if skipped else '')
+        if t == 'free' and not web:
+            now = dt.datetime.now().astimezone()
+            busy = api.calendar_freebusy(self.email(s.get('role', 'me')), now, now + dt.timedelta(days=int(s.get('days', 5)) + 7))
+            slots = g.free_slots(busy, days=s.get('days', 5), hours=s.get('hours', '10:00-17:00'),
+                                 minutes=s.get('minutes', 30), count=s.get('count', 3))
+            self.context[key] = [{'start': t.isoformat(), 'label': g.slot_label(t)} for t in slots]
+            return f'{len(slots)} open times'
         if t == 'sheet':
             rows = g.sheet_rows(self.browser(s['role']), _fill(s['sheet'], self.cfg), s.get('gid'))
             self.context[key] = [{(k or '').strip().lower(): (v or '').strip() for k, v in r.items()} for r in rows]
@@ -318,13 +379,24 @@ class Run:
         if self.dry_run:
             return 'would do (dry run)'
         key = a['key']
+        from lib import google_api as api
+        web = a.get('via') == 'web'
         if a['type'] == 'draft_email':
-            g.compose_draft(self.browser(a.get('role', 'me')), a['to'], a['subject'], a['body'])
+            if web:
+                g.compose_draft(self.browser(a.get('role', 'me')), a['to'], a['subject'], a['body'])
+            else:
+                reply = self._reply_target(a)
+                api.gmail_create_draft(self.email(a.get('role', 'me')), a['to'], a['subject'], a['body'],
+                                       thread_id=reply.get('thread'), in_reply_to=reply.get('message_id'), key=key)
             result = 'draft saved (you press Send)'
         elif a['type'] == 'book_event':
             start = dt.datetime.fromisoformat(a['start'])
-            g.calendar_event(self.browser(a.get('role', 'me')), a['title'], start, int(a.get('minutes', 30)),
-                             a['guest'], a.get('details', ''))
+            if web:
+                g.calendar_event(self.browser(a.get('role', 'me')), a['title'], start, int(a.get('minutes', 30)),
+                                 a['guest'], a.get('details', ''))
+            else:
+                api.calendar_insert(self.email(a.get('role', 'me')), a['title'], start, int(a.get('minutes', 30)),
+                                    [a['guest']], a.get('details', ''), key=key)
             result = 'booked, invitation sent'
         else:
             return 'nothing to do'
@@ -333,6 +405,16 @@ class Run:
         self.state['pending'].pop(key, None)
         self.save()
         return result
+
+    def _reply_target(self, a):
+        """The message a draft answers: "reply_to" (a message id) if the script gave it, else the newest message in
+        this run from that person with the same subject."""
+        mail = [m for v in self.context.values() if isinstance(v, list) for m in v if isinstance(m, dict) and 'thread' in m]
+        if a.get('reply_to'):
+            return next((m for m in mail if m.get('id') == a['reply_to']), {})
+        bare = lambda x: re.sub(r'(?i)^\s*((re|fwd?):\s*)+', '', str(x or '')).strip().lower()  # noqa: E731
+        hits = [m for m in mail if m.get('from') == str(a.get('to', '')).lower() and bare(m.get('subject')) == bare(a.get('subject'))]
+        return max(hits, key=lambda m: m.get('date', '')) if hits else {}
 
     def save(self):
         if not self.dry_run:
@@ -356,6 +438,9 @@ class Run:
                 if not self.dry_run:
                     for mid in getattr(self, '_new_seen', []):
                         self.state.setdefault('seen', {})[mid] = _now()
+                    if getattr(self, '_handled_by', None) and self._new_seen:
+                        from lib import google_api
+                        google_api.gmail_mark_handled(self._handled_by, self._new_seen)
         finally:
             self.log['finished'] = _now()
             self.save()

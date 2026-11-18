@@ -636,7 +636,31 @@ def routine_rehearse(name, approve_all=True, dry_run=False):
     return json.loads(res.stdout.strip().splitlines()[-1])
 
 
+CONNECT_SAY = ('A Google page opened in the Chrome window for {email}. It may say "Google hasn\'t verified this app": '
+               'click Advanced, then Go to Idli (unsafe). It is our own app. Then tick the boxes and click Continue.')
+
+
+def google_connect(role):
+    """Sign a confirmed TEST account in to Idli's Google app (Gmail, Calendar, Sheets through Google's APIs), in its
+    own Chrome profile. Waits until the person has said yes on Google's page (up to 10 minutes)."""
+    from lib import chromeprofiles, google_api
+    row = next((r for r in chromeprofiles.test_accounts(str(data_dir())) if r['role'] == role), None)
+    if not row:
+        raise ValueError(f'No test account has the role {role}. Confirm one with test_account_set first.')
+    chromeprofiles.check_test_profile(str(data_dir()), row['profile'])
+    if google_api.connected(row['email']):
+        return {'ok': True, 'email': row['email'], 'note': 'Already connected.'}
+    out = google_api.connect(row['email'], lambda url: chromeprofiles.open_for_sign_in(row['profile'], url))
+    out['told_the_person'] = CONNECT_SAY.format(email=row['email'])
+    return out
+
+
 ROUTINE_TOOLS = {
+    'google_connect': (google_connect, 'Connect a confirmed TEST account to Idli\'s Google app, so routines can use '
+                       'Gmail, Calendar and Sheets through Google\'s APIs. BEFORE calling, tell the person: ' +
+                       CONNECT_SAY.format(email='<the account>') + ' Then call it; it waits for them.',
+                       {'role': {'type': 'string', 'description': 'The test account\'s role, such as me or lead'}},
+                       ['role']),
     'routine_check': (routine_check, 'Check routines/<name>.json: the steps, the 9B judge (with "unclear"), the '
                       'scripts, and which test settings are set.', {'name': {'type': 'string'}}, ['name']),
     'routine_config_set': (routine_config_set, 'Set a routine setting for the TEST accounts, used as {config.<key>} '

@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import google_web, routines  # noqa: E402
+from lib import google_api, google_web, routines  # noqa: E402
 
 FEED = """<?xml version="1.0"?><feed><entry><title>Re: Meeting</title><summary>Friday 2 pm works</summary>
 <link href="https://mail.google.com/mail/u/0?account_id=a&amp;message_id=1a2b3c4d5e6f&amp;view=conv"/>
@@ -34,7 +34,7 @@ for m in d["context"].get("mail", []):
                      d["context"]["slots"][v["picked"] - 1]["start"], "minutes": 30, "guest": m["from"]})
     elif v.get("agreed"):
         acts.append({"type": "draft_email", "key": "offer:" + m["id"], "role": "me", "to": m["from"],
-                     "subject": "Times", "body": "\n".join(s["label"] for s in d["context"]["slots"])})
+                     "subject": m["subject"], "body": "\n".join(s["label"] for s in d["context"]["slots"])})
 print(json.dumps({"actions": acts, "memory": {"runs": d["memory"].get("runs", 0) + 1}}))
 '''
 
@@ -82,15 +82,18 @@ class Running(unittest.TestCase):
         self.did = []
         tz = dt.datetime.now().astimezone().tzinfo
         slots = [dt.datetime(2026, 11, 19 + i, 10, 0, tzinfo=tz) for i in range(3)]
-        self.p = [mock.patch.object(google_web, 'sheet_rows', return_value=[{'Name': 'L', 'Email': 'Lead@example.org'}]),
-                  mock.patch.object(google_web, 'mail_search', side_effect=lambda b, senders, days=7: [
-                      {'id': m['id']} for m in self.inbox]),
-                  mock.patch.object(google_web, 'mail_message', side_effect=lambda b, i: next(
-                      m for m in self.inbox if m['id'] == i)),
-                  mock.patch.object(google_web, 'ical_busy', return_value=[]),
+        self.p = [mock.patch.object(routines, '_email', return_value='me@example.org'),
+                  mock.patch.object(google_api, 'sheet_values', return_value=[{'Name': 'L', 'Email': 'Lead@example.org'}]),
+                  mock.patch.object(google_api, 'gmail_list', side_effect=lambda who, q, n=100: [
+                      {'id': m['id']} for m in self.inbox if m['id'] not in self.handled]),
+                  mock.patch.object(google_api, 'gmail_raw', side_effect=lambda who, i: {
+                      'thread': 't-' + i, 'message_id': '<' + i + '@x>', **next(m for m in self.inbox if m['id'] == i)}),
+                  mock.patch.object(google_api, 'gmail_mark_handled', side_effect=lambda who, ids: self.handled.update(ids)),
+                  mock.patch.object(google_api, 'calendar_freebusy', return_value=[]),
                   mock.patch.object(google_web, 'free_slots', return_value=slots),
-                  mock.patch.object(google_web, 'compose_draft', side_effect=lambda b, *a: self.did.append(('draft',) + a)),
-                  mock.patch.object(google_web, 'calendar_event', side_effect=lambda b, *a: self.did.append(('book',) + a))]
+                  mock.patch.object(google_api, 'gmail_create_draft', side_effect=lambda who, *a, **k: self.did.append(('draft',) + a + (k,))),
+                  mock.patch.object(google_api, 'calendar_insert', side_effect=lambda who, *a, **k: self.did.append(('book',) + a + (k,)))]
+        self.handled = set()
         for p in self.p:
             p.start()
         self.verdicts = {'yes': {'agreed': True, 'unclear': False}}
@@ -116,7 +119,10 @@ class Running(unittest.TestCase):
         self.assertTrue(log['ok'], log)
         self.assertEqual([d[0] for d in self.did], ['draft'])  # the non-lead mail was left alone
         self.assertIn('1 new from the list', log['steps'][1]['note'])
-        self.assertIn('1 last answered by someone else', log['steps'][1]['note'])
+        self.assertIn('1 from others', log['steps'][1]['note'])
+        self.assertEqual(self.did[0][-1]['thread_id'], 't-aa11')  # a reply in the lead's thread
+        self.assertEqual(self.did[0][-1]['in_reply_to'], '<aa11@x>')
+        self.assertIn('aa11', self.handled)  # labelled Idli/handled after the run went through
         self.go()
         self.assertEqual(len(self.did), 1)  # done once
         # the lead picks the second time
@@ -151,7 +157,7 @@ class Running(unittest.TestCase):
             raise ValueError('Calendar did not save the event.')
         self.inbox[0]['new_text'] = 'pick2'
         self.verdicts['pick2'] = {'agreed': True, 'picked': 2, 'unclear': False}
-        with mock.patch.object(google_web, 'calendar_event', side_effect=boom):
+        with mock.patch.object(google_api, 'calendar_insert', side_effect=boom):
             log = self.go(approve_all=True)
         self.assertEqual(routines._read(routines.state_dir(self.d, 'leads') / 'state.json', {}).get('seen', {}), {})
         log = self.go(approve_all=True)
