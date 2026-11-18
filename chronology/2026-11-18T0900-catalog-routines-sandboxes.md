@@ -292,3 +292,10 @@ Owner's rules (built in phase 1, commit b46249da):
 - A sandbox question with no Mini open goes to Sandbox Claude, masked, to build it in steps (`blocks.run_steps`).
 - PDFs that come with spreadsheets go to Claude too, as masked text (`lib/docmask.py`).
 - New `blocks.meetings` (titles, guests, declined) under the calendar block.
+- **Phase 2 on the laptop so far** (`benchmarks/runs/2026-11-18-mini-escalation/`): Drivey unchanged first (9 s);
+  a blind "which meetings do I have this week?" went to Claude masked, which wrote a 3-step script, ran it
+  through Idli (real meetings on the left) and saved "My meetings this week"; in Lead replies, "list of leads"
+  (outside service, 9 s: the sheet's 5 rows), "meetings yesterday" (the calendar), "which emails are new" (No: the
+  9B mapped it to an email search, 18 s), "the draft for Asha" (the whole preview, 44 s), "step 2" (no steps:
+  Fork card) all worked. The fork made "Lead replies in steps" (6 named steps, calendar notices skipped).
+  The merry-parrot sandbox's outside setting was changed from Never to Ask for this test.
