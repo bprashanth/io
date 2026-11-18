@@ -249,7 +249,7 @@ def check(folder, run_tests=True):
         res = _spawn('test', folder, None, {}, 90)
         if not res.get('ok'):
             problems.append('its test failed: ' + str(res.get('error') or 'no reason given')[:300])
-    out = {'ok': not problems, 'problems': problems[:12], 'card': card(folder) if m else '',
+    out = {'ok': not problems, 'problems': problems[:12], 'card': card(folder) if m and not problems else '',
            'seconds': round(time.time() - t0, 1)}
     if out['ok'] and run_tests:
         out['checked'] = 'The scan passed and test_block.py passed on its fake data.'
