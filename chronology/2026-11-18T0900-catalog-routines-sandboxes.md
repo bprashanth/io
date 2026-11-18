@@ -152,3 +152,18 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
   page now shows filled cells, and a hidden column of whole text cells (or nothing at all) reads "Notes entirely
   withheld" (shot 16). Long-running chats and page servers had to be restarted to pick this up (page servers on
   the same ports).
+- **Minis: ask, activate, fork (code in 3db57720, deploying).**
+  - `lib/minitalk.py`: anything typed while a saved action Mini is open goes to the new `mini_talk` tool. The 9B
+    reads the Mini's steps and code and decides: explain (answers from the code), preview (Idli runs the Mini on
+    the real accounts with `IDLI_PREVIEW=1`: reading as usual, drafts and bookings only collected and shown, never
+    written), run, turn on or off, or change (points to Fork). Before this, the owner's three questions all got
+    "This Mini can't answer that. Add files...".
+  - Turn on: the Mini is bound to an account from today; its Gmail searches get `after:<today>`. Scheduling stays
+    a gap and the reply says so.
+  - Fork: a Fork button on the Mini card copies the scripts (values coded again) into Sandbox Claude's
+    `forks/<id>/` with FORK.md, and types the prompt into Sandbox Claude on the right. `script_try` now runs in
+    preview by default, and shows its real output in the left chat ("Run from Claude: <title>"); Claude still
+    gets it masked. A fork's draft saves as a new Mini, never into the original.
+  - Found while testing: opening an action Mini ran it once for real (an "example" run meant for chart Minis).
+    Drafts and bookings are keyed, so nothing doubled, but opening must not act: fixed. Checks before saving a
+    draft now run in preview too.

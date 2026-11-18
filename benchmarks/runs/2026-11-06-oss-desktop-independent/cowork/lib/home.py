@@ -672,7 +672,10 @@ def mini_open(data_dir, ident, workspace=None):
     lines = ['[' + plain(m['name']).replace('[', '').replace(']', '') + '](' + journey.page_url(
         data_dir, 'mini-card', mini=ident, embed=1, h=700, ws=workspace or '') + ')']
     charts = m.get('charts', [])
-    if not charts and m['questions']:
+    from lib import minitalk
+    actions = minitalk.is_action(data_dir, {**m, 'id': ident})
+    # An action Mini is never run just by opening it: its run drafts and books (lib/minitalk.py)
+    if not charts and m['questions'] and not actions:
         try:
             example = run_mini(data_dir, ident, m['questions'][0]['id'], {})
             if example['chart']:
@@ -685,8 +688,6 @@ def mini_open(data_dir, ident, workspace=None):
     can_query = not os.path.exists(os.path.join(data_dir, 'no-query-service'))
     # Yes at setup (query-service-always): no card each time; only masked data is sent, as with the card.
     query_auto = can_query and os.path.exists(os.path.join(data_dir, 'query-service-always'))
-    from lib import minitalk
-    actions = minitalk.is_action(data_dir, {**m, 'id': ident})
     if actions:  # an action Mini (accounts, not files): ask it, preview it, run it or turn it on (lib/minitalk.py)
         lines += ['', minitalk.state(m) + ' Ask how it works, or "show me what you would draft". Nothing is written '
                   'until you say "run it". To change it, press Fork on its card.']
