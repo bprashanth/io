@@ -141,7 +141,7 @@ class ActionMiniTests(unittest.TestCase):
         out = self.talk('show me the draft you would write',
                         [{'kind': 'preview'}, {'answer': 'It would offer Asha three times.'}])
         self.assertEqual(out['kind'], 'preview')
-        self.assertIn('**Draft to lead@x.org**', out['reply'])
+        self.assertIn('**Would draft to lead@x.org**', out['reply'])
         self.assertIn('> Hello Asha, would Fri 2 PM work?', out['reply'])
         self.assertIn('Nothing was drafted, booked or sent', out['reply'])
 
@@ -159,7 +159,8 @@ class ActionMiniTests(unittest.TestCase):
 
     def test_change_points_to_fork(self):
         out = self.talk('only replies from the last 2 days', [{'kind': 'change'}])
-        self.assertIn('press Fork', out['reply'])
+        self.assertEqual(out['kind'], 'none')  # the router offers the Fork card
+        self.assertIn('Fork it to continue with Claude', out['reply'])
 
     def test_fork_copies_without_touching_the_original(self):
         from lib import home, minifork, journey

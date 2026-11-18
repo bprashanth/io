@@ -1,5 +1,7 @@
 """Local Drivey review sessions and editable Mini drafts. Never imported by the router."""
 import datetime
+import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -95,7 +97,33 @@ def review_done(data_dir, ident):
         return {'done': True}
 
 
-def handoff(data_dir, files, question, workspace, mini_id=None):
+def ask_claude(data_dir, question, workspace, preview=False):
+    """A sandbox question that no Mini answers (owner, 2026-11-18): Sandbox Claude gets it masked, builds it with the
+    sandbox's blocks as a workflow in steps, runs it through Idli (the real results show on the left) and offers to
+    save it as a Mini. With preview: only what Claude would get, for the person's card."""
+    if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
+        raise ValueError('Open this question in its sandbox chat and try again.')
+    masked = privacy.mask_account_text(str(data_dir), ' '.join(str(question).split())[:800])
+    if preview:
+        return {'preview_only': True, 'masked_question': masked}
+    prompt = ('A question from the chat on the left that no Mini answers yet (masked by Idli): "' + masked + '". '
+              'Answer it with this sandbox\'s blocks: write a short script in named steps, run it with script_try '
+              '(the person sees the real result on the left), and offer to save it as a Mini. If the blocks can\'t '
+              'do it, say so and tell the person to ask the Builder.')
+    with home._SEND_LOCK:
+        wid = home._drivey_workspace(data_dir, workspace)
+        tid = home._claude_terminal(data_dir, wid)
+        if tid:
+            home.type_into(tid, prompt)
+        else:
+            tid = home._start_claude(wid, prompt)
+        home._remember(data_dir, wid, tid)
+    from lib import uiswitch
+    shown = uiswitch.show_terminal(wid, tid, 'right')
+    return {'terminal': tid, 'focused': bool(shown.get('ok')), 'reply': 'Sent to Claude on the right.'}
+
+
+def handoff(data_dir, files, question, workspace, mini_id=None, docs=None):
     # Apply suggestions on the first handoff from a Mini, and retain reviewed choices.
     if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
         raise ValueError('Open this question in its Drivey workspace and try again.')
@@ -103,6 +131,10 @@ def handoff(data_dir, files, question, workspace, mini_id=None):
     if mini_id:
         mini = home.read(home.object_path(data_dir, 'minis', mini_id))
         question += ' Mini context: ' + home.plain(mini['name']) + '. ' + home.plain(mini['goal'])[:240]
+    if docs:  # PDFs that came with the spreadsheets, as masked text in Claude's folder (lib/docmask.py)
+        from lib import docmask
+        question += docmask.note_for_claude([d for d in docs if isinstance(d, dict) and
+                                             re.fullmatch(r'docs/[\w .()-]+\.txt', str(d.get('local', '')))])
     result = home.send(data_dir, prepared['files'], question, workspace)
     def change(state):
         state.setdefault('workspace_minis', {})[workspace] = mini_id
@@ -177,6 +209,26 @@ def _fork_of(data_dir, code):
         return None
 
 
+def _step_titles(data_dir, folder, questions):
+    """A workflow written in named steps (lib/blocks.run_steps): its step titles, so the person can run each one."""
+    import subprocess
+    import sys
+    if len(questions) != 1:
+        return []
+    script = folder / questions[0]['script']
+    if 'run_steps(' not in script.read_text():
+        return []
+    env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_')}
+    env.update({'IDLI_COWORK': str(Path(__file__).resolve().parent.parent), 'IDLI_SANDBOX': str(Path(data_dir))})
+    try:
+        r = subprocess.run([sys.executable, '-I', str(script), '--list-steps'], cwd=folder, env=env,
+                           capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
+        titles = json.loads(r.stdout.strip().splitlines()[-1])
+        return [home.plain(str(t))[:120] for t in titles if str(t).strip()][:12]
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return []
+
+
 def draft_mini(data_dir, title, story, questions, code, workspace, author):
     if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
         raise ValueError('Open Claude from a Drivey workspace and try again.')
@@ -209,7 +261,9 @@ def draft_mini(data_dir, title, story, questions, code, workspace, author):
         drive = Path(data_dir).resolve() / 'drive'
         drive.mkdir(exist_ok=True)
         (folder / 'drive').symlink_to(drive, target_is_directory=True)
+        steps = _step_titles(data_dir, folder, questions)
         draft = {'id': ident, 'name': home.plain(title), 'goal': home.plain(story), 'questions': questions,
+                 **({'steps': steps} if steps else {}),
                  'files': selected, 'charts': pins, 'code': str(code or home.work_dir(data_dir)), 'workspace': workspace,
                  'source_id': source_id, 'source_name': source_name, 'author': author,
                  **({'forked_from': forked_from} if forked_from else {}),
@@ -368,6 +422,7 @@ def save_draft(data_dir, ident, edits, action='new'):
                             'questions': saved_questions,
                             'files': list(files.values()), 'charts': list(all_charts.values()),
                             'author': draft['author'], 'date': draft['date'], 'code': draft['code'],
-                            **({'forked_from': draft['forked_from']} if draft.get('forked_from') else {})})
+                            **({'forked_from': draft['forked_from']} if draft.get('forked_from') else {}),
+                            **({'steps': draft['steps']} if draft.get('steps') and action == 'new' else {})})
         home.write(folder / 'mini.json', {**draft, 'saved_id': target_id})
         return {'id': target_id, 'saved': True}

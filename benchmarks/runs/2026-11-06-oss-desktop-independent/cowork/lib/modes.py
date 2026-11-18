@@ -1132,6 +1132,21 @@ def _build_card_text(team, labels):
     what = ', '.join(labels) if labels else 'this'
     return f"{team} can't read {what} yet. The Builder can add that to {team}. Build it with the Builder?"
 SERVICE_CARD = ('Send this to the query service?')
+MAP_CARD = 'Let the outside service pick the step?'
+MAP_YES = ('Yes', 'Send it. Only the masked question and the list go.')
+MAP_NO = ('No, Idli picks', "Idli's own model picks. Nothing leaves this computer.")
+FORK_CARD = 'Fork this Mini and continue with Claude?'
+FORK_YES = ('Fork it', 'Claude gets a copy and your question with private values as codes. The original stays.')
+FORK_NO = ('Not now', 'The Mini stays as it is.')
+
+
+def _map_lead(c):
+    """The mapping card's lead: exactly what the outside service would get (lib/miniscope.py)."""
+    return ("This Mini has no direct answer for that. An outside service (" + str(c.get('service') or 'online') +
+            ') can pick which of its steps, or which plain read of your accounts, answers it. Idli then runs it here.'
+            '\n\nIt would get your question with private values as codes and this list. Never your emails, '
+            'calendar or sheet.\n\nQuestion: "' + str(c.get('masked_question', '')) + '"\n\n```\n' +
+            str(c.get('menu', ''))[:2500] + '\n```')
 
 
 def _service_lead(c):
@@ -1168,6 +1183,7 @@ def drivey_route(j):
             'question': _lib('minimap').plain(text), 'options': [{'label': a, 'description': b} for a, b in options]}]}))
         return message(model, content)
     active, pending, asked, build, blockctx = None, None, None, None, None
+    talked, askclaude = None, None  # a question to an open workflow Mini; a sandbox question for Claude (no Mini)
     for e in ev:
         if e[0] == 'said':
             if e[1] != 'Privacy checked':
@@ -1181,8 +1197,12 @@ def drivey_route(j):
             blockctx = {'name': inp.get('name'), 'paths': inp.get('paths') or []}
         elif name == 'mini_ask' and inp.get('question'):
             asked = inp['question']
+        elif name == 'mini_talk' and not inp.get('route') and not inp.get('fork'):
+            talked = inp.get('question')
+        elif name == 'claude_handoff' and inp.get('preview') and not inp.get('files'):
+            askclaude, pending = {'question': inp.get('question', '')}, None
         elif name == 'drive_fetch':
-            active = blockctx = None
+            active = blockctx = askclaude = None
             pending = {**res, 'question': inp.get('question', '')}
             build = ({'request': inp.get('question', ''), 'kinds': res.get('missing') or [], 'files': res['unsupported']}
                      if res.get('unsupported') else None)
@@ -1219,7 +1239,20 @@ def drivey_route(j):
         if name in ACCOUNT_TOOLS:  # a sandbox's account tool answered: the 9B carries on with it
             return None
         if name == 'mini_talk':
+            if res.get('kind') == 'consent' and isinstance(res.get('consent'), dict):
+                return card('Mapping', MAP_CARD, [MAP_YES, MAP_NO], _map_lead(res['consent']))
+            if res.get('kind') == 'none' and res.get('reply'):
+                return card('Fork', FORK_CARD, [FORK_YES, FORK_NO], res['reply'])
             return say(res.get('reply') or res.get('error') or 'The Mini could not answer. Ask again.')
+        if name == 'claude_handoff' and res.get('preview_only') and not inp.get('files'):
+            masked = res.get('masked_question')
+            if not isinstance(masked, str):
+                return say('Could not prepare the masked question. Send it again.')
+            return card('Claude', 'No Mini answers that yet. Claude can build it with this sandbox\'s blocks: it gets '
+                        'your question with private values as codes, and Idli runs what it writes here and shows you '
+                        'the result.\n\nMasked question: "' + masked + '"',
+                        [('Switch to Claude', 'Send your question and open Claude on the right.'),
+                         ('Not yet', 'Keep working here. Nothing is sent.')])
         if name == 'block_run':
             return say(res.get('reply') or res.get('error') or 'The block could not answer. Ask again.')
         if name == 'drive_fetch' and not res.get('files') and isinstance(res.get('block'), dict) and \
@@ -1281,6 +1314,11 @@ def drivey_route(j):
                          ' yet: ' + ', '.join(res['unsupported']) + '. Type "build it" to ask the Builder to add that.'
                          if 'builder_open' in names else
                          ' To use these too, save spreadsheet copies in Drive and pick them with @: ' + ', '.join(res['unsupported']) + '.')
+            if res.get('docs'):
+                n = len(res['docs'])
+                lead += (f' Also the text of {n} PDF' + ('' if n == 1 else 's') + ': ' +
+                         ', '.join(d.get('title', '') for d in res['docs'][:6]) +
+                         ', with names, places and numbers as codes.')
             if res.get('errors'):
                 lead += ' Some files could not be downloaded. Pick them again to retry, or continue with these files.'
             return card('Privacy', "Review what Claude will see or accept Idli's choices?",
@@ -1324,9 +1362,19 @@ def drivey_route(j):
                 chosen = next((o['description'] for q in inp.get('questions', []) for o in q.get('options', [])
                                if o.get('label') == answer), answer)
                 return call('mini_ask', id=active['id'], question=chosen)
+            if head == 'Mapping' and active and talked:
+                return message(model, [_text('Working on it...'), _tool_use(_tool_name(tools, 'mini_talk'), {
+                    'id': active['id'], 'question': talked, 'route': 'service' if answer == MAP_YES[0] else 'local'})])
+            if head == 'Fork' and active and talked:
+                if answer == FORK_YES[0]:
+                    return call('mini_talk', id=active['id'], question=talked, fork=True)
+                return say('OK. The Mini stays as it is.')
+            if head == 'Claude' and answer == 'Switch to Claude' and askclaude and not pending:
+                return call('claude_handoff', files=[], question=askclaude['question'])
             if head == 'Claude' and answer == 'Switch to Claude' and pending:
                 return call('claude_handoff', files=pending['files'], question=pending['question'],
-                            **({'mini_id': pending['mini_id']} if pending.get('mini_id') else {}))
+                            **({'mini_id': pending['mini_id']} if pending.get('mini_id') else {}),
+                            **({'docs': pending['docs']} if pending.get('docs') else {}))
             if answer == 'Not yet':
                 return say('OK. Change the question or files and send again.')
             return say('OK. Nothing was sent.')
@@ -1375,6 +1423,10 @@ def drivey_route(j):
         return call('privacy_review_open', files=active['files'], question=said, preview_only=True, mini_id=active['id'])
     if 'builder_open' in names and _lib('teamcaps').kinds_in_words(said):  # "can you read photos?": ask the team
         return call('builder_open', request=said, preview=True)
-    if accounts:  # a sandbox: "find my emails from x", "book it" are for the 9B and its account tools
+    if accounts and 'mini_talk' in names:
+        # A sandbox question that no open Mini answers goes to Sandbox Claude, masked, to build it as a Mini. The 9B
+        # never picks account tools on its own (owner, 2026-11-18; narrative/SANDBOXES.md "Routing in a sandbox").
+        return call('claude_handoff', files=[], question=said, preview=True)
+    if accounts:  # an older sandbox without mini_talk: the 9B and its account tools, as before
         return None
     return say(PICK_FILES)

@@ -384,8 +384,18 @@ def calendar_insert(email, title, start, minutes, attendees, details='', key=Non
 
 
 def calendar_events(email, start, end, q=None):
+    """The meetings in a time range, in order: title, start, end, guests and whether this account declined."""
     r = call(email, 'GET', CAL + '/calendars/primary/events',
              params={'timeMin': _rfc3339(start), 'timeMax': _rfc3339(end), 'singleEvents': 'true',
-                     **({'q': q} if q else {})})
-    return [{'id': e.get('id'), 'title': e.get('summary', ''), 'start': (e.get('start') or {}).get('dateTime'),
-             'attendees': [a.get('email') for a in e.get('attendees') or []]} for e in r.get('items') or []]
+                     'orderBy': 'startTime', 'maxResults': '100', **({'q': q} if q else {})})
+    out = []
+    for e in r.get('items') or []:
+        if e.get('status') == 'cancelled':
+            continue
+        me = next((a for a in e.get('attendees') or [] if a.get('self')), {})
+        out.append({'id': e.get('id'), 'title': e.get('summary', ''),
+                    'start': (e.get('start') or {}).get('dateTime') or (e.get('start') or {}).get('date'),
+                    'end': (e.get('end') or {}).get('dateTime') or (e.get('end') or {}).get('date'),
+                    'attendees': [a.get('email') for a in e.get('attendees') or [] if not a.get('self')],
+                    'declined': me.get('responseStatus') == 'declined'})
+    return out

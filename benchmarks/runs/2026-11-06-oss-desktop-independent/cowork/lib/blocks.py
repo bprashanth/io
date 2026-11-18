@@ -20,7 +20,7 @@ BLOCKS = {
     'gmail_search': 'Find emails in an account, for example from one sender or with a word in the subject.',
     'gmail_read': 'Read one email (sender, subject, date, text).',
     'gmail_draft': 'Write a reply or a new email as a draft in Gmail. The person presses Send.',
-    'calendar_freebusy': 'Find busy and free times in an account\'s calendar.',
+    'calendar_freebusy': 'See an account\'s calendar: its meetings, busy times and free times.',
     'calendar_book': 'Put a meeting on the calendar and invite guests by email.',
     'sheet_read': 'Read the rows of a Google Sheet.',
     'nine_b': 'Ask the private model a question about real content (did they agree, which time, which topic).',
@@ -164,6 +164,13 @@ def calendar_busy(start, end, role=None, data_dir=None):
     return google_api.calendar_freebusy(account(role, data_dir), _when(start), _when(end))
 
 
+def meetings(start, end, role=None, data_dir=None):
+    """The meetings on an account's calendar between two times, in order (title, start, end, guests, declined)."""
+    from lib import google_api
+    _need('calendar_freebusy', data_dir)
+    return google_api.calendar_events(account(role, data_dir), _when(start), _when(end))
+
+
 def free_times(days=5, minutes=30, count=3, start_hour=10, end_hour=17, role=None, after=None, data_dir=None):
     """A few open times on working days (one a day where possible), avoiding busy times."""
     now = _when(after) if after else dt.datetime.now().astimezone()
@@ -212,6 +219,41 @@ def nine_b(question, text, schema=None, data_dir=None):
                                                          'unclear': {'type': 'boolean'}},
                         'required': ['answer', 'unclear']}
     return routines.judge(f'{question}\n\n---\n{str(text)[:6000]}\n---', schema)
+
+
+# ---- a workflow Mini in named steps (narrative/SANDBOXES.md "Routing in a sandbox") ----
+# Sandbox Claude writes a workflow as steps, each a function that takes a shared dict (ctx) and prints what it found:
+#     STEPS = [('Read the leads sheet', read_leads), ('Find their replies', find_replies), ...]
+#     blocks.run_steps(STEPS)
+# The person can then run step 1, 2, 3 on their own and see each output (lib/minitalk.py). Arguments:
+#   --step N      run steps 1 to N, show only step N's output
+#   --list-steps  print the step titles as JSON and stop (nothing is read)
+
+def run_steps(steps, argv=None):
+    import argparse
+    import contextlib
+    import io
+    import sys
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--step', type=int, default=0)
+    ap.add_argument('--list-steps', action='store_true')
+    args, _ = ap.parse_known_args(argv)
+    if args.list_steps:
+        print(json.dumps([str(t) for t, _ in steps]))
+        return None
+    upto = args.step if 1 <= args.step <= len(steps) else len(steps)
+    ctx = {}
+    for i, (title, fn) in enumerate(steps[:upto], 1):
+        shown = not args.step or i == upto
+        if shown:
+            print(f'== Step {i}: {title}')
+            fn(ctx)
+            print()
+        else:
+            with contextlib.redirect_stdout(io.StringIO()):
+                fn(ctx)
+    sys.stdout.flush()
+    return ctx
 
 
 def _transform_lines(data_dir):
@@ -267,15 +309,26 @@ def claude_guide(data_dir):
               '- Look at account content with `account_peek` (masked). Never ask the person for real values.',
               '- Write the workflow as a Python script in your folder. Start it with:',
               '  `import os, sys; sys.path.insert(0, os.environ["IDLI_COWORK"]); from lib import blocks`',
-              '  then call blocks.gmail_search, gmail_read, gmail_draft, free_times, calendar_book, sheet_read and,',
+              '  then call blocks.gmail_search, gmail_read, gmail_draft, meetings, calendar_busy, free_times,',
+              '  calendar_book, sheet_read and,',
               '  for any judgement on real content (did they agree, which time, what topic), blocks.nine_b(question,',
               '  text, schema). Never judge with word rules: the private model reads the real text, you never do.',
               '- Give every draft and booking a key (the email id it answers), so a second run never does it twice.',
-              '- Try it with `script_try` (the person is asked; you get the output masked). Print short lines.',
-              '- When the person is happy, save it as a Mini with `idli_draft_mini`: one question per step or one',
-              '  for the whole workflow, its script and no parameters unless needed. The person runs it from the',
-              '  left.',
-              '- Anything the blocks can\'t do is a gap: say so plainly. The Builder (outside) makes a new sandbox.',
+              '- Write a workflow in named steps, so the person can run and check each one on its own: one',
+              '  function per step that takes a shared dict and prints what it found (short lines, one per item),',
+              '  then at the end `blocks.run_steps([("Read the leads sheet", read_leads), ("Find their replies",',
+              '  find_replies), ...])`. Do all the work inside the steps (nothing at the top level). Read your own',
+              '  options with argparse `parse_known_args`, so `--step N` passes through. Keep each step small and',
+              '  plain: read, then judge (nine_b), then act. Step titles are plain words a colleague understands.',
+              '- Try it with `script_try` (the person is asked; you get the output masked). `args: {"step": 2}` runs',
+              '  steps 1 and 2 and shows step 2.',
+              '- When the person is happy, save it as a Mini with `idli_draft_mini`: one question for the whole',
+              '  workflow, its script and no parameters unless needed. Idli reads the steps from the script. The',
+              '  person runs it, or one step of it, from the left.',
+              '- When you were sent a question the Mini could not answer, make the smallest change that answers it',
+              '  (split a step, add a step, print more), show it with `script_try`, then save it as a new Mini.',
+              '- Anything the blocks can\'t do is a gap: say so plainly, and tell the person to ask the Builder',
+              '  (outside, in the sidebar). The Builder adds blocks; you can\'t.',
               '- Call the left side "the chat on the left" (this is not Drivey).']
     return '\n'.join(lines) + '\n'
 

@@ -1432,10 +1432,36 @@ def t_drive_fetch(paths, question='Help me understand these files.'):
                 fetched['block'] = {'name': name, 'title': m.get('title') or name}
         except Exception:  # noqa: BLE001
             pass
+    if fetched.get('files') and fetched.get('unsupported') and 'pdf' in (fetched.get('missing') or []) and \
+            _is_sandbox(data_dir):
+        # PDFs with spreadsheets, in a sandbox: they go to Claude too, as masked text (lib/docmask.py, owner 2026-11-18)
+        from lib import docmask
+        got = docmask.prepare(data_dir, paths)
+        if got.get('docs'):
+            fetched['docs'] = got['docs']
+            done = {d['title'] for d in got['docs']}
+            fetched['unsupported'] = [u for u in fetched['unsupported'] if u not in done]
+            left = (fetched.get('skipped') or {}).get('PDF', 0) - len(done)
+            if 'PDF' in (fetched.get('skipped') or {}):
+                if left > 0:
+                    fetched['skipped']['PDF'] = left
+                else:
+                    fetched['skipped'].pop('PDF')
+            if not any(u.lower().endswith('.pdf') for u in fetched['unsupported']):
+                fetched['missing'] = [k for k in fetched.get('missing') or [] if k != 'pdf']
+            fetched.pop('block', None)
     if fetched.get('files'):
         prepared = home.prepare(data_dir, fetched['files'], question)
         fetched.update(masked_question=prepared['masked_question'])
     return fetched
+
+
+def _is_sandbox(data_dir):
+    try:
+        with open(os.path.join(data_dir, 'team.json')) as f:
+            return json.load(f).get('kind') == 'sandbox'
+    except (OSError, ValueError):
+        return False
 
 
 def t_privacy_review_open(files, question, preview_only=False, mini_id=None):
@@ -1444,9 +1470,11 @@ def t_privacy_review_open(files, question, preview_only=False, mini_id=None):
                                os.environ.get('PASEO_AGENT_ID'), home.chat_workspace(), preview_only, mini_id)
 
 
-def t_claude_handoff(files, question, mini_id=None):
+def t_claude_handoff(files, question, mini_id=None, docs=None, preview=False):
     from lib import home, journey
-    return journey.handoff(os.path.realpath(sh.data_dir()), files, question, home.chat_workspace(), mini_id)
+    if not files:  # a sandbox question no Mini answers: Claude gets it masked, to build it with the blocks
+        return journey.ask_claude(os.path.realpath(sh.data_dir()), question, home.chat_workspace(), preview)
+    return journey.handoff(os.path.realpath(sh.data_dir()), files, question, home.chat_workspace(), mini_id, docs)
 
 
 def t_mini_open(id):
@@ -1504,9 +1532,9 @@ def t_mini_ask(id, qid=None, params=None, question=None, preview=False):
     return home.mini_ask(files().data_dir, id, qid, params or {}, home.chat_workspace())
 
 
-def t_mini_talk(id, question):
+def t_mini_talk(id, question, route=None, fork=False):
     from lib import home, minitalk
-    return minitalk.talk(files().data_dir, id, question, home.chat_workspace())
+    return minitalk.talk(files().data_dir, id, question, home.chat_workspace(), route, fork)
 
 
 def t_builder_open(request, kinds=None, files=None, preview=False):
@@ -1533,7 +1561,8 @@ TOOLS = {
          "preview_only": {"type": "boolean"}, "mini_id": {"type": "string"}}, ["files", "question"]),
     "claude_handoff": (t_claude_handoff, "After consent, send masked file references and the question to this workspace's Claude.",
         {"files": {"type": "array", "items": {"type": "object"}}, "question": {"type": "string"},
-         "mini_id": {"type": "string"}}, ["files", "question"]),
+         "mini_id": {"type": "string"}, "docs": {"type": "array", "items": {"type": "object"}},
+         "preview": {"type": "boolean"}}, ["files", "question"]),
     "mini_open": (t_mini_open, "Open a saved Mini with its questions, options and example charts.",
                   {"id": {"type": "string"}}, ["id"]),
     "wire_page": (t_wire_page, "Show what Idli's privacy guard sent to Claude, optionally searched for a name or word.",
@@ -1550,7 +1579,9 @@ TOOLS = {
                     ["kind", "title"]),
     "mini_talk": (t_mini_talk, "Anything typed while a saved action Mini is open: explain it, preview it on the real "
                   "accounts (nothing written), run it, or turn it on for an account.",
-                  {"id": {"type": "string"}, "question": {"type": "string"}}, ["id", "question"]),
+                  {"id": {"type": "string"}, "question": {"type": "string"},
+                   "route": {"type": "string", "enum": ["service", "local"]}, "fork": {"type": "boolean"}},
+                  ["id", "question"]),
     "mini_ask": (t_mini_ask, "Run one saved Mini question with validated parameters, or (with question instead of "
                  "qid) have the query service answer a question the saved ones don't cover.",
                  {"id": {"type": "string"}, "qid": {"type": "string"}, "params": {"type": "object"},
