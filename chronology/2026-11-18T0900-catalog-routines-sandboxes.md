@@ -140,3 +140,15 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
   - the composer says "Build with public data here. For private data or your own accounts, type /sandbox.", and
     the Builder answers "hi" the same way.
   Checked on the laptop: shots 04 to 10.
+- **Insights, the owner's attempt.** They first picked the sheet "Strategy classics" (lower-case c), then typed the
+  folder "Strategy Classics", which failed: a folder from the @ picker comes without its trailing slash, and
+  `drivestubs.fetch` only read folders ending in "/". Now a path that holds files is read as a folder, and Idli
+  says which files it used and what it skipped. That folder has 18 PDFs and no spreadsheets, so on the laptop
+  Idli now says: "Strategy Classics has 18 PDFs and no spreadsheets. Idli answers questions from spreadsheets.
+  Reading these files is not a building block yet: ask the Builder for it." (shot 14). A folder with
+  spreadsheets is covered by tests only: no Drive folder on the laptop holds spreadsheets, and I didn't add one to
+  the account.
+- **Privacy page.** The owner saw "Notes (blank) ->" with nothing after it: the first three cells were blank. The
+  page now shows filled cells, and a hidden column of whole text cells (or nothing at all) reads "Notes entirely
+  withheld" (shot 16). Long-running chats and page servers had to be restarted to pick this up (page servers on
+  the same ports).
