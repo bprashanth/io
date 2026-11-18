@@ -427,6 +427,13 @@ def run_mini(data_dir, ident, qid, params):
     return run_manifest(data_dir, object_path(data_dir, 'minis', ident), qid, params)
 
 
+def _sandbox(data_dir):
+    try:
+        return json.loads((Path(data_dir) / 'team.json').read_text()).get('kind') == 'sandbox'
+    except (OSError, ValueError):
+        return False
+
+
 def run_manifest(data_dir, manifest, qid, params):
     m = read(manifest)
     q = next((q for q in m['questions'] if q['id'] == qid), None)
@@ -442,11 +449,14 @@ def run_manifest(data_dir, manifest, qid, params):
     env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_')}
     # A sandbox's Mini may call its blocks (lib/blocks.py): it finds them through these
     env.update({'IDLI_COWORK': str(Path(__file__).resolve().parent.parent), 'IDLI_SANDBOX': str(Path(data_dir))})
+    # A sandbox's action Mini asks the private model about each reply (lib/blocks.nine_b): give it longer
+    limit = 300 if _sandbox(data_dir) else 60
     try:
-        r = subprocess.run(args, cwd=manifest.parent, env=env, capture_output=True, text=True, timeout=60,
+        r = subprocess.run(args, cwd=manifest.parent, env=env, capture_output=True, text=True, timeout=limit,
                            stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
-        raise ValueError('This question took longer than 60 seconds') from None
+        raise ValueError(f'This question took longer than {limit // 60} minutes' if limit > 60 else
+                         'This question took longer than 60 seconds') from None
     if r.returncode:
         raise ValueError('The Mini script failed. Ask Claude to check it.')
     lines = r.stdout.rstrip().splitlines()
