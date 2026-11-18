@@ -122,3 +122,21 @@ local on `oss-desktop-eval`. Only the `catalog-ci` branch was pushed (with decla
   - a Mini card remembers a stale port;
   - New tab > Agent lacks the sandbox's Minis;
   - "Drivey" wording inside sandboxes.
+
+## 5. Owner round: Builder first, folder insights, Minis to ask, activate and fork (2026-11-18, in progress)
+
+Spec in [UX.md](../narrative/UX.md): "The Builder is Claude Code first", "Minis: ask, activate, fork", "Insights
+details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
+
+- **The laptop's git is back.** `git fetch` by the DGX's Tailscale IP works again. The two hand-synced commits had
+  the same content as the DGX's; the laptop moved to the DGX head with `reset --keep` (branch
+  `backup-before-dgx-reset-2026-11-18` kept). Code now reaches the laptop with `git pull`.
+- **Builder (Paseo idli26, commit 8554b33d).** The owner's new Builder chat had opened on Idli 9B, and P15 (every
+  Idli-provider chat gets a Claude pane) split it. Now:
+  - a Builder chat is one pane, whatever its model; an old empty right pane closes itself;
+  - the model menu in the Builder shows only Claude, with Opus 5.5 first. With no Claude Code, it shows Idli 9B
+    and 30B;
+  - Careful and Auto left the Idli menu everywhere (laptop config and `setup-laptop.py`);
+  - the composer says "Build with public data here. For private data or your own accounts, type /sandbox.", and
+    the Builder answers "hi" the same way.
+  Checked on the laptop: shots 04 to 10.
