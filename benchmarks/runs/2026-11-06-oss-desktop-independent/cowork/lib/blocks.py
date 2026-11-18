@@ -232,6 +232,7 @@ def claude_guide(data_dir):
               '- When the person is happy, save it as a Mini with `idli_draft_mini`: one question per step or one',
               '  for the whole workflow, its script and no parameters unless needed. The person runs it from the',
               '  left.',
-              '- Anything the blocks can\'t do is a gap: say so plainly. The Builder (outside) makes a new sandbox.']
+              '- Anything the blocks can\'t do is a gap: say so plainly. The Builder (outside) makes a new sandbox.',
+              '- Call the left side "the chat on the left" (this is not Drivey).']
     return '\n'.join(lines) + '\n'
 

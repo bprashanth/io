@@ -14,6 +14,9 @@ When the person wants such a workflow, or types `/sandbox`, follow the `/sandbox
 3. Call `sandbox_blocks`. Break the workflow into blocks from that list only. Tell the person the plan in one or two
    lines: "Your workflow needs: find emails, read them, draft replies, find free times, book meetings, and the private
    model to read replies."
+   Questions about Drive files (tables, Minis) need only `drive_files`; Idli already reads them and keeps names
+   private. Use `sheet_read` only when an account workflow reads a sheet (for example a leads list), and `nine_b`
+   only when a step needs judgement on real email or calendar content.
 4. If any step has no block (for example posting to Instagram, sending WhatsApp messages, a website Idli doesn't
    know), say plainly which step has no block, call `sandbox_create` with that step in `gaps`, and stop. No sandbox
    is made. Our team gets the request.

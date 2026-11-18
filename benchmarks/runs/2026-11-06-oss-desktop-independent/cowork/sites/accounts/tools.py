@@ -42,6 +42,6 @@ TOOLS = {
                       'guests': {'type': 'array', 'items': {'type': 'string'}}, 'minutes': {'type': 'integer'},
                       **ROLE}, ['title', 'start', 'guests']),
     'sheet_rows': (_safe(lambda sheet, role=None: {'rows': blocks.sheet_read(sheet, role=role)[:200]}),
-                   'Read the rows of a Google Sheet (its link or id).', {'sheet': {'type': 'string'}, **ROLE},
+                   'Read the rows of a Google Sheet from its link or id, inside an account workflow (for example a leads list). Not for @Drive files: those go through drive_fetch.', {'sheet': {'type': 'string'}, **ROLE},
                    ['sheet']),
 }

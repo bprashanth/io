@@ -75,6 +75,37 @@ class RouterTests(unittest.TestCase):
     def test_identity_requires_exact_cowork_tools(self):
         t=Transcript();t.j['tools'].append({'name':'mcp__cowork__file_ask'})
         self.assertIsNone(modes.drivey_route(t.j))
+    def test_sandbox_routes_files_like_drivey_and_leaves_account_requests_to_the_9b(self):
+        def sandbox():
+            t = Transcript()
+            t.j['tools'] += [{'name': 'mcp__cowork__mail_search'}, {'name': 'mcp__cowork__book_meeting'}]
+            return t
+        t = sandbox(); t.said('How many visits? @Drive/visits.xlsx')
+        self.assertEqual(t.tool()['input'], {'paths': ['Drive/visits.xlsx'], 'question': 'How many visits?'})
+        t = sandbox(); t.j['messages'].append({'role': 'user', 'content': 'find my emails from asha@x.org'})
+        self.assertIsNone(modes.drivey_route(t.j))
+        t = Transcript(); t.said('find my emails from asha@x.org')  # Drivey itself is unchanged
+        self.assertEqual(t.text(), modes.PICK_FILES)
+    def test_sandbox_9b_gets_its_account_tools_and_prompt(self):
+        t = Transcript()
+        t.j['tools'] += [{'name': 'mcp__cowork__mail_search', 'description': 'Find emails',
+                          'input_schema': {'type': 'object', 'properties': {'query': {'type': 'string'}}}}]
+        t.j['messages'].append({'role': 'user', 'content': 'find my emails from asha@x.org'})
+        seen = {}
+        def fake(msgs, tools):
+            seen['system'], seen['tools'] = msgs[0]['content'], [x['function']['name'] for x in tools]
+            return {'choices': [{'message': {'content': '', 'tool_calls': [{'id': 'c1', 'type': 'function',
+                    'function': {'name': 'mcp__cowork__mail_search', 'arguments': '{"query": "from:asha@x.org"}'}}]}}]}
+        with patch.object(modes, '_nine_call', side_effect=fake):
+            r = modes.respond(t.j)
+        self.assertIn('mcp__cowork__mail_search', seen['tools'])
+        self.assertIn('sandbox', seen['system'])
+        self.assertEqual([b['name'] for b in r['content'] if b['type'] == 'tool_use'], ['mcp__cowork__mail_search'])
+        t.j['messages'].append({'role': 'assistant', 'content': r['content']})
+        call = [b for b in r['content'] if b['type'] == 'tool_use'][0]
+        t.j['messages'].append({'role': 'user', 'content': [{'type': 'tool_result', 'tool_use_id': call['id'],
+                                                             'content': '{"emails": []}'}]})
+        self.assertIsNone(modes.drivey_route(t.j))  # the 9B, not the Drivey route, answers from the result
     def test_reminder_and_system_after_question(self):
         t=Transcript();t.j['messages']=[{'role':'user','content':'How many? @"Drive/My folder/visits.xlsx"'},
             {'role':'user','content':'<system-reminder>Reminder</system-reminder>'}, {'role':'system','content':'Note'}]

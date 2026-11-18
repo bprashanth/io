@@ -175,11 +175,25 @@ def _lean_system():
             "(CLAUDE.md):\n\n" + text)
 
 
+ACCOUNT_SYSTEM = (
+    "You are Idli, a private assistant on this computer, in a sandbox: you work on the person's own accounts with the "
+    "tools you have (find emails, read an email, write a draft, find free times, book a meeting, read a sheet). Today "
+    "is {today}. Do what the person asks, one step at a time, by calling a tool straight away; don't ask what they "
+    "want when the request is clear. Then say what you did and what you found in one to three short sentences, with "
+    "the names, emails and times. Drafts stay in Gmail until the person presses Send; never say an email was sent. "
+    "To book, use the time the lead picked and the lead's email as the guest. If something is unclear (did they agree, "
+    "which time), say so and ask. To keep a workflow, tell them to ask Claude on the right to save it as a Mini.")
+
+
+def _account_chat(tools):
+    return any(_short(t.get("name", "")) in ACCOUNT_TOOLS for t in tools or [])
+
+
 def _nine_tools(tools):
     keep = []
     for t in tools or []:
         short = _short(t.get("name", ""))
-        if t.get("name") != "AskUserQuestion" and short not in TWELVE:
+        if t.get("name") != "AskUserQuestion" and short not in TWELVE and short not in ACCOUNT_TOOLS:
             continue
         sch = json.loads(json.dumps(t.get("input_schema") or {"type": "object", "properties": {}}))
         desc = t.get("description", "")
@@ -261,7 +275,9 @@ def nine(j, variant=None, pre=None, check=None):
     """The 9B runs the chat the way the E7 eval loop ran it. variant (careful / auto, the grounded modes): file_ask
     gets pipeline=<variant>, and chart_request is not offered (no "ask Claude" in these chats). pre(msgs) may edit
     the chat before the 9B reads it; check(text, msgs) may send the 9B back once with a reason."""
-    msgs = [{"role": "system", "content": _lean_system()}] + _to_openai(j.get("messages") or [])
+    system = ACCOUNT_SYSTEM.format(today=time.strftime("%A %Y-%m-%d")) if _account_chat(j.get("tools")) \
+        else _lean_system()
+    msgs = [{"role": "system", "content": system}] + _to_openai(j.get("messages") or [])
     if pre:
         msgs = pre(msgs)
     tools = _nine_tools(j.get("tools"))
@@ -1087,6 +1103,9 @@ def _drivey_question(msgs):
 
 DRIVEY_TOOLS = frozenset(('drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask'))
 DRIVEY_EXTRA = frozenset(('binder_item', 'builder_open'))  # newer laptops; older ones route the same without it
+# A sandbox's account blocks (lib/blocks.LEFT_TOOLS, narrative/SANDBOXES.md): files, Minis and handoffs route as in
+# Drivey; a typed request with no @ file and no open Mini goes to the 9B, which calls these tools itself.
+ACCOUNT_TOOLS = frozenset(('mail_search', 'mail_read', 'mail_draft', 'free_times', 'book_meeting', 'sheet_rows'))
 PICK_FILES = 'Add files or a folder with @ and send again.'
 ASKING_SERVICE = 'Asking the query service...'
 ASKING_SERVICE_AUTO = 'Asking the query service. Only masked data is sent...'
@@ -1121,8 +1140,9 @@ def drivey_route(j):
     msgs, tools, model = j.get('messages') or [], j.get('tools') or [], j.get('model', '')
     names = {_short(t.get('name', '')) for t in tools
              if t.get('name', '').startswith('mcp__cowork__') or _short(t.get('name', '')) in DRIVEY_TOOLS}
-    if not DRIVEY_TOOLS <= names <= DRIVEY_TOOLS | DRIVEY_EXTRA:
+    if not DRIVEY_TOOLS <= names <= DRIVEY_TOOLS | DRIVEY_EXTRA | ACCOUNT_TOOLS:
         return None
+    accounts = bool(names & ACCOUNT_TOOLS)
     ev = _events(msgs)
     def say(text):
         return message(model, [_text(_lib('minimap').plain(text))])
@@ -1180,6 +1200,8 @@ def drivey_route(j):
     last = ev[-1]
     if last[0] == 'tool':
         _, name, inp, res = last
+        if name in ACCOUNT_TOOLS:  # a sandbox's account tool answered: the 9B carries on with it
+            return None
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported') and 'builder_open' in names:
             return card('Builder', _build_card_text(res.get('team'), res.get('labels')), [BUILD_IT, NOT_NOW],
                         'Not opened: ' + ', '.join(res['unsupported'][:6]) + '.')
@@ -1308,4 +1330,6 @@ def drivey_route(j):
         return call('privacy_review_open', files=active['files'], question=said, preview_only=True, mini_id=active['id'])
     if 'builder_open' in names and _lib('teamcaps').kinds_in_words(said):  # "can you read photos?": ask the team
         return call('builder_open', request=said, preview=True)
+    if accounts:  # a sandbox: "find my emails from x", "book it" are for the 9B and its account tools
+        return None
     return say(PICK_FILES)
