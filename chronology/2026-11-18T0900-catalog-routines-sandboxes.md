@@ -82,7 +82,10 @@ local on `oss-desktop-eval`. Only the `catalog-ci` branch was pushed (with decla
   - the leads sandbox: sheet, find the lead's email, draft three times, the 9B reads the pick, booked on both
     calendars;
   - the gap case (Instagram, plus scheduling) was refused with both gaps named;
-  - the leads Mini (step 13) is still being retried.
+  - the leads Mini then passed. Sandbox Claude wrote it with `nine_b` and `script_try`. Run from the left, it read
+    10 replies and doubled nothing. Its transcript shows only codes, no real email or name;
+  - the Drivey regression passed again at the end;
+  - the full suite: 265 passed, 3 skipped.
 - **Fixes:**
   - sandbox chats lost Drivey's routing;
   - the 9B didn't see the account tools;
@@ -112,4 +115,10 @@ local on `oss-desktop-eval`. Only the `catalog-ci` branch was pushed (with decla
 - Redaction of account data at the same standard as files.
 - What a Mini is for an action workflow, and how the person edits it.
 - Where team stacks, the catalog and Chrome profiles sit in the sandbox model.
-- Laptop `git fetch dgx` hits Tailscale re-authentication again.
+- Laptop `git fetch dgx` hits Tailscale re-authentication again. The laptop has two chunk-synced commits
+  (`be7ffadc`, `92e0e058`) to reconcile on the next pull.
+- Sandbox rough edges:
+  - running chats and page servers keep old code until restarted;
+  - a Mini card remembers a stale port;
+  - New tab > Agent lacks the sandbox's Minis;
+  - "Drivey" wording inside sandboxes.
