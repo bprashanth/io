@@ -289,6 +289,22 @@ class RouterTests(unittest.TestCase):
         self.assertIn('Add files', out['content'][0]['text'])
 
 
+class DocsRouteTests(unittest.TestCase):
+    def test_the_pdf_text_goes_with_the_handoff_after_the_review(self):
+        docs = [{'title': 'r.pdf', 'local': 'docs/r.txt'}]
+        files = [{'title': 'd.csv', 'local': 'drive/d.csv'}]
+        msgs = [{'role': 'user', 'content': '"Drive/My Drive/study" analyse this'}] + \
+            _turn('drive_fetch', {'paths': ['Drive/My Drive/study'], 'question': 'analyse this'},
+                  {'files': files, 'docs': docs}, 'u1') + \
+            _card_answer('Privacy', "Accept Idli's choices", 'u2') + \
+            _turn('privacy_review_open', {'files': files, 'question': 'analyse this', 'preview_only': True},
+                  {'files': files, 'preview_only': True, 'masked_question': 'analyse this'}, 'u3') + \
+            _card_answer('Claude', 'Switch to Claude', 'u4')
+        use = _uses(_route(msgs))[0]
+        self.assertEqual(use['name'], 'mcp__cowork__claude_handoff')
+        self.assertEqual(use['input']['docs'], docs)
+
+
 class DocsTests(unittest.TestCase):
     def test_pdf_text_is_masked_for_claude(self):
         from lib import docmask

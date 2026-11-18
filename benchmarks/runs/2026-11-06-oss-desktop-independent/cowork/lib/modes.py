@@ -1209,7 +1209,8 @@ def drivey_route(j):
         elif name == 'builder_open' and inp.get('preview'):
             build = {'request': inp.get('request', ''), 'kinds': res.get('missing') or [], 'files': []}
         elif name == 'privacy_review_open' and res.get('files'):
-            pending = {**res, 'question': inp.get('question', ''), 'mini_id': inp.get('mini_id')}
+            pending = {**res, 'question': inp.get('question', ''), 'mini_id': inp.get('mini_id'),
+                       **({'docs': pending['docs']} if pending and pending.get('docs') else {})}
         elif name == 'AskUserQuestion' and 'Not yet' in (_card_answers(inp, res.get('text', '')) or []):
             pending = None
         elif name == 'claude_handoff':
