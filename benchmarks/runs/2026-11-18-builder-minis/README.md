@@ -20,14 +20,12 @@ accounts are 87profligate@gmail.com ("me") and 88profligate@gmail.com ("a lead")
 | 10 | Privacy page on "Strategy classics": the hidden Notes column | Pass: "Notes entirely withheld". Before: "Notes (blank) ->" with nothing after it | 15, 16 |
 | 11 | Open the Lead replies Mini | Pass: the card plus "Not on for an account yet... Ask how it works, or 'show me what you would draft'. Nothing is written until you say 'run it'. To change it, press Fork on its card." The first open ran the Mini once for real (an example run meant for chart Minis). Nothing doubled (drafts and bookings are keyed). Fixed in 7127882b | 17 |
 | 12 | "how are leads picked? which file does it use?" | Pass, thin: the 9B named the leads sheet and its id, and "replied in the last two weeks". It left out how the replies are classified | 18 |
-| 13 | "show me the draft response you'd write" | Preview ran on the real accounts, wrote nothing, and answered "no drafts: 5 already answered or booked, 5 no action". Correct: every reply was already handled. A fresh "yes" from 88 was sent so a draft would show, but the laptop link dropped before I could ask again | n/a |
-| 14 | "Turn this on for my account" (87 standing in) | Not run on the laptop (link down). Unit test: bound to 87 from today, Gmail searches get `after:<today>`, the reply says scheduling is not a block yet | n/a |
-| 15 | Fork: Fork button, Claude explains, change the rule, show results on the left, save as a new Mini | Not run on the laptop (link down). Unit test: the copy in Claude's `forks/<id>/` with FORK.md; the prompt goes to Sandbox Claude; the original's script is unchanged; the fork's draft is not offered "Add to" the original | n/a |
-| 16 | Drivey regression at the end | Not run (link down). Drivey code paths are unchanged apart from the shared privacy page and the folder message | n/a |
+| 13 | "show me the draft response you'd write" | First ask: correct "no drafts", since every reply was already handled. After 88 sent a fresh "yes" ("Reading programme visit"): the whole reply draft, with three times, and "Nothing was drafted, booked or sent". 87's Drafts has no draft for that thread (checked through the API). The 9B's summary line above it came back empty ("Here is what it found.") | 19 |
+| 14 | "Activate this mini on my account" (87 standing in) | Pass: "Turned on for 87profligate@gmail.com, starting from today (18 Nov)... Running it every morning on its own is not a building block yet." The card reads "On for 87profligate@gmail.com from 18 Nov." | 20, 21 |
+| 15 | Fork: Fork button, Claude explains, change to the last 2 days, show results, save, original unchanged | Pass. Sandbox Claude laid out the flow and asked how to change it. It explained how leads are picked, set `DAYS_BACK = 2` in its copy, and ran `script_try` in preview after the person's yes. The real output showed on the left as "Run from Claude: Lead replies, last 2 days", with the full draft and nothing written. The draft card offered only a new Mini. Save made "Lead replies (last 2 days)" with `forked_from`. The original keeps `DAYS_BACK = 14`, its file is unchanged, and it is still on for 87. The fork session's tool results hold no real email or name | 22-27 |
+| 16 | Drivey regression at the end | Pass: the "Household debt by ward" Mini answered "which ward owes the most?" with the ward table | 28 |
 
-The laptop's reverse tunnel (DevTools 49333, Paseo daemon 46767) dropped at about 16:42 IST. The laptop still
-answers Tailscale pings, but it has no SSH server, so only the owner can restart the tunnel:
-`desktop/laptop-up.sh start` on the laptop.
+The laptop's tunnel dropped at about 16:42 IST. The owner restarted it, and steps 13 to 16 were run after that.
 
 ## What changed
 
@@ -51,7 +49,7 @@ answers Tailscale pings, but it has no SSH server, so only the owner can restart
 
 - `tests/test_builder_minis.py`: 11 tests.
 - `utils/idli-builder.test.ts` (Paseo): 3 tests.
-- On the DGX: 324 passed and 5 skipped in the usual set (`tests/`, `lib/test_ccproxy.py`, `lib/test_home.py`,
-  `lib/test_privacy*.py`, `lib/test_chat.py`). The 11 failures are the same before and after these changes
-  (DGX-only: Paseo CLI and launcher paths).
-- The laptop suite was not run (link down).
+- **Laptop** (pytest through `uv run --with pytest`, since the laptop venv has no pytest): 325 passed, 5 skipped,
+  11 failed in `tests/`, `lib/test_ccproxy.py`, `lib/test_home.py`, `lib/test_privacy*.py`, `lib/test_chat.py`.
+- **DGX:** 324 passed, 5 skipped, 11 failed in the same set. The 11 are 10 in `lib/test_chat.py` and
+  `lib/test_home.py::test_launcher_config_and_proxy`. They fail the same way at fe862842, before this round.

@@ -206,3 +206,10 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
   - Pass.
 - (4) Drivey regression (last): a new Drivey question, the "Household debt by ward" Mini, then "which ward owes the
   most?". Answered by the Mini with the ward table (Yerawada first). Pass (shot 28).
+- (5) Laptop suite (pytest through `uv run --with pytest`): 325 passed, 5 skipped, 11 failed. The 11 (10 in
+  `lib/test_chat.py`, plus `test_launcher_config_and_proxy`) also fail at fe862842, before this round. They are not
+  new.
+- Not built: escalating a Mini question the 9B can't place, masked, to an outside model. It needs the per-question
+  consent card that the "ask each time" setting promises, and this sandbox was made with the outside service off,
+  so the laptop couldn't exercise it. Left as a rough edge.
+- Gallery: http://100.82.28.38:8766/ (30 shots).
