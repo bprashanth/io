@@ -92,6 +92,30 @@ def _when(s):
     return t if t.tzinfo else t.astimezone()
 
 
+# ---- preview and "start from" (lib/minitalk.py) ----
+# IDLI_PREVIEW=1: a Mini run that only shows what it would do. Drafts and bookings are written to IDLI_PREVIEW_LOG
+# (one JSON line each) instead of Gmail and the calendar; reading still happens on the real accounts.
+# IDLI_SINCE=YYYY-MM-DD: a Mini turned on for an account from a day reads nothing older (Gmail searches get after:).
+
+def preview():
+    return os.environ.get('IDLI_PREVIEW') == '1'
+
+
+def _preview_note(kind, **item):
+    path = os.environ.get('IDLI_PREVIEW_LOG')
+    if path:
+        with open(path, 'a') as f:
+            f.write(json.dumps({'kind': kind, **item}, default=str) + '\n')
+    return {'id': f'preview-{kind}', 'preview': True}
+
+
+def _since(query):
+    day = os.environ.get('IDLI_SINCE', '')
+    if re.fullmatch(r'\d{4}-\d\d-\d\d', day) and 'after:' not in str(query):
+        return f'{query} after:{day.replace("-", "/")}'
+    return query
+
+
 # ---- the blocks ----
 
 def gmail_search(query, role=None, limit=10, data_dir=None):
@@ -99,7 +123,7 @@ def gmail_search(query, role=None, limit=10, data_dir=None):
     _need('gmail_search', data_dir)
     email = account(role, data_dir)
     out = []
-    for m in google_api.gmail_list(email, str(query), limit=int(limit)):
+    for m in google_api.gmail_list(email, _since(str(query)), limit=int(limit)):
         msg = google_api.gmail_raw(email, m['id'])
         out.append({'id': m['id'], 'from': msg.get('from', ''), 'subject': msg.get('subject', ''),
                     'date': msg.get('date', ''), 'snippet': ' '.join(str(msg.get('new_text', '')).split())[:160]})
@@ -128,6 +152,8 @@ def gmail_draft(to, subject, body, reply_to=None, role=None, key=None, data_dir=
             subject = m.get('subject', '')
         if subject and not subject.lower().startswith('re:'):
             subject = 'Re: ' + subject
+    if preview():
+        return _preview_note('draft', account=email, to=to, subject=subject, body=body)
     return google_api.gmail_create_draft(email, to, subject, body, thread_id=thread, in_reply_to=in_reply_to,
                                          key=key)
 
@@ -164,6 +190,9 @@ def calendar_book(title, start, minutes, guests, role=None, key=None, details=''
     _need('calendar_book', data_dir)
     guests = [g for g in (guests if isinstance(guests, list) else [guests]) if g]
     key = key or f'{title}|{start}|{",".join(sorted(guests))}'
+    if preview():
+        return _preview_note('booking', account=account(role, data_dir), title=title, start=str(start),
+                             minutes=int(minutes), guests=guests)
     return google_api.calendar_insert(account(role, data_dir), title, _when(start), int(minutes), guests,
                                       details=details, key=key)
 

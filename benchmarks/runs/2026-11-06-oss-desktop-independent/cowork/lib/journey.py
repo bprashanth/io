@@ -164,6 +164,19 @@ def questions_checked(questions, root):
     return out
 
 
+def _fork_of(data_dir, code):
+    """The Mini a fork folder (Claude's forks/<id>/, lib/minifork.py) was copied from, or None."""
+    try:
+        if not code:
+            return None
+        base = home.work_dir(data_dir)
+        folder = Path(str(code)) if Path(str(code)).is_absolute() else base / str(code)
+        meta = home.read(home.inside(base, folder / 'FORK.json'))
+        return meta.get('from') if isinstance(meta.get('from'), str) else None
+    except (OSError, ValueError):
+        return None
+
+
 def draft_mini(data_dir, title, story, questions, code, workspace, author):
     if not isinstance(workspace, str) or not re.fullmatch(r'[\w-]{1,80}', workspace):
         raise ValueError('Open Claude from a Drivey workspace and try again.')
@@ -182,6 +195,9 @@ def draft_mini(data_dir, title, story, questions, code, workspace, author):
         if workspace and view.get('workspace') == workspace and view.get('pinned'):
             pins.append({'id': path.stem, 'title': view['title']})
     source_id = state.get('workspace_minis', {}).get(workspace)
+    forked_from = _fork_of(data_dir, code)
+    if forked_from:  # a fork saves as a new Mini; the original stays as it is (lib/minifork.py)
+        source_id = None
     source_name = home.read(home.object_path(data_dir, 'minis', source_id))['name'] if source_id else None
     folder.mkdir(parents=True)
     try:
@@ -196,11 +212,12 @@ def draft_mini(data_dir, title, story, questions, code, workspace, author):
         draft = {'id': ident, 'name': home.plain(title), 'goal': home.plain(story), 'questions': questions,
                  'files': selected, 'charts': pins, 'code': str(code or home.work_dir(data_dir)), 'workspace': workspace,
                  'source_id': source_id, 'source_name': source_name, 'author': author,
+                 **({'forked_from': forked_from} if forked_from else {}),
                  'date': datetime.date.today().isoformat()}
         home.write(folder / 'mini.json', draft)
         # Check the very scripts the Mini will run, with their defaults, before offering Save.
         for q in questions:
-            home.run_manifest(data_dir, folder / 'mini.json', q['id'], {})
+            home.run_manifest(data_dir, folder / 'mini.json', q['id'], {}, preview=True)
         home.write(home.inside(data_dir, f'.idli/mini-drafts/{ident}.json', exists=False), {'folder': str(folder)})
     except Exception:
         shutil.rmtree(folder)
@@ -256,10 +273,19 @@ def edit_draft(data_dir, ident, edits):
 
 def card_data(data_dir, draft=None, mini=None):
     """What the Mini page shows. The same page is the draft (editable) and the saved Mini (as colleagues see it)."""
+    extra = {}
     if mini:
         m = home.read(home.object_path(data_dir, 'minis', mini))
         questions, mode = m['questions'], 'mini'
         name, blocks = m['name'], blocks_of(m)
+        from lib import minitalk
+        if minitalk.is_action(data_dir, {**m, 'id': mini}):  # Fork and its account state (lib/minifork.py)
+            extra = {'actions': True, 'state': minitalk.state(m)}
+            if m.get('forked_from'):
+                try:
+                    extra['forked_from'] = home.plain(home.read(home.object_path(data_dir, 'minis', m['forked_from']))['name'])
+                except (OSError, ValueError, KeyError):
+                    pass
     else:
         m = draft_data(data_dir, draft)
         e = m.get('edits') or {}
@@ -274,7 +300,8 @@ def card_data(data_dir, draft=None, mini=None):
                            'options': '; '.join(home._option_words(k, d) for k, d in q.get('params', {}).items())}
                           for q in questions],
             'sources': home.file_labels(m.get('files', [])), 'workspace': m.get('workspace'),
-            'saved_id': m.get('saved_id'), 'source_id': m.get('source_id'), 'source_name': m.get('source_name')}
+            'saved_id': m.get('saved_id'), 'source_id': m.get('source_id'), 'source_name': m.get('source_name'),
+            **extra}
 
 
 def save_draft(data_dir, ident, edits, action='new'):
@@ -317,7 +344,7 @@ def save_draft(data_dir, ident, edits, action='new'):
         check = {**draft, 'questions': questions}
         home.write(folder / 'check.json', check)
         for q in questions:
-            home.run_manifest(data_dir, folder / 'check.json', q['id'], {})
+            home.run_manifest(data_dir, folder / 'check.json', q['id'], {}, preview=True)
         target.parent.mkdir(parents=True, exist_ok=True)
         saved_questions = list(existing.get('questions', []))
         for q in questions:
@@ -340,6 +367,7 @@ def save_draft(data_dir, ident, edits, action='new'):
                             'heading': story.splitlines()[0][:140],
                             'questions': saved_questions,
                             'files': list(files.values()), 'charts': list(all_charts.values()),
-                            'author': draft['author'], 'date': draft['date'], 'code': draft['code']})
+                            'author': draft['author'], 'date': draft['date'], 'code': draft['code'],
+                            **({'forked_from': draft['forked_from']} if draft.get('forked_from') else {})})
         home.write(folder / 'mini.json', {**draft, 'saved_id': target_id})
         return {'id': target_id, 'saved': True}

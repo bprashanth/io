@@ -758,6 +758,9 @@ def make_handler(files, token):
                     return self._send(200, {'sent': True})
                 if u.path == '/api/mini-card-edit':
                     return self._send(200, journey.edit_draft(files.data_dir, body['id'], body))
+                if u.path == '/api/mini-fork':  # Fork on a saved action Mini's card: a copy for Sandbox Claude
+                    from lib import minifork
+                    return self._send(200, minifork.fork(files.data_dir, str(body['mini']), str(body.get('ws') or '')))
                 if u.path == '/api/mini-save':
                     return self._send(200, journey.save_draft(files.data_dir, body['id'], body, body.get('action', 'new')))
                 if u.path == "/api/home/prepare":

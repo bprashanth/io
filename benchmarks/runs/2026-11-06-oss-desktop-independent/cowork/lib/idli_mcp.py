@@ -754,9 +754,12 @@ def account_peek(block, args=None):
     return {'masked': True, 'result': _masked_account(PEEK[block](args or {}))}
 
 
-def script_try(script, args=None):
-    """Run one of your scripts (in your folder) on the sandbox's real accounts; you get its output masked. The
-    person is asked first: a script may write drafts or book meetings."""
+def script_try(script, args=None, preview=True, title=None):
+    """Run one of your scripts (in your folder) on the sandbox's real accounts; you get its output masked, and the
+    person sees the real output in the chat on the left. In preview (the default) drafts and bookings are only
+    collected, never written (lib/blocks.preview). The person is asked first."""
+    import tempfile
+    import time as _time
     work = Path(os.environ.get('IDLI_CLAUDE_WORK') or '.').resolve()
     p = (work / str(script)).resolve()
     if not p.is_relative_to(work) or p.suffix != '.py' or not p.is_file():
@@ -766,10 +769,36 @@ def script_try(script, args=None):
         argv += ['--' + re.sub(r'[^a-z0-9_]', '', str(k).lower()), str(v)]
     env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_')}
     env.update({'IDLI_SANDBOX': str(data_dir()), 'IDLI_COWORK': str(Path(__file__).resolve().parent.parent)})
-    r = subprocess.run(argv, cwd=str(data_dir()), env=env, capture_output=True, text=True, timeout=120,
-                       stdin=subprocess.DEVNULL)
+    fd, log = tempfile.mkstemp(prefix='idli-preview-', suffix='.jsonl')
+    os.close(fd)
+    if preview:
+        env.update({'IDLI_PREVIEW': '1', 'IDLI_PREVIEW_LOG': log})
+    try:
+        r = subprocess.run(argv, cwd=str(data_dir()), env=env, capture_output=True, text=True, timeout=300,
+                           stdin=subprocess.DEVNULL)
+        items = [json.loads(x) for x in Path(log).read_text().splitlines() if x.strip()]
+    finally:
+        os.unlink(log)
+    # The real output goes to the left chat (Idli's side); Claude gets it masked.
+    workspace = os.environ.get('IDLI_WORKSPACE')
+    shown = False
+    name = ' '.join(str(title or f'{p.stem} {_time.strftime("%H:%M:%S")}').split())[:120]
+    runs = Path(data_dir()) / '.idli' / 'runs'
+    runs.mkdir(parents=True, exist_ok=True)
+    home.write(runs / f'{int(_time.time() * 1000)}.json', {'title': name, 'workspace': workspace, 'preview': bool(preview),
+               'output': r.stdout[-6000:], 'error': bool(r.returncode), 'items': items[:20]})
+    if workspace:
+        try:
+            home.post_to_left(workspace, 'Run', name)
+            shown = True
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+    masked_items = _masked_account([{k: v for k, v in i.items()} for i in items[:10]])
     return {'exit': r.returncode, 'output': _masked_account(r.stdout[-4000:]),
-            'error': _masked_account(r.stderr[-1500:]) if r.returncode else ''}
+            'error': _masked_account(r.stderr[-1500:]) if r.returncode else '',
+            'preview': bool(preview), 'would_write': masked_items,
+            'shown_left': shown, 'note': ('The person sees the real output in the chat on the left, titled "' + name +
+                                          '". Point them there in one short line.') if shown else ''}
 
 
 def _is_sandbox():
@@ -785,8 +814,12 @@ if os.environ.get('IDLI_ROLE') not in ('builder', 'outside') and _is_sandbox():
                              'other private values.', {'block': {'type': 'string'}, 'args': {'type': 'object'}},
                              ['block'])
     TOOLS['script_try'] = (script_try, 'Run your script (a .py in your folder that imports lib.blocks) on the real '
-                           'accounts and get its output masked. The person is asked first.',
-                           {'script': {'type': 'string'}, 'args': {'type': 'object'}}, ['script'])
+                           'accounts and get its output masked; the person sees the real output on the left. '
+                           'preview (default true) collects drafts and bookings without writing them. The person '
+                           'is asked first.',
+                           {'script': {'type': 'string'}, 'args': {'type': 'object'},
+                            'preview': {'type': 'boolean'}, 'title': {'type': 'string', 'description':
+                                        'A short title for this run, shown on the left'}}, ['script'])
 
 
 # ---- the Builder outside every sandbox (IDLI_ROLE=outside, ~/idli-insights/builder) ----

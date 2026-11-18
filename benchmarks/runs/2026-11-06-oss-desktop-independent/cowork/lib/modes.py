@@ -1106,6 +1106,7 @@ DRIVEY_EXTRA = frozenset(('binder_item', 'builder_open'))  # newer laptops; olde
 # A sandbox's account blocks (lib/blocks.LEFT_TOOLS, narrative/SANDBOXES.md): files, Minis and handoffs route as in
 # Drivey; a typed request with no @ file and no open Mini goes to the 9B, which calls these tools itself.
 ACCOUNT_TOOLS = frozenset(('mail_search', 'mail_read', 'mail_draft', 'free_times', 'book_meeting', 'sheet_rows'))
+SANDBOX_EXTRA = frozenset(('mini_talk',))  # a saved action Mini, asked, previewed or turned on (lib/minitalk.py)
 PICK_FILES = 'Add files or a folder with @ and send again.'
 KIND_WORDS = {'PDF': ('PDF', 'PDFs'), 'Image': ('image', 'images'), 'Google Docs': ('Google Doc', 'Google Docs'),
               'Google Slides': ('Google Slides file', 'Google Slides files'), 'Microsoft Word': ('Word file', 'Word files'),
@@ -1153,7 +1154,7 @@ def drivey_route(j):
     msgs, tools, model = j.get('messages') or [], j.get('tools') or [], j.get('model', '')
     names = {_short(t.get('name', '')) for t in tools
              if t.get('name', '').startswith('mcp__cowork__') or _short(t.get('name', '')) in DRIVEY_TOOLS}
-    if not DRIVEY_TOOLS <= names <= DRIVEY_TOOLS | DRIVEY_EXTRA | ACCOUNT_TOOLS:
+    if not DRIVEY_TOOLS <= names <= DRIVEY_TOOLS | DRIVEY_EXTRA | ACCOUNT_TOOLS | SANDBOX_EXTRA:
         return None
     accounts = bool(names & ACCOUNT_TOOLS)
     ev = _events(msgs)
@@ -1215,6 +1216,8 @@ def drivey_route(j):
         _, name, inp, res = last
         if name in ACCOUNT_TOOLS:  # a sandbox's account tool answered: the 9B carries on with it
             return None
+        if name == 'mini_talk':
+            return say(res.get('reply') or res.get('error') or 'The Mini could not answer. Ask again.')
         if name == 'drive_fetch' and not res.get('files') and res.get('unsupported') and 'builder_open' in names:
             return card('Builder', _build_card_text(res.get('team'), res.get('labels')), [BUILD_IT, NOT_NOW],
                         'Not opened: ' + ', '.join(res['unsupported'][:6]) + '.')
@@ -1322,7 +1325,7 @@ def drivey_route(j):
     opened = re.fullmatch(r'Open Mini: .+ \[([\w-]{1,100})\]', said)
     if opened:
         return call('mini_open', id=opened[1])
-    posted = re.fullmatch(r'(Chart|Mini draft) from Claude: (.{1,160})', said.strip())
+    posted = re.fullmatch(r'(Chart|Mini draft|Run) from Claude: (.{1,160})', said.strip())
     if posted and 'binder_item' in names:  # Claude's chart or Mini draft, shown in this chat (the binder)
         return call('binder_item', kind=posted[1], title=posted[2])
     if 'builder_open' in names and re.match(r'(?i)\s*(please\s+)?(open|start|go to)\s+the\s+builder\b', said):
@@ -1338,6 +1341,11 @@ def drivey_route(j):
         question = _lib('minimap').without_mentions(said, paths)
         return message(model, [_text('Getting your files from Drive...'),
                                _tool_use(_tool_name(tools, 'drive_fetch'), {'paths': paths, 'question': question})])
+    if active and active.get('actions') and 'mini_talk' in names:
+        # A saved action Mini is frozen: questions about it are answered or previewed, never acted on, unless the
+        # person says to run it or turn it on (lib/minitalk.py, owner 2026-11-18).
+        return message(model, [_text('Working on it...'),
+                               _tool_use(_tool_name(tools, 'mini_talk'), {'id': active['id'], 'question': said})])
     if active:
         mapped = _lib('minimap').map_questions(active['questions'], said, NINE_URL)
         if mapped.get('qid'):

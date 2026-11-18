@@ -1497,6 +1497,11 @@ def t_mini_ask(id, qid=None, params=None, question=None, preview=False):
     return home.mini_ask(files().data_dir, id, qid, params or {}, home.chat_workspace())
 
 
+def t_mini_talk(id, question):
+    from lib import home, minitalk
+    return minitalk.talk(files().data_dir, id, question, home.chat_workspace())
+
+
 def t_builder_open(request, kinds=None, files=None, preview=False):
     from lib import builder, home
     if preview:
@@ -1536,6 +1541,9 @@ TOOLS = {
     "binder_item": (t_binder_item, "Show Claude's latest chart or Mini draft with this title in this chat.",
                     {"kind": {"type": "string", "enum": ["Chart", "Mini draft"]}, "title": {"type": "string"}},
                     ["kind", "title"]),
+    "mini_talk": (t_mini_talk, "Anything typed while a saved action Mini is open: explain it, preview it on the real "
+                  "accounts (nothing written), run it, or turn it on for an account.",
+                  {"id": {"type": "string"}, "question": {"type": "string"}}, ["id", "question"]),
     "mini_ask": (t_mini_ask, "Run one saved Mini question with validated parameters, or (with question instead of "
                  "qid) have the query service answer a question the saved ones don't cover.",
                  {"id": {"type": "string"}, "qid": {"type": "string"}, "params": {"type": "object"},

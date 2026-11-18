@@ -390,6 +390,9 @@ def refresh_teams():
     from lib import teams
     for folder in teams.refresh_team_tools():
         say(f"write {folder}/cowork.tools")
+    from lib import sandboxes
+    for folder in sandboxes.refresh_tools():
+        say(f"write {folder}/cowork.tools")
 
 
 def builder_folder():

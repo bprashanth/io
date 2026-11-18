@@ -434,7 +434,7 @@ def _sandbox(data_dir):
         return False
 
 
-def run_manifest(data_dir, manifest, qid, params):
+def run_manifest(data_dir, manifest, qid, params, preview=False):
     m = read(manifest)
     q = next((q for q in m['questions'] if q['id'] == qid), None)
     if not q:
@@ -449,6 +449,11 @@ def run_manifest(data_dir, manifest, qid, params):
     env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_')}
     # A sandbox's Mini may call its blocks (lib/blocks.py): it finds them through these
     env.update({'IDLI_COWORK': str(Path(__file__).resolve().parent.parent), 'IDLI_SANDBOX': str(Path(data_dir))})
+    if (m.get('active') or {}).get('since'):  # turned on for an account from a day (lib/minitalk.py)
+        env['IDLI_SINCE'] = str(m['active']['since'])
+    if preview:  # a check before saving: an action Mini reads the accounts but writes nothing (lib/blocks.preview)
+        env['IDLI_PREVIEW'] = '1'
+        env.pop('IDLI_PREVIEW_LOG', None)
     # A sandbox's action Mini asks the private model about each reply (lib/blocks.nine_b): give it longer
     limit = 300 if _sandbox(data_dir) else 60
     try:
@@ -518,7 +523,7 @@ def chart_markdown(data_dir, title, chart, agent=None, sources=None, script=None
     return f'![{label}]({out})\n[Open interactive]({url})'
 
 
-BINDER_KINDS = {'Chart': 'view', 'Mini draft': 'mini-card'}
+BINDER_KINDS = {'Chart': 'view', 'Mini draft': 'mini-card', 'Run': None}  # Run: Sandbox Claude's script_try
 
 
 def binder_item(data_dir, kind, title, workspace=None):
@@ -530,6 +535,23 @@ def binder_item(data_dir, kind, title, workspace=None):
     def key(t):
         return ' '.join(plain(str(t)).split())[:160]
     title = key(title)
+    if kind == 'Run':  # a script Sandbox Claude ran: the real output, here only (Claude got it masked)
+        from lib import minitalk
+        for path in sorted((Path(data_dir) / '.idli/runs').glob('*.json'), key=lambda p: p.stat().st_mtime,
+                           reverse=True):
+            run = read(path)
+            if key(run.get('title', '')) == title and (not workspace or run.get('workspace') in (workspace, None)):
+                out = str(run.get('output') or '').strip() or '(no output)'
+                lines = [f'**{title}**', '', '```', out[-5000:], '```']
+                if run.get('error'):
+                    lines += ['', 'It stopped with an error. Claude sees the error masked and can fix it.']
+                items = minitalk._items_text(run.get('items') or [])
+                if items:
+                    lines += [items]
+                lines += ['', minitalk.NOTHING_WRITTEN if run.get('preview') else
+                          '_Run on your real accounts. Drafts wait in Gmail until you press Send._']
+                return {'reply': '\n'.join(lines)}
+        raise ValueError('That run is no longer here. Ask Claude to run it again.')
     if kind == 'Chart':
         found = None
         for path in sorted((Path(data_dir) / 'views').glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True):
@@ -663,8 +685,13 @@ def mini_open(data_dir, ident, workspace=None):
     can_query = not os.path.exists(os.path.join(data_dir, 'no-query-service'))
     # Yes at setup (query-service-always): no card each time; only masked data is sent, as with the card.
     query_auto = can_query and os.path.exists(os.path.join(data_dir, 'query-service-always'))
+    from lib import minitalk
+    actions = minitalk.is_action(data_dir, {**m, 'id': ident})
+    if actions:  # an action Mini (accounts, not files): ask it, preview it, run it or turn it on (lib/minitalk.py)
+        lines += ['', minitalk.state(m) + ' Ask how it works, or "show me what you would draft". Nothing is written '
+                  'until you say "run it". To change it, press Fork on its card.']
     return {'id': ident, 'files': m.get('files', []), 'questions': m['questions'], 'can_query': can_query,
-            **({'query_auto': True} if query_auto else {}),
+            **({'query_auto': True} if query_auto else {}), **({'actions': True} if actions else {}),
             'reply': plain('\n'.join(lines))}
 
 

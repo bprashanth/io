@@ -173,11 +173,11 @@ def _fill(value, cfg):
 
 # ---- the private 9B ----
 
-def judge(prompt, schema, timeout=120):
+def judge(prompt, schema, timeout=120, max_tokens=400):
     """One answer from the private 9B, shaped by the JSON schema."""
     from lib import stackwall
     base, headers, model = stackwall.model_upstream()
-    body = {'model': model, 'temperature': 0, 'stream': False, 'max_tokens': 400,
+    body = {'model': model, 'temperature': 0, 'stream': False, 'max_tokens': int(max_tokens),
             'messages': [{'role': 'system', 'content': 'Answer with JSON only, matching the schema. If you are not '
                           'sure, set "unclear" to true.'}, {'role': 'user', 'content': prompt}],
             'response_format': {'type': 'json_schema', 'json_schema': {'name': 'answer', 'schema': schema}},

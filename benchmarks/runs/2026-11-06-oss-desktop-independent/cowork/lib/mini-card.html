@@ -20,6 +20,7 @@ h1{font-size:21px;line-height:1.25;margin:0 0 4px;letter-spacing:-.01em}
 h2{font-size:15px;margin:18px 0 6px}
 ul.ask{margin:0;padding-left:22px}ul.ask li{margin:4px 0}ul.ask em{color:var(--muted)}
 .end{color:var(--muted);margin:8px 0 0}
+.dim{color:var(--muted);font-size:13px}#mini-actions p{margin:4px 0}
 /* Editing (the draft only) */
 .edit .blk,.edit li.q{cursor:text}
 .edit .blk:hover,.edit .blk:focus-within,.edit li.q:hover{background:var(--hover);box-shadow:0 0 0 6px var(--hover)}
@@ -55,6 +56,9 @@ footer .primary{margin:0}footer button{margin:0}
   <p class="end">Ask in your own words.</p>
   <footer id="actions" hidden><div id="status" role="status" aria-live="polite">Loading...</div>
     <button type="button" id="add-to" hidden></button><button type="button" id="save" class="primary">Save Mini</button></footer>
+  <div class="saved" id="mini-actions" hidden><p id="mini-state"></p>
+    <p><button type="button" id="fork">Fork</button> <span class="dim">Make a copy and change it with Claude. This Mini stays as it is.</span></p>
+    <p id="fork-status" role="status" aria-live="polite"></p></div>
   <p class="saved" id="saved" hidden>Saved. Find it under Minis when you start a new Drivey chat. You and colleagues can ask it questions there.</p>
 </main>
 <script src="/home.js?__TOKEN_QUERY__"></script>
@@ -95,6 +99,8 @@ function render(){
     :`<div class="blk text" data-i="${i}" ${edit?'tabindex="0" role="button" aria-label="Edit this text"':''}>${edit?tools('text',i):''}<div class="body">${md(b.text)}</div></div>`).join('');
   $('questions').innerHTML=card.questions.map((q,i)=>`<li class="q" data-q="${i}"><span class="words" ${edit?'contenteditable="plaintext-only" aria-label="Question '+(i+1)+'"':''}>${esc(q.question)}</span>${q.options?` <em>(${esc(q.options)})</em>`:''}${edit?tools('question',i).replace(/data-move/g,'data-qmove').replace(/data-remove/g,'data-qremove'):''}</li>`).join('')
     ||'<li class="end">Keep at least one question to save this Mini.</li>';
+  $('mini-actions').hidden=!(card.mode==='mini'&&card.actions);
+  if(card.actions)$('mini-state').textContent=card.state+(card.forked_from?' Forked from '+card.forked_from+'.':'');
   if(card.source_name&&edit){$('add-to').hidden=false;$('add-to').textContent='Add to '+card.source_name;$('save').textContent='Save as a new Mini';}
   if(edit)wire();
   $('page').setAttribute('aria-busy','false');post();
@@ -159,6 +165,9 @@ async function save(action){
     card.mode='saved';render();say('');if(channel)channel.postMessage('changed');}
   catch(e){say(e.message,true);}finally{document.querySelectorAll('footer button').forEach(b=>b.disabled=false);}
 }
+$('fork').onclick=async()=>{$('fork').disabled=true;$('fork-status').textContent='Making your copy...';
+  try{const r=await api('/api/mini-fork',{mini:MINI,ws:WSQ||card.workspace||''});$('fork-status').textContent=r.message;}
+  catch(e){$('fork-status').textContent=e.message;}finally{$('fork').disabled=false;post();}};
 $('save').onclick=()=>save('new');$('add-to').onclick=()=>save('add');
 async function load(){
   try{card=await api('/api/mini-card?'+new URLSearchParams(MINI?{mini:MINI}:{id:ID}));render();if(canEdit())say('Changes are kept as you go. Save when it looks right.');}

@@ -19,7 +19,8 @@ ADJ = ['wobbly', 'quiet', 'brave', 'sunny', 'clever', 'gentle', 'lucky', 'nimble
 NOUN = ['heron', 'mango', 'otter', 'lotus', 'kite', 'tiger', 'parrot', 'banyan', 'pebble', 'comet', 'falcon',
         'jasmine', 'koel', 'neem', 'peacock', 'river', 'monsoon', 'sparrow', 'turtle', 'lantern']
 # The left chat's tools: Drivey's (files, Minis, Claude) and the sandbox's account blocks
-BASE_TOOLS = ['drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask', 'binder_item']
+BASE_TOOLS = ['drive_fetch', 'privacy_review_open', 'claude_handoff', 'mini_open', 'mini_ask', 'binder_item',
+              'mini_talk']  # mini_talk: ask, preview, run or turn on a saved action Mini (lib/minitalk.py)
 SITES = 'google\nfiles\naccounts\n'
 
 
@@ -71,9 +72,7 @@ def create(word, goal, block_list, accounts=None, private=True, outside='ask', g
         json.dump(meta, f, indent=2)
     with open(os.path.join(COWORK, 'idli', 'CLAUDE.md')) as src, open(os.path.join(folder, 'CLAUDE.md'), 'w') as dst:
         dst.write(src.read() + blocks.describe(folder))
-    tools = BASE_TOOLS + [blocks.LEFT_TOOLS[b] for b in known if b in blocks.LEFT_TOOLS]
-    with open(os.path.join(folder, 'cowork.tools'), 'w') as f:
-        f.write('\n'.join(tools) + '\n')
+    write_tools(folder, known)
     with open(os.path.join(folder, 'cowork.sites'), 'w') as f:
         f.write(SITES)
     teams.set_outside(folder, meta['outside'])
@@ -92,6 +91,25 @@ def create(word, goal, block_list, accounts=None, private=True, outside='ask', g
     if open_it:
         out['opened'] = bool(teams.open_team(os.path.basename(folder)).get('ok'))
     return out
+
+
+def write_tools(folder, known=None):
+    """The left chat's tools: Drivey's and one per account block. Returns True when the file changed."""
+    known = known if known is not None else blocks.enabled(folder)
+    want = '\n'.join(BASE_TOOLS + [blocks.LEFT_TOOLS[b] for b in known if b in blocks.LEFT_TOOLS]) + '\n'
+    path = os.path.join(folder, 'cowork.tools')
+    if os.path.exists(path) and open(path).read() == want:
+        return False
+    with open(path, 'w') as f:
+        f.write(want)
+    return True
+
+
+def refresh_tools():
+    """Sandboxes made before a tool was added get it too (the bootstrap calls this)."""
+    root = os.path.join(teams._idli(), 'teams')
+    return [os.path.join(root, d) for d in (sorted(os.listdir(root)) if os.path.isdir(root) else [])
+            if is_sandbox(os.path.join(root, d)) and write_tools(os.path.join(root, d))]
 
 
 def connect(email):
