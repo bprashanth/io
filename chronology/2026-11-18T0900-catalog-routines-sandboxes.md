@@ -204,3 +204,5 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
     records and in the morning run's Sandbox Claude session, where the person typed "Asha". None appear in the
     fork session's tool results.
   - Pass.
+- (4) Drivey regression (last): a new Drivey question, the "Household debt by ward" Mini, then "which ward owes the
+  most?". Answered by the Mini with the ward table (Yerawada first). Pass (shot 28).
