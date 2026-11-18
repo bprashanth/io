@@ -46,3 +46,16 @@ themselves call the 9B for judgement on real content.
   time"), sees each one work, and saves the result as a Mini. A Mini for an action workflow is a script with `nine_b`
   calls.
 - **C:** revisit when a sandbox has more blocks than the 9B can pick from reliably.
+
+## The chain (owner, 2026-11-18; built)
+
+For questions in a sandbox. Each step only when the one before can't answer.
+1. **The 9B, direct:** only what maps cleanly to the open Mini (its questions, its named steps, explain, the whole
+   preview, run, turn on). Never a free choice of tools.
+2. **Mapping, with consent:** the outside service gets the masked question and a short fixed menu (the Mini's
+   steps and the sandbox's read blocks) and picks one or two items with arguments, or SQL for a data Mini. Idli runs
+   them here and shows the output. This is C, kept small: the mapper chooses from a list, it doesn't plan.
+3. **The 9B maps instead** when the person says No to the outside service, or the sandbox was made without one.
+4. **Fork to Sandbox Claude** (masked) when nothing on the menu answers: it changes the Mini's steps or adds one,
+   runs it through Idli, and saves a new Mini. A question with no Mini open goes straight to Claude.
+5. **The Builder** (outside) for anything net new: a missing block.

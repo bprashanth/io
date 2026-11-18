@@ -88,14 +88,22 @@ Noted 2026-11-15.
   - Mini scripts get the same scan;
   - checked on the laptop: 18 PDFs answered in 63 s, then 20 s; actions and a bad import refused; Drivey and the
     leads Mini unchanged.
+- **The question chain** (`benchmarks/runs/2026-11-18-mini-escalation/`, SANDBOXES.md "Routing in a sandbox"):
+  - the 9B never picks account tools on its own; a question with no Mini goes to Sandbox Claude, masked;
+  - in a workflow Mini: direct (plain commands, a few fixed kinds), else mapped to the Mini's steps and read blocks
+    (the outside service with consent, or the 9B on No), else Fork; the Builder for anything net new;
+  - workflows in named steps (`blocks.run_steps`), run one at a time from the left; a `meetings` read block;
+  - PDFs with spreadsheets go to Claude as masked text;
+  - leads angles checked on the laptop; the insights folder (PDF plus data) not yet, the laptop link dropped.
 - **Open:**
   - Paseo's approval card shows JSON, not the hook's words (a Paseo patch);
   - the Builder's hook lives in its own folder (move it outside);
   - a block's cached Drive download ignores later edits to the file;
   - pages and servers: local or on silo;
   - redaction for account data (email bodies, senders, calendar titles) at the same standard as files;
-  - escalating a Mini question the 9B can't place (masked, to an outside model) is not built; the 9B places
-    every question today;
+  - the insights folder round on the laptop (PDF plus data to Claude, a Mini, a second year's file, a new Mini);
+  - a whole-Mini or late-step answer takes 40 to 90 s (the 9B reads each reply on every run); keep step results;
+  - the sandbox start card still says "Ask about your Drive files" in a leads sandbox (Paseo page);
   - running a turned-on Mini on a schedule (a gap: no block);
   - connecting the person's real account (turn on binds an account from today; test accounts only so far);
   - where the earlier work fits: team stacks, the trusted catalog, test-account Chrome profiles. These become

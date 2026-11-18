@@ -308,3 +308,13 @@ Owner's rules (built in phase 1, commit b46249da):
 - **Left:** the insights folder (public NDSA 2021 Fixity Survey: report PDF and data CSV, CC BY 4.0; the Dryad set
   needs a login now), adding the 2025 data and extending the charts as a new Mini, Drivey last, README, gallery,
   docs, suites.
+- **The laptop link dropped at about 21:45 IST** (Paseo daemon tunnel and CDP refused), before the insights round
+  and the final Drivey check. The owner needs to run `desktop/laptop-up.sh start` again.
+- **PDF masking on the DGX** (NDSA 2021 Fixity Survey report, public, CC BY 4.0; the Dryad set the owner named needs
+  a login now): whole pages through the name scanner left all 11 cover authors; line by line, in parallel, they were
+  coded. 53 s for the first 150,000 characters, kept per file version (ed3d7708).
+- **Docs:** SANDBOXES "Routing in a sandbox" (replaces the free-9B routing), ESCALATION_MODELS "The chain", UX,
+  ONGOING section 4. README with 16 steps and shots in `benchmarks/runs/2026-11-18-mini-escalation/`. DGX suite:
+  355 passed, 5 skipped, the 11 known failures.
+- **Left for when the laptop is back:** the insights folder round (upload script ready), Drivey last, the laptop
+  suite.

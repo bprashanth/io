@@ -95,6 +95,10 @@ change it.
   flow laid out, asking what to change. The person asks ("first explain how leads are picked"), changes a step,
   and asks to see results. Claude edits the script on masked data. Idli runs it on the real data and shows the
   results in the left pane, step by step. The original Mini is untouched; the fork saves as a new Mini.
+- **How a question is answered (built 2026-11-18):** the 9B only for what maps cleanly; otherwise a short menu of
+  the Mini's steps and the sandbox's read blocks, picked by the outside service with consent (or the 9B on No);
+  otherwise Fork. A workflow Mini is written in named steps, so a colleague can run step 1, 2, 3 and check each
+  before trusting it. Details: [SANDBOXES.md](SANDBOXES.md) "Routing in a sandbox".
 - **The rule.** Plain workflow Minis run without Claude. Questions about a Mini, including running part of it, go
   through the 9B plus escalation. Changing, extending or adding logic needs a fork into Claude.
 

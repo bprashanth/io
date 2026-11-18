@@ -50,14 +50,43 @@ per-team Builder. Drivey is unchanged.
   Sandbox Claude then writes the workflow as a script, with `blocks.nine_b` for every judgement on real content,
   and saves it as a Mini. The Mini runs on this computer, and a second run never drafts or books twice.
 
-## Routing (lib/modes.py, served by the DGX router)
+## Routing in a sandbox (owner, 2026-11-18; lib/modes.py, served by the DGX router)
 
-- **The Drivey route still owns the left chat.** It handles @ files, Minis, cards and handoffs.
-- **A sandbox chat** has extra account tools (`mail_search`, `mail_read`, `mail_draft`, `free_times`,
-  `book_meeting`, `sheet_rows`). With those tools:
-  - a typed request with no @ file and no open Mini goes to the 9B;
-  - the result of an account tool goes back to the 9B;
-  - the 9B gets those tools and a short sandbox prompt, in place of the Drivey prompt.
+The 9B never chooses freely. The earlier rule (a typed request with no file and no Mini went to the 9B with the
+account tools) gave random answers: asked for the leads, the 9B made up a sheet link (Google's sample sheet from its
+API docs) and got a 404.
+
+- **The Drivey route still owns the left chat:** @ files, Minis, cards and handoffs. Drivey itself is unchanged.
+- **No Mini open, no @ file:** the question goes to Sandbox Claude, masked, after a card that shows the masked
+  question ("No Mini answers that yet..."). Claude builds it with the sandbox's blocks as a short script in named
+  steps, runs it through Idli (`script_try`; the real result shows on the left) and offers to save it as a Mini.
+- **A workflow Mini open** (`mini_talk`, `lib/minitalk.py`, `lib/miniscope.py`), in this order:
+  1. **Direct.** Plain commands need no model ("run step 2", "run it", "turn it off", "fork"). The 9B sorts
+     anything else into a few fixed kinds: explain (from the steps and code), the whole preview, run, turn on, turn
+     off, change. If unsure, "other".
+  2. **Mapped, with consent.** "Other" is mapped, never answered freely. The menu is short and fixed: the Mini's
+     named steps (run steps 1 to N in preview, show step N), the whole Mini in preview, and the sandbox's read blocks
+     (a sheet the Mini reads, a Gmail search, the meetings between two days, free times). Writes are never on it.
+     The mapper answers with one or two items and their arguments, or "none". Idli runs them on the real accounts in
+     preview and shows the output as code wrote it, with one line on who picked and "Nothing was drafted, booked or
+     sent".
+     - The sandbox's outside setting decides who maps. Ask each time: a card shows exactly what would go (the
+       masked question and the menu); Yes sends it to the outside service, "No, Idli picks" has the 9B map it with
+       the same menu (the person's quality choice). Always: the service, no card. Never: the 9B.
+  3. **Fork.** "None", or a change, ends at a Fork card. The fork gets a copy and the masked question, and Sandbox
+     Claude makes the smallest change that answers it (split a step, add one, print more), shows it with
+     `script_try` and saves a new Mini. Something the blocks can't do: Claude says so and points to the Builder in
+     the sidebar. Sandbox Claude has no `builder_open` in a sandbox (it used to open a per-team Builder beside
+     itself).
+- **Workflows in named steps** (`blocks.run_steps`): one function per step, each printing what it found;
+  `--step N` runs steps 1 to N and shows N; `--list-steps` lists them without reading anything. Idli keeps the
+  titles in mini.json; opening the Mini lists them and what it can see ("reads a sheet, reads your email, sees your
+  calendar...").
+- **Files:** @ files with no Mini go to Claude through the privacy review, as in Drivey. PDFs that come with
+  spreadsheets go too, as masked text in Claude's folder (`lib/docmask.py`: pypdf, then the folder's known values,
+  the rules and the name scanner line by line; about a minute for 50 pages, kept per file version). A folder of
+  only PDFs still goes to the PDF block, if the sandbox has one.
+- **New read block:** `blocks.meetings(start, end)` (title, time, guests, declined) under the calendar block.
 
 ## What the person sees
 
@@ -92,7 +121,7 @@ A saved Mini is frozen. The person builds trust by asking it things, then turns 
   Claude's `forks/<id>/` with FORK.md. Sandbox Claude opens on the right with the current flow and asks how to
   change it. Its `script_try` runs in preview by default. The real output shows on the left as "Run from Claude:
   <title>", and Claude gets it masked. Saving makes a new Mini with `forked_from`; the original never changes.
-- **Not built:** escalating a Mini question the 9B can't place, masked, to an outside model.
+- **Built since:** questions the 9B can't place go to the mapping above ("Routing in a sandbox").
 
 ## Three levels: actions, transforms, pages (2026-11-18, owner)
 
