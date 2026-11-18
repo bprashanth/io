@@ -186,3 +186,21 @@ details". Evidence in `benchmarks/runs/2026-11-18-builder-minis/`.
 - (2) Turn on: "Activate this mini on my account" turned it on for 87profligate from today (18 Nov), and said that
   a schedule is not a building block yet. `mini.json` has `active: {role: me, since: 2026-11-18}`. The card now
   reads "On for 87profligate@gmail.com from 18 Nov." above the Fork button. Pass (shots 20, 21).
+- (3) Fork, on the laptop:
+  - Fork on the Lead replies card answered "Claude has your copy on the right". Sandbox Claude laid out the flow
+    in 7 steps and asked how to change it (shot 22).
+  - "First explain how leads are picked": it explained from the script, including two small issues it noticed
+    (shot 23).
+  - "Only look at replies from the last 2 days, then show me the results": it changed `DAYS_BACK` to 2 in its
+    copy, then asked for `script_try` (preview), which I approved as the person (shot 24).
+  - The real output landed on the left as "Run from Claude: Lead replies, last 2 days": 5 leads, the draft for 88's
+    "Reading programme visit" in full, and "Nothing was drafted, booked or sent" (shot 25).
+  - "Save it as a new Mini" put a draft card on the left, offered only as a new Mini, with no "Add to Lead replies"
+    (shot 26). Save made `lead-replies-last-2-days-d6992c7c` with `DAYS_BACK = 2` and `forked_from` (shot 27).
+  - The original still has `DAYS_BACK = 14`, an unchanged file (mtime from its save this morning), and it is still
+    turned on for 87.
+  - Gmail: no draft for "Reading programme" in 87's Drafts.
+  - Masking: in this sandbox's transcripts, the real emails and names appear only in the left chat's (Idli's)
+    records and in the morning run's Sandbox Claude session, where the person typed "Asha". None appear in the
+    fork session's tool results.
+  - Pass.
