@@ -53,6 +53,9 @@ def note_gap(gaps, goal):
 def create(word, goal, block_list, accounts=None, private=True, outside='ask', gaps=None, open_it=True):
     """Make a sandbox with exactly these blocks, or refuse when there is a gap."""
     known, unknown = blocks.plan(block_list)
+    # a transform the Builder wrote (lib/transforms.py) is not a gap: it is added with block_add
+    written = os.path.join(builder_dir(), 'blocks')
+    unknown = [b for b in unknown if not os.path.isfile(os.path.join(written, str(b), 'manifest.json'))]
     gaps = [str(g)[:80] for g in (gaps or [])] + unknown
     if gaps:
         note_gap(gaps, goal)

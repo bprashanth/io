@@ -918,7 +918,7 @@ def block_check(name):
     if not folder.is_relative_to(_builder_blocks().resolve()) or not folder.is_dir():
         raise ValueError(f'No block folder called {name} in blocks/.')
     res = transforms.check(folder)
-    return {k: res[k] for k in ('ok', 'problems', 'card', 'seconds') if k in res}
+    return {k: res[k] for k in ('ok', 'checked', 'problems', 'card', 'seconds') if k in res}
 
 
 def _find_sandbox(sandbox):
