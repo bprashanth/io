@@ -316,5 +316,10 @@ Owner's rules (built in phase 1, commit b46249da):
 - **Docs:** SANDBOXES "Routing in a sandbox" (replaces the free-9B routing), ESCALATION_MODELS "The chain", UX,
   ONGOING section 4. README with 16 steps and shots in `benchmarks/runs/2026-11-18-mini-escalation/`. DGX suite:
   355 passed, 5 skipped, the 11 known failures.
-- **Left for when the laptop is back:** the insights folder round (upload script ready), Drivey last, the laptop
-  suite.
+- **Finished after the owner reopened the laptop (23:00 to 23:55):** the NDSA 2021 report and data went into a
+  folder in 87's Drive; "help me analyse this study" sent the CSV through the privacy review and the PDF as masked
+  text (the cover's 11 authors coded). One bug: the PDF note was lost after the review (fixed, c4225579). Claude
+  made two charts and the Mini "Fixity checks 2021"; adding the 2025 data and report with that Mini open went to
+  Claude with the Mini as context (6dbab66e), which drew 2021 vs 2025 and saved "Fixity checks 2021 and 2025" as a
+  new Mini; the first is unchanged. Drivey last: unchanged. Laptop suite: 356 passed, 5 skipped, the 11 known.
+  Round complete; README and gallery in `benchmarks/runs/2026-11-18-mini-escalation/`.

@@ -94,14 +94,15 @@ Noted 2026-11-15.
     (the outside service with consent, or the 9B on No), else Fork; the Builder for anything net new;
   - workflows in named steps (`blocks.run_steps`), run one at a time from the left; a `meetings` read block;
   - PDFs with spreadsheets go to Claude as masked text;
-  - leads angles checked on the laptop; the insights folder (PDF plus data) not yet, the laptop link dropped.
+  - checked on the laptop: the leads angles, and an insights folder (report PDF plus data, then a second year's
+    files, saved as a new Mini).
 - **Open:**
   - Paseo's approval card shows JSON, not the hook's words (a Paseo patch);
   - the Builder's hook lives in its own folder (move it outside);
   - a block's cached Drive download ignores later edits to the file;
   - pages and servers: local or on silo;
   - redaction for account data (email bodies, senders, calendar titles) at the same standard as files;
-  - the insights folder round on the laptop (PDF plus data to Claude, a Mini, a second year's file, a new Mini);
+  - masking a long PDF takes 1 to 3 min the first time; pinned charts didn't reach a Mini draft once;
   - a whole-Mini or late-step answer takes 40 to 90 s (the 9B reads each reply on every run); keep step results;
   - the sandbox start card still says "Ask about your Drive files" in a leads sandbox (Paseo page);
   - running a turned-on Mini on a schedule (a gap: no block);

@@ -39,17 +39,30 @@ The sandbox's outside setting was Never; it was set to Ask each time for this ro
 | 15 | "which leads agreed but have not picked a time yet?" | Card, Yes: the service picked step 4 | Pass, the one draft in full | 94 s | 31 |
 | 16 | "also post each booked meeting to our Instagram page" | 9B: change, Fork card, Fork | Pass on the chain: Claude said only the Builder can add an Instagram block. **Bug found:** it then opened the old per-team Builder beside itself; interrupted before it wrote anything. Fixed: no `builder_open` for Sandbox Claude in a sandbox | 32 s | 32 to 34 |
 
-Not run on the laptop: the laptop link (Paseo daemon tunnel and CDP) dropped at about 21:45 IST, before the
-insights round and the final Drivey check.
+The laptop link dropped at about 21:45 IST; the owner reopened it and the rest ran at 23:00 to 23:55.
 
-- **Insights folder:** not run. The Dryad set the owner named needs a login now, so I picked a public one with a
-  report and data from two years: the NDSA Fixity Survey (Zenodo, CC BY 4.0), 2021 report PDF and data CSV, then
-  the 2025 data to add. Both are downloaded on the DGX. The upload to 87's Drive is scripted (87's Chrome profile,
-  Shift+F for the folder, Shift+U with the file chooser answered over CDP) but did not run.
-- **PDF masking, run on the DGX on the 2021 report:** 96 pages, the first 150,000 characters masked in 53 s. The
-  first run (the name scanner on whole pages) left all 11 authors' names on the cover; the scanner's confidence
-  drops with length. Line by line, in parallel, all were coded (NAME_001 to NAME_008 on the cover, one partial).
-- **Drivey last:** not run.
+### Insights: a report PDF and data in one folder, then a second year
+
+The Dryad set the owner named needs a login now, so this uses a public one with a report and data from two years:
+the NDSA Fixity Survey (Zenodo, CC BY 4.0). The files were put in a folder "NDSA fixity study" in 87's Drive through
+87's Chrome profile, and the Drive index was rebuilt. Sandbox: `lucky-koel-7672 drivecharts` (outside service: ask).
+
+| # | Question or action | Route | Result | Time | Shots |
+|---|---|---|---|---|---|
+| 17 | `@NDSA fixity study` "help me analyse this study: how often do organisations check fixity, and what charts would show it?" | drive_fetch: the CSV for review, the PDF as masked text | Pass: "using NDSA 2021 Fixity Survey Data.csv. Also the text of 1 PDF ... with names, places and numbers as codes." Privacy page as before | 230 s the first time (most of it masking 96 pages), 83 s later | 36, 37, 39 |
+| 18 | Switch to Claude | Handoff with the docs note | **Bug found:** the first try lost the PDF note after the privacy review. Fixed (c4225579). Second try: Claude got "Also the text of 1 PDF, masked by Idli: docs/NDSA 2021 Fixity Survey Report.txt", read it, and checked its counts against the report's | 1 min | 38, 40 |
+| 19 | The PDF reached Claude masked | Claude's folder and the wire log | Pass: the cover's 11 authors are NAME_049 to NAME_057 (one partial, "NAME_057'homme"); no author name in the text Claude has | n/a | n/a |
+| 20 | "make A and B, show them on the left, save as a Mini Fixity checks 2021" | Claude, idli_show, idli_draft_mini | Pass: two charts on the left (intervals; checks after events), saved as "Fixity checks 2021" with 2 questions. Its charts list is empty: the pins didn't reach the draft | about 4 min | 41 to 45 |
+| 21 | Open the Mini: "how often do organisations check fixity on stored files?" | 9B maps to the Mini's question | Pass | 7 s | 47 |
+| 22 | With the Mini open, `@2025 data` `@2025 report` "redo the check interval chart with 2025 next to 2021" | Masked handoff with the Mini as context (6dbab66e) | Pass: Claude got the 2025 CSV, the 2025 report's masked text (11 names coded) and "Mini context: Fixity checks 2021", and drew 2021 vs 2025 as shares | fetch 115 s (masking the 2025 report), Claude 2.5 min | 48 to 50 |
+| 23 | "do the same for checks after events, save as a new Mini Fixity checks 2021 and 2025" | Save card: Add to the Mini, or Save as a new Mini | Pass: "Save as a new Mini" made "Fixity checks 2021 and 2025" with 2 comparison questions; the 2021 Mini is unchanged | 1.5 min | 51, 52 |
+| 24 | Drivey last: "which ward owes the most?" | Mini, as before | Pass, the ward table. (A misclick first opened "Invasive plants"; its out-of-scope card was the same as before) | 16 s | 53, 54 |
+
+Laptop suite: 356 passed, 5 skipped, the same 11 known failures.
+
+- **PDF masking, measured on the DGX first** on the 2021 report: 96 pages, the first 150,000 characters masked in
+  53 s. The name scanner on whole pages left all 11 authors' names on the cover (its confidence drops with length);
+  line by line, in parallel, they were coded.
 
 ## Built (commits)
 
@@ -59,9 +72,16 @@ insights round and the final Drivey check.
 - 44f65e15: no `builder_open` for Sandbox Claude in a sandbox; opening a workflow Mini lists what it sees and its
   steps.
 - ed3d7708: PDF text masked line by line, in parallel, kept per file version.
-- Tests: `tests/test_mini_escalation.py` (15). DGX suite: 355 passed, 5 skipped, the same 11 known failures.
+- c4225579: the PDF note survives the privacy review.
+- 6dbab66e: files added while a data Mini is open go to Claude with that Mini as context.
+- Tests: `tests/test_mini_escalation.py` (16). Suites: DGX 355 passed, laptop 356 passed, 5 skipped each, the same
+  11 known failures.
 
 ## Rough edges
+
+- **Masking a long PDF is slow the first time** (1 to 3 min for a 100-page report); kept afterwards.
+- **Pinned charts didn't reach the first Mini draft**; the saved Mini has its questions but no pinned charts.
+- **The 2021 and 2025 Mini lists only the 2025 file** as its files (its scripts read both).
 
 - **Slow late steps:** a step after "read each reply" takes 70 to 95 s, because the 9B reads every reply on every
   run. Keep step results for a few minutes, or keep the 9B's reading per message.
