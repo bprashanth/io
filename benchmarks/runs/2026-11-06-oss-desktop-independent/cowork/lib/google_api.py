@@ -110,6 +110,8 @@ def connect(email, open_url, timeout=600):
     got = {}
 
     class H(http.server.BaseHTTPRequestHandler):
+        timeout = 5  # Chrome keeps spare connections open; an idle one must not hold the page up
+
         def log_message(self, *a):
             pass
 
@@ -127,7 +129,8 @@ def connect(email, open_url, timeout=600):
                 'Google did not give Idli access. Go back to Idli and try again.'
             self.wfile.write(f'<!doctype html><title>Idli</title><p style="font:16px system-ui">{msg}</p>'.encode())
 
-    srv = http.server.HTTPServer(('127.0.0.1', 0), H)
+    srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), H)
+    srv.daemon_threads = True
     port = srv.server_address[1]
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
