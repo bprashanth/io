@@ -14,12 +14,18 @@ import tempfile
 ASK = ['mcp__idli__unmask', 'mcp__idli__script_try']
 
 
+def paseo_app_dirs(home):
+    """Paseo's app data (browser profile with the person's sign-ins, chats): Linux, then Mac, then Windows."""
+    return [home / '.config/Paseo', home / '.config/paseo', home / 'Library/Application Support/Paseo',
+            home / 'AppData/Roaming/Paseo']
+
+
 def private_paths(data_dir, work):
     home = Path.home()
     work = Path(work).resolve()
     from lib import wirelog  # the "Sent to Claude" log, even before it exists
-    paths = [Path(data_dir).resolve(), home / '.cache/idli', home / '.paseo', home / '.config/Paseo',
-             home / '.config/paseo', home / '.config/idlisseus', wirelog.folder()]
+    paths = [Path(data_dir).resolve(), home / '.cache/idli', home / '.paseo', *paseo_app_dirs(home),
+             home / '.config/idlisseus', wirelog.folder()]
     # Everything else Idli keeps beside Claude's folder (other workspaces, downloads, settings).
     parent = work.parent
     if parent != home and parent.name == 'idli-insights':
@@ -86,7 +92,7 @@ def builder_private(data_dir, ext):
                 continue
             paths.append(p)
     from lib import wirelog
-    paths += [home / '.cache/idli', home / '.paseo', home / '.config/Paseo', home / '.config/paseo',
+    paths += [home / '.cache/idli', home / '.paseo', *paseo_app_dirs(home),
               home / '.config/idlisseus', wirelog.folder(), home / '.claude/projects']
     return sorted({str(Path(p).resolve()) for p in paths})
 
