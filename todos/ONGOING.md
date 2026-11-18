@@ -80,7 +80,7 @@ Noted 2026-11-15.
   - an action Mini can be asked (the 9B explains from its code), previewed on the real accounts with nothing
     written, run, turned on for an account from today, or forked into Sandbox Claude. A fork's runs show on the
     left and it saves as a new Mini.
-  - Laptop checks for turn on and Fork are still to do (the laptop link dropped).
+  - all checked on the laptop (preview with the full draft, turn on, Fork to a new Mini, Drivey unchanged).
 - **Open:**
   - redaction for account data (email bodies, senders, calendar titles) at the same standard as files;
   - escalating a Mini question the 9B can't place (masked, to an outside model) is not built; the 9B places
