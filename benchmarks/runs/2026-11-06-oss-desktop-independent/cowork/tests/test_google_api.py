@@ -110,7 +110,7 @@ class SignIn(Base):
             back = q['redirect_uri'][0] + '?' + urllib.parse.urlencode({'code': 'C', 'state': q['state'][0]})
             threading.Thread(target=lambda: real_urlopen(back, timeout=5).read(), daemon=True).start()
         out = api.connect('me@example.org', browser, timeout=10)
-        self.assertEqual(out, {'ok': True, 'email': 'me@example.org', 'missing': []})
+        self.assertEqual(out, {'ok': True, 'email': 'me@example.org'})
         f = api.token_file('me@example.org')
         self.assertEqual(oct(f.stat().st_mode)[-3:], '600')
         self.assertEqual(json.loads(f.read_text())['refresh_token'], 'RT')

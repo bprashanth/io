@@ -153,8 +153,12 @@ def connect(email, open_url, timeout=600):
         raise ValueError(f'Google signed in {who or "another account"}, not {email}. Sign in with {email} in that '
                          'window and try again.')
     missing = [s.rsplit('/', 1)[1] for s in SCOPES if s not in granted]
+    if missing:  # Google lets the person untick boxes; half a sign-in would fail later, mid-run
+        revoke_token(tok)
+        raise ValueError('Google gave Idli only part of what it needs. Sign in again and tick every box on Google\'s '
+                         'page (or "Select all").')
     _save(email, {k: tok[k] for k in ('refresh_token', 'access_token', 'expires_at', 'scope') if k in tok})
-    return {'ok': True, 'email': email, 'missing': missing}
+    return {'ok': True, 'email': email}
 
 
 def revoke_token(tok):
