@@ -8,6 +8,7 @@
   - [One file at a time: index and graph built as files are learned](p1/file_by_file_index.md)
   - [Read every table on a tab (subtables, info blocks)](p1/subtables.md): the owner's decision; today Idli reads
     one table per tab.
+  - [The installation backend: vetting, signed catalog, mirrors, updates](p1/installation_backend.md).
   - [Pixi and the trusted catalog: refinements](p1/pixi_catalog_refinements.md): model paths, sizes, shared envs, updates, signing, request vetting.
   - [Sandboxing team tools properly](p1/sandboxing_later.md): after the catalog POC; WSL2 test, Mac Seatbelt, risk tiers, DGX fallback.
   - [Installers and the demo gaps](p1/deployment_strategy.md): D1-D11, with Pyodide as row 21.
@@ -18,6 +19,7 @@
   - [Team stacks: what's left](p1/team_stacks_next.md): the laptop run, sharing and joining, WSL2 and the Mac VM,
     tool outputs into the privacy review, Whisper as a GPU service.
 - **p2/**: measured speed-ups, not integrated yet.
+  - [A separate browser for agent work](p2/agent_browser.md): Chrome for Testing first; parked 2026-11-18.
   - [Free tier capacity for ~100 people on one DGX (E11)](p2/capacity_free_tier.md): moved here because E7
     held up (the local 9B with the split matched Muse on fresh chats); test the 9B only.
   - [Fake copy: keep date order, read "12-Mar-22" dates](p2/fake_copy_dates.md) (E1).
