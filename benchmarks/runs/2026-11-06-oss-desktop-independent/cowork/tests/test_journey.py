@@ -171,7 +171,7 @@ class RouterTests(unittest.TestCase):
         t.result({'question':question,'consent':self.CONSENT})
         card=t.tool()['input']['questions'][0];self.assertEqual(card['header'],'Query service')
         self.assertEqual([o['label'] for o in card['options']],['Yes','No'])
-        lead=t.r['content'][0]['text'];self.assertIn('PLACE_001',lead);self.assertIn('never gets rows',lead);self.assertIn('deepseek',lead)
+        lead=t.r['content'][0]['text'];self.assertIn('PLACE_001',lead);self.assertIn('never gets rows',lead);self.assertIn('idli-remote',lead)
         t.choose(answer)
     def test_mini_query_consent_no_sends_nothing(self):
         t=self.query_mini();self.consent(t,'Which ward had most visits in May?','No')

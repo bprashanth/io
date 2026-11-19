@@ -379,7 +379,7 @@ def answer(data_dir, mini, question, route, call=None):
     if route == 'service':
         c = consent(data_dir, mini, question)
         choice = map_service(data_dir, c['masked_question'], c['menu'], call)
-        who = f'An outside service ({c["service"]}) picked'
+        who = None  # the person already said yes on the card
     else:
         choice = map_local(question, real_menu)
         who = "Idli's own model picked"
@@ -395,7 +395,8 @@ def answer(data_dir, mini, question, route, call=None):
         parts += [f'**{head}**', '', body, '']
     title = str(choice.get('title') or '').strip()
     lines = ([f'### {title}', ''] if title else []) + parts + [
-        f'_{who} {" and ".join(_label(u, data_dir, mini) for u in chosen)}. {NOTHING_WRITTEN}_']
+        (f'_{who} {" and ".join(_label(u, data_dir, mini) for u in chosen)}. {NOTHING_WRITTEN}_' if who
+         else '_Nothing was drafted, booked or sent._')]
     return {'kind': 'mapped', 'reply': home.plain('\n'.join(lines).strip()), 'used': [u['item'] for u in chosen]}
 
 

@@ -1132,28 +1132,25 @@ def _build_card_text(team, labels):
     what = ', '.join(labels) if labels else 'this'
     return f"{team} can't read {what} yet. The Builder can add that to {team}. Build it with the Builder?"
 SERVICE_CARD = ('Send this to the query service?')
-MAP_CARD = 'Let the outside service pick the step?'
-MAP_YES = ('Yes', 'Send it. Only the masked question and the list go.')
-MAP_NO = ('No, Idli picks', "Idli's own model picks. Nothing leaves this computer.")
+MAP_CARD = 'Can I proceed?'
+MAP_YES = ('Yes', 'Send the question above to idli-remote.')
+MAP_NO = ('No, Idli picks', 'Nothing leaves this computer.')
 FORK_CARD = 'Fork this Mini and continue with Claude?'
 FORK_YES = ('Fork it', 'Claude gets a copy and your question with private values as codes. The original stays.')
 FORK_NO = ('Not now', 'The Mini stays as it is.')
 
 
 def _map_lead(c):
-    """The mapping card's lead: exactly what the outside service would get (lib/miniscope.py)."""
-    return ("This Mini has no direct answer for that. An outside service (" + str(c.get('service') or 'online') +
-            ') can pick which of its steps, or which plain read of your accounts, answers it. Idli then runs it here.'
-            '\n\nIt would get your question with private values as codes and this list. Never your emails, '
-            'calendar or sheet.\n\nQuestion: "' + str(c.get('masked_question', '')) + '"\n\n```\n' +
-            str(c.get('menu', ''))[:2500] + '\n```')
+    """The mapping card's lead: the masked question that would go to idli-remote (lib/miniscope.py)."""
+    return ('I want to call idli-remote with this question: "' + str(c.get('masked_question', '')) + '". '
+            'It will help me make better decisions.\n\n'
+            '**Most important: your account data is only ever read by me and stays on this computer.**')
 
 
 def _service_lead(c):
     """The consent card's lead: exactly what the query service would get."""
     more = f'\n...and {c["more"]} more lines' if c.get('more') else ''
-    return ("None of this Mini's questions fit. An external query service (" + str(c.get('service') or 'online') +
-            ') can write a query for it. The query then runs on this computer.\n\n'
+    return ("None of this Mini's questions fit. idli-remote can write a query for it. The query then runs on this computer.\n\n"
             'It would get your question and the list of columns, with private values as codes. It never gets rows.'
             '\n\nQuestion: "' + str(c.get('masked_question', '')) + '"\n\nColumns (a sample):\n```\n' +
             str(c.get('sample', '')) + more + '\n```')

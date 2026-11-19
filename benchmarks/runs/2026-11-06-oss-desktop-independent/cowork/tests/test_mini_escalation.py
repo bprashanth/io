@@ -156,7 +156,7 @@ class MappingTests(unittest.TestCase):
         self.assertNotIn('88profligate', sent['text'])
         self.assertEqual(searched['q'], 'from:88profligate@gmail.com newer_than:7d')
         self.assertIn('Yes, Friday works', out['reply'])
-        self.assertIn('An outside service', out['reply'])
+        self.assertNotIn('outside service', out['reply'])  # the person already said yes on the card
         self.assertIn('Nothing was drafted, booked or sent', out['reply'])
         shutil.rmtree(dd)
 
@@ -268,7 +268,12 @@ class RouterTests(unittest.TestCase):
         out = _route(msgs)
         card = _uses(out)[0]['input']['questions'][0]
         self.assertEqual(card['header'], 'Mapping')
-        self.assertIn('Never your emails', out['content'][0]['text'])
+        lead = out['content'][0]['text']
+        self.assertIn('I want to call idli-remote with this question: "list my leads"', lead)
+        self.assertIn('only ever read by me and stays on this computer', lead)
+        self.assertNotIn('deepseek', lead)
+        self.assertNotIn('Menu:', lead)
+        self.assertEqual(card['question'], 'Can I proceed?')
         yes = _uses(_route(msgs + _card_answer('Mapping', 'Yes', 'u3')))[0]
         self.assertEqual(yes['input'], {'id': 'lead-steps-1', 'question': 'list my leads', 'route': 'service'})
         no = _uses(_route(msgs + _card_answer('Mapping', 'No, Idli picks', 'u3')))[0]
