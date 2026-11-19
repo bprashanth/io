@@ -451,6 +451,54 @@ def calendar_events(email, start, end, q=None):
     return out
 
 
+
+# ---- Drive (read only: drive.readonly) ----
+
+DRIVE = 'https://www.googleapis.com/drive/v3'
+DRIVE_KINDS = {'pdf': "mimeType='application/pdf'",
+               'sheet': "(mimeType='application/vnd.google-apps.spreadsheet' or mimeType contains 'spreadsheetml' "
+                        "or mimeType='text/csv')",
+               'doc': "(mimeType='application/vnd.google-apps.document' or mimeType contains 'wordprocessingml')",
+               'folder': "mimeType='application/vnd.google-apps.folder'"}
+
+
+def drive_files(email, folder=None, kind=None, since=None, until=None, name_words=None, shared=False, limit=50):
+    """Files newest change first: id, name, kind, folder ids, last change, owner. since/until are RFC 3339 times."""
+    q = ['trashed=false']
+    if folder:
+        q.append(f"'{folder}' in parents")
+    if kind in DRIVE_KINDS:
+        q.append(DRIVE_KINDS[kind])
+    if since:
+        q.append(f"modifiedTime >= '{since}'")
+    if until:
+        q.append(f"modifiedTime < '{until}'")
+    if name_words:
+        words = [w.replace("'", "") for w in str(name_words).split() if w]
+        if words:
+            q.append('(' + ' or '.join(f"name contains '{w}'" for w in words) + ')')
+    if shared:
+        q.append('sharedWithMe')
+    r = call(email, 'GET', DRIVE + '/files', params={
+        'q': ' and '.join(q), 'orderBy': 'modifiedTime desc', 'pageSize': str(min(int(limit or 50), 100)),
+        'fields': 'files(id,name,mimeType,parents,modifiedTime,owners(emailAddress),shared)',
+        'supportsAllDrives': 'true', 'includeItemsFromAllDrives': 'true'})
+    return r.get('files') or []
+
+
+def drive_bytes(email, file_id, mime=None):
+    """A file's bytes: Google Sheets come as CSV (first tab), Google Docs as plain text, others as stored."""
+    if mime == 'application/vnd.google-apps.spreadsheet':
+        url, params = f'{DRIVE}/files/{file_id}/export', {'mimeType': 'text/csv'}
+    elif mime == 'application/vnd.google-apps.document':
+        url, params = f'{DRIVE}/files/{file_id}/export', {'mimeType': 'text/plain'}
+    else:
+        url, params = f'{DRIVE}/files/{file_id}', {'alt': 'media', 'supportsAllDrives': 'true'}
+    req = urllib.request.Request(url + '?' + urllib.parse.urlencode(params),
+                                 headers={'Authorization': 'Bearer ' + access_token(email)})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return r.read()
+
 if __name__ == '__main__':  # python -m lib.google_api start EMAIL | finish EMAIL 'http://localhost/?...'
     import sys
     if len(sys.argv) >= 3 and sys.argv[1] == 'start':

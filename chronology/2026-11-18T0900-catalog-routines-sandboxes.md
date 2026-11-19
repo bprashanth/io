@@ -377,3 +377,26 @@ Owner's rules (built in phase 1, commit b46249da):
 - **Not run:** the read-only end-to-end check on the laptop (`e2e.py`), because the laptop link was down.
 - **Recommendation:** do the refactor, with commands, steps that take overrides, and man pages with 2 or 3 examples
   each. A follow-up 4th condition (a kubectl/gh-style grammar) reuses the harness and the frozen held-out set.
+
+## 11. One CLI grammar, condition 4, and a blind tester (2026-11-19, in progress)
+
+- **Phase A, the grammar** (`narrative/CLI_CHOICES.md`):
+  - Read kubectl's conventions and `explain`, gh's `list` and `--json`, clig.dev, GNU/POSIX options, docker's
+    management commands and aws's `--cli-input-json`.
+  - Chosen: `idli VERB RESOURCE [NAME] [flags]`, verb first.
+    - Read verbs `list`/`get`/`explain`, plus the domain verbs `judge` and `run`.
+    - Write verbs preview unless `--apply`, and are never on the mapper's menu.
+    - Shared flags: `--since`/`--until`/`--search`/`--where`/`--latest`/`--limit`/`--as`/`-o`.
+    - Mini-defined views (`leads`, `replies`).
+    - `explain` is the man page, with real-date examples.
+  - Decided against proposed is marked in the doc.
+- **Phase B, condition 4** in `benchmarks/runs/2026-11-19-capability-cli-mapping`:
+  - Added through the `FAMILY` hook, plus a 12-question Drive set (4 held out, frozen by hash before any run).
+  - Dev tuning was two wording fixes (`run mini` shows each draft; `judge` takes any question). The second changed
+    nothing, so tuning stopped.
+  - Held-out was scored once.
+  - The owner then asked for Drive structure commands. Condition 4b (`describe`, `summarise`) gets a second Drive
+    set of 10, frozen with no tuning.
+- **OAuth on the DGX:** `lib/google_api.py` gained `paste_start`/`paste_finish` (consent link, PKCE verifier kept
+  0600, the owner pastes the address the browser lands on) and drive.readonly. The owner signed in 87 and 88 with
+  all five scopes. Drive read helpers: `drive_files`, `drive_bytes`.

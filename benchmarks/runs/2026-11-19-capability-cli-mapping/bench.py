@@ -21,7 +21,12 @@ HERE = Path(__file__).resolve().parent
 RES = HERE / 'results'
 TODAY = dt.date(2026, 11, 19)
 Q = {q['id']: q for q in json.load(open(HERE / 'questions.json'))['questions']}
+Q.update({q['id']: q for q in json.load(open(HERE / 'drive_questions.json'))['questions']})
 SPLIT = json.load(open(HERE / 'split.json'))
+_DS = json.load(open(HERE / 'drive_split.json'))
+SPLIT.update({'drive-dev': _DS['dev'], 'drive-heldout': _DS['heldout']})
+Q.update({q['id']: q for q in json.load(open(HERE / 'drive2_questions.json'))['questions']})
+SPLIT['drive2'] = json.load(open(HERE / 'drive2_split.json'))['all']
 
 
 # ---- calling the mappers ----
@@ -130,7 +135,7 @@ def _key(k):
 # Conditions. A new condition (e.g. a kubectl/gh-style grammar) is: a menu builder in menus.prompt, an entry here
 # naming its family, and, if its commands differ, a translation of its answer into the canonical items below (add
 # a family branch in items()). Gold stays canonical, so the frozen held-out set is reused as is.
-FAMILY = {'1': 'menu', '2': 'cli', '3': 'cli'}
+FAMILY = {'1': 'menu', '2': 'cli', '3': 'cli', '4': 'grammar', '4b': 'grammar'}
 
 
 def family(cond):
@@ -142,7 +147,116 @@ def gold_key(cond):
 
 
 CMD = {'sheet rows': 'sheet_rows', 'mail search': 'mail_search', 'mail read': 'mail_read',
-       'calendar meetings': 'meetings', 'calendar free': 'free_times', 'nine-b judge': 'judge', 'whole': 'whole'}
+       'calendar meetings': 'meetings', 'calendar free': 'free_times', 'nine-b judge': 'judge', 'whole': 'whole',
+       'drive list': 'drive_list', 'file read': 'file_read'}
+
+
+def grammar_item(line):
+    """One 'idli VERB RESOURCE [NAME] [flags]' line -> (canonical item, args), as the grammar defines it
+    (narrative/CLI_CHOICES.md). Unknown shapes -> ('invalid', {})."""
+    import shlex
+    try:
+        toks = shlex.split(str(line))
+    except ValueError:
+        toks = str(line).split()
+    if toks and toks[0] == 'idli':
+        toks = toks[1:]
+    pos, flags, where = [], {}, {}
+    i = 0
+    while i < len(toks):
+        t = toks[i]
+        if t.startswith('--'):
+            k, eq, v = t[2:].partition('=')
+            if not eq:
+                if i + 1 < len(toks) and not toks[i + 1].startswith('--'):
+                    v = toks[i + 1]; i += 1
+                else:
+                    v = True
+            if k == 'where':
+                wk, _, wv = str(v).partition('=')
+                where[wk.strip().lower()] = wv.strip()
+            else:
+                flags[k.replace('-', '_')] = v
+        else:
+            pos.append(t)
+        i += 1
+    if len(pos) < 2:
+        return ('invalid', {})
+    verb, res, name = pos[0].lower(), pos[1].lower(), (pos[2] if len(pos) > 2 else None)
+    a = {}
+    if flags.get('search'):
+        a['text'] = flags['search']
+    if verb == 'run':
+        if res == 'mini':
+            return ('whole', {})
+        if res == 'step' and name:
+            for k in ('since', 'until'):
+                if k in flags:
+                    a[k] = flags[k]
+            if 'start' in flags or 'end' in flags:
+                a.update({k: flags[k] for k in ('start', 'end') if k in flags})
+            if where.get('guest'):
+                a['guest'] = where['guest']
+            return (f'step:{name}', a)
+        return ('invalid', {})
+    if verb == 'judge':
+        return ('judge', {'over': 2})
+    if verb == 'list' and res in ('leads', 'lead'):
+        return ('sheet_rows', {})
+    if verb == 'list' and res in ('rows', 'row'):
+        return ('sheet_rows', {})
+    if res in ('replies', 'reply'):
+        a['from_sheet'] = 'SHEET_1'
+        a.update({k: flags[k] for k in ('since', 'until') if k in flags})
+        if where.get('from') and where['from'] != 'leads':
+            a['from'] = where['from']
+        return ('mail_search', a)
+    if res in ('mail', 'email', 'emails'):
+        if verb == 'get':
+            return ('mail_read', {'from': where.get('from') or name})
+        a.update({k: flags[k] for k in ('since', 'until') if k in flags})
+        if where.get('from') == 'leads':
+            a['from_sheet'] = 'SHEET_1'
+        elif where.get('from'):
+            a['from'] = where['from']
+        return ('mail_search', a)
+    if res in ('events', 'event', 'meetings'):
+        if 'since' in flags:
+            a['start'] = flags['since']
+        if 'until' in flags:
+            a['end'] = flags['until']
+        if where.get('guest') == 'leads':
+            a['with_sheet'] = 'SHEET_1'
+        elif where.get('guest'):
+            a['guest'] = where['guest']
+        return ('meetings', a)
+    if res in ('freetimes', 'freetime', 'slots'):
+        for k in ('days', 'minutes', 'count'):
+            if k in flags:
+                try:
+                    a[k] = int(flags[k])
+                except ValueError:
+                    a[k] = flags[k]
+        return ('free_times', a)
+    if verb == 'describe' and res in ('files', 'file', 'folder', 'folders'):
+        if res.startswith('folder'):
+            return ('drive_list', {'in': name})
+        return ('file_describe', {'file': name})
+    if verb in ('summarise', 'summarize') and res in ('files', 'file'):
+        return ('file_summary', {'file': name})
+    if verb == 'list' and res in ('folders', 'folder'):
+        return ('drive_list', {'type': 'folder'})
+    if res in ('files', 'file'):
+        if verb == 'get':
+            return ('file_read', {'file': name or where.get('name')})
+        a.update({k: flags[k] for k in ('since', 'until') if k in flags})
+        for k in ('in', 'type', 'shared'):
+            if where.get(k):
+                a[k] = where[k]
+        if 'shared' in flags:
+            a['shared'] = 'true'
+        return ('drive_list', a)
+    return ('invalid', {})
 
 
 def items(answer, cond):
@@ -152,6 +266,15 @@ def items(answer, cond):
     uses = answer.get('use') if family(cond) == 'menu' else answer.get('run')
     if not uses:
         return [('none', {})] if answer.get('none') or uses == [] else [('invalid', {})]
+    if family(cond) == 'grammar':
+        out = []
+        for line in (uses if isinstance(uses, list) else [uses])[:2]:
+            name, a = grammar_item(line if isinstance(line, str) else (line.get('cmd') if isinstance(line, dict) else ''))
+            for d in ('since', 'until', 'start', 'end'):
+                if d in a:
+                    a[d] = _date(a[d])
+            out.append((name, a))
+        return out or [('invalid', {})]
     out = []
     for u in uses[:2]:
         if not isinstance(u, dict):
@@ -218,7 +341,7 @@ def grade(qid, answer, cond):
 def score(args):
     rows = []
     for f in sorted(RES.glob(f'{args.split}-*.jsonl')):
-        m = re.match(rf'{args.split}-(\w+)-c(\w+?)(?:-r(\d))?\.jsonl', f.name)
+        m = re.match(rf'{args.split}-([a-z]+)-c(\w+?)(?:-r(\d))?\.jsonl', f.name)
         mapper, condname, rep = m.group(1), m.group(2), m.group(3)
         cond = condname
         res = [json.loads(ln) for ln in f.read_text().splitlines() if ln.strip()]
