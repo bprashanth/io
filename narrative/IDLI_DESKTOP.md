@@ -1,284 +1,286 @@
 # Idli Desktop: an operating layer for NGOs
 
-2026-11-16. Written after Teams became a page. It replaces the strategy brief of 2026-11-13 (still in git history:
-`git show 459eed69:narrative/IDLI_DESKTOP.md`). Each claim is marked **[built]** (in the code), **[tested]** (walked
-through in the app on the laptop's test account), **[idea]** or **[untested]**. How a person moves through Drivey and
-Teams, step by step, is in [DRIVEY_JOURNEY.md](DRIVEY_JOURNEY.md). The design reasoning is in
-[docs/idli-design.md](../docs/idli-design.md). Where the work stands is in
-[docs/idli-handoff.md](../docs/idli-handoff.md).
+2026-11-19. Written after the move from Teams to sandboxes. It replaces the 2026-11-16 version, which was written
+around Teams (still in git history: `git show 620f12e5:narrative/IDLI_DESKTOP.md`). Each claim is marked
+**[built]** (in the code), **[tested]** (walked through in the app on the laptop's test accounts), **[idea]** or
+**[untested]**.
+
+Details live in:
+- [SANDBOXES.md](SANDBOXES.md): the model, routing, blocks;
+- [ESCALATION_MODELS.md](ESCALATION_MODELS.md): who decides what;
+- [UX.md](UX.md): what the person sees;
+- [PAGES_AND_TOOLS.md](PAGES_AND_TOOLS.md): the trusted catalog and pixi;
+- the chronology `chronology/2026-11-18T0900-catalog-routines-sandboxes.md`.
 
 ---
 
 ## 1. What we are doing
 
-People at NGOs run on spreadsheets, WhatsApp groups, email, funder portals and Google Drive. AI agents such as
-Claude Code can now do much of that work, but NGO staff stop using them for four reasons:
-- the data is about real people and can't be pasted into a chat;
-- every task means switching between tools;
-- they can't tell if an answer is right;
-- they're afraid the agent will break something.
+People at NGOs run on spreadsheets, email, calendars, WhatsApp and Google Drive. AI agents can do much of that
+work. NGO staff don't use them because:
+- the data is about real people;
+- they can't tell whether an answer is right;
+- they're afraid the agent will break something;
+- frontier models cost money.
 
-On top of that, frontier models cost money that a programme budget doesn't have.
+**Idli Desktop is the layer between an NGO's people and AI.** The aim is to let an NGO use AI first, on its real
+work, without giving up the privacy of the people it serves.
 
-**Idli Desktop is meant to be the operating layer between an NGO's people and AI.** The goal is that an NGO can use
-AI first, for its real work, at a cost it can manage and without giving up the privacy of the people it serves. It
-should be able to keep what it builds this way, and pass it on to the rest of the team.
+The method hasn't changed:
+- **A large model learns once, on stand-ins:** masked data, fake files, test accounts.
+- **A small private model and code do the daily work** on the real data, on the person's computer.
+- **What the large model leaves behind is kept as a Mini.**
 
-It works by splitting each job between two kinds of model:
-- **A large model learns once, on stand-ins.** It sees fake or masked copies of the data, or test accounts. It
-  writes code, scripts and an explanation.
-- **A small model runs that work every day.** It runs on the real data, on the person's own computer, as the
-  person. It makes only small choices; code does the arithmetic and the actions.
-
-The person sees each hand-off between the two and says yes to it. What the large model leaves behind is kept as a
-**Mini**, and Minis are kept and shared inside a **Team**.
-
-The shell is **Paseo**, a desktop app that hosts agent CLIs (Claude Code, Codex, a local model) and a browser with
-the person's own logins. We patch it (build idli25 today), and the person never sees a terminal they didn't ask
-for. **[built]**
+The shell is **Paseo**, a desktop app that hosts Claude Code and other agents, with Idli's patches (build idli26 on
+the laptop). **[built]**
 
 ---
 
-## 2. What a Team is
+## 2. Teams are postponed, not dropped
 
-**A Team is a collection of Minis, the people who use them, and the rules they share, organised around one kind of
-work.** Examples are "Insights" (household survey analysis), "Field M&E" or "Livelihoods Wardha". In the sidebar a
-team is a heading. Under it are the team's workspaces. Each workspace is the two halves: Idli on the left and the
-person's own Claude on the right.
+Until 2026-11-17 the organising unit was the **Team**:
+- a heading in the sidebar;
+- a New team wizard with six questions;
+- a per-team Builder and Analyst;
+- a Teams page with an Installed tools line.
 
-A team holds:
-- **Its Minis.** Each team has its own list, separate from other teams.
-- **Its folder.** `~/idli-insights/teams/<name>/` holds the answers given at setup (`team.json`), the instructions
-  and tools, downloads, and the privacy codes. Claude's masked copies sit beside it in `claude-masked-<name>`.
-- **Its rules, set by answering the setup questions:**
-  - where the data lives;
-  - who uses it;
-  - whether the files hold names, places or phone numbers (masking stays on whatever the answer);
-  - whether a Mini may ask an outside service when it can't answer.
-- **Its own trail.** The Privacy log labels every request with the team's name.
+It worked, but it put too many ideas on screen at once. People had to understand teams, two Claudes per team,
+stacks, tools and Minis before doing anything.
 
-A manager makes a team on the **Teams page** under Start here: New team, six questions with one panel each, then
-Set it up. The new team's card then has **Open** and **Delete**. Delete removes the team's chats and moves its
-folder to an archive, so a mistake loses nothing. **[built, tested 2026-11-16]**
+**Decision (owner, 2026-11-18):** be brutally simple for now. Strip the product down to the two things that have
+to exist for anything else to work: **the Builder and the sandbox**. Teams are removed from the sidebar and the
+wizard is gone. This is a postponement, not a conclusion. The reasons for teams still stand:
+- what an NGO builds belongs to a group doing a job;
+- rules like "never use the outside service" belong to the group, not the individual;
+- Minis need a home where one person makes them and others run them.
 
-**Why a team and not an app:** what an NGO builds belongs to a group of people doing a job, not to one person's
-chat history. The team is where a Mini made by one person becomes something everyone else can use. It is also where
-rules belong that individuals shouldn't have to decide each time, such as "this team never uses the outside
-service". Drivey is the first team. It was built by hand, and the PoC's "make a team" produces exact copies of it
-under new names.
+Teams come back once the barebones are solid, probably as a layer over sandboxes: a team owns some sandboxes, their
+Minis and their rules. Until then the "one person builds, the rest run" pattern is carried by the Mini and its
+share code. **[idea]**
 
-**Not built yet [idea]:**
-- membership across computers (a team today lives on one machine; its Minis travel by share code);
-- roles (who may make Minis and who only uses them);
-- team-wide settings beyond the four questions;
-- a team whose Minis are workflows rather than data (see section 3).
+Drivey, the first hand-built team, stays exactly as it is. It is the regression check for every change.
+**[tested, first and last in every round]**
 
 ---
 
-## 3. What a Mini is, and whether the two kinds are the same thing
+## 3. The barebones: two places
 
-A Mini is **a piece of work the large model learned once, saved so a small model and code can repeat it on demand,
-and shared with the team.**
+There are two places, with a hard line between them.
 
-### The two kinds as they look today
+### 3.1 The Builder: outside
 
-**The data Mini (Drivey) [built, tested]**
-- **Data:** one or more Drive files. These are fetched fresh as the person every time the Mini opens, so the numbers
-  are always current.
-- **Scripts:** one per saved question. Each has its options (ward, months, species).
-- **A narrative:** the author's own text and the pinned charts, arranged like a short document.
-- **Follow-up questions:**
-  1. The small model maps the person's words to one saved question and its options, and the script answers.
-  2. If nothing fits, the person can say yes to the outside query service.
-  3. If that doesn't work, the question goes to Claude, on masked copies.
-  4. Whatever Claude finds can be added back to the Mini.
-
-**The workflow Mini [idea; WhatsAppy is an empty space for it]**
-An example: log in to email, find emails with leads, add them to the Excel sheet, and schedule a call on the
-calendar. It has:
-- logins in the app's browser (email, Drive, calendar);
-- a sequence of steps, where each step is code that reads or writes one page, like a small API for that site;
-- a narrative of what the workflow does and when;
-- small decisions along the way: is this email a lead, which row is it, which free slot to pick.
-
-### Are these two patterns the same?
-
-**They have the same shape. What differs is the effects they have on the world.** Lay both Minis side by side and
-they have the same parts:
-
-| Part | Data Mini | Workflow Mini |
-|---|---|---|
-| **What it is bound to** | Drive files, read as the person | Logged-in sites, used as the person |
-| **What the large model learned on** | A fake or masked copy of the file | Test accounts, or recorded pages with fake data |
-| **Entry points** | Saved questions with options | Named actions with parameters ("find leads since Monday") |
-| **Code behind each entry point** | A script that reads the file | Step code that reads or writes pages |
-| **What the small model does** | Picks the question and options | Picks the action, and makes the small judgements in between (is this a lead?) |
-| **Narrative** | The author's page and charts | What it does, when, and what it will change |
-| **When it can't do something** | Query service with a yes, then Claude on masked copies | Same: ask, then send it to Claude on stand-ins, with a yes |
-| **How it grows** | Claude adds a question | Claude adds a step or an action |
-
-The data Mini is the read-only special case of the workflow Mini. One of its steps is "fetch the file" and the rest
-are "answer". **The building blocks are therefore shared** (section 4), and the team, the Minis list, the share code
-and the consent cards should serve both kinds.
-
-The differences are real, and all of them come from the workflow Mini being able to change things:
-- **Writes need a yes each time,** at least at first. A data Mini can't hurt anything. A workflow Mini sends emails
-  and books meetings. The rule already used for Drive applies: never overwrite, never delete, and a card before every
-  write. (On WhatsAppy the owner's rule today is that nothing is sent at all, by anyone, including the private 30B.)
-- **It runs over time.** It needs triggers ("every morning") and a log of what it did. A data Mini just answers when
-  asked.
-- **It is more fragile.** Sites change their pages, so step code breaks. The fix is in the same loop: the small model
-  notices that a step failed, and the large model re-learns that step on the test account.
-- **It needs more trust.** A shared Mini that acts in someone's browser is more dangerous than a shared dashboard.
-  It needs to show who made it and what it can change, before anyone says yes to it.
-
-There is a third kind, an **org kit Mini** **[idea]**: brand colours, templates and "how we make the newsletter in
-Canva". It has no small model and no data, only instructions and assets for the person's own Claude. It fits the
-same table with most rows empty. That is why the Mini, not the dashboard, is the right unit.
-
----
-
-## 4. The building blocks
-
-Each block is one piece of the operating layer. Most were built for Drivey and are meant to be reused by every team
-and every kind of Mini.
-
-### 4.1 Small models
-- A **local 9B** (Qwen 3.5 9B) runs on the person's computer, free. **Muse 30B** runs on our own hardware for
-  heavier private work. Evals compare against Muse 30B on held-out sets. **[built]**
-- **What they do:** choose, not compose. They map a question to a saved script, choose its options, and decide which
-  card to show next. Code computes every number and writes every sentence that carries a number. When the 9B wrote
-  answers in its own words, it dropped a number in 13 of 53 turns; when code wrote them, none were dropped. Mapping
-  questions to a Mini's scripts with the 9B scored 84 of 85, including 20 of 20 correct "no match" answers.
-  **[tested]**
-- **Why it matters for cost:** the expensive model is used once to learn. The cheap model is used every day.
-
-### 4.2 Redaction (masking)
-- **What leaves the computer is masked:**
-  - the person's own Claude Code reaches Anthropic through Idli's masking proxy (`lib/ccproxy.py`);
-  - names, places, phone numbers and other private values become codes (`NAME_007`, `PLACE_005`) in every request;
-  - the replies are turned back into real values for the person. **[built, tested]**
-- **Claude works on masked copies of the files**, not the real ones, inside its own sandbox (it can't read Idli's
-  private folder). An earlier version showed why this matters: Claude found real species names by running scripts on
-  the real file. **[built, tested]**
-- **The person checks what will be hidden before anything leaves.** The privacy review shows a switch per column,
-  with real values next to their codes. **[built, tested]**
-- **Start here > Privacy** lists everything sent in the last 7 days, as codes, and can be searched by a real name.
+- **What it is:** an ordinary Claude Code project in the sidebar. It defaults to Opus, like Antigravity. If Paseo
+  has no Claude Code, it falls back to Idli 9B or 30B. **[built, tested]**
+- **What it's for:** anything with public data: a dashboard from a public dataset, a script, a plan. The opening
+  line says so: "Build with public data here. For private data or your own accounts, type /sandbox."
   **[built, tested]**
-- **Wire audits on the laptop found no real values in what was sent.** One example: 16 requests, 0 real names,
-  250 place codes. **[tested]**
-- **How it detects private values:** a vault of known values, close matches, regex rules, and a local name scanner
-  (GLiNER). **[built]**
+- **What it never sees:** the person's private files, accounts or what a sandbox finds. It sees each sandbox as a
+  black box: its name, its blocks and its accounts. **[built]**
+- **What it does for sandboxes:**
+  1. **`/sandbox`:** it asks four questions, one at a time:
+     - what you want to do;
+     - whether the data has names, places or phone numbers;
+     - whether Idli may ask an outside service (masked data only): ask each time, never, or always;
+     - which accounts to use.
+  2. **It maps the request to blocks** and makes a sandbox with exactly those. **[built, tested]**
+  3. **It refuses a missing action** in plain words and records it as a request to our team. Instagram posting,
+     and running on a schedule, were both refused. **[built, tested]**
+  4. **It writes missing transforms** and adds them to a sandbox, after one approval card (section 4).
+     **[built, tested]**
 
-### 4.3 Large and small models working together
-- **Teacher and worker:** Claude teaches on stand-ins, and what it leaves behind is code (scripts, chart code, a
-  Mini). The private model drives that code on the real data. **[built]**
-- **The two halves on screen:** Idli (the small model and code) on the left, the person's own Claude on the right.
-  A bright border shows which side is in control, so a hand-off looks like the focus moving. The split now repairs
-  itself if Paseo loses it. **[built, tested]**
-- **Charts travel between them:** Claude's charts appear in Idli's chat, and a click on a bar can send that bar back
-  to Claude as a question. **[built, tested]**
-- **No new subscription:** Claude is the person's own Claude Code subscription. Idli doesn't resell it. (Open
-  question: the subscription terms may rule out a proxy that rewrites prompts. If so, the right side switches to
-  Codex.) **[open]**
+### 3.2 The sandbox: inside
 
-### 4.4 Escalation to larger models while the work runs, with consent
-Most questions never leave the computer. When a piece of the work is beyond the small model, that one piece goes up
-the ladder, and every step up has a yes or no card that shows exactly what will be sent:
-1. **The Mini's own scripts** answer, on this computer. **[built]**
-2. **The outside query service** comes next. It gets the masked question and the column list, never rows, and writes
-   one read-only query that runs locally. It may ask back which of two or three questions was meant. It is capped at
-   200 questions a day per computer. A team can turn it off at setup. **[built, tested]**
-3. **Claude on masked copies** is next. The person switches to the right half and Claude works there. **[built,
-   tested]**
-4. **Inside Claude:**
-   - `unmask` can reveal a contextual value (a place, a species), never a personal one. It needs two consents and
-     is limited to 3 reveals per workspace.
-   - `lookup` searches the web from this computer with the real value, and the results are masked before Claude
-     sees them. **[built, tested]**
+- **What it is:** a sidebar heading named like a container (`merry-parrot-7ac1 leads`,
+  `lucky-koel-7672 drivecharts`). It opens as a Drivey-style split. **[built, tested]**
+- **Left, Idli:** the private 9B and code, on the real files and accounts.
+  - Here the person asks questions, runs Minis, and sees every real result.
+  - The 9B never chooses freely (section 5).
+- **Right, Sandbox Claude:** Claude Code on masked data only.
+  - Files reach it as masked copies. PDFs reach it as masked text.
+  - Account content reaches it masked.
+  - It can only use the blocks plugged into its sandbox. Its scripts get the same import check as blocks.
+  - It never runs anything on real data itself. Idli runs its scripts, shows the real output on the left, and
+    hands Claude the masked output. **[built, tested]**
+- **Why the split:** inside, the person can do less, but it is safe. To extend what a sandbox can do, you go back
+  outside to the Builder.
 
-The rule throughout: **escalate the piece, not the whole job, and only with a yes.**
+### 3.3 Who sees what
 
-### 4.5 Logins and the browser ("UI as API")
-- **No OAuth apps and no API keys for Google:**
-  - the person signs in once in Paseo's browser;
-  - Idli reads Drive with that session, and the cookies go only to Google;
-  - a shared Mini fetches its file with the receiver's own Google account. **[built, tested]**
-- **Site plugins:** narrow tools that read a page like an API. The large model writes them on a test account, and
-  the small model uses them on the real account. Only Google is built; it was first built for Gmail, Drive and
-  Sheets. **[built for Google]**
-- **Start here > Logins** checks Google, Claude and the private model, and helps the person sign in.
-  **[built, tested]**
-- **Open problems:**
-  - reading the session through DevTools needs a proper Paseo change before shipping;
-  - many sites' terms forbid automation;
-  - funder portals rarely have test accounts. **[open]**
-
-### 4.6 Sharing Minis
-- **How it works:**
-  - a Mini has a share code (`IDLI-XXXX-XXXX`);
-  - the receiver says yes, and the Mini appears in their list;
-  - the code carries the workflow and which file it points at, never data rows;
-  - the code bundle is stored at silo.idli.cc. **[built, tested on one account]**
-- **Not tested yet:** two different Google accounts.
-- **Not built:**
-  - updates to a shared Mini (a share is a frozen copy today);
-  - cloning a Mini onto a different file of the same kind;
-  - signing, so people can see who made a Mini. **[idea]**
-
-### 4.7 Organising Minis and workflows
-- **Today:**
-  - Teams are headings, and each team has its own Minis;
-  - Start here holds the Teams page, Privacy and Logins;
-  - in a workspace, Minis show as slim cartridges under the chat box. **[built, tested]**
-- **Next [idea]:**
-  - a team's Minis page that lists data and workflow Minis together;
-  - a Mini's entry points, as an index the small model can search across Minis;
-  - a library of common Minis (a funder's report format, a standard survey) that NGOs clone rather than share.
+| | Real data | Masked data | Can change what a sandbox can do |
+|---|---|---|---|
+| **Builder** | Never | Never; only fake data and the trusted list | Yes: makes sandboxes, writes transforms |
+| **Sandbox Claude** | Never | Yes | Only through Minis built from its blocks |
+| **Idli (9B + code)** | Yes | — | No; it picks from fixed menus |
+| **Outside service** | Never | The masked question and a short menu | No; it picks one item |
 
 ---
 
-## 5. Cost
+## 4. What a sandbox can do: three levels
 
-| Who does the work | Who pays | How often |
+| Level | Examples | Who builds it |
 |---|---|---|
-| The small model (9B) on the person's computer | Nobody | Every day, most questions |
-| Muse 30B on our hardware | Us (could be a paid tier) | Heavier private work |
-| The outside query service (DeepSeek through OpenRouter) | Our OpenRouter key in the PoC; short replies, capped at 200 questions a day | Questions the Mini can't answer |
-| Claude | The person's own subscription | Learning, and new questions, with a yes |
+| **Actions** | Gmail drafts, Calendar bookings, anything that writes, sends or posts, a new website, a schedule | Our team only. The Builder refuses and sends a request |
+| **Transforms** | Read PDFs, Word or tables; summarise; ask the 9B | The Builder writes them and adds them, within the trusted list |
+| **Pages and servers** | Page servers, long-running tools | Undecided: on the person's computer or on silo |
 
-The design keeps the expensive model at the edges, for learning and for new questions, and the cheap model in the
-middle, for the daily work. As a team's Minis grow, it needs Claude less.
+### Actions: built by us [built, tested on 87 and 88]
+
+- `drive_files`;
+- `gmail_search`, `gmail_read` and `gmail_draft` (drafts only: the person presses Send);
+- `calendar_freebusy`, `calendar_book` and `meetings`;
+- `sheet_read`;
+- `nine_b`, a judgement on real content with a fixed answer shape.
+
+They run through Google's APIs with Idli's own OAuth app, with tokens per account on the person's computer. A
+booking has a fixed key, so it is never made twice.
+
+### Transforms: written by the Builder [built, tested]
+
+- **What it checks:**
+  - only trusted imports, baked into the build (plain-transform stdlib, pandas, numpy, openpyxl, pypdf,
+    python-docx);
+  - no network, no files outside the sandbox, no `eval`;
+  - a test on fake data.
+- **Cost:** the check takes about 0.1 s, once, when the block is added. Each run only compares a digest.
+- **Approval:** the person sees one card: "Add block: Read PDFs. Uses pypdf. Reads PDFs you give it. Sends
+  nothing."
+- **Results on the laptop:**
+  - the owner's "add PDF reading to drivecharts" took 43 s;
+  - 18 PDFs were answered in 63 s, then 20 s for a follow-up;
+  - a block that imports `requests` was refused with a plain reason.
+- **The catch:** there is no wall (no bwrap) on any platform for now. The check is a guard, not a boundary. Walls
+  come with the p1 `sandboxing_later` todo.
+
+### The trusted catalog [built, tested; not yet wired into sandboxes]
+
+Heavier tools (Whisper, Piper, NLLB, OCR, face blur and others, 14 in all) are vetted by us and served from silo.
+They install with pixi on every platform, and installing them is the same on every OS. They fit the transforms
+level once the catalog's tools are offered to the Builder as block dependencies. **[idea]**
 
 ---
 
-## 6. Open questions
+## 5. Minis, and how a question is answered
 
-- **Subscription terms.** Can a person's Claude subscription go through a proxy that rewrites prompts? If not, the
-  right half becomes Codex.
-- **Workflow Minis that write.** How much approval is enough, how is a Mini made safe to share, and which sites can
-  be automated through the browser at all?
-- **Teams across computers.** A team is on one machine today. A real team needs shared membership, and a way to keep
-  Minis in step without a server that holds data.
-- **The first Mini.** A guided first Mini from a sample file, at the end of making a team, is still a concept.
-- **Is this a product or a wedge?** If the CLI makers add their own desktop apps, what stays ours: privacy,
-  cheap daily runs, and Minis organised by team for NGOs.
+A **Mini** is work Claude did once, saved so Idli can repeat it on the real data without Claude.
+- **Data Minis** are scripts per saved question.
+- **Workflow Minis** are scripts in **named steps**: read the leads, find replies, have the 9B read each one, and
+  draft times. Each step can run on its own, in preview. **[built, tested]**
+
+### The chain (owner, 2026-11-18) [built, tested]
+
+The 9B never chooses freely. When it was allowed to, it made up a sheet link and gave empty answers. Each question
+goes down this chain until something can answer it:
+
+1. **The 9B, direct.** This covers only what maps cleanly to the open Mini:
+   - its saved questions;
+   - "run step 2";
+   - explain;
+   - a preview of the whole Mini;
+   - run, turn on, or fork.
+2. **Mapping, with consent.** The outside service gets the masked question and a short fixed menu: the Mini's
+   steps and the sandbox's read blocks, or SQL for a data Mini. It picks one item. Idli runs it on the real data in
+   preview and shows the output as the code wrote it. Write actions are never on the menu.
+3. **The 9B maps instead** if the person says No. This is the person's quality call.
+4. **Fork to Sandbox Claude** when nothing on the menu fits. Claude gets a copy of the Mini and the masked
+   question. It splits a step, adds one, adds a chart or adds a file. Idli runs each try, and it saves as a new
+   Mini. The original never changes.
+5. **The Builder** for anything net new, such as a missing action.
+
+A question asked with no Mini open goes straight to Sandbox Claude, masked, which builds a Mini for it.
+
+**Why this matters:** in a team, one person makes the Minis with Claude and everyone else runs them. Nobody runs a
+leads Mini they can't check piece by piece. So the person has to be able to:
+- see each step's output;
+- ask basic questions the blocks can answer even if the Mini doesn't name them, like "show me my meetings
+  yesterday" or "which emails are new";
+- get correct answers to those.
+
+If that stage fails, people give up on the Mini. That is why the chain escalates for mapping instead of trusting
+the 9B alone.
+
+### Turning on and forking [built, tested]
+
+- **Turn on:** "turn this on for my account" binds the Mini to an account from today. Running on a schedule is
+  still a gap.
+- **Fork:** a button on the Mini card. Sandbox Claude opens with the current flow and asks how to change it.
+
+### Tested on the laptop (2026-11-18)
+
+- **Leads**, in the merry-parrot sandbox:
+  - "list of leads" took 9 s;
+  - "meetings yesterday" took 8 s;
+  - "which emails are new" took 18 s, with the 9B mapping it after a No;
+  - "the draft for Asha" took 44 s;
+  - "step 2" on a Mini with no steps went to a fork, which split it into 6 steps;
+  - "which leads agreed but haven't picked a time" mapped to step 4 and took 94 s;
+  - Instagram ended at the Builder.
+- **Insights**, on a public survey with a report PDF and data CSV:
+  - the PDF reached Claude masked;
+  - a two-chart Mini was saved;
+  - adding the 2025 data with the Mini open made a new, extended Mini.
 
 ---
 
-## 7. What exists today
+## 6. Masking and accounts
 
-- **Paseo build idli25:**
-  - Start here: the Teams page, Privacy, Logins;
-  - Drivey: Idli on the left, the person's masked Claude on the right, Minis, and the query service;
-  - team headings made from the Teams page, as Drivey clones;
-  - WhatsAppy: an empty Claude space with no sending.
-- **Evidence:**
-  - tests, synthetic fixtures and evals against Muse 30B;
-  - laptop walk-throughs on a test Google account (chronology under `chronology/2026-11-1*`).
-- **Not built:**
-  - workflow Minis;
-  - org kit Minis;
-  - teams across computers;
-  - Mini updates, clones and signing;
-  - the guided first Mini.
+- **What goes outside is masked:** names, places and numbers become codes. This covers Claude's requests through
+  Idli's proxy, files, PDF text and account content. The person checks a privacy page before files go, and
+  "<column> entirely withheld" is shown plainly. **[built, tested]**
+- **Accounts:**
+  - Google uses OAuth with Idli's own app, which is unverified (Advanced, then "Go to idli"), with a cap of 100
+    users. Daily work uses the APIs, not the web pages.
+  - Testing uses 87profligate (me) and 88profligate (a lead). Sending between them is allowed. WhatsApp never
+    sends. **[built, tested]**
+- **Gaps:**
+  - account content is masked as text but not yet reviewed column by column the way files are;
+  - connecting a real account with "start from today" has been tested only with 87 standing in. **[untested]**
+
+---
+
+## 7. Cost
+
+| Who | Pays | When |
+|---|---|---|
+| The 9B on the person's computer | Nobody | Every day, most questions |
+| Muse 30B on our hardware | Us | Heavier private work |
+| The outside service (mapping, SQL) | Our key in the PoC | Questions a Mini can't place, with consent |
+| Claude (Builder and Sandbox Claude) | The person's own subscription | Building, forking, new questions |
+
+The expensive model stays at the edges. As Minis grow, Claude is needed less.
+
+---
+
+## 8. Open questions
+
+- **When teams come back,** what do they own: sandboxes, Minis, rules, people? How do they work across computers?
+- **Walls.** The transform check and the trusted list are a guard on every platform. A real boundary needs bwrap,
+  WSL or containers (p1 `sandboxing_later`).
+- **Pages and servers:** do they run on the laptop or on silo?
+- **Schedules.** A workflow Mini that runs every morning is still a gap, and it's the most-requested action.
+- **Speed.** Steps where the 9B reads every reply take 70 to 95 s, and the first masking of a long PDF takes 1 to
+  3 min.
+- **Subscription terms.** Can a person's Claude subscription go through a masking proxy?
+- **The Builder's own guard.** The approval check sits in a folder the Builder can edit, and should move out.
+
+---
+
+## 9. What exists today
+
+- **Sidebar:** Start here (Logins, Privacy), Drivey, the Builder, and one heading per sandbox. **[built, tested]**
+- **Sandboxes on the laptop:**
+  - `merry-parrot-7ac1 leads` (Lead replies, Lead replies in steps);
+  - `quiet-tiger-0760 survey`;
+  - `lucky-koel-7672 drivecharts` (Read PDFs);
+  - the fixity insights Minis.
+- **Alpha release, prepared and not pushed:**
+  - `.github/workflows/idli-alpha.yml` builds patched Paseo plus the Idli kit for Linux, Mac and Windows;
+  - only the Linux arm64 build has been made for real;
+  - the Windows installer doesn't run yet;
+  - the apps are unsigned;
+  - each tester needs the DGX and a silo token.
+
+  Steps are in `docs/idli-alpha-release.md`.
+- **Tests:** 356 passed and 5 skipped on the laptop. 11 failures are older than this work, in `lib/test_chat.py`
+  and `lib/test_home.py`.
+- **Evidence:** `benchmarks/runs/2026-11-18-*` (sandboxes, builder-minis, transform-blocks, mini-escalation), each
+  with a README and screenshots.
