@@ -67,6 +67,9 @@ API docs) and got a 404.
   2. **Mapped, with consent.** "Other" is mapped, never answered freely. The menu is short and fixed: the Mini's
      named steps (run steps 1 to N in preview, show step N), the whole Mini in preview, and the sandbox's read blocks
      (a sheet the Mini reads, a Gmail search, the meetings between two days, free times). Writes are never on it.
+     A Gmail search can take `from_sheet` (a sheet code), which limits it to the people on that sheet and leaves
+     out calendar notices. The mapper is told to use it for questions about the Mini's people ("lead replies"),
+     and not for broad ones ("all my emails today"), 2026-11-19.
      The mapper answers with one or two items and their arguments, or "none". Idli runs them on the real accounts in
      preview and shows the output as code wrote it, with one line on who picked and "Nothing was drafted, booked or
      sent".
@@ -87,6 +90,31 @@ API docs) and got a 404.
   the rules and the name scanner line by line; about a minute for 50 pages, kept per file version). A folder of
   only PDFs still goes to the PDF block, if the sandbox has one.
 - **New read block:** `blocks.meetings(start, end)` (title, time, guests, declined) under the calendar block.
+
+## script_try asks twice, in the left chat (owner, 2026-11-19; lib/tries.py)
+
+Claude Code's own prompt for `script_try` ("Script Try Tool", "Rule ... overrides auto mode") meant nothing to
+people. So Claude Code no longer asks: `lib/launchsettings.py` moves `mcp__idli__script_try` from ask to allow, also
+in older sandboxes on their next launch. Idli asks instead, in its own pane.
+
+1. **Gate 1:** "Claude wants Idli to read more from your accounts: <title>. Nothing is written. You'll see what it
+   finds here." The card is "Run it here?" with Yes or No. A run that isn't a preview says it may draft, book or
+   send.
+2. **On Yes,** Idli runs the script on this computer and shows the real output on the left.
+3. **Gate 2:** "Claude would get this, with private values as codes:", then the first lines of the masked output.
+   The card is "Send it to Claude?" with Yes or No.
+4. **On Yes,** Claude gets the masked output. On a No at either gate it gets a plain note ("The person chose not to
+   run this / not to share this output. Try another way, or ask them."), and nothing has reached it, or Anthropic.
+
+How it's wired:
+- Claude's call and the left chat meet through `<sandbox>/.idli/tries/<id>.json`.
+- `script_try` posts "Try from Claude: <title> [<id>]" to the left chat. The router answers with `binder_item` kind
+  "Try" and the two cards.
+- Claude's pane only shows the call in progress.
+- Each gate waits 10 minutes, and `MCP_TOOL_TIMEOUT` for Sandbox Claude is now 30 minutes.
+
+Gate 2 earns its place. On its first run on the laptop it showed `NAME_001 Verma`, a surname that account masking
+missed.
 
 ## What the person sees
 

@@ -338,3 +338,22 @@ Owner's rules (built in phase 1, commit b46249da):
   builds, models, envs, OAuth and token files, Chrome profiles.
 - Gaps: the Windows installer (shell launchers), unsigned apps, each tester needs the DGX and a silo token.
 - Then `declaude origin/main` was run locally, with the unrelated changed PNGs stashed.
+
+## 9. The consent card, script_try's two gates, searches that fit (2026-11-19)
+
+- **The idli-remote card:**
+  - The mapping card now says: I want to call idli-remote with this question: "...". It will help me make better
+    decisions. Your account data is only ever read by me and stays on this computer. Can I proceed?
+  - No service name or menu is shown. No "outside service picked" footer appears after a yes.
+- **script_try** no longer uses Claude Code's prompt.
+  - Idli asks twice in the left chat: run it here, then send the masked output to Claude.
+  - Nothing reaches Claude before the second yes, and a No gives Claude a note so it tries another way
+    (`lib/tries.py`).
+  - On the laptop: Yes then Yes sent the masked list. Yes then No left Claude asking the person to check the left.
+  - Gate 2 showed "NAME_001 Verma": account masking misses a surname. Open.
+- **Mapping:**
+  - A Gmail search can be scoped to the Mini's sheet (`from_sheet`), with calendar notices left out.
+  - "This morning's lead replies" now searches only the leads. "All emails from today" stays broad.
+- **The owner's rule:** run only the tests a change touches; full regression is for complex changes. Fix on the DGX
+  first, then the laptop.
+- `benchmarks/runs/2026-11-18-mini-escalation/README.md`, "Round 2026-11-19", shots 55 to 63.

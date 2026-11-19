@@ -95,3 +95,28 @@ Laptop suite: 356 passed, 5 skipped, the same 11 known failures.
 - **Test data:** 5 duplicate "Meeting with Asha Verma" events on Fri 20 Nov in 87's calendar from earlier runs.
 - **"My meetings this week" was saved by the old page server**, so its steps were copied from its draft by hand;
   page servers were restarted and the next save ("Lead replies in steps") kept them on its own.
+
+## Round 2026-11-19: script_try asks in the left chat; searches fit the question
+
+Owner's asks:
+- Claude Code's prompt for `script_try` ("Script Try Tool", "Rule ... overrides auto mode") was unreadable.
+- "show me this morning's lead replies" got a LinkedIn notice and a calendar decline.
+
+Code: `lib/tries.py`, `lib/idli_mcp.script_try`, `lib/modes.py` (Try cards), `lib/miniscope.py` (from_sheet).
+
+| # | What | Result | Shots |
+|---|---|---|---|
+| 1 | Lead replies Mini: "show me this mornings lead replies" | The idli-remote card, Yes. The search was scoped to the people on the leads sheet, with calendar notices left out. "No emails match" is correct: 88's last reply was yesterday 4:41 PM | 56, 57 |
+| 2 | "show me all emails from today" | A broad search, `newer_than:1d`, as asked. LinkedIn, the decline (marked "a calendar notice") and 88's reply | 58 |
+| 3 | Sandbox Claude: "write a script that lists my leads, run it with script_try" | No Claude Code prompt; the right pane only showed "Calling idli". The left chat showed gate 1: "Claude wants Idli to read more from your accounts: List my leads. Nothing is written." | 59 |
+| 4 | Gate 1 Yes | The real list ran on the left. Gate 2 showed "Claude would get this, with private values as codes" with the masked sample | 60 |
+| 5 | Gate 2 Yes | "Sent to Claude". Claude got the masked output and described it | 61 |
+| 6 | "add each lead's email and run it again", gate 1 Yes, gate 2 **No** | "Not sent". Claude said it can't check the results itself, and asked the person whether the list on the left looks right | 62, 63 |
+
+Found by gate 2, as it should be:
+- The masked sample showed `NAME_001 Verma`. A surname stays unmasked in account text when only the first name is a
+  known value.
+- Before this round that line went to Claude unseen. Now the person sees it and can say No.
+- Masking account text needs the full-name rule that files have (open item, not fixed here).
+
+Also: "today" maps to `newer_than:1d`, which is the last 24 hours, so it includes yesterday evening.
