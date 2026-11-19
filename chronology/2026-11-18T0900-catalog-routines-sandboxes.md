@@ -458,3 +458,26 @@ Owner's rules (built in phase 1, commit b46249da):
 
   It also has views plus one `--where` selector (which answers `get lead`/`--where lead=` without lead-specific
   code), a blind task bank with separate coverage and correctness scores, and an order of work.
+
+## 13. The record store scaffold, benchmarked blind (2026-11-19, in progress)
+
+- **Task bank first, written blind:**
+  - **Writer:** Cursor `agent` in the bwrap wall, seeing only a person-level brief of 87's account and GOALS_v0
+    section 1 (`benchmarks/runs/2026-11-19-record-store/bank/BRIEF.md`).
+  - **Size:** 80 tasks across trust, own definitions, own workflows and other sites.
+  - **Frozen** by hash in PLAN.md: dev 53, held-out 27. The builder reads dev only.
+- **Scaffold** (`cowork/lib/recstore.py`, `cowork/lib/idlicli.py`, `cowork/desktop/idli`):
+  - **The store:** one DuckDB per sandbox, one row per email, event, Drive file and sheet. Every spreadsheet is
+    its own table.
+  - **Labels:** one table, keyed by kind, record, definition and version.
+  - **Connectors:** read only, through the APIs with the DGX's 87 tokens. One sync of 188 emails, 10 events, 191
+    files and 23 sheets took about 2 minutes and made a 0.27 MB store. Gmail's per-minute quota needed retry with
+    backoff.
+  - **Dates are worked out in code:** `day_range` and the `dates_note` given to the mapper.
+  - **Verbs:** `list`, `count`, `get`, `explain`, `describe`, `read`, `summarise`, `define`, `judge`, `query`,
+    `view`, `draft` (preview), `ask`.
+  - **`ask`:**
+    - the mapper (idli-remote on masked text, or the 9B) returns idli commands;
+    - Idli runs them;
+    - the 9B words 1 to 3 sentences that respond to what was just said, with the rows shown under them;
+    - any number not in the result throws the wording away.
