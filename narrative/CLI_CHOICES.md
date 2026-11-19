@@ -107,6 +107,8 @@ idli VERB RESOURCE [NAME] [flags]
 | `list` | read | many items, short (one line each) |
 | `get` | read | one item in full (an email's body, a file's content) |
 | `explain` | read | what a resource, step or flag is: its man page, with examples |
+| `describe` | read | an item's shape: a PDF's pages, a spreadsheet's rows and columns, a folder's files by kind |
+| `summarise` | read (domain) | the private 9B reads a file on this computer and sums it up (`--question Q` to focus it) |
 | `judge` | read (domain) | the private 9B reads each item of a resource and answers a question: `--question Q --answers A,B,C` |
 | `run` | read (preview) | `run step N` runs a Mini's steps 1 to N and shows step N; `run mini` runs the whole Mini. Both are previews |
 | `draft` | write | an email draft. The person presses Send in Gmail |
@@ -117,8 +119,9 @@ idli VERB RESOURCE [NAME] [flags]
   forgotten flag can't write. **[proposed]**
 - **The mapper never sees write verbs.** idli-remote and the 9B get the read verbs only. Writes run when the
   person says "run it", or from a Mini's own steps. **[decided]**
-- **`judge` and `run` are our only verbs outside the usual create, read, update, delete set,** as `logs` and
-  `exec` are in kubectl. A judgement isn't a resource, so it gets its own verb rather than being forced into one.
+- **`judge`, `summarise` and `run` are our only verbs outside the usual create, read, update, delete set,** as
+  `logs` and `exec` are in kubectl. A judgement or a summary isn't a resource, so each gets its own verb rather than
+  being forced into one.
 
 ### Resources
 
@@ -129,6 +132,7 @@ idli VERB RESOURCE [NAME] [flags]
 - `rows`: the rows of a sheet (`list rows SHEET_1`).
 - `files`: Drive files, with name, kind, folder and last change. `get file FILE` gives the content (a PDF's text,
   or a spreadsheet's columns and first rows).
+- `folders`: Drive folders (`list folders`; `describe folder NAME` counts its files by kind).
 
 **Resources a Mini defines** are views over the account resources. They're the main win: they put the Mini's own
 words into the grammar. **[proposed]**
@@ -188,8 +192,25 @@ everyone (`todos/idli-insights/p1/capability_versions.md`).
 
 ## What the benchmark says about the grammar
 
-The results are in [the benchmark's README](../benchmarks/runs/2026-11-19-capability-cli-mapping/README.md),
-condition 4. They are summarised in the next section once the held-out set is scored.
+Condition 4 of [the benchmark](../benchmarks/runs/2026-11-19-capability-cli-mapping/README.md), with the frozen
+held-out sets each scored once, three runs per question:
+
+| | Man pages (condition 3) | This grammar (condition 4) |
+|---|---|---|
+| idli-remote, leads, all | 94% | 96%, and 100% of the replies that came back |
+| 9B, leads, held-out / dev | 100% / 95% | 100% / 86% |
+| 9B, median time | 3.5 s | 2.1 s |
+| Prompt | 6.0k characters | 4.5k characters |
+| Drive set, both mappers | 92 to 100% | 92 to 100% |
+
+Adding `describe` (pages, columns, a folder's kinds) and `summarise` lifted a second Drive set from 60% to 80% for
+the 9B and from 43% to 73% for idli-remote. Listing folders was missing and has been added.
+
+**[decided: adopt the grammar]**
+- **Shared flags:** keep them.
+- **Dates:** "since Monday" and "this week" should be resolved by code before the mapper sees the question. They're
+  most of the 9B's remaining misses.
+- **New verbs:** add `describe`, `summarise` and `list folders`.
 
 ## Open questions
 

@@ -94,3 +94,74 @@ All of these go away with commands, where steps take overrides and commands are 
 
 A 4th condition will be a uniform kubectl/gh-style grammar (owner, via the coordinator). It reuses this harness
 (`menus.prompt`, `FAMILY` in `bench.py`) and the frozen held-out set, scored once per condition.
+
+## Follow-up: condition 4, one grammar (2026-11-19)
+
+The grammar is in [narrative/CLI_CHOICES.md](../../../narrative/CLI_CHOICES.md): `idli VERB RESOURCE [NAME] [flags]`.
+- Read verbs: `list`, `get`, `judge`, `run step N`, `run mini`.
+- Shared flags: `--since`, `--until`, `--search`, `--where`.
+- The Mini's own views: `leads` and `replies`.
+- Examples use real dates, and are the same examples as condition 3, translated.
+
+The mapper writes command lines. `bench.grammar_item` turns them into the same canonical items, so the frozen gold is
+reused.
+
+**Dev tuning:** two wording fixes.
+- `run mini` shows the draft for each person.
+- `judge` takes any question.
+
+The second fix changed nothing, so tuning stopped. The held-out set was scored once.
+
+**Leads questions** (32: 21 dev, 11 held out; three runs each):
+
+| mapper | condition | dev | held-out | all | failed calls | exact of valid | median s | prompt chars |
+|---|---|---|---|---|---|---|---|---|
+| 9B | 3 CLI + man pages | 95% | 100% | 97% | 0/96 | 97% | 3.5 | 6.0k |
+| 9B | **4 grammar** | 86% | 100% | 91% | 0/96 | 91% | **2.1** | **4.5k** |
+| idli-remote | 3 CLI + man pages | 95% | 91% | 94% | 6/96 | 100% | 1.3 | 6.0k |
+| idli-remote | **4 grammar** | **98%** | 91% | **96%** | 4/96 | **100%** | **1.1** | **4.5k** |
+
+- **idli-remote is as good or better with the grammar.** It was also faster, with a prompt a quarter shorter.
+  - Every remote miss under condition 4 was an empty reply. The benchmark kept production's old 400-token limit for
+    comparability; production now uses 1200 (commit 89d025b7).
+- **The 9B is the same on held-out (100%), but lower on dev.** It got 18 of 21 in every run.
+  - It reads "show me the draft for NAME_001" as something the commands can't do.
+  - "since Monday" became the 17th, as in every condition.
+  - "this week" became the next 7 days.
+  - In exchange it's 40% faster (2.1 s against 3.5 s), on a shorter prompt.
+
+**Drive questions** (12: 8 dev, 4 held out, frozen by hash before any run; conditions 3 and 4 only):
+
+| mapper | condition | dev | held-out | all | median s |
+|---|---|---|---|---|---|
+| 9B | 3 | 100% | 75% | 92% | 3.4 |
+| 9B | 4 | 88% | 100% | 92% | 2.0 |
+| idli-remote | 3 | 100% | 100% | 100% | 1.3 |
+| idli-remote | 4 | 100% | 100% | 100% | 1.1 |
+
+**Second Drive set, structure and summaries** (10 questions, frozen, no tuning, so all held out). Condition 4b is 4
+plus `describe` (a PDF's pages, a spreadsheet's columns, a folder's kinds) and `summarise file` (the 9B reads it on
+this computer):
+
+| mapper | condition | exact | none right |
+|---|---|---|---|
+| 9B | 4 | 60% | 1/2 |
+| 9B | **4b** | **80%** | 2/2 |
+| idli-remote | 4 | 43% | 1/2 to 0/2 |
+| idli-remote | **4b** | **73%** | 0/2 to 1/2 |
+
+- **`describe` and `summarise` are worth adding.** Without them, "summarise the report" and "what is it about" had
+  no command.
+- **Gap: nobody could list folders.** The grammar's `files` had kinds pdf, sheet and doc, but no folders (e07 missed
+  in every run). The blind-tester harness adds `list folders`.
+- **Gold note:** "what kinds of files are in there?" answered with `describe file FOLDER_1` is valid under 4b's
+  menu (`describe` covers a folder). The gold only took `list files`, so 4b is slightly under-counted.
+- **idli-remote sometimes answers analysis with commands, and the 9B doesn't.** For "compare 2021 and 2025" or "make
+  a chart", it returned `get file` on both data files instead of none (handing it on to Claude).
+
+**What it means:**
+- **Adopt the grammar.** It's as good as man pages for idli-remote and on held-out for the 9B, faster for both, and
+  shorter.
+- **The 9B's remaining misses are about dates and scope.** That's code's job: resolve "this week" and "since Monday"
+  before the mapper sees the question.
+- **Add `describe`, `summarise` and `list folders`.**
