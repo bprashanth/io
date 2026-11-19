@@ -357,3 +357,23 @@ Owner's rules (built in phase 1, commit b46249da):
 - **The owner's rule:** run only the tests a change touches; full regression is for complex changes. Fix on the DGX
   first, then the laptop.
 - `benchmarks/runs/2026-11-18-mini-escalation/README.md`, "Round 2026-11-19", shots 55 to 63.
+
+## 10. Benchmark: CLI capabilities with man pages against today's menu (2026-11-19)
+
+- **The owner's question:** would capabilities written as commands with arguments and short man pages help
+  idli-remote and the 9B answer partial questions about a Mini? See `benchmarks/runs/2026-11-19-capability-cli-mapping/`.
+  - The plan came first: 32 masked questions (16 from the owner's chats) over the leads sandbox's three Minis. 11 were
+    held out, frozen by hash.
+  - Each mapper ran 3 times on each condition. The man pages were tuned on dev only.
+- **Exact match over all questions:**
+  - **the 9B:** 78% with today's menu, 88% with CLI schemas, 97% with man pages;
+  - **idli-remote:** 81%, 90% and 94%; on valid replies 88%, 100% and 100%.
+  - The held-out set agrees with dev.
+  - Schemas give most of idli-remote's gain. Examples (with real dates, not placeholders) give the 9B's.
+  - A worked-out dates line made both worse.
+  - The cost: about twice the prompt, and +0.9 s for the 9B.
+- **Production bug found:** idli-remote's mapping call uses `max_tokens` 400. The model's reasoning uses it up in 5 to
+  14% of calls (empty or cut-off JSON), and `miniscope.map_service` crashes on the empty reply.
+- **Not run:** the read-only end-to-end check on the laptop (`e2e.py`), because the laptop link was down.
+- **Recommendation:** do the refactor, with commands, steps that take overrides, and man pages with 2 or 3 examples
+  each. A follow-up 4th condition (a kubectl/gh-style grammar) reuses the harness and the frozen held-out set.
