@@ -66,6 +66,12 @@ class LineScanner:
                         lines.append((at + a, line[a:a + self.WINDOW]))
                         if a + self.WINDOW >= len(line):
                             break
+                    # Lists ("Kari May, University of Pittsburgh, Krista Oldham, ..."): each piece on its own too.
+                    off = 0
+                    for piece in line.split(','):
+                        if 2 < len(piece.strip()) <= self.WINDOW:
+                            lines.append((at + off, piece))
+                        off += len(piece) + 1
             at += len(line) + 1
         spans = []
         for (off, _), got in zip(lines, self.pool.map(lambda x: self.scanner(x[1]), lines)):

@@ -82,6 +82,7 @@ class World:
         self.work.mkdir(parents=True, exist_ok=True)
         self.wire = self.dd / 'wire.jsonl'
         self.pending = None   # an escalation waiting for the person's yes
+        self.ambiguous = None
         self.context = []     # the Drive files and folders the conversation is about (Drive file dicts)
         self.leads = []
         self.sheet = None
@@ -131,6 +132,9 @@ def menu(world):
     if world.kind == 'leads':
         system, text, _ = menus.prompt('4', 'steps')
         text = text.replace('--since 2026-11-05', f'--since {(t - dt.timedelta(days=14)).isoformat()}')
+        text = text.replace('  run step N [flags]', '  explain mini | explain step N   what the Mini does, step by step, '
+                            'with the exact sheet, columns, dates and rules it uses (questions about how it works)\n'
+                            '  run step N [flags]')
     else:
         system, text, _ = menus.prompt('4b', 'fixity')
         text = text.replace(menus.MINIS['fixity']['goal'], 'No Mini is open. This sandbox reads your Drive files.')
@@ -233,14 +237,41 @@ def mail_lines(items):
         notice = bool(NOTICE.match(r.get('subject', '')))
         first = ' '.join((r.get('new_text') or r.get('text') or '').split())[:140]
         out.append(f'- {_fmt(_when(r.get("date")))}, from {r.get("from")}: **{r.get("subject", "")}**'
-                   + (' (a calendar notice)' if notice else '') + f'. {first}')
+                   + (' (a calendar notice)' if notice else '') + (' (already answered)' if r.get('handled') else '')
+                   + f'. {first}')
     return out
 
 
-def replies(world, since=None, until=None, search=None):
+_HANDLED = []
+
+
+def handled_label():
+    """The Idli/handled label's id, looked up read-only (production's _label_id creates it when missing)."""
+    if not _HANDLED:
+        ls = g.call(ME, 'GET', g.GMAIL + '/labels').get('labels') or []
+        _HANDLED.append(next((x['id'] for x in ls if x.get('name') == g.HANDLED), None))
+    return _HANDLED[0]
+
+
+def replies(world, since=None, until=None, search=None, open_only=False):
+    """Mail from leads, calendar notices left out. open_only (the Mini's step 2): only the newest reply per thread,
+    and not ones already answered (labelled Idli/handled), as the Mini does."""
     since = since or today() - dt.timedelta(days=14)
     items = mails(mail_query(since, until, search=search, leads=world.lead_emails()), limit=20)
-    return [r for r in items if not NOTICE.match(r.get('subject', ''))]
+    items = [r for r in items if not NOTICE.match(r.get('subject', ''))]
+    lab = handled_label()
+    for r in items:
+        r['handled'] = bool(lab and lab in (r.get('labels') or []))
+    if not open_only:
+        return items
+    seen, out = set(), []
+    for r in items:  # newest first
+        if r.get('thread') in seen:
+            continue
+        seen.add(r.get('thread'))
+        if not r['handled']:
+            out.append(r)
+    return out
 
 
 def judge_items(items, question, answers):
@@ -279,9 +310,12 @@ def run_steps(world, n, flags):
     if n == 1:
         return ['**Step 1: Read the leads sheet**', ''] + [f'- {r.get("Name")}, {r.get("Email")}, {r.get("Status", "")}'
                                                           for r in world.leads]
-    reps = replies(world, since, until, flags.get('search'))
+    reps = replies(world, since, until, flags.get('search'), open_only=True)
     if n == 2:
-        return ['**Step 2: Find their replies**', ''] + (mail_lines(reps) or ['No replies from leads in that time.'])
+        s0 = since or today() - dt.timedelta(days=14)
+        return ['**Step 2: Find their replies**', f'From {s0.isoformat()} to {(until or today()).isoformat()}; the newest '
+                'reply in each thread, not ones already answered.', ''] + (
+            mail_lines(reps) or ['No new replies from leads in that time.'])
     judged = judge_items(reps, JUDGE_Q + ' If they picked one, give the time as written.', JUDGE_A)
     if n == 3:
         return ['**Step 3: Read each reply**', ''] + ([f'- {r.get("from")}: "{r.get("subject")}": **{a}**'
@@ -302,8 +336,18 @@ def run_steps(world, n, flags):
         if n == 4:
             return out
     if n in (5, 7):
-        books = [f'- Would book "Meeting with {world.name_of(r.get("from")) or r.get("from")}" at '
-                 f'{t or "the time they gave"}, with {r.get("from")} invited' for r, a, t in judged if a == 'picked']
+        upcoming = g.calendar_events(ME, dt.datetime.now(IST), dt.datetime.now(IST) + dt.timedelta(days=30))
+        books = []
+        for r, a, t in judged:
+            if a != 'picked':
+                continue
+            have = [e for e in upcoming if r.get('from') in (e.get('attendees') or []) and not e.get('declined')]
+            if have:
+                books.append(f'- {r.get("from")} picked {t or "a time"}: already on the calendar ("{have[0]["title"]}", '
+                             f'{_fmt(_when(have[0]["start"]))}), so skipped')
+            else:
+                books.append(f'- Would book "Meeting with {world.name_of(r.get("from")) or r.get("from")}" at '
+                             f'{t or "the time they gave"}, with {r.get("from")} invited')
         out += ['', '**Step 5: Book the time for leads who picked one**', ''] + (books or ['No lead picked a time.'])
         if n == 5:
             return out
@@ -331,9 +375,13 @@ def find(world, name, folder=False):
     exact = [f for f in pool if f['name'].lower() == name.lower()]
     near = [f for f in pool if name.lower() in f['name'].lower()]
     every = [f for f in pool if all(w in f['name'].lower() for w in words)]
-    hit = (exact or near or every or [None])[0]
-    if hit and hit not in world.context:
-        world.context.append(hit)
+    cands = exact or near or every
+    mine = [f for f in cands if any(o.get('emailAddress') == ME for o in f.get('owners') or [])]
+    hit = (mine or cands or [None])[0]
+    world.ambiguous = len(exact) > 1 and f'{len(exact)} items in Drive are called "{hit["name"]}"; this is the one in ' \
+        f'{"your" if hit in mine else "a shared"} Drive.' if hit else None
+    if hit:
+        world.context = [x for x in world.context if x['id'] != hit['id']] + [hit]
     return hit
 
 
@@ -407,8 +455,30 @@ def summarise(world, f, question=None):
             ''] + [f'- {x}' for x in pts] if pts else ['The private model could not summarise it.']
 
 
+def explain(world, what, n=None):
+    t = today()
+    s0 = t - dt.timedelta(days=14)
+    cols = list(world.leads[0].keys()) if world.leads else []
+    steps = [
+        f'1. Read the leads sheet: "Leads (test)" in your Drive, columns {", ".join(cols)} ({len(world.leads)} people).',
+        f'2. Find their replies: emails from those people from {s0.isoformat()} (two weeks ago) to today, the newest in '
+        'each thread, leaving out calendar notices (accepted, declined, invitations) and replies already answered.',
+        f'3. Read each reply: the private model on this computer answers "{JUDGE_Q}" with one of: '
+        + ', '.join(JUDGE_A) + '.',
+        '4. Draft open times for leads who agreed: a reply offering three open 30-minute times on the next working '
+        'days, between 10 AM and 5 PM, saved as a Gmail draft for you to send.',
+        '5. Book the time for leads who picked one: a 30-minute event on your calendar with them invited, skipped if '
+        'one is already there.',
+        '6. Totals: how many replies in each group.']
+    if n and str(n).isdigit() and 1 <= int(n) <= 6:
+        return [steps[int(n) - 1]]
+    return ['**Lead replies in steps**', ''] + steps + ['', 'Nothing is drafted, booked or sent until you say "run it".']
+
+
 def execute(world, line):
     pos, flags, where = parse(line)
+    if len(pos) >= 1 and pos[0].lower() == 'explain' and world.kind == 'leads':
+        return explain(world, pos[1] if len(pos) > 1 else 'mini', pos[2] if len(pos) > 2 else None)
     if len(pos) < 2:
         return None
     verb, res = pos[0].lower(), pos[1].lower()
@@ -596,11 +666,16 @@ def answer(world, question, mapper):
     turn.update({'masked': masked, 'mapped': out, 'map_secs': secs, 'wire_leaks': leaks})
     if isinstance(out, dict) and out.get('none'):
         if world.kind == 'insights':
-            files = [f for f in world.context if f['mimeType'] != 'application/vnd.google-apps.folder']
-            for fo in [f for f in world.context if f['mimeType'] == 'application/vnd.google-apps.folder'][-1:]:
-                files += [x for x in g.drive_files(ME, folder=fo['id'], limit=30)
-                          if x['mimeType'] in ('text/csv', 'application/pdf', 'application/vnd.google-apps.spreadsheet')
-                          or 'spreadsheetml' in x['mimeType']]
+            readable = lambda x: x['mimeType'] in ('text/csv', 'application/pdf',  # noqa: E731
+                                                   'application/vnd.google-apps.spreadsheet') or 'spreadsheetml' in x['mimeType']
+            ql = question.lower()
+            files = [f for f in world.context if readable(f) and Path(f['name']).stem.lower() in ql]
+            if not files:
+                folders = [f for f in world.context if f['mimeType'] == 'application/vnd.google-apps.folder']
+                if folders:
+                    files = [x for x in g.drive_files(ME, folder=folders[-1]['id'], limit=30) if readable(x)]
+            if not files:
+                files = [f for f in world.context if readable(f)][-3:]
             seen, uniq = set(), []
             for f in files:
                 if f['id'] not in seen:
@@ -620,6 +695,7 @@ def answer(world, question, mapper):
     if isinstance(out, dict) and isinstance(out.get('run'), list) and out['run']:
         parts = [f'### {out.get("title")}'] if out.get('title') else []
         ran = []
+        world.ambiguous = None
         for line in out['run'][:2]:
             try:
                 body = execute(world, line)
@@ -627,6 +703,9 @@ def answer(world, question, mapper):
                 body = [f'Could not read that: {type(e).__name__}: {str(e)[:120]}']
             ran.append(str(line))
             parts += [''] + (body if body is not None else ["I couldn't run that part."])
+            if getattr(world, 'ambiguous', None):
+                parts += ['', f'_Note: {world.ambiguous}_']
+                world.ambiguous = None
         turn.update({'route': 'commands', 'ran': ran,
                      'reply': '\n'.join(parts + ['', NOTHING if world.kind == 'leads' else '_Read here; nothing in '
                                                  'Drive was changed._'])})

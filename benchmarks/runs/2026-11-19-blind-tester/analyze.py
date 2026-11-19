@@ -22,7 +22,11 @@ def main(d):
             for c in (r.get('message') or {}).get('content') or []:
                 if c.get('type') == 'text':
                     texts.append(c.get('text', ''))
-    cheat = [c for c in cmds if c[0] != 'shellToolCall' or not str(c[1]).lstrip().startswith(('./ask', 'ask '))]
+    def own(c):  # the agent waiting for, or reading the saved output of, its own long-running ./ask
+        return c[0] in ('awaitToolCall', 'getMcpToolsToolCall') or (
+            c[0] == 'readToolCall' and '/.cursor/projects/work/terminals/' in str(c[1]))
+    cheat = [c for c in cmds if not own(c) and (c[0] != 'shellToolCall' or
+                                                 not str(c[1]).lstrip().startswith(('./ask', 'ask ')))]
     print(f'# {d.name}\n\nTester commands: {len(cmds)}; not ./ask: {len(cheat)}')
     for c in cheat:
         print(f'- FLAG {c[0]}: {str(c[1])[:200]}')
