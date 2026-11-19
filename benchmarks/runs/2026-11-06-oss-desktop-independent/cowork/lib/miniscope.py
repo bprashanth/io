@@ -186,7 +186,8 @@ def _service_name():
 def map_service(data_dir, question_masked, menu_masked, call=None):
     from lib import minisql
     minisql._count_call(data_dir)
-    body = {'model': minisql.MODEL, 'temperature': 0, 'max_tokens': 400,
+    # 400 ran out in 5-14% of calls (the model's reasoning used it all; benchmarks/runs/2026-11-19-capability-cli-mapping)
+    body = {'model': minisql.MODEL, 'temperature': 0, 'max_tokens': 1200,
             'response_format': {'type': 'json_object'},
             'messages': [{'role': 'system', 'content': MAP_SYSTEM},
                          {'role': 'user', 'content': menu_masked + '\n\nQuestion: ' + question_masked}]}
@@ -199,7 +200,10 @@ def map_service(data_dir, question_masked, menu_masked, call=None):
         'User-Agent': 'idli-miniscope/1'})
     with urllib.request.urlopen(req, timeout=60) as r:
         text = json.load(r)['choices'][0]['message']['content']
-    return json.loads(re.sub(r'^```(?:json)?\s*|\s*```$', '', text.strip()))
+    try:
+        return json.loads(re.sub(r'^```(?:json)?\s*|\s*```$', '', (text or '').strip()))
+    except ValueError:  # empty or cut off: no pick, so the person gets the Fork offer, not a crash
+        return {'none': 'no clear pick'}
 
 
 def map_local(question, menu_real):
