@@ -1135,6 +1135,12 @@ SERVICE_CARD = ('Send this to the query service?')
 MAP_CARD = 'Can I proceed?'
 MAP_YES = ('Yes', 'Send the question above to idli-remote.')
 MAP_NO = ('No, Idli picks', 'Nothing leaves this computer.')
+TRY_HEAD, TRY_ASK = 'Claude asks', 'Run it here?'  # Sandbox Claude's script_try, gate 1 (lib/tries.py)
+TRY_YES = ('Yes', 'Idli runs it on this computer and shows you what it finds. Nothing goes to Claude yet.')
+TRY_NO = ('No', 'Nothing runs. Claude is told no and tries another way.')
+SEND_HEAD, SEND_ASK = 'Send to Claude', 'Send it to Claude?'  # gate 2
+SEND_YES = ('Yes', 'Claude gets this output with private values as codes.')
+SEND_NO = ('No', 'Nothing goes to Claude. It tries another way.')
 FORK_CARD = 'Fork this Mini and continue with Claude?'
 FORK_YES = ('Fork it', 'Claude gets a copy and your question with private values as codes. The original stays.')
 FORK_NO = ('Not now', 'The Mini stays as it is.')
@@ -1180,6 +1186,7 @@ def drivey_route(j):
             'question': _lib('minimap').plain(text), 'options': [{'label': a, 'description': b} for a, b in options]}]}))
         return message(model, content)
     active, pending, asked, build, blockctx = None, None, None, None, None
+    trycard = None  # the last script_try gate shown here (lib/tries.py)
     talked, askclaude = None, None  # a question to an open workflow Mini; a sandbox question for Claude (no Mini)
     for e in ev:
         if e[0] == 'said':
@@ -1190,6 +1197,8 @@ def drivey_route(j):
         if name == 'mini_open':
             active = res if res.get('id') and res.get('questions') else None
             pending = build = blockctx = None
+        elif name == 'binder_item' and res.get('gate'):
+            trycard = res
         elif name == 'block_run' and not res.get('error'):
             blockctx = {'name': inp.get('name'), 'paths': inp.get('paths') or []}
         elif name == 'mini_ask' and inp.get('question'):
@@ -1336,6 +1345,12 @@ def drivey_route(j):
             return say(res.get('reply') or 'Claude could not open yet. Send your question again to retry.')
         if name in ('mini_open', 'mini_ask'):
             return say(res.get('reply') or 'I could not open this Mini. Open it again, or pick its files with @ to ask Claude.')
+        if name == 'binder_item' and res.get('gate') == 1:
+            return card(TRY_HEAD, TRY_ASK, [TRY_YES, TRY_NO], res.get('text'))
+        if name == 'binder_item' and res.get('gate') == 2:
+            return card(SEND_HEAD, SEND_ASK, [SEND_YES, SEND_NO], str(res.get('shown') or '') +
+                        '\n\nClaude would get this, with private values as codes:\n\n```\n' +
+                        str(res.get('sample') or '(no output)') + '\n```')
         if name == 'binder_item':
             return say(res.get('reply') or res.get('error') or 'That is no longer here. Ask Claude to show it again.')
         if name == 'builder_open':
@@ -1343,6 +1358,13 @@ def drivey_route(j):
         if name == 'AskUserQuestion':
             answer = (_card_answers(inp, res.get('text', '')) or [None])[0]
             head = (inp.get('questions') or [{}])[0].get('header')
+            if head == TRY_HEAD and trycard:
+                return message(model, [_text('Running it here...' if answer == TRY_YES[0] else 'OK.'), _tool_use(
+                    _tool_name(tools, 'binder_item'), {'kind': 'Try', 'title': '[' + str(trycard['id']) + ']',
+                                                       'answer': 'run' if answer == TRY_YES[0] else 'no'})])
+            if head == SEND_HEAD and trycard:
+                return call('binder_item', kind='Try', title='[' + str(trycard['id']) + ']',
+                            answer='send' if answer == SEND_YES[0] else 'keep')
             if head == 'Privacy' and answer in ('Check each file', "Accept Idli's choices"):
                 return preview(answer == 'Check each file')
             if head == 'Builder':
@@ -1387,7 +1409,7 @@ def drivey_route(j):
     opened = re.fullmatch(r'Open Mini: .+ \[([\w-]{1,100})\]', said)
     if opened:
         return call('mini_open', id=opened[1])
-    posted = re.fullmatch(r'(Chart|Mini draft|Run) from Claude: (.{1,160})', said.strip())
+    posted = re.fullmatch(r'(Chart|Mini draft|Run|Try) from Claude: (.{1,160})', said.strip())
     if posted and 'binder_item' in names:  # Claude's chart or Mini draft, shown in this chat (the binder)
         return call('binder_item', kind=posted[1], title=posted[2])
     if 'builder_open' in names and re.match(r'(?i)\s*(please\s+)?(open|start|go to)\s+the\s+builder\b', said):

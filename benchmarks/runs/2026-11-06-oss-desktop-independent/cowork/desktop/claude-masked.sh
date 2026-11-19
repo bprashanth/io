@@ -107,5 +107,5 @@ printf '\033]0;%s\007' "$ROLE_TITLE"
 # The account's claude.ai connectors (Drive, Gmail, Calendar) would reach real data around Idli's masking: off.
 export ENABLE_CLAUDEAI_MCP_SERVERS=false
 # A sandbox Mini may take minutes (the private model reads each reply): MCP calls get ten
-export MCP_TOOL_TIMEOUT=${MCP_TOOL_TIMEOUT:-600000}
+export MCP_TOOL_TIMEOUT=${MCP_TOOL_TIMEOUT:-1800000}  # script_try waits for two cards on the left (lib/tries.py)
 exec "$CLAUDE_BIN" "--mcp-config=$WORK/.idli-mcp.json" "$@"

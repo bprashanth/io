@@ -63,8 +63,9 @@ def fork(data_dir, ident, workspace=None, ask=None):
         '2. Explain a step when asked (read the script). Change the script here when they ask for a change. Keep it '
         'in named steps (`blocks.run_steps`, see your instructions), so the person can check each one.',
         '3. Show results with `script_try` (script: the path above, a short `title`). It runs on the real accounts in '
-        'preview: nothing is drafted, booked or sent. The person sees the real results in the chat on the left; you '
-        'see them masked. Never work out results yourself.',
+        'preview: nothing is drafted, booked or sent. The person says yes twice in the chat on the left (run it, then '
+        'send you the output masked) and sees the real results there. On a no you get a short note: try another way '
+        'or ask them. Never work out results yourself.',
         '4. When they are happy, save it with `idli_draft_mini` (code: `forks/' + new_id + '`, title: a new name, '
         'for example the old one with what changed). It becomes a new Mini; the original stays.', '']))
     if asked:

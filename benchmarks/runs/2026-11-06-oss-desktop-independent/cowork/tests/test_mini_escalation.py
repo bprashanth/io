@@ -129,6 +129,31 @@ class MappingTests(unittest.TestCase):
         self.assertNotIn('gmail_draft', c['menu'])  # writes are never on the menu
         shutil.rmtree(dd)
 
+    def test_from_sheet_scopes_the_search_to_the_leads_and_drops_calendar_notices(self):
+        dd = _sandbox()
+        searched = {}
+
+        def search(query, role=None, limit=10, data_dir=None):
+            searched['q'] = query
+            return [{'from': '88profligate@gmail.com', 'subject': 'Reading programme visit', 'date': '2026-11-19T04:00:00+00:00',
+                     'snippet': 'Yes, glad to meet'},
+                    {'from': '88profligate@gmail.com', 'subject': 'Declined: Meeting with Asha @ Fri', 'date':
+                     '2026-11-19T03:00:00+00:00', 'snippet': 'has declined'}]
+        from lib import miniscope, home, blocks
+        mini = {**home.read(dd / 'minis/lead-steps-1/mini.json'), 'id': 'lead-steps-1'}
+        with patch.object(blocks, 'sheet_read', return_value=[{'Name': 'Asha', 'Email': '88profligate@gmail.com'}]), \
+                patch.object(blocks, 'gmail_search', side_effect=search):
+            head, body = miniscope.run_item(str(dd), mini, {'item': 'mail_search', 'args': {
+                'query': 'newer_than:1d', 'from_sheet': 'SHEET_1'}})
+            self.assertIn('from:(88profligate@gmail.com)', searched['q'])
+            self.assertIn('Reading programme visit', body)
+            self.assertNotIn('Declined', body)
+            head, body = miniscope.run_item(str(dd), mini, {'item': 'mail_search', 'args': {'query': 'newer_than:1d'}})
+            self.assertEqual(searched['q'], 'newer_than:1d')
+            self.assertIn('(a calendar notice)', body)
+        self.assertIn('from_sheet', miniscope.MAP_SYSTEM)
+        shutil.rmtree(dd)
+
     def test_the_service_gets_codes_and_idli_runs_the_real_search(self):
         dd = _sandbox()
         sent = {}

@@ -1518,9 +1518,9 @@ def t_team_create(name, goal='', data='', people='', private='', outside=False, 
         return {'ok': False, 'error': ' '.join(str(e).split())[:200] or 'Could not set it up.'}
 
 
-def t_binder_item(kind, title):
+def t_binder_item(kind, title, answer=None):
     from lib import home
-    return home.binder_item(files().data_dir, kind, title, home.chat_workspace())
+    return home.binder_item(files().data_dir, kind, title, home.chat_workspace(), answer)
 
 
 def t_mini_ask(id, qid=None, params=None, question=None, preview=False):
@@ -1575,7 +1575,8 @@ TOOLS = {
                      "trying": {"type": "boolean"}, "notes": {"type": "array", "items": {"type": "string"}}},
                     ["name"]),
     "binder_item": (t_binder_item, "Show Claude's latest chart or Mini draft with this title in this chat.",
-                    {"kind": {"type": "string", "enum": ["Chart", "Mini draft"]}, "title": {"type": "string"}},
+                    {"kind": {"type": "string", "enum": ["Chart", "Mini draft", "Run", "Try"]},
+                     "title": {"type": "string"}, "answer": {"type": "string"}},
                     ["kind", "title"]),
     "mini_talk": (t_mini_talk, "Anything typed while a saved action Mini is open: explain it, preview it on the real "
                   "accounts (nothing written), run it, or turn it on for an account.",

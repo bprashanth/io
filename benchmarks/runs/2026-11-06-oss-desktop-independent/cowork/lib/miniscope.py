@@ -31,7 +31,8 @@ READS = {  # menu id: (the block it needs, what it does, its arguments)
     'sheet_rows': ('sheet_read', 'the rows of a sheet the Mini uses', 'sheet (one of the sheet codes below)'),
     'mail_search': ('gmail_search', 'emails that match a Gmail search, newest first (date, sender, subject, '
                     'first words)', 'query (Gmail search words, e.g. "from:EMAIL_001 newer_than:7d" or '
-                    '"subject:meeting after:2026/11/10"), limit (at most 20)'),
+                    '"subject:meeting after:2026/11/10"), limit (at most 20), from_sheet (optional, a sheet code: only '
+                    'mail from the people listed on that sheet, with calendar notices left out)'),
     'meetings': ('calendar_freebusy', 'the meetings on the calendar between two days (title, time, guests)',
                  'start (YYYY-MM-DD), end (YYYY-MM-DD, the last day included)'),
     'free_times': ('calendar_freebusy', 'open times on the next working days', 'days, minutes, count'),
@@ -49,12 +50,16 @@ Rules:
 - Prefer a step of the Mini when it is what the question asks about ("who replied", "what would step 2 give").
 - Use a read item for a plain look at the account the Mini works on ("my meetings yesterday", "list my leads").
 - "whole" only for what the Mini would do overall (what it would draft or book).
+- When the question is about the Mini's own people ("lead replies", "did any lead write"), give mail_search a
+  from_sheet with the sheet code. Leave it out only when the question is broad ("all my emails today").
 - If nothing on the menu answers it (it needs a new step, a change, a write, another account), answer none."""
 MAP_SCHEMA = {'type': 'object', 'properties': {
     'use': {'type': 'array', 'items': {'type': 'object', 'properties': {
         'item': {'type': 'string'}, 'args': {'type': 'object'}, 'role': {'type': 'string'}}, 'required': ['item']}},
     'title': {'type': 'string'}, 'none': {'type': 'string'}}}
 NOTHING_WRITTEN = 'It ran on this computer. Nothing was drafted, booked or sent.'
+CALENDAR_NOTICE = re.compile(r'(?i)^\s*(declined|accepted|tentatively accepted|invitation|updated invitation|'
+                             r'canceled event|cancelled event)\b[^:]{0,40}:')
 
 
 # ---- what the Mini is made of ----
@@ -322,12 +327,28 @@ def run_item(data_dir, mini, use):
     if item == 'mail_search':
         query = str(args.get('query') or '').strip() or 'newer_than:7d'
         limit = max(1, min(int(args.get('limit') or 10), 20))
+        people = None
+        if args.get('from_sheet'):
+            ids = sheets(data_dir, mini)
+            k = int(re.sub(r'\D', '', str(args['from_sheet'])) or 1)
+            rows = blocks.sheet_read(ids[min(max(k, 1), len(ids)) - 1], role=role, data_dir=data_dir) if ids else []
+            people = sorted({e.lower() for r in rows or [] for v in r.values()
+                             for e in re.findall(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+', str(v))})
+            if not people:
+                return 'Email from the sheet', 'The sheet lists no email addresses.'
+            query = (re.sub(r'\bfrom:\S+', '', query).strip() + ' from:(' + ' OR '.join(people) + ')').strip()
         found = blocks.gmail_search(query, role=role, limit=limit, data_dir=data_dir) or []
+        if people is not None:
+            found = [m for m in found if not CALENDAR_NOTICE.match(str(m.get('subject') or ''))]
+        head = f'Email ({who}) from the people on the sheet' if people is not None else f'Email ({who}): {query}'
         if not found:
-            return f'Email ({who}): {query}', 'No emails match.'
-        lines = [f'- {_local(_mail_date(m.get("date")))}, from {m.get("from")}: **{m.get("subject") or "(no subject)"}**.'
-                 f' {m.get("snippet", "")[:120]}' for m in found]
-        return f'Email ({who}): {query}', '\n'.join(lines)
+            return head, 'No emails match.'
+        def line(m):
+            subject = m.get('subject') or '(no subject)'
+            note = ' (a calendar notice)' if CALENDAR_NOTICE.match(str(subject)) else ''
+            return (f'- {_local(_mail_date(m.get("date")))}, from {m.get("from")}: **{subject}**{note}.'
+                    f' {m.get("snippet", "")[:120]}')
+        return head, '\n'.join(line(m) for m in found)
     if item == 'meetings':
         today = dt.date.today()
         a = _day(args.get('start'), today)

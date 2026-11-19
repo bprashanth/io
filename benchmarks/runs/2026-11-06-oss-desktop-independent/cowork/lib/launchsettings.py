@@ -11,7 +11,10 @@ from pathlib import Path
 import os
 import tempfile
 
-ASK = ['mcp__idli__unmask', 'mcp__idli__script_try']
+ASK = ['mcp__idli__unmask']
+# script_try asks the person twice in Idli's left chat instead (lib/tries.py); Claude Code's own prompt for it was
+# unreadable ("Script Try Tool", "Rule ... overrides auto mode"), owner 2026-11-19.
+ALLOW = ['mcp__idli__script_try']
 
 
 def paseo_app_dirs(home):
@@ -42,7 +45,8 @@ def merge(work, data_dir=None):
     path = Path(work) / '.claude/settings.json'
     settings = json.loads(path.read_text()) if path.exists() else {}
     permissions = settings.setdefault('permissions', {})
-    permissions['ask'] = list(dict.fromkeys(permissions.get('ask', []) + ASK))
+    permissions['ask'] = [a for a in dict.fromkeys(permissions.get('ask', []) + ASK) if a not in ALLOW]
+    permissions['allow'] = list(dict.fromkeys(permissions.get('allow', []) + ALLOW))
     if data_dir:
         private = private_paths(data_dir, work)
         rules = [f'{tool}(/{p}/**)' for p in private for tool in ('Read', 'Edit')]

@@ -523,15 +523,20 @@ def chart_markdown(data_dir, title, chart, agent=None, sources=None, script=None
     return f'![{label}]({out})\n[Open interactive]({url})'
 
 
-BINDER_KINDS = {'Chart': 'view', 'Mini draft': 'mini-card', 'Run': None}  # Run: Sandbox Claude's script_try
+BINDER_KINDS = {'Chart': 'view', 'Mini draft': 'mini-card', 'Run': None,  # Run: Sandbox Claude's script_try output
+                'Try': None}  # Try: its two consent gates (lib/tries.py)
 
 
-def binder_item(data_dir, kind, title, workspace=None):
+def binder_item(data_dir, kind, title, workspace=None, answer=None):
     """The newest chart or Mini draft from Claude with this title, as a page the left chat shows inline (its "binder":
-    charts in order, each with Pin, then the editable Mini draft)."""
+    charts in order, each with Pin, then the editable Mini draft). kind "Try": a script_try's gates (lib/tries.py)."""
     from lib import journey
     if kind not in BINDER_KINDS:
         raise ValueError('Unknown item')
+    if kind == 'Try':
+        from lib import tries
+        m = re.search(r'\[(\d{6,20})\]\s*$', str(title))
+        return tries.left(data_dir, m[1] if m else str(title).strip(), answer)
     def key(t):
         return ' '.join(plain(str(t)).split())[:160]
     title = key(title)

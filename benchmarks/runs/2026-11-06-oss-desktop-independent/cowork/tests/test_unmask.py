@@ -157,7 +157,11 @@ def test_settings_merge_idempotent(tmp_path):
     path.write_text(json.dumps(before))
     for _ in range(2):launchsettings.merge(tmp_path)
     saved=json.loads(path.read_text())
-    assert saved=={**before,'permissions':{**before['permissions'],'ask':['Write',*launchsettings.ASK]}}
+    assert saved=={**before,'permissions':{**before['permissions'],'ask':['Write',*launchsettings.ASK],
+                                           'allow':['Read',*launchsettings.ALLOW]}}
+    # an older sandbox's ask rule for script_try goes: it asks twice in the left chat instead (lib/tries.py)
+    path.write_text(json.dumps({'permissions':{'ask':['mcp__idli__script_try']}}));launchsettings.merge(tmp_path)
+    p=json.loads(path.read_text())['permissions'];assert 'mcp__idli__script_try' not in p['ask'] and 'mcp__idli__script_try' in p['allow']
     assert path.stat().st_mode & 0o777==0o600
 
 @pytest.mark.parametrize('name',[' Pune DISTRICT ','P U N E','pune','Poona'])

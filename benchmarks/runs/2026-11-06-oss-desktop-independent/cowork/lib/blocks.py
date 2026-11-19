@@ -320,7 +320,7 @@ def claude_guide(data_dir):
               '  find_replies), ...])`. Do all the work inside the steps (nothing at the top level). Read your own',
               '  options with argparse `parse_known_args`, so `--step N` passes through. Keep each step small and',
               '  plain: read, then judge (nine_b), then act. Step titles are plain words a colleague understands.',
-              '- Try it with `script_try` (the person is asked; you get the output masked). `args: {"step": 2}` runs',
+              '- Try it with `script_try` (the person says yes twice on the left: to run it, then to send you its output masked; on a no you get a note, so try another way). `args: {"step": 2}` runs',
               '  steps 1 and 2 and shows step 2.',
               '- When the person is happy, save it as a Mini with `idli_draft_mini`: one question for the whole',
               '  workflow, its script and no parameters unless needed. Idli reads the steps from the script. The',

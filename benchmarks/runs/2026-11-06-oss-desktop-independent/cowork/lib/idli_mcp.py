@@ -751,6 +751,9 @@ PEEK = {'gmail_search': lambda a: blocks_mod().gmail_search(a.get('query', ''), 
         'sheet_read': lambda a: blocks_mod().sheet_read(a['sheet'], role=a.get('role'))[:100]}
 
 
+TITLES = {'script_try': 'Ask Idli to run this on your accounts'}  # what Claude Code shows for the call
+
+
 def blocks_mod():
     from lib import blocks
     return blocks
@@ -768,51 +771,74 @@ def account_peek(block, args=None):
 
 
 def script_try(script, args=None, preview=True, title=None):
-    """Run one of your scripts (in your folder) on the sandbox's real accounts; you get its output masked, and the
-    person sees the real output in the chat on the left. In preview (the default) drafts and bookings are only
-    collected, never written (lib/blocks.preview). The person is asked first."""
+    """Run one of your scripts (in your folder) on the sandbox's real accounts, after two yeses from the person in
+    the chat on the left (lib/tries.py): one to run it, one to send you its output masked. In preview (the default)
+    drafts and bookings are only collected, never written (lib/blocks.preview)."""
     import tempfile
     import time as _time
+    from lib import tries
     work = Path(os.environ.get('IDLI_CLAUDE_WORK') or '.').resolve()
     p = (work / str(script)).resolve()
     if not p.is_relative_to(work) or p.suffix != '.py' or not p.is_file():
         raise ValueError('Give a .py file in your folder.')
     _script_problems(p)
+    workspace = os.environ.get('IDLI_WORKSPACE')
+    if not workspace:
+        raise ValueError('The chat on the left is not open, so the person cannot say yes. Ask them to open the sandbox.')
+    name = ' '.join(str(title or p.stem.replace('_', ' ')).split())[:100]
+    ident = str(int(_time.time() * 1000))
+    dd = data_dir()
+    tries.write(dd, ident, {'title': name, 'preview': bool(preview), 'workspace': workspace, 'state': 'ask1',
+                            'script': p.name})
+    try:
+        home.post_to_left(workspace, 'Try', f'{name} [{ident}]')
+    except (OSError, ValueError, subprocess.SubprocessError):
+        raise ValueError('Could not reach the chat on the left. Ask the person to open the sandbox and try again.')
+    gate1 = tries.wait(dd, ident, ('run', 'no1'), tries.GATE_WAIT)
+    if not gate1:
+        tries.update(dd, ident, state='expired')
+        return {'ran': False, 'note': tries.NO_ANSWER}
+    if gate1['state'] == 'no1':
+        return {'ran': False, 'note': tries.REFUSED_RUN}
     argv = [sys.executable, '-I', str(p)]
     for k, v in (args or {}).items():
         argv += ['--' + re.sub(r'[^a-z0-9_]', '', str(k).lower()), str(v)]
     env = {k: v for k, v in os.environ.items() if not k.startswith('PASEO_')}
-    env.update({'IDLI_SANDBOX': str(data_dir()), 'IDLI_COWORK': str(Path(__file__).resolve().parent.parent)})
+    env.update({'IDLI_SANDBOX': str(dd), 'IDLI_COWORK': str(Path(__file__).resolve().parent.parent)})
     fd, log = tempfile.mkstemp(prefix='idli-preview-', suffix='.jsonl')
     os.close(fd)
     if preview:
         env.update({'IDLI_PREVIEW': '1', 'IDLI_PREVIEW_LOG': log})
     try:
-        r = subprocess.run(argv, cwd=str(data_dir()), env=env, capture_output=True, text=True, timeout=300,
+        r = subprocess.run(argv, cwd=str(dd), env=env, capture_output=True, text=True, timeout=300,
                            stdin=subprocess.DEVNULL)
         items = [json.loads(x) for x in Path(log).read_text().splitlines() if x.strip()]
+    except subprocess.TimeoutExpired:
+        tries.update(dd, ident, state='failed')
+        return {'ran': False, 'note': 'It ran for more than 5 minutes and was stopped.'}
     finally:
         os.unlink(log)
-    # The real output goes to the left chat (Idli's side); Claude gets it masked.
-    workspace = os.environ.get('IDLI_WORKSPACE')
-    shown = False
-    name = ' '.join(str(title or f'{p.stem} {_time.strftime("%H:%M:%S")}').split())[:120]
-    runs = Path(data_dir()) / '.idli' / 'runs'
+    # The real output goes to the left chat (Idli's side); Claude gets it masked, and only after the second yes.
+    runs = Path(dd) / '.idli' / 'runs'
     runs.mkdir(parents=True, exist_ok=True)
     home.write(runs / f'{int(_time.time() * 1000)}.json', {'title': name, 'workspace': workspace, 'preview': bool(preview),
                'output': r.stdout[-6000:], 'error': bool(r.returncode), 'items': items[:20]})
-    if workspace:
-        try:
-            home.post_to_left(workspace, 'Run', name)
-            shown = True
-        except (OSError, ValueError, subprocess.SubprocessError):
-            pass
     masked_items = _masked_account([{k: v for k, v in i.items()} for i in items[:10]])
-    return {'exit': r.returncode, 'output': _masked_account(r.stdout[-4000:]),
-            'error': _masked_account(r.stderr[-1500:]) if r.returncode else '',
-            'preview': bool(preview), 'would_write': masked_items,
-            'shown_left': shown, 'note': ('The person sees the real output in the chat on the left, titled "' + name +
-                                          '". Point them there in one short line.') if shown else ''}
+    out = {'exit': r.returncode, 'output': _masked_account(r.stdout[-4000:]),
+           'error': _masked_account(r.stderr[-1500:]) if r.returncode else '',
+           'preview': bool(preview), 'would_write': masked_items}
+    if r.returncode:  # an error: the person saw it on the left; Claude gets the masked error to fix it
+        tries.update(dd, ident, state='failed')
+        return {**out, 'note': 'It stopped with an error. The person saw it on the left.'}
+    tries.update(dd, ident, state='ask2', sample=tries.sample(out['output']))
+    gate2 = tries.wait(dd, ident, ('send', 'keep'), tries.GATE_WAIT)
+    if not gate2:
+        tries.update(dd, ident, state='expired')
+        return {'ran': True, 'note': tries.NO_ANSWER}
+    if gate2['state'] == 'keep':
+        return {'ran': True, 'note': tries.REFUSED_SEND}
+    return {**out, 'note': 'The person sees the real output in the chat on the left, titled "' + name +
+            '". Point them there in one short line.'}
 
 
 def block_run(name, paths=None, question=''):
@@ -860,9 +886,10 @@ if os.environ.get('IDLI_ROLE') not in ('builder', 'outside') and _is_sandbox():
                           'the left.', {'name': {'type': 'string'}, 'paths': {'type': 'array', 'items':
                                         {'type': 'string'}}, 'question': {'type': 'string'}}, ['name'])
     TOOLS['script_try'] = (script_try, 'Run your script (a .py in your folder that imports lib.blocks) on the real '
-                           'accounts and get its output masked; the person sees the real output on the left. '
-                           'preview (default true) collects drafts and bookings without writing them. The person '
-                           'is asked first.',
+                           'accounts. The person answers two cards in the chat on the left: one to run it, one to '
+                           'send you its output masked. If they say no, you get a short note instead: try another '
+                           'way or ask them. preview (default true) collects drafts and bookings without writing '
+                           'them.',
                            {'script': {'type': 'string'}, 'args': {'type': 'object'},
                             'preview': {'type': 'boolean'}, 'title': {'type': 'string', 'description':
                                         'A short title for this run, shown on the left'}}, ['script'])
@@ -992,7 +1019,8 @@ def main():
                           'capabilities': {'tools': {}}, 'serverInfo': {'name': 'idli', 'version': '0.1'}}
             elif method == 'tools/list':
                 result = {'tools': [{'name': name, 'description': desc, 'inputSchema': {
-                    'type': 'object', 'properties': props, 'required': required}}
+                    'type': 'object', 'properties': props, 'required': required},
+                    **({'title': TITLES[name], 'annotations': {'title': TITLES[name]}} if name in TITLES else {})}
                     for name, (_, desc, props, required) in TOOLS.items()]}
             elif method == 'tools/call':
                 try:
