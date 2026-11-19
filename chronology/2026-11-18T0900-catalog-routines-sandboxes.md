@@ -424,3 +424,15 @@ Owner's rules (built in phase 1, commit b46249da):
   - the replies list should say which leads didn't reply;
   - same-named Drive folders need saying;
   - parallel sessions hit Gmail's quota (harness).
+- **Phase C results** (`benchmarks/runs/2026-11-19-blind-tester/README.md`):
+  - **Leads:** 10 sessions over three harness versions. Round 3 is the fair one:
+    - idli-remote took the sceptical finance head through all three stages ("yes, with caution");
+    - the coordinator (remote) and the programme lead (9B) broke at "one person at a time": no command filters by
+      lead or joins the sheet to the replies.
+  - **Insights:** 3 sessions.
+    - Stages 1 and 2 held for both mappers: folder contents, columns, PDF summaries checked against the report.
+    - Escalation to Claude on masked copies gave a correct comparison between years.
+    - Breaks: a PDF summary that didn't extract, and the harness's file choice, which the consent card exposed.
+  - **No cheating:** the only flags were the agent waiting on its own long `./ask`, plus one pty wrapper around it.
+  - **Next:** `get lead NAME` and `--where lead=`; `explain` answers the one step asked; "would draft" wording in
+    production's footer; one definition of replies; `summarise` for spreadsheets; consent as a card.
