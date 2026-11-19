@@ -496,3 +496,25 @@ Owner's rules (built in phase 1, commit b46249da):
   - a forgiving `--label`;
   - prefer acting on a reasonable reading over asking back;
   - replies don't end with "Would you like..." and don't mention seconds or judging.
+- **Dev round 2** (grades by a blind grader, Cursor `agent` in the wall, which checks answers with read-only SQL on
+  the store):
+  - **idli-remote:**
+    - trust: 9 of 10 correct;
+    - own definitions: 18 of 20;
+    - workflows: 1 correct and 3 partial of 13, plus 4 correct refusals;
+    - other sites: 10 of 10 refused correctly.
+  - **The 9B:** trust 7 of 10, definitions 10 of 20, workflows 1 of 13 correct.
+  - **Coverage:** 39 to 40 of 53 can be expressed with the existing layers. The rest need a new connector (other
+    sites, about 11) or a new write action (move, rename, recurring). Only "every Monday" (a schedule) was called a
+    design miss.
+  - **Speed:** median turn 4.7 s (remote) and 7.7 s (9B).
+- **Fixes after round 2, still general:**
+  - **`continue`:** the mapper may run the first commands and see their results before writing the rest, and a
+    placeholder like `<thread_id>` in a command triggers this in code. Both mappers had invented ids.
+  - **No phantom "lead" account** in the menu.
+  - **No command advice** in replies.
+- **First blind tester** (coordinator on leads, idli-remote):
+  - **Trusted:** the simple checks, and "who hasn't replied" after one rephrase.
+  - **Trust broke at the draft:** a lead with no email thread got a draft to another person's address.
+  - **Fixed:** a draft must match one conversation, or say who it is to with `--to`. Greetings and "what can you
+    see" now map to `explain`.

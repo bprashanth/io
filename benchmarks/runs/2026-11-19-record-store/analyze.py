@@ -25,8 +25,10 @@ if grades:
         ids = [t for t in by_task if (k == 'ALL' or by_task[t][0]['kind'] == k) and t in grades]
         g = [grades[t] for t in ids]
         c, k2 = Counter(x.get('coverage') for x in g), Counter(x.get('correctness') for x in g)
-        avg = lambda f: (f'{st.mean([x[f] for x in g if isinstance(x.get(f), (int, float))]):.1f}'
-                         if any(isinstance(x.get(f), (int, float)) for x in g) else '-')
+        multi = {t for t in ids if len(by_task[t]) > 1}
+        def avg(f):
+            v = [grades[t][f] for t in ids if isinstance(grades[t].get(f), (int, float)) and (f == 'fit' or t in multi)]
+            return f'{st.mean(v):.1f}' if v else '-'
         print(f'| {k} | {len(g)} | {c["yes"]} | {c["new_connector"]} | {c["new_write"]} | {c["design_miss"]} | {k2["correct"]} | '
               f'{k2["partial"]} | {k2["wrong"]} | {k2["refused_ok"]} | {k2["refused_wrong"]} | {k2["failed"]} | {avg("fit")} | {avg("ack")} | {avg("repetitive")} |')
     print('\nDesign misses and wrong answers:')

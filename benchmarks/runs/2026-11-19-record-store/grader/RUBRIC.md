@@ -30,10 +30,11 @@ For every task write one object to `grades.json` (a JSON list), with:
 
   For a category the person defined (urgent, about caste...), judge whether the items shown plausibly fit and
   whether obvious ones are missing. Check a few in the data; don't demand perfection.
-- `fit` (1-5): does the reply answer what was asked, at the level asked ("just the number" means a number)?
-- `ack` (1-5, or null for one-turn tasks): when a follow-up corrects or points at something ("no, only after lunch",
+- `fit` (1-5): does the reply answer what was asked, at the level asked ("just the number" means a number)? A
+  correct refusal that says plainly why and what would make it possible fits well (4-5).
+- `ack` (1-5; null when the task has one turn): when a follow-up corrects or points at something ("no, only after lunch",
   "the second one"), does the reply take it in?
-- `repetitive` (1-5, or null for one-turn tasks): 5 means the replies read naturally across the session, 1 means
+- `repetitive` (1-5; null when the task has one turn): 5 means the replies read naturally across the session, 1 means
   the same sentence or formula again and again.
 - `notes`: one or two sentences: what was wrong, or what made it good.
 

@@ -324,20 +324,32 @@ def summarise(con, ref, question=''):
 
 
 def draft(con, a):
+    """A draft, previewed only. --reply-to must match one conversation (all its words in the sender or subject);
+    a new email to someone with no conversation needs --to ADDRESS."""
     to, subject, context = a.to or '', a.subject, ''
     if a.reply_to:
-        r = con.execute('SELECT thread_id, subject, from_addr, from_name, body_text FROM mail WHERE thread_id = ? OR '
-                        "subject ILIKE ? OR from_addr ILIKE ? OR from_name ILIKE ? ORDER BY date DESC LIMIT 1",
-                        [a.reply_to, f'%{a.reply_to}%', f'%{a.reply_to}%', f'%{a.reply_to}%']).fetchone()
+        ref = a.reply_to.strip()
+        r = con.execute('SELECT thread_id, subject, from_addr, from_name, body_text FROM mail WHERE thread_id = ? OR id = ? '
+                        'ORDER BY date DESC LIMIT 1', [ref, ref]).fetchone()
         if not r:
-            raise Err(f'No thread matching "{a.reply_to}". Try `idli list threads --search "{a.reply_to}"`.')
-        to = to or r[2]
-        subject = subject or ('Re: ' + r[1] if not r[1].lower().startswith('re:') else r[1])
-        context = f'Their last email ({r[3]}):\n{(r[4] or "")[:1500]}'
+            words = [w.replace("'", '') for w in ref.split() if w]
+            cond = ' AND '.join(f"(coalesce(from_name, '') || ' ' || from_addr || ' ' || subject) ILIKE '%{w}%'" for w in words)
+            r = con.execute(f"SELECT thread_id, subject, from_addr, from_name, body_text FROM mail WHERE direction = 'in' "
+                            f"AND {cond} ORDER BY date DESC LIMIT 1").fetchone()
+        if not r:
+            if not to:
+                raise Err(f'No conversation with "{ref}". For a new email, give --to ADDRESS (for example from the leads '
+                          'sheet) and --subject.')
+        else:
+            to = to or r[2]
+            subject = subject or ('Re: ' + r[1] if not r[1].lower().startswith('re:') else r[1])
+            context = f'Their last email ({r[3] or r[2]}):\n{(r[4] or "")[:1500]}'
+    if not to:
+        raise Err('Say who the draft is to: --reply-to a conversation, or --to ADDRESS.')
     schema = {'type': 'object', 'properties': {'body': {'type': 'string'}}, 'required': ['body']}
-    body = rs._nine([{'role': 'user', 'content': f'Write a short, polite email body (no subject line) from me. '
+    body = rs._nine([{'role': 'user', 'content': f'Write a short, polite email body (no subject line) from me to {to}. '
                       f'{a.ask}\n{context}\nSign off as "Me".'}], schema, max_tokens=400)['body']
-    return Result(kind='text', text=f'Would draft (not saved):\nTo: {to}\nSubject: {subject}\n\n{body}')
+    return Result(kind='text', text=f'Would draft (not saved):\nTo: {to}\nSubject: {subject or "(none)"}\n\n{body}')
 
 
 # ---- explain: the man page, with real dates ----
@@ -392,7 +404,8 @@ def explain(con, resource=None):
 # ---- ask: the left chat. The mapper picks commands; Idli runs them; the 9B words a short reply ----
 
 GRAMMAR_HEAD = """You turn a person's request into `idli` commands that read their own Google data from a local store.
-Answer with JSON only: {"commands": ["idli ...", ...]} or {"cannot": "<one sentence>", "needs": "<kind>"}.
+Answer with JSON only: {"commands": ["idli ...", ...]} (add "continue": true to see results before the next
+commands) or {"cannot": "<one sentence>", "needs": "<kind>"}.
 
 Commands (read only unless said):
   idli list RESOURCE [--where COND] [--since D] [--until D] [--on D] [--search WORDS] [--label DEF[=VAL]]
@@ -414,6 +427,7 @@ Rules:
 - A category the person has in mind ("urgent", "about caste", "funder meeting", "photos with people") that is not
   a field: define it (a clear yes/no question), judge the relevant rows (narrow first with --where, --in or
   --since so fewer rows are judged), then list with --label. Reuse an existing definition when it fits.
+- A greeting, or "what can you do / what can you see": idli explain (it lists what Idli can read).
 - Exact words or names the person gives: --search.  "How many": count.  "By X" or a breakdown: --by.
 - Follow-ups refer to the previous answer (shown below with its rows and ids): use the ids, or narrow the
   previous command.
@@ -423,6 +437,8 @@ Rules:
   "new_connector".
 - If the data simply isn't there, cannot, needs "not_in_data". Prefer a reasonable reading of a vague request
   (and act on it) over asking back; use cannot, needs "clarify", only when no reading makes sense.
+- When a later command needs a value from an earlier result (an id, a name, a thread), don't guess or write a
+  placeholder: give only the earlier commands with "continue": true. You'll see their results and give the rest.
 - A period ("yesterday", "last week", "next Monday") is --on PERIOD. --since D means from D until now.
 - Time of day: hour(start) >= 13 (after lunch), hour(date) < 12 (morning). Booleans: not is_bulk, is_unread.
 """
@@ -461,7 +477,8 @@ def menu(con, mask=None):
     views = con.execute('SELECT name, about FROM views').fetchall()
     if views:
         lines.append('Views: ' + '; '.join(f'{n}: {a}' for n, a in views))
-    lines.append(f'Today is {rs.now():%A %Y-%m-%d}, time zone Asia/Kolkata. Accounts: me (default), lead.')
+    lines.append(f'Today is {rs.now():%A %Y-%m-%d}, time zone Asia/Kolkata. All data is from my own account '
+                 f'({account()}); "account" is always that.')
     return '\n'.join(lines)
 
 
@@ -492,21 +509,28 @@ def _remote(system, user, max_tokens=5000):
         body['provider'] = {'data_collection': 'deny'}
     req = urllib.request.Request(minisql.URL, json.dumps(body).encode(), {
         'Content-Type': 'application/json', 'Authorization': 'Bearer ' + minisql._key(), 'User-Agent': 'idli-scaffold/1'})
-    with urllib.request.urlopen(req, timeout=90) as r:
-        txt = json.load(r)['choices'][0]['message']['content'] or ''
-    m = re.search(r'\{.*\}', txt, re.S)
-    txt = m.group(0) if m else txt
-    try:
-        return json.loads(txt)
-    except ValueError:  # the model writes \' inside JSON strings, which JSON doesn't allow
-        return json.loads(txt.replace("\\'", "'"))
+    for attempt in (0, 1):
+        with urllib.request.urlopen(req, timeout=120) as r:
+            txt = json.load(r)['choices'][0]['message']['content'] or ''
+        m = re.search(r'\{.*\}', txt, re.S)
+        txt = m.group(0) if m else txt
+        for t in (txt, txt.replace("\\'", "'")):  # the model sometimes writes \' inside JSON strings
+            try:
+                return json.loads(t)
+            except ValueError:
+                pass
+        log = os.environ.get('IDLI_MAPPER_LOG')
+        if log:
+            open(log, 'a').write(json.dumps({'bad_json': txt[:4000]}) + '\n')
+    raise ValueError('The mapper did not answer in JSON twice.')
 
 
 PLAN_SCHEMA = {'type': 'object', 'properties': {'commands': {'type': 'array', 'items': {'type': 'string'}},
+                                                'continue': {'type': 'boolean'},
                                                 'cannot': {'type': 'string'}, 'needs': {'type': 'string'}}}
 
 
-def map_question(con, question, history, mapper='remote', data_dir=None, failed=None):
+def map_question(con, question, history, mapper='remote', data_dir=None, failed=None, so_far=None):
     """The plan: idli commands for this question. Remote mapping sees masked text only. `failed` is a repair
     round: the commands that failed and why, so the mapper corrects them."""
     ctx = []
@@ -516,6 +540,9 @@ def map_question(con, question, history, mapper='remote', data_dir=None, failed=
     note = rs.dates_note(question)
     user = (menu(con) + '\n\n' + ('\n\n'.join(ctx) + '\n\n' if ctx else '') +
             f'Request: {question}' + (f'\nDates in this request: {note}' if note else ''))
+    if so_far:
+        user += ('\n\nYou already ran these for this request; their results:\n' + so_far[:5000] +
+                 '\nNow give the remaining commands (or none, as {"commands": []}, if the results already answer it).')
     if failed:
         user += ('\n\nYour commands for this request failed:\n' + '\n'.join(failed) +
                  '\nGive the full corrected list of commands (same JSON shape).')
@@ -527,7 +554,7 @@ def map_question(con, question, history, mapper='remote', data_dir=None, failed=
         plan = home.rehydrate(data_dir, plan)
     else:
         plan = rs._nine([{'role': 'system', 'content': grammar()}, {'role': 'user', 'content': user}], PLAN_SCHEMA,
-                        max_tokens=700, timeout=180)
+                        max_tokens=1500, timeout=180)
     return plan, len(user)
 
 
@@ -537,7 +564,8 @@ using only the result below. Rules:
   a few words, then answer.
 - Don't repeat the wording of your previous reply. Don't list the rows (they are shown under your words); mention
   at most two items by name.
-- Don't mention how it was worked out (seconds, judging, definitions, commands) unless they asked.
+- Don't mention how it was worked out (seconds, judging, definitions, commands) unless they asked. Never tell
+  them to run a command. If a step failed, say in plain words what you couldn't find.
 - Only use numbers that appear in the result. If the result is empty, say so plainly and suggest one next step.
 - Talk like a colleague about their data ("4 files are in the fixity folder"), never about rows or results.
 - Don't end with a question or an offer ("Would you like...") unless their request was unclear.
@@ -578,21 +606,34 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
     if not plan.get('commands'):
         needs = plan.get('needs', 'clarify')
         why = plan.get('cannot') or 'I am not sure what to look up.'
-        lead = {'new_connector': "That site isn't connected yet, so I can't read it. ",
-                'new_write_action': "I can only read and preview here; I can't change things in your accounts. ",
-                'not_in_data': '', 'clarify': ''}.get(needs, '')
-        rec.update(reply=lead + why, shown='', commands=[], needs=needs, total_s=round(time.time() - t0, 2))
+        nxt = {'new_connector': ' The Builder can ask for a connector for it; until then I only see your Google account.',
+               'new_write_action': ' I can read and show previews (a draft reply, for example), but changing things '
+                                   'in your accounts needs an action our team adds.'}.get(needs, '')
+        rec.update(reply=why.rstrip() + nxt, shown='', commands=[], needs=needs, total_s=round(time.time() - t0, 2))
         return rec
     shown_parts, cmds, judge_s, errors = run_plan(con, plan)
     if errors:  # one repair round: the mapper sees what failed and why
         try:
             plan2, _ = map_question(con, question, history, mapper, data_dir, failed=errors)
             if plan2.get('commands'):
-                rec['repaired'] = plan2
+                rec['repaired'] = plan = plan2
                 shown_parts, cmds, judge_s2, errors = run_plan(con, plan2)
                 judge_s += judge_s2
         except Exception:
             pass
+    rounds = 0
+    while plan.get('continue') and rounds < 2 and not errors:  # the mapper asked to see results first
+        rounds += 1
+        so_far = '\n'.join(f'$ {c}\n{p}' for c, p in zip(cmds, shown_parts))
+        try:
+            plan, _ = map_question(con, question, history, mapper, data_dir, so_far=so_far)
+        except Exception:
+            break
+        if not plan.get('commands'):
+            break
+        more_parts, more_cmds, js, errors = run_plan(con, plan)
+        shown_parts += more_parts; cmds += more_cmds; judge_s += js
+    rec['rounds'] = rounds
     shown = '\n\n'.join(shown_parts)
     t1 = time.time()
     reply, why = compose(question, shown, history)
@@ -607,9 +648,15 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
     return rec
 
 
+PLACEHOLDER = re.compile(r'<[A-Za-z_][A-Za-z0-9_ .\-]{1,60}>')
+
+
 def run_plan(con, plan):
     shown_parts, cmds, judge_s, errors = [], [], 0.0, []
     for c in plan['commands'][:6]:
+        if PLACEHOLDER.search(c):  # it needs a value from the results so far: stop here and ask for the rest
+            plan['continue'] = True
+            break
         try:
             argv = shlex.split(c)
         except ValueError:
