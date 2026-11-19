@@ -152,6 +152,14 @@ def parser():
 def run_argv(con, argv):
     if argv and argv[0] == 'idli':
         argv = argv[1:]
+    # `--label people = 'yes'` arrives as three words: join them
+    out = []
+    for t in argv:
+        if out and (t.startswith('=') or out[-1].endswith('=')) and len(out) >= 2 and out[-2] == '--label':
+            out[-1] += t
+        else:
+            out.append(t)
+    argv = out
     if not argv:
         return Result(kind='text', text=__doc__)
     a = parser().parse_args(argv)
@@ -383,7 +391,7 @@ def explain(con, resource=None):
 
 # ---- ask: the left chat. The mapper picks commands; Idli runs them; the 9B words a short reply ----
 
-GRAMMAR = """You turn a person's request into `idli` commands that read their own Google data from a local store.
+GRAMMAR_HEAD = """You turn a person's request into `idli` commands that read their own Google data from a local store.
 Answer with JSON only: {"commands": ["idli ...", ...]} or {"cannot": "<one sentence>", "needs": "<kind>"}.
 
 Commands (read only unless said):
@@ -413,8 +421,24 @@ Rules:
   Drafting an email reply is available as a preview.
 - WhatsApp, Slack, Mattermost, Canva, LinkedIn, Amazon, funder portals are not connected: cannot, needs
   "new_connector".
-- If the data simply isn't there, cannot, needs "not_in_data". If the request is too vague to act on, cannot,
-  needs "clarify" with the question to ask back.
+- If the data simply isn't there, cannot, needs "not_in_data". Prefer a reasonable reading of a vague request
+  (and act on it) over asking back; use cannot, needs "clarify", only when no reading makes sense.
+- A period ("yesterday", "last week", "next Monday") is --on PERIOD. --since D means from D until now.
+- Time of day: hour(start) >= 13 (after lunch), hour(date) < 12 (morning). Booleans: not is_bulk, is_unread.
+"""
+
+
+def grammar():
+    lw = rs.day_range('last week')
+    return GRAMMAR_HEAD + f"""
+Examples (today is {rs.now():%A %Y-%m-%d}):
+  "emails I got last week" -> idli list mail --on "last week" --where "direction = 'in'"
+  "how many PDFs in Strategy Classics" -> idli count files --in "Strategy Classics" --where "kind = 'pdf'"
+  "meetings next monday" -> idli list events --on "next monday"
+  "urgent emails" -> idli define urgent --on mail --ask "Does this email ask me to act or reply soon?" --answers yes,no ;
+                     idli judge mail --def urgent --where "direction = 'in' and not is_bulk" ; idli list threads --label urgent
+  "leads who haven't replied" -> idli query "SELECT l.Name, l.Email FROM sheet_leads_x l WHERE lower(l.Email) NOT IN
+                     (SELECT from_addr FROM mail WHERE direction = 'in')"   (use the real sheet table: idli list sheets)
 """
 
 
@@ -424,10 +448,10 @@ def menu(con, mask=None):
     for k, r in rs.RESOURCES.items():
         if k in ('labels',):
             continue
-        lines.append(f'- {k}: {r["about"]}. Fields: {", ".join(rs.columns(con, k))}')
-    sheets = con.execute('SELECT name, columns, nrows FROM sheets ORDER BY name').fetchall()
-    lines.append('- rows --sheet NAME. Sheets: ' + '; '.join(f'"{m(n)}" ({nr} rows: {", ".join(m(c) for c in json.loads(cs)[:8])})'
-                                                         for n, cs, nr in sheets))
+        lines.append(f'- {k}: {r["about"]}. Fields: {", ".join(rs.columns(con, k))}' + _values(con, k))
+    sheets = con.execute('SELECT name, columns, nrows, tbl FROM sheets ORDER BY name').fetchall()
+    lines.append('- rows --sheet NAME. Sheets: ' + '; '.join(
+        f'"{m(n)}" (SQL table {t}, {nr} rows; columns: {", ".join(m(c) for c in json.loads(cs)[:8])})' for n, cs, nr, t in sheets))
     folders = con.execute("SELECT path || CASE WHEN path = '' THEN '' ELSE '/' END || name FROM files "
                           "WHERE kind = 'folder' ORDER BY 1").fetchall()
     lines.append('Drive folders: ' + '; '.join(m(f[0]) for f in folders))
@@ -441,10 +465,28 @@ def menu(con, mask=None):
     return '\n'.join(lines)
 
 
-def _remote(system, user, max_tokens=1500):
+def _values(con, resource):
+    """The values of short, few-valued text fields (direction: in, out), so filters use real values."""
+    r = rs.RESOURCES[resource]
+    if r.get('filter') or resource in ('definitions', 'sheets'):
+        return ''
+    out = []
+    for c, t in con.execute(f'SELECT column_name, column_type FROM (DESCRIBE SELECT * FROM "{r["table"]}")').fetchall():
+        if t != 'VARCHAR' or c in ('id', 'thread_id', 'account'):
+            continue
+        n, mx = con.execute(f'SELECT count(DISTINCT "{c}"), max(length("{c}")) FROM "{r["table"]}"').fetchone()
+        if n and n <= 10 and (mx or 0) <= 24:
+            vals = [v[0] for v in con.execute(f'SELECT DISTINCT "{c}" FROM "{r["table"]}" ORDER BY 1').fetchall()]
+            out.append(f'{c} is one of: {", ".join(repr(v) for v in vals)}')
+    return ('. ' + '; '.join(out)) if out else ''
+
+
+def _remote(system, user, max_tokens=5000):
     from lib import minisql
     import urllib.request
+    # reasoning is capped: uncapped, it used all of 1500 tokens on workflow asks and the JSON came back cut off
     body = {'model': minisql.MODEL, 'temperature': 0, 'max_tokens': max_tokens, 'response_format': {'type': 'json_object'},
+            'reasoning': {'effort': 'low'},
             'messages': [{'role': 'system', 'content': system}, {'role': 'user', 'content': user}]}
     if 'openrouter.ai' in minisql.URL:
         body['provider'] = {'data_collection': 'deny'}
@@ -453,33 +495,38 @@ def _remote(system, user, max_tokens=1500):
     with urllib.request.urlopen(req, timeout=90) as r:
         txt = json.load(r)['choices'][0]['message']['content'] or ''
     m = re.search(r'\{.*\}', txt, re.S)
-    return json.loads(m.group(0) if m else txt)
+    txt = m.group(0) if m else txt
+    try:
+        return json.loads(txt)
+    except ValueError:  # the model writes \' inside JSON strings, which JSON doesn't allow
+        return json.loads(txt.replace("\\'", "'"))
 
 
 PLAN_SCHEMA = {'type': 'object', 'properties': {'commands': {'type': 'array', 'items': {'type': 'string'}},
                                                 'cannot': {'type': 'string'}, 'needs': {'type': 'string'}}}
 
 
-def map_question(con, question, history, mapper='remote', data_dir=None):
-    """The plan: idli commands for this question. Remote mapping sees masked text only."""
-    if mapper == 'remote':
-        from lib import privacy
-        mask = lambda s: privacy.mask_account_text(data_dir, s)
-    else:
-        mask = lambda s: s
+def map_question(con, question, history, mapper='remote', data_dir=None, failed=None):
+    """The plan: idli commands for this question. Remote mapping sees masked text only. `failed` is a repair
+    round: the commands that failed and why, so the mapper corrects them."""
     ctx = []
     for h in history[-2:]:
-        ctx.append(f'Earlier question: {mask(h["q"])}\nCommands run: {mask(json.dumps(h.get("commands", [])))}\n'
-                   f'Result shown:\n{mask(h.get("shown", "")[:1500])}')
+        ctx.append(f'Earlier question: {h["q"]}\nCommands run: {json.dumps(h.get("commands", []))}\n'
+                   f'Result shown:\n{h.get("shown", "")[:1500]}')
     note = rs.dates_note(question)
-    user = (menu(con, mask) + '\n\n' + ('\n\n'.join(ctx) + '\n\n' if ctx else '') +
-            f'Request: {mask(question)}' + (f'\nDates in this request: {note}' if note else ''))
+    user = (menu(con) + '\n\n' + ('\n\n'.join(ctx) + '\n\n' if ctx else '') +
+            f'Request: {question}' + (f'\nDates in this request: {note}' if note else ''))
+    if failed:
+        user += ('\n\nYour commands for this request failed:\n' + '\n'.join(failed) +
+                 '\nGive the full corrected list of commands (same JSON shape).')
     if mapper == 'remote':
-        plan = _remote(GRAMMAR, user)
+        from lib import privacy
+        user = privacy.mask_account_text(data_dir, user)  # once, over everything that leaves (0.2 s)
+        plan = _remote(grammar(), user)
         from lib import home
         plan = home.rehydrate(data_dir, plan)
     else:
-        plan = rs._nine([{'role': 'system', 'content': GRAMMAR}, {'role': 'user', 'content': user}], PLAN_SCHEMA,
+        plan = rs._nine([{'role': 'system', 'content': grammar()}, {'role': 'user', 'content': user}], PLAN_SCHEMA,
                         max_tokens=700, timeout=180)
     return plan, len(user)
 
@@ -490,7 +537,10 @@ using only the result below. Rules:
   a few words, then answer.
 - Don't repeat the wording of your previous reply. Don't list the rows (they are shown under your words); mention
   at most two items by name.
+- Don't mention how it was worked out (seconds, judging, definitions, commands) unless they asked.
 - Only use numbers that appear in the result. If the result is empty, say so plainly and suggest one next step.
+- Talk like a colleague about their data ("4 files are in the fixity folder"), never about rows or results.
+- Don't end with a question or an offer ("Would you like...") unless their request was unclear.
 - Plain words, no headings, no bullet points, no "As an AI"."""
 
 
@@ -533,6 +583,31 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
                 'not_in_data': '', 'clarify': ''}.get(needs, '')
         rec.update(reply=lead + why, shown='', commands=[], needs=needs, total_s=round(time.time() - t0, 2))
         return rec
+    shown_parts, cmds, judge_s, errors = run_plan(con, plan)
+    if errors:  # one repair round: the mapper sees what failed and why
+        try:
+            plan2, _ = map_question(con, question, history, mapper, data_dir, failed=errors)
+            if plan2.get('commands'):
+                rec['repaired'] = plan2
+                shown_parts, cmds, judge_s2, errors = run_plan(con, plan2)
+                judge_s += judge_s2
+        except Exception:
+            pass
+    shown = '\n\n'.join(shown_parts)
+    t1 = time.time()
+    reply, why = compose(question, shown, history)
+    rec['compose_s'] = round(time.time() - t1, 2)
+    rec['compose_fallback'] = why
+    final_rows = shown_parts[-1] if shown_parts else ''
+    body = (reply + '\n\n' if reply else '') + (final_rows if final_rows else '')
+    if show_commands:
+        body += '\n\n(Ran: ' + ' ; '.join(cmds) + ')'
+    rec.update(reply=body.strip(), words=reply, shown=shown, commands=cmds, errors=errors, judge_s=round(judge_s, 1),
+               total_s=round(time.time() - t0, 2))
+    return rec
+
+
+def run_plan(con, plan):
     shown_parts, cmds, judge_s, errors = [], [], 0.0, []
     for c in plan['commands'][:6]:
         try:
@@ -560,18 +635,7 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
             shown_parts.append(r.render())
         else:
             shown_parts.append(r.render())
-    shown = '\n\n'.join(shown_parts)
-    t1 = time.time()
-    reply, why = compose(question, shown, history)
-    rec['compose_s'] = round(time.time() - t1, 2)
-    rec['compose_fallback'] = why
-    final_rows = shown_parts[-1] if shown_parts else ''
-    body = (reply + '\n\n' if reply else '') + (final_rows if final_rows else '')
-    if show_commands:
-        body += '\n\n(Ran: ' + ' ; '.join(cmds) + ')'
-    rec.update(reply=body.strip(), words=reply, shown=shown, commands=cmds, errors=errors, judge_s=round(judge_s, 1),
-               total_s=round(time.time() - t0, 2))
-    return rec
+    return shown_parts, cmds, judge_s, errors
 
 
 def _session_path():

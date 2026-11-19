@@ -481,3 +481,18 @@ Owner's rules (built in phase 1, commit b46249da):
     - Idli runs them;
     - the 9B words 1 to 3 sentences that respond to what was just said, with the rows shown under them;
     - any number not in the result throws the wording away.
+- **Dev round 1** (53 tasks, 65 turns, each mapper on its own copy of the store):
+  - **Speed:** median turn 5.1 s with idli-remote and 7.5 s with the 9B. The first judging of all Drive files
+    took 5 to 9 minutes, because it reads each PDF once. 9B judging in total: 20 min (remote's run) and 13 min
+    (the 9B's).
+  - **Store:** about 10 MB with 120 file texts and 764 labels. The extracted text is the bulk.
+- **General fixes after round 1, on dev only:**
+  - mask the whole prompt once (19 s became 0.2 s);
+  - field values in the menu (`direction` is `in` or `out`);
+  - `--on` for periods;
+  - cap the remote's reasoning (it used all 1,500 tokens, so the JSON came back cut off);
+  - parse `\'` in its JSON;
+  - one repair round that feeds a failed command's error back to the mapper;
+  - a forgiving `--label`;
+  - prefer acting on a reasonable reading over asking back;
+  - replies don't end with "Would you like..." and don't mention seconds or judging.

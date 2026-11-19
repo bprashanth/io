@@ -490,8 +490,11 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
                                                          for c in cols) + ')' for w in words) + ')')
     if folder:
         conds.append(f"(path ILIKE '%{folder.replace(chr(39), '')}%')")
-    if label:
-        name, _, val = label.partition('=')
+    if label:  # "urgent", "urgent=yes", "urgent = 'yes'", "label.urgent='no'"
+        m = re.match(r"\s*(?:label\.)?([A-Za-z0-9_]+)\s*(?:=\s*'?([^']*)'?)?\s*$", label)
+        if not m:
+            raise ValueError(f'--label takes NAME or NAME=VALUE, for example --label urgent=yes (got "{label}").')
+        name, val = m.group(1), (m.group(2) or 'yes')
         conds.append(compile_where(con, resource if resource in RESOURCES else 'files',
                                    f"label.{name.strip()} = '{(val or 'yes').strip()}'"))
     wh = (' WHERE ' + ' AND '.join(f'({c})' for c in conds)) if conds else ''
