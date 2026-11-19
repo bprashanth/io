@@ -214,6 +214,35 @@ Tested on the laptop:
 
 Details in `benchmarks/runs/2026-11-18-transform-blocks/README.md`.
 
+## Capabilities as CLIs (owner, 2026-11-19; direction, not built)
+
+Fixing one capability at a time (an email search that couldn't be limited to the leads) doesn't scale. Instead:
+
+- **Every capability is a CLI with arguments**, for example:
+  - `mail search --query --from-sheet --since --limit --role`;
+  - `calendar meetings --start --end`;
+  - `sheet rows --sheet`;
+  - `nine-b judge --question --shape`;
+  - `pdf read`.
+
+  Its `--help` is its schema. It reads JSON in and writes JSON out, and runs in preview unless told to act. Reads,
+  transforms and actions all share this shape.
+- **A Mini is a chain of invocations.** Each step is one capability call. Some of its arguments are fixed by the
+  Mini (the leads sheet), some are left open (since when, which lead), and a step can take an earlier step's output.
+  Glue code is kept to a minimum. Running step N or the whole chain in preview falls out for free.
+- **idli-remote fills in arguments.** It gets the masked question, the Mini's chain and the argument schemas. It
+  returns which steps to run, with which values, and the result is checked against the schema. It never writes code.
+  "This morning's lead replies" becomes `mail search --from-sheet SHEET_1 --since today`. "All emails today" becomes
+  the same command without `--from-sheet`.
+- **Sandbox Claude (inside)** chains capabilities with the right arguments, adds new arguments when a chain needs
+  them, and draws charts. It stays within the sandbox's import surface. The left and right panes go back and forth
+  for this, through the two gates.
+- **The Builder (outside)** chooses each sandbox's surface: which capabilities, imports and sources it gets. It
+  writes new capabilities from trusted packages and sources, and asks our team for new actions or new account
+  reads.
+- **Changing a capability that other sandboxes use:** copy on write in the sandbox, additive arguments only, Minis
+  pinned to a hash, and the Builder promotes. See the p1 todo `todos/idli-insights/p1/capability_versions.md`.
+
 ## Tested
 
 See `benchmarks/runs/2026-11-18-sandboxes/README.md`, `benchmarks/runs/2026-11-18-builder-minis/README.md` and `benchmarks/runs/2026-11-18-transform-blocks/README.md`, which have screenshots for each step.

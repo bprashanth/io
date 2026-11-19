@@ -10,6 +10,8 @@
     one table per tab.
   - [The installation backend: vetting, signed catalog, mirrors, updates](p1/installation_backend.md).
   - [Pixi and the trusted catalog: refinements](p1/pixi_catalog_refinements.md): model paths, sizes, shared envs, updates, signing, request vetting.
+  - [When a sandbox's Claude changes a capability](p1/capability_versions.md): copy on write in the sandbox,
+    additive arguments only, Minis pinned to a hash, the Builder promotes, other sandboxes opt in.
   - [Sandboxing team tools properly](p1/sandboxing_later.md): after the catalog POC; WSL2 test, Mac Seatbelt, risk tiers, DGX fallback.
   - [Installers and the demo gaps](p1/deployment_strategy.md): D1-D11, with Pyodide as row 21.
   - [Paseo patches](p1/paseo_patches.md): P1, P3 and P12 for the demo.
