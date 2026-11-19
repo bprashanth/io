@@ -400,3 +400,27 @@ Owner's rules (built in phase 1, commit b46249da):
 - **OAuth on the DGX:** `lib/google_api.py` gained `paste_start`/`paste_finish` (consent link, PKCE verifier kept
   0600, the owner pastes the address the browser lands on) and drive.readonly. The owner signed in 87 and 88 with
   all five scopes. Drive read helpers: `drive_files`, `drive_bytes`.
+- **Phase B results** (benchmark README, "Follow-up: condition 4"):
+  - **idli-remote:** grammar 96% against 94% for man pages; every reply that came back was right.
+  - **9B:** 100% on held-out, 86% on dev. It's 40% faster on a quarter shorter prompt.
+  - **Drive set:** 92 to 100% for both conditions.
+  - **4b** (`describe`, `summarise`) lifted the second Drive set from 60% to 80% (9B) and from 43% to 73% (remote).
+    Listing folders was missing.
+- **Phase C, the blind tester** (`benchmarks/runs/2026-11-19-blind-tester/`):
+  - **Harness:** plays the left chat on the real 87 and 88 data, read-only, with production masking: questions and
+    menus to idli-remote through `mask_account_text`, Claude's replies through `home.rehydrate`, PDFs through
+    docmask, spreadsheets through `privacy.suggest` + maskcopy. Insights escalate to Sandbox Claude (headless Claude,
+    no tools), and Idli runs Claude's script on the real files.
+  - **Tester:** Cursor's `agent` inside a bwrap wall that sees only an empty folder with `./ask`.
+  - **Wire spot-check found a real leak:** the 2025 NDSA report's PDF text came out one word per line, so 9 author
+    names reached Claude.
+    - Fixed in production docmask: join the runs, scan long lines in 70-character windows and each comma piece.
+    - One name is left ("Kari May").
+- **Rounds 1 and 2 broke trust early.** Two of the causes were my harness: no `explain` path, and drafting for
+  answered threads. The real findings:
+  - "which sheet, which columns, what date range" needs `explain`;
+  - a preview that shows draft text under "Nothing was drafted" reads as a contradiction (now "Would draft (not
+    saved)");
+  - the replies list should say which leads didn't reply;
+  - same-named Drive folders need saying;
+  - parallel sessions hit Gmail's quota (harness).

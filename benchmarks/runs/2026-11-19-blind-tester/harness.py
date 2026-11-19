@@ -43,7 +43,7 @@ NOTICE = re.compile(r'^(Accepted|Declined|Tentatively accepted|Invitation|Update
                     r'Cancelled event)\b', re.I)
 JUDGE_Q = 'did they agree to meet, and did they pick a time?'
 JUDGE_A = ['picked', 'agreed', 'other']
-NOTHING = '_Nothing was drafted, booked or sent._'
+NOTHING = '_A preview: nothing was saved to Gmail or your calendar, and nothing was sent._'
 PY = str(COWORK / '.venv' / 'bin' / 'python')
 
 
@@ -212,8 +212,22 @@ def parse(line):
     return pos, flags, where
 
 
+_RAW = {}
+
+
 def mails(query, limit=10):
-    return [g.gmail_raw(ME, m['id']) for m in g.gmail_list(ME, query, limit=limit)]
+    out = []
+    for m in g.gmail_list(ME, query, limit=limit):
+        if m['id'] not in _RAW:
+            _RAW[m['id']] = g.gmail_raw(ME, m['id'])
+        out.append(_RAW[m['id']])
+    return out
+
+
+def no_reply_line(world, items):
+    got = {r.get('from', '').lower() for r in items}
+    missing = [r.get('Name', '') for r in world.leads if r.get('Email', '').lower() not in got]
+    return [f'No reply in this time from: {", ".join(missing)}.'] if missing else []
 
 
 def mail_query(since=None, until=None, frm=None, search=None, leads=None):
@@ -278,8 +292,10 @@ def judge_items(items, question, answers):
     out = []
     for r in items:
         text = (r.get('new_text') or r.get('text') or '')[:2000]
-        a = routines.judge(f'Email from {r.get("from")}, subject "{r.get("subject")}":\n\n{text}\n\nQuestion: '
-                           f'{question}\nAnswer with one of: {", ".join(answers)}.',
+        sent = _when(r.get('date'))
+        a = routines.judge(f'Email from {r.get("from")}, subject "{r.get("subject")}", sent {sent.strftime("%A %Y-%m-%d") if sent else ""}:'
+                           f'\n\n{text}\n\nQuestion: {question}\nAnswer with one of: {", ".join(answers)}. If they '
+                           'picked a time, give "time" as YYYY-MM-DDTHH:MM (India time).',
                            {'type': 'object', 'properties': {'answer': {'type': 'string', 'enum': answers},
                                                              'time': {'type': 'string'}}, 'required': ['answer']},
                            timeout=180, max_tokens=200)
@@ -315,7 +331,7 @@ def run_steps(world, n, flags):
         s0 = since or today() - dt.timedelta(days=14)
         return ['**Step 2: Find their replies**', f'From {s0.isoformat()} to {(until or today()).isoformat()}; the newest '
                 'reply in each thread, not ones already answered.', ''] + (
-            mail_lines(reps) or ['No new replies from leads in that time.'])
+            mail_lines(reps) or ['No new replies from leads in that time.']) + [''] + no_reply_line(world, reps)
     judged = judge_items(reps, JUDGE_Q + ' If they picked one, give the time as written.', JUDGE_A)
     if n == 3:
         return ['**Step 3: Read each reply**', ''] + ([f'- {r.get("from")}: "{r.get("subject")}": **{a}**'
@@ -331,23 +347,31 @@ def run_steps(world, n, flags):
                 drafts += [f'To {r.get("from")}, re: {r.get("subject")}', '```',
                            f'Hi {first},\n\nThank you for your reply. Here are three times that work for me:\n'
                            + '\n'.join(f'- {_fmt(s)} (30 minutes)' for s in slots) + '\n\nWhich suits you best?', '```']
-        out += ['**Step 4: Draft open times for leads who agreed**', ''] + (drafts or ['No lead agreed without '
+        out += ['**Step 4: Draft open times for leads who agreed**', 'Would draft (not saved to Gmail):', ''] + (drafts or ['No lead agreed without '
                                                                                         'picking a time.'])
         if n == 4:
             return out
     if n in (5, 7):
-        upcoming = g.calendar_events(ME, dt.datetime.now(IST), dt.datetime.now(IST) + dt.timedelta(days=30))
+        upcoming = g.calendar_events(ME, dt.datetime.now(IST) - dt.timedelta(days=1),
+                                     dt.datetime.now(IST) + dt.timedelta(days=30))
         books = []
         for r, a, t in judged:
             if a != 'picked':
                 continue
-            have = [e for e in upcoming if r.get('from') in (e.get('attendees') or []) and not e.get('declined')]
-            if have:
-                books.append(f'- {r.get("from")} picked {t or "a time"}: already on the calendar ("{have[0]["title"]}", '
-                             f'{_fmt(_when(have[0]["start"]))}), so skipped')
+            try:
+                when = dt.datetime.fromisoformat(str(t)[:16]).replace(tzinfo=IST)
+            except ValueError:
+                when = None
+            who = world.name_of(r.get('from')) or r.get('from')
+            same = [e for e in upcoming if when and _when(e['start']) == when and r.get('from') in (e.get('attendees') or [])]
+            if same:
+                books.append(f'- {who} picked {_fmt(when)}: already on your calendar at that time ("{same[0]["title"]}"), '
+                             'so it would not book again')
+            elif when:
+                books.append(f'- Would book (not saved): "Meeting with {who}", {_fmt(when)}, 30 minutes, with '
+                             f'{r.get("from")} invited')
             else:
-                books.append(f'- Would book "Meeting with {world.name_of(r.get("from")) or r.get("from")}" at '
-                             f'{t or "the time they gave"}, with {r.get("from")} invited')
+                books.append(f'- {who} picked a time, but it could not be read ("{t}"): it would ask you first')
         out += ['', '**Step 5: Book the time for leads who picked one**', ''] + (books or ['No lead picked a time.'])
         if n == 5:
             return out
@@ -524,7 +548,8 @@ def execute(world, line):
         return [f'- {r.get("from")}: "{r.get("subject")}": **{a}**' for r, a, _ in
                 judge_items(items, str(flags.get('question', '')), answers)] or ['Nothing to read.']
     if res in ('replies', 'reply'):
-        return mail_lines(replies(world, since, until, flags.get('search'))) or ['No replies from leads in that time.']
+        reps = replies(world, since, until, flags.get('search'))
+        return (mail_lines(reps) or ['No replies from leads in that time.']) + [''] + no_reply_line(world, reps)
     if res in ('mail', 'email', 'emails'):
         frm = where.get('from')
         if frm and frm != 'leads' and '@' not in frm:  # a person's name: their address from the leads sheet
