@@ -16,8 +16,14 @@ from lib import home
 MAX_CHARS = 150_000     # about 50 pages; the rest is left out and the file says so
 
 
+def _rejoin(text):
+    """Some PDFs come out of pypdf one word per line ("Matthew\\n \\nMcEniry"), which hides names from a line-by-line
+    scanner (the 2025 NDSA report's authors reached Claude, 2026-11-19). Join those runs back into lines."""
+    return re.sub(r'[ \t]*\n[ \t]+\n[ \t]*', ' ', text)
+
+
 def pdf_text(path):
-    cache = Path(str(path) + '.text.txt')
+    cache = Path(str(path) + '.text2.txt')  # text2: joined word-per-line runs
     if cache.is_file() and cache.stat().st_mtime >= Path(path).stat().st_mtime:
         return cache.read_text()
     from pypdf import PdfReader
@@ -26,7 +32,7 @@ def pdf_text(path):
         reader = PdfReader(str(path))
         for i, page in enumerate(reader.pages, 1):
             try:
-                pages.append(f'[page {i}]\n' + (page.extract_text() or '').strip())
+                pages.append(f'[page {i}]\n' + _rejoin(page.extract_text() or '').strip())
             except Exception:  # noqa: BLE001  (one bad page: skip it)
                 pages.append(f'[page {i}: could not be read]')
     except Exception:  # noqa: BLE001
@@ -45,16 +51,26 @@ class LineScanner:
         from lib import privacy
         self.scanner, self.pool = privacy.Scanner(), ThreadPoolExecutor(workers)
 
+    WINDOW = 70  # a long line is read in overlapping windows: the scanner misses names in long pieces
+
     def __call__(self, text):
         lines, at = [], 0
         for line in str(text).split('\n'):
             if len(line.strip()) > 2:
-                lines.append((at, line))
+                if len(line) <= self.WINDOW:
+                    lines.append((at, line))
+                else:
+                    step = self.WINDOW // 2
+                    for start in range(0, len(line), step):
+                        a = line.rfind(' ', 0, start) + 1 if start else 0
+                        lines.append((at + a, line[a:a + self.WINDOW]))
+                        if a + self.WINDOW >= len(line):
+                            break
             at += len(line) + 1
         spans = []
         for (off, _), got in zip(lines, self.pool.map(lambda x: self.scanner(x[1]), lines)):
             spans += [(a + off, b + off, k, c) for a, b, k, c in got]
-        return spans
+        return sorted(set(spans))
 
     def close(self):
         self.pool.shutdown(wait=False)
@@ -94,7 +110,7 @@ def prepare(data_dir, paths):
             missed.append(f['title'])  # a scan, with no text to read
             continue
         cut = len(text) > MAX_CHARS
-        kept = Path(str(f['path']) + '.masked.txt')  # masked once per file version (about a minute for 50 pages)
+        kept = Path(str(f['path']) + '.masked2.txt')  # masked once per file version (about a minute for 50 pages)
         if kept.is_file() and kept.stat().st_mtime >= Path(f['path']).stat().st_mtime:
             body = kept.read_text()
         else:
