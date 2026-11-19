@@ -378,7 +378,7 @@ Owner's rules (built in phase 1, commit b46249da):
 - **Recommendation:** do the refactor, with commands, steps that take overrides, and man pages with 2 or 3 examples
   each. A follow-up 4th condition (a kubectl/gh-style grammar) reuses the harness and the frozen held-out set.
 
-## 11. One CLI grammar, condition 4, and a blind tester (2026-11-19, in progress)
+## 11. One CLI grammar, condition 4, and a blind tester (2026-11-19)
 
 - **Phase A, the grammar** (`narrative/CLI_CHOICES.md`):
   - Read kubectl's conventions and `explain`, gh's `list` and `--json`, clig.dev, GNU/POSIX options, docker's
@@ -436,3 +436,25 @@ Owner's rules (built in phase 1, commit b46249da):
   - **No cheating:** the only flags were the agent waiting on its own long `./ask`, plus one pty wrapper around it.
   - **Next:** `get lead NAME` and `--where lead=`; `explain` answers the one step asked; "would draft" wording in
     production's footer; one definition of replies; `summarise` for spreadsheets; consent as a card.
+
+## 12. What the benchmarks concluded, and goals v0 (2026-11-19)
+
+- **Conclusion of sections 10 and 11:**
+  - A structured surface with schemas and short real-date examples maps partial questions well: the 9B went from
+    78% to 97%, idli-remote from 81% to 94%.
+  - The kubectl-style grammar matches man pages with shorter prompts.
+  - The blind testers' remaining breaks were missing parts of the surface, not mapping errors: one person at a
+    time, explaining one step, summarising a spreadsheet, consent as a card.
+  - The limits: 54 questions, mostly one sandbox and one account, many derived from the owner's explorations. The
+    shape works; coverage is unproven.
+- **The owner's direction:** people will make their own workflows on other sites (WhatsApp, Canva, LinkedIn,
+  Slack), with their own definitions ("conservation emails", "photos with animals") and their own chains. We must
+  not overfit by adding one action per test.
+- **[narrative/GOALS_v0.md](../narrative/GOALS_v0.md)** sets out four layers that grow by rule:
+  - connectors return records with fields;
+  - a DuckDB record store per sandbox, with SQL over masked schemas;
+  - definitions: a judge (text, or the 9B's vision for images) with a check-a-sample loop;
+  - chains, which are the Minis.
+
+  It also has views plus one `--where` selector (which answers `get lead`/`--where lead=` without lead-specific
+  code), a blind task bank with separate coverage and correctness scores, and an order of work.
