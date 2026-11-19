@@ -21,7 +21,7 @@ for tid, t in tasks.items():
 json.dump(out, open(sys.argv[3], 'w'), indent=1, ensure_ascii=False)
 print(len(out), 'tasks')
 PY
-cp "$G/RUBRIC.md" "$RUN/work/"
+sed "s/{TODAY}/${RS_TODAY:-2026-11-19 (Thursday)}/" "$G/RUBRIC.md" > "$RUN/work/RUBRIC.md"
 "$PY" -c "import sys; sys.path.insert(0, '$G/../../2026-11-06-oss-desktop-independent/cowork'); import os; os.chdir('$G/../../2026-11-06-oss-desktop-independent/cowork'); from lib import idlicli; open('$RUN/work/grammar.md','w').write(idlicli.grammar())"
 "$PY" "$G/sqlserve.py" "$RUN/store.duckdb" "$PORT" > "$RUN/sql.out" 2>&1 &
 SP=$!; trap 'kill $SP 2>/dev/null || true' EXIT

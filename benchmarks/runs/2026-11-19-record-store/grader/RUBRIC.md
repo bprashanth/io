@@ -4,8 +4,7 @@ You grade transcripts of an assistant ("Idli") answering requests about one pers
 data is in a database you can query: run `./ask "SELECT ..."` (read-only SQL, DuckDB). Start with
 `./ask "SHOW TABLES"` and `./ask "DESCRIBE mail"`. Tables: mail (one row per email), threads (view), events,
 event_guests, files (Drive), sheets (one row per spreadsheet; each sheet's rows are in the table named in `tbl`),
-file_text, definitions, labels. Times are local (Asia/Kolkata). "Today" is the date the transcripts were made:
-2026-11-19 (Thursday).
+file_text, definitions, labels. Times are local (Asia/Kolkata). "Today" is the date the transcripts were made: {TODAY}.
 
 `transcripts.json` holds, per task: the request turns, what a correct answer needs (`expect`, written beforehand by
 someone else), and per turn the assistant's commands, the rows it showed, and its reply. `grammar.md` describes

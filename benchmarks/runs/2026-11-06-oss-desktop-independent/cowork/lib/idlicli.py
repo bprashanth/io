@@ -139,6 +139,8 @@ def parser():
     w.add_argument('--to')
     w.add_argument('--subject', default='')
     w.add_argument('--ask', default='', help='what the draft should say')
+    dd = sub.add_parser('date', help='what a date phrase means: next monday, last week, 7d')
+    dd.add_argument('phrase', nargs='+')
     a = sub.add_parser('ask', help='ask in your own words')
     a.add_argument('question', nargs='+')
     a.add_argument('--mapper', default=os.environ.get('IDLI_MAPPER', 'remote'), choices=['remote', 'nine'])
@@ -207,6 +209,12 @@ def run_argv(con, argv):
         return Result(kind='text', text=f'Saved view "{a.name}". List it with: idli list {a.name}')
     if v == 'draft':
         return draft(con, a)
+    if v == 'date':
+        ph = ' '.join(a.phrase)
+        x, y = rs.day_range(ph)
+        y = y - dt.timedelta(days=1)
+        return Result(kind='text', text=f'{ph} = {x:%A %d %B %Y}' + ('' if x == y else f' to {y:%A %d %B %Y}') +
+                      f' (today is {rs.now():%A %d %B %Y}).')
     if v == 'size':
         return Result(kind='text', text=json.dumps(rs.size_report(sandbox(), con)))
     raise Err('Try `idli --help`.')
@@ -309,11 +317,13 @@ def summarise(con, ref, question=''):
         return Result(kind='text', text=f'{name} has no text I can read (it may be a scan).')
     chunks = [t[i:i + 7000] for i in range(0, min(len(t), 35000), 7000)]
     schema = {'type': 'object', 'properties': {'summary': {'type': 'string'}}, 'required': ['summary']}
-    parts = []
-    for c in chunks:
-        parts.append(rs._nine([{'role': 'user', 'content': f'Summarise this part of "{name}" in 3 sentences'
-                                + (f', focusing on: {question}' if question else '') + f'.\n\n{c}'}], schema,
-                              max_tokens=300)['summary'])
+    import concurrent.futures as cf
+    def part(c):
+        return rs._nine([{'role': 'user', 'content': f'Summarise this part of "{name}" in 3 sentences'
+                          + (f', focusing on: {question}' if question else '') + f'.\n\n{c}'}], schema,
+                        max_tokens=300)['summary']
+    with cf.ThreadPoolExecutor(4) as ex:  # the parts at once: a 96-page report took over a minute one by one
+        parts = list(ex.map(part, chunks))
     if len(parts) > 1:
         final = rs._nine([{'role': 'user', 'content': f'Combine these notes on "{name}" into one summary of 4-6 '
                            f'sentences{", focusing on: " + question if question else ""}. Keep only what the notes say.'
@@ -419,6 +429,7 @@ Commands (read only unless said):
   idli judge RESOURCE --def NAME [--where COND] [--since D]                       label each row (slow: ~1 s a row)
   idli query "SELECT ..."                      read-only SQL for joins and anything else
   idli draft mail --reply-to REF --ask "WHAT TO SAY"   preview only; nothing is saved or sent
+  idli date PHRASE                             what "next monday", "last week" mean (for questions about dates)
 Dates D: today, yesterday, tomorrow, 7d, last week, this week, next week, monday, next monday, YYYY-MM-DD.
 COND is SQL over the resource's fields; field ~ 'x' means contains; label.NAME = 'yes' uses a definition.
 
