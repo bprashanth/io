@@ -30,7 +30,7 @@ from pathlib import Path
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/calendar.events',
           'https://www.googleapis.com/auth/calendar.freebusy',
-          'https://www.googleapis.com/auth/spreadsheets.readonly']
+          'https://www.googleapis.com/auth/spreadsheets.readonly', 'https://www.googleapis.com/auth/drive.readonly']
 HANDLED = 'Idli/handled'
 EMAIL = re.compile(r'[^@\s/\\]+@[^@\s/\\]+\.[a-z]{2,}', re.I)
 
@@ -92,10 +92,10 @@ AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 
 # ---- consent ----
 
-def consent_url(email, port, state, challenge):
+def consent_url(email, port, state, challenge, redirect=None):
     cid, _ = client()
     return AUTH_URL + '?' + urllib.parse.urlencode({
-        'client_id': cid, 'redirect_uri': f'http://127.0.0.1:{port}/', 'response_type': 'code',
+        'client_id': cid, 'redirect_uri': redirect or f'http://127.0.0.1:{port}/', 'response_type': 'code',
         'scope': ' '.join(SCOPES), 'access_type': 'offline', 'prompt': 'consent', 'login_hint': email,
         'state': state, 'code_challenge': challenge, 'code_challenge_method': 'S256'})
 
@@ -142,12 +142,18 @@ def connect(email, open_url, timeout=600):
         srv.shutdown()
     if not got.get('code'):
         raise ValueError('Google sign-in did not finish' + (f' ({got["error"]}).' if got.get('error') else ' in time.'))
+    return _exchange(email, got['code'], f'http://127.0.0.1:{port}/', verifier)
+
+
+def _exchange(email, code, redirect, verifier):
+    """Swap the code for a token (PKCE), keep it only if it belongs to this email and has every scope."""
     cid, secret = client()
-    tok = _post_form(TOKEN_URL, {'code': got['code'], 'client_id': cid, 'client_secret': secret,
-                                 'redirect_uri': f'http://127.0.0.1:{port}/', 'grant_type': 'authorization_code',
+    tok = _post_form(TOKEN_URL, {'code': code, 'client_id': cid, 'client_secret': secret,
+                                 'redirect_uri': redirect, 'grant_type': 'authorization_code',
                                  'code_verifier': verifier})
     if not tok.get('refresh_token'):
-        raise ValueError('Google did not give a lasting sign-in. Try again.')
+        raise ValueError('Google did not give a lasting sign-in' + (f' ({tok["error"]})' if tok.get('error') else '') +
+                         '. Try again.')
     tok['expires_at'] = time.time() + int(tok.get('expires_in', 3600))
     granted = set(str(tok.get('scope', '')).split())
     who = _get('https://gmail.googleapis.com/gmail/v1/users/me/profile', tok['access_token']).get('emailAddress', '')
@@ -162,6 +168,50 @@ def connect(email, open_url, timeout=600):
                          'page (or "Select all").')
     _save(email, {k: tok[k] for k in ('refresh_token', 'access_token', 'expires_at', 'scope') if k in tok})
     return {'ok': True, 'email': email}
+
+
+# ---- consent on a computer with no browser (the DGX): open the link anywhere, paste the address back ----
+
+PASTE_REDIRECT = 'http://localhost'  # the Desktop client's registered loopback; the page won't load, that's expected
+
+
+def _pending(email):
+    return token_file(email).parent / 'pending' / f'{str(email).lower()}.json'
+
+
+def paste_start(email):
+    """A consent link for this account. The PKCE verifier and state wait on this computer (0600) for paste_finish."""
+    verifier = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
+    state = secrets.token_urlsafe(24)
+    p = _pending(email)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(p.parent.parent, 0o700)
+    os.chmod(p.parent, 0o700)
+    fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w') as f:
+        json.dump({'verifier': verifier, 'state': state, 'redirect': PASTE_REDIRECT, 'at': time.time()}, f)
+    return consent_url(email, 0, state, challenge, redirect=PASTE_REDIRECT)
+
+
+def paste_finish(email, pasted):
+    """Finish with the address the browser landed on (http://localhost/?state=...&code=...)."""
+    p = _pending(email)
+    try:
+        pend = json.loads(p.read_text())
+    except (OSError, ValueError):
+        raise ValueError('No sign-in is waiting for this account here. Start again.')
+    q = urllib.parse.parse_qs(urllib.parse.urlparse(str(pasted).strip()).query)
+    if (q.get('error') or [''])[0]:
+        raise ValueError(f'Google did not give access ({q["error"][0]}).')
+    if (q.get('state') or [''])[0] != pend['state']:
+        raise ValueError('That address is not from the link made for this account. Use the newest link.')
+    code = (q.get('code') or [''])[0]
+    if not code:
+        raise ValueError('That address has no code in it. Copy the whole address from the browser bar.')
+    out = _exchange(email, code, pend['redirect'], pend['verifier'])
+    p.unlink(missing_ok=True)
+    return out
 
 
 def revoke_token(tok):
@@ -399,3 +449,19 @@ def calendar_events(email, start, end, q=None):
                     'attendees': [a.get('email') for a in e.get('attendees') or [] if not a.get('self')],
                     'declined': me.get('responseStatus') == 'declined'})
     return out
+
+
+if __name__ == '__main__':  # python -m lib.google_api start EMAIL | finish EMAIL 'http://localhost/?...'
+    import sys
+    if len(sys.argv) >= 3 and sys.argv[1] == 'start':
+        print(paste_start(sys.argv[2]))
+    elif len(sys.argv) >= 4 and sys.argv[1] == 'finish':
+        try:
+            r = paste_finish(sys.argv[2], sys.argv[3])
+            print(f"Signed in: {r['email']}")
+        except ValueError as e:
+            print(f'Not signed in: {e}')
+            sys.exit(1)
+    else:
+        print("usage: python -m lib.google_api start EMAIL | finish EMAIL 'http://localhost/?...'")
+        sys.exit(2)
