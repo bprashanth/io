@@ -6,6 +6,9 @@ Design context: [GOALS_V0.5](../../../narrative/GOALS_V0.5.md). Nothing below is
 
 ## Bugs found in the session (fix first)
 
+Done 2026-11-20: **B1, B2** (cursor per thread, retries for temporary errors only, failures not saved and
+reported; checked on a copy of the owner's sandbox: 93 judged, 0 failed, where 187 of 191 had failed).
+
 | # | Bug | Evidence | Fix |
 |---|---|---|---|
 | B1 | judge crashes on files: 4 threads share one DuckDB connection; first-time PDF text writes collide | 187 of 191 "unsure" were `could not judge: ResourceInUseException`; reproduced on a copy | a cursor per thread; retry only transient errors (Drive 429/5xx, 9B timeout), backoff, 2 tries |
@@ -15,6 +18,7 @@ Design context: [GOALS_V0.5](../../../narrative/GOALS_V0.5.md). Nothing below is
 | B5 | spelled-out numbers ("one") skip the number check | same | check number words too |
 | B6 | the mapper read an incoming "Declined:" notice as "I declined" | same | `explain mail`/`explain calendar` say what is_calendar_notice and my_response mean |
 | B7 | `get event X` / `get mail X` silently take the first substring match | code: `title ILIKE %X%` ... LIMIT 1 | more than one match: list them and ask |
+| B10 | judge only reads text for PDFs and Word files; CSV, Excel, text and Python are judged by name | judge test: the 9B goes 20 -> 33 of 38 with contents | show the first 1,200 characters (Excel as rows) for every file kind |
 
 ## Agreed (owner, 2026-11-20)
 
@@ -67,7 +71,15 @@ Design context: [GOALS_V0.5](../../../narrative/GOALS_V0.5.md). Nothing below is
 - Derived tables: a script step's output is its own table in the sandbox store, linked by ids (file_id, event id);
   the registry records which Mini and step made it, it is rebuilt when the step reruns, and dropped with the Mini.
 
-## Judge test (agreed to move up)
+## Judge test (done 2026-11-20, `benchmarks/runs/2026-11-20-judge-models/README.md`)
+
+- Result: what the judge sees matters most (B10). Clef-flash and idli-remote 38/38 with content; 9B BF16 35, Q5 33,
+  Muse 33 (4x slower). Hosted Clef sees real content, so for real data it must run locally. The set is too easy at
+  the top: a harder second set is needed to separate Clef from idli-remote.
+- Labels to confirm by the owner: listed in that README.
+- `idli ask --mapper nine` now uses the BF16 9B (`idli-9b-bf16`, port 8292); `nine_compressed` the served Q5.
+
+### The plan as agreed
 
 - Topic "about endangered species", deliberately hard: CSV, Excel, PDF, Python, Docs, with near misses (endangered
   languages, extinct species, wildlife tourism budgets, a species list with no threat status, a zoo ticket CSV).

@@ -83,3 +83,21 @@ Root causes found:
   `sudo rm -rf ~/.cache/huggingface/hub/models--MadeAgents--Hammer2.1-7b && sudo chown -R beeps: ~/.cache/huggingface`
   and the move follows. The masking service (`io-privacy-server`) uses its own `app/io/hf-cache` and is untouched.
 - Earlier sessions' untracked results and traces committed (siblings already tracked; no test-account addresses).
+
+## 6. Judge fixes and the judge model test (2026-11-20 evening)
+
+- **B1/B2 fixed** in `recstore.judge`: a DuckDB cursor per thread; retries (3 tries, 2 s and 6 s) only for
+  temporary errors (rate limits, server errors, timeouts, a busy store); failures are not saved, are reported
+  ("N could not be judged"), and earlier saved failures are judged again. A copy of the owner's sandbox: 93 judged,
+  0 failed, 135 s (before: 187 of 191 failed). A file whose text can't be parsed is judged on its name and says so.
+- **BF16 9B:** converted with llama.cpp's converter at the image's build (b10524; today's converter writes tensor
+  names the image can't read). Served as `idli-9b-bf16` on port 8292, same settings as `idli-9b`.
+  `idli ask --mapper nine` uses it; `--mapper nine_compressed` uses the served Q5.
+- **Clef-flash** answers on OpenRouter at `/api/v1/systemone` (a state plus typed questions; `noul` gives P(yes)),
+  pinned to the Cloudflare provider.
+- **The test** (`benchmarks/runs/2026-11-20-judge-models/`): 38 synthetic files, "about endangered species".
+  With file contents: Clef 38, idli-remote 38, 9B BF16 35, 9B Q5 33, Muse 33. As `judge` works today (text only for
+  PDFs and Word): 9B Q5 20, BF16 21, idli-remote 26, Clef 33. Seconds per item: Clef 0.47 (hosted), idli-remote 0.98,
+  Q5 1.71, BF16 3.84, Muse 6.93.
+- **Conclusions:** give the judge every file's contents (B10) first; Clef is the best value but must run locally
+  for real data; BF16 gains little over Q5; Muse adds nothing here. The set is too easy at the top.
