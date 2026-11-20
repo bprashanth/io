@@ -1,21 +1,22 @@
 """`idli`: the record store on the command line, and `idli ask`, the left chat on top of it.
 
-    idli sync [mail|events|files|sheets|all]        read your Google account into this sandbox's store
-    idli list RESOURCE [--where ..] [--since ..]    rows: mail, threads, events, files, folders, photos, sheets,
-                                                    rows --sheet NAME, labels, definitions, or a view
-    idli get RESOURCE ID|NAME                       one item in full
-    idli explain [RESOURCE]                         fields and examples (the man page)
-    idli describe file|sheet NAME                   what's inside: pages, columns, value ranges
-    idli read file NAME                             a PDF's or document's text
-    idli summarise file NAME [--question Q]         the 9B's summary of a file
+    idli sync [gmail|gcalendar|drive|all]           copy your Google account into this sandbox (read only); drive also
+                                                    reads every document's text and makes a short card for each
+    idli list RESOURCE [--where ..] [--since ..]    rows: mail, threads, calendar, files, folders, photos, sheets,
+          [--search ..] [--count] [--group-by ..]   rows --sheet NAME, labels, definitions, or a view
+    idli get RESOURCE REF [--text] [--outline]      one item in full; a file's text; its pages or a sheet's columns
+    idli summarise file NAME | --search WORDS       one file's summary, or what your documents say about a topic
+    idli explain [RESOURCE]                         fields and examples (the manual page)
     idli define NAME --on mail|event|file|photo --ask "..." --answers yes,no
-    idli judge RESOURCE --def NAME [--where ..]     the 9B labels each row once per definition version
+    idli judge RESOURCE --def NAME [--search ..]    label each row once per definition version (Clef by default)
     idli query "SELECT ..."                         any read-only SQL over the store
     idli view NAME --sql "SELECT ..."               save a query as a resource you can list
     idli draft mail --reply-to THREAD --ask "..."   a draft, previewed only (nothing is saved or sent)
     idli ask "question"                             ask in your own words; it picks the commands and answers
+    -v, -vv, -vvv                                   show steps, then prompts and items, then every model call
 
-Nothing here changes your accounts. narrative/GOALS_v0.md and narrative/EXAMPLES_V0.md explain the design.
+--search: every word must appear; "words in quotes" are an exact phrase; most mentions first.
+Nothing here changes your accounts. narrative/GOALS_V0.5.md explains the design.
 """
 import argparse
 import datetime as dt
@@ -65,7 +66,7 @@ def _fmt(v):
     if isinstance(v, float):
         return f'{v:.2f}'.rstrip('0').rstrip('.')
     s = '' if v is None else str(v)
-    return s if len(s) <= 90 else s[:87] + '...'
+    return s if len(s) <= 160 else s[:157] + '...'
 
 
 # ---- what the person sees while things run: -v, -vv, -vvv (or -v 1..3), progress, the log ----
@@ -158,43 +159,51 @@ class P(argparse.ArgumentParser):
 def parser():
     p = P(prog='idli', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, add_help=True)
     sub = p.add_subparsers(dest='verb')
-    s = sub.add_parser('sync', help='read your Google account into the store')
-    s.add_argument('what', nargs='?', default='all', choices=['all', 'mail', 'events', 'files', 'sheets', 'drive'],
-                   help='drive = files and sheets, then read the text of every document not read yet')
+    s = sub.add_parser('sync', help='copy your Google account into this sandbox (read only)')
+    s.add_argument('what', nargs='?', default='all', choices=['all', 'gmail', 'gcalendar', 'drive', 'mail', 'events', 'files', 'sheets'],
+                   help='gmail, gcalendar, drive (files and sheets, then the text and a card for every document), or all')
     s.add_argument('--no-read', action='store_true', help='copy the file list only; read the text later')
     s.add_argument('--no-cards', action='store_true', help='read the text but make no summary cards now')
     s.add_argument('--as', dest='role', default='me')
-    for verb in ('list', 'count'):
-        l = sub.add_parser(verb, help='rows of a resource' if verb == 'list' else 'how many rows match')
+    for verb in ('list', 'count'):  # count is list --count; still accepted, not in the menu
+        l = sub.add_parser(verb, help='rows of a resource' if verb == 'list' else argparse.SUPPRESS)
         l.add_argument('resource')
         l.add_argument('--where', help="filter, e.g. \"direction = 'in' and subject ~ 'visit'\" or \"label.urgent = 'yes'\"")
         l.add_argument('--since', help='today, yesterday, 7d, last week, monday, 2026-11-12')
         l.add_argument('--until')
         l.add_argument('--on', help='one day or range: yesterday, next monday, this week')
-        l.add_argument('--search', help='words that must all appear')
+        l.add_argument('--search', action='append', help='words that must all appear; "in quotes" = an exact phrase. '
+                       'Files: names, folders, every page of text and the cards; most mentions first')
         l.add_argument('--label', help='DEFINITION or DEFINITION=VALUE, e.g. urgent or funder=yes')
         l.add_argument('--all', dest='show_all', action='store_true', help='include empty files (hidden by default)')
         l.add_argument('--in', '--folder', dest='folder', help='Drive folder name (files, photos, folders)')
         l.add_argument('--sheet', help='which sheet, for rows')
-        l.add_argument('--by', help='count by these fields, e.g. kind or folder,kind')
+        l.add_argument('--group-by', '--by', dest='by', help='count by these fields, e.g. kind or folder,kind')
+        l.add_argument('--count', action='store_true', help='only how many match')
         l.add_argument('--fields', help='which fields to show')
         l.add_argument('--order', help='e.g. "date desc"')
         l.add_argument('--limit', type=int, default=50)
         l.add_argument('-o', dest='out', default='table', choices=['table', 'json'])
     g = sub.add_parser('get', help='one item in full')
-    g.add_argument('resource', choices=['mail', 'thread', 'event', 'file'])
+    g.add_argument('resource', choices=['mail', 'thread', 'event', 'calendar', 'file', 'sheet'])
     g.add_argument('ref', help='an id, or words from its name or subject')
+    g.add_argument('--text', action='store_true', help="a file's text")
+    g.add_argument('--outline', action='store_true', help="a file's pages, or a sheet's columns with examples")
+    g.add_argument('--chars', type=int, default=3000)
     e = sub.add_parser('explain', help='fields and examples')
     e.add_argument('resource', nargs='?')
-    for verb in ('describe', 'read', 'summarise'):
-        d = sub.add_parser(verb, help={'describe': "what's inside a file or sheet", 'read': "a file's text",
-                                       'summarise': "the 9B's summary of a file"}[verb])
+    for verb in ('describe', 'read'):  # now get file --outline / --text; still accepted, not in the menu
+        d = sub.add_parser(verb, help=argparse.SUPPRESS)
         d.add_argument('what', choices=['file', 'sheet'] if verb == 'describe' else ['file'])
         d.add_argument('ref', help='a name (or words from it) or an id')
-        if verb == 'summarise':
-            d.add_argument('--question', default='')
         if verb == 'read':
             d.add_argument('--chars', type=int, default=3000)
+    d = sub.add_parser('summarise', help="the 9B's summary of one file, or what your documents say about a topic")
+    d.add_argument('what', nargs='?', choices=['file', 'files'], default='files')
+    d.add_argument('ref', nargs='?', help='one file: a name (or words from it) or an id')
+    d.add_argument('--search', action='append', help='across documents: the pages that mention this most')
+    d.add_argument('--in', '--folder', dest='folder')
+    d.add_argument('--question', default='')
     d = sub.add_parser('define', help='your own category, applied by judge')
     d.add_argument('name')
     d.add_argument('--on', required=True, choices=['mail', 'event', 'file', 'photo'])
@@ -205,10 +214,11 @@ def parser():
     j.add_argument('--def', dest='defn', required=True)
     j.add_argument('--where')
     j.add_argument('--in', '--folder', dest='folder', help='only files in this Drive folder')
+    j.add_argument('--search', action='append', help='only rows that match, as in list --search')
     j.add_argument('--since')
     j.add_argument('--limit', type=int, default=300)
-    j.add_argument('--judge', choices=JUDGES, help='who labels: nine (BF16 9B), nine_compressed (served 9B, default), '
-                                                   'clef (hosted Clef-flash: it sees real content, test accounts only)')
+    j.add_argument('--judge', choices=JUDGES, help='who labels: clef (default; hosted Clef-flash, it sees real content: '
+                                                   'test accounts only), nine_compressed (served 9B), nine (BF16 9B)')
     q = sub.add_parser('query', help='read-only SQL over the store')
     q.add_argument('sql')
     v = sub.add_parser('view', help='save a query as a resource')
@@ -226,11 +236,11 @@ def parser():
     dd.add_argument('phrase', nargs='+')
     a = sub.add_parser('ask', help='ask in your own words')
     a.add_argument('question', nargs='+')
-    a.add_argument('--mapper', default=os.environ.get('IDLI_MAPPER', 'remote'), choices=['remote', 'nine', 'nine_compressed'],
+    a.add_argument('--mapper', default=os.environ.get('IDLI_MAPPER', 'nine_compressed'), choices=['remote', 'nine', 'nine_compressed'],
                    help='remote: idli-remote maps (masked). nine: the full 9B (BF16) maps and words the reply. '
                         'nine_compressed: the served 9B (Q5) does both')
-    a.add_argument('--judge', choices=JUDGES, help='who labels rows when a judge step runs; follows --mapper '
-                                                   '(remote: the served 9B). clef: hosted, sees real content')
+    a.add_argument('--judge', choices=JUDGES, help='who labels rows when a judge step runs: clef by default '
+                                                   '(hosted, sees real content: test accounts only)')
     a.add_argument('--new', action='store_true', help='start a new conversation')
     sub.add_parser('size', help="the store's size")
     return p
@@ -255,7 +265,8 @@ def run_argv(con, argv):
     v = a.verb
     if v == 'sync':
         acct, out = account(a.role), []
-        whats = {'all': ['mail', 'events', 'files', 'sheets'], 'drive': ['files', 'sheets']}.get(a.what, [a.what])
+        whats = {'all': ['mail', 'events', 'files', 'sheets'], 'drive': ['files', 'sheets'], 'gmail': ['mail'],
+                 'gcalendar': ['events']}.get(a.what, [a.what])
         start = {'mail': 'reading the last 60 days of mail', 'events': 'reading the calendar',
                  'files': 'listing Drive', 'sheets': 'reading spreadsheets changed since the last sync'}
         for what in whats:
@@ -296,13 +307,22 @@ def run_argv(con, argv):
     if v in ('list', 'count'):
         cols, rows, sql = rs.select(con, a.resource, where=a.where, since=a.since, until=a.until, on=a.on,
                                     search=a.search, label=a.label, folder=a.folder, sheet=a.sheet, by=a.by,
-                                    count=(v == 'count'), fields=a.fields, order=a.order, limit=a.limit,
+                                    count=(v == 'count' or a.count), fields=a.fields, order=a.order, limit=a.limit,
                                     show_all=a.show_all)
         if getattr(a, 'out', 'table') == 'json':
             return Result(kind='text', text=json.dumps([dict(zip(cols, map(_fmt, r))) for r in rows], ensure_ascii=False))
         return Result(cols, rows, sql=sql)
     if v == 'get':
-        return get(con, a.resource, a.ref)
+        res = 'event' if a.resource == 'calendar' else a.resource
+        if res in ('file', 'sheet') and a.outline:
+            return describe(con, res, a.ref)
+        if res == 'file' and a.text:
+            fid, name = find_file(con, a.ref)
+            t = rs.file_text(con, file_account(con, fid), fid)
+            return Result(kind='text', text=f'{name} ({len(t)} characters):\n\n' + t[:a.chars])
+        if res == 'sheet':
+            return describe(con, 'sheet', a.ref)
+        return get(con, res, a.ref)
     if v == 'explain':
         return Result(kind='text', text=explain(con, a.resource))
     if v == 'describe':
@@ -312,6 +332,10 @@ def run_argv(con, argv):
         t = rs.file_text(con, file_account(con, fid), fid)
         return Result(kind='text', text=f'{name} ({len(t)} characters):\n\n' + t[:a.chars])
     if v == 'summarise':
+        if a.search:
+            return summarise_search(con, a.search, a.folder, a.question)
+        if not a.ref:
+            raise Err('Say which file (idli summarise file NAME), or a topic (idli summarise --search "border effects")')
         return summarise(con, a.ref, a.question)
     if v == 'define':
         name, ver = rs.define(con, a.name, a.on, a.ask, a.answers)
@@ -320,6 +344,7 @@ def run_argv(con, argv):
     if v == 'judge':
         res = {'mail': 'mail', 'event': 'events'}.get(a.resource, a.resource)
         r = rs.judge(con, res, a.defn, where=a.where, since=a.since, limit=a.limit, account=account(), folder=a.folder,
+                     search=a.search,
                      progress=progress_line, on_item=(lambda n, lab, why: say(2, f'  {n}: {lab or "FAILED"} ({why})'))
                      if VERBOSE >= 2 else None)
         return Result(kind='text', text=judge_summary(r, a.defn, res), note=json.dumps(r, default=str))
@@ -396,7 +421,7 @@ def get(con, what, ref):
         r = con.execute("SELECT * FROM events WHERE id = ? OR title ILIKE ? ORDER BY start LIMIT 1",
                         [ref, f'%{ref}%']).fetchone()
         if not r:
-            raise Err(f'No event matching "{ref}". Try `idli list events --search "{ref}"`.')
+            raise Err(f'No event matching "{ref}". Try `idli list calendar --search "{ref}"`.')
         cols = rs.columns(con, 'events')
         return Result(kind='text', text='\n'.join(f'{c}: {_fmt(x)}' for c, x in zip(cols, r) if x not in (None, '')))
     if what == 'thread':
@@ -478,6 +503,41 @@ def summarise(con, ref, question=''):
     return Result(kind='text', text=f'{name}: {final}\n(Read {min(len(t), 35000)} of {len(t)} characters.)')
 
 
+def summarise_search(con, search, folder=None, question='', docs=5, chars=9000):
+    """What the documents say about a topic: the pages that mention it most, read by the 9B, with file and page."""
+    phrases, words, rank = rs.parse_search(search)
+    _, rows, _ = rs.select(con, 'files', search=search, folder=folder, fields='id, name', limit=docs)
+    if not rows or not rank:
+        return Result(kind='text', text='No document mentions that. Try other words, or `idli list files --search`.')
+    rx = rs._phrase_re(rank)
+    excerpts, used = [], 0
+    for fid, name in rows:
+        pages = con.execute(f"SELECT page, text, len(regexp_extract_all(lower(text), '{rx}')) n FROM file_pages "
+                            f"WHERE file_id = ? ORDER BY n DESC, page LIMIT 2", [fid]).fetchall()
+        for page, text, n in pages:
+            if not n and len(rank) > 1:
+                continue
+            hit = re.search(rx, text.lower()) or re.search(re.escape(rank[0].lower()), text.lower())
+            i = max(0, (hit.start() if hit else 0) - 700)
+            piece = re.sub(r'\s+', ' ', text[i:i + 1800])
+            excerpts.append(f'[{name}, page {page}]\n{piece}')
+            used += len(piece)
+            if used > chars:
+                break
+        if used > chars:
+            break
+    topic = ' '.join(rank)
+    schema = {'type': 'object', 'properties': {'answer': {'type': 'string'}}, 'required': ['answer']}
+    ans = rs._nine([{'role': 'system', 'content': 'Explain a topic to the person using only the excerpts from their '
+                     'documents. 4 to 6 plain sentences. After each point, name the file and page in brackets, as given. '
+                     'If the excerpts disagree or are thin, say so. Never add facts that are not in the excerpts.'},
+                    {'role': 'user', 'content': f'Topic: {topic}' + (f'\nTheir question: {question}' if question else '') +
+                     '\n\n' + '\n\n'.join(excerpts)}], schema, max_tokens=600, timeout=240)['answer']
+    srcs = sorted({e.split(']')[0][1:] for e in excerpts})
+    return Result(kind='text', text=f'{ans.strip()}\n\nFrom {len(excerpts)} passages in: ' +
+                  '; '.join(sorted({s.rsplit(", page", 1)[0] for s in srcs})))
+
+
 def draft(con, a):
     """A draft, previewed only. --reply-to must match one conversation (all its words in the sender or subject);
     a new email to someone with no conversation needs --to ADDRESS."""
@@ -522,15 +582,18 @@ def explain(con, resource=None):
             lines.append(f'- {n}: your view. {ab}')
         lines += ['', 'Examples:',
                   f'  idli list mail --since yesterday --where "direction = \'in\' and not is_bulk"',
-                  f'  idli count files --in "NDSA fixity study"',
-                  f'  idli list files --by kind',
-                  f'  idli list events --on "next monday"   (= {rs.day_range("next monday")[0]})',
+                  f'  idli list files --count --in "NDSA fixity study"',
+                  f'  idli list files --group-by kind',
+                  f'  idli list files --search \'"border effects"\'   (names, text and cards; most mentions first)',
+                  f'  idli summarise --search \'"border effects"\'   (what your documents say, with file and page)',
+                  f'  idli list calendar --on "next monday"   (= {rs.day_range("next monday")[0]})',
                   '  idli define urgent --on mail --ask "Does this email ask me to act soon?" --answers yes,no',
                   '  idli judge mail --def urgent --where "not is_bulk"   then   idli list threads --label urgent',
                   'More: idli explain mail (or any resource).']
         return '\n'.join(lines)
     if resource == 'rows':
-        return 'rows --sheet NAME: the rows of one spreadsheet. `idli describe sheet NAME` lists its columns.'
+        return 'rows --sheet NAME: the rows of one spreadsheet. `idli get sheet NAME` lists its columns.'
+    resource = rs.resource_name(resource)
     if resource not in rs.RESOURCES:
         raise Err(f'No resource "{resource}". `idli explain` lists them.')
     r = rs.RESOURCES[resource]
@@ -538,18 +601,20 @@ def explain(con, resource=None):
     ex = {
         'mail': [f'idli list mail --since "last week" --where "direction = \'in\' and not is_bulk"   (last week = {lw[0]} to {lw[1] - dt.timedelta(days=1)})',
                  "idli list mail --search \"reading programme\"",
-                 "idli count mail --since 7d --by is_bulk,is_calendar_notice",
+                 "idli list mail --since 7d --group-by is_bulk,is_calendar_notice",
                  "idli list mail --where \"from_addr ~ 'linkedin'\""],
         'threads': ["idli list threads --where \"last_direction = 'in' and not is_bulk\"",
                     "idli list threads --label urgent    (after define and judge)"],
-        'events': [f'idli list events --on yesterday   (= {today - dt.timedelta(days=1)})',
-                   "idli list events --since today --where \"guests ~ '@'\"",
-                   "idli list events --where \"my_response = 'declined'\""],
-        'files': ['idli list files --in "NDSA fixity study"', 'idli count files --in "Strategy Classics" --where "kind = \'pdf\'"',
-                  'idli list files --by kind', "idli list files --search caste"],
+        'calendar': [f'idli list calendar --on yesterday   (= {today - dt.timedelta(days=1)})',
+                     "idli list calendar --since today --where \"guests ~ '@'\"",
+                     "idli list calendar --where \"my_response = 'declined'\"   (my_response: Google's RSVP, or organizer)"],
+        'files': ['idli list files --in "NDSA fixity study"', 'idli list files --count --in "Strategy Classics" --where "kind = \'pdf\'"',
+                  'idli list files --group-by kind', "idli list files --search caste",
+                  'idli list files --search \'"border effects"\'   (exact phrase; names, every page of text, cards)',
+                  'idli get file wincoop --outline   (pages and the summary card)'],
         'folders': ['idli list folders', "idli list folders --where \"path ~ 'Strategy'\""],
         'photos': ['idli list photos', 'idli define has_people --on photo --ask "Are there people in this photo?"'],
-        'sheets': ['idli list sheets', 'idli describe sheet "Leads (test)"', 'idli list rows --sheet "Leads (test)"'],
+        'sheets': ['idli list sheets', 'idli get sheet "Leads (test)"', 'idli list rows --sheet "Leads (test)"'],
     }.get(resource, [])
     return (f'{resource}: {r["about"]}.\nFields: {", ".join(cols)}.\n'
             f'Dates filter on {r["date"]}. --where takes SQL-like conditions; field ~ \'x\' means contains; '
@@ -564,29 +629,34 @@ commands) or {"cannot": "<one sentence>", "needs": "<kind>"}.
 
 Commands (read only unless said):
   idli list RESOURCE [--where COND] [--since D] [--until D] [--on D] [--search WORDS] [--label DEF[=VAL]]
-                     [--in FOLDER] [--sheet NAME] [--by FIELDS] [--fields F] [--order "F desc"] [--limit N]
-  idli count RESOURCE [same filters]          how many
-  idli get mail|thread|event|file REF          one item in full (REF: id, or words from its name/subject)
-  idli describe file|sheet REF                 pages, or columns with examples
-  idli read file REF                           a PDF/document's text
+                     [--in FOLDER] [--sheet NAME] [--group-by FIELDS] [--count] [--fields F] [--order "F desc"] [--limit N]
+  idli get mail|thread|calendar|file|sheet REF [--text] [--outline]   one item in full (REF: id, or words from its
+                                               name/subject); --text: a file's text; --outline: pages, or a sheet's columns
   idli summarise file REF [--question Q]       a summary of one file
+  idli summarise --search WORDS [--in FOLDER]  what the person's documents say about a topic, with file and page
   idli define NAME --on mail|event|file|photo --ask "QUESTION" --answers a,b,c   the person's own category
-  idli judge RESOURCE --def NAME [--where COND] [--in FOLDER] [--since D]                     label each row (slow: ~1 s a row)
+  idli judge RESOURCE --def NAME [--where COND] [--search WORDS] [--in FOLDER] [--since D]   label each row (costly)
   idli query "SELECT ..."                      read-only SQL for joins and anything else
   idli draft mail --reply-to REF --ask "WHAT TO SAY"   preview only; nothing is saved or sent
   idli date PHRASE                             what "next monday", "last week" mean (for questions about dates)
 Dates D: today, yesterday, tomorrow, 7d, last week, this week, next week, monday, next monday, YYYY-MM-DD.
 COND is SQL over the resource's fields; field ~ 'x' means contains; label.NAME = 'yes' uses a definition.
+--search WORDS: every word must appear; words in double quotes are an exact phrase ('"border effects"'). On files
+it covers names, folders, the full text of every page and a short summary card; files with the most mentions come
+first. Give a repeated --search for things that must all appear. `idli explain` is the manual page, not a topic.
 
 Rules:
-- Use only the resources and fields listed below. Prefer list/count with flags; use query only for joins.
+- Use only the resources and fields listed below. Prefer list with flags; use query only for joins.
 - A category the person has in mind ("urgent", "about caste", "funder meeting", "photos with people") that is not
   a field: define it (a clear yes/no question), judge the relevant rows (narrow first with --where, --in or
   --since so fewer rows are judged), then list with --label. Reuse an existing definition when it fits; never
   define an existing name again. Word a new definition generally, as the person means the category, not from one
   document you just saw (no examples copied from a result). The person is shown the wording and decides.
 - A greeting, or "what can you do / what can you see": idli explain (it lists what Idli can read).
-- Exact words or names the person gives: --search.  "How many": count.  "By X" or a breakdown: --by.
+- A named thing (a term, a phrase, a person, a place): --search, quoting a phrase of two or more words. "How many":
+  list --count. "By X" or a breakdown: --group-by. "Explain X", "what do my documents say about X":
+  idli summarise --search '"X"'. Search first; define and judge only for a category no words capture ("urgent",
+  "about conservation"), and narrow the judge with --search, --in or --where.
 - Follow-ups refer to the previous answer (shown below with its rows and ids): use the ids, or narrow the
   previous command.
 - Moving, renaming, sending, booking, posting or deleting are not available: answer cannot, needs "new_write_action".
@@ -607,10 +677,14 @@ def grammar():
     return GRAMMAR_HEAD + f"""
 Examples (today is {rs.now():%A %Y-%m-%d}):
   "emails I got last week" -> idli list mail --on "last week" --where "direction = 'in'"
-  "how many PDFs in Strategy Classics" -> idli count files --in "Strategy Classics" --where "kind = 'pdf'"
-  "meetings next monday" -> idli list events --on "next monday"
+  "how many PDFs in Strategy Classics" -> idli list files --count --in "Strategy Classics" --where "kind = 'pdf'"
+  "meetings next monday" -> idli list calendar --on "next monday"
+  "docs that discuss border effects" -> idli list files --search '"border effects"'
+  "explain border effects to me" -> idli summarise --search '"border effects"'
   "urgent emails" -> idli define urgent --on mail --ask "Does this email ask me to act or reply soon?" --answers yes,no ;
                      idli judge mail --def urgent --where "direction = 'in' and not is_bulk" ; idli list threads --label urgent
+  "which of those are really about it" (after a search) -> idli define NAME --on file --ask "..." ;
+                     idli judge files --def NAME --search '"the same words"' ; idli list files --label NAME
   "leads who haven't replied" -> idli query "SELECT l.Name, l.Email FROM sheet_leads_x l WHERE lower(l.Email) NOT IN
                      (SELECT from_addr FROM mail WHERE direction = 'in')"   (use the real sheet table: idli list sheets)
 """
@@ -649,10 +723,10 @@ def _values(con, resource):
         return ''
     out = []
     for c, t in con.execute(f'SELECT column_name, column_type FROM (DESCRIBE SELECT * FROM "{r["table"]}")').fetchall():
-        if t != 'VARCHAR' or c in ('id', 'thread_id', 'account'):
+        if t != 'VARCHAR' or c in ('id', 'thread_id', 'account', 'title', 'subject', 'name', 'description', 'snippet'):
             continue
-        n, mx = con.execute(f'SELECT count(DISTINCT "{c}"), max(length("{c}")) FROM "{r["table"]}"').fetchone()
-        if n and n <= 10 and (mx or 0) <= 24:
+        n, mx, tot = con.execute(f'SELECT count(DISTINCT "{c}"), max(length("{c}")), count(*) FROM "{r["table"]}"').fetchone()
+        if n and n <= 10 and (mx or 0) <= 24 and tot >= 3 * n:  # a real set of values, not a few titles
             vals = [v[0] for v in con.execute(f'SELECT DISTINCT "{c}" FROM "{r["table"]}" ORDER BY 1').fetchall()]
             out.append(f'{c} is one of: {", ".join(repr(v) for v in vals)}')
     return ('. ' + '; '.join(out)) if out else ''
@@ -751,9 +825,16 @@ def compose(question, shown, history, plan_note=''):
                          max_tokens=220)['reply'].strip()
     except Exception:
         return '', 'compose_failed'
-    allowed = set(NUM.findall(shown)) | set(NUM.findall(question)) | {'1', '2', '3'}
-    allowed |= {str(len(shown.splitlines()))}
-    bad = [n for n in NUM.findall(reply) if n not in allowed and n.replace(',', '') not in allowed]
+    words = {'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6', 'seven': '7', 'eight': '8',
+             'nine': '9', 'ten': '10', 'eleven': '11', 'twelve': '12', 'single': '1'}
+    said = NUM.findall(reply) + [words[w.lower()] for w in re.findall(r'\b(' + '|'.join(words) + r')\b', reply, re.I)]
+    if 'Nothing matches' in shown and said:  # an empty result has no count to word
+        return '', 'number_on_empty_result:' + ','.join(said)
+    allowed = set(NUM.findall(shown)) | set(NUM.findall(question))
+    m = re.match(r'(\d+) rows?\b', shown.strip())
+    allowed |= {m.group(1)} if m else set()
+    allowed |= {str(i) for i in range(1, 4)} if not m or int(m.group(1)) >= 3 else set()  # "two of them" from a longer list
+    bad = [n for n in said if n not in allowed and n.replace(',', '') not in allowed]
     if bad:
         return '', 'number_not_in_result:' + ','.join(bad)
     return reply, ''
@@ -829,11 +910,16 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
     rec['rounds'] = rounds
     shown = '\n\n'.join(shown_parts)
     t1 = time.time()
-    reply, why = compose(question, shown, history)
+    final_rows = shown_parts[-1] if shown_parts else ''
+    earlier = ('Earlier steps (not shown to the person; do not describe their rows): ' + ' ; '.join(cmds[:-1])) \
+        if len(cmds) > 1 else ''
+    reply, why = compose(question, final_rows, history, plan_note=earlier)
     rec['compose_s'] = round(time.time() - t1, 2)
     rec['compose_fallback'] = why
-    final_rows = shown_parts[-1] if shown_parts else ''
     body = (reply + '\n\n' if reply else '') + (final_rows if final_rows else '')
+    if final_rows and re.search(r'list files .*--search', cmds[-1] if cmds else '') and 'Nothing matches' not in final_rows:
+        body += ('\n\nThese mention it; to check which ones are really about it, ask me to judge them '
+                 '(it reads only these files).')
     if show_commands:
         body += '\n\n(Ran: ' + ' ; '.join(cmds) + ')'
     rec.update(reply=body.strip(), words=reply, shown=shown, commands=cmds, errors=errors, judge_s=round(judge_s, 1),
@@ -949,7 +1035,7 @@ def use_models(mapper=None, judge=None):
     remote mapper the judge stays the served 9B: judging reads real content, and idli-remote only sees masked text.
     Clef is never the default: hosted, it sees real content (test accounts only)."""
     rs.NINE = 'nine' if mapper == 'nine' else 'nine_compressed'
-    rs.JUDGE = judge or os.environ.get('IDLI_JUDGE') or (mapper if mapper in ('nine', 'nine_compressed') else 'nine_compressed')
+    rs.JUDGE = judge or os.environ.get('IDLI_JUDGE') or 'clef'  # owner's choice 2026-11-21 (test accounts: hosted)
 
 
 def _session_path():

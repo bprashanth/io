@@ -56,7 +56,7 @@ RESOURCES = {
     'threads': {'table': 'threads', 'date': 'last_date', 'kind': 'mail', 'id': 'thread_id',
                 'text': ['subject', 'people'], 'show': ['last_date', 'subject', 'people', 'messages', 'last_from'],
                 'about': 'one row per email conversation (made from mail)'},
-    'events': {'table': 'events', 'date': 'start', 'kind': 'event', 'text': ['title', 'location', 'guests', 'description'],
+    'calendar': {'table': 'events', 'date': 'start', 'kind': 'event', 'text': ['title', 'location', 'guests', 'description'],
                'show': ['start', 'title', 'guests', 'my_response', 'location'],
                'about': 'one row per calendar event (about 60 days back and 60 ahead)'},
     'files': {'table': 'files', 'date': 'modified', 'kind': 'file', 'text': ['name', 'path'],
@@ -73,6 +73,11 @@ RESOURCES = {
                     'show': ['name', 'version', 'on_kind', 'ask', 'answers'], 'about': 'your own categories'},
 }
 KIND_TABLE = {'mail': ('mail', 'id'), 'event': ('events', 'id'), 'file': ('files', 'id')}
+ALIASES = {'events': 'calendar', 'event': 'calendar'}  # older names still work; the menu shows the new ones
+
+
+def resource_name(r):
+    return ALIASES.get(r, r)
 
 
 def now():
@@ -621,9 +626,81 @@ def compile_where(con, resource, where):
     return w
 
 
+def _re(w):
+    """A word for a DuckDB (RE2) regular expression, lower case, special characters escaped."""
+    return re.sub(r'([.^$*+?()\[\]{}|\\])', r'\\\1', w.lower().replace("'", ''))
+
+
+def _phrase_re(words):
+    """The words next to each other: any spaces, hyphens or line breaks between them, the last one singular or
+    plural ("border effect", "border-effects")."""
+    ws = [_re(w) for w in words]
+    ws[-1] = ws[-1][:-1] + 's?' if ws[-1].endswith('s') and len(ws[-1]) > 3 else ws[-1] + 's?'
+    return r'\b' + r'[\s\-]+'.join(ws)
+
+
+def parse_search(search):
+    """--search may be given more than once; each one must match. Text in double quotes is an exact phrase; other
+    words must all appear, anywhere. Returns (phrases, words, rank_phrase)."""
+    items = search if isinstance(search, list) else [search]
+    phrases, words, rank = [], [], None
+    for item in items:
+        quoted = re.findall(r'"([^"]+)"', item)
+        rest = [w for w in re.split(r'\s+', re.sub(r'"[^"]*"', ' ', item).strip()) if w]
+        phrases += [q.split() for q in quoted if q.split()]
+        words += rest
+        if rank is None:  # rank by the first phrase: quoted, or the unquoted words read as one
+            rank = quoted[0].split() if quoted else (rest or None)
+    return phrases, words, rank
+
+
+def search_sql(con, r, src, search):
+    """Conditions, a "how it matched" column and a ranking for --search. On files it covers names, folders, every
+    page of text and the cards; elsewhere the resource's text fields."""
+    phrases, words, rank_words = parse_search(search)
+    like = lambda w: w.replace("'", '').replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    if not (r.get('kind') == 'file' and r.get('table') == 'files'):
+        cols = r.get('text') or [c for c in columns_of(con, src)]
+        blob = "lower(concat_ws(' ', " + ', '.join(f'CAST({c} AS TEXT)' for c in cols) + '))'
+        conds = [f"{blob} LIKE '%{like(w.lower())}%' ESCAPE '\\'" for w in words]
+        conds += [f"regexp_matches({blob}, '{_phrase_re(p)}')" for p in phrases]
+        return ['(' + ' AND '.join(conds) + ')'] if conds else [], '', ''
+    here = "lower(name || ' ' || path)"
+    card = "(SELECT lower(c.summary || ' ' || c.key_terms) FROM file_cards c WHERE c.file_id = files.id)"
+    pages = 'SELECT file_id FROM file_pages'
+    conds = []
+    for w in words:
+        lw = like(w.lower())
+        conds.append(f"({here} LIKE '%{lw}%' ESCAPE '\\' OR coalesce({card}, '') LIKE '%{lw}%' ESCAPE '\\' OR "
+                     f"id IN ({pages} WHERE lower(text) LIKE '%{lw}%' ESCAPE '\\'))")
+    for p in phrases:
+        rx = _phrase_re(p)
+        conds.append(f"(regexp_matches({here}, '{rx}') OR regexp_matches(coalesce({card}, ''), '{rx}') OR "
+                     f"id IN ({pages} WHERE regexp_matches(lower(text), '{rx}')))")
+    if not rank_words:
+        return conds, '', ''
+    rx = _phrase_re(rank_words)
+    n = f"(SELECT coalesce(sum(len(regexp_extract_all(lower(p.text), '{rx}'))), 0) FROM file_pages p WHERE p.file_id = files.id)"
+    def first(cond, col):
+        return f"(SELECT p.{col} FROM file_pages p WHERE p.file_id = files.id AND {cond} ORDER BY p.page LIMIT 1)"
+    w0 = like(rank_words[0].lower())
+    by_rx, by_word = f"regexp_matches(lower(p.text), '{rx}')", f"lower(p.text) LIKE '%{w0}%' ESCAPE '\\'"
+    pg = f"coalesce({first(by_rx, 'page')}, {first(by_word, 'page')})"
+    tx = f"coalesce({first(by_rx, 'text')}, {first(by_word, 'text')})"
+    at = (f"greatest(1, coalesce(nullif(strpos(lower({tx}), regexp_extract(lower({tx}), '{rx}')), 0), "
+          f"strpos(lower({tx}), '{rank_words[0].lower().replace(chr(39), '')}')) - 40)")
+    snippet = (f"CASE WHEN {pg} IS NULL THEN 'in the name or card' ELSE 'p.' || {pg} || ': ...' || "
+               f"regexp_replace(substr({tx}, {at}, 110), '\\s+', ' ', 'g') || '...' END")
+    label = ("'phrase'" if len(rank_words) > 1 else "'mentioned'")
+    found = (f", CASE WHEN {n} > 0 THEN {label} || ' x' || {n} || '; ' ELSE "
+             f"{chr(39) + 'words apart; ' + chr(39) if len(rank_words) > 1 else chr(39) + chr(39)} END || {snippet} AS found")
+    return conds, found, f'{n} DESC'
+
+
 def select(con, resource, where=None, since=None, until=None, on=None, search=None, label=None, folder=None,
            sheet=None, by=None, count=False, fields=None, order=None, limit=50, show_all=False):
     """Build and run the query for `list`. Returns (columns, rows, sql). Empty files are left out unless show_all."""
+    resource = resource_name(resource)
     if resource == 'rows':
         if not sheet:
             raise ValueError('Say which sheet: `idli list rows --sheet "Leads (test)"`. `idli list sheets` shows them.')
@@ -658,26 +735,10 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
         conds.append(f"{dcol} < TIMESTAMP '{b} 00:00:00'")
     if (on or since or until) and not dcol:
         raise ValueError(f'{resource} has no date to filter on.')
-    found = ''
+    found, rank = '', ''
     if search:
-        cols = r.get('text') or [c for c in columns_of(con, src)]
-        raw = [w.replace("'", '') for w in re.split(r'\s+', search.strip()) if w]
-        # % and _ are wildcards in LIKE: search for them as typed
-        words = [w.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') for w in raw]
-        lk = "ESCAPE '\\'"
-        if r.get('kind') == 'file' and r.get('table') == 'files':  # names and folders, or anywhere in the text
-            conds.append('(' + ' AND '.join(
-                '(' + ' OR '.join(f"CAST({c} AS TEXT) ILIKE '%{w}%' {lk}" for c in cols) +
-                f" OR id IN (SELECT file_id FROM file_pages WHERE text ILIKE '%{w}%' {lk})"
-                f" OR id IN (SELECT file_id FROM file_cards WHERE summary || ' ' || key_terms ILIKE '%{w}%' {lk}))"
-                for w in words) + ')')
-            w0, wl = raw[0], words[0]
-            found = (f", (SELECT 'p.' || page || ': ...' || regexp_replace(substr(text, greatest(1, "
-                     f"strpos(lower(text), lower('{w0}')) - 70), 160), '\\s+', ' ', 'g') || '...' FROM file_pages p "
-                     f"WHERE p.file_id = files.id AND p.text ILIKE '%{wl}%' {lk} ORDER BY page LIMIT 1) AS found")
-        else:
-            conds.append('(' + ' AND '.join('(' + ' OR '.join(f"CAST({c} AS TEXT) ILIKE '%{w}%' {lk}"
-                                                             for c in cols) + ')' for w in words) + ')')
+        conds_s, found, rank = search_sql(con, r, src, search)
+        conds += conds_s
     if folder:
         conds.append(f"(path ILIKE '%{folder.replace(chr(39), '')}%')")
     if label:  # "urgent", "urgent=yes", "urgent = 'yes'", "label.urgent='no'"
@@ -694,8 +755,11 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
     elif count:
         sql = f'SELECT count(*) AS n FROM {src}{wh}'
     else:
-        cols = fields or ((', '.join(r['show']) if r.get('show') else '*') + found)
-        ordr = order or (f'{dcol} DESC' if dcol else '1')
+        if fields and found:  # the "how it matched" column goes with a search, named or not
+            cols = re.sub(r'\bfound\b', lambda _: found[2:], fields) if re.search(r'\bfound\b', fields) else fields + found
+        else:
+            cols = fields or ((', '.join(r['show']) if r.get('show') else '*') + found)
+        ordr = order or ', '.join(x for x in (rank, f'{dcol} DESC' if dcol else '1') if x)
         sql = f'SELECT {cols} FROM {src}{wh} ORDER BY {ordr} LIMIT {int(limit)}'
     cur = con.execute(sql)
     return [d[0] for d in cur.description], cur.fetchall(), sql
@@ -893,7 +957,7 @@ def _names(con, kind, ids):
 
 
 def judge(con, resource, name, where=None, since=None, limit=300, account=None, workers=4, progress=None, on_item=None,
-          folder=None):
+          folder=None, search=None):
     """Label each matching row once per definition version. Each label is saved as it lands; failures are reported
     and not saved; Ctrl+C keeps what was done (raises Stopped). Returns counts, examples and seconds."""
     d = con.execute('SELECT version, on_kind, ask, answers FROM definitions WHERE name = ? ORDER BY version DESC',
@@ -902,17 +966,19 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
         raise ValueError(f'No definition "{name}". Make one: idli define {name} --on mail --ask "..." --answers yes,no')
     ver, on_kind, ask, answers = d[0], d[1], d[2], json.loads(d[3])
     kind = 'file' if on_kind in ('file', 'photo') else on_kind
-    res = resource if resource in RESOURCES else {'mail': 'mail', 'event': 'events', 'file': 'files'}[kind]
+    resource = resource_name(resource)
+    res = resource if resource in RESOURCES else {'mail': 'mail', 'event': 'calendar', 'file': 'files'}[kind]
     if RESOURCES[res]['kind'] != kind:
         raise ValueError(f'"{name}" is a definition on {on_kind}, so judge it on '
-                         f'{ {"mail": "mail", "event": "events", "file": "files or photos"}[kind] }.')
+                         f'{ {"mail": "mail", "event": "calendar", "file": "files or photos"}[kind] }.')
     scope = where
     if on_kind == 'photo':  # pictures only
         scope = f"({where}) AND kind = 'image'" if where else "kind = 'image'"
     elif kind == 'file':  # a text definition: no folders, pictures or videos, nothing empty
         keep = f"kind IN ({','.join(repr(k) for k in TEXT_KINDS)}) AND NOT {EMPTY_SQL}"
         scope = f"({where}) AND {keep}" if where else keep
-    _, rows, _ = select(con, res, where=scope, since=since, fields='id', limit=limit, order='id', folder=folder)
+    _, rows, _ = select(con, res, where=scope, since=since, fields='id', limit=limit, order='id', folder=folder,
+                        search=search)
     ids = [r[0] for r in rows]
     if kind == 'file' and on_kind != 'photo':  # binary files of kind 'other' (zips, apps) have nothing to read
         meta = {r[0]: r[1:] for r in con.execute('SELECT id, kind, mime, name FROM files').fetchall()}
