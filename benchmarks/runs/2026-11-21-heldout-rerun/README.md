@@ -4,7 +4,7 @@
 the rewritten manual, the yes card, Clef as judge) make the mappers better, or confuse them?
 
 **Method:** the same 27 frozen held-out tasks as 2026-11-20 (`../2026-11-19-record-store/bank/tasks_heldout.json`,
-sha256 c81e4cd2...; unchanged), run once on frozen code (commit in `FROZEN_COMMIT`: 1cdf6b3e), each mapper on its
+sha256 c81e4cd2...; unchanged), run once on frozen code (commit in `FROZEN_COMMIT`: 9afd8e93), each mapper on its
 own copy of one synced sandbox (87profligate: 190 emails, 10 events, 192 files with text and cards; stores are not
 in git). Graded by fresh blind graders with read-only SQL (`../2026-11-19-record-store/grader/grade.sh`, today set to
 2026-11-21). Two changes to the harness, both logged per turn: a yes card is accepted on the tester's behalf

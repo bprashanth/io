@@ -32,7 +32,7 @@ not reworded, plural search, pasted listing rows as --reply-to, two-part questio
 
 ## 4. Held-out rerun (`benchmarks/runs/2026-11-21-heldout-rerun/README.md`)
 
-Same 27 frozen tasks, frozen code 1cdf6b3e, blind graders: the 9B 5 -> 10 correct; idli-remote 13 -> 13. After the
+Same 27 frozen tasks, frozen code 9afd8e93, blind graders: the 9B 5 -> 10 correct; idli-remote 13 -> 13. After the
 freeze: `--on "next month"`, `judge --since/--until/--on`, repeated `--label`. A new held-out set is needed.
 
 ## 5. dune
