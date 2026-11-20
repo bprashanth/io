@@ -543,9 +543,25 @@ def define(con, name, on_kind, ask, answers, examples=None):
     return name, ver
 
 
-def _nine(messages, schema, max_tokens=300, timeout=120):
+# Which models this process uses. idlicli sets them from --mapper and --judge.
+#   NINE:  the 9B that maps (with --mapper nine*) and words replies: 'nine' (BF16) or 'nine_compressed' (served Q5)
+#   JUDGE: who labels rows: 'nine', 'nine_compressed', or 'clef' (hosted Clef-flash: it sees real content, so
+#          test accounts only)
+NINE = os.environ.get('IDLI_NINE', 'nine_compressed')
+JUDGE = os.environ.get('IDLI_JUDGE', 'nine_compressed')
+NINE_BF16_URL = os.environ.get('IDLI_9B_BF16_URL', 'http://127.0.0.1:8292')  # idli-9b-bf16 on the DGX
+CLEF_UNSURE = (0.35, 0.65)  # P(yes) inside this band is unsure; for other answers, a top answer under 0.5 is
+
+
+def _nine_upstream(variant):
+    if variant == 'nine' and not os.environ.get('IDLI_9B_URL'):
+        return NINE_BF16_URL, {}, 'qwen3.5-9b-bf16'
     from lib import stackwall
-    base, headers, model = stackwall.model_upstream()
+    return stackwall.model_upstream()
+
+
+def _nine(messages, schema, max_tokens=300, timeout=120, variant=None):
+    base, headers, model = _nine_upstream(variant or NINE)
     body = {'model': model, 'temperature': 0, 'stream': False, 'max_tokens': max_tokens, 'messages': messages,
             'response_format': {'type': 'json_schema', 'json_schema': {'name': 'answer', 'schema': schema}},
             'chat_template_kwargs': {'enable_thinking': False}}
@@ -555,6 +571,33 @@ def _nine(messages, schema, max_tokens=300, timeout=120):
         txt = json.load(r)['choices'][0]['message']['content']
     m = re.search(r'\{.*\}', txt, re.S)
     return json.loads(m.group(0) if m else txt)
+
+
+def _clef(text, ask, answers, timeout=60):
+    """Clef-flash through OpenRouter, Cloudflare as the only provider. Returns (label, detail). It scores each
+    allowed answer; `unsure` is ours, never offered to it."""
+    from lib import minisql
+    opts = [a for a in answers if a != 'unsure']
+    yesno = sorted(opts) == ['no', 'yes']
+    q = {'type': 'noul', 'instructions': ask} if yesno else \
+        {'type': 'choice', 'instructions': ask, 'criteria': {a: a for a in opts}}
+    body = {'model': 'cloudflare/clef-flash', 'state': text, 'questions': {'q': q},
+            'provider': {'order': ['Cloudflare'], 'allow_fallbacks': False}}
+    req = urllib.request.Request('https://openrouter.ai/api/v1/systemone', json.dumps(body).encode(), {
+        'Content-Type': 'application/json', 'Authorization': 'Bearer ' + minisql._key(), 'User-Agent': 'idli-scaffold/1'})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        out = json.load(r)
+    if out.get('provider') != 'Cloudflare':
+        raise RuntimeError(f'Clef was served by {out.get("provider")}, not Cloudflare')
+    a = out['answers']['q']
+    if yesno:
+        p = a['noul']
+        lab = 'unsure' if CLEF_UNSURE[0] < p < CLEF_UNSURE[1] else ('yes' if p >= 0.5 else 'no')
+        return lab, f'Clef: P(yes) = {p:.2f}'
+    probs = a['probabilities']
+    top = max(probs, key=probs.get)
+    lab = top if probs[top] >= 0.5 else 'unsure'
+    return lab, 'Clef: ' + ', '.join(f'{k} {v:.2f}' for k, v in sorted(probs.items(), key=lambda kv: -kv[1]))
 
 
 def _item_text(con, kind, rid, account, with_text=True):
@@ -638,7 +681,10 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
                 msgs = [{'role': 'system', 'content': 'You label one item for the person. Answer with JSON only. '
                          'If the item does not give enough to tell, answer unsure.'},
                         {'role': 'user', 'content': f'{ask}\nAnswers: {", ".join(answers)}\n\n---\n{text}\n---'}]
-            out = _retry(lambda: _nine(msgs, schema))
+            if JUDGE == 'clef' and on_kind != 'photo':
+                lab, why = _retry(lambda: _clef(text, ask, answers))
+                return rid, lab, why
+            out = _retry(lambda: _nine(msgs, schema, variant='nine_compressed' if JUDGE == 'clef' else JUDGE))
             lab = out.get('label') if out.get('label') in answers else 'unsure'
             return rid, lab, str(out.get('why', ''))[:200]
         except Exception as e:  # one item failing never stops the rest, and is not saved as an answer
@@ -662,7 +708,7 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
                               f'AND record_id IN ({",".join(repr(i) for i in ids) or "NULL"}) GROUP BY label',
                               [kind, name, ver]).fetchall())
     return {'definition': name, 'version': ver, 'judged_now': len(todo) - len(failed), 'already': len(ids) - len(todo),
-            'failed': len(failed), 'failed_examples': [w for _, w in failed[:3]],
+            'failed': len(failed), 'failed_examples': [w for _, w in failed[:3]], 'judge': JUDGE,
             'counts': counts, 'seconds': round(time.time() - t0, 1)}
 
 

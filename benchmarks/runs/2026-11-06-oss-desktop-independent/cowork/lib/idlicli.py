@@ -126,6 +126,8 @@ def parser():
     j.add_argument('--where')
     j.add_argument('--since')
     j.add_argument('--limit', type=int, default=300)
+    j.add_argument('--judge', choices=JUDGES, help='who labels: nine (BF16 9B), nine_compressed (served 9B, default), '
+                                                   'clef (hosted Clef-flash: it sees real content, test accounts only)')
     q = sub.add_parser('query', help='read-only SQL over the store')
     q.add_argument('sql')
     v = sub.add_parser('view', help='save a query as a resource')
@@ -146,6 +148,8 @@ def parser():
     a.add_argument('--mapper', default=os.environ.get('IDLI_MAPPER', 'remote'), choices=['remote', 'nine', 'nine_compressed'],
                    help='remote: idli-remote maps (masked). nine: the full 9B (BF16) maps and words the reply. '
                         'nine_compressed: the served 9B (Q5) does both')
+    a.add_argument('--judge', choices=JUDGES, help='who labels rows when a judge step runs; follows --mapper '
+                                                   '(remote: the served 9B). clef: hosted, sees real content')
     a.add_argument('--new', action='store_true', help='start a new conversation')
     sub.add_parser('size', help="the store's size")
     return p
@@ -199,7 +203,7 @@ def run_argv(con, argv):
                                         f'Next: idli judge {"photos" if a.on == "photo" else {"mail": "mail", "event": "events", "file": "files"}[a.on]} --def {name}')
     if v == 'judge':
         r = rs.judge(con, a.resource, a.defn, where=a.where, since=a.since, limit=a.limit, account=account())
-        return Result(kind='text', text=f'Judged {r["judged_now"]} now ({r["already"]} already judged), {r["seconds"]} s. '
+        return Result(kind='text', text=f'Judged {r["judged_now"]} now by {r["judge"]} ({r["already"]} already judged), {r["seconds"]} s. '
                                         f'Labels: ' + ', '.join(f'{k} {n}' for k, n in sorted(r['counts'].items())) +
                                         (f'. {r["failed"]} could not be judged (run judge again to retry): '
                                          f'{r["failed_examples"][0]}' if r.get('failed') else ''),
@@ -700,14 +704,15 @@ def run_plan(con, plan):
     return shown_parts, cmds, judge_s, errors
 
 
-NINE_BF16_URL = os.environ.get('IDLI_9B_BF16_URL', 'http://127.0.0.1:8292')  # idli-9b-bf16 on the DGX
+JUDGES = ['nine', 'nine_compressed', 'clef']
 
 
-def use_nine(mapper):
-    """Which 9B this run talks to, for mapping, wording and judging. `nine` is the full (BF16) model; anything else
-    keeps the served, compressed one (Q5, port 8291 on the DGX, or silo from a laptop). IDLI_9B_URL, if set, wins."""
-    if mapper == 'nine' and not os.environ.get('IDLI_9B_URL'):
-        os.environ['IDLI_9B_URL'] = NINE_BF16_URL
+def use_models(mapper=None, judge=None):
+    """Set which 9B maps and words replies, and who judges. The judge follows the mapper unless given. With the
+    remote mapper the judge stays the served 9B: judging reads real content, and idli-remote only sees masked text.
+    Clef is never the default: hosted, it sees real content (test accounts only)."""
+    rs.NINE = 'nine' if mapper == 'nine' else 'nine_compressed'
+    rs.JUDGE = judge or os.environ.get('IDLI_JUDGE') or (mapper if mapper in ('nine', 'nine_compressed') else 'nine_compressed')
 
 
 def _session_path():
@@ -718,9 +723,11 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     con = rs.connect(sandbox())
     try:
+        if argv[:1] == ['judge']:
+            use_models(None, parser().parse_args(argv).judge)
         if argv[:1] == ['ask']:
             a = parser().parse_args(argv)
-            use_nine(a.mapper)
+            use_models(a.mapper, a.judge)
             sp = _session_path()
             hist = [] if a.new or not sp.exists() else json.loads(sp.read_text())
             rec = ask(con, ' '.join(a.question), hist, a.mapper, data_dir=sandbox())

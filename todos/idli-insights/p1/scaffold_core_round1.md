@@ -78,6 +78,10 @@ reported; checked on a copy of the owner's sandbox: 93 judged, 0 failed, where 1
   the top: a harder second set is needed to separate Clef from idli-remote.
 - Labels to confirm by the owner: listed in that README.
 - `idli ask --mapper nine` now uses the BF16 9B (`idli-9b-bf16`, port 8292); `nine_compressed` the served Q5.
+- `--judge nine|nine_compressed|clef` on `ask` and `judge`; it covers every judge step inside `ask`. It follows the
+  mapper; with `--mapper remote` it stays the served 9B (judging reads real content). Clef only when named: hosted,
+  it sees real content. Yes/no definitions use P(yes) with 0.35 to 0.65 as unsure; others the top answer if >= 0.5.
+  Labels are kept per definition version whoever judged, so comparing judges needs a fresh copy or a new version.
 
 ### The plan as agreed
 
