@@ -74,8 +74,17 @@ idli ask "question"                            the left chat: mapper -> commands
 
 | mapper | correct | partial | wrong | refused ok | refused wrong | failed |
 |---|---|---|---|---|---|---|
-| idli-remote | see below | | | | | |
+| idli-remote | 13 | 4 | 1 | 8 | 0 | 1 |
 | 9B | 5 | 6 | 6 | 8 | 1 | 1 |
+
+Held-out by kind for idli-remote:
+- trust: 4 of 5 correct;
+- own definition: 9 of 10 correct, plus 1 partial;
+- own workflow: 3 partial, 3 correct refusals, 1 failed;
+- other site: 5 of 5 correct refusals.
+
+Its one wrong answer (T55) said "1 document" for a count of 0. The number check always allows 1, 2 and 3, a
+loophole to close. Its fit was 4.5, acknowledgement 4.8 and repetition 4.6.
 
 **Reply quality**, scored 1 to 5 by the grader:
 - **idli-remote, dev round 3:** fit 4.2, acknowledges corrections 4.6, not repetitive 4.1.

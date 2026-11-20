@@ -525,7 +525,13 @@ Owner's rules (built in phase 1, commit b46249da):
     the code was frozen (11844101) for held-out.
 - **Held-out** (27 tasks, frozen, fresh grader sessions):
   - **The 9B:** 5 correct, 6 partial, 6 wrong, 8 correct refusals, 1 wrong refusal, 1 failed.
-  - **idli-remote:** in the README. Its first grader session stopped without grading, so it was rerun.
+  - **idli-remote:** 13 correct, 4 partial, 1 wrong, 8 correct refusals, 1 failed. Its first grader session
+    stopped without grading, so it was rerun. By kind:
+    - trust: 4 of 5;
+    - definitions: 9 of 10, plus 1 partial;
+    - workflows: 0 correct, 3 partial;
+    - other sites: 5 of 5 correct refusals.
+  - **Reply quality, idli-remote:** fit 4.5, acknowledgement 4.8, repetition 4.6.
 - **Blind testers (6 sessions):**
   - **Simple checks held in 5 of 6,** and a few steps in 4.
   - **Every tester that reached the workflow stage broke there:** a draft to the wrong lead, an incomplete
