@@ -530,8 +530,12 @@ def summarise_search(con, search, folder=None, question='', docs=5, chars=9000):
     for fid, name in rows:
         pages = con.execute(f"SELECT page, text, len(regexp_extract_all(lower(text), '{rx}')) n FROM file_pages "
                             f"WHERE file_id = ? ORDER BY n DESC, page LIMIT 2", [fid]).fetchall()
+        if not any(n for _, _, n in pages):  # the words, but not together: the pages with most of them
+            like = ' + '.join(f"(lower(text) LIKE '%{w.lower().replace(chr(39), '')}%')::INT" for w in rank)
+            pages = con.execute(f'SELECT page, text, {like} n FROM file_pages WHERE file_id = ? ORDER BY n DESC, page '
+                                f'LIMIT 2', [fid]).fetchall()
         for page, text, n in pages:
-            if not n and len(rank) > 1:
+            if not n:
                 continue
             hit = re.search(rx, text.lower()) or re.search(re.escape(rank[0].lower()), text.lower())
             i = max(0, (hit.start() if hit else 0) - 700)
@@ -543,6 +547,9 @@ def summarise_search(con, search, folder=None, question='', docs=5, chars=9000):
         if used > chars:
             break
     topic = ' '.join(rank)
+    if not excerpts:
+        return Result(kind='text', text=f'I found files with those words but no passage about "{topic}" to read. '
+                      'Try fewer words, or `idli summarise file NAME` for one file.')
     schema = {'type': 'object', 'properties': {'answer': {'type': 'string'}}, 'required': ['answer']}
     ans = rs._nine([{'role': 'system', 'content': 'Explain a topic to the person using only the excerpts from their '
                      'documents. 4 to 6 plain sentences. After each point, name the file and page in brackets, as given. '
@@ -560,10 +567,14 @@ def draft(con, a):
     to, subject, context = a.to or '', a.subject, ''
     if a.reply_to:
         ref = a.reply_to.strip()
+        if ' | ' in ref:  # a row pasted from a listing: "1. Fri 20 Nov 09:58 | name | addr | subject | in"
+            parts = [x.strip() for x in re.sub(r'^\d+\.\s*', '', ref).split(' | ')]
+            ref = max((x for x in parts if '@' not in x and x not in ('in', 'out')), key=len, default=ref)
         r = con.execute('SELECT thread_id, subject, from_addr, from_name, body_text FROM mail WHERE thread_id = ? OR id = ? '
                         'ORDER BY date DESC LIMIT 1', [ref, ref]).fetchone()
         if not r:
-            words = [w.replace("'", '') for w in ref.split() if w]
+            # words only: subjects carry curly quotes, colons and question marks that the ref may not
+            words = [w for w in re.findall(r"[^\W_]{2,}", ref) if w.lower() not in ('re', 'fwd', 'fw')][:12]
             cond = ' AND '.join(f"(coalesce(from_name, '') || ' ' || from_addr || ' ' || subject) ILIKE '%{w}%'" for w in words)
             r = con.execute(f"SELECT thread_id, subject, from_addr, from_name, body_text FROM mail WHERE direction = 'in' "
                             f"AND {cond} ORDER BY date DESC LIMIT 1").fetchone()
@@ -702,6 +713,8 @@ Examples (today is {rs.now():%A %Y-%m-%d}):
   "emails I got last week" -> idli list mail --on "last week" --where "direction = 'in'"
   "how many PDFs in Strategy Classics" -> idli list files --count --in "Strategy Classics" --where "kind = 'pdf'"
   "meetings next monday" -> idli list calendar --on "next monday"
+  "who emails me the most" -> idli list mail --where "direction = 'in'" --group-by from_addr --limit 5
+  "which spreadsheet has the most rows" -> idli list sheets --order "nrows desc" --limit 1
   "docs that discuss border effects" -> idli list files --search '"border effects"'
   "explain border effects to me" -> idli summarise --search '"border effects"'
   "urgent emails" -> idli define urgent --on mail --ask "Does this email ask me to act or reply soon?" --answers yes,no ;
@@ -957,6 +970,10 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
     shown = '\n\n'.join(shown_parts)
     t1 = time.time()
     final_rows = shown_parts[-1] if shown_parts else ''
+    reads = [(c, p) for c, p in zip(cmds, shown_parts) if not re.match(r'(idli\s+)?(define|judge|view)\b', c)]
+    if 1 < len(reads) <= 3 and all(len(p.splitlines()) <= 6 for _, p in reads[:-1]):
+        # "how many sheets, and which has the most rows": each part is an answer; show (and word) them all
+        final_rows = '\n\n'.join(p for _, p in reads)
     earlier = ('Earlier steps (not shown to the person; do not describe their rows): ' + ' ; '.join(cmds[:-1])) \
         if len(cmds) > 1 else ''
     if cmds and re.match(r'(idli\s+)?(summarise|explain)\b', cmds[-1]) and 'failed' not in final_rows[:40]:
@@ -1074,8 +1091,11 @@ def run_plan(con, plan):
         try:
             argv = shlex.split(c)
         except ValueError:
-            errors.append(f'{c}: could not read the command')
-            continue
+            try:  # 'direction = \'in\'': a shell can't escape inside single quotes; read it as meant
+                argv = shlex.split(re.sub(r"'((?:[^'\\]|\\')*)'", lambda m: '"' + m.group(1).replace("\\'", "'") + '"', c))
+            except ValueError:
+                errors.append(f'{c}: could not read the command')
+                continue
         verb = argv[1] if argv[:1] == ['idli'] and len(argv) > 1 else argv[0]
         if verb in ('define', 'view'):  # a new meaning: never made or changed without the person's yes
             try:
