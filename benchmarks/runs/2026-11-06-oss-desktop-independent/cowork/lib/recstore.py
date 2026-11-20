@@ -702,7 +702,8 @@ def _names(con, kind, ids):
     return dict(con.execute(f'SELECT id, {col} FROM {tbl} WHERE id IN ({",".join(repr(i) for i in ids)})').fetchall())
 
 
-def judge(con, resource, name, where=None, since=None, limit=300, account=None, workers=4, progress=None, on_item=None):
+def judge(con, resource, name, where=None, since=None, limit=300, account=None, workers=4, progress=None, on_item=None,
+          folder=None):
     """Label each matching row once per definition version. Each label is saved as it lands; failures are reported
     and not saved; Ctrl+C keeps what was done (raises Stopped). Returns counts, examples and seconds."""
     d = con.execute('SELECT version, on_kind, ask, answers FROM definitions WHERE name = ? ORDER BY version DESC',
@@ -721,7 +722,7 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
     elif kind == 'file':  # a text definition: no folders, pictures or videos, nothing empty
         keep = f"kind IN ({','.join(repr(k) for k in TEXT_KINDS)}) AND NOT {EMPTY_SQL}"
         scope = f"({where}) AND {keep}" if where else keep
-    _, rows, _ = select(con, res, where=scope, since=since, fields='id', limit=limit, order='id')
+    _, rows, _ = select(con, res, where=scope, since=since, fields='id', limit=limit, order='id', folder=folder)
     ids = [r[0] for r in rows]
     if kind == 'file' and on_kind != 'photo':  # binary files of kind 'other' (zips, apps) have nothing to read
         meta = {r[0]: r[1:] for r in con.execute('SELECT id, kind, mime, name FROM files').fetchall()}

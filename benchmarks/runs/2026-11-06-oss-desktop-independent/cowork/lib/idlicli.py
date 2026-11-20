@@ -91,7 +91,8 @@ def progress_line(done, total, failed, elapsed, what='judging'):
     if not TTY or VERBOSE >= 2:  # at -vv every item prints its own line
         return
     left = (elapsed / done) * (total - done) if done else 0
-    eta = f', about {int(left // 60)} min {int(left % 60)} s left' if done < total else ''
+    eta = (f', about {int(left // 60)} min {int(left % 60)} s left' if left >= 60 else f', about {int(left)} s left') \
+        if done < total else ''
     print(f'\r\033[K{what} {done} of {total}' + (f', {failed} failed' if failed else '') + eta,
           end='' if done < total else '\n', file=sys.stderr, flush=True)
 
@@ -194,6 +195,7 @@ def parser():
     j.add_argument('resource')
     j.add_argument('--def', dest='defn', required=True)
     j.add_argument('--where')
+    j.add_argument('--in', dest='folder', help='only files in this Drive folder')
     j.add_argument('--since')
     j.add_argument('--limit', type=int, default=300)
     j.add_argument('--judge', choices=JUDGES, help='who labels: nine (BF16 9B), nine_compressed (served 9B, default), '
@@ -274,7 +276,7 @@ def run_argv(con, argv):
                                         f'Next: idli judge {"photos" if a.on == "photo" else {"mail": "mail", "event": "events", "file": "files"}[a.on]} --def {name}')
     if v == 'judge':
         res = {'mail': 'mail', 'event': 'events'}.get(a.resource, a.resource)
-        r = rs.judge(con, res, a.defn, where=a.where, since=a.since, limit=a.limit, account=account(),
+        r = rs.judge(con, res, a.defn, where=a.where, since=a.since, limit=a.limit, account=account(), folder=a.folder,
                      progress=progress_line, on_item=(lambda n, lab, why: say(2, f'  {n}: {lab or "FAILED"} ({why})'))
                      if VERBOSE >= 2 else None)
         return Result(kind='text', text=judge_summary(r, a.defn, res), note=json.dumps(r, default=str))
@@ -522,7 +524,7 @@ Commands (read only unless said):
   idli read file REF                           a PDF/document's text
   idli summarise file REF [--question Q]       a summary of one file
   idli define NAME --on mail|event|file|photo --ask "QUESTION" --answers a,b,c   the person's own category
-  idli judge RESOURCE --def NAME [--where COND] [--since D]                       label each row (slow: ~1 s a row)
+  idli judge RESOURCE --def NAME [--where COND] [--in FOLDER] [--since D]                     label each row (slow: ~1 s a row)
   idli query "SELECT ..."                      read-only SQL for joins and anything else
   idli draft mail --reply-to REF --ask "WHAT TO SAY"   preview only; nothing is saved or sent
   idli date PHRASE                             what "next monday", "last week" mean (for questions about dates)
@@ -533,7 +535,9 @@ Rules:
 - Use only the resources and fields listed below. Prefer list/count with flags; use query only for joins.
 - A category the person has in mind ("urgent", "about caste", "funder meeting", "photos with people") that is not
   a field: define it (a clear yes/no question), judge the relevant rows (narrow first with --where, --in or
-  --since so fewer rows are judged), then list with --label. Reuse an existing definition when it fits.
+  --since so fewer rows are judged), then list with --label. Reuse an existing definition when it fits; never
+  define an existing name again. Word a new definition generally, as the person means the category, not from one
+  document you just saw (no examples copied from a result). The person is shown the wording and decides.
 - A greeting, or "what can you do / what can you see": idli explain (it lists what Idli can read).
 - Exact words or names the person gives: --search.  "How many": count.  "By X" or a breakdown: --by.
 - Follow-ups refer to the previous answer (shown below with its rows and ids): use the ids, or narrow the
@@ -578,9 +582,11 @@ def menu(con, mask=None):
     folders = con.execute("SELECT path || CASE WHEN path = '' THEN '' ELSE '/' END || name FROM files "
                           "WHERE kind = 'folder' ORDER BY 1").fetchall()
     lines.append('Drive folders: ' + '; '.join(m(f[0]) for f in folders))
-    defs = con.execute('SELECT name, max(version), any_value(on_kind), arg_max(ask, version) FROM definitions GROUP BY name').fetchall()
+    defs = con.execute('SELECT name, max(version), arg_max(on_kind, version), arg_max(ask, version), '
+                       'arg_max(answers, version) FROM definitions GROUP BY name').fetchall()
     if defs:
-        lines.append('Definitions already made: ' + '; '.join(f'{n} (on {k}): {a}' for n, v, k, a in defs))
+        lines.append('Definitions already made (reuse them; never define these names again): ' + '; '.join(
+            f'{n} (on {k}, answers {"/".join(json.loads(ans))}): {a}' for n, v, k, a, ans in defs))
     views = con.execute('SELECT name, about FROM views').fetchall()
     if views:
         lines.append('Views: ' + '; '.join(f'{n}: {a}' for n, a in views))
@@ -706,14 +712,30 @@ def compose(question, shown, history, plan_note=''):
     return reply, ''
 
 
-def ask(con, question, history, mapper='remote', data_dir=None, show_commands=True):
-    """One turn. Returns a dict with the reply and everything the bench needs."""
+def _held(rec, plan, question, t0):
+    """The plan stopped at a new meaning: ask the person, or say it was dropped."""
+    if plan.get('pending'):
+        rec.update(reply='Before I go on: ' + plan['pending']['card'] +
+                   '\n\nTo keep it: idli ask yes\nTo use your own wording: idli ask "yes: <your question>"'
+                   '\nAsking anything else drops it.', pending={'q': question, **plan['pending']})
+    else:
+        rec.update(reply='Okay, I did not make it, and nothing was judged. You can ask again in other words.')
+    rec.update(shown='', commands=rec.get('commands', []), needs='meaning', total_s=round(time.time() - t0, 2))
+    return rec
+
+
+def ask(con, question, history, mapper='remote', data_dir=None, show_commands=True, resume=None):
+    """One turn. Returns a dict with the reply and everything the bench needs. `resume` carries on a plan that
+    stopped at a new meaning, after the person said yes."""
     t0 = time.time()
     rec = {'q': question, 'mapper': mapper}
-    try:
-        plan, rec['prompt_chars'] = map_question(con, question, history, mapper, data_dir)
-    except Exception as e:
-        plan = {'cannot': f'I could not work out the steps ({type(e).__name__}).', 'needs': 'mapper_failed'}
+    if resume:
+        plan, rec['resumed'] = {'commands': resume['commands']}, True
+    else:
+        try:
+            plan, rec['prompt_chars'] = map_question(con, question, history, mapper, data_dir)
+        except Exception as e:
+            plan = {'cannot': f'I could not work out the steps ({type(e).__name__}).', 'needs': 'mapper_failed'}
     rec['map_s'] = round(time.time() - t0, 2)
     rec['plan'] = plan
     if not plan.get('commands'):
@@ -725,13 +747,21 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
         rec.update(reply=why.rstrip() + nxt, shown='', commands=[], needs=needs, total_s=round(time.time() - t0, 2))
         return rec
     shown_parts, cmds, judge_s, errors = run_plan(con, plan)
+    if plan.get('pending') or plan.get('declined'):
+        rec['commands'] = cmds
+        return _held(rec, plan, question, t0)
     if errors:  # one repair round: the mapper sees what failed and why
         try:
             plan2, _ = map_question(con, question, history, mapper, data_dir, failed=errors)
             if plan2.get('commands'):
                 rec['repaired'] = plan = plan2
+                made = [c for c in cmds if re.match(r'(idli\s+)?(define|view)\b', c)]  # already in the store
                 shown_parts, cmds, judge_s2, errors = run_plan(con, plan2)
+                cmds = made + [c for c in cmds if c not in made]
                 judge_s += judge_s2
+                if plan.get('pending') or plan.get('declined'):
+                    rec['commands'] = cmds
+                    return _held(rec, plan, question, t0)
         except Exception:
             pass
     rounds = 0
@@ -746,6 +776,9 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
             break
         more_parts, more_cmds, js, errors = run_plan(con, plan)
         shown_parts += more_parts; cmds += more_cmds; judge_s += js
+        if plan.get('pending') or plan.get('declined'):
+            rec['commands'] = cmds
+            return _held(rec, plan, question, t0)
     rec['rounds'] = rounds
     shown = '\n\n'.join(shown_parts)
     t1 = time.time()
@@ -762,6 +795,39 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
 
 
 PLACEHOLDER = re.compile(r'<[A-Za-z_][A-Za-z0-9_ .\-]{1,60}>')
+CONFIRM = None  # main sets it when someone can answer now: card -> True, False, or a better wording (str)
+SECONDS_PER_ITEM = {'clef': 0.2, 'nine_compressed': 0.9, 'nine': 1.9}  # measured 2026-11-20, two at a time
+
+
+def meaning_card(con, verb, a):
+    """What the person is asked before a new category or saved list is made."""
+    if verb == 'view':
+        return (f'I would save "{a.name}" to mean: {a.about or "the rows of this query"}.\n'
+                f'  The rule: {a.sql}')
+    things = {'mail': ('emails', "SELECT count(*) FROM mail"), 'event': ('events', "SELECT count(*) FROM events"),
+              'photo': ('pictures', "SELECT count(*) FROM files WHERE kind = 'image'"),
+              'file': ('files', f"SELECT count(*) FROM files WHERE kind IN ('pdf', 'doc', 'sheet', 'other') "
+                                f"AND NOT {rs.EMPTY_SQL}")}[a.on]
+    n = con.execute(things[1]).fetchone()[0]
+    secs = n * SECONDS_PER_ITEM.get(rs.JUDGE, 1)
+    took = f'about {int(secs // 60)} min' if secs >= 90 else f'about {int(secs)} s'
+    return (f'I would make a new category "{a.name}": {a.ask}\n'
+            f'  Answers: {", ".join(a.answers.split(","))}.\n'
+            f'  Judging all your {things[0]} with it reads up to {n} of them ({took} with {rs.JUDGE}); '
+            f'it can be narrowed to fewer.')
+
+
+def tty_confirm(card):
+    print('\n' + card, file=sys.stderr)
+    try:
+        ans = input('Keep this? y = yes, n = no, or type a better wording: ').strip()
+    except EOFError:
+        return None
+    if ans.lower() in ('y', 'yes'):
+        return True
+    if ans.lower() in ('', 'n', 'no'):
+        return False
+    return ans
 
 
 def run_plan(con, plan):
@@ -775,6 +841,30 @@ def run_plan(con, plan):
         except ValueError:
             errors.append(f'{c}: could not read the command')
             continue
+        verb = argv[1] if argv[:1] == ['idli'] and len(argv) > 1 else argv[0]
+        if verb in ('define', 'view'):  # a new meaning: never made or changed without the person's yes
+            try:
+                pa = parser().parse_args(argv[1:] if argv[:1] == ['idli'] else argv)
+            except Err as e:
+                errors.append(f'{c}: {e}')
+                continue
+            tbl = 'definitions' if verb == 'define' else 'views'
+            if con.execute(f'SELECT 1 FROM {tbl} WHERE name = ?', [pa.name]).fetchone():
+                say(1, f'[step] {c}\n       skipped: "{pa.name}" already exists, so it is used as it is')
+                plan.setdefault('kept', []).append(pa.name)
+                continue
+            card = meaning_card(con, verb, pa)
+            ans = CONFIRM(card) if CONFIRM else None
+            if ans is None:  # no one to ask right now: stop here, keep the rest for "idli ask yes"
+                plan['pending'] = {'card': card, 'commands': plan['commands'][plan['commands'].index(c):]}
+                break
+            if ans is False:
+                plan['declined'] = card
+                break
+            if isinstance(ans, str):  # the person's own wording
+                pa.ask = ans
+                argv = ['define', pa.name, '--on', pa.on, '--ask', ans, '--answers', pa.answers]
+                c = shlex.join(['idli'] + argv)
         cmds.append(c)
         t0 = time.time()
         say(1, f'[step] {c}' + ('   (writes to the store)' if re.match(r'(idli\s+)?(define|judge|view)\b', c) else ''))
@@ -842,14 +932,30 @@ def main(argv=None):
             hist = [] if a.new or not sp.exists() else json.loads(sp.read_text())
             MAPPER_CALLS.clear()
             ctx = store_context(con)
-            rec = ask(con, ' '.join(a.question), hist, a.mapper, data_dir=sandbox(), show_commands=False)
-            hist.append({k: rec.get(k) for k in ('q', 'commands', 'shown', 'reply')})
+            q = ' '.join(a.question)
+            global CONFIRM
+            resume = None
+            m = re.match(r'\s*(yes|y|ok|keep it)\b[\s:,]*(.*)$', q, re.I | re.S)
+            if m and hist and hist[-1].get('pending'):  # the yes to the last turn's card
+                resume, wording, used = hist[-1]['pending'], m.group(2).strip() or True, []
+                q = resume['q']
+
+                def CONFIRM(card):  # yes to the card already shown; a later new meaning stops again
+                    if used:
+                        return None
+                    used.append(1)
+                    return wording
+            elif sys.stdin.isatty() and sys.stderr.isatty():
+                CONFIRM = tty_confirm
+            rec = ask(con, q, hist, a.mapper, data_dir=sandbox(), show_commands=False, resume=resume)
+            hist.append({k: rec.get(k) for k in ('q', 'commands', 'shown', 'reply', 'pending')})
             sp.write_text(json.dumps(hist[-6:], default=str))
             log({'verb': 'ask', 'q': rec['q'], 'mapper': a.mapper, 'wording': rs.NINE, 'judge': rs.JUDGE,
                  'new_conversation': a.new, 'earlier': [h['q'] for h in hist[:-1]], 'store': ctx,
                  'mapper_calls': MAPPER_CALLS, 'commands': rec.get('commands'), 'errors': rec.get('errors'),
                  'steps_shown': rec.get('shown'), 'words': rec.get('words'), 'reply': rec['reply'],
                  'wording_dropped': rec.get('compose_fallback'), 'needs': rec.get('needs'),
+                 'pending': rec.get('pending'), 'resumed': rec.get('resumed'),
                  'seconds': {k: rec.get(k) for k in ('map_s', 'compose_s', 'judge_s', 'total_s')}})
             print(rec['reply'])
             if rec.get('commands'):
