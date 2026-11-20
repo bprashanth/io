@@ -186,7 +186,8 @@ def parser():
         l.add_argument('-o', dest='out', default='table', choices=['table', 'json'])
     g = sub.add_parser('get', help='one item in full')
     g.add_argument('resource', choices=['mail', 'thread', 'event', 'calendar', 'file', 'sheet'])
-    g.add_argument('ref', help='an id, or words from its name or subject')
+    g.add_argument('ref', nargs='?', help='an id, or words from its name or subject')
+    g.add_argument('--sheet', '--name', dest='ref2', help=argparse.SUPPRESS)  # models reach for these; same as REF
     g.add_argument('--text', action='store_true', help="a file's text")
     g.add_argument('--outline', action='store_true', help="a file's pages, or a sheet's columns with examples")
     g.add_argument('--chars', type=int, default=3000)
@@ -314,8 +315,19 @@ def run_argv(con, argv):
                                     show_all=a.show_all)
         if getattr(a, 'out', 'table') == 'json':
             return Result(kind='text', text=json.dumps([dict(zip(cols, map(_fmt, r))) for r in rows], ensure_ascii=False))
+        if (v == 'count' or a.count) and not a.by:
+            n = rows[0][0] if rows else 0
+            return Result(kind='text', text=f'Count: {n} {rs.resource_name(a.resource)} match.', sql=sql)
+        if a.search and rs.resource_name(a.resource) == 'files' and rows and cols[-1] == 'found':
+            ph = sum(1 for r in rows if str(r[-1]).startswith(('phrase', 'mentioned')))
+            apart = sum(1 for r in rows if str(r[-1]).startswith('words apart'))
+            note = (f'{ph} have the words together; {apart} only have them apart (shown last).' if apart else '')
+            return Result(cols, rows, sql=sql, note=note)
         return Result(cols, rows, sql=sql)
     if v == 'get':
+        a.ref = a.ref or a.ref2
+        if not a.ref:
+            raise Err(f'Say which one: idli get {a.resource} NAME')
         res = 'event' if a.resource == 'calendar' else a.resource
         if res in ('file', 'sheet') and a.outline:
             return describe(con, res, a.ref)
@@ -510,6 +522,7 @@ def summarise_search(con, search, folder=None, question='', docs=5, chars=9000):
     """What the documents say about a topic: the pages that mention it most, read by the 9B, with file and page."""
     phrases, words, rank = rs.parse_search(search)
     _, rows, _ = rs.select(con, 'files', search=search, folder=folder, fields='id, name', limit=docs)
+    rows = [r[:2] for r in rows]  # a search adds its "found" column
     if not rows or not rank:
         return Result(kind='text', text='No document mentions that. Try other words, or `idli list files --search`.')
     rx = rs._phrase_re(rank)
@@ -619,7 +632,9 @@ def explain(con, resource=None):
         'photos': ['idli list photos', 'idli define has_people --on photo --ask "Are there people in this photo?"'],
         'sheets': ['idli list sheets', 'idli get sheet "Leads (test)"', 'idli list rows --sheet "Leads (test)"'],
     }.get(resource, [])
-    return (f'{resource}: {r["about"]}.\nFields: {", ".join(cols)}.\n'
+    notes = rs.FIELD_NOTES.get(resource, {})
+    return (f'{resource}: {r["about"]}.\nFields: {", ".join(cols)}.\n' +
+            ''.join(f'  {f}: {n}\n' for f, n in notes.items()) +
             f'Dates filter on {r["date"]}. --where takes SQL-like conditions; field ~ \'x\' means contains; '
             f"label.NAME = 'yes' uses your definitions.\nExamples:\n" + '\n'.join('  ' + e for e in ex))
 
@@ -656,6 +671,11 @@ Rules:
   define an existing name again. Word a new definition generally, as the person means the category, not from one
   document you just saw (no examples copied from a result). The person is shown the wording and decides.
 - A greeting, or "what can you do / what can you see": idli explain (it lists what Idli can read).
+- Use the person's own words: never add --search words, --in folders or --where conditions they didn't ask for.
+- A field that already means the thing (newsletters: is_bulk; sent by me: direction = 'out'; declined:
+  my_response = 'declined'): filter on it; don't define a category for it.
+- A file the person names ("summarise wincoop", "what's in the leads sheet"): idli summarise file NAME, idli get
+  sheet NAME, idli get file NAME.
 - A named thing (a term, a phrase, a person, a place): --search, quoting a phrase of two or more words. "How many":
   list --count. "By X" or a breakdown: --group-by. "Explain X", "what do my documents say about X":
   idli summarise --search '"X"'. Search first; define and judge only for a category no words capture ("urgent",
@@ -699,7 +719,9 @@ def menu(con, mask=None):
     for k, r in rs.RESOURCES.items():
         if k in ('labels',):
             continue
-        lines.append(f'- {k}: {r["about"]}. Fields: {", ".join(rs.columns(con, k))}' + _values(con, k))
+        notes = rs.FIELD_NOTES.get(k, {})
+        lines.append(f'- {k}: {r["about"]}. Fields: {", ".join(rs.columns(con, k))}' + _values(con, k) +
+                     ('. Meanings: ' + '; '.join(f'{f} = {n}' for f, n in notes.items()) if notes else ''))
     sheets = con.execute('SELECT name, columns, nrows, tbl FROM sheets ORDER BY name').fetchall()
     lines.append('- rows --sheet NAME. Sheets: ' + '; '.join(
         f'"{m(n)}" (SQL table {t}, {nr} rows; columns: {", ".join(m(c) for c in json.loads(cs)[:8])})' for n, cs, nr, t in sheets))
@@ -791,8 +813,12 @@ def map_question(con, question, history, mapper='remote', data_dir=None, failed=
         from lib import home
         plan = home.rehydrate(data_dir, raw)
     else:
-        raw = plan = rs._nine([{'role': 'system', 'content': grammar()}, {'role': 'user', 'content': user}], PLAN_SCHEMA,
-                              max_tokens=1500, timeout=180)
+        msgs = [{'role': 'system', 'content': grammar()}, {'role': 'user', 'content': user}]
+        try:
+            raw = plan = rs._nine(msgs, PLAN_SCHEMA, max_tokens=1500, timeout=180)
+        except ValueError:  # cut off or not JSON: once more, asked to be brief
+            msgs[-1] = {'role': 'user', 'content': user + '\n\nAnswer with short JSON: at most 4 commands.'}
+            raw = plan = rs._nine(msgs, PLAN_SCHEMA, max_tokens=1500, timeout=180)
     kind = 'repair' if failed else ('continue' if so_far else 'first')
     MAPPER_CALLS.append({'kind': kind, 'mapper': mapper, 'sent': user, 'returned': raw, 'seconds': round(time.time() - t0, 2)})
     say(1, f'[mapper {mapper}, {kind}] {round(time.time() - t0, 1)} s')
@@ -833,11 +859,17 @@ def compose(question, shown, history, plan_note=''):
     said = NUM.findall(reply) + [words[w.lower()] for w in re.findall(r'\b(' + '|'.join(words) + r')\b', reply, re.I)]
     if 'Nothing matches' in shown and said:  # an empty result has no count to word
         return '', 'number_on_empty_result:' + ','.join(said)
-    allowed = set(NUM.findall(shown)) | set(NUM.findall(question))
+    body = re.sub(r'(?m)^\s*\d+\.\s', '', shown)  # "1. ", "2. ": list numbering, not numbers in the result
+    allowed = set(NUM.findall(body)) | set(NUM.findall(question))
     m = re.match(r'(\d+) rows?\b', shown.strip())
-    allowed |= {m.group(1)} if m else set()
-    allowed |= {str(i) for i in range(1, 4)} if not m or int(m.group(1)) >= 3 else set()  # "two of them" from a longer list
+    total = m.group(1) if m else None
     bad = [n for n in said if n not in allowed and n.replace(',', '') not in allowed]
+    # "I found 19 documents", "three meetings": a count of the results must be the real count
+    nouns = r'(emails?|messages?|meetings?|events?|files?|documents?|docs?|pdfs?|sheets?|spreadsheets?|rows?|items?|results?|threads?|people|leads?|photos?)'
+    for w in re.findall(r'\b(\d+|' + '|'.join(words) + r')\s+(?:\w+\s+){0,2}?' + nouns + r'\b', reply, re.I):
+        n = words.get(w[0].lower(), w[0])
+        if total and n != total:  # strict: "two of the 4 meetings" also drops the wording; the rows still show
+            bad.append(f'{n} (shown: {total})')
     if bad:
         return '', 'number_not_in_result:' + ','.join(bad)
     return reply, ''
@@ -886,7 +918,7 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
             plan2, _ = map_question(con, question, history, mapper, data_dir, failed=errors)
             if plan2.get('commands'):
                 rec['repaired'] = plan = plan2
-                made = [c for c in cmds if re.match(r'(idli\s+)?(define|view)\b', c)]  # already in the store
+                made = [c for c in cmds if re.match(r'(idli\s+)?(define|view|judge)\b', c)]  # already done
                 shown_parts, cmds, judge_s2, errors = run_plan(con, plan2)
                 cmds = made + [c for c in cmds if c not in made]
                 judge_s += judge_s2

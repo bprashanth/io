@@ -65,7 +65,7 @@ RESOURCES = {
                 'show': ['name', 'path'], 'about': 'Drive folders (files with kind folder)'},
     'photos': {'table': 'files', 'date': 'modified', 'kind': 'file', 'text': ['name', 'path'], 'filter': "kind = 'image'",
                'show': ['name', 'path', 'modified'], 'about': 'Drive images (files with kind image)'},
-    'sheets': {'table': 'sheets', 'date': None, 'kind': 'sheet', 'id': 'file_id', 'text': ['name'],
+    'sheets': {'table': 'sheets', 'date': None, 'kind': 'sheet', 'id': 'file_id', 'text': ['name', 'columns'],
                'show': ['name', 'columns', 'nrows'], 'about': 'one row per spreadsheet that was read; its rows are `rows --sheet NAME`'},
     'labels': {'table': 'labels', 'date': 'judged_at', 'kind': 'label', 'id': 'record_id', 'text': ['label', 'detail'],
                'show': ['kind', 'record_id', 'definition', 'label', 'detail'], 'about': 'what judge decided'},
@@ -73,6 +73,20 @@ RESOURCES = {
                     'show': ['name', 'version', 'on_kind', 'ask', 'answers'], 'about': 'your own categories'},
 }
 KIND_TABLE = {'mail': ('mail', 'id'), 'event': ('events', 'id'), 'file': ('files', 'id')}
+# What a field means, where it isn't obvious from its name: written by whoever writes the connector. The menu and
+# `explain` show these, so the mapper uses a field instead of inventing a category for it.
+FIELD_NOTES = {
+    'mail': {'direction': "'in' received, 'out' sent by me",
+             'is_bulk': 'newsletters, promotions and notifications (rule: an unsubscribe header, a noreply sender, or '
+                        "Gmail's promotions, social, updates or forums tab)",
+             'is_calendar_notice': 'calendar emails: invitations, Accepted:, Declined: (rule: subject or attachment)',
+             'gmail_labels': "Gmail's own labels, comma separated (INBOX, SENT, IMPORTANT, STARRED, ...)"},
+    'threads': {'is_bulk': 'every email in the thread is bulk', 'last_direction': "'in' if they wrote last"},
+    'calendar': {'my_response': "my RSVP from Google: accepted, declined, tentative, needsAction; organizer if I made it",
+                 'guests': 'guest email addresses', 'organizer': "the organizer's email address"},
+    'files': {'kind': 'pdf, doc, sheet, slides, image, video, folder, form, other', 'path': 'the folder path',
+              'shared': 'shared with me or by me'},
+}
 ALIASES = {'events': 'calendar', 'event': 'calendar'}  # older names still work; the menu shows the new ones
 
 
@@ -628,6 +642,9 @@ def compile_where(con, resource, where):
                f"AND label = '{val}'")
         return f"{idcol} {'NOT ' if op != '=' else ''}IN ({sub})"
     w = LABEL_REF.sub(lab, where)
+    cols = {c.lower() for c in columns(con, resource)}
+    # "declined" in double quotes is a column name in SQL; models often mean the value. Quote values as values.
+    w = re.sub(r'"([^"]*)"', lambda m: m.group(0) if m.group(1).lower() in cols else "'" + m.group(1).replace("'", "''") + "'", w)
     w = re.sub(r'([A-Za-z_][A-Za-z0-9_]*)\s*~\s*\'([^\']*)\'', lambda m: f"{m.group(1)} ILIKE '%{m.group(2)}%'", w)
     return w
 
@@ -677,6 +694,8 @@ def search_sql(con, r, src, search):
     conds = []
     for w in words:
         lw = like(w.lower())
+        if len(lw) > 4 and lw.endswith('s') and not lw.endswith('ss'):
+            lw = lw[:-1]  # adivasis -> adivasi; also matches the plural
         conds.append(f"({here} LIKE '%{lw}%' ESCAPE '\\' OR coalesce({card}, '') LIKE '%{lw}%' ESCAPE '\\' OR "
                      f"id IN ({pages} WHERE lower(text) LIKE '%{lw}%' ESCAPE '\\'))")
     for p in phrases:
