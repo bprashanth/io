@@ -518,3 +518,28 @@ Owner's rules (built in phase 1, commit b46249da):
   - **Trust broke at the draft:** a lead with no email thread got a draft to another person's address.
   - **Fixed:** a draft must match one conversation, or say who it is to with `--to`. Greetings and "what can you
     see" now map to `explain`.
+- **Dev round 3** (with `continue` and the placeholder guard):
+  - **idli-remote:** none wrong and none failed. 23 correct, 15 partial, 13 correct refusals, 2 wrong refusals.
+  - **The 9B:** 19 correct, 11 wrong or failed (mostly workflows).
+  - **Fixes after round 3** (`idli date`; summary parts in parallel; a grader that is told the run's date). Then
+    the code was frozen (11844101) for held-out.
+- **Held-out** (27 tasks, frozen, fresh grader sessions):
+  - **The 9B:** 5 correct, 6 partial, 6 wrong, 8 correct refusals, 1 wrong refusal, 1 failed.
+  - **idli-remote:** in the README. Its first grader session stopped without grading, so it was rerun.
+- **Blind testers (6 sessions):**
+  - **Simple checks held in 5 of 6,** and a few steps in 4.
+  - **Every tester that reached the workflow stage broke there:** a draft to the wrong lead, an incomplete
+    five-lead summary, a cross-year analysis that said 2025 was missing.
+  - **Also found and fixed:**
+    - "hi" and "what can you read" were refused;
+    - "what day is next monday" was refused after the help showed that date;
+    - a 96-page summary was too slow.
+- **What it says** (`benchmarks/runs/2026-11-19-record-store/README.md`):
+  - **The store and definitions carry "own definition" asks:** 100% coverage, and none wrong with idli-remote.
+  - **Trust questions work.**
+  - **Workflows are the weak layer.** They need a Mini's views and chains written by Sandbox Claude, with the
+    mapper only filling values.
+  - **The 9B should not plan.**
+  - **Other sites are "new connector".**
+  - **The store is 13 MB.** First-time judging of a whole Drive takes minutes.
+- **Laptop:** not synced. Nothing is wired into the app yet.
