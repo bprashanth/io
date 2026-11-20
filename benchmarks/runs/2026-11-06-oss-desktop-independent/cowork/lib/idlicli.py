@@ -838,7 +838,8 @@ using only the result below. Rules:
 - Only use numbers that appear in the result. If the result is empty, say so plainly and suggest one next step.
 - Talk like a colleague about their data ("4 files are in the fixity folder"), never about rows or results.
 - Don't end with a question or an offer ("Would you like...") unless their request was unclear.
-- Plain words, no headings, no bullet points, no "As an AI"."""
+- Plain words, no headings, no bullet points, no "As an AI".
+- A draft is only a preview: never say it was saved, sent, or put in a folder."""
 
 
 NUM = re.compile(r'(?<![\w.])\d+(?:[.,]\d+)?(?![\w])')
@@ -857,6 +858,8 @@ def compose(question, shown, history, plan_note=''):
     words = {'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6', 'seven': '7', 'eight': '8',
              'nine': '9', 'ten': '10', 'eleven': '11', 'twelve': '12', 'single': '1'}
     said = NUM.findall(reply) + [words[w.lower()] for w in re.findall(r'\b(' + '|'.join(words) + r')\b', reply, re.I)]
+    if re.search(r'Would draft \(not saved\)', shown) and re.search(r'\b(saved|sent|drafts? folder|unsent|outbox|ready in)\b', reply, re.I):
+        return '', 'draft_claimed_saved'
     if 'Nothing matches' in shown and said:  # an empty result has no count to word
         return '', 'number_on_empty_result:' + ','.join(said)
     body = re.sub(r'(?m)^\s*\d+\.\s', '', shown)  # "1. ", "2. ": list numbering, not numbers in the result
@@ -868,7 +871,7 @@ def compose(question, shown, history, plan_note=''):
     nouns = r'(emails?|messages?|meetings?|events?|files?|documents?|docs?|pdfs?|sheets?|spreadsheets?|rows?|items?|results?|threads?|people|leads?|photos?)'
     for w in re.findall(r'\b(\d+|' + '|'.join(words) + r')\s+(?:\w+\s+){0,2}?' + nouns + r'\b', reply, re.I):
         n = words.get(w[0].lower(), w[0])
-        if total and n != total:  # strict: "two of the 4 meetings" also drops the wording; the rows still show
+        if total and n != total and n not in allowed:  # a count that is neither the total nor a value shown
             bad.append(f'{n} (shown: {total})')
     if bad:
         return '', 'number_not_in_result:' + ','.join(bad)
@@ -892,6 +895,12 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
     stopped at a new meaning, after the person said yes."""
     t0 = time.time()
     rec = {'q': question, 'mapper': mapper}
+    global SAID
+    SAID = ' '.join([h.get('q') or '' for h in history] + [question])
+    SEARCHED.clear()
+    for h in history:
+        for c in h.get('commands') or []:
+            SEARCHED.update(_searches(c))
     if resume:
         plan, rec['resumed'] = {'commands': resume['commands']}, True
     else:
@@ -907,7 +916,9 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
         nxt = {'new_connector': ' The Builder can ask for a connector for it; until then I only see your Google account.',
                'new_write_action': ' I can read and show previews (a draft reply, for example), but changing things '
                                    'in your accounts needs an action our team adds.'}.get(needs, '')
-        rec.update(reply=why.rstrip() + nxt, shown='', commands=[], needs=needs, total_s=round(time.time() - t0, 2))
+        why = why.rstrip()
+        why += '' if not nxt or why.endswith(('.', '!', '?')) else '.'
+        rec.update(reply=why + nxt, shown='', commands=[], needs=needs, total_s=round(time.time() - t0, 2))
         return rec
     shown_parts, cmds, judge_s, errors = run_plan(con, plan)
     if plan.get('pending') or plan.get('declined'):
@@ -948,7 +959,10 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
     final_rows = shown_parts[-1] if shown_parts else ''
     earlier = ('Earlier steps (not shown to the person; do not describe their rows): ' + ' ; '.join(cmds[:-1])) \
         if len(cmds) > 1 else ''
-    reply, why = compose(question, final_rows, history, plan_note=earlier)
+    if cmds and re.match(r'(idli\s+)?(summarise|explain)\b', cmds[-1]) and 'failed' not in final_rows[:40]:
+        reply, why = '', 'prose_result'  # the result is already written for the person
+    else:
+        reply, why = compose(question, final_rows, history, plan_note=earlier)
     rec['compose_s'] = round(time.time() - t1, 2)
     rec['compose_fallback'] = why
     body = (reply + '\n\n' if reply else '') + (final_rows if final_rows else '')
@@ -998,12 +1012,65 @@ def tty_confirm(card):
     return ans
 
 
+SAID = ''  # the person's words this conversation (ask sets it): --search may only use these
+SEARCHED = set()  # --search values already run this conversation: a judge may narrow to "those" only
+
+
+def _searches(c):
+    try:
+        argv = shlex.split(c)
+    except ValueError:
+        return []
+    return [argv[i + 1].strip('"\' ').lower() for i, t in enumerate(argv[:-1]) if t == '--search']
+
+
+def own_words(c):
+    """Drop --search values whose words the person never used. Models add their own ("reply" to find emails that
+    need a reply), which narrows a judge to the wrong rows. Returns the command and what was dropped."""
+    if not SAID or '--search' not in c:
+        return c, []
+    try:
+        argv = shlex.split(c)
+    except ValueError:
+        return c, []
+    said = set(re.findall(r'[a-z0-9]+', SAID.lower()))
+    stem = lambda w: w[:-1] if len(w) > 4 and w.endswith('s') else w
+    said |= {stem(w) for w in said}
+    judging = 'judge' in argv[:2]
+    out, dropped, i = [], [], 0
+    while i < len(argv):
+        if argv[i] == '--search' and i + 1 < len(argv):
+            ws = re.findall(r'[a-z0-9]+', argv[i + 1].lower())
+            not_said = ws and not all(w in said or stem(w) in said for w in ws)
+            not_shown = judging and argv[i + 1].strip('"\' ').lower() not in SEARCHED  # judge narrows to a shown search
+            if not_said or not_shown:
+                dropped.append(argv[i + 1]); i += 2; continue
+        out.append(argv[i]); i += 1
+    return (qjoin(out), dropped) if dropped else (c, [])
+
+
+def qjoin(argv):
+    """A command line as a person would type it: "double quotes" around anything with spaces or single quotes."""
+    def q(a):
+        if re.fullmatch(r'[\w./:@=,+-]+', a):
+            return a
+        return '"' + a.replace('\\', '\\\\').replace('"', '\\"') + '"' if '"' not in a or "'" in a else "'" + a + "'"
+    return ' '.join(q(a) for a in argv)
+
+
 def run_plan(con, plan):
     shown_parts, cmds, judge_s, errors = [], [], 0.0, []
     for c in plan['commands'][:6]:
         if PLACEHOLDER.search(c):  # it needs a value from the results so far: stop here and ask for the rest
             plan['continue'] = True
             break
+        c2, dropped = own_words(c)
+        SEARCHED.update(_searches(c2)) if not re.match(r'(idli\s+)?judge\b', c2) else None
+        if dropped:
+            say(1, f'[own words] dropped --search {dropped}: not words the person used')
+            plan.setdefault('dropped_search', []).extend(dropped)
+            plan['commands'] = [c2 if x == c else x for x in plan['commands']]
+            c = c2
         try:
             argv = shlex.split(c)
         except ValueError:
