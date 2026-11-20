@@ -6,6 +6,11 @@ Design context: [GOALS_V0.5](../../../narrative/GOALS_V0.5.md). Nothing below is
 
 ## Bugs found in the session (fix first)
 
+Done 2026-11-20 night: **B3, B9, B10, B11, B12, B13, B14** (the yes card, contents for every kind, skips, saving as
+it lands), `-v` levels and the log, `sync drive` with pages and content search, summary cards (chronology section 7).
+Still open: **B4, B5, B6, B7, B8**, the renames (sync gmail/gcalendar, events -> calendar, count and --by folds),
+the log-to-dev-bank export, a harder judge set.
+
 Done 2026-11-20: **B1, B2** (cursor per thread, retries for temporary errors only, failures not saved and
 reported; checked on a copy of the owner's sandbox: 93 judged, 0 failed, where 187 of 191 had failed).
 

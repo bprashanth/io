@@ -156,6 +156,7 @@ def parser():
     s.add_argument('what', nargs='?', default='all', choices=['all', 'mail', 'events', 'files', 'sheets', 'drive'],
                    help='drive = files and sheets, then read the text of every document not read yet')
     s.add_argument('--no-read', action='store_true', help='copy the file list only; read the text later')
+    s.add_argument('--no-cards', action='store_true', help='read the text but make no summary cards now')
     s.add_argument('--as', dest='role', default='me')
     for verb in ('list', 'count'):
         l = sub.add_parser(verb, help='rows of a resource' if verb == 'list' else 'how many rows match')
@@ -267,6 +268,15 @@ def run_argv(con, argv):
                                (f', {rr["failed"]} could not be read ({rr["failed_examples"][0]})' if rr['failed'] else ''))
                 else:
                     out.append('documents: all read already')
+                todo = [] if a.no_cards else rs.to_card(con)
+                if todo:
+                    print(f'Making a short card for {len(todo)} documents with the 9B (about '
+                          f'{max(1, round(len(todo) * 5 / 60))} min; measured 5 s each). Ctrl+C keeps what was made; '
+                          '--no-cards skips this.',
+                          file=sys.stderr)
+                    rc = rs.make_cards(con, progress=progress_line)
+                    out.append(f'cards made: {rc["made"]} in {rc["seconds"]} s' +
+                               (f', {rc["failed"]} failed ({rc["failed_examples"][0]})' if rc['failed'] else ''))
         return Result(kind='text', text='Synced ' + acct + '. ' + '; '.join(out) + '.')
     if v in ('list', 'count'):
         cols, rows, sql = rs.select(con, a.resource, where=a.where, since=a.since, until=a.until, on=a.on,
@@ -362,7 +372,11 @@ def get(con, what, ref):
         fid, _ = find_file(con, ref, kinds=None)
         cols = rs.columns(con, 'files')
         r = con.execute('SELECT * FROM files WHERE id = ?', [fid]).fetchone()
-        return Result(kind='text', text='\n'.join(f'{c}: {_fmt(x)}' for c, x in zip(cols, r) if x not in (None, '')))
+        out = '\n'.join(f'{c}: {_fmt(x)}' for c, x in zip(cols, r) if x not in (None, ''))
+        c = rs.card(con, fid)
+        if c:
+            out += f'\nsummary: {c[0]}\nkey terms: {", ".join(c[1])}'
+        return Result(kind='text', text=out)
     if what == 'event':
         r = con.execute("SELECT * FROM events WHERE id = ? OR title ILIKE ? ORDER BY start LIMIT 1",
                         [ref, f'%{ref}%']).fetchone()

@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, account TEXT, name TEXT, 
   width INTEGER, height INTEGER, fetched_at TIMESTAMP);
 CREATE TABLE IF NOT EXISTS file_text (file_id TEXT PRIMARY KEY, modified TIMESTAMP, pages INTEGER, text TEXT);
 CREATE TABLE IF NOT EXISTS file_pages (file_id TEXT, page INTEGER, text TEXT, PRIMARY KEY (file_id, page));
+CREATE TABLE IF NOT EXISTS file_cards (file_id TEXT PRIMARY KEY, modified TIMESTAMP, summary TEXT, key_terms TEXT,
+  made_by TEXT, made_at TIMESTAMP);
 CREATE TABLE IF NOT EXISTS sheets (name TEXT, file_id TEXT PRIMARY KEY, tbl TEXT, columns TEXT, nrows INTEGER,
   fetched_at TIMESTAMP);
 CREATE TABLE IF NOT EXISTS definitions (name TEXT, version INTEGER, on_kind TEXT, ask TEXT, answers TEXT,
@@ -474,9 +476,80 @@ def read_texts(con, account=None, workers=4, progress=None, limit=None):
     return {'read': done, 'failed': len(failed), 'failed_examples': failed[:3], 'seconds': round(time.time() - t0, 1)}
 
 
+CARD_SCHEMA = {'type': 'object', 'properties': {
+    'summary': {'type': 'string'}, 'key_terms': {'type': 'array', 'items': {'type': 'string'}, 'maxItems': 15}},
+    'required': ['summary', 'key_terms']}
+CARD_PROMPT = """You write a short card about one file so it can be found and sorted later. Answer with JSON:
+- summary: 2 or 3 plain sentences on what the file is and what it covers. Keep the file's own words for its subject
+  (if it says "Adivasi", write "Adivasi", not a synonym).
+- key_terms: up to 15 names, places, groups, species, organisations, programmes and topic words, each exactly as
+  written in the file. For a spreadsheet, include its column names.
+Use only what is in the text."""
+
+
+def _card_input(con, fid):
+    """The name and a sample of the text: the start, a stretch from the middle and the end, about 6,000 characters."""
+    name, kind, path = con.execute('SELECT name, kind, path FROM files WHERE id = ?', [fid]).fetchone()
+    pages = [r[0] for r in con.execute('SELECT text FROM file_pages WHERE file_id = ? ORDER BY page', [fid]).fetchall()]
+    text = '\n'.join(pages)
+    if len(text) > 6000:
+        mid = len(text) // 2
+        text = text[:3600] + '\n[...]\n' + text[mid - 1000:mid + 1000] + '\n[...]\n' + text[-600:]
+    return f'File name: {name}\nKind: {kind}\nFolder: {path}\n\n{text}'
+
+
+def to_card(con):
+    """Files read for their current version that have no card for it."""
+    return [r[0] for r in con.execute(
+        "SELECT f.id FROM files f JOIN file_text t ON t.file_id = f.id AND t.modified = f.modified "
+        "LEFT JOIN file_cards c ON c.file_id = f.id WHERE coalesce(t.pages, 0) >= 0 AND length(trim(t.text)) > 0 "
+        "AND (c.file_id IS NULL OR c.modified IS DISTINCT FROM f.modified) ORDER BY f.modified DESC").fetchall()]
+
+
+def make_cards(con, workers=4, progress=None, limit=None):
+    """A card per file version, by the served 9B. Ctrl+C keeps what was made."""
+    todo, t0, failed, done = to_card(con)[:limit], time.time(), [], 0
+
+    def one(fid):
+        cur = con.cursor()
+        try:
+            out = _retry_brief(lambda: _nine([{'role': 'system', 'content': CARD_PROMPT},
+                                              {'role': 'user', 'content': _card_input(cur, fid)}], CARD_SCHEMA,
+                                             max_tokens=700, timeout=180, variant='nine_compressed'))
+            terms = [str(t).strip() for t in out.get('key_terms') or [] if str(t).strip()][:15]
+            cur.execute('INSERT OR REPLACE INTO file_cards SELECT id, modified, ?, ?, ?, ? FROM files WHERE id = ?',
+                        [str(out.get('summary', '')).strip(), json.dumps(terms, ensure_ascii=False), 'nine_compressed',
+                         local(now()), fid])
+            return fid, None
+        except Exception as e:
+            return fid, f'{type(e).__name__}: {str(e)[:100]}'
+        finally:
+            cur.close()
+    ex = cf.ThreadPoolExecutor(workers)
+    futs = [ex.submit(one, f) for f in todo]
+    try:
+        for i, fut in enumerate(cf.as_completed(futs), 1):
+            fid, err = fut.result()
+            failed.append(err) if err else None
+            done += 0 if err else 1
+            if progress:
+                progress(i, len(todo), len(failed), time.time() - t0, 'making cards')
+    except KeyboardInterrupt:
+        ex.shutdown(wait=False, cancel_futures=True)
+        raise
+    ex.shutdown(wait=True)
+    return {'made': done, 'failed': len(failed), 'failed_examples': failed[:3], 'seconds': round(time.time() - t0, 1)}
+
+
+def card(con, fid):
+    r = con.execute('SELECT summary, key_terms FROM file_cards c JOIN files f ON f.id = c.file_id '
+                    'AND c.modified = f.modified WHERE c.file_id = ?', [fid]).fetchall()
+    return (r[0][0], json.loads(r[0][1] or '[]')) if r else None
+
+
 def drop_orphans(con):
     """Text, pages and labels of files no longer in Drive."""
-    for t, col in (('file_text', 'file_id'), ('file_pages', 'file_id')):
+    for t, col in (('file_text', 'file_id'), ('file_pages', 'file_id'), ('file_cards', 'file_id')):
         con.execute(f'DELETE FROM {t} WHERE {col} NOT IN (SELECT id FROM files)')
     con.execute("DELETE FROM labels WHERE kind = 'file' AND record_id NOT IN (SELECT id FROM files)")
 
@@ -576,7 +649,9 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
         if r.get('kind') == 'file' and r.get('table') == 'files':  # names and folders, or anywhere in the text
             conds.append('(' + ' AND '.join(
                 '(' + ' OR '.join(f"CAST({c} AS TEXT) ILIKE '%{w}%' {lk}" for c in cols) +
-                f" OR id IN (SELECT file_id FROM file_pages WHERE text ILIKE '%{w}%' {lk}))" for w in words) + ')')
+                f" OR id IN (SELECT file_id FROM file_pages WHERE text ILIKE '%{w}%' {lk})"
+                f" OR id IN (SELECT file_id FROM file_cards WHERE summary || ' ' || key_terms ILIKE '%{w}%' {lk}))"
+                for w in words) + ')')
             w0, wl = raw[0], words[0]
             found = (f", (SELECT 'p.' || page || ': ...' || regexp_replace(substr(text, greatest(1, "
                      f"strpos(lower(text), lower('{w0}')) - 70), 160), '\\s+', ' ', 'g') || '...' FROM file_pages p "
@@ -754,6 +829,9 @@ def _item_text(con, kind, rid, account, with_text=True):
             body = re.sub(r'[ \t]+', ' ', body.replace(BOM, '')).strip()
             if not body:
                 return None  # nothing to judge
+            c = card(con, rid)
+            if c:
+                out += f'\n\nSummary: {c[0]}\nKey terms: {", ".join(c[1])}'
             out += '\n\nStart of the text:\n' + body[:1200]
         except Exception as e:
             if _transient(e):  # the network or the store, not the file: let the caller retry

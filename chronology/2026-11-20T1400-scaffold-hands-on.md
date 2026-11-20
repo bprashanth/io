@@ -101,3 +101,45 @@ Root causes found:
   Q5 1.71, BF16 3.84, Muse 6.93.
 - **Conclusions:** give the judge every file's contents (B10) first; Clef is the best value but must run locally
   for real data; BF16 gains little over Q5; Muse adds nothing here. The set is too easy at the top.
+
+## 7. The owner's adivasi session, and the fixes it led to (2026-11-20 night)
+
+**What the session showed** (sandbox `~/idli-sbx/t1`, checked with read-only SQL on a copy):
+- "Find the adivasi article" failed: `--search` read names and folders only; the word is in 2 documents' text.
+- The 9B's summary of the note said "Particularly Vulnerable Tribal Groups", dropping the word "Adivasi".
+- "Is it about adivasi tribes?" made a definition without asking, worded from the note just read: "Adivasi tribes
+  (e.g., Toda, Kota, Irular, PVTGs)". With it, the owner's test document (a list of other tribes) was "no" for both
+  9Bs and Clef (0.16); with a plain wording Clef gave 0.96. Clef also gave an empty document 0.86 under the narrow
+  wording. The wording mattered more than the model.
+- The 9B judge ran over folders, pictures and videos, showed no progress, and Ctrl+C lost everything.
+- The owner's test document was made at 21:05 and the sandbox's last Drive sync was 20:47; a later re-sync did
+  not reach that sandbox (sync works on a copy).
+
+**Built (commits f1130bf0, baf711c3, d2f7907e, and the cards commit):**
+1. Judge: every file kind's contents (B10: sheets as rows, text and code files); folders, media and empty files
+   skipped (B11, B13); each label saved as it lands, Ctrl+C keeps them and says how many are left (B12); ends with
+   up to 5 examples per answer and the `list --label` command for all. Empty files hidden from listings (`--all`).
+2. `-v`, `-vv`, `-vvv` (or `-v N`): steps and models; prompts, plans, every step's rows and judged items; every
+   model call, retries and pypdf's warnings. A progress line on long work. Every command and every `ask` turn (with
+   the masked prompt, the plan, the store's counts, definitions and views) goes to `<sandbox>/log.jsonl`.
+3. The yes card (B3, B9, B14): the mapper can't make or change a definition or view on its own. An existing name is
+   reused as it is; a new one shows its wording and judging cost; in a terminal the person answers y, n or types a
+   better wording; otherwise the turn stops and `idli ask yes` (or `yes: <wording>`) carries on. The menu shows each
+   definition's answers; the grammar asks for general wording. `judge` takes `--in`.
+4. `sync drive` (files and sheets) reads every document's text page by page into `file_pages`, newest first, four
+   at a time, with a size estimate; changed files are read again and their labels dropped; deleted files' text,
+   cards and labels removed; a broken file is noted per version and not retried. `--search` on files covers
+   contents and shows the page and a snippet. On the copy: 140 documents, 3,625 pages, 9.5 MB of text, 70 s;
+   "adivasi" finds both documents.
+5. Summary cards (`file_cards`): made by the served 9B per file version during `sync drive` (`--no-cards` skips),
+   2-3 sentences plus up to 15 key terms kept as written; the judge reads the card before the start of the text;
+   search covers cards; `get file` shows the card. On the copy: 141 cards in 12 minutes (about 5 s each, three
+   times the first estimate); 8 failed when the 9B listed terms until the reply was cut off, fixed by capping the
+   list at 15 in the schema. The card for the Vol. 53 note keeps "Adivasi" in its key terms.
+   Judging "Is this about Adivasi or tribal communities of India?" with cards: the 9B said yes to 22 of 141 (206 s),
+   Clef to 3 plus 4 unsure (16 s). Both found the owner's test document. The 9B's extra yes are caste and
+   entrepreneurship papers that mention Scheduled Tribes, and vegetation sheets with a "Toda name" column: the
+   difference is strictness, which the owner decides.
+6. Also fixed: `.pptx` typed as slides (was "doc", read as binary); a re-sync of sheets crashed on a half-read
+   result; my earlier `_retry` had replaced mail sync's quota retry (renamed to `_retry_brief`); LIKE wildcards in
+   search terms.
