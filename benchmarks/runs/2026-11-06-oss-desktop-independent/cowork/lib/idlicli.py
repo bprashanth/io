@@ -158,7 +158,7 @@ class P(argparse.ArgumentParser):
 
 def parser():
     p = P(prog='idli', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, add_help=True)
-    sub = p.add_subparsers(dest='verb')
+    sub = p.add_subparsers(dest='verb', metavar='VERB')
     s = sub.add_parser('sync', help='copy your Google account into this sandbox (read only)')
     s.add_argument('what', nargs='?', default='all', choices=['all', 'gmail', 'gcalendar', 'drive', 'mail', 'events', 'files', 'sheets'],
                    help='gmail, gcalendar, drive (files and sheets, then the text and a card for every document), or all')
@@ -272,7 +272,10 @@ def run_argv(con, argv):
         for what in whats:
             t0 = time.time()
             say(1, f'[sync {what}] {start[what]} ...')
-            if what == 'sheets':
+            if what == 'mail':
+                n = rs.sync_mail(con, acct, progress=progress_line, on_item=item_line('mail'))
+                out.append(f'mail: {n} new')
+            elif what == 'sheets':
                 n = rs.sync_sheets(con, acct, progress=progress_line, on_item=item_line('sheet'))
                 out.append(f'sheets: {n} read (unchanged ones skipped)')
             else:

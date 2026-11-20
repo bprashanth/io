@@ -186,7 +186,7 @@ CAL_NOTICE = re.compile(r'^(accepted|declined|tentatively accepted|invitation|up
 BULK_FROM = re.compile(r'(no-?reply|noreply|notifications?|mailer-daemon|news(letter)?|updates?|digest|info)@', re.I)
 
 
-def sync_mail(con, account, days=60, limit=600):
+def sync_mail(con, account, days=60, limit=600, progress=None, on_item=None):
     g, t0 = _g(), time.time()
     ids = [m['id'] for m in g.gmail_list(account, f'newer_than:{int(days)}d -in:chats', limit=limit)]
     have = {r[0] for r in con.execute('SELECT id FROM mail WHERE account = ?', [account]).fetchall()}
@@ -211,9 +211,15 @@ def sync_mail(con, account, days=60, limit=600):
                 'UNREAD' in labels, bulk and not notice, notice, local(now())]
 
     rows = []
+    if on_item:
+        on_item('new', f'{len(todo)} of the {len(ids)} emails in the last {days} days')
     with cf.ThreadPoolExecutor(3) as ex:
         for row in ex.map(one, todo):
             rows.append(row)
+            if progress:
+                progress(len(rows), len(todo), 0, time.time() - t0, 'reading mail')
+            if on_item:
+                on_item(f'{row[3]:%d %b %H:%M}', f'{row[6] or row[5]}: {row[8][:70]}')
             if len(rows) % 50 == 0:  # keep what we have if Google stops us part way
                 con.executemany('INSERT OR REPLACE INTO mail VALUES (' + ','.join('?' * 16) + ')', rows[-50:])
     tail = rows[len(rows) - len(rows) % 50:]

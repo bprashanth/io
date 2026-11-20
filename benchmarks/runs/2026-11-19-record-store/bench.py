@@ -17,10 +17,13 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--only', default='')
     ap.add_argument('--sandbox', default=os.environ.get('IDLI_SANDBOX'))
+    ap.add_argument('--judge', default=None, help='clef (default), nine_compressed, nine')
+    ap.add_argument('--no-yes', dest='yes', action='store_false', help="don't accept yes cards on the tester's behalf")
     a = ap.parse_args()
     tasks = json.load(open(a.tasks))
     only = set(filter(None, a.only.split(',')))
     con = rs.connect(a.sandbox)
+    idlicli.use_models(a.mapper, a.judge)  # 2026-11-21: Clef judges by default
     out = open(a.out, 'a')
     for t in tasks:
         if only and t['id'] not in only:
@@ -28,6 +31,12 @@ def main():
         hist = []
         for i, q in enumerate(t['turns']):
             rec = idlicli.ask(con, q, hist, a.mapper, data_dir=a.sandbox)
+            if rec.get('pending') and a.yes:  # 2026-11-21: the yes card. A tester would read it and say yes
+                card = rec['pending']['card']
+                idlicli.CONFIRM = lambda c: True
+                rec = idlicli.ask(con, q, hist, a.mapper, data_dir=a.sandbox, resume=rec['pending'])
+                idlicli.CONFIRM = None
+                rec['card_shown_and_accepted'] = card
             hist.append({k: rec.get(k) for k in ('q', 'commands', 'shown', 'reply')})
             rec.update(task=t['id'], turn=i, kind=t['kind'], site=t['site'])
             out.write(json.dumps(rec, default=str) + '\n'); out.flush()
