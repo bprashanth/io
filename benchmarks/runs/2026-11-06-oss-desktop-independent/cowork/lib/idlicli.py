@@ -153,7 +153,9 @@ def parser():
     p = P(prog='idli', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, add_help=True)
     sub = p.add_subparsers(dest='verb')
     s = sub.add_parser('sync', help='read your Google account into the store')
-    s.add_argument('what', nargs='?', default='all', choices=['all', 'mail', 'events', 'files', 'sheets'])
+    s.add_argument('what', nargs='?', default='all', choices=['all', 'mail', 'events', 'files', 'sheets', 'drive'],
+                   help='drive = files and sheets, then read the text of every document not read yet')
+    s.add_argument('--no-read', action='store_true', help='copy the file list only; read the text later')
     s.add_argument('--as', dest='role', default='me')
     for verb in ('list', 'count'):
         l = sub.add_parser(verb, help='rows of a resource' if verb == 'list' else 'how many rows match')
@@ -246,9 +248,25 @@ def run_argv(con, argv):
     v = a.verb
     if v == 'sync':
         acct, out = account(a.role), []
-        for what in (['mail', 'events', 'files', 'sheets'] if a.what == 'all' else [a.what]):
+        whats = {'all': ['mail', 'events', 'files', 'sheets'], 'drive': ['files', 'sheets']}.get(a.what, [a.what])
+        for what in whats:
+            t0 = time.time()
             n = getattr(rs, f'sync_{what}')(con, acct)
-            out.append(f'{what}: {n} new or updated')
+            say(1, f'[sync {what}] {n} in {round(time.time() - t0, 1)} s')
+            out.append(f'{what}: {n} listed')
+        if 'files' in whats or 'sheets' in whats:
+            rs.drop_orphans(con)
+            if not a.no_read:
+                todo = [r for r in rs.to_read(con, acct) if rs.readable(r[4], r[5], r[2])]
+                if todo:
+                    mb = sum(r[3] or 0 for r in todo) / 1e6
+                    print(f'Reading {len(todo)} documents not read yet ({mb:.0f} MB to download, Google Docs not '
+                          'counted). Ctrl+C keeps what was read; sync again to carry on.', file=sys.stderr)
+                    rr = rs.read_texts(con, acct, progress=progress_line)
+                    out.append(f'documents read: {rr["read"]} in {rr["seconds"]} s' +
+                               (f', {rr["failed"]} could not be read ({rr["failed_examples"][0]})' if rr['failed'] else ''))
+                else:
+                    out.append('documents: all read already')
         return Result(kind='text', text='Synced ' + acct + '. ' + '; '.join(out) + '.')
     if v in ('list', 'count'):
         cols, rows, sql = rs.select(con, a.resource, where=a.where, since=a.since, until=a.until, on=a.on,

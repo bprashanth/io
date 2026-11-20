@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, account TEXT, name TEXT, 
   folder TEXT, path TEXT, size BIGINT, modified TIMESTAMP, owner TEXT, shared BOOLEAN, taken_at TEXT,
   width INTEGER, height INTEGER, fetched_at TIMESTAMP);
 CREATE TABLE IF NOT EXISTS file_text (file_id TEXT PRIMARY KEY, modified TIMESTAMP, pages INTEGER, text TEXT);
+CREATE TABLE IF NOT EXISTS file_pages (file_id TEXT, page INTEGER, text TEXT, PRIMARY KEY (file_id, page));
 CREATE TABLE IF NOT EXISTS sheets (name TEXT, file_id TEXT PRIMARY KEY, tbl TEXT, columns TEXT, nrows INTEGER,
   fetched_at TIMESTAMP);
 CREATE TABLE IF NOT EXISTS definitions (name TEXT, version INTEGER, on_kind TEXT, ask TEXT, answers TEXT,
@@ -362,8 +363,8 @@ def sync_sheets(con, account, max_bytes=3_000_000):
             continue
         df = df.dropna(how='all').fillna('')
         df.columns = [re.sub(r'\s+', ' ', str(c)).strip() or f'col{i + 1}' for i, c in enumerate(df.columns)]
-        old = con.execute('SELECT tbl FROM sheets WHERE file_id = ?', [fid]).fetchone()
-        tbl = old[0] if old else _slug(name, taken)
+        old = con.execute('SELECT tbl FROM sheets WHERE file_id = ?', [fid]).fetchall()  # all: a half-read result blocks register
+        tbl = old[0][0] if old else _slug(name, taken)
         taken.add(tbl)
         con.register('df_in', df)
         con.execute(f'CREATE OR REPLACE TABLE "{tbl}" AS SELECT row_number() OVER () AS row_no, * FROM df_in')
@@ -375,30 +376,109 @@ def sync_sheets(con, account, max_bytes=3_000_000):
     return n
 
 
+PAGE_CHARS = 3000  # documents without real pages (Docs, text, sheets) are cut into parts of about this size
+
+
+def _parts(text):
+    out, buf = [], ''
+    for para in text.split('\n'):
+        if len(buf) + len(para) > PAGE_CHARS and buf:
+            out.append(buf); buf = ''
+        buf += para + '\n'
+    return out + ([buf] if buf.strip() else [])
+
+
 def file_text(con, account, fid):
-    """A PDF's or document's text, read once and kept (capped)."""
-    row = con.execute('SELECT f.modified, t.modified, t.text, f.mime, f.kind FROM files f LEFT JOIN file_text t '
+    """A file's text, read once per version and kept: the whole (capped) in file_text, and page by page in
+    file_pages for search. PDFs keep their pages; other files are cut into parts of about PAGE_CHARS."""
+    row = con.execute('SELECT f.modified, t.modified, t.text, f.mime, f.kind, '
+                      '(SELECT count(*) FROM file_pages p WHERE p.file_id = f.id) FROM files f LEFT JOIN file_text t '
                       'ON t.file_id = f.id WHERE f.id = ?', [fid]).fetchone()
     if not row:
         raise ValueError('No such file in the store. Run `idli sync files` first.')
-    fmod, tmod, text, mime, kind = row
-    if text is not None and tmod == fmod:
+    fmod, tmod, text, mime, kind, npages = row
+    if text is not None and tmod == fmod and (npages or not text.strip()):  # read; an empty file has no pages
         return text
-    raw = _g().drive_bytes(account, fid, mime)
-    pages = None
-    if kind == 'pdf':
-        from pypdf import PdfReader
-        rd = PdfReader(io.BytesIO(raw))
-        pages = len(rd.pages)
-        text = '\n'.join((p.extract_text() or '') for p in rd.pages[:80])
-    elif 'wordprocessing' in (mime or ''):
-        import docx
-        text = '\n'.join(p.text for p in docx.Document(io.BytesIO(raw)).paragraphs)
+    if kind == 'sheet':
+        pages = [_sheet_text(con, account, fid, mime, rows=2000)]
     else:
-        text = raw.decode('utf-8', 'replace')
-    text = re.sub(r'[ \t]+', ' ', text)[:TEXT_CAP]
-    con.execute('INSERT OR REPLACE INTO file_text VALUES (?,?,?,?)', [fid, fmod, pages, text])
+        raw = _g().drive_bytes(account, fid, mime)
+        if kind == 'pdf':
+            from pypdf import PdfReader
+            pages = [(p.extract_text() or '') for p in PdfReader(io.BytesIO(raw)).pages[:200]]
+        elif 'wordprocessing' in (mime or ''):
+            import docx
+            pages = ['\n'.join(p.text for p in docx.Document(io.BytesIO(raw)).paragraphs)]
+        elif mime == 'application/vnd.google-apps.document' or readable(kind, mime, ''):
+            pages = [raw.decode('utf-8', 'replace')]
+        else:
+            pages = ['']
+    pages = [re.sub(r'[ \t]+', ' ', p.replace(BOM, '')) for p in pages]
+    if kind != 'pdf':
+        pages = _parts('\n'.join(pages)) or ['']
+    text = '\n'.join(pages)[:TEXT_CAP]
+    con.execute('DELETE FROM file_pages WHERE file_id = ?', [fid])
+    rows = [[fid, i + 1, p] for i, p in enumerate(pages) if p.strip()]
+    if rows:
+        con.executemany('INSERT INTO file_pages VALUES (?,?,?)', rows)
+    if tmod is not None and tmod != fmod:  # the file changed: what was judged on the old version no longer holds
+        con.execute("DELETE FROM labels WHERE kind = 'file' AND record_id = ?", [fid])
+    con.execute('INSERT OR REPLACE INTO file_text VALUES (?,?,?,?)', [fid, fmod, len(pages) if kind == 'pdf' else None, text])
     return text
+
+
+def to_read(con, account=None):
+    """Files whose text hasn't been read for their current version: (id, account, name, size)."""
+    acct = 'AND f.account = ?' if account else ''
+    return con.execute(
+        "SELECT f.id, f.account, f.name, f.size, f.kind, f.mime FROM files f LEFT JOIN file_text t ON t.file_id = f.id "
+        f"WHERE f.kind IN ('pdf', 'doc', 'sheet', 'other') {acct} AND (t.file_id IS NULL OR t.modified IS DISTINCT FROM "
+        "f.modified OR (length(trim(t.text)) > 0 AND coalesce(t.pages, 0) >= 0 "
+        "AND NOT EXISTS (SELECT 1 FROM file_pages p WHERE p.file_id = f.id))) "
+        "ORDER BY f.modified DESC",
+        [account] if account else []).fetchall()
+
+
+def read_texts(con, account=None, workers=4, progress=None, limit=None):
+    """Read every document not read yet (newest first), in parallel. Ctrl+C keeps what was read. Returns counts."""
+    todo = [r for r in to_read(con, account) if readable(r[4], r[5], r[2])][:limit]
+    t0, done, failed = time.time(), 0, []
+
+    def one(r):
+        cur = con.cursor()
+        try:
+            _retry_brief(lambda: file_text(cur, r[1], r[0]))
+            return r, None
+        except Exception as e:
+            if not _transient(e):  # a broken file: note it for this version (pages = -1) so sync doesn't retry it
+                cur.execute('INSERT OR REPLACE INTO file_text SELECT id, modified, -1, ? FROM files WHERE id = ?',
+                            [f'(could not be read: {type(e).__name__})', r[0]])
+            return r, f'{type(e).__name__}: {str(e)[:100]}'
+        finally:
+            cur.close()
+    ex = cf.ThreadPoolExecutor(workers)
+    futs = [ex.submit(one, r) for r in todo]
+    try:
+        for i, fut in enumerate(cf.as_completed(futs), 1):
+            r, err = fut.result()
+            if err:
+                failed.append(f'{r[2]}: {err}')
+            else:
+                done += 1
+            if progress:
+                progress(i, len(todo), len(failed), time.time() - t0, 'reading')
+    except KeyboardInterrupt:
+        ex.shutdown(wait=False, cancel_futures=True)
+        raise
+    ex.shutdown(wait=True)
+    return {'read': done, 'failed': len(failed), 'failed_examples': failed[:3], 'seconds': round(time.time() - t0, 1)}
+
+
+def drop_orphans(con):
+    """Text, pages and labels of files no longer in Drive."""
+    for t, col in (('file_text', 'file_id'), ('file_pages', 'file_id')):
+        con.execute(f'DELETE FROM {t} WHERE {col} NOT IN (SELECT id FROM files)')
+    con.execute("DELETE FROM labels WHERE kind = 'file' AND record_id NOT IN (SELECT id FROM files)")
 
 
 def image_b64(account, fid, mime, side=512):
@@ -486,11 +566,24 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
         conds.append(f"{dcol} < TIMESTAMP '{b} 00:00:00'")
     if (on or since or until) and not dcol:
         raise ValueError(f'{resource} has no date to filter on.')
+    found = ''
     if search:
         cols = r.get('text') or [c for c in columns_of(con, src)]
-        words = [w for w in re.split(r'\s+', search.strip()) if w]
-        conds.append('(' + ' AND '.join('(' + ' OR '.join(f"CAST({c} AS TEXT) ILIKE '%{w.replace(chr(39), '')}%'"
-                                                         for c in cols) + ')' for w in words) + ')')
+        raw = [w.replace("'", '') for w in re.split(r'\s+', search.strip()) if w]
+        # % and _ are wildcards in LIKE: search for them as typed
+        words = [w.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') for w in raw]
+        lk = "ESCAPE '\\'"
+        if r.get('kind') == 'file' and r.get('table') == 'files':  # names and folders, or anywhere in the text
+            conds.append('(' + ' AND '.join(
+                '(' + ' OR '.join(f"CAST({c} AS TEXT) ILIKE '%{w}%' {lk}" for c in cols) +
+                f" OR id IN (SELECT file_id FROM file_pages WHERE text ILIKE '%{w}%' {lk}))" for w in words) + ')')
+            w0, wl = raw[0], words[0]
+            found = (f", (SELECT 'p.' || page || ': ...' || regexp_replace(substr(text, greatest(1, "
+                     f"strpos(lower(text), lower('{w0}')) - 70), 160), '\\s+', ' ', 'g') || '...' FROM file_pages p "
+                     f"WHERE p.file_id = files.id AND p.text ILIKE '%{wl}%' {lk} ORDER BY page LIMIT 1) AS found")
+        else:
+            conds.append('(' + ' AND '.join('(' + ' OR '.join(f"CAST({c} AS TEXT) ILIKE '%{w}%' {lk}"
+                                                             for c in cols) + ')' for w in words) + ')')
     if folder:
         conds.append(f"(path ILIKE '%{folder.replace(chr(39), '')}%')")
     if label:  # "urgent", "urgent=yes", "urgent = 'yes'", "label.urgent='no'"
@@ -507,7 +600,7 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
     elif count:
         sql = f'SELECT count(*) AS n FROM {src}{wh}'
     else:
-        cols = fields or (', '.join(r['show']) if r.get('show') else '*')
+        cols = fields or ((', '.join(r['show']) if r.get('show') else '*') + found)
         ordr = order or (f'{dcol} DESC' if dcol else '1')
         sql = f'SELECT {cols} FROM {src}{wh} ORDER BY {ordr} LIMIT {int(limit)}'
     cur = con.execute(sql)
