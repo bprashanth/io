@@ -18,6 +18,10 @@ reported; checked on a copy of the owner's sandbox: 93 judged, 0 failed, where 1
 | B5 | spelled-out numbers ("one") skip the number check | same | check number words too |
 | B6 | the mapper read an incoming "Declined:" notice as "I declined" | same | `explain mail`/`explain calendar` say what is_calendar_notice and my_response mean |
 | B7 | `get event X` / `get mail X` silently take the first substring match | code: `title ILIKE %X%` ... LIMIT 1 | more than one match: list them and ask |
+| B11 | a text definition is judged on folders, images and videos too (by name) | `judge files --def adivasi` judged all 191 files incl. 18 folders | skip folders and media unless the definition is on photos |
+| B12 | labels are saved only when the whole run ends; Ctrl+C loses everything | owner's interrupted 9B run kept nothing | save each label as it lands; Ctrl+C stops cleanly and says how many were kept |
+| B13 | an empty document is sent to the judge | Clef gave an empty "Untitled document" P(yes) 0.86 | no text: `unsure`, no model call |
+| B14 | the mapper wrote a definition from the document it had just read: "Adivasi tribes (e.g., Toda, Kota, Irular, PVTGs)" | owner's test doc (a list of other tribes): both 9Bs no, Clef 0.16; with a plain question Clef 0.96 | the yes card for new meanings (agreed 3); show the exact wording |
 | B10 | judge only reads text for PDFs and Word files; CSV, Excel, text and Python are judged by name | judge test: the 9B goes 20 -> 33 of 38 with contents | show the first 1,200 characters (Excel as rows) for every file kind |
 
 ## Agreed (owner, 2026-11-20)
@@ -96,6 +100,16 @@ reported; checked on a copy of the owner's sandbox: 93 judged, 0 failed, where 1
   scoring head (`joint_head.safetensors`, custom code `joint_schema_model.py`). Its weights differ from Qwen3.5-9B
   (LoRA merged), so it cannot share memory with our 9B. Not on OpenRouter; listed on Workers AI. No torch+CUDA
   environment on the DGX yet. Full Qwen3.5-9B BF16 is in `~/.cache/huggingface/hub/models--Qwen--Qwen3.5-9B` (19 GB).
+
+## Session 2 findings (2026-11-20 night, the adivasi chat)
+
+- Search failed because `--search` reads names and folders only; "adivasi" is in 2 documents' text. Content search
+  first; summary cards (with key terms kept verbatim) during background reading; embeddings only if tests still miss.
+- No progress output on long judges; proposed: a progress line by default, `-v`/`-vv`/`-vvv` for detail, `--show N`
+  rows per minority answer after `judge`. pypdf's "Ignoring wrong pointing object" (a PDF with a broken xref,
+  read anyway) only at `-vvv`.
+- The owner's re-sync didn't reach `~/idli-sbx/t1` (last Drive sync 20:47; the test doc was made 21:05); sync on a
+  copy works.
 
 ## Open questions
 
