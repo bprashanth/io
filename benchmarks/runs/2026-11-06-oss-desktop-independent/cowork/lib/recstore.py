@@ -286,8 +286,9 @@ def sync_events(con, account, back=60, ahead=60):
 
 def _kind(mime):
     m = mime or ''
+    # presentation before document: a .pptx is "officedocument.presentationml.presentation"
     for k, pat in [('folder', 'folder'), ('sheet', 'spreadsheet'), ('sheet', 'text/csv'), ('pdf', 'pdf'),
-                   ('doc', 'document'), ('doc', 'wordprocessing'), ('slides', 'presentation'), ('image', 'image/'),
+                   ('slides', 'presentation'), ('doc', 'document'), ('doc', 'wordprocessing'), ('image', 'image/'),
                    ('video', 'video/'), ('form', 'form')]:
         if pat in m:
             return k
@@ -449,8 +450,8 @@ def compile_where(con, resource, where):
 
 
 def select(con, resource, where=None, since=None, until=None, on=None, search=None, label=None, folder=None,
-           sheet=None, by=None, count=False, fields=None, order=None, limit=50):
-    """Build and run the query for `list`. Returns (columns, rows, sql)."""
+           sheet=None, by=None, count=False, fields=None, order=None, limit=50, show_all=False):
+    """Build and run the query for `list`. Returns (columns, rows, sql). Empty files are left out unless show_all."""
     if resource == 'rows':
         if not sheet:
             raise ValueError('Say which sheet: `idli list rows --sheet "Leads (test)"`. `idli list sheets` shows them.')
@@ -469,6 +470,8 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
         r = {'table': None, 'date': None, 'kind': v[0], 'text': None, 'show': None, 'sql': v[1]}
     src = f'({r["sql"]})' if r.get('sql') else f'"{r["table"]}"'
     conds = [r['filter']] if r.get('filter') else []
+    if resource == 'files' and not show_all:
+        conds.append(f'NOT {EMPTY_SQL}')
     if where:
         conds.append(compile_where(con, resource if resource in RESOURCES else 'files', where))
     dcol = r.get('date')
@@ -547,6 +550,7 @@ def define(con, name, on_kind, ask, answers, examples=None):
 #   NINE:  the 9B that maps (with --mapper nine*) and words replies: 'nine' (BF16) or 'nine_compressed' (served Q5)
 #   JUDGE: who labels rows: 'nine', 'nine_compressed', or 'clef' (hosted Clef-flash: it sees real content, so
 #          test accounts only)
+TRACE = None  # idlicli sets this to its `say(level, msg)`; level 3 shows every model call
 NINE = os.environ.get('IDLI_NINE', 'nine_compressed')
 JUDGE = os.environ.get('IDLI_JUDGE', 'nine_compressed')
 NINE_BF16_URL = os.environ.get('IDLI_9B_BF16_URL', 'http://127.0.0.1:8292')  # idli-9b-bf16 on the DGX
@@ -567,8 +571,12 @@ def _nine(messages, schema, max_tokens=300, timeout=120, variant=None):
             'chat_template_kwargs': {'enable_thinking': False}}
     req = urllib.request.Request(base + '/v1/chat/completions', json.dumps(body).encode(),
                                  {**headers, 'Content-Type': 'application/json'})
+    t0 = time.time()
     with urllib.request.urlopen(req, timeout=timeout) as r:
         txt = json.load(r)['choices'][0]['message']['content']
+    if TRACE:
+        TRACE(3, f'[9B {variant or NINE} at {base}, {time.time() - t0:.1f} s]\n--- sent:\n' +
+              '\n'.join(str(m.get('content'))[:6000] for m in messages) + f'\n--- returned:\n{txt}')
     m = re.search(r'\{.*\}', txt, re.S)
     return json.loads(m.group(0) if m else txt)
 
@@ -589,6 +597,8 @@ def _clef(text, ask, answers, timeout=60):
         out = json.load(r)
     if out.get('provider') != 'Cloudflare':
         raise RuntimeError(f'Clef was served by {out.get("provider")}, not Cloudflare')
+    if TRACE:
+        TRACE(3, f'[clef]\n--- sent:\n{text[:6000]}\n--- question: {json.dumps(q)}\n--- returned: {json.dumps(out["answers"])}')
     a = out['answers']['q']
     if yesno:
         p = a['noul']
@@ -598,6 +608,39 @@ def _clef(text, ask, answers, timeout=60):
     top = max(probs, key=probs.get)
     lab = top if probs[top] >= 0.5 else 'unsure'
     return lab, 'Clef: ' + ', '.join(f'{k} {v:.2f}' for k, v in sorted(probs.items(), key=lambda kv: -kv[1]))
+
+
+TEXT_KINDS = ('pdf', 'doc', 'sheet', 'other')       # file kinds a text definition reads
+TEXTLIKE = re.compile(r'^text/|json|[/+]xml\b|yaml|javascript|x-python|x-sh|x-r\b|markdown|csv|ipynb', re.I)
+TEXT_EXT = re.compile(r'\.(txt|md|py|r|ipynb|json|csv|tsv|ya?ml|sh|js|ts|sql|html?|tex)$', re.I)
+BOM = chr(0xfeff)
+# A file with no content at all: an uploaded file of 0 bytes, or a document whose text came back empty. PDFs with
+# pages but no text (scans) are not empty. Listings hide these unless --all; judge skips them.
+EMPTY_SQL = ("((kind NOT IN ('folder', 'doc', 'sheet', 'slides', 'form') AND size = 0 AND mime NOT LIKE "
+             "'application/vnd.google-apps%') OR (kind <> 'pdf' AND id IN (SELECT file_id FROM file_text WHERE "
+             f"length(trim(replace(text, '{BOM}', ''))) = 0)))")
+
+
+def readable(kind, mime, name):
+    """Can a text definition read this file's contents? PDFs, documents, sheets, and text-like files."""
+    if kind in ('pdf', 'doc', 'sheet'):
+        return True
+    return kind == 'other' and bool(TEXTLIKE.search(mime or '') or TEXT_EXT.search(name or ''))
+
+
+def _sheet_text(con, account, fid, mime, rows=15):
+    """A spreadsheet as its header and first rows, from the table sync made, or read now."""
+    t = con.execute('SELECT tbl FROM sheets WHERE file_id = ?', [fid]).fetchone()
+    if t:
+        cur = con.execute(f'SELECT * EXCLUDE (row_no) FROM "{t[0]}" LIMIT {rows}')
+        head = [d[0] for d in cur.description]
+        return '\n'.join(', '.join(str(v) for v in r) for r in [head] + cur.fetchall())
+    raw = _g().drive_bytes(account, fid, mime)
+    if 'spreadsheetml' in (mime or ''):
+        import pandas as pd
+        df = pd.read_excel(io.BytesIO(raw), dtype=str, nrows=rows).fillna('')
+        return '\n'.join(', '.join(map(str, r)) for r in [list(df.columns)] + df.values.tolist())
+    return '\n'.join(raw.decode('utf-8', 'replace').splitlines()[:rows + 1])
 
 
 def _item_text(con, kind, rid, account, with_text=True):
@@ -612,9 +655,13 @@ def _item_text(con, kind, rid, account, with_text=True):
         return f'When: {r[0]:%Y-%m-%d %H:%M}\nTitle: {r[1]}\nWhere: {r[2]}\nGuests: {r[3]}\nMy response: {r[4]}\n{r[5][:800]}'
     r = con.execute('SELECT name, kind, path, mime FROM files WHERE id = ?', [rid]).fetchone()
     out = f'File name: {r[0]}\nKind: {r[1]}\nFolder: {r[2]}'
-    if with_text and r[1] in ('pdf', 'doc'):
+    if with_text and readable(r[1], r[3], r[0]):
         try:
-            out += '\n\nStart of the text:\n' + file_text(con, account, rid)[:1200]
+            body = _sheet_text(con, account, rid, r[3]) if r[1] == 'sheet' else file_text(con, account, rid)
+            body = re.sub(r'[ \t]+', ' ', body.replace(BOM, '')).strip()
+            if not body:
+                return None  # nothing to judge
+            out += '\n\nStart of the text:\n' + body[:1200]
         except Exception as e:
             if _transient(e):  # the network or the store, not the file: let the caller retry
                 raise
@@ -626,21 +673,38 @@ def _transient(e):
     """Errors worth retrying: rate limits, server errors, timeouts, a busy store. Not a broken file."""
     s = f'{type(e).__name__} {e}'
     return bool(re.search(r'\b(429|500|502|503|504)\b|[Tt]imed? ?out|URLError|Connection(Reset|Refused|Error)|'
-                          r'RemoteDisconnected|ResourceInUse|rateLimit|backendError', s))
+                          r'RemoteDisconnected|ResourceInUse|rateLimit|backendError|Quota|Rate Limit', s))
 
 
-def _retry(fn, tries=3, waits=(2, 6)):
+def _retry_brief(fn, tries=3, waits=(2, 6)):
     for i in range(tries):
         try:
             return fn()
         except Exception as e:
             if i == tries - 1 or not _transient(e):
                 raise
+            if TRACE:
+                TRACE(3, f'[retry {i + 1}] {type(e).__name__}: {str(e)[:200]}')
             time.sleep(waits[min(i, len(waits) - 1)])
 
 
-def judge(con, resource, name, where=None, since=None, limit=300, account=None, workers=4, progress=None):
-    """Label each matching row with the 9B, once per definition version. Returns counts and seconds spent."""
+class Stopped(Exception):
+    """Ctrl+C during judge: what was judged is kept."""
+    def __init__(self, result):
+        super().__init__('stopped')
+        self.result = result
+
+
+def _names(con, kind, ids):
+    if not ids:
+        return {}
+    tbl, col = {'mail': ('mail', 'subject'), 'event': ('events', 'title'), 'file': ('files', 'name')}[kind]
+    return dict(con.execute(f'SELECT id, {col} FROM {tbl} WHERE id IN ({",".join(repr(i) for i in ids)})').fetchall())
+
+
+def judge(con, resource, name, where=None, since=None, limit=300, account=None, workers=4, progress=None, on_item=None):
+    """Label each matching row once per definition version. Each label is saved as it lands; failures are reported
+    and not saved; Ctrl+C keeps what was done (raises Stopped). Returns counts, examples and seconds."""
     d = con.execute('SELECT version, on_kind, ask, answers FROM definitions WHERE name = ? ORDER BY version DESC',
                     [name]).fetchone()
     if not d:
@@ -651,18 +715,24 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
     if RESOURCES[res]['kind'] != kind:
         raise ValueError(f'"{name}" is a definition on {on_kind}, so judge it on '
                          f'{ {"mail": "mail", "event": "events", "file": "files or photos"}[kind] }.')
-    idcol = 'id'
-    _, rows, _ = select(con, res, where=where, since=since, fields=idcol, limit=limit, order=idcol)
+    scope = where
+    if on_kind == 'photo':  # pictures only
+        scope = f"({where}) AND kind = 'image'" if where else "kind = 'image'"
+    elif kind == 'file':  # a text definition: no folders, pictures or videos, nothing empty
+        keep = f"kind IN ({','.join(repr(k) for k in TEXT_KINDS)}) AND NOT {EMPTY_SQL}"
+        scope = f"({where}) AND {keep}" if where else keep
+    _, rows, _ = select(con, res, where=scope, since=since, fields='id', limit=limit, order='id')
     ids = [r[0] for r in rows]
+    if kind == 'file' and on_kind != 'photo':  # binary files of kind 'other' (zips, apps) have nothing to read
+        meta = {r[0]: r[1:] for r in con.execute('SELECT id, kind, mime, name FROM files').fetchall()}
+        ids = [i for i in ids if readable(*meta[i])]
     # failures saved by older versions ("could not judge: ...") are not answers: judge them again
     done = {r[0] for r in con.execute("SELECT record_id FROM labels WHERE kind = ? AND definition = ? AND version = ? "
                                       "AND coalesce(detail, '') NOT LIKE 'could not judge%'", [kind, name, ver]).fetchall()}
     todo = [i for i in ids if i not in done]
     schema = {'type': 'object', 'properties': {'label': {'type': 'string', 'enum': answers},
                                                'why': {'type': 'string'}}, 'required': ['label', 'why']}
-    acct = {}
-    if kind == 'file':
-        acct = dict(con.execute('SELECT id, account FROM files').fetchall())
+    acct = dict(con.execute('SELECT id, account FROM files').fetchall()) if kind == 'file' else {}
     t0 = time.time()
 
     def one(rid):
@@ -670,46 +740,69 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
         try:
             if on_kind == 'photo':
                 mime = cur.execute('SELECT mime FROM files WHERE id = ?', [rid]).fetchone()[0]
-                if not str(mime).startswith('image/'):
-                    return rid, 'unsure', 'not an image'
-                img = _retry(lambda: image_b64(acct.get(rid, account), rid, mime))
+                img = _retry_brief(lambda: image_b64(acct.get(rid, account), rid, mime))
                 msgs = [{'role': 'user', 'content': [
                     {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + img}},
                     {'type': 'text', 'text': f'{ask}\nAnswer with one of: {", ".join(answers)}, and a short why.'}]}]
             else:
-                text = _retry(lambda: _item_text(cur, kind, rid, acct.get(rid, account)))
+                text = _retry_brief(lambda: _item_text(cur, kind, rid, acct.get(rid, account)))
+                if text is None:
+                    return rid, 'unsure', 'empty: nothing to read'
                 msgs = [{'role': 'system', 'content': 'You label one item for the person. Answer with JSON only. '
                          'If the item does not give enough to tell, answer unsure.'},
                         {'role': 'user', 'content': f'{ask}\nAnswers: {", ".join(answers)}\n\n---\n{text}\n---'}]
             if JUDGE == 'clef' and on_kind != 'photo':
-                lab, why = _retry(lambda: _clef(text, ask, answers))
+                lab, why = _retry_brief(lambda: _clef(text, ask, answers))
                 return rid, lab, why
-            out = _retry(lambda: _nine(msgs, schema, variant='nine_compressed' if JUDGE == 'clef' else JUDGE))
+            out = _retry_brief(lambda: _nine(msgs, schema, variant='nine_compressed' if JUDGE == 'clef' else JUDGE))
             lab = out.get('label') if out.get('label') in answers else 'unsure'
             return rid, lab, str(out.get('why', ''))[:200]
         except Exception as e:  # one item failing never stops the rest, and is not saved as an answer
             return rid, None, f'{type(e).__name__}: {str(e)[:120]}'
         finally:
             cur.close()
-    results = []
-    with cf.ThreadPoolExecutor(workers) as ex:
-        for i, r in enumerate(ex.map(one, todo)):
-            results.append(r)
-            if progress and (i + 1) % 20 == 0:
-                progress(i + 1, len(todo))
-    failed = [(rid, why) for rid, lab, why in results if lab is None]
-    for rid, lab, why in results:
-        if lab is not None:
-            con.execute('INSERT OR REPLACE INTO labels VALUES (?,?,?,?,?,?,?)', [kind, rid, name, ver, lab, why, local(now())])
-    if failed:  # drop earlier saved failures for these rows so they read as not judged yet
-        con.execute("DELETE FROM labels WHERE kind = ? AND definition = ? AND version = ? AND detail LIKE 'could not judge%' "
-                    f"AND record_id IN ({','.join(repr(r) for r, _ in failed)})", [kind, name, ver])
-    counts = dict(con.execute('SELECT label, count(*) FROM labels WHERE kind = ? AND definition = ? AND version = ? '
-                              f'AND record_id IN ({",".join(repr(i) for i in ids) or "NULL"}) GROUP BY label',
-                              [kind, name, ver]).fetchall())
-    return {'definition': name, 'version': ver, 'judged_now': len(todo) - len(failed), 'already': len(ids) - len(todo),
-            'failed': len(failed), 'failed_examples': [w for _, w in failed[:3]], 'judge': JUDGE,
-            'counts': counts, 'seconds': round(time.time() - t0, 1)}
+
+    failed, saved = [], 0
+    names = _names(con, kind, todo) if on_item else {}
+
+    def summary(stopped=False):
+        if failed:  # earlier saved failures for these rows read as not judged yet
+            con.execute("DELETE FROM labels WHERE kind = ? AND definition = ? AND version = ? AND detail LIKE "
+                        f"'could not judge%' AND record_id IN ({','.join(repr(r) for r, _ in failed)})", [kind, name, ver])
+        q = (f'FROM labels WHERE kind = ? AND definition = ? AND version = ? '
+             f'AND record_id IN ({",".join(repr(i) for i in ids) or "NULL"})')
+        counts = dict(con.execute(f'SELECT label, count(*) {q} GROUP BY label', [kind, name, ver]).fetchall())
+        common = max(counts, key=counts.get) if counts else None
+        ex = {}
+        for lab in counts:
+            if lab != common or len(counts) == 1:
+                rids = [r[0] for r in con.execute(f'SELECT record_id {q} AND label = ? LIMIT 5', [kind, name, ver, lab]).fetchall()]
+                nm = _names(con, kind, rids)
+                ex[lab] = [nm.get(r, r) for r in rids]
+        return {'definition': name, 'version': ver, 'judge': JUDGE, 'judged_now': saved, 'to_judge': len(todo),
+                'already': len(ids) - len(todo), 'failed': len(failed), 'failed_examples': [w for _, w in failed[:3]],
+                'counts': counts, 'examples': ex, 'seconds': round(time.time() - t0, 1), 'stopped': stopped}
+
+    ex = cf.ThreadPoolExecutor(workers)
+    futs = [ex.submit(one, rid) for rid in todo]
+    try:
+        for i, fut in enumerate(cf.as_completed(futs), 1):
+            rid, lab, why = fut.result()
+            if lab is None:
+                failed.append((rid, why))
+            else:
+                con.execute('INSERT OR REPLACE INTO labels VALUES (?,?,?,?,?,?,?)',
+                            [kind, rid, name, ver, lab, why, local(now())])
+                saved += 1
+            if on_item:
+                on_item(names.get(rid, rid), lab, why)
+            if progress:
+                progress(i, len(todo), len(failed), time.time() - t0)
+    except KeyboardInterrupt:
+        ex.shutdown(wait=False, cancel_futures=True)
+        raise Stopped(summary(stopped=True))
+    ex.shutdown(wait=True)
+    return summary()
 
 
 def size_report(sandbox, con):

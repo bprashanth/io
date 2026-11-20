@@ -68,6 +68,75 @@ def _fmt(v):
     return s if len(s) <= 90 else s[:87] + '...'
 
 
+# ---- what the person sees while things run: -v, -vv, -vvv (or -v 1..3), progress, the log ----
+VERBOSE = int(os.environ.get('IDLI_VERBOSE') or 0)
+TTY = sys.stderr.isatty()
+MAPPER_CALLS = []  # this turn's mapper calls: the masked prompt sent and the plan returned (for -vv and the log)
+
+
+def say(level, msg):
+    """Print to stderr when -v is at least `level`. Level 1: steps and timings. 2: prompts, plans, every step's rows,
+    every judged item. 3: full model calls, retries, library warnings."""
+    if VERBOSE >= level:
+        if TTY:
+            print('\r\033[K', end='', file=sys.stderr)
+        print(msg, file=sys.stderr, flush=True)
+
+
+def dim(text):
+    return f'\033[2m{text}\033[0m' if sys.stdout.isatty() else text
+
+
+def progress_line(done, total, failed, elapsed, what='judging'):
+    if not TTY or VERBOSE >= 2:  # at -vv every item prints its own line
+        return
+    left = (elapsed / done) * (total - done) if done else 0
+    eta = f', about {int(left // 60)} min {int(left % 60)} s left' if done < total else ''
+    print(f'\r\033[K{what} {done} of {total}' + (f', {failed} failed' if failed else '') + eta,
+          end='' if done < total else '\n', file=sys.stderr, flush=True)
+
+
+def take_verbosity(argv):
+    """-v, -vv, -vvv, -v N or --verbose[=N] anywhere on the line. Returns argv without them."""
+    global VERBOSE
+    out, i = [], 0
+    while i < len(argv):
+        t = argv[i]
+        if re.fullmatch(r'-v+', t):
+            VERBOSE = max(VERBOSE, len(t) - 1)
+            if i + 1 < len(argv) and argv[i + 1] in ('1', '2', '3'):
+                VERBOSE = int(argv[i + 1]); i += 1
+        elif t.startswith('--verbose'):
+            VERBOSE = int(t.split('=', 1)[1]) if '=' in t else max(VERBOSE, 1)
+        else:
+            out.append(t)
+        i += 1
+    VERBOSE = min(VERBOSE, 3)
+    return out
+
+
+def log(entry):
+    """One line per command in <sandbox>/log.jsonl. It holds real data, like the store, and goes with the sandbox."""
+    try:
+        entry = {'at': rs.local(rs.now()).isoformat(timespec='seconds'), **entry}
+        with open(Path(sandbox()) / 'log.jsonl', 'a') as f:
+            f.write(json.dumps(entry, default=str, ensure_ascii=False) + '\n')
+    except OSError:
+        pass
+
+
+def store_context(con):
+    """What the store held when a question was asked: counts, definitions, views (for the log and the dev bank)."""
+    ctx = {'today': f'{rs.now():%Y-%m-%d}'}
+    for t in ('mail', 'events', 'files', 'file_text', 'labels'):
+        ctx[t] = con.execute(f'SELECT count(*) FROM {t}').fetchone()[0]
+    ctx['definitions'] = [list(r) for r in con.execute(
+        'SELECT name, max(version), arg_max(ask, version), arg_max(answers, version) FROM definitions GROUP BY name').fetchall()]
+    ctx['views'] = [r[0] for r in con.execute('SELECT name FROM views').fetchall()]
+    ctx['last_sync'] = {w: str(t) for w, t in con.execute('SELECT what, max(at_time) FROM sync_log GROUP BY what').fetchall()}
+    return ctx
+
+
 # ---- the parser: one grammar for people, scripts and the mapper ----
 
 class Err(ValueError):
@@ -94,6 +163,7 @@ def parser():
         l.add_argument('--on', help='one day or range: yesterday, next monday, this week')
         l.add_argument('--search', help='words that must all appear')
         l.add_argument('--label', help='DEFINITION or DEFINITION=VALUE, e.g. urgent or funder=yes')
+        l.add_argument('--all', dest='show_all', action='store_true', help='include empty files (hidden by default)')
         l.add_argument('--in', dest='folder', help='Drive folder name (files, photos, folders)')
         l.add_argument('--sheet', help='which sheet, for rows')
         l.add_argument('--by', help='count by these fields, e.g. kind or folder,kind')
@@ -181,7 +251,8 @@ def run_argv(con, argv):
     if v in ('list', 'count'):
         cols, rows, sql = rs.select(con, a.resource, where=a.where, since=a.since, until=a.until, on=a.on,
                                     search=a.search, label=a.label, folder=a.folder, sheet=a.sheet, by=a.by,
-                                    count=(v == 'count'), fields=a.fields, order=a.order, limit=a.limit)
+                                    count=(v == 'count'), fields=a.fields, order=a.order, limit=a.limit,
+                                    show_all=a.show_all)
         if getattr(a, 'out', 'table') == 'json':
             return Result(kind='text', text=json.dumps([dict(zip(cols, map(_fmt, r))) for r in rows], ensure_ascii=False))
         return Result(cols, rows, sql=sql)
@@ -202,12 +273,11 @@ def run_argv(con, argv):
         return Result(kind='text', text=f'Definition "{name}" version {ver}: {a.ask} ({a.answers}). '
                                         f'Next: idli judge {"photos" if a.on == "photo" else {"mail": "mail", "event": "events", "file": "files"}[a.on]} --def {name}')
     if v == 'judge':
-        r = rs.judge(con, a.resource, a.defn, where=a.where, since=a.since, limit=a.limit, account=account())
-        return Result(kind='text', text=f'Judged {r["judged_now"]} now by {r["judge"]} ({r["already"]} already judged), {r["seconds"]} s. '
-                                        f'Labels: ' + ', '.join(f'{k} {n}' for k, n in sorted(r['counts'].items())) +
-                                        (f'. {r["failed"]} could not be judged (run judge again to retry): '
-                                         f'{r["failed_examples"][0]}' if r.get('failed') else ''),
-                      note=json.dumps(r))
+        res = {'mail': 'mail', 'event': 'events'}.get(a.resource, a.resource)
+        r = rs.judge(con, res, a.defn, where=a.where, since=a.since, limit=a.limit, account=account(),
+                     progress=progress_line, on_item=(lambda n, lab, why: say(2, f'  {n}: {lab or "FAILED"} ({why})'))
+                     if VERBOSE >= 2 else None)
+        return Result(kind='text', text=judge_summary(r, a.defn, res), note=json.dumps(r, default=str))
     if v == 'query':
         cols, rows = rs.query(con, a.sql)
         return Result(cols, rows, sql=a.sql)
@@ -226,6 +296,24 @@ def run_argv(con, argv):
     if v == 'size':
         return Result(kind='text', text=json.dumps(rs.size_report(sandbox(), con)))
     raise Err('Try `idli --help`.')
+
+
+def judge_summary(r, defn, res):
+    head = 'Stopped. Kept' if r.get('stopped') else 'Judged'
+    lines = [f'{head} {r["judged_now"]} now by {r["judge"]} ({r["already"]} already judged), {r["seconds"]} s. '
+             'Labels: ' + (', '.join(f'{k} {n}' for k, n in sorted(r['counts'].items())) or 'none yet') + '.']
+    for lab, names in r.get('examples', {}).items():
+        n = r['counts'].get(lab, 0)
+        lines.append(f'  {lab} ({n}): ' + '; '.join(str(x) for x in names) + (' ...' if n > len(names) else ''))
+    if r.get('examples'):
+        labs = list(r['examples'])
+        lab = next((x for x in labs if x not in ('unsure', 'no')), labs[0])
+        lines.append(f'  All of them: idli list {res} --label {defn}={lab}')
+    if r.get('stopped'):
+        lines.append(f'  {r["to_judge"] - r["judged_now"] - r["failed"]} not judged yet: run the same command to carry on.')
+    if r.get('failed'):
+        lines.append(f'  {r["failed"]} could not be judged (run judge again to retry): {r["failed_examples"][0]}')
+    return '\n'.join(lines)
 
 
 def file_account(con, fid):
@@ -565,15 +653,21 @@ def map_question(con, question, history, mapper='remote', data_dir=None, failed=
     if failed:
         user += ('\n\nYour commands for this request failed:\n' + '\n'.join(failed) +
                  '\nGive the full corrected list of commands (same JSON shape).')
+    t0 = time.time()
     if mapper == 'remote':
         from lib import privacy
         user = privacy.mask_account_text(data_dir, user)  # once, over everything that leaves (0.2 s)
-        plan = _remote(grammar(), user)
+        raw = _remote(grammar(), user)
         from lib import home
-        plan = home.rehydrate(data_dir, plan)
+        plan = home.rehydrate(data_dir, raw)
     else:
-        plan = rs._nine([{'role': 'system', 'content': grammar()}, {'role': 'user', 'content': user}], PLAN_SCHEMA,
-                        max_tokens=1500, timeout=180)
+        raw = plan = rs._nine([{'role': 'system', 'content': grammar()}, {'role': 'user', 'content': user}], PLAN_SCHEMA,
+                              max_tokens=1500, timeout=180)
+    kind = 'repair' if failed else ('continue' if so_far else 'first')
+    MAPPER_CALLS.append({'kind': kind, 'mapper': mapper, 'sent': user, 'returned': raw, 'seconds': round(time.time() - t0, 2)})
+    say(1, f'[mapper {mapper}, {kind}] {round(time.time() - t0, 1)} s')
+    say(2, f'[sent to the mapper' + (' (masked)' if mapper == 'remote' else '') + f', {len(user)} characters]\n{user}')
+    say(2, f'[the mapper returned]\n{json.dumps(raw, ensure_ascii=False)}')
     return plan, len(user)
 
 
@@ -682,13 +776,19 @@ def run_plan(con, plan):
             errors.append(f'{c}: could not read the command')
             continue
         cmds.append(c)
+        t0 = time.time()
+        say(1, f'[step] {c}' + ('   (writes to the store)' if re.match(r'(idli\s+)?(define|judge|view)\b', c) else ''))
         try:
             r = run_argv(con, argv)
+            say(1, f'       {round(time.time() - t0, 1)} s')
+            say(2, r.render())
         except (Err, ValueError) as e:
             errors.append(f'{c}: {e}')
             shown_parts.append(f'(That step failed: {e})')
+            say(1, f'       failed: {e}')
             continue
         except Exception as e:
+            say(1, f'       failed: {type(e).__name__}: {e}')
             errors.append(f'{c}: {type(e).__name__}: {e}')
             shown_parts.append(f'(That step failed: {type(e).__name__})')
             continue
@@ -719,29 +819,68 @@ def _session_path():
     return Path(sandbox()) / 'session.json'
 
 
+def ran_block(cmds):
+    marks = [c + ('   (writes to the store)' if re.match(r'(idli\s+)?(define|judge|view)\b', c) else '') for c in cmds]
+    return dim('Ran:\n' + '\n'.join('  ' + m for m in marks)) if cmds else ''
+
+
 def main(argv=None):
-    argv = sys.argv[1:] if argv is None else argv
+    argv = take_verbosity(sys.argv[1:] if argv is None else argv)
+    import logging
+    logging.getLogger('pypdf').setLevel(logging.WARNING if VERBOSE >= 3 else logging.ERROR)
+    rs.TRACE = say
     con = rs.connect(sandbox())
+    t0 = time.time()
     try:
         if argv[:1] == ['judge']:
             use_models(None, parser().parse_args(argv).judge)
         if argv[:1] == ['ask']:
             a = parser().parse_args(argv)
             use_models(a.mapper, a.judge)
+            say(1, f'[models] mapper {a.mapper}, wording {rs.NINE}, judge {rs.JUDGE}; sandbox {sandbox()}')
             sp = _session_path()
             hist = [] if a.new or not sp.exists() else json.loads(sp.read_text())
-            rec = ask(con, ' '.join(a.question), hist, a.mapper, data_dir=sandbox())
+            MAPPER_CALLS.clear()
+            ctx = store_context(con)
+            rec = ask(con, ' '.join(a.question), hist, a.mapper, data_dir=sandbox(), show_commands=False)
             hist.append({k: rec.get(k) for k in ('q', 'commands', 'shown', 'reply')})
             sp.write_text(json.dumps(hist[-6:], default=str))
+            log({'verb': 'ask', 'q': rec['q'], 'mapper': a.mapper, 'wording': rs.NINE, 'judge': rs.JUDGE,
+                 'new_conversation': a.new, 'earlier': [h['q'] for h in hist[:-1]], 'store': ctx,
+                 'mapper_calls': MAPPER_CALLS, 'commands': rec.get('commands'), 'errors': rec.get('errors'),
+                 'steps_shown': rec.get('shown'), 'words': rec.get('words'), 'reply': rec['reply'],
+                 'wording_dropped': rec.get('compose_fallback'), 'needs': rec.get('needs'),
+                 'seconds': {k: rec.get(k) for k in ('map_s', 'compose_s', 'judge_s', 'total_s')}})
             print(rec['reply'])
+            if rec.get('commands'):
+                print('\n' + ran_block(rec['commands']))
             return 0
-        print(run_argv(con, argv).render(max_rows=50))
+        r = run_argv(con, argv)
+        out = r.render(max_rows=50)
+        log({'verb': argv[0] if argv else '', 'argv': argv, 'seconds': round(time.time() - t0, 2),
+             'output': out[:2000]})
+        print(out)
         return 0
+    except rs.Stopped as st:  # Ctrl+C during judge: what was judged is kept
+        res = {'mail': 'mail', 'event': 'events'}.get(argv[1], argv[1]) if len(argv) > 1 and argv[0] == 'judge' else 'files'
+        print('\n' + judge_summary(st.result, st.result['definition'], res), file=sys.stderr)
+        log({'verb': 'judge', 'argv': argv, 'stopped': True, 'result': st.result})
+        sys.stderr.flush(); sys.stdout.flush()
+        con.close()
+        os._exit(130)  # don't wait for model calls still in flight
+    except KeyboardInterrupt:
+        print('\nStopped.', file=sys.stderr)
+        con.close()
+        os._exit(130)
     except (Err, ValueError) as e:
         print(f'idli: {e}', file=sys.stderr)
+        log({'verb': argv[0] if argv else '', 'argv': argv, 'error': str(e)})
         return 2
     finally:
-        con.close()
+        try:
+            con.close()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':
