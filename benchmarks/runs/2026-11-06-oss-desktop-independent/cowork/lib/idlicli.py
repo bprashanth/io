@@ -143,7 +143,9 @@ def parser():
     dd.add_argument('phrase', nargs='+')
     a = sub.add_parser('ask', help='ask in your own words')
     a.add_argument('question', nargs='+')
-    a.add_argument('--mapper', default=os.environ.get('IDLI_MAPPER', 'remote'), choices=['remote', 'nine'])
+    a.add_argument('--mapper', default=os.environ.get('IDLI_MAPPER', 'remote'), choices=['remote', 'nine', 'nine_compressed'],
+                   help='remote: idli-remote maps (masked). nine: the full 9B (BF16) maps and words the reply. '
+                        'nine_compressed: the served 9B (Q5) does both')
     a.add_argument('--new', action='store_true', help='start a new conversation')
     sub.add_parser('size', help="the store's size")
     return p
@@ -198,7 +200,9 @@ def run_argv(con, argv):
     if v == 'judge':
         r = rs.judge(con, a.resource, a.defn, where=a.where, since=a.since, limit=a.limit, account=account())
         return Result(kind='text', text=f'Judged {r["judged_now"]} now ({r["already"]} already judged), {r["seconds"]} s. '
-                                        f'Labels: ' + ', '.join(f'{k} {n}' for k, n in sorted(r['counts'].items())),
+                                        f'Labels: ' + ', '.join(f'{k} {n}' for k, n in sorted(r['counts'].items())) +
+                                        (f'. {r["failed"]} could not be judged (run judge again to retry): '
+                                         f'{r["failed_examples"][0]}' if r.get('failed') else ''),
                       note=json.dumps(r))
     if v == 'query':
         cols, rows = rs.query(con, a.sql)
@@ -696,6 +700,16 @@ def run_plan(con, plan):
     return shown_parts, cmds, judge_s, errors
 
 
+NINE_BF16_URL = os.environ.get('IDLI_9B_BF16_URL', 'http://127.0.0.1:8292')  # idli-9b-bf16 on the DGX
+
+
+def use_nine(mapper):
+    """Which 9B this run talks to, for mapping, wording and judging. `nine` is the full (BF16) model; anything else
+    keeps the served, compressed one (Q5, port 8291 on the DGX, or silo from a laptop). IDLI_9B_URL, if set, wins."""
+    if mapper == 'nine' and not os.environ.get('IDLI_9B_URL'):
+        os.environ['IDLI_9B_URL'] = NINE_BF16_URL
+
+
 def _session_path():
     return Path(sandbox()) / 'session.json'
 
@@ -706,6 +720,7 @@ def main(argv=None):
     try:
         if argv[:1] == ['ask']:
             a = parser().parse_args(argv)
+            use_nine(a.mapper)
             sp = _session_path()
             hist = [] if a.new or not sp.exists() else json.loads(sp.read_text())
             rec = ask(con, ' '.join(a.question), hist, a.mapper, data_dir=sandbox())

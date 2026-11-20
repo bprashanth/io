@@ -572,9 +572,28 @@ def _item_text(con, kind, rid, account, with_text=True):
     if with_text and r[1] in ('pdf', 'doc'):
         try:
             out += '\n\nStart of the text:\n' + file_text(con, account, rid)[:1200]
-        except Exception:
-            pass
+        except Exception as e:
+            if _transient(e):  # the network or the store, not the file: let the caller retry
+                raise
+            out += '\n\n(The text could not be read; judge from the name and folder.)'
     return out
+
+
+def _transient(e):
+    """Errors worth retrying: rate limits, server errors, timeouts, a busy store. Not a broken file."""
+    s = f'{type(e).__name__} {e}'
+    return bool(re.search(r'\b(429|500|502|503|504)\b|[Tt]imed? ?out|URLError|Connection(Reset|Refused|Error)|'
+                          r'RemoteDisconnected|ResourceInUse|rateLimit|backendError', s))
+
+
+def _retry(fn, tries=3, waits=(2, 6)):
+    for i in range(tries):
+        try:
+            return fn()
+        except Exception as e:
+            if i == tries - 1 or not _transient(e):
+                raise
+            time.sleep(waits[min(i, len(waits) - 1)])
 
 
 def judge(con, resource, name, where=None, since=None, limit=300, account=None, workers=4, progress=None):
@@ -592,8 +611,9 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
     idcol = 'id'
     _, rows, _ = select(con, res, where=where, since=since, fields=idcol, limit=limit, order=idcol)
     ids = [r[0] for r in rows]
-    done = {r[0] for r in con.execute('SELECT record_id FROM labels WHERE kind = ? AND definition = ? AND version = ?',
-                                      [kind, name, ver]).fetchall()}
+    # failures saved by older versions ("could not judge: ...") are not answers: judge them again
+    done = {r[0] for r in con.execute("SELECT record_id FROM labels WHERE kind = ? AND definition = ? AND version = ? "
+                                      "AND coalesce(detail, '') NOT LIKE 'could not judge%'", [kind, name, ver]).fetchall()}
     todo = [i for i in ids if i not in done]
     schema = {'type': 'object', 'properties': {'label': {'type': 'string', 'enum': answers},
                                                'why': {'type': 'string'}}, 'required': ['label', 'why']}
@@ -603,37 +623,46 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
     t0 = time.time()
 
     def one(rid):
+        cur = con.cursor()  # a DuckDB connection takes one call at a time; each thread gets its own cursor
         try:
             if on_kind == 'photo':
-                mime = con.execute('SELECT mime FROM files WHERE id = ?', [rid]).fetchone()[0]
+                mime = cur.execute('SELECT mime FROM files WHERE id = ?', [rid]).fetchone()[0]
                 if not str(mime).startswith('image/'):
                     return rid, 'unsure', 'not an image'
-                img = image_b64(acct.get(rid, account), rid, mime)
+                img = _retry(lambda: image_b64(acct.get(rid, account), rid, mime))
                 msgs = [{'role': 'user', 'content': [
                     {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + img}},
                     {'type': 'text', 'text': f'{ask}\nAnswer with one of: {", ".join(answers)}, and a short why.'}]}]
             else:
-                text = _item_text(con, kind, rid, acct.get(rid, account))
+                text = _retry(lambda: _item_text(cur, kind, rid, acct.get(rid, account)))
                 msgs = [{'role': 'system', 'content': 'You label one item for the person. Answer with JSON only. '
                          'If the item does not give enough to tell, answer unsure.'},
                         {'role': 'user', 'content': f'{ask}\nAnswers: {", ".join(answers)}\n\n---\n{text}\n---'}]
-            out = _nine(msgs, schema)
+            out = _retry(lambda: _nine(msgs, schema))
             lab = out.get('label') if out.get('label') in answers else 'unsure'
             return rid, lab, str(out.get('why', ''))[:200]
-        except Exception as e:  # one item failing never stops the rest
-            return rid, 'unsure', f'could not judge: {type(e).__name__}'
+        except Exception as e:  # one item failing never stops the rest, and is not saved as an answer
+            return rid, None, f'{type(e).__name__}: {str(e)[:120]}'
+        finally:
+            cur.close()
     results = []
     with cf.ThreadPoolExecutor(workers) as ex:
         for i, r in enumerate(ex.map(one, todo)):
             results.append(r)
             if progress and (i + 1) % 20 == 0:
                 progress(i + 1, len(todo))
+    failed = [(rid, why) for rid, lab, why in results if lab is None]
     for rid, lab, why in results:
-        con.execute('INSERT OR REPLACE INTO labels VALUES (?,?,?,?,?,?,?)', [kind, rid, name, ver, lab, why, local(now())])
+        if lab is not None:
+            con.execute('INSERT OR REPLACE INTO labels VALUES (?,?,?,?,?,?,?)', [kind, rid, name, ver, lab, why, local(now())])
+    if failed:  # drop earlier saved failures for these rows so they read as not judged yet
+        con.execute("DELETE FROM labels WHERE kind = ? AND definition = ? AND version = ? AND detail LIKE 'could not judge%' "
+                    f"AND record_id IN ({','.join(repr(r) for r, _ in failed)})", [kind, name, ver])
     counts = dict(con.execute('SELECT label, count(*) FROM labels WHERE kind = ? AND definition = ? AND version = ? '
                               f'AND record_id IN ({",".join(repr(i) for i in ids) or "NULL"}) GROUP BY label',
                               [kind, name, ver]).fetchall())
-    return {'definition': name, 'version': ver, 'judged_now': len(todo), 'already': len(ids) - len(todo),
+    return {'definition': name, 'version': ver, 'judged_now': len(todo) - len(failed), 'already': len(ids) - len(todo),
+            'failed': len(failed), 'failed_examples': [w for _, w in failed[:3]],
             'counts': counts, 'seconds': round(time.time() - t0, 1)}
 
 
