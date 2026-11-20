@@ -6,6 +6,12 @@ Design context: [GOALS_V0.5](../../../narrative/GOALS_V0.5.md). Nothing below is
 
 ## Bugs found in the session (fix first)
 
+Done 2026-11-21: phrase search with ranking, `summarise --search`, `judge --search/--on/--until`, Clef as default
+judge, folds and renames, B4, B5, B8, field meanings in the menu, sync progress, and 20 fixes from the agent trial
+(chronology 2026-11-21T0000). Held-out rerun: 9B 5 -> 10 correct, idli-remote 13 -> 13.
+Next: a new held-out set; workflows (views, Minis); spreadsheet tabs beyond the first; the 9B dropping the person's
+words and copying manual examples.
+
 Done 2026-11-20 night: **B3, B9, B10, B11, B12, B13, B14** (the yes card, contents for every kind, skips, saving as
 it lands), `-v` levels and the log, `sync drive` with pages and content search, summary cards (chronology section 7).
 Still open: **B4, B5, B6, B7, B8**, the renames (sync gmail/gcalendar, events -> calendar, count and --by folds),

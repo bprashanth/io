@@ -174,7 +174,8 @@ def parser():
         l.add_argument('--on', help='one day or range: yesterday, next monday, this week')
         l.add_argument('--search', action='append', help='words that must all appear; "in quotes" = an exact phrase. '
                        'Files: names, folders, every page of text and the cards; most mentions first')
-        l.add_argument('--label', help='DEFINITION or DEFINITION=VALUE, e.g. urgent or funder=yes')
+        l.add_argument('--label', action='append', help='DEFINITION or DEFINITION=VALUE, e.g. urgent or funder=yes; '
+                       'give it twice for both')
         l.add_argument('--all', dest='show_all', action='store_true', help='include empty files (hidden by default)')
         l.add_argument('--in', '--folder', dest='folder', help='Drive folder name (files, photos, folders)')
         l.add_argument('--sheet', help='which sheet, for rows')
@@ -217,6 +218,8 @@ def parser():
     j.add_argument('--in', '--folder', dest='folder', help='only files in this Drive folder')
     j.add_argument('--search', action='append', help='only rows that match, as in list --search')
     j.add_argument('--since')
+    j.add_argument('--until')
+    j.add_argument('--on', help='one day or range: yesterday, next week, next month')
     j.add_argument('--limit', type=int, default=300)
     j.add_argument('--judge', choices=JUDGES, help='who labels: clef (default; hosted Clef-flash, it sees real content: '
                                                    'test accounts only), nine_compressed (served 9B), nine (BF16 9B)')
@@ -359,7 +362,7 @@ def run_argv(con, argv):
     if v == 'judge':
         res = {'mail': 'mail', 'event': 'events'}.get(a.resource, a.resource)
         r = rs.judge(con, res, a.defn, where=a.where, since=a.since, limit=a.limit, account=account(), folder=a.folder,
-                     search=a.search,
+                     search=a.search, until=a.until, on=a.on,
                      progress=progress_line, on_item=(lambda n, lab, why: say(2, f'  {n}: {lab or "FAILED"} ({why})'))
                      if VERBOSE >= 2 else None)
         return Result(kind='text', text=judge_summary(r, a.defn, res), note=json.dumps(r, default=str))

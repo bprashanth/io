@@ -145,7 +145,9 @@ def day_range(phrase, today=None):
               'last week': (monday - dt.timedelta(days=7), monday),
               'next week': (monday + dt.timedelta(days=7), monday + dt.timedelta(days=14)),
               'this month': (today.replace(day=1), (today.replace(day=28) + dt.timedelta(days=4)).replace(day=1)),
-              'last month': ((today.replace(day=1) - dt.timedelta(days=1)).replace(day=1), today.replace(day=1))}
+              'last month': ((today.replace(day=1) - dt.timedelta(days=1)).replace(day=1), today.replace(day=1)),
+              'next month': ((today.replace(day=28) + dt.timedelta(days=4)).replace(day=1),
+                             (((today.replace(day=28) + dt.timedelta(days=4)).replace(day=28)) + dt.timedelta(days=4)).replace(day=1))}
     if p in simple:
         return simple[p]
     m = re.fullmatch(r'(last|next|this|since)?\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday)', p)
@@ -766,7 +768,7 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
         conds += conds_s
     if folder:
         conds.append(f"(path ILIKE '%{folder.replace(chr(39), '')}%')")
-    if label:  # "urgent", "urgent=yes", "urgent = 'yes'", "label.urgent='no'"
+    for label in (label if isinstance(label, list) else [label] if label else []):  # each one must match
         m = re.match(r"\s*(?:label\.)?([A-Za-z0-9_]+)\s*(?:=\s*'?([^']*)'?)?\s*$", label)
         if not m:
             raise ValueError(f'--label takes NAME or NAME=VALUE, for example --label urgent=yes (got "{label}").')
@@ -982,7 +984,7 @@ def _names(con, kind, ids):
 
 
 def judge(con, resource, name, where=None, since=None, limit=300, account=None, workers=4, progress=None, on_item=None,
-          folder=None, search=None):
+          folder=None, search=None, until=None, on=None):
     """Label each matching row once per definition version. Each label is saved as it lands; failures are reported
     and not saved; Ctrl+C keeps what was done (raises Stopped). Returns counts, examples and seconds."""
     d = con.execute('SELECT version, on_kind, ask, answers FROM definitions WHERE name = ? ORDER BY version DESC',
@@ -1002,8 +1004,8 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
     elif kind == 'file':  # a text definition: no folders, pictures or videos, nothing empty
         keep = f"kind IN ({','.join(repr(k) for k in TEXT_KINDS)}) AND NOT {EMPTY_SQL}"
         scope = f"({where}) AND {keep}" if where else keep
-    _, rows, _ = select(con, res, where=scope, since=since, fields='id', limit=limit, order='id', folder=folder,
-                        search=search)
+    _, rows, _ = select(con, res, where=scope, since=since, until=until, on=on, fields='id', limit=limit, order='id',
+                        folder=folder, search=search)
     ids = [r[0] for r in rows]
     if kind == 'file' and on_kind != 'photo':  # binary files of kind 'other' (zips, apps) have nothing to read
         meta = {r[0]: r[1:] for r in con.execute('SELECT id, kind, mime, name FROM files').fetchall()}
