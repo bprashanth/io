@@ -80,11 +80,16 @@ def say(level, msg):
     if VERBOSE >= level:
         if TTY:
             print('\r\033[K', end='', file=sys.stderr)
-        print(msg, file=sys.stderr, flush=True)
+        print(f'{time.strftime("%H:%M:%S")} {msg}', file=sys.stderr, flush=True)
 
 
 def dim(text):
     return f'\033[2m{text}\033[0m' if sys.stdout.isatty() else text
+
+
+def item_line(what):
+    """At -vv, one line per item as it finishes: '12:01:03 read thorat.pdf: 5 pages, 25,610 characters, 1.2 s'."""
+    return (lambda name, detail: say(2, f'  {what} {name}: {detail}')) if VERBOSE >= 2 else None
 
 
 def progress_line(done, total, failed, elapsed, what='judging'):
@@ -146,7 +151,8 @@ class Err(ValueError):
 
 class P(argparse.ArgumentParser):
     def error(self, message):
-        raise Err(f'{message}. Try `idli {self.prog.split()[-1]} --help` or `idli explain`.')
+        verb = self.prog.split()[-1]
+        raise Err(f'{message}. Try `idli {"" if verb == "idli" else verb + " "}--help` or `idli explain`.')
 
 
 def parser():
@@ -168,7 +174,7 @@ def parser():
         l.add_argument('--search', help='words that must all appear')
         l.add_argument('--label', help='DEFINITION or DEFINITION=VALUE, e.g. urgent or funder=yes')
         l.add_argument('--all', dest='show_all', action='store_true', help='include empty files (hidden by default)')
-        l.add_argument('--in', dest='folder', help='Drive folder name (files, photos, folders)')
+        l.add_argument('--in', '--folder', dest='folder', help='Drive folder name (files, photos, folders)')
         l.add_argument('--sheet', help='which sheet, for rows')
         l.add_argument('--by', help='count by these fields, e.g. kind or folder,kind')
         l.add_argument('--fields', help='which fields to show')
@@ -198,7 +204,7 @@ def parser():
     j.add_argument('resource')
     j.add_argument('--def', dest='defn', required=True)
     j.add_argument('--where')
-    j.add_argument('--in', dest='folder', help='only files in this Drive folder')
+    j.add_argument('--in', '--folder', dest='folder', help='only files in this Drive folder')
     j.add_argument('--since')
     j.add_argument('--limit', type=int, default=300)
     j.add_argument('--judge', choices=JUDGES, help='who labels: nine (BF16 9B), nine_compressed (served 9B, default), '
@@ -250,11 +256,18 @@ def run_argv(con, argv):
     if v == 'sync':
         acct, out = account(a.role), []
         whats = {'all': ['mail', 'events', 'files', 'sheets'], 'drive': ['files', 'sheets']}.get(a.what, [a.what])
+        start = {'mail': 'reading the last 60 days of mail', 'events': 'reading the calendar',
+                 'files': 'listing Drive', 'sheets': 'reading spreadsheets changed since the last sync'}
         for what in whats:
             t0 = time.time()
-            n = getattr(rs, f'sync_{what}')(con, acct)
+            say(1, f'[sync {what}] {start[what]} ...')
+            if what == 'sheets':
+                n = rs.sync_sheets(con, acct, progress=progress_line, on_item=item_line('sheet'))
+                out.append(f'sheets: {n} read (unchanged ones skipped)')
+            else:
+                n = getattr(rs, f'sync_{what}')(con, acct)
+                out.append(f'{what}: {n} listed')
             say(1, f'[sync {what}] {n} in {round(time.time() - t0, 1)} s')
-            out.append(f'{what}: {n} listed')
         if 'files' in whats or 'sheets' in whats:
             rs.drop_orphans(con)
             if not a.no_read:
@@ -263,7 +276,8 @@ def run_argv(con, argv):
                     mb = sum(r[3] or 0 for r in todo) / 1e6
                     print(f'Reading {len(todo)} documents not read yet ({mb:.0f} MB to download, Google Docs not '
                           'counted). Ctrl+C keeps what was read; sync again to carry on.', file=sys.stderr)
-                    rr = rs.read_texts(con, acct, progress=progress_line)
+                    say(1, f'[read] {len(todo)} documents, four at a time, newest first ...')
+                    rr = rs.read_texts(con, acct, progress=progress_line, on_item=item_line('read'))
                     out.append(f'documents read: {rr["read"]} in {rr["seconds"]} s' +
                                (f', {rr["failed"]} could not be read ({rr["failed_examples"][0]})' if rr['failed'] else ''))
                 else:
@@ -274,7 +288,8 @@ def run_argv(con, argv):
                           f'{max(1, round(len(todo) * 5 / 60))} min; measured 5 s each). Ctrl+C keeps what was made; '
                           '--no-cards skips this.',
                           file=sys.stderr)
-                    rc = rs.make_cards(con, progress=progress_line)
+                    say(1, f'[cards] {len(todo)} documents ...')
+                    rc = rs.make_cards(con, progress=progress_line, on_item=item_line('card'))
                     out.append(f'cards made: {rc["made"]} in {rc["seconds"]} s' +
                                (f', {rc["failed"]} failed ({rc["failed_examples"][0]})' if rc['failed'] else ''))
         return Result(kind='text', text='Synced ' + acct + '. ' + '; '.join(out) + '.')

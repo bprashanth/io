@@ -345,15 +345,22 @@ def _slug(name, taken):
     return s
 
 
-def sync_sheets(con, account, max_bytes=3_000_000):
-    """Every spreadsheet in Drive (Google Sheets, Excel, CSV) as its own table, first tab, columns as text."""
+def sync_sheets(con, account, max_bytes=3_000_000, progress=None, on_item=None):
+    """Every spreadsheet in Drive (Google Sheets, Excel, CSV) as its own table, first tab, columns as text.
+    A sheet read since it last changed is skipped."""
     import pandas as pd
     g, t0 = _g(), time.time()
-    rows = con.execute("SELECT id, name, mime, size FROM files WHERE account = ? AND kind = 'sheet'", [account]).fetchall()
+    rows = con.execute("SELECT f.id, f.name, f.mime, f.size FROM files f LEFT JOIN sheets s ON s.file_id = f.id "
+                       "WHERE f.account = ? AND f.kind = 'sheet' AND (s.file_id IS NULL OR s.fetched_at < f.modified) "
+                       "ORDER BY f.modified DESC", [account]).fetchall()
     taken = {r[0] for r in con.execute('SELECT tbl FROM sheets').fetchall()}
     n = 0
-    for fid, name, mime, size in rows:
+    for i, (fid, name, mime, size) in enumerate(rows, 1):
+        t1 = time.time()
+        if progress:
+            progress(i - 1, len(rows), 0, time.time() - t0, 'reading sheets')
         if size and size > max_bytes:
+            on_item and on_item(name, f'skipped: {size / 1e6:.1f} MB is over the {max_bytes / 1e6:.0f} MB limit')
             continue
         try:
             raw = g.drive_bytes(account, fid, mime)
@@ -361,7 +368,8 @@ def sync_sheets(con, account, max_bytes=3_000_000):
                 df = pd.read_excel(io.BytesIO(raw), dtype=str)
             else:
                 df = pd.read_csv(io.BytesIO(raw), dtype=str)
-        except Exception:  # an unreadable file is skipped; it still shows in `files`
+        except Exception as e:  # an unreadable file is skipped; it still shows in `files`
+            on_item and on_item(name, f'could not be read: {type(e).__name__}')
             continue
         df = df.dropna(how='all').fillna('')
         df.columns = [re.sub(r'\s+', ' ', str(c)).strip() or f'col{i + 1}' for i, c in enumerate(df.columns)]
@@ -374,6 +382,9 @@ def sync_sheets(con, account, max_bytes=3_000_000):
         con.execute('INSERT OR REPLACE INTO sheets VALUES (?,?,?,?,?,?)',
                     [name, fid, tbl, json.dumps(list(df.columns)), len(df), local(now())])
         n += 1
+        on_item and on_item(name, f'{len(df)} rows, {len(df.columns)} columns, {time.time() - t1:.1f} s')
+    if progress and rows:
+        progress(len(rows), len(rows), 0, time.time() - t0, 'reading sheets')
     _log(con, 'sheets', account, n, t0)
     return n
 
@@ -441,15 +452,19 @@ def to_read(con, account=None):
         [account] if account else []).fetchall()
 
 
-def read_texts(con, account=None, workers=4, progress=None, limit=None):
+def read_texts(con, account=None, workers=4, progress=None, limit=None, on_item=None):
     """Read every document not read yet (newest first), in parallel. Ctrl+C keeps what was read. Returns counts."""
     todo = [r for r in to_read(con, account) if readable(r[4], r[5], r[2])][:limit]
     t0, done, failed = time.time(), 0, []
 
     def one(r):
         cur = con.cursor()
+        t1 = time.time()
         try:
-            _retry_brief(lambda: file_text(cur, r[1], r[0]))
+            text = _retry_brief(lambda: file_text(cur, r[1], r[0]))
+            if on_item:
+                np = cur.execute('SELECT count(*) FROM file_pages WHERE file_id = ?', [r[0]]).fetchall()[0][0]
+                on_item(r[2], f'{np} pages, {len(text):,} characters, {time.time() - t1:.1f} s')
             return r, None
         except Exception as e:
             if not _transient(e):  # a broken file: note it for this version (pages = -1) so sync doesn't retry it
@@ -506,12 +521,13 @@ def to_card(con):
         "AND (c.file_id IS NULL OR c.modified IS DISTINCT FROM f.modified) ORDER BY f.modified DESC").fetchall()]
 
 
-def make_cards(con, workers=4, progress=None, limit=None):
+def make_cards(con, workers=4, progress=None, limit=None, on_item=None):
     """A card per file version, by the served 9B. Ctrl+C keeps what was made."""
     todo, t0, failed, done = to_card(con)[:limit], time.time(), [], 0
 
     def one(fid):
         cur = con.cursor()
+        t1 = time.time()
         try:
             out = _retry_brief(lambda: _nine([{'role': 'system', 'content': CARD_PROMPT},
                                               {'role': 'user', 'content': _card_input(cur, fid)}], CARD_SCHEMA,
@@ -520,6 +536,9 @@ def make_cards(con, workers=4, progress=None, limit=None):
             cur.execute('INSERT OR REPLACE INTO file_cards SELECT id, modified, ?, ?, ?, ? FROM files WHERE id = ?',
                         [str(out.get('summary', '')).strip(), json.dumps(terms, ensure_ascii=False), 'nine_compressed',
                          local(now()), fid])
+            if on_item:
+                nm = cur.execute('SELECT name FROM files WHERE id = ?', [fid]).fetchall()[0][0]
+                on_item(nm, f'{time.time() - t1:.1f} s; key terms: {", ".join(terms[:6])}' + (' ...' if len(terms) > 6 else ''))
             return fid, None
         except Exception as e:
             return fid, f'{type(e).__name__}: {str(e)[:100]}'
