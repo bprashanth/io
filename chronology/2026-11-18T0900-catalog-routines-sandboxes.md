@@ -549,3 +549,18 @@ Owner's rules (built in phase 1, commit b46249da):
   - **Other sites are "new connector".**
   - **The store is 13 MB.** First-time judging of a whole Drive takes minutes.
 - **Laptop:** not synced. Nothing is wired into the app yet.
+
+## 14. Written up for a new agent (2026-11-20)
+
+- **[narrative/GOALS_V0.5.md](../narrative/GOALS_V0.5.md)** gathers the current core in one document:
+  - the scaffold;
+  - the command design;
+  - the store and sandboxes;
+  - the benchmark results;
+  - why workflows need Minis made of views, definitions and chains (with the T33 transcript as the example);
+  - the journeys inside a sandbox (use and stretch a Mini, a new Mini, fork, insights, teammates);
+  - the Builder's boundary (to be decided);
+  - how it ties to Paseo and today's app code.
+- **IDLI_DESKTOP.md** points to it.
+- **`docs/idli-handoff.md`** has a new top checkpoint, ordered from most to least relevant: current thinking,
+  evidence, chronology, state, then rules. Older checkpoints follow, for looking things up.

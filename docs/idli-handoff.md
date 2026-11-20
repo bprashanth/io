@@ -1,7 +1,108 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-17 (~03:00 IST), DGX. Overwrite this page whenever the state changes. Keep `chronology/` (one
-file per step since 2026-11-13) and the narratives in step with it.
+Last updated 2026-11-20, DGX. Overwrite the top section whenever the state changes. Keep `chronology/` and the
+narratives in step with it.
+
+This repo has a long history (event ladders, io, Codex, shield, Drivey, Teams). **Focus on the last two weeks:
+Idli Desktop as sandboxes plus a command-line core.** The older material below is there to look things up, not to
+start from.
+
+## Checkpoint 2026-11-20: where we are (read in this order)
+
+### 1. The current thinking (read all of these first)
+1. **[narrative/GOALS_V0.5.md](../narrative/GOALS_V0.5.md):** the core.
+   - The scaffold (`idli` commands over a DuckDB store per sandbox).
+   - The command design.
+   - What crosses the masking line.
+   - The benchmark results.
+   - Why workflows need Minis (views, definitions, chains).
+   - The journeys inside a sandbox, and the Builder's boundary.
+   - Next steps.
+2. **[narrative/EXAMPLES_V0.md](../narrative/EXAMPLES_V0.md):** concrete tables, commands and queries for Gmail,
+   Drive, WhatsApp, calendar and leads.
+3. **[narrative/CLI_CHOICES.md](../narrative/CLI_CHOICES.md):** the grammar and its references (kubectl, gh,
+   clig.dev).
+4. **[narrative/IDLI_DESKTOP.md](../narrative/IDLI_DESKTOP.md):** the product around the core.
+   - Paseo.
+   - The Builder outside, sandboxes inside.
+   - Teams postponed.
+   - Who sees what.
+5. **[narrative/SANDBOXES.md](../narrative/SANDBOXES.md)** and
+   **[narrative/ESCALATION_MODELS.md](../narrative/ESCALATION_MODELS.md):** how the app does it today. Covers
+   routing, the Mini question chain, fork, the two consent questions, and transform blocks.
+6. [narrative/GOALS_v0.md](../narrative/GOALS_v0.md): the goal (people extend Idli themselves) and the four layers.
+   [narrative/UX.md](../narrative/UX.md): screen rules.
+
+### 2. Evidence (READMEs, newest first)
+- `benchmarks/runs/2026-11-19-record-store/`:
+  - the scaffold's blind bench (80 tasks written blind, 27 held out, graders with SQL, blind testers);
+  - the raw transcripts are kept out of git (they hold test-account mail).
+- `benchmarks/runs/2026-11-19-capability-cli-mapping/`: menu vs commands vs manual pages vs grammar.
+- `benchmarks/runs/2026-11-19-blind-tester/`: the first blind testers; a PDF masking leak found and fixed.
+- `benchmarks/runs/2026-11-18-{sandboxes,builder-minis,transform-blocks,mini-escalation}/`: the app rounds on the
+  laptop, with screenshots.
+- `benchmarks/runs/2026-11-17-trusted-catalog/`, `2026-11-18-leads-routine/`, `2026-11-17-builder-journey/`.
+
+### 3. Chronology
+- `chronology/2026-11-18T0900-catalog-routines-sandboxes.md`:
+  - sections 1 to 9: the app (catalog, OAuth, sandboxes, Minis, transform blocks, escalation chain, script_try
+    consent);
+  - sections 10 to 13: CLI benchmarks, the grammar, the blind testers, the scaffold.
+- Earlier steps are one file each in `chronology/` (2026-11-13 onward).
+
+### 4. State right now
+- **Branch:**
+  - `oss-desktop-eval`, about 378 commits ahead of `origin/main`, **not pushed**;
+  - history was declauded on 2026-11-18 (backup branch `backup-before-declaude-2026-11-18`);
+  - commits since carry no Claude lines.
+
+  The owner reviews and pushes. Before any push: `bash -ic 'declaude origin/main'`, then
+  `git push --force-with-lease`.
+- **Alpha release prepared, not pushed:** `.github/workflows/idli-alpha.yml` and `docs/idli-alpha-release.md`.
+  - Paseo 0.15.2 plus our patch, and the Idli kit, for Linux, Mac and Windows.
+  - Only Linux arm64 was built for real. The Windows installer doesn't run yet.
+- **Scaffold code** (`benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/`):
+  - `lib/recstore.py`, `lib/idlicli.py`, `desktop/idli`;
+  - try it with `IDLI_SANDBOX=<dir> desktop/idli --help`.
+- **App code, same folder:**
+  - the router's routing is `lib/modes.py`, served by the DGX's `muse-prefix-proxy.service`. It's a systemd user
+    service: restart it after changing modes.py. Muse itself is untouched;
+  - the Mini chain is `lib/minitalk.py` and `lib/miniscope.py`;
+  - also `lib/minifork.py`, `lib/tries.py` (the two consent questions), `lib/blocks.py`, `lib/transforms.py`,
+    `lib/google_api.py`, `lib/docmask.py`, `lib/privacy.py`;
+  - the MCP tools are in `lib/idli_mcp.py`.
+- **Google test accounts:**
+  - 87profligate@gmail.com is "me" and 88profligate@gmail.com is "a lead". Sending between them is allowed;
+    WhatsApp never sends;
+  - OAuth uses Idli's own unverified app (GCP project `bitrot-in`), with scopes gmail.modify, calendar.events,
+    calendar.freebusy, spreadsheets.readonly and drive.readonly;
+  - tokens are in `~/.config/idlisseus/google-tokens/` on the laptop and on the DGX (DGX consent with
+    `python -m lib.google_api start EMAIL`, then `finish EMAIL 'ADDRESS'`).
+- **Laptop:**
+  - synced to `aca76f65` (2026-11-19). The scaffold isn't on it, on purpose: test there once we know what ships;
+  - the tunnel is often down: ask the owner to run `desktop/laptop-up.sh start`;
+  - sync with `git fetch dgx` then `git reset --keep dgx/oss-desktop-eval`, after a backup branch, keeping its
+    `file-skills/households` edits.
+- **Owner to-dos:**
+  - rotate silo's Access token (it leaked into a transcript on 2026-11-17);
+  - `claude auth login` on the DGX before 26 to 29 Nov.
+
+### 5. Rules for this phase (on top of "Rules that always hold" at the end)
+- Run targeted tests for simple changes, and the full suite only for routing, masking or blocks. Fix on the DGX
+  first, then the laptop.
+- Benchmarks:
+  - a blind task bank written before building;
+  - held-out sets frozen by hash and run once on frozen code;
+  - graders that check against data;
+  - general fixes only, never per-question patches.
+- Delegate grinding to subagents, Cursor `agent` or `codex exec`. Codex may run, but nothing under `~/.codex` may be
+  edited.
+- Plain copy in anything a person reads. No "deepseek" in the UI: say "idli-remote".
+- Never print `catalog.source()`, the OAuth client file, tokens, or silo headers.
+
+---
+
+## Older checkpoints (look things up here as needed)
 
 ## Checkpoint 2026-11-17: team stacks (overnight)
 

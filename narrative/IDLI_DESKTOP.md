@@ -1,11 +1,21 @@
 # Idli Desktop: an operating layer for NGOs
 
-2026-11-19. Written after the move from Teams to sandboxes. It replaces the 2026-11-16 version, which was written
+2026-11-19, updated 2026-11-20. Written after the move from Teams to sandboxes. It replaces the 2026-11-16 version, which was written
 around Teams (still in git history: `git show 620f12e5:narrative/IDLI_DESKTOP.md`). Each claim is marked
 **[built]** (in the code), **[tested]** (walked through in the app on the laptop's test accounts), **[idea]** or
 **[untested]**.
 
+**Update 2026-11-20:** the core engine under this product is now described in [GOALS_V0.5.md](GOALS_V0.5.md):
+- a local record store per sandbox;
+- one command language (`idli list`, `judge`, `ask`...);
+- definitions, views and chains as what a Mini is made of;
+- the blind benchmarks.
+
+Read that first for where the thinking is. This page stays the product view: Paseo, the Builder, sandboxes, Minis,
+masking.
+
 Details live in:
+- [GOALS_V0.5.md](GOALS_V0.5.md): the core (scaffold, commands, store, results, journeys);
 - [SANDBOXES.md](SANDBOXES.md): the model, routing, blocks;
 - [ESCALATION_MODELS.md](ESCALATION_MODELS.md): who decides what;
 - [UX.md](UX.md): what the person sees;
@@ -284,3 +294,11 @@ The expensive model stays at the edges. As Minis grow, Claude is needed less.
   and `lib/test_home.py`.
 - **Evidence:** `benchmarks/runs/2026-11-18-*` (sandboxes, builder-minis, transform-blocks, mini-escalation), each
   with a README and screenshots.
+- **The core, headless (2026-11-19 to 20):**
+  - `cowork/desktop/idli`, a command line over a DuckDB store per sandbox, synced read-only from Google;
+  - definitions judged by the 9B;
+  - `idli ask`, where idli-remote or the 9B maps words to commands, Idli runs them, and the 9B words the reply.
+
+  On blind held-out asks, trust questions and people's own definitions mostly work; multi-step workflows don't yet,
+  because there were no Minis to fix the meaning of words like "lead". See [GOALS_V0.5.md](GOALS_V0.5.md) and
+  `benchmarks/runs/2026-11-19-record-store/`. Not wired into the app yet.
