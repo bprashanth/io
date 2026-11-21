@@ -39,8 +39,8 @@ CREATE TABLE IF NOT EXISTS file_text (file_id TEXT PRIMARY KEY, modified TIMESTA
 CREATE TABLE IF NOT EXISTS file_pages (file_id TEXT, page INTEGER, text TEXT, PRIMARY KEY (file_id, page));
 CREATE TABLE IF NOT EXISTS file_cards (file_id TEXT PRIMARY KEY, modified TIMESTAMP, summary TEXT, key_terms TEXT,
   made_by TEXT, made_at TIMESTAMP);
-CREATE TABLE IF NOT EXISTS sheets (name TEXT, file_id TEXT PRIMARY KEY, tbl TEXT, columns TEXT, nrows INTEGER,
-  fetched_at TIMESTAMP);
+CREATE TABLE IF NOT EXISTS sheets (name TEXT, file_id TEXT, tab TEXT, tab_index INTEGER, tbl TEXT, columns TEXT,
+  nrows INTEGER, fetched_at TIMESTAMP, PRIMARY KEY (file_id, tab));
 CREATE TABLE IF NOT EXISTS definitions (name TEXT, version INTEGER, on_kind TEXT, ask TEXT, answers TEXT,
   examples TEXT, created TIMESTAMP, PRIMARY KEY (name, version));
 CREATE TABLE IF NOT EXISTS labels (kind TEXT, record_id TEXT, definition TEXT, version INTEGER, label TEXT,
@@ -66,8 +66,9 @@ RESOURCES = {
                 'show': ['name', 'path'], 'about': 'Drive folders (files with kind folder)'},
     'photos': {'table': 'files', 'date': 'modified', 'kind': 'file', 'text': ['name', 'path'], 'filter': "kind = 'image'",
                'show': ['name', 'path', 'modified'], 'about': 'Drive images (files with kind image)'},
-    'sheets': {'table': 'sheets', 'date': None, 'kind': 'sheet', 'id': 'file_id', 'text': ['name', 'columns'],
-               'show': ['name', 'columns', 'nrows'], 'about': 'one row per spreadsheet that was read; its rows are `rows --sheet NAME`'},
+    'sheets': {'table': 'sheets', 'date': None, 'kind': 'sheet', 'id': 'file_id', 'text': ['name', 'tab', 'columns'],
+               'show': ['name', 'tab', 'columns', 'nrows'],
+               'about': 'one row per tab of each spreadsheet; its rows are `rows --sheet NAME` (or "NAME / TAB")'},
     'labels': {'table': 'labels', 'date': 'judged_at', 'kind': 'label', 'id': 'record_id', 'text': ['label', 'detail'],
                'show': ['kind', 'record_id', 'definition', 'label', 'detail'], 'about': 'what judge decided'},
     'definitions': {'table': 'definitions', 'date': 'created', 'kind': 'definition', 'id': 'name', 'text': ['ask'],
@@ -112,6 +113,15 @@ def connect(sandbox, read_only=False):
     p.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(p / 'store.duckdb'), read_only=read_only)
     if not read_only:
+        if 'tab' not in [r[0] for r in con.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'sheets'").fetchall()] and \
+                con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name = 'sheets'").fetchone()[0]:
+            # before 2026-11-21 a sheet was one row (its first tab). Tab '?' marks them to be read again, all tabs
+            con.execute('ALTER TABLE sheets RENAME TO sheets_first_tab_only')
+            con.execute(DDL)
+            con.execute("INSERT INTO sheets SELECT name, file_id, '?', 0, tbl, columns, nrows, fetched_at "
+                        "FROM sheets_first_tab_only")
+            con.execute('DROP TABLE sheets_first_tab_only')
         con.execute(DDL)
         con.execute("""CREATE OR REPLACE VIEW threads AS SELECT thread_id, arg_min(subject, date) AS subject,
           min(date) AS first_date, max(date) AS last_date, count(*) AS messages,
@@ -376,14 +386,49 @@ def _slug(name, taken):
     return s
 
 
+MAX_TABS = 30
+
+
+def _unique(cols):
+    seen, out = {}, []
+    for c in cols:
+        seen[c] = seen.get(c, 0) + 1
+        out.append(c if seen[c] == 1 else f'{c} {seen[c]}')
+    return out
+
+
+def _read_tabs(g, account, fid, mime, pd):
+    """Every tab of a spreadsheet as (title, DataFrame), first row as the header."""
+    if mime == 'application/vnd.google-apps.spreadsheet':
+        out = []
+        try:
+            tabs = g.sheet_tabs(account, fid)
+        except ValueError:
+            tabs = []
+        if not tabs:  # nothing readable through the Sheets API: the first tab, as Drive exports it
+            return [('Sheet1', pd.read_csv(io.BytesIO(g.drive_bytes(account, fid, mime)), dtype=str))]
+        for title, v in tabs:
+            if not v:
+                out.append((title, pd.DataFrame()))
+                continue
+            width = max(len(r) for r in v)
+            rows = [list(r) + [''] * (width - len(r)) for r in v]
+            out.append((title, pd.DataFrame(rows[1:], columns=rows[0], dtype=str)))
+        return out
+    raw = g.drive_bytes(account, fid, mime)
+    if 'spreadsheetml' in (mime or '') or 'ms-excel' in (mime or ''):
+        return [(str(t), df) for t, df in pd.read_excel(io.BytesIO(raw), dtype=str, sheet_name=None).items()]
+    return [('csv', pd.read_csv(io.BytesIO(raw), dtype=str))]
+
+
 def sync_sheets(con, account, max_bytes=3_000_000, progress=None, on_item=None):
     """Every spreadsheet in Drive (Google Sheets, Excel, CSV) as its own table, first tab, columns as text.
     A sheet read since it last changed is skipped."""
     import pandas as pd
     g, t0 = _g(), time.time()
-    rows = con.execute("SELECT f.id, f.name, f.mime, f.size FROM files f LEFT JOIN sheets s ON s.file_id = f.id "
-                       "WHERE f.account = ? AND f.kind = 'sheet' AND (s.file_id IS NULL OR s.fetched_at < f.modified) "
-                       "ORDER BY f.modified DESC", [account]).fetchall()
+    rows = con.execute("SELECT f.id, f.name, f.mime, f.size FROM files f WHERE f.account = ? AND f.kind = 'sheet' AND "
+                       "NOT EXISTS (SELECT 1 FROM sheets s WHERE s.file_id = f.id AND s.fetched_at >= f.modified "
+                       "AND s.tab <> '?') ORDER BY f.modified DESC", [account]).fetchall()
     taken = {r[0] for r in con.execute('SELECT tbl FROM sheets').fetchall()}
     n = 0
     for i, (fid, name, mime, size) in enumerate(rows, 1):
@@ -394,26 +439,37 @@ def sync_sheets(con, account, max_bytes=3_000_000, progress=None, on_item=None):
             on_item and on_item(name, f'skipped: {size / 1e6:.1f} MB is over the {max_bytes / 1e6:.0f} MB limit')
             continue
         try:
-            raw = g.drive_bytes(account, fid, mime)
-            if 'spreadsheetml' in mime:
-                df = pd.read_excel(io.BytesIO(raw), dtype=str)
-            else:
-                df = pd.read_csv(io.BytesIO(raw), dtype=str)
+            tabs = _read_tabs(g, account, fid, mime, pd)
         except Exception as e:  # an unreadable file is skipped; it still shows in `files`
             on_item and on_item(name, f'could not be read: {type(e).__name__}')
             continue
-        df = df.dropna(how='all').fillna('')
-        df.columns = [re.sub(r'\s+', ' ', str(c)).strip() or f'col{i + 1}' for i, c in enumerate(df.columns)]
-        old = con.execute('SELECT tbl FROM sheets WHERE file_id = ?', [fid]).fetchall()  # all: a half-read result blocks register
-        tbl = old[0][0] if old else _slug(name, taken)
-        taken.add(tbl)
-        con.register('df_in', df)
-        con.execute(f'CREATE OR REPLACE TABLE "{tbl}" AS SELECT row_number() OVER () AS row_no, * FROM df_in')
-        con.unregister('df_in')
-        con.execute('INSERT OR REPLACE INTO sheets VALUES (?,?,?,?,?,?)',
-                    [name, fid, tbl, json.dumps(list(df.columns)), len(df), local(now())])
+        old = {r[0]: r[1] for r in con.execute('SELECT tab, tbl FROM sheets WHERE file_id = ? ORDER BY tab_index',
+                                                [fid]).fetchall()}
+        first_old = next(iter(old.values()), None)
+        con.execute('DELETE FROM sheets WHERE file_id = ?', [fid])
+        kept = []
+        for ti, (tab, df) in enumerate(tabs[:MAX_TABS]):
+            df = df.dropna(how='all').fillna('')
+            if df.empty and not len(df.columns):
+                continue
+            df.columns = _unique([re.sub(r'\s+', ' ', str(c)).strip() or f'col{j + 1}' for j, c in enumerate(df.columns)])
+            # the first tab keeps the name sheets always had (sheet_leads_test); others get the tab in theirs
+            tbl = old.get(tab) or (first_old if ti == 0 and first_old else None) or \
+                _slug(name if ti == 0 else f'{name} {tab}', taken)
+            taken.add(tbl)
+            con.register('df_in', df)
+            con.execute(f'CREATE OR REPLACE TABLE "{tbl}" AS SELECT row_number() OVER () AS row_no, * FROM df_in')
+            con.unregister('df_in')
+            con.execute('INSERT OR REPLACE INTO sheets VALUES (?,?,?,?,?,?,?,?)',
+                        [name, fid, tab, ti, tbl, json.dumps(list(df.columns)), len(df), local(now())])
+            kept.append(tbl)
+        for gone in set(old.values()) - set(kept):  # a tab that was removed
+            con.execute(f'DROP TABLE IF EXISTS "{gone}"')
+        for t in ('file_text', 'file_pages', 'file_cards'):  # its text and card are made again, from every tab
+            con.execute(f'DELETE FROM {t} WHERE file_id = ?', [fid])
         n += 1
-        on_item and on_item(name, f'{len(df)} rows, {len(df.columns)} columns, {time.time() - t1:.1f} s')
+        on_item and on_item(name, f'{len(kept)} tab{"s" if len(kept) != 1 else ""}: ' +
+                            ', '.join(f'{t} ({len(d)} rows)' for t, d in tabs[:MAX_TABS]) + f', {time.time() - t1:.1f} s')
     if progress and rows:
         progress(len(rows), len(rows), 0, time.time() - t0, 'reading sheets')
     _log(con, 'sheets', account, n, t0)
@@ -758,8 +814,10 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
     if resource == 'rows':
         if not sheet:
             raise ValueError('Say which sheet: `idli list rows --sheet "Leads (test)"`. `idli list sheets` shows them.')
-        t = con.execute('SELECT tbl FROM sheets WHERE name ILIKE ? OR tbl = ? ORDER BY fetched_at DESC',
-                        [f'%{sheet}%', sheet]).fetchone()
+        # "Leads (test)" (its first tab), "Leads (test) / Contacts", a tab name, or the table name
+        t = con.execute("SELECT tbl FROM sheets WHERE (name || ' / ' || tab) ILIKE ? OR tab ILIKE ? OR name ILIKE ? "
+                        "OR tbl = ? ORDER BY (tbl = ?) DESC, ((name || ' / ' || tab) ILIKE ?) DESC, tab_index, "
+                        "fetched_at DESC", [f'%{sheet}%', sheet, f'%{sheet}%', sheet, sheet, f'%{sheet}%']).fetchone()
         if not t:
             raise ValueError(f'No sheet matching "{sheet}". `idli list sheets` shows the ones that were read.')
         r = {'table': t[0], 'date': None, 'kind': 'row', 'text': None, 'show': None}
@@ -938,11 +996,15 @@ def readable(kind, mime, name):
 
 def _sheet_text(con, account, fid, mime, rows=15):
     """A spreadsheet as its header and first rows, from the table sync made, or read now."""
-    t = con.execute('SELECT tbl FROM sheets WHERE file_id = ?', [fid]).fetchone()
-    if t:
-        cur = con.execute(f'SELECT * EXCLUDE (row_no) FROM "{t[0]}" LIMIT {rows}')
-        head = [d[0] for d in cur.description]
-        return '\n'.join(', '.join(str(v) for v in r) for r in [head] + cur.fetchall())
+    tabs = con.execute('SELECT tab, tbl FROM sheets WHERE file_id = ? ORDER BY tab_index', [fid]).fetchall()
+    if tabs:
+        parts = []
+        for tab, tbl in tabs:
+            cur = con.execute(f'SELECT * EXCLUDE (row_no) FROM "{tbl}" LIMIT {rows}')
+            head = [d[0] for d in cur.description]
+            body = '\n'.join(', '.join(str(v) for v in r) for r in [head] + cur.fetchall())
+            parts.append(body if len(tabs) == 1 else f'[Tab: {tab}]\n{body}')
+        return '\n\n'.join(parts)
     raw = _g().drive_bytes(account, fid, mime)
     if 'spreadsheetml' in (mime or ''):
         import pandas as pd

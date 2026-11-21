@@ -32,3 +32,23 @@ So Claude does not pick these up automatically yet: the engine can't express the
 ## How to test
 Add to E6 and E2: a planted file with an info block plus two side-by-side tables. Score whether each table is
 found, checked, and answerable in the form, and whether the 9B's question steps on it stay at the E7 level.
+
+## The scaffold (2026-11-21): tabs done, subtables to do
+
+Tabs are read since 2026-11-21: every tab of a Google Sheet (Sheets API, a chart tab skipped) or an `.xlsx`
+becomes its own table; `sheets` has one row per tab (`tab`, `tab_index`); the first tab keeps its old table name;
+`rows --sheet "NAME / TAB"`; judging, cards and search read every tab (`recstore.sync_sheets`, `_read_tabs`).
+
+Still one header row per tab. The test case is already in the test account: the vegetation workbooks
+(`field_vars_indicators*.xlsx`) have a species table *below* the raw data on a tab, with its own header
+("Species name Abbr, Species name expanded, Toda name"). Search finds "Toda name" in the text; `list sheets
+--search "Toda name"` does not, because it isn't a column.
+
+To build in the scaffold:
+1. Split a tab into blocks at fully empty rows and columns; each block's first filled row is its header; a block
+   of two columns with labels on the left is a key/value block (one record).
+2. Each block becomes its own table (`sheet_x__tab__2`), registered in `sheets` with a `block` and its cell range,
+   and named from a title cell above it when there is one.
+3. Test files: the vegetation workbooks, the germination template (an info block above the table), one with two
+   tables side by side, and one with stacked sections that repeat a header (already handled by `filekit`).
+4. Only when the heuristic can't tell where a header is: ask the 9B with the first 30 rows, once per file version.

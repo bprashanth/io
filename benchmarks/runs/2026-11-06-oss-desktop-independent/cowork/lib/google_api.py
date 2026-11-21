@@ -291,6 +291,23 @@ CAL = 'https://www.googleapis.com/calendar/v3'
 
 # ---- Sheets ----
 
+def sheet_tabs(email, sheet_id):
+    """A Google Sheet's tabs, in order, with every row of each as lists of strings: [(title, rows)]."""
+    meta = call(email, 'GET', f'https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}',
+                params={'fields': 'sheets.properties(title,index)'})
+    out = []
+    for sh in sorted(meta.get('sheets') or [], key=lambda x: x['properties'].get('index', 0)):
+        title = sh['properties']['title']
+        rng = "'" + title.replace("'", "''") + "'!A:ZZ"
+        try:
+            v = call(email, 'GET', f'https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/'
+                     + urllib.parse.quote(rng)).get('values') or []
+        except ValueError:  # a chart sheet has no cells to read: skip that tab, keep the others
+            continue
+        out.append((title, v))
+    return out
+
+
 def sheet_values(email, sheet_id, rng='A:ZZ'):
     """A sheet's rows as dicts (the first row gives the headings)."""
     if not re.fullmatch(r'[A-Za-z0-9_-]{20,80}', str(sheet_id)):

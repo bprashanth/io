@@ -339,11 +339,12 @@ def run_argv(con, argv):
             t = rs.file_text(con, file_account(con, fid), fid)
             return Result(kind='text', text=f'{name} ({len(t)} characters):\n\n' + t[:a.chars])
         if res == 'sheet':
-            row = con.execute('SELECT tbl, nrows, name FROM sheets WHERE name ILIKE ? OR tbl = ? ORDER BY nrows DESC',
-                              [f'%{a.ref}%', a.ref]).fetchall()
-            if row and row[0][1] <= 50 and not a.outline:  # small: every row, values in full
-                cur = con.execute(f'SELECT * EXCLUDE (row_no) FROM "{row[0][0]}"')
-                return Result([d[0] for d in cur.description], cur.fetchall(), note=f'{row[0][2]} (all {row[0][1]} rows)')
+            name, tab, tbl, nrows, tabs = find_sheet(con, a.ref)
+            others = f'; other tabs: {", ".join(t for t in tabs if t != tab)}' if len(tabs) > 1 else ''
+            if nrows <= 50 and not a.outline:  # small: every row, values in full
+                cur = con.execute(f'SELECT * EXCLUDE (row_no) FROM "{tbl}"')
+                return Result([d[0] for d in cur.description], cur.fetchall(),
+                              note=f'{name} / {tab} (all {nrows} rows{others})' if len(tabs) > 1 else f'{name} (all {nrows} rows)')
             return describe(con, 'sheet', a.ref)
         return get(con, res, a.ref)
     if v == 'explain':
@@ -467,20 +468,33 @@ def get(con, what, ref):
                                     f'{(r[6] or "")[:3000]}')
 
 
+def find_sheet(con, ref):
+    """A sheet or one of its tabs: "Leads (test)", "Leads (test) / Contacts", a tab name or a table name.
+    Returns (name, tab, table, rows, every tab of that file)."""
+    r = con.execute("SELECT name, tab, tbl, nrows, file_id FROM sheets WHERE (name || ' / ' || tab) ILIKE ? OR tab ILIKE ? "
+                    "OR name ILIKE ? OR tbl = ? ORDER BY (tbl = ?) DESC, ((name || ' / ' || tab) ILIKE ?) DESC, "
+                    "(name ILIKE ?) DESC, tab_index", [f'%{ref}%', ref, f'%{ref}%', ref, ref, f'%{ref}%', ref]).fetchall()
+    if not r:
+        raise Err(f'No sheet matching "{ref}". `idli list sheets` shows them.')
+    tabs = [x[0] for x in con.execute('SELECT tab FROM sheets WHERE file_id = ? ORDER BY tab_index', [r[0][4]]).fetchall()]
+    return r[0][0], r[0][1], r[0][2], r[0][3], tabs
+
+
 def describe(con, what, ref):
     if what == 'sheet':
-        row = con.execute('SELECT name, tbl, nrows FROM sheets WHERE name ILIKE ? OR tbl = ? ORDER BY nrows DESC',
-                          [f'%{ref}%', ref]).fetchone()
-        if not row:
-            raise Err(f'No sheet matching "{ref}". `idli list sheets` shows them.')
-        return _describe_table(con, row[1], f'{row[0]}: {row[2]} rows')
+        name, tab, tbl, nrows, tabs = find_sheet(con, ref)
+        head = f'{name}' + (f' / {tab}' if len(tabs) > 1 else '') + f': {nrows} rows'
+        if len(tabs) > 1:
+            head += f'\nTabs: {", ".join(tabs)} (idli get sheet "{name} / TAB" for another)'
+        return _describe_table(con, tbl, head)
     fid, name = find_file(con, ref)
     f = con.execute('SELECT kind, mime, size, modified, path FROM files WHERE id = ?', [fid]).fetchone()
     head = f'{name} ({f[0]}, {f[2] or "?"} bytes, changed {_fmt(f[3])}, in {f[4] or "My Drive"})'
     if f[0] == 'sheet':
-        t = con.execute('SELECT tbl, nrows FROM sheets WHERE file_id = ?', [fid]).fetchone()
+        t = con.execute('SELECT tbl, nrows, tab FROM sheets WHERE file_id = ? ORDER BY tab_index', [fid]).fetchall()
         if t:
-            return _describe_table(con, t[0], head + f'\n{t[1]} rows')
+            tabs = f'\nTabs: {", ".join(x[2] for x in t)}' if len(t) > 1 else ''
+            return _describe_table(con, t[0][0], head + f'\n{t[0][1]} rows' + tabs)
     if f[0] in ('pdf', 'doc'):
         t = rs.file_text(con, file_account(con, fid), fid)
         pages = con.execute('SELECT pages FROM file_text WHERE file_id = ?', [fid]).fetchone()[0]
@@ -753,9 +767,14 @@ def menu(con, mask=None):
         notes = rs.FIELD_NOTES.get(k, {})
         lines.append(f'- {k}: {r["about"]}. Fields: {", ".join(rs.columns(con, k))}' + _values(con, k) +
                      ('. Meanings: ' + '; '.join(f'{f} = {n}' for f, n in notes.items()) if notes else ''))
-    sheets = con.execute('SELECT name, columns, nrows, tbl FROM sheets ORDER BY name').fetchall()
-    lines.append('- rows --sheet NAME. Sheets: ' + '; '.join(
-        f'"{m(n)}" (SQL table {t}, {nr} rows; columns: {", ".join(m(c) for c in json.loads(cs)[:8])})' for n, cs, nr, t in sheets))
+    sheets = con.execute('SELECT name, tab, columns, nrows, tbl, file_id FROM sheets ORDER BY name, tab_index').fetchall()
+    ntabs = {}
+    for r in sheets:
+        ntabs[r[5]] = ntabs.get(r[5], 0) + 1
+    lines.append('- rows --sheet NAME (or "NAME / TAB" for another tab). Sheets: ' + '; '.join(
+        f'"{m(n)}' + (f' / {m(tb)}' if ntabs[fid] > 1 else '') +
+        f'" (SQL table {t}, {nr} rows; columns: {", ".join(m(c) for c in json.loads(cs)[:8])})'
+        for n, tb, cs, nr, t, fid in sheets))
     folders = con.execute("SELECT path || CASE WHEN path = '' THEN '' ELSE '/' END || name FROM files "
                           "WHERE kind = 'folder' ORDER BY 1").fetchall()
     lines.append('Drive folders: ' + '; '.join(m(f[0]) for f in folders))
