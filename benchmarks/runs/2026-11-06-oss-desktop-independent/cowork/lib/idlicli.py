@@ -1369,8 +1369,8 @@ def struggle(rec, history):
     if any(re.match(r'(idli\s+)?query\b', c) and re.search(r'\bjoin\b|\bin\s*\(\s*select', c, re.I)
            for c in rec.get('commands') or []):
         why.append('I had to write my own join')
-    q = _words(rec.get('q'))
-    for h in history[-3:]:  # the person asking again: the last answer didn't help
+    q = _words(rec.get('q')) if not rec.get('resumed') else set()  # "yes" to a card re-runs the question
+    for h in [h for h in history[-3:] if not h.get('pending')]:  # the person asking again: the last answer didn't help
         hw = _words(h.get('q'))
         if q and hw and len(q & hw) / len(q | hw) >= 0.6:
             why.append('you asked this again')
