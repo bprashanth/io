@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS file_text (file_id TEXT PRIMARY KEY, modified TIMESTA
 CREATE TABLE IF NOT EXISTS file_pages (file_id TEXT, page INTEGER, text TEXT, PRIMARY KEY (file_id, page));
 CREATE TABLE IF NOT EXISTS file_cards (file_id TEXT PRIMARY KEY, modified TIMESTAMP, summary TEXT, key_terms TEXT,
   made_by TEXT, made_at TIMESTAMP);
+CREATE TABLE IF NOT EXISTS file_chunks (file_id TEXT, page INTEGER, chunk INTEGER, modified TIMESTAMP, text TEXT,
+  vec FLOAT[1024], PRIMARY KEY (file_id, page, chunk));
+CREATE TABLE IF NOT EXISTS card_vecs (file_id TEXT PRIMARY KEY, modified TIMESTAMP, vec FLOAT[1024]);
 CREATE TABLE IF NOT EXISTS sheets (name TEXT, file_id TEXT, tab TEXT, tab_index INTEGER, tbl TEXT, columns TEXT,
   nrows INTEGER, fetched_at TIMESTAMP, PRIMARY KEY (file_id, tab));
 CREATE TABLE IF NOT EXISTS definitions (name TEXT, version INTEGER, on_kind TEXT, ask TEXT, answers TEXT,
@@ -465,7 +468,7 @@ def sync_sheets(con, account, max_bytes=3_000_000, progress=None, on_item=None):
             kept.append(tbl)
         for gone in set(old.values()) - set(kept):  # a tab that was removed
             con.execute(f'DROP TABLE IF EXISTS "{gone}"')
-        for t in ('file_text', 'file_pages', 'file_cards'):  # its text and card are made again, from every tab
+        for t in ('file_text', 'file_pages', 'file_cards', 'file_chunks', 'card_vecs'):  # made again, from every tab
             con.execute(f'DELETE FROM {t} WHERE file_id = ?', [fid])
         n += 1
         on_item and on_item(name, f'{len(kept)} tab{"s" if len(kept) != 1 else ""}: ' +
@@ -521,6 +524,7 @@ def file_text(con, account, fid):
     rows = [[fid, i + 1, p] for i, p in enumerate(pages) if p.strip()]
     if rows:
         con.executemany('INSERT INTO file_pages VALUES (?,?,?)', rows)
+    con.execute('DELETE FROM file_chunks WHERE file_id = ?', [fid])  # embedded again from the new text
     if tmod is not None and tmod != fmod:  # the file changed: what was judged on the old version no longer holds
         con.execute("DELETE FROM labels WHERE kind = 'file' AND record_id = ?", [fid])
     con.execute('INSERT OR REPLACE INTO file_text VALUES (?,?,?,?)', [fid, fmod, len(pages) if kind == 'pdf' else None, text])
@@ -653,9 +657,130 @@ def card(con, fid):
     return (r[0][0], json.loads(r[0][1] or '[]')) if r else None
 
 
+# ---- meaning: embeddings of page chunks and cards (Qwen3-Embedding-0.6B, idli-embed on the DGX) ----
+EMBED_URL = os.environ.get('IDLI_EMBED_URL', 'http://127.0.0.1:8293')
+DIM = 1024
+CHUNK, OVERLAP = 1200, 200
+QUERY_PREFIX = 'Instruct: Given a question about a person\'s documents, find the passages that answer it\nQuery: '
+
+
+def embed(texts, query=False, batch=32):
+    """Vectors for texts (unit length). A question gets the model's query instruction; passages don't."""
+    out = []
+    for i in range(0, len(texts), batch):
+        part = [(QUERY_PREFIX + t if query else t)[:6000] for t in texts[i:i + batch]]
+        req = urllib.request.Request(EMBED_URL + '/v1/embeddings', json.dumps({'input': part}).encode(),
+                                     {'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = sorted(json.load(r)['data'], key=lambda d: d['index'])
+        for d in data:
+            v = d['embedding']
+            n = math.sqrt(sum(x * x for x in v)) or 1.0
+            out.append([x / n for x in v])
+    return out
+
+
+def embeddings_ready(con):
+    try:
+        return con.execute('SELECT count(*) FROM file_chunks').fetchone()[0] > 0
+    except Exception:
+        return False
+
+
+def _chunks(text):
+    text = re.sub(r'\s+', ' ', text).strip()
+    if len(text) <= CHUNK:
+        return [text] if text else []
+    out, i = [], 0
+    while i < len(text):
+        out.append(text[i:i + CHUNK])
+        i += CHUNK - OVERLAP
+    return out
+
+
+def to_embed(con):
+    """Files read for their current version whose chunks aren't embedded for it; cards without a vector."""
+    files = [r[0] for r in con.execute(
+        "SELECT f.id FROM files f JOIN file_text t ON t.file_id = f.id AND t.modified = f.modified "
+        "WHERE EXISTS (SELECT 1 FROM file_pages p WHERE p.file_id = f.id) AND NOT EXISTS (SELECT 1 FROM file_chunks c "
+        "WHERE c.file_id = f.id AND c.modified = f.modified) ORDER BY f.modified DESC").fetchall()]
+    cards = [r[0] for r in con.execute(
+        "SELECT c.file_id FROM file_cards c JOIN files f ON f.id = c.file_id AND c.modified = f.modified "
+        "LEFT JOIN card_vecs v ON v.file_id = c.file_id WHERE v.file_id IS NULL OR v.modified IS DISTINCT FROM "
+        "f.modified").fetchall()]
+    return files, cards
+
+
+def make_embeddings(con, progress=None, on_item=None):
+    """Embed every page chunk of every read file, and every card, for their current version."""
+    files, cards = to_embed(con)
+    t0, n_chunks = time.time(), 0
+    for i, fid in enumerate(files, 1):
+        mod, name = con.execute('SELECT modified, name FROM files WHERE id = ?', [fid]).fetchone()
+        rows = []
+        for page, text in con.execute('SELECT page, text FROM file_pages WHERE file_id = ? ORDER BY page', [fid]).fetchall():
+            for j, c in enumerate(_chunks(text)):
+                rows.append([fid, page, j, mod, c])
+        vecs = embed([r[4] for r in rows]) if rows else []
+        con.execute('DELETE FROM file_chunks WHERE file_id = ?', [fid])
+        if rows:
+            con.executemany('INSERT INTO file_chunks VALUES (?,?,?,?,?,?)', [r + [v] for r, v in zip(rows, vecs)])
+        n_chunks += len(rows)
+        on_item and on_item(name, f'{len(rows)} chunks')
+        progress and progress(i, len(files), 0, time.time() - t0, 'embedding')
+    if cards:
+        texts = []
+        for fid in cards:
+            nm, summ, terms = con.execute('SELECT f.name, c.summary, c.key_terms FROM file_cards c JOIN files f '
+                                          'ON f.id = c.file_id WHERE c.file_id = ?', [fid]).fetchone()
+            texts.append(f'{nm}. {summ} Key terms: {", ".join(json.loads(terms or "[]"))}')
+        vecs = embed(texts)
+        con.executemany('INSERT OR REPLACE INTO card_vecs SELECT id, modified, ? FROM files WHERE id = ?',
+                        [[v, fid] for v, fid in zip(vecs, cards)])
+    return {'files': len(files), 'chunks': n_chunks, 'cards': len(cards), 'seconds': round(time.time() - t0, 1)}
+
+
+def semantic_files(con, question, ids=None, k=30, floor=None):
+    """Files closest in meaning to the question: [(file_id, score, page, chunk_text)], best first. The score is the
+    best chunk's cosine, nudged by the card's. `ids` limits to files that passed the other filters."""
+    q = embed([question], query=True)[0]
+    limit = f"AND c.file_id IN ({','.join(repr(i) for i in ids)})" if ids is not None else ''
+    if ids is not None and not ids:
+        return []
+    rows = con.execute(f"""
+        WITH best AS (SELECT c.file_id, c.page, c.text, array_cosine_similarity(c.vec, ?::FLOAT[{DIM}]) s,
+                             row_number() OVER (PARTITION BY c.file_id ORDER BY array_cosine_similarity(c.vec,
+                             ?::FLOAT[{DIM}]) DESC) rn FROM file_chunks c WHERE true {limit})
+        SELECT b.file_id, b.s + 0.25 * coalesce(array_cosine_similarity(v.vec, ?::FLOAT[{DIM}]), 0) score, b.page, b.text
+        FROM best b LEFT JOIN card_vecs v ON v.file_id = b.file_id WHERE b.rn = 1 ORDER BY score DESC LIMIT {int(k)}""",
+                       [q, q, q]).fetchall()
+    if floor is not None:
+        return [r for r in rows if r[1] >= floor]
+    # measured 2026-11-21: topics score 0.6-0.8 ("border effects", "coalition"); single rare words and names
+    # ("adivasi", "leads") and unrelated questions sit at 0.35-0.55, which is noise. Use meaning only when the best
+    # match stands out, and only near it.
+    if not rows or rows[0][1] < SEMANTIC_TOP:
+        return []
+    return [r for r in rows if r[1] >= max(SEMANTIC_FLOOR, rows[0][1] - SEMANTIC_BAND)]
+
+
+SEMANTIC_TOP = float(os.environ.get('IDLI_SEMANTIC_TOP', '0.55'))
+SEMANTIC_FLOOR = float(os.environ.get('IDLI_SEMANTIC_FLOOR', '0.5'))
+SEMANTIC_BAND = 0.15
+
+
+def semantic_chunks(con, question, ids=None, k=8):
+    """The passages closest in meaning to the question: [(file_id, page, text, score)]."""
+    q = embed([question], query=True)[0]
+    limit = f"WHERE c.file_id IN ({','.join(repr(i) for i in ids)})" if ids else ''
+    return con.execute(f"SELECT c.file_id, c.page, c.text, array_cosine_similarity(c.vec, ?::FLOAT[{DIM}]) s "
+                       f"FROM file_chunks c {limit} ORDER BY s DESC LIMIT {int(k)}", [q]).fetchall()
+
+
 def drop_orphans(con):
     """Text, pages and labels of files no longer in Drive."""
-    for t, col in (('file_text', 'file_id'), ('file_pages', 'file_id'), ('file_cards', 'file_id')):
+    for t, col in (('file_text', 'file_id'), ('file_pages', 'file_id'), ('file_cards', 'file_id'),
+                   ('file_chunks', 'file_id'), ('card_vecs', 'file_id')):
         con.execute(f'DELETE FROM {t} WHERE {col} NOT IN (SELECT id FROM files)')
     con.execute("DELETE FROM labels WHERE kind = 'file' AND record_id NOT IN (SELECT id FROM files)")
 
@@ -805,10 +930,53 @@ def search_sql(con, r, src, search):
     return conds, found, f'{n} DESC, ({words_score}) DESC'
 
 
+def _search_text(search):
+    items = search if isinstance(search, list) else [search]
+    return ' '.join(re.sub(r'"', ' ', x) for x in items if x).strip()
+
+
+def fused_files(con, search, limit=50, fields=None, **kw):
+    """--search on files without a quoted phrase: the literal ranking and the meaning ranking, merged
+    (reciprocal rank fusion). A file found only by meaning says so, with its closest passage."""
+    _, base, _ = select(con, 'files', fields='id', limit=100000, order='id', plain=True, **kw)
+    base_ids = [r[0] for r in base]
+    _, lit, _ = select(con, 'files', search=search, fields='id', limit=300, plain=True, **kw)
+    lit_rank = {r[0]: i for i, r in enumerate(lit)}
+    lit_found = {r[0]: r[-1] for r in lit}
+    sem = semantic_files(con, _search_text(search), ids=base_ids, k=30)
+    sem_rank = {r[0]: i for i, r in enumerate(sem)}
+    sem_info = {r[0]: r for r in sem}
+    score = {}
+    for d, rk in ((lit_rank, 60), (sem_rank, 60)):
+        for fid, i in d.items():
+            score[fid] = score.get(fid, 0) + 1 / (rk + i + 1)
+    order = sorted(score, key=lambda f: -score[f])[:int(limit)]
+    if not order:
+        return ['name', 'kind', 'path', 'modified', 'found'], [], 'fused: nothing'
+    show = fields or ', '.join(RESOURCES['files']['show'])
+    rows = {r[0]: r[1:] for r in con.execute(
+        f"SELECT id, {show} FROM files WHERE id IN ({','.join(repr(i) for i in order)})").fetchall()}
+    cols = [c.strip() for c in show.split(',')] + ['found']
+
+    def found(fid):
+        if fid in lit_found and isinstance(lit_found[fid], str):
+            return lit_found[fid]
+        _, sc, page, text = sem_info[fid]
+        return f'similar meaning {sc:.2f}; p.{page}: ...{re.sub(chr(92) + "s+", " ", text[:110])}...'
+    return cols, [tuple(rows[f]) + (found(f),) for f in order if f in rows], \
+        f'fused: {len(lit_rank)} literal, {len(sem_rank)} by meaning'
+
+
 def select(con, resource, where=None, since=None, until=None, on=None, search=None, label=None, folder=None,
-           sheet=None, by=None, count=False, fields=None, order=None, limit=50, show_all=False):
+           sheet=None, by=None, count=False, fields=None, order=None, limit=50, show_all=False, plain=False):
     """Build and run the query for `list`. Returns (columns, rows, sql). Empty files are left out unless show_all."""
     resource = resource_name(resource)
+    if (not plain and search and resource == 'files' and not by and not count and not order
+            and '"' not in _search_text(search) + ''.join(search if isinstance(search, list) else [search])
+            and embeddings_ready(con)):
+        # unquoted words: literal and meaning, merged. Quoted phrases stay literal only.
+        return fused_files(con, search, limit=limit, fields=fields, where=where, since=since, until=until, on=on,
+                           label=label, folder=folder, show_all=show_all)
     if isinstance(where, list):  # --where given more than once: all of them
         where = ' AND '.join(f'({w})' for w in where if w) or None
     if resource == 'rows':

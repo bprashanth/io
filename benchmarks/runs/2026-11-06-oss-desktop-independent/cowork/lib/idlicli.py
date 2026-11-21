@@ -164,6 +164,7 @@ def parser():
                    help='gmail, gcalendar, drive (files and sheets, then the text and a card for every document), or all')
     s.add_argument('--no-read', action='store_true', help='copy the file list only; read the text later')
     s.add_argument('--no-cards', action='store_true', help='read the text but make no summary cards now')
+    s.add_argument('--no-embed', action='store_true', help='make no embeddings now (search then matches words only)')
     s.add_argument('--as', dest='role', default='me')
     for verb in ('list', 'count'):  # count is list --count; still accepted, not in the menu
         l = sub.add_parser(verb, help='rows of a resource' if verb == 'list' else argparse.SUPPRESS)
@@ -310,6 +311,18 @@ def run_argv(con, argv):
                     rc = rs.make_cards(con, progress=progress_line, on_item=item_line('card'))
                     out.append(f'cards made: {rc["made"]} in {rc["seconds"]} s' +
                                (f', {rc["failed"]} failed ({rc["failed_examples"][0]})' if rc['failed'] else ''))
+                if not a.no_embed:
+                    files_, cards_ = rs.to_embed(con)
+                    if files_ or cards_:
+                        say(1, f'[embed] {len(files_)} documents and {len(cards_)} cards ...')
+                        print(f'Embedding {len(files_)} documents and {len(cards_)} cards, so search also finds the '
+                              'same meaning in other words (about 2 s a document). --no-embed skips this.', file=sys.stderr)
+                        try:
+                            re_ = rs.make_embeddings(con, progress=progress_line, on_item=item_line('embed'))
+                            out.append(f'embedded: {re_["files"]} documents ({re_["chunks"]} passages), {re_["cards"]} '
+                                       f'cards in {re_["seconds"]} s')
+                        except Exception as e:  # the embedding server is down: search still works by words
+                            out.append(f'embeddings skipped ({type(e).__name__}); search matches words only')
         return Result(kind='text', text='Synced ' + acct + '. ' + '; '.join(out) + '.')
     if v in ('list', 'count'):
         cols, rows, sql = rs.select(con, a.resource, where=a.where, since=a.since, until=a.until, on=a.on,
@@ -546,9 +559,16 @@ def summarise(con, ref, question=''):
 def summarise_search(con, search, folder=None, question='', docs=5, chars=9000):
     """What the documents say about a topic: the pages that mention it most, read by the 9B, with file and page."""
     phrases, words, rank = rs.parse_search(search)
-    _, rows, _ = rs.select(con, 'files', search=search, folder=folder, fields='id, name', limit=docs)
+    _, rows, _ = rs.select(con, 'files', search=search, folder=folder, fields='id, name', limit=docs, plain=True)
     rows = [r[:2] for r in rows]  # a search adds its "found" column
-    if not rows or not rank:
+    by_meaning = []
+    if not phrases and rs.embeddings_ready(con):  # passages that say it in other words
+        topic = rs._search_text(search) + (f'. {question}' if question else '')
+        hits = rs.semantic_chunks(con, topic, k=8)
+        best = hits[0][3] if hits else 0
+        by_meaning = [h for h in hits if h[3] >= max(rs.SEMANTIC_FLOOR, best - rs.SEMANTIC_BAND)] \
+            if best >= rs.SEMANTIC_TOP else []
+    if (not rows and not by_meaning) or not rank:
         return Result(kind='text', text='No document mentions that. Try other words, or `idli list files --search`.')
     rx = rs._phrase_re(rank)
     excerpts, used = [], 0
@@ -571,6 +591,15 @@ def summarise_search(con, search, folder=None, question='', docs=5, chars=9000):
                 break
         if used > chars:
             break
+    names = dict(con.execute('SELECT id, name FROM files').fetchall())
+    seen = {e.split(']')[0] for e in excerpts}
+    for fid, page, text, sc in by_meaning:  # literal passages first, then the closest in meaning
+        key = f'[{names.get(fid, fid)}, page {page}'
+        if key in seen or used > chars:
+            continue
+        excerpts.append(f'{key}]\n{text}')
+        seen.add(key)
+        used += len(text)
     topic = ' '.join(rank)
     if not excerpts:
         return Result(kind='text', text=f'I found files with those words but no passage about "{topic}" to read. '
