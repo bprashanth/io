@@ -6,7 +6,7 @@
           [--search ..] [--count] [--group-by ..]   rows --sheet NAME, labels, definitions, or a view
     idli get RESOURCE REF [--text] [--outline]      one item in full; a file's text; its pages or a sheet's columns
     idli summarise file NAME | --search WORDS       one file's summary, or what your documents say about a topic
-    idli explain [RESOURCE]                         fields and examples (the manual page)
+    idli help [RESOURCE]                            fields and examples (the manual page)
     idli define NAME --on mail|event|file|photo --ask "..." --answers yes,no
     idli judge RESOURCE --def NAME [--search ..]    label each row once per definition version (Clef by default)
     idli query "SELECT ..."                         any read-only SQL over the store
@@ -26,6 +26,7 @@ import re
 import shlex
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 from lib import recstore as rs
@@ -153,7 +154,7 @@ class Err(ValueError):
 class P(argparse.ArgumentParser):
     def error(self, message):
         verb = self.prog.split()[-1]
-        raise Err(f'{message}. Try `idli {"" if verb == "idli" else verb + " "}--help` or `idli explain`.')
+        raise Err(f'{message}. Try `idli {"" if verb == "idli" else verb + " "}--help` or `idli help`.')
 
 
 def parser():
@@ -193,8 +194,9 @@ def parser():
     g.add_argument('--text', action='store_true', help="a file's text")
     g.add_argument('--outline', action='store_true', help="a file's pages, or a sheet's columns with examples")
     g.add_argument('--chars', type=int, default=3000)
-    e = sub.add_parser('explain', help='fields and examples')
-    e.add_argument('resource', nargs='?')
+    for verb in ('help', 'explain'):  # explain: the old name, still accepted; people say "explain X" for topics
+        e = sub.add_parser(verb, help='fields and examples (the manual page)' if verb == 'help' else argparse.SUPPRESS)
+        e.add_argument('resource', nargs='?')
     for verb in ('describe', 'read'):  # now get file --outline / --text; still accepted, not in the menu
         d = sub.add_parser(verb, help=argparse.SUPPRESS)
         d.add_argument('what', choices=['file', 'sheet'] if verb == 'describe' else ['file'])
@@ -360,7 +362,7 @@ def run_argv(con, argv):
                               note=f'{name} / {tab} (all {nrows} rows{others})' if len(tabs) > 1 else f'{name} (all {nrows} rows)')
             return describe(con, 'sheet', a.ref)
         return get(con, res, a.ref)
-    if v == 'explain':
+    if v in ('help', 'explain'):
         return Result(kind='text', text=explain(con, a.resource))
     if v == 'describe':
         return describe(con, a.what, a.ref)
@@ -670,13 +672,13 @@ def explain(con, resource=None):
                   f'  idli list calendar --on "next monday"   (= {rs.day_range("next monday")[0]})',
                   '  idli define urgent --on mail --ask "Does this email ask me to act soon?" --answers yes,no',
                   '  idli judge mail --def urgent --where "not is_bulk"   then   idli list threads --label urgent',
-                  'More: idli explain mail (or any resource).']
+                  'More: idli help mail (or any resource).']
         return '\n'.join(lines)
     if resource == 'rows':
         return 'rows --sheet NAME: the rows of one spreadsheet. `idli get sheet NAME` lists its columns.'
     resource = rs.resource_name(resource)
     if resource not in rs.RESOURCES:
-        raise Err(f'No resource "{resource}". `idli explain` lists them.')
+        raise Err(f'No resource "{resource}". `idli help` lists them.')
     r = rs.RESOURCES[resource]
     cols = rs.columns(con, resource)
     ex = {
@@ -726,7 +728,7 @@ Dates D: today, yesterday, tomorrow, 7d, last week, this week, next week, monday
 COND is SQL over the resource's fields; field ~ 'x' means contains; label.NAME = 'yes' uses a definition.
 --search WORDS: every word must appear; words in double quotes are an exact phrase ('"border effects"'). On files
 it covers names, folders, the full text of every page and a short summary card; files with the most mentions come
-first. Give a repeated --search for things that must all appear. `idli explain` is the manual page, not a topic.
+first. Give a repeated --search for things that must all appear. `idli help` is the manual page.
 
 Rules:
 - Use only the resources and fields listed below. Prefer list with flags; use query only for joins.
@@ -735,7 +737,7 @@ Rules:
   --since so fewer rows are judged), then list with --label. Reuse an existing definition when it fits; never
   define an existing name again. Word a new definition generally, as the person means the category, not from one
   document you just saw (no examples copied from a result). The person is shown the wording and decides.
-- A greeting, or "what can you do / what can you see": idli explain (it lists what Idli can read).
+- A greeting, or "what can you do / what can you see": idli help (it lists what Idli can read).
 - Use the person's own words: never add --search words, --in folders or --where conditions they didn't ask for.
 - A field that already means the thing (newsletters: is_bulk; sent by me: direction = 'out'; declined:
   my_response = 'declined'): filter on it; don't define a category for it.
@@ -1102,7 +1104,7 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
         final_rows = '\n\n'.join(p for _, p in reads)
     earlier = ('Earlier steps (not shown to the person; do not describe their rows): ' + ' ; '.join(cmds[:-1])) \
         if len(cmds) > 1 else ''
-    if cmds and re.match(r'(idli\s+)?(summarise|explain)\b', cmds[-1]) and 'failed' not in final_rows[:40]:
+    if cmds and re.match(r'(idli\s+)?(summarise|explain|help)\b', cmds[-1]) and 'failed' not in final_rows[:40]:
         reply, why = '', 'prose_result'  # the result is already written for the person
     else:
         reply, why = compose(question, final_rows, history, plan_note=earlier)
@@ -1308,6 +1310,95 @@ def menu_miss(con, rec):
             'empty_result': 'Nothing matches' in (rec.get('shown') or '')}
 
 
+# ---- what kind of ask, and did this turn struggle (owner, 2026-11-21) ----
+KINDS = {
+    'lookup': 'The answer is already in the data as it is: dates, senders, folders, counts, file names, or words in '
+              'documents. Nothing has to be judged.',
+    'judgement': 'Each item has to be read and judged against a category the person has in mind, like urgent, about '
+                 'climate, sounds unhappy, asks for money.',
+    'workflow': 'Several steps, joining different sources, or words that mean something particular in this '
+                "person's work (leads, follow up, prep list, needs a reply from my partners).",
+    'elsewhere': 'Needs a site that is not connected (WhatsApp, Slack, LinkedIn) or an action that changes things '
+                 '(send, post, book, move, delete).',
+}
+CHIP_MIN = 0.5
+CHIP_COLOUR = {'lookup': 32, 'judgement': 33, 'workflow': 35, 'elsewhere': 34, 'struggled': 31}
+
+
+def classify(question):
+    """Clef labels the ask. Hosted Clef sees the question (test accounts; Clef runs locally later). Returns
+    (label, probabilities), or (None, {}) when Clef can't be reached."""
+    from lib import minisql
+    body = {'model': 'cloudflare/clef-flash', 'state': question,
+            'questions': {'kind': {'type': 'choice', 'instructions': 'What kind of request is this, for an assistant '
+                                   "that reads the person's own email, calendar and files?", 'criteria': KINDS}},
+            'provider': {'order': ['Cloudflare'], 'allow_fallbacks': False}}
+    try:
+        req = urllib.request.Request('https://openrouter.ai/api/v1/systemone', json.dumps(body).encode(), {
+            'Content-Type': 'application/json', 'Authorization': 'Bearer ' + minisql._key(), 'User-Agent': 'idli-scaffold/1'})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            a = json.load(r)['answers']['kind']
+        probs = {k: round(v, 2) for k, v in a['probabilities'].items()}
+        # measured 2026-11-21 on 91 labelled tasks: top >= 0.5, or >= 0.4 with a 0.15 lead: 70 chips, 70% agree,
+        # workflow chips 10 of 13 right (benchmarks/runs/2026-11-21-kind-classifier)
+        v = sorted(probs.values(), reverse=True)
+        sure = v[0] >= CHIP_MIN or (v[0] >= 0.4 and v[0] - v[1] >= 0.15)
+        return (a['choice'] if sure else None), probs
+    except Exception:
+        return None, {}
+
+
+def _words(q):
+    return set(re.findall(r'[a-z0-9]{3,}', (q or '').lower())) - rs.STOP
+
+
+def struggle(rec, history):
+    """Signs this turn went badly, from what happened inside it (never just an empty result)."""
+    why = []
+    if rec.get('repaired'):
+        why.append('a step failed and was redone')
+    if rec.get('errors'):
+        why.append('a step failed')
+    if rec.get('needs') == 'mapper_failed':
+        why.append('I could not work out the steps')
+    if any(re.match(r'(idli\s+)?query\b', c) and re.search(r'\bjoin\b|\bin\s*\(\s*select', c, re.I)
+           for c in rec.get('commands') or []):
+        why.append('I had to write my own join')
+    q = _words(rec.get('q'))
+    for h in history[-3:]:  # the person asking again: the last answer didn't help
+        hw = _words(h.get('q'))
+        if q and hw and len(q & hw) / len(q | hw) >= 0.6:
+            why.append('you asked this again')
+            break
+    return why
+
+
+def chips(kind, why):
+    def chip(label, text=None):
+        t = f'[{text or label}]'
+        return f'\033[{CHIP_COLOUR[label]}m{t}\033[0m' if sys.stdout.isatty() else t
+    out = [chip(kind)] if kind else []
+    if why:
+        out.append(chip('struggled', 'struggled: ' + '; '.join(dict.fromkeys(why))))
+    return ' '.join(out)
+
+
+def offer(kind, why, rec):
+    """What to suggest next, from the kind of ask and whether it struggled."""
+    if rec.get('pending'):
+        return ''  # the yes card already asks
+    if 'you asked this again' in why:
+        return 'This does not seem to be working. idli-remote may do better (it sees your question masked): ' \
+               'idli ask --mapper remote "..."'
+    if kind == 'workflow':
+        tail = ' For a reliable repeat, this could become a Mini.'
+        return ('I did my best, but this looks like a workflow. idli-remote may do better: idli ask --mapper remote '
+                '"..."' + tail) if why else ('This looks like a workflow.' + tail)
+    if why and kind in ('lookup', None):
+        return 'I struggled with this one. idli-remote may do better: idli ask --mapper remote "..."'
+    return ''
+
+
 def ran_block(cmds):
     marks = [c + ('   (writes to the store)' if re.match(r'(idli\s+)?(define|judge|view)\b', c) else '') for c in cmds]
     return dim('Ran:\n' + '\n'.join('  ' + m for m in marks)) if cmds else ''
@@ -1349,7 +1440,13 @@ def main(argv=None):
                 return 0
             elif sys.stdin.isatty() and sys.stderr.isatty():
                 CONFIRM = tty_confirm
+            import concurrent.futures as _cf
+            _ex = _cf.ThreadPoolExecutor(1)
+            kind_f = _ex.submit(classify, q) if os.environ.get('IDLI_CHIPS', '1') != '0' else None
             rec = ask(con, q, hist, a.mapper, data_dir=sandbox(), show_commands=False, resume=resume)
+            kind, kind_p = kind_f.result() if kind_f else (None, {})
+            why = struggle(rec, hist)
+            rec.update(kind=kind, kind_probs=kind_p, struggled=why)
             hist.append({k: rec.get(k) for k in ('q', 'commands', 'shown', 'reply', 'pending')})
             sp.write_text(json.dumps(hist[-6:], default=str))
             log({'verb': 'ask', 'q': rec['q'], 'mapper': a.mapper, 'wording': rs.NINE, 'judge': rs.JUDGE,
@@ -1358,9 +1455,16 @@ def main(argv=None):
                  'steps_shown': rec.get('shown'), 'words': rec.get('words'), 'reply': rec['reply'],
                  'wording_dropped': rec.get('compose_fallback'), 'needs': rec.get('needs'),
                  'pending': rec.get('pending'), 'resumed': rec.get('resumed'), 'menu': dict(MENU_INFO),
+                 'kind': rec.get('kind'), 'kind_probs': rec.get('kind_probs'), 'struggled': rec.get('struggled'),
                  'menu_miss': menu_miss(con, rec),
                  'seconds': {k: rec.get(k) for k in ('map_s', 'compose_s', 'judge_s', 'total_s')}})
+            line = chips(kind, why)
+            if line:
+                print(line)
             print(rec['reply'])
+            nxt = offer(kind, why, rec)
+            if nxt:
+                print('\n' + nxt)
             if rec.get('commands'):
                 print('\n' + ran_block(rec['commands']))
             return 0
