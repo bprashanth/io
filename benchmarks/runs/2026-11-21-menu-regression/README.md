@@ -28,3 +28,6 @@ and every turn keeps logging the menu and any miss. To decide properly: repeat e
 compare on a new held-out set.
 
 `results/`: turns (`*-nine.jsonl` trimmed, `*-nine-fullmenu.jsonl` full), grades, `compare.py`.
+
+The turn-by-turn results and transcripts hold real rows from the test accounts, so they are kept on the DGX
+and not in git.

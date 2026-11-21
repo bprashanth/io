@@ -50,3 +50,6 @@ word. "Which emails need a reply" copied the manual's `urgent` example (wording 
 - The 9B drops words the person said (partnership) and copies examples from the manual (urgent).
 - Workflows ("have any of my leads emailed me?") need views and Minis; the 9B's SQL breaks.
 - Sync reads only the first tab of a spreadsheet.
+
+The turn-by-turn results and transcripts hold real rows from the test accounts, so they are kept on the DGX
+and not in git.

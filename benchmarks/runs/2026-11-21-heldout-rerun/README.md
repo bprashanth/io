@@ -34,3 +34,6 @@ These after-freeze fixes need a new held-out set to be measured: these 27 tasks 
 
 `results/`: `heldout-*.jsonl` (turns), `heldout-*.log`, `grades-*.json`. `python ../2026-11-19-record-store/analyze.py
 results/heldout-remote.jsonl results/grades-remote.json` prints the tables.
+
+The turn-by-turn results and transcripts hold real rows from the test accounts, so they are kept on the DGX
+and not in git.
