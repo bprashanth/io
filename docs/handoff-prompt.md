@@ -1,5 +1,8 @@
 # Handoff prompt for the next agent (2026-11-21)
 
+**The core moved to `../silo` (branch `idli-core`). Use `../silo/docs/handoff-prompt.md` for work on the core;
+this one is for work in io itself.**
+
 Paste this to start a new agent on this repo. Keep it current: the agent that ends a session rewrites it.
 
 ---

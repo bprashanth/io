@@ -9,6 +9,9 @@ start from.
 
 ## Checkpoint 2026-11-21: the scaffold core, hands-on (read in this order)
 
+**Moved:** the core now lives in `../silo` (branch `idli-core`, `core/`, `docs/handoff.md`); continue there. io stays
+the lab (benchmarks, history, the app).
+
 **Status:** items 1-6 below are built (2026-11-21). The smaller menu (item 2) is opt-in (`IDLI_MENU_TRIM=1`): on
 the dev bank it gave fewer errors but 17 vs 26 correct, mostly noise, so it isn't proven harmless
 (`benchmarks/runs/2026-11-21-menu-regression/README.md`). The next agent starts from `docs/handoff-prompt.md`.
