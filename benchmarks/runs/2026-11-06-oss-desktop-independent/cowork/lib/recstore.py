@@ -11,6 +11,7 @@ import datetime as dt
 import email.utils
 import io
 import json
+import math
 import os
 import re
 import time
@@ -85,6 +86,7 @@ FIELD_NOTES = {
     'calendar': {'my_response': "my RSVP from Google: accepted, declined, tentative, needsAction; organizer if I made it",
                  'guests': 'guest email addresses', 'organizer': "the organizer's email address"},
     'files': {'kind': 'pdf, doc, sheet, slides, image, video, folder, form, other', 'path': 'the folder path',
+              'owner': "the owner's email address; 'me' means the account's own address",
               'shared': 'shared with me or by me'},
 }
 ALIASES = {'events': 'calendar', 'event': 'calendar'}  # older names still work; the menu shows the new ones
@@ -117,6 +119,7 @@ def connect(sandbox, read_only=False):
           arg_max(coalesce(nullif(from_name, ''), from_addr), date) AS last_from, arg_max(direction, date) AS last_direction,
           sum(CASE WHEN is_unread THEN 1 ELSE 0 END) AS unread, bool_and(is_bulk) AS is_bulk,
           bool_and(is_calendar_notice) AS is_calendar_notice FROM mail GROUP BY thread_id""")
+        con.execute('CREATE OR REPLACE VIEW calendar AS SELECT * FROM events')  # the resource name works in SQL too
     return con
 
 
@@ -132,7 +135,8 @@ def day_range(phrase, today=None):
     if re.fullmatch(r'\d{4}-\d{2}-\d{2}', p):
         d = dt.date.fromisoformat(p)
         return d, d + dt.timedelta(days=1)
-    m = re.fullmatch(r'(?:last |past )?(\d+)\s*(d|days?|w|weeks?|m|months?)', p)
+    p = re.sub(r'\b(a few|few|several)\b', '3', re.sub(r'\b(a couple of|couple of|a couple)\b', '2', p))
+    m = re.fullmatch(r'(?:in the |the )?(?:last |past )?(\d+)\s*(d|days?|w|weeks?|m|months?)', p)
     if m:
         n, u = int(m.group(1)), m.group(2)[0]
         days = n * {'d': 1, 'w': 7, 'm': 30}[u]
@@ -645,10 +649,19 @@ def compile_where(con, resource, where):
         return f"{idcol} {'NOT ' if op != '=' else ''}IN ({sub})"
     w = LABEL_REF.sub(lab, where)
     cols = {c.lower() for c in columns(con, resource)}
+    me = (con.execute('SELECT any_value(account) FROM files').fetchone() or [None])[0] or \
+         (con.execute('SELECT any_value(account) FROM mail').fetchone() or [None])[0]
+    if me:  # "owner = 'me'": the account's own address
+        w = re.sub(r'''(\b(?:owner|from_addr|organizer|to_addrs|account)\s*(?:=|~|!=|<>)\s*)['"]me['"]''',
+                       lambda m: f"{m.group(1)}'{me}'", w, flags=re.I)
     # "declined" in double quotes is a column name in SQL; models often mean the value. Quote values as values.
     w = re.sub(r'"([^"]*)"', lambda m: m.group(0) if m.group(1).lower() in cols else "'" + m.group(1).replace("'", "''") + "'", w)
     w = re.sub(r'([A-Za-z_][A-Za-z0-9_]*)\s*~\s*\'([^\']*)\'', lambda m: f"{m.group(1)} ILIKE '%{m.group(2)}%'", w)
     return w
+
+
+STOP = {'a', 'an', 'the', 'of', 'in', 'on', 'for', 'to', 'and', 'or', 'about', 'with', 'by', 'at', 'from', 'is',
+        'are', 'my', 'me', 'explain', 'docs', 'documents', 'files'}
 
 
 def _re(w):
@@ -683,6 +696,7 @@ def search_sql(con, r, src, search):
     """Conditions, a "how it matched" column and a ranking for --search. On files it covers names, folders, every
     page of text and the cards; elsewhere the resource's text fields."""
     phrases, words, rank_words = parse_search(search)
+    words = [w for w in words if w.lower() not in STOP] or words  # "of" doesn't have to appear
     like = lambda w: w.replace("'", '').replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
     if not (r.get('kind') == 'file' and r.get('table') == 'files'):
         cols = r.get('text') or [c for c in columns_of(con, src)]
@@ -708,6 +722,17 @@ def search_sql(con, r, src, search):
         return conds, '', ''
     rx = _phrase_re(rank_words)
     n = f"(SELECT coalesce(sum(len(regexp_extract_all(lower(p.text), '{rx}'))), 0) FROM file_pages p WHERE p.file_id = files.id)"
+    # below the phrase matches: how much each word is used, rarer words counting more (a small BM25)
+    total = con.execute('SELECT count(DISTINCT file_id) FROM file_pages').fetchone()[0] or 1
+    score = []
+    for w in [w for w in rank_words if w.lower() not in STOP] or rank_words:
+        wl = w.lower()
+        wr = _re(w[:-1] if len(wl) > 4 and wl.endswith('s') and not wl.endswith('ss') else w)
+        df = con.execute(f"SELECT count(DISTINCT file_id) FROM file_pages WHERE regexp_matches(lower(text), '{wr}')").fetchone()[0]
+        idf = math.log(1 + total / (1 + df))
+        score.append(f"{idf:.3f} * ln(1 + (SELECT coalesce(sum(len(regexp_extract_all(lower(p.text), '{wr}'))), 0) "
+                     f"FROM file_pages p WHERE p.file_id = files.id))")
+    words_score = ' + '.join(score) or '0'
     def first(cond, col):
         return f"(SELECT p.{col} FROM file_pages p WHERE p.file_id = files.id AND {cond} ORDER BY p.page LIMIT 1)"
     w0 = like(rank_words[0].lower())
@@ -721,13 +746,15 @@ def search_sql(con, r, src, search):
     label = ("'phrase'" if len(rank_words) > 1 else "'mentioned'")
     found = (f", CASE WHEN {n} > 0 THEN {label} || ' x' || {n} || '; ' ELSE "
              f"{chr(39) + 'words apart; ' + chr(39) if len(rank_words) > 1 else chr(39) + chr(39)} END || {snippet} AS found")
-    return conds, found, f'{n} DESC'
+    return conds, found, f'{n} DESC, ({words_score}) DESC'
 
 
 def select(con, resource, where=None, since=None, until=None, on=None, search=None, label=None, folder=None,
            sheet=None, by=None, count=False, fields=None, order=None, limit=50, show_all=False):
     """Build and run the query for `list`. Returns (columns, rows, sql). Empty files are left out unless show_all."""
     resource = resource_name(resource)
+    if isinstance(where, list):  # --where given more than once: all of them
+        where = ' AND '.join(f'({w})' for w in where if w) or None
     if resource == 'rows':
         if not sheet:
             raise ValueError('Say which sheet: `idli list rows --sheet "Leads (test)"`. `idli list sheets` shows them.')
@@ -782,6 +809,9 @@ def select(con, resource, where=None, since=None, until=None, on=None, search=No
     elif count:
         sql = f'SELECT count(*) AS n FROM {src}{wh}'
     else:
+        if fields:  # quote plain field names: "end" is an SQL word
+            known = {c.lower() for c in columns_of(con, src)}
+            fields = ', '.join(f'"{f.strip()}"' if f.strip().lower() in known else f.strip() for f in fields.split(','))
         if fields and found:  # the "how it matched" column goes with a search, named or not
             cols = re.sub(r'\bfound\b', lambda _: found[2:], fields) if re.search(r'\bfound\b', fields) else fields + found
         else:
@@ -994,6 +1024,8 @@ def judge(con, resource, name, where=None, since=None, limit=300, account=None, 
     ver, on_kind, ask, answers = d[0], d[1], d[2], json.loads(d[3])
     kind = 'file' if on_kind in ('file', 'photo') else on_kind
     resource = resource_name(resource)
+    if isinstance(where, list):
+        where = ' AND '.join(f'({w})' for w in where if w) or None
     res = resource if resource in RESOURCES else {'mail': 'mail', 'event': 'calendar', 'file': 'files'}[kind]
     if RESOURCES[res]['kind'] != kind:
         raise ValueError(f'"{name}" is a definition on {on_kind}, so judge it on '

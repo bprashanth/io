@@ -168,7 +168,7 @@ def parser():
     for verb in ('list', 'count'):  # count is list --count; still accepted, not in the menu
         l = sub.add_parser(verb, help='rows of a resource' if verb == 'list' else argparse.SUPPRESS)
         l.add_argument('resource')
-        l.add_argument('--where', help="filter, e.g. \"direction = 'in' and subject ~ 'visit'\" or \"label.urgent = 'yes'\"")
+        l.add_argument('--where', action='append', help="filter, e.g. \"direction = 'in' and subject ~ 'visit'\" or \"label.urgent = 'yes'\"")
         l.add_argument('--since', help='today, yesterday, 7d, last week, monday, 2026-11-12')
         l.add_argument('--until')
         l.add_argument('--on', help='one day or range: yesterday, next monday, this week')
@@ -214,7 +214,7 @@ def parser():
     j = sub.add_parser('judge', help='label each row with a definition')
     j.add_argument('resource')
     j.add_argument('--def', dest='defn', required=True)
-    j.add_argument('--where')
+    j.add_argument('--where', action='append')
     j.add_argument('--in', '--folder', dest='folder', help='only files in this Drive folder')
     j.add_argument('--search', action='append', help='only rows that match, as in list --search')
     j.add_argument('--since')
@@ -339,6 +339,11 @@ def run_argv(con, argv):
             t = rs.file_text(con, file_account(con, fid), fid)
             return Result(kind='text', text=f'{name} ({len(t)} characters):\n\n' + t[:a.chars])
         if res == 'sheet':
+            row = con.execute('SELECT tbl, nrows, name FROM sheets WHERE name ILIKE ? OR tbl = ? ORDER BY nrows DESC',
+                              [f'%{a.ref}%', a.ref]).fetchall()
+            if row and row[0][1] <= 50 and not a.outline:  # small: every row, values in full
+                cur = con.execute(f'SELECT * EXCLUDE (row_no) FROM "{row[0][0]}"')
+                return Result([d[0] for d in cur.description], cur.fetchall(), note=f'{row[0][2]} (all {row[0][1]} rows)')
             return describe(con, 'sheet', a.ref)
         return get(con, res, a.ref)
     if v == 'explain':
@@ -371,6 +376,9 @@ def run_argv(con, argv):
         return Result(cols, rows, sql=a.sql)
     if v == 'view':
         rs.query(con, a.sql, limit=1)
+        if not re.fullmatch(r'[a-z][a-z0-9_]{1,40}', a.name) or a.name in rs.RESOURCES:
+            raise Err('A view name is a short lower-case word (leads, from_leads) and not a resource name.')
+        con.execute(f'CREATE OR REPLACE VIEW "{a.name}" AS {a.sql}')  # so other commands can use it: IN (SELECT ...)
         con.execute('INSERT OR REPLACE INTO views VALUES (?,?,?,?)', [a.name, a.on, a.sql, a.about])
         return Result(kind='text', text=f'Saved view "{a.name}". List it with: idli list {a.name}')
     if v == 'draft':
@@ -690,6 +698,12 @@ Rules:
   my_response = 'declined'): filter on it; don't define a category for it.
 - A file the person names ("summarise wincoop", "what's in the leads sheet"): idli summarise file NAME, idli get
   sheet NAME, idli get file NAME.
+- A question about a field (who owns, how big, who is invited): show it, e.g. --fields "name, owner".
+- A group word that means people or things in the person's own data (leads, funders, donors, partners): if a
+  sheet or rule clearly holds them, propose a view the person confirms, then use it: idli view leads --sql
+  "SELECT Name, lower(Email) AS email FROM sheet_leads_test" --about "Name and Email from the Leads (test) sheet" ;
+  idli list mail --where "from_addr IN (SELECT email FROM leads)". If nothing clearly holds them, cannot,
+  needs "clarify", and say what you would need. Reuse a view that exists.
 - A named thing (a term, a phrase, a person, a place): --search, quoting a phrase of two or more words. "How many":
   list --count. "By X" or a breakdown: --group-by. "Explain X", "what do my documents say about X":
   idli summarise --search '"X"'. Search first; define and judge only for a category no words capture ("urgent",
@@ -720,8 +734,9 @@ Examples (today is {rs.now():%A %Y-%m-%d}):
   "which spreadsheet has the most rows" -> idli list sheets --order "nrows desc" --limit 1
   "docs that discuss border effects" -> idli list files --search '"border effects"'
   "explain border effects to me" -> idli summarise --search '"border effects"'
-  "urgent emails" -> idli define urgent --on mail --ask "Does this email ask me to act or reply soon?" --answers yes,no ;
-                     idli judge mail --def urgent --where "direction = 'in' and not is_bulk" ; idli list threads --label urgent
+  "emails about the school visit" -> idli define school_visit --on mail --ask "Is this email about planning a school
+                     visit?" --answers yes,no ; idli judge mail --def school_visit --where "direction = 'in' and not is_bulk" ;
+                     idli list threads --label school_visit   (name and word each category for what the person asked)
   "which of those are really about it" (after a search) -> idli define NAME --on file --ask "..." ;
                      idli judge files --def NAME --search '"the same words"' ; idli list files --label NAME
   "leads who haven't replied" -> idli query "SELECT l.Name, l.Email FROM sheet_leads_x l WHERE lower(l.Email) NOT IN
@@ -751,7 +766,13 @@ def menu(con, mask=None):
             f'{n} (on {k}, answers {"/".join(json.loads(ans))}): {a}' for n, v, k, a, ans in defs))
     views = con.execute('SELECT name, about FROM views').fetchall()
     if views:
-        lines.append('Views: ' + '; '.join(f'{n}: {a}' for n, a in views))
+        def vcols(n):
+            try:
+                return ', '.join(r[0] for r in con.execute(f'DESCRIBE "{n}"').fetchall())
+            except Exception:
+                return '?'
+        lines.append('Views (the person confirmed these meanings; reuse them, also inside SQL as tables): ' +
+                     '; '.join(f'{n} (columns: {vcols(n)}): {a}' for n, a in views))
     lines.append(f'Today is {rs.now():%A %Y-%m-%d}, time zone Asia/Kolkata. All data is from my own account '
                  f'({account()}); "account" is always that.')
     return '\n'.join(lines)
@@ -855,7 +876,10 @@ using only the result below. Rules:
 - Talk like a colleague about their data ("4 files are in the fixity folder"), never about rows or results.
 - Don't end with a question or an offer ("Would you like...") unless their request was unclear.
 - Plain words, no headings, no bullet points, no "As an AI".
-- A draft is only a preview: never say it was saved, sent, or put in a folder."""
+- A draft is only a preview: never say it was saved, sent, or put in a folder.
+- Only state what the rows show. If they ask who owns something, its size or its guests and that field isn't
+  in the rows, say you can't see it here; never guess it from a name. Your previous reply was about an earlier
+  question: don't repeat it."""
 
 
 NUM = re.compile(r'(?<![\w.])\d+(?:[.,]\d+)?(?![\w])')
@@ -876,6 +900,9 @@ def compose(question, shown, history, plan_note=''):
     said = NUM.findall(reply) + [words[w.lower()] for w in re.findall(r'\b(' + '|'.join(words) + r')\b', reply, re.I)]
     if re.search(r'Would draft \(not saved\)', shown) and re.search(r'\b(saved|sent|drafts? folder|unsent|outbox|ready in)\b', reply, re.I):
         return '', 'draft_claimed_saved'
+    if 'Nothing matches' not in shown and re.match(r'\d+ rows?\b|Count: [1-9]', shown.strip()) and \
+            re.search(r"\b(couldn't find|could not find|no (emails?|files?|documents?|results?|meetings?) (match|found)|nothing (matches|found))\b", reply, re.I):
+        return '', 'says_nothing_but_rows_shown'
     if 'Nothing matches' in shown and said:  # an empty result has no count to word
         return '', 'number_on_empty_result:' + ','.join(said)
     body = re.sub(r'(?m)^\s*\d+\.\s', '', shown)  # "1. ", "2. ": list numbering, not numbers in the result
@@ -996,7 +1023,7 @@ def ask(con, question, history, mapper='remote', data_dir=None, show_commands=Tr
     return rec
 
 
-PLACEHOLDER = re.compile(r'<[A-Za-z_][A-Za-z0-9_ .\-]{1,60}>')
+PLACEHOLDER = re.compile(r'<[A-Za-z_][A-Za-z0-9_ .\-]{1,60}>|(?<![\w"\'-])(REF|NAME|WORDS|FOLDER|ID|THREAD)(?![\w"\'-])')
 CONFIRM = None  # main sets it when someone can answer now: card -> True, False, or a better wording (str)
 SECONDS_PER_ITEM = {'clef': 0.2, 'nine_compressed': 0.9, 'nine': 1.9}  # measured 2026-11-20, two at a time
 
@@ -1203,6 +1230,9 @@ def main(argv=None):
                         return None
                     used.append(1)
                     return wording
+            elif m:  # "yes" with no card waiting: nothing to agree to
+                print('There is nothing waiting for a yes. Ask your question again and I will show you the card.')
+                return 0
             elif sys.stdin.isatty() and sys.stderr.isatty():
                 CONFIRM = tty_confirm
             rec = ask(con, q, hist, a.mapper, data_dir=sandbox(), show_commands=False, resume=resume)

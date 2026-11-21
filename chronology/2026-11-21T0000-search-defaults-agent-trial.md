@@ -39,3 +39,28 @@ freeze: `--on "next month"`, `judge --since/--until/--on`, repeated `--label`. A
 
 - `../dune` is a git repo with `.gitignore` for `*.claude.*`; `docs/cli.claude.md` holds the terms and commands
   table for the owner to copy into `docs/cli.md`. `.index.md` lists what to carry.
+
+## 6. The owner's second session (t2): coalitions, ownership, leads (2026-11-21 afternoon)
+
+- "creation of coalitions" unquoted ranked the NDSA fixity reports high: "of" had to appear, and words-apart
+  matches were ordered newest first. Now: small words (of, the, about...) are not required, and below phrase
+  matches files rank by how often each word appears, rarer words counting more (a small BM25). Coalition papers now
+  follow the phrase match; `summarise --search 'coalition'` was already good (pages with most mentions).
+- "owned by me": `owner = "me"` matched nothing. 'me' now means the account's address in owner, from_addr,
+  organizer and to_addrs (157 files). "Who owns docs on conservation": the owner column wasn't shown and the 9B
+  guessed owners from file names. Rules: a question about a field shows it (--fields); the reply states only what
+  the rows show.
+- "Mails from leads": the 9B searched for the word "leads"; idli-remote joined the Leads sheets (0 last week is
+  right: 88profligate's mail is 16-18 Nov). The reply to the next question repeated the leads answer: wording that
+  says nothing was found while rows are shown is now dropped.
+- The leads workflow broke on `get sheet`'s column summary, which cut emails at 80 characters; a sheet of up to 50
+  rows now shows every row in full. "The last few weeks" is 3 weeks. Views are real database views (usable inside
+  SQL), and the manual proposes a view for group words (leads, funders) through the yes card. Several `--where`
+  mean all of them. `ask yes` with nothing waiting says so. `-vvv` printed the whole 7,352-character prompt
+  (the menu lists every folder and sheet), which looked like going through all files.
+- Dev bank: `benchmarks/runs/2026-11-19-record-store/bank/tasks_owner_dev.json`, 11 tasks from the owner's
+  sessions with SQL-checked expectations. Run on a clean copy of t2 (`2026-11-21-agent-trial/owner-dev/`): border
+  effects, explain, coalitions, ownership, leads last week right; after fixes for placeholder REF, `end` as a field,
+  `calendar` in SQL and the copied `urgent` example, the adivasi task is right too. Still weak: the 9B drops the
+  person's words, carries a filter into a question that drops it ("who owns" kept owner = me), and doesn't connect
+  88profligate with Asha Verma across two results.
