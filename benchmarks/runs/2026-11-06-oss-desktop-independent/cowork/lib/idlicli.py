@@ -825,7 +825,9 @@ def relevant_sheets(con, question, history):
 
 def menu(con, mask=None, question=None, history=()):
     m = mask or (lambda s: s)
-    full = os.environ.get('IDLI_MENU_FULL') == '1'  # the control for measuring the smaller menu
+    # The smaller menu is opt-in (IDLI_MENU_TRIM=1): on 2026-11-21 it gave fewer errors but 17 vs 26 correct on the dev
+    # bank, mostly grader and 9B noise, so it isn't proven harmless (benchmarks/runs/2026-11-21-menu-regression)
+    full = os.environ.get('IDLI_MENU_TRIM') != '1' or os.environ.get('IDLI_MENU_FULL') == '1'
     keep = relevant_sheets(con, question, list(history)) if question and not full else None
     MENU_INFO.clear()
     MENU_INFO.update(sheets_with_columns=sorted(keep) if keep is not None else 'all')

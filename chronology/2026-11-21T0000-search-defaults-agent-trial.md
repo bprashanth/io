@@ -64,3 +64,23 @@ freeze: `--on "next month"`, `judge --since/--until/--on`, repeated `--label`. A
   `calendar` in SQL and the copied `urgent` example, the adivasi task is right too. Still weak: the 9B drops the
   person's words, carries a filter into a question that drops it ("who owns" kept owner = me), and doesn't connect
   88profligate with Asha Verma across two results.
+
+## 7. Embeddings, the menu, chips, help, docs (2026-11-21 evening)
+
+- **Meaning:** `idli-embed` (Qwen3-Embedding-0.6B, Q8, port 8293) embeds ~1,200-character chunks of every page and
+  every card during `sync drive` (11,000 chunks in ~5 min the first time). Unquoted `--search` merges the word
+  ranking with the meaning ranking; quoted phrases stay literal. Topics score 0.6-0.8 and work ("women
+  entrepreneurs" finds `female_entrepreneurship.pdf`; "contact details of my leads" finds the Leads sheets); single
+  rare words and names score as noise (0.35-0.55), so meaning is used only when the best match stands out.
+  `summarise --search` adds the closest passages.
+- **Menu:** trimmed to sheet columns for the relevant sheets, with menu misses logged; measured on the dev bank
+  against the full menu: fewer errors, 17 vs 26 correct, mostly grader and 9B noise. Kept opt-in
+  (`IDLI_MENU_TRIM=1`). `benchmarks/runs/2026-11-21-menu-regression/README.md`.
+- **Chips:** one Clef call per ask labels lookup / judgement / workflow / elsewhere; shown when Clef is fairly sure
+  (70 of 91 labelled tasks, 70% agree, workflow 10 of 13). Struggle (a step failed or was redone, no steps, a
+  hand-written join, the same question again) shows a red chip with an offer: idli-remote, or a Mini.
+  `benchmarks/runs/2026-11-21-kind-classifier/README.md`.
+- `idli help` replaces `explain` (still accepted). A test caps the 9B's instructions. Fixes tagged code or prose.
+  A bare word compared with a field is a value (`kind = slides`), and `owner = me` is the account.
+- **Docs:** `narrative/GOALS_V0.6.md` (the scaffold as built and tested); V0.5 superseded; IDLI_DESKTOP,
+  CLI_CHOICES, EXAMPLES updated; `docs/handoff-prompt.md`; the handoff's 2026-11-21 checkpoint.

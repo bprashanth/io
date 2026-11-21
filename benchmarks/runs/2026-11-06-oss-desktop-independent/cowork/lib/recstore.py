@@ -841,6 +841,11 @@ def compile_where(con, resource, where):
         return f"{idcol} {'NOT ' if op != '=' else ''}IN ({sub})"
     w = LABEL_REF.sub(lab, where)
     cols = {c.lower() for c in columns(con, resource)}
+    # kind = slides: a bare word compared with a text field is a value (unless it is a column, a number or SQL)
+    sqlw = {'true', 'false', 'null', 'and', 'or', 'not', 'is', 'in', 'like', 'ilike', 'between'}
+    w = re.sub(r"\b([A-Za-z_]\w*)\s*(=|!=|<>)\s*([A-Za-z_][\w-]*)\b(?!\s*\()",
+               lambda m: m.group(0) if m.group(3).lower() in cols or m.group(3).lower() in sqlw or m.group(1).lower() not in cols
+               else f"{m.group(1)} {m.group(2)} '{m.group(3)}'", w)
     me = (con.execute('SELECT any_value(account) FROM files').fetchone() or [None])[0] or \
          (con.execute('SELECT any_value(account) FROM mail').fetchone() or [None])[0]
     if me:  # "owner = 'me'": the account's own address

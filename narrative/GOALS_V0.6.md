@@ -66,8 +66,9 @@ Try it: `IDLI_SANDBOX=~/idli-sbx/NAME desktop/idli help`. **[built]**
 - On files it covers names, folders, every page (all tabs of sheets) and the cards, with a "how it matched" column.
 
 **`ask`**, one turn **[built, tested]**:
-1. The menu is built for this question: everything, but sheet columns only for the sheets it seems to be about
-   (by words or meaning, or used last turn). Every turn logs the menu and any **menu miss**.
+1. The menu: everything the store holds. A smaller menu (sheet columns only for the sheets a question seems to be
+   about) is built but opt-in (`IDLI_MENU_TRIM=1`): on the dev bank it wasn't proven harmless
+   (`benchmarks/runs/2026-11-21-menu-regression/`). Every turn logs the menu and any **menu miss**.
 2. The mapper returns commands. Code then checks them: `--search` words must be the person's own; a judge may only
    narrow to a search already shown; double-quoted values are values; `'me'` is the account's address; placeholders
    (`REF`) wait for results.
@@ -103,7 +104,8 @@ which is the plan for real data. **[idea: local Clef]**
   SQL-checked answers.
 - **Kind chips** (`2026-11-21-kind-classifier/`): 70 of 91 labelled questions get a chip, 70% agree; workflow
   chips 10 of 13 right; most disagreements are labels written before search-first.
-- **Menu trimming** (`2026-11-21-menu-regression/`): see its README.
+- **Menu trimming** (`2026-11-21-menu-regression/`): fewer errors but 17 vs 26 correct on the dev bank, mostly
+  grader and 9B noise; kept opt-in until measured properly.
 
 ## 5. What a judgement, a view and a workflow are (as tested)
 

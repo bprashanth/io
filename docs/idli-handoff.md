@@ -9,9 +9,9 @@ start from.
 
 ## Checkpoint 2026-11-21: the scaffold core, hands-on (read in this order)
 
-**Status:** items 1-6 below are built (2026-11-21). Measuring the smaller menu against the full one on the dev bank
-(`benchmarks/runs/2026-11-21-menu-regression/`, blind graders running). The next agent starts from
-`docs/handoff-prompt.md`.
+**Status:** items 1-6 below are built (2026-11-21). The smaller menu (item 2) is opt-in (`IDLI_MENU_TRIM=1`): on
+the dev bank it gave fewer errors but 17 vs 26 correct, mostly noise, so it isn't proven harmless
+(`benchmarks/runs/2026-11-21-menu-regression/README.md`). The next agent starts from `docs/handoff-prompt.md`.
 
 ### 1. What this phase is
 The owner tests the scaffold (`desktop/idli`, a CLI over a DuckDB store per sandbox) by hand on test account
