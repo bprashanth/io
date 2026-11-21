@@ -787,8 +787,45 @@ Examples (today is {rs.now():%A %Y-%m-%d}):
 """
 
 
-def menu(con, mask=None):
+MENU_INFO = {}  # what this turn's menu held: for the log, and to spot a miss
+MENU_SHEETS_WITH_COLUMNS = 5
+MENU_FOLDERS = 25
+
+
+def relevant_sheets(con, question, history):
+    """Sheet tables whose columns the mapper should see: named by a word in the question, close in meaning to it,
+    or used in the last turn."""
+    if not question:
+        return set()
+    words = {w for w in re.findall(r'[a-z0-9]{3,}', question.lower()) if w not in rs.STOP}
+    rows = con.execute('SELECT tbl, file_id, name, tab, columns FROM sheets').fetchall()
+    pick = []
+    for tbl, fid, name, tab, cols in rows:  # by words: in the sheet's name, tab or columns
+        text = f'{name} {tab} {" ".join(json.loads(cols or "[]"))}'.lower()
+        if words & set(re.findall(r'[a-z0-9]{3,}', text)):
+            pick.append(tbl)
+    try:  # by meaning: the sheet's card
+        if rs.embeddings_ready(con):
+            ids = [r[1] for r in rows]
+            for fid, sc in rs.semantic_cards(con, question, ids):
+                pick += [r[0] for r in rows if r[1] == fid]
+    except Exception:
+        pass
+    for h in history[-1:]:  # what the last turn used
+        for c in h.get('commands') or []:
+            pick += [r[0] for r in rows if r[0] in c or f'"{r[2]}' in c]
+    out = []
+    for t in pick:
+        if t not in out:
+            out.append(t)
+    return set(out[:MENU_SHEETS_WITH_COLUMNS])
+
+
+def menu(con, mask=None, question=None, history=()):
     m = mask or (lambda s: s)
+    keep = relevant_sheets(con, question, list(history)) if question else None
+    MENU_INFO.clear()
+    MENU_INFO.update(sheets_with_columns=sorted(keep) if keep is not None else 'all')
     lines = ['Resources and fields:']
     for k, r in rs.RESOURCES.items():
         if k in ('labels',):
@@ -800,13 +837,24 @@ def menu(con, mask=None):
     ntabs = {}
     for r in sheets:
         ntabs[r[5]] = ntabs.get(r[5], 0) + 1
-    lines.append('- rows --sheet NAME (or "NAME / TAB" for another tab). Sheets: ' + '; '.join(
-        f'"{m(n)}' + (f' / {m(tb)}' if ntabs[fid] > 1 else '') +
-        f'" (SQL table {t}, {nr} rows; columns: {", ".join(m(c) for c in json.loads(cs)[:8])})'
-        for n, tb, cs, nr, t, fid in sheets))
-    folders = con.execute("SELECT path || CASE WHEN path = '' THEN '' ELSE '/' END || name FROM files "
-                          "WHERE kind = 'folder' ORDER BY 1").fetchall()
-    lines.append('Drive folders: ' + '; '.join(m(f[0]) for f in folders))
+    def sheet_line(n, tb, cs, nr, t, fid):
+        name = f'"{m(n)}' + (f' / {m(tb)}' if ntabs[fid] > 1 else '') + '"'
+        if keep is not None and t not in keep:  # columns only for the sheets this question seems to be about
+            return f'{name} ({t}, {nr} rows)'
+        return f'{name} (SQL table {t}, {nr} rows; columns: {", ".join(m(c) for c in json.loads(cs)[:8])})'
+    lines.append('- rows --sheet NAME (or "NAME / TAB" for another tab). Sheets (columns shown for the likely ones; '
+                 'idli get sheet NAME --outline shows any): ' + '; '.join(sheet_line(*r) for r in sheets))
+    folders = [f[0] for f in con.execute("SELECT path || CASE WHEN path = '' THEN '' ELSE '/' END || name FROM files "
+                                         "WHERE kind = 'folder' ORDER BY 1").fetchall()]
+    if len(folders) > MENU_FOLDERS and question:  # many: the ones the question names first, then the rest by name
+        qw = set(re.findall(r'[a-z0-9]{3,}', question.lower()))
+        named = [f for f in folders if qw & set(re.findall(r'[a-z0-9]{3,}', f.lower()))]
+        folders = (named + [f for f in folders if f not in named])[:MENU_FOLDERS]
+        extra = ' (more: idli list folders)'
+    else:
+        extra = ''
+    MENU_INFO['folders_shown'] = len(folders)
+    lines.append('Drive folders: ' + '; '.join(m(f) for f in folders) + extra)
     defs = con.execute('SELECT name, max(version), arg_max(on_kind, version), arg_max(ask, version), '
                        'arg_max(answers, version) FROM definitions GROUP BY name').fetchall()
     if defs:
@@ -882,7 +930,7 @@ def map_question(con, question, history, mapper='remote', data_dir=None, failed=
         ctx.append(f'Earlier question: {h["q"]}\nCommands run: {json.dumps(h.get("commands", []))}\n'
                    f'Result shown:\n{h.get("shown", "")[:1500]}')
     note = rs.dates_note(question)
-    user = (menu(con) + '\n\n' + ('\n\n'.join(ctx) + '\n\n' if ctx else '') +
+    user = (menu(con, question=question, history=history) + '\n\n' + ('\n\n'.join(ctx) + '\n\n' if ctx else '') +
             f'Request: {question}' + (f'\nDates in this request: {note}' if note else ''))
     if so_far:
         user += ('\n\nYou already ran these for this request; their results:\n' + so_far[:5000] +
@@ -1242,6 +1290,24 @@ def _session_path():
     return Path(sandbox()) / 'session.json'
 
 
+def menu_miss(con, rec):
+    """A command or error that involves a sheet whose columns weren't in the menu: the smaller menu may have caused
+    it. Logged on every turn, so the trimming can be judged on evidence (owner, 2026-11-21)."""
+    kept = MENU_INFO.get('sheets_with_columns')
+    if kept == 'all' or kept is None:
+        return None
+    text = ' '.join(rec.get('commands') or []) + ' ' + ' '.join(rec.get('errors') or [])
+    used = []
+    for tbl, name in con.execute('SELECT tbl, name FROM sheets').fetchall():
+        if tbl in text or (name and name.lower() in text.lower()):
+            used.append(tbl)
+    missed = [t for t in dict.fromkeys(used) if t not in kept]
+    if not missed:
+        return None
+    return {'sheets_without_columns': missed, 'had_errors': bool(rec.get('errors')),
+            'empty_result': 'Nothing matches' in (rec.get('shown') or '')}
+
+
 def ran_block(cmds):
     marks = [c + ('   (writes to the store)' if re.match(r'(idli\s+)?(define|judge|view)\b', c) else '') for c in cmds]
     return dim('Ran:\n' + '\n'.join('  ' + m for m in marks)) if cmds else ''
@@ -1291,7 +1357,8 @@ def main(argv=None):
                  'mapper_calls': MAPPER_CALLS, 'commands': rec.get('commands'), 'errors': rec.get('errors'),
                  'steps_shown': rec.get('shown'), 'words': rec.get('words'), 'reply': rec['reply'],
                  'wording_dropped': rec.get('compose_fallback'), 'needs': rec.get('needs'),
-                 'pending': rec.get('pending'), 'resumed': rec.get('resumed'),
+                 'pending': rec.get('pending'), 'resumed': rec.get('resumed'), 'menu': dict(MENU_INFO),
+                 'menu_miss': menu_miss(con, rec),
                  'seconds': {k: rec.get(k) for k in ('map_s', 'compose_s', 'judge_s', 'total_s')}})
             print(rec['reply'])
             if rec.get('commands'):

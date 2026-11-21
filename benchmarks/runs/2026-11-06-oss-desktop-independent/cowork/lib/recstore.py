@@ -769,6 +769,17 @@ SEMANTIC_FLOOR = float(os.environ.get('IDLI_SEMANTIC_FLOOR', '0.5'))
 SEMANTIC_BAND = 0.15
 
 
+def semantic_cards(con, question, ids=None, k=5):
+    """Cards closest in meaning to the question: [(file_id, score)], only when the best stands out."""
+    q = embed([question], query=True)[0]
+    limit = f"WHERE file_id IN ({','.join(repr(i) for i in ids)})" if ids else ''
+    rows = con.execute(f"SELECT file_id, array_cosine_similarity(vec, ?::FLOAT[{DIM}]) s FROM card_vecs {limit} "
+                       f"ORDER BY s DESC LIMIT {int(k)}", [q]).fetchall()
+    if not rows or rows[0][1] < SEMANTIC_TOP:
+        return []
+    return [r for r in rows if r[1] >= max(SEMANTIC_FLOOR, rows[0][1] - SEMANTIC_BAND)]
+
+
 def semantic_chunks(con, question, ids=None, k=8):
     """The passages closest in meaning to the question: [(file_id, page, text, score)]."""
     q = embed([question], query=True)[0]
@@ -941,7 +952,8 @@ def fused_files(con, search, limit=50, fields=None, **kw):
     _, base, _ = select(con, 'files', fields='id', limit=100000, order='id', plain=True, **kw)
     base_ids = [r[0] for r in base]
     _, lit, _ = select(con, 'files', search=search, fields='id', limit=300, plain=True, **kw)
-    lit_rank = {r[0]: i for i, r in enumerate(lit)}
+    # words that are merely somewhere in a long file are weak evidence: they rank after the meaning matches
+    lit_rank = {r[0]: i + (40 if str(r[-1]).startswith('words apart') else 0) for i, r in enumerate(lit)}
     lit_found = {r[0]: r[-1] for r in lit}
     sem = semantic_files(con, _search_text(search), ids=base_ids, k=30)
     sem_rank = {r[0]: i for i, r in enumerate(sem)}
