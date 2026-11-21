@@ -1,11 +1,58 @@
 # Idli: handoff (read this first)
 
-Last updated 2026-11-20, DGX. Overwrite the top section whenever the state changes. Keep `chronology/` and the
+Last updated 2026-11-21, DGX. Overwrite the top section whenever the state changes. Keep `chronology/` and the
 narratives in step with it.
 
 This repo has a long history (event ladders, io, Codex, shield, Drivey, Teams). **Focus on the last two weeks:
 Idli Desktop as sandboxes plus a command-line core.** The older material below is there to look things up, not to
 start from.
+
+## Checkpoint 2026-11-21: the scaffold core, hands-on (read in this order)
+
+**Status:** in progress (agent working through the list below). Updated as each item lands.
+
+### 1. What this phase is
+The owner tests the scaffold (`desktop/idli`, a CLI over a DuckDB store per sandbox) by hand on test account
+87profligate, and an agent fixes what breaks with general fixes only. Paseo and the app come later. A sibling
+repo `../dune` will receive only the parts that are understood and tested; `../dune/.index.md` lists them.
+
+### 2. Read first
+1. `todos/idli-insights/p1/scaffold_core_round1.md`: the running list (bugs with evidence, decisions, proposals).
+2. `chronology/2026-11-20T1400-scaffold-hands-on.md` and `chronology/2026-11-21T0000-search-defaults-agent-trial.md`.
+3. `../dune/docs/cli.claude.md`: every term and command with an example (the owner copies it into `cli.md`).
+4. `narrative/GOALS_V0.5.md` (written before hands-on testing; parts are design, not built), `CLI_CHOICES.md`,
+   `EXAMPLES_V0.md`.
+
+### 3. Evidence
+- `benchmarks/runs/2026-11-21-heldout-rerun/`: frozen held-out, 9B 5 -> 10 correct, idli-remote 13 -> 13.
+- `benchmarks/runs/2026-11-21-agent-trial/`: the agent asking like the owner; 20+ fixes; `owner-dev/` runs.
+- `benchmarks/runs/2026-11-19-record-store/bank/tasks_owner_dev.json`: the owner's own questions, SQL-checked.
+- `benchmarks/runs/2026-11-20-judge-models/`: Clef vs 9B vs Muse as judge.
+
+### 4. State
+- Code: `benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/lib/{recstore,idlicli}.py`, `desktop/idli`.
+- Sandboxes on the DGX: `~/idli-sbx/t1`, `t2` (the owner's), `agent1`-`agent4` (the agent's). Test-account data;
+  not in git.
+- Models: the served 9B (Q5, port 8291) maps and words; `idli-9b-bf16` (port 8292) for `--mapper nine`;
+  Clef-flash judges by default (OpenRouter, Cloudflare only; hosted, so test accounts only).
+- Branch `oss-desktop-eval`, about 400 commits ahead, not pushed. Run `declaude origin/main` after committing;
+  it rewrites hashes, so quote hashes only after it.
+
+### 5. Being built now (owner's go, 2026-11-21), in this order
+1. Embeddings for cards and page chunks, fused with literal search (quoted phrases stay literal); used by search,
+   `summarise --search` and the menu.
+2. A smaller menu: every sheet and view name, columns only for relevant sheets; every menu miss logged.
+3. Kind chips (lookup / judgement / workflow, by Clef) and struggle signals with escalation offers, including a
+   repeated question.
+4. `idli explain` renamed `idli help` (users say "explain X").
+5. A size cap on the 9B's instructions; fixes tagged code or prose.
+6. Docs: GOALS, IDLI_DESKTOP, EXAMPLES, CLI_CHOICES brought up to date; this handoff and a handoff prompt.
+
+### 6. Rules for this phase
+- General fixes only; prefer code over prose (a sentence in the 9B's instructions). Measure on the dev bank and,
+  for claims, on a new held-out set.
+- Grinding goes to Cursor `agent` or `codex exec`; nothing under `~/.codex` is edited.
+- Plain copy in anything a person reads. No "deepseek" in UI text: "idli-remote".
 
 ## Checkpoint 2026-11-20: where we are (read in this order)
 
