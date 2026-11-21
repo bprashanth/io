@@ -1,0 +1,166 @@
+# Drivey's Claude: masked copies and the sandbox
+
+How the person's own Claude Code (the right pane in Drivey) is kept away from their real data. This is the Claude
+Code setup. The older Codex setup (io) is in [sandboxing.md](sandboxing.md). Current as of 2026-11-15.
+
+## Three layers
+
+| Layer | What it stops | Where |
+|---|---|---|
+| Masked copies | Claude's commands and scripts only ever see codes | `lib/maskcopy.py` |
+| Sandbox and permission rules | Claude reading the real files, the vault or Idli's settings | `lib/launchsettings.py` |
+| Masking proxy | Real values in anything sent to Anthropic | `lib/ccproxy.py` |
+
+Plus Idli's own tools (MCP, `lib/idli_mcp.py`), which run outside the sandbox and are the only way from Claude to
+real values: `unmask` needs the person's yes twice (Claude Code's ask prompt and Idli's consent page). `lookup` is withheld from
+Claude (2026-11-15): results about a value can't be masked reliably and are thinner than WebSearch after a reveal.
+
+## The launch
+
+`desktop/claude-masked.sh` (Paseo provider `idli-claude`) does this every time, in order, and starts nothing if a
+step fails:
+1. Removes an old `drive` link to the real downloads, if one is there.
+2. Writes the masked copies with `maskcopy.build`. If this fails: "Idli couldn't prepare the masked copies; not
+   starting Claude (nothing was sent)."
+3. Starts the proxy. If it fails: "Idli's privacy proxy didn't start; not starting Claude (nothing was sent)."
+4. Writes `.claude/settings.json` with `launchsettings.merge(work, data_dir)` and the MCP config (0600).
+5. Starts `claude` with `ANTHROPIC_BASE_URL` pointing at the proxy. API keys from the environment are removed, so
+   the person's own subscription login is used.
+
+## Folders
+
+| Folder | What it is | Claude's shell |
+|---|---|---|
+| `~/idli-insights/claude-masked/` | Claude's work folder | read and write |
+| `~/idli-insights/claude-masked/drive/` | masked copies of the reviewed files | read |
+| `~/idli-insights/cowork-real/` (`IDLI_DATA`) | real downloads, vault, privacy choices | blocked |
+| other folders in `~/idli-insights/` | other workspaces, config | blocked |
+| `~/.cache/idli`, `~/.paseo`, `~/.config/Paseo`, `~/.config/paseo`, `~/.config/idlisseus` | Idli caches, Paseo and browser sign-ins, the query service key | blocked |
+| `~/.claude/projects/` | Claude Code's transcripts, which hold real values (Claude's replies with codes put back) | blocked for the shell only; Claude Code itself reads them |
+
+## The settings Idli writes
+
+In `~/idli-insights/claude-masked/.claude/settings.json`, merged into whatever is there:
+
+```json
+{
+  "permissions": {
+    "ask": ["mcp__idli__unmask"],
+    "deny": ["Read(//<each blocked folder>/**)", "Edit(//<each blocked folder>/**)"]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": { "denyRead": ["<each blocked folder>", "~/.claude/projects"] }
+  }
+}
+```
+
+- `permissions.deny` covers Claude Code's own Read, Edit and search tools. Claude Code matches these paths without
+  regard to case, so a blocked sibling named `Claude-masked` would also block `claude-masked` and Claude's own
+  `CLAUDE.md` (it then starts with "Instruction file not loaded"). `private_paths` leaves out any folder that matches
+  the work folder that way, and `merge` drops older rules that do.
+- `sandbox` covers every shell command (bubblewrap on Linux, Seatbelt on macOS). `autoAllowBashIfSandboxed` means
+  the person isn't asked about each command, which is fine because the command can't reach anything private.
+  `allowUnsandboxedCommands: false` removes Claude's way to retry a command outside the sandbox.
+- Linux needs `bwrap` and `socat` installed and user namespaces allowed. The laptop and the DGX have them.
+- Network from shell commands is left at Claude Code's default. Idli adds no domains. Not yet tested on its own (see
+  open items).
+
+## The masked copies
+
+`maskcopy.build(data_dir, work)`:
+- Copies only files the person reviewed (privacy mode "mask"). Unreviewed files are not copied at all, and a copy
+  is removed when its file stops being reviewed.
+- Keeps layout and types cell by cell (openpyxl): same sheets, rows, columns, number and date cells. Only cells in
+  hidden columns, and known private values anywhere else, change.
+- A cell in a hidden column becomes its code. A repeated header inside the sheet stays as it is. A revealed value
+  is written as the real value.
+- Comments, hyperlinks, defined names and document properties are dropped.
+- Rebuilt on every launch, after every reveal and after a reveal is hidden again (`/api/reveals/hide`).
+
+## Numbers
+
+Rule from 2026-11-15 (`privacy.matched_in_text`):
+- A cell in a column the person hid is always coded, whatever it holds.
+- In free text (Claude's messages, scripts, script output, other cells), numbers of up to three digits and short
+  decimals (6, 52, 4.5) are not matched against hidden values. Masking them turned counts and totals into codes and
+  Claude couldn't read its own results.
+- Numbers with four or more digits (amounts, phones, Aadhaar, PIN codes) and decimals with four or more places
+  (GPS) are still matched.
+- Column suggestions: a column of small numbers is suggested visible (counts and measures) unless its heading looks
+  like an identifier (id, phone, number, Aadhaar, PAN, account, card and similar).
+- The scanner never tags a bare number.
+
+## Leftovers in an older vault
+
+Earlier versions put things in the vault that shouldn't be there. The proxy and the copies now ignore them:
+- Product words ("claude", "idli", "paseo"...) are never matched, including by the close-match step. An old scanner
+  false positive (`NAME_007` = "Claude") turned Claude's folder path into `NAME_007-masked`, and Claude wrote files
+  to a folder of that name, since tool inputs keep codes.
+- Headings coded as values (a header row repeated mid-sheet, coded as `sppnam`) are not masked when they only ever
+  stood for a hidden column's own heading (`privacy.heading_codes`). Name, phone and ID codes are always masked.
+- A species key heading such as "Species name expanded" counts as contextual, not as a person's name. A column
+  without a heading (`column_22`) doesn't decide a value's class when a named column holds it too.
+
+## Reveals and the leak check
+
+A revealed value can contain a hidden one as a word ("Fern sp." revealed, the species code "fern" hidden). Masking
+leaves the revealed value whole, and the leak check skips revealed values the same way. Before that fix every
+request refused with a 403 and Claude stalled.
+
+## What Claude is told
+
+`idli/CLAUDE-masked.md` (copied in as `CLAUDE.md`) and the `masked-data` skill say: the files are masked copies; use
+codes exactly as they appear; the real files aren't reachable and Claude must not look for them; never guess what a
+code stands for or ask the person to type real values. When a place, species, programme or category matters, ask
+with `unmask` (one value, or a whole column of up to 80 values for one reveal). To search the web about one, unmask
+it first and then use WebSearch.
+People's names, phones, IDs and exact locations are never revealed.
+
+## Sent to Claude (the wire log)
+
+Every request the proxy sends to Anthropic is logged on this computer (`lib/wirelog.py`), always on:
+- one line per request in `~/idli-insights/wire/<day>.jsonl`, kept 7 days: time, app (from the launcher's
+  `X-Idli-App` header, which the proxy removes before forwarding), masked count, and only what was new in that request
+  (each request repeats the whole conversation). Codes stay codes; it is exactly what left.
+- a refused request keeps only the codes that stopped it, never its text.
+- the folder is outside Claude's work folder and in its sandbox deny list from the first launch.
+- Start here has a "Sent to Claude" tab (`/wire`): search a word or a real name (a known private value also finds its
+  code, with a line saying it went only as that code), and filter by app.
+- Cost: one small append per request. The 80-request laptop test was 12 MB as full bodies; new text only is a small
+  fraction of that.
+
+`--wire-log` on the proxy still writes full bodies to `ccproxy-wire/` for audits.
+
+## How the person sees real values
+
+- Claude's text replies: the proxy puts real values back in place of codes.
+- Charts (`idli_show`) and Mini drafts (`idli_draft_mini`): Idli puts real values back in titles, data and scripts.
+  Both appear in the Drivey chat on the left (the binder): each chart inline with its headline and Pin, then the
+  editable Mini draft.
+  Mini scripts get real values only inside string literals, so a saved Mini runs on the real file.
+- Commands and raw script output in the Claude pane show codes, because that is what Claude ran and saw.
+
+## Tested
+
+- DGX, shola fixture, real Claude Code CLI on the owner's Pro login (2026-11-15): given the real path, Claude used
+  its copy and declined to read the private folder. `cat` and Read were refused by the permission rules; a Python
+  script got "No such file" in the sandbox. Wire audit of 52 requests: no names or sites, no species before its
+  reveal.
+- Laptop, owner's test account, real field_vars_indicators file, Paseo idli21, 2026-11-15: big-trees question,
+  whole-column reveal of the species key (44 names) through both consent steps, WebSearch with the real names,
+  chart. Wire audit of all 80 requests: none held any of the 229 hidden values (172 personal, 57 contextual).
+- Tests: `tests/test_maskcopy.py` (copies, rehydrated Mini scripts, reveals, settings, numbers),
+  `lib/test_home.py` (launcher writes the sandbox block).
+
+## Open items
+
+- Network from sandboxed commands: confirm that a script can't post the copies anywhere (they hold codes only, so
+  the harm is small, but check).
+- Inference: Claude can still work out a code's meaning from structure (which species grows where). The masked
+  copies stop guessing against real values; they don't stop reasoning. Accepted for contextual values.
+- The proxy masks Claude's own history. If Claude writes a guess that exactly matches a hidden value, the next
+  request shows it as a code, which confirms the guess. Possible fix: don't mask text Claude itself wrote.
+- Running a script on the real file through Idli: [todos/idli-insights/p1/run_on_real.md](../todos/idli-insights/p1/run_on_real.md).

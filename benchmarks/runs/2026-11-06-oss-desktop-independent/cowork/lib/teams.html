@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teams</title>
+<script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('embed');</script>
+<style>
+:root { --bg: #f6f5f2; --ink: #1d1d1b; --muted: #6b6a66; --accent: #2f5d50; --on-accent: #ffffff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #161615; --ink: #ecebe7;
+  --muted: #a3a29c; --accent: #8cc7b2; --on-accent: #0b0b0b; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { padding: 16px; }
+html.embed body { background: transparent; }
+html.embed main { padding: 6px 4px 10px; }
+button { font: inherit; font-size: 15px; font-weight: 600; padding: 11px 26px; min-height: 44px; border-radius: 999px;
+  border: 0; background: var(--accent); color: var(--on-accent); cursor: pointer; }
+button:disabled { opacity: .6; cursor: default; }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+#msg { color: var(--muted); margin-top: 8px; min-height: 1em; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <button type="button" id="make">Make a team</button>
+  <div id="msg" role="status"></div>
+</main>
+<script>
+const P = new URLSearchParams(location.search), T = P.get("t");
+const post = () => { if (P.get("embed") === "1") parent.postMessage({type: "idli-height",
+  px: Math.ceil(document.querySelector("main").getBoundingClientRect().height + 8)}, "*"); };
+new ResizeObserver(post).observe(document.body);
+const btn = document.getElementById("make"), msg = document.getElementById("msg");
+btn.addEventListener("click", async () => {
+  btn.disabled = true;
+  msg.textContent = "";
+  try {
+    const res = await fetch(`/api/team-start?t=${encodeURIComponent(T)}`, {method: "POST",
+      headers: {"Content-Type": "application/json"}, body: "{}"});
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || "Could not start. Try again.");
+  } catch (e) {
+    msg.textContent = e.message || "Could not start. Try again.";
+  }
+  setTimeout(() => { btn.disabled = false; }, 4000);
+});
+</script>
+</body>
+</html>

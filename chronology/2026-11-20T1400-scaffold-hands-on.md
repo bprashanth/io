@@ -1,0 +1,145 @@
+# 2026-11-20: the owner's first hands-on session with the scaffold, and what it changes
+
+Follows [2026-11-18T0900-catalog-routines-sandboxes.md](2026-11-18T0900-catalog-routines-sandboxes.md), section 14
+(GOALS_V0.5 written up). The owner chose to focus on the scaffold loop alone before the app, Paseo, or the move to a
+new repo (`../dune`). The running list of bugs, decisions and proposals is
+[todos/idli-insights/p1/scaffold_core_round1.md](../todos/idli-insights/p1/scaffold_core_round1.md). The docs to
+carry into dune are indexed, sparingly, in `../dune/.index.md`.
+
+## 1. What the scaffold is, checked against the code
+
+- `desktop/idli` runs `lib/idlicli.py` over one DuckDB file at `$IDLI_SANDBOX/store.duckdb`.
+- **Layer 1, no model:** `sync` copies one Google account into the store (the account is fixed in code: `ACCOUNTS`
+  in idlicli.py); `list`, `get`, `query` and the rest are SQL.
+- **Layer 2, `ask`:** the question, the menu and the grammar are masked once; the mapper (idli-remote, or the 9B with
+  `--mapper nine`) returns commands as JSON; Idli runs them (one repair round, up to two continue rounds); the 9B
+  words one to three sentences; numbers not in the result drop the wording. `session.json` keeps 6 turns.
+- **The menu** is built by code each turn (`menu()`): descriptions typed by a developer in `RESOURCES`
+  (recstore.py), column names from DuckDB, "is one of" values sampled from the data, then definitions and views.
+- **Not built:** Minis and chains. The store has `views` and `definitions` only, sandbox-wide.
+- The default sandbox `~/idli-insights/scaffold` was empty; the benchmark's sandboxes were temporary copies. Every
+  test starts with a sync.
+
+## 2. The owner's session (`~/idli-sbx/t1`), checked with read-only SQL
+
+| Ask | What happened | Verdict |
+|---|---|---|
+| "show me meetings with Asha", 9B | `--where "'Asha' in guests"`; guests holds addresses, the name is in titles | wrong (empty) |
+| same, idli-remote | `--search "Asha"`, 6 events | right |
+| "emails from everyone I've declined meetings with", 9B | 0 declined events in the store (5 accepted, 5 organizer); the mapper read an incoming "Declined:" notice as the owner declining; the reply described step 2's rows while the last step showed nothing | wrong |
+| `judge files --def economics` (yes, no, contains_economic_data) | 187 of 191 "unsure" were crashes: `ResourceInUseException` | bug |
+| "show me docs on economics", 9B | the mapper re-ran `define economics` (v2, yes/no), dropping the owner's third answer, judged only Docs (35), not PDFs (86); 16 yes | definition replaced silently |
+
+Root causes found:
+- **B1:** judge's 4 threads share one DuckDB connection; first-time PDF text writes collide. Reproduced on a copy:
+  about half of threaded reads fail.
+- **B2:** a failed judgement is saved as `unsure`.
+- **B3/B9:** the menu shows each definition's question but not its answers, and nothing stops the mapper redefining.
+- **B4/B5:** the reply is worded from all steps but only the last is shown; spelled-out numbers skip the check.
+- **B7:** `get event X` is `id = X OR title ILIKE %X% ... LIMIT 1`, a silent first match.
+- **B8:** "is one of" lists any short column with 10 or fewer values, so a small calendar lists titles as choices.
+
+## 3. Decisions (owner, 2026-11-20)
+
+1. `sync` names the place (`sync gmail`, `sync gcalendar`, `sync drive`); other verbs name the record (`list mail`,
+   `list calendar`, `list files`). `events` becomes `calendar`.
+2. Fewer verbs: `count` into `list --count / --group-by`; `read`, `summarise`, `describe` into `get file`. `--by`
+   becomes `--group-by`. One way per thing (`--search` vs `--where ~` split the two mappers on the same ask).
+3. When the mapper has to supply a meaning the menu doesn't hold, it says so; a yes saves it as a view. A
+   definition's card states the judging cost. Code also flags any raw `query` or cross-resource join. View vs
+   definition: decidable exactly from fields and joins is a view; needs reading content is a definition.
+4. `ask` shows the last step's rows and words the reply from those only; every step goes to `--verbose` and the log.
+5. Every turn is logged to `<sandbox>/log.jsonl` with its context; on request the agent checks turns with SQL and
+   adds them to the dev bank, asking the owner only where it can't tell. Never to the held-out set.
+6. Document text is read in the background when a sandbox is made, newest first, with a cost estimate up front
+   (to try and see). One row per page, full-text index.
+7. Script steps (Sandbox Claude) write their output as a table in the sandbox store, registered with an about line,
+   owned by the Mini that made it. Record kinds move from the `RESOURCES` dict to a registry in the store.
+8. Boundary: a rule over columns already in the store is a view (Sandbox Claude); a rule that needs data the store
+   doesn't copy is a connector change (Builder). Writing verbs stay with our team.
+9. The judge model test moves up (section 4).
+
+## 4. The judge model test (started)
+
+- Topic "about endangered species", with near misses, across CSV, Excel, PDF, Python and Docs; about 40 synthetic
+  items in `benchmarks/runs/2026-11-20-judge-models/`.
+- Candidates: the 9B as served (Q5 GGUF), the 9B uncompressed (BF16 GGUF, second llama-server), Clef-flash, Muse 28B,
+  idli-remote as a reference.
+- Facts checked:
+  - **Muse is dense,** not MoE: `muse-glimmer` architecture, 28B, 52 blocks, no expert keys. The 2026-11-16 image
+    crash was a flake (owner); images are fine.
+  - **Clef-flash** (`Cloudflare/clef-flash`, Apache-2.0) ships 18.8 GB of weights plus a 0.24 GB scoring head. Its
+    attention and MLP weights differ from Qwen3.5-9B (the LoRA is merged), so it can't share memory with our 9B.
+    OpenRouter lists it (hidden from the main list: output "decisions") via DeepInfra (FP8), PrimeIntellect and
+    Cloudflare. The owner chose Cloudflare as the provider, no fallback.
+  - The full Qwen3.5-9B (BF16, 19 GB) was in `~/.cache/huggingface`.
+- `idli ask --mapper nine` will mean the uncompressed 9B and `nine_compressed` today's Q5.
+
+## 5. Housekeeping
+
+- `~/.cache/huggingface` (about 50 GB): deleted with the owner's agreement a partial Qwen3-Next-80B, a partial
+  Qwen3.5-122B, dinov2 and 13 empty leftovers. Hammer2.1-7b (15 GB) and 37 files under `modules` are owned by root
+  (no sudo for the agent), so neither the delete nor the move to `/mnt/seagate/hf-cache` was done; the owner runs
+  `sudo rm -rf ~/.cache/huggingface/hub/models--MadeAgents--Hammer2.1-7b && sudo chown -R beeps: ~/.cache/huggingface`
+  and the move follows. The masking service (`io-privacy-server`) uses its own `app/io/hf-cache` and is untouched.
+- Earlier sessions' untracked results and traces committed (siblings already tracked; no test-account addresses).
+
+## 6. Judge fixes and the judge model test (2026-11-20 evening)
+
+- **B1/B2 fixed** in `recstore.judge`: a DuckDB cursor per thread; retries (3 tries, 2 s and 6 s) only for
+  temporary errors (rate limits, server errors, timeouts, a busy store); failures are not saved, are reported
+  ("N could not be judged"), and earlier saved failures are judged again. A copy of the owner's sandbox: 93 judged,
+  0 failed, 135 s (before: 187 of 191 failed). A file whose text can't be parsed is judged on its name and says so.
+- **BF16 9B:** converted with llama.cpp's converter at the image's build (b10524; today's converter writes tensor
+  names the image can't read). Served as `idli-9b-bf16` on port 8292, same settings as `idli-9b`.
+  `idli ask --mapper nine` uses it; `--mapper nine_compressed` uses the served Q5.
+- **Clef-flash** answers on OpenRouter at `/api/v1/systemone` (a state plus typed questions; `noul` gives P(yes)),
+  pinned to the Cloudflare provider.
+- **The test** (`benchmarks/runs/2026-11-20-judge-models/`): 38 synthetic files, "about endangered species".
+  With file contents: Clef 38, idli-remote 38, 9B BF16 35, 9B Q5 33, Muse 33. As `judge` works today (text only for
+  PDFs and Word): 9B Q5 20, BF16 21, idli-remote 26, Clef 33. Seconds per item: Clef 0.47 (hosted), idli-remote 0.98,
+  Q5 1.71, BF16 3.84, Muse 6.93.
+- **Conclusions:** give the judge every file's contents (B10) first; Clef is the best value but must run locally
+  for real data; BF16 gains little over Q5; Muse adds nothing here. The set is too easy at the top.
+
+## 7. The owner's adivasi session, and the fixes it led to (2026-11-20 night)
+
+**What the session showed** (sandbox `~/idli-sbx/t1`, checked with read-only SQL on a copy):
+- "Find the adivasi article" failed: `--search` read names and folders only; the word is in 2 documents' text.
+- The 9B's summary of the note said "Particularly Vulnerable Tribal Groups", dropping the word "Adivasi".
+- "Is it about adivasi tribes?" made a definition without asking, worded from the note just read: "Adivasi tribes
+  (e.g., Toda, Kota, Irular, PVTGs)". With it, the owner's test document (a list of other tribes) was "no" for both
+  9Bs and Clef (0.16); with a plain wording Clef gave 0.96. Clef also gave an empty document 0.86 under the narrow
+  wording. The wording mattered more than the model.
+- The 9B judge ran over folders, pictures and videos, showed no progress, and Ctrl+C lost everything.
+- The owner's test document was made at 21:05 and the sandbox's last Drive sync was 20:47; a later re-sync did
+  not reach that sandbox (sync works on a copy).
+
+**Built (commits f1130bf0, baf711c3, d2f7907e, and the cards commit):**
+1. Judge: every file kind's contents (B10: sheets as rows, text and code files); folders, media and empty files
+   skipped (B11, B13); each label saved as it lands, Ctrl+C keeps them and says how many are left (B12); ends with
+   up to 5 examples per answer and the `list --label` command for all. Empty files hidden from listings (`--all`).
+2. `-v`, `-vv`, `-vvv` (or `-v N`): steps and models; prompts, plans, every step's rows and judged items; every
+   model call, retries and pypdf's warnings. A progress line on long work. Every command and every `ask` turn (with
+   the masked prompt, the plan, the store's counts, definitions and views) goes to `<sandbox>/log.jsonl`.
+3. The yes card (B3, B9, B14): the mapper can't make or change a definition or view on its own. An existing name is
+   reused as it is; a new one shows its wording and judging cost; in a terminal the person answers y, n or types a
+   better wording; otherwise the turn stops and `idli ask yes` (or `yes: <wording>`) carries on. The menu shows each
+   definition's answers; the grammar asks for general wording. `judge` takes `--in`.
+4. `sync drive` (files and sheets) reads every document's text page by page into `file_pages`, newest first, four
+   at a time, with a size estimate; changed files are read again and their labels dropped; deleted files' text,
+   cards and labels removed; a broken file is noted per version and not retried. `--search` on files covers
+   contents and shows the page and a snippet. On the copy: 140 documents, 3,625 pages, 9.5 MB of text, 70 s;
+   "adivasi" finds both documents.
+5. Summary cards (`file_cards`): made by the served 9B per file version during `sync drive` (`--no-cards` skips),
+   2-3 sentences plus up to 15 key terms kept as written; the judge reads the card before the start of the text;
+   search covers cards; `get file` shows the card. On the copy: 141 cards in 12 minutes (about 5 s each, three
+   times the first estimate); 8 failed when the 9B listed terms until the reply was cut off, fixed by capping the
+   list at 15 in the schema. The card for the Vol. 53 note keeps "Adivasi" in its key terms.
+   Judging "Is this about Adivasi or tribal communities of India?" with cards: the 9B said yes to 22 of 141 (206 s),
+   Clef to 3 plus 4 unsure (16 s). Both found the owner's test document. The 9B's extra yes are caste and
+   entrepreneurship papers that mention Scheduled Tribes, and vegetation sheets with a "Toda name" column: the
+   difference is strictness, which the owner decides.
+6. Also fixed: `.pptx` typed as slides (was "doc", read as binary); a re-sync of sheets crashed on a half-read
+   result; my earlier `_retry` had replaced mail sync's quota retry (renamed to `_retry_brief`); LIKE wildcards in
+   search terms.

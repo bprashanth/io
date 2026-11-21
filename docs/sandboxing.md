@@ -1,6 +1,7 @@
 # Sandboxing: what the assistant's commands can reach
 
-Part of [ARCHITECTURE.md](ARCHITECTURE.md). The argument behind these choices is in
+Part of [ARCHITECTURE.md](ARCHITECTURE.md). For Drivey's Claude Code (masked copies, Claude Code's sandbox) see
+[claude-masked-sandbox.md](claude-masked-sandbox.md). The argument behind these choices is in
 `narrative/2026-09-15-sandboxing-field-note.md`.
 
 This page describes the local main application unless explicitly marked remote. The separate

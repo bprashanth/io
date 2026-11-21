@@ -1,0 +1,226 @@
+"""Tests for the file form (lib/formkit.py). Run: .venv/bin/python -m lib.test_formkit
+
+Uses sites/files/testdata/field_programme_tracker.xlsx (three tabs, messy on purpose) with a hand-written
+skill in sites/files/testdata/skills, plus the taught skills in file-skills/ on the event-eval files.
+Expected numbers were computed separately with pandas."""
+import os
+import shutil
+import sys
+import tempfile
+
+import duckdb
+import pandas as pd
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TD = os.path.join(HERE, "sites", "files", "testdata")
+EVAL = os.path.join(HERE, "..", "..", "2026-11-07-cowork-event-eval", "data")
+os.environ["IDLI_FILE_SKILLS"] = os.path.join(TD, "skills")
+from lib import filekit as fk  # noqa: E402
+from lib import formkit as fm  # noqa: E402
+
+fails = 0
+
+
+def ok(cond, what):
+    global fails
+    print(("ok   " if cond else "FAIL ") + what)
+    fails += 0 if cond else 1
+
+
+def opened(path, skills=None):
+    if skills:
+        fk.SKILLS_DIR = skills
+    sheets, _ = fk.raw_sheets(path)
+    s, score, _ = fm.match_file(sheets)
+    con = duckdb.connect()
+    b = fm.build(con, path, s, "t") if s else {}
+    return sheets, s, con, b
+
+
+TRACKER = os.path.join(TD, "field_programme_tracker.xlsx")
+fk.SKILLS_DIR = os.path.join(TD, "skills")
+sheets, s, con, b = opened(TRACKER)
+ok(s and s["id"] == "field_programme_tracker", "recognises a three-tab workbook")
+ok(fm.contract(s, sheets, con, b)["status"] == "ok", "contract ok on the taught file")
+f = fm.form(con, s, "Visits", b)
+r = fm.run(con, f, b["Visits"]["table"], {"measures": ["disbursed", "rows"], "group_by": ["officer_district"],
+                                          "preset": "completed", "date": {"from": "01/07/2026", "to": "30/09/2026"}})
+got = {x["Officer's district"]: (x["Amount disbursed (Rs)"], x["Number of visits"]) for x in r["rows"]}
+ok(got == {"Pune": (219500, 15), "Satara": (140750, 13), "Kolhapur": (127000, 9), "Sangli": (82000, 9)},
+   "lookup across tabs + preset + dd/mm dates: district totals match pandas")
+ok(r["total"] == {"Amount disbursed (Rs)": 569250, "Number of visits": 46}, "grand total row")
+r = fm.run(con, f, b["Visits"]["table"], {"filters": {"field_officer": ["ravi patil"], "status": ["follow-up"]}})
+ok(r["total"]["Matching visits"] == 4, "row listing with case-insensitive choice filters")
+
+for bad, why in [({"measures": ["sum(1); DROP TABLE x"]}, "unknown measure"),
+                 ({"group_by": ['"x"; select 1']}, "unknown grouping"),
+                 ({"filters": {"nope": ["a"]}}, "unknown filter column"),
+                 ({"filters": {"village": ["x' OR '1'='1"]}, "measures": ["rows"]}, None),
+                 ({"date": {"from": "yesterday-ish"}}, "unreadable date")]:
+    try:
+        r = fm.run(con, f, b["Visits"]["table"], bad)
+        ok(why is None and r["rows"][0]["Number of visits"] == 0, "a quote in a value is data, not SQL")
+    except fm.SpecError:
+        ok(why is not None, f"rejects {why}")
+
+# --- the contract test on edited copies of the workbook
+tmp = tempfile.mkdtemp()
+
+
+def edited(name, fn):
+    frames = pd.read_excel(TRACKER, sheet_name=None, header=None, dtype=object)
+    fn(frames)
+    p = os.path.join(tmp, name + ".xlsx")
+    with pd.ExcelWriter(p) as w:
+        for k, df in frames.items():
+            df.to_excel(w, sheet_name=k, index=False, header=False)
+    sh, sk, c, bb = opened(p)
+    return fm.contract(sk, sh, c, bb) if sk else {"status": "unrecognised"}
+
+
+def new_status(fr):
+    fr["Visits"].iloc[5, 5] = "On hold"
+def rename_amount(fr):
+    fr["Visits"].iloc[2, 4] = "Amount paid out"
+def drop_officers(fr):
+    del fr["Officers"]
+def broken_dates(fr):
+    fr["Visits"].iloc[3:, 0] = "sometime"
+def new_column(fr):
+    fr["Villages"][9] = ["Pincode"] + ["4110" + str(i) for i in range(len(fr["Villages"]) - 1)]
+def renamed_tab(fr):
+    fr["Field visits"] = fr.pop("Visits")
+
+
+c = edited("status", new_status)
+ok(c["status"] == "drift" and any("on hold" in m.lower() for m in c["messages"]), "new status value -> drift, named")
+c = edited("rename", rename_amount)
+ok(c["status"] == "changed" and any("amount_disbursed" in m for m in c["messages"]), "renamed used column -> changed")
+c = edited("officers", drop_officers)
+ok(c["status"] in ("changed", "unrecognised"), "a tab removed -> changed")
+c = edited("dates", broken_dates)
+ok(c["status"] == "changed" and any("Visit date" in m for m in c["messages"]), "dates stop parsing -> changed")
+c = edited("newcol", new_column)
+ok(c["status"] == "drift" and any("Pincode" in m for m in c["messages"]), "new column -> drift")
+c = edited("tabname", renamed_tab)
+ok(c["status"] == "drift" and any("Field visits" in m for m in c["messages"]), "renamed tab -> drift, still maps")
+
+# --- lookups with "match": "first_name": "Meena" in Visits is Meena Kulkarni in Officers, if no one else is a Meena
+import json  # noqa: E402
+sk_dir = os.path.join(tmp, "skills", "field_programme_tracker")
+shutil.copytree(os.path.join(TD, "skills", "field_programme_tracker"), sk_dir)
+sj = json.load(open(os.path.join(sk_dir, "skill.json")))
+sj["tabs"]["Visits"]["lookups"][0]["match"] = "first_name"
+sj["tabs"]["Visits"]["normalize"]["field_officer"].pop("map")  # the first-name match must do the work, not a hand map
+json.dump(sj, open(os.path.join(sk_dir, "skill.json"), "w"))
+sh, s, c, bb = opened(TRACKER, os.path.join(tmp, "skills"))
+f = fm.form(c, s, "Visits", bb)
+r = fm.run(c, f, bb["Visits"]["table"], {"measures": ["rows"], "group_by": ["officer_district"]})
+got = {x["Officer's district"]: x["Number of visits"] for x in r["rows"]}
+ok(got == {"Kolhapur": 23, "Pune": 47, "Sangli": 26, "Satara": 44}, "first-name lookup: every visit gets its officer's district")
+probs, _ = fm.check(TRACKER, s, tmp)
+ok(not any(p["column"] == "Field officer" for p in probs), "first-name lookup: unique first names are not reported")
+
+
+def second_ravi(fr):
+    o = fr["Officers"]
+    o.loc[len(o)] = ["Ravi Deshmukh", "9800000000", "ravi.d@saathi.org", "Sangli"]
+
+
+p = os.path.join(tmp, "ravi.xlsx")
+frames = pd.read_excel(TRACKER, sheet_name=None, header=None, dtype=object)
+second_ravi(frames)
+with pd.ExcelWriter(p) as w:
+    for k, df in frames.items():
+        df.to_excel(w, sheet_name=k, index=False, header=False)
+sh, s, c, bb = opened(p, os.path.join(tmp, "skills"))
+f = fm.form(c, s, "Visits", bb)
+r = fm.run(c, f, bb["Visits"]["table"], {"measures": ["rows"], "group_by": ["officer_district"]})
+got = {x["Officer's district"]: x["Number of visits"] for x in r["rows"]}
+ok(got.get("Satara") == 41 and got.get("(blank)") == 3, "first-name lookup: an ambiguous first name stays unmatched")
+probs, _ = fm.check(p, s, tmp)
+ok(sum("shared by several" in x["problem"] for x in probs) == 3, "first-name lookup: ambiguous first name is reported")
+
+# --- lookup "accept" (the team's own codes) and row_checks (across columns and tabs)
+import re  # noqa: E402
+sj = json.load(open(os.path.join(TD, "skills", "field_programme_tracker", "skill.json")))
+p = os.path.join(tmp, "no_wagholi.xlsx")  # Wagholi missing from the Villages tab: its visits are reported...
+frames = pd.read_excel(TRACKER, sheet_name=None, header=None, dtype=object)
+vt = frames["Villages"]
+vt.loc[vt[0].astype(str).str.strip() == "Wagholi", 0] = "Wagholi East"
+with pd.ExcelWriter(p) as w:
+    for k, df in frames.items():
+        df.to_excel(w, sheet_name=k, index=False, header=False)
+probs, _ = fm.check(p, sj, tmp)
+n_wag = sum(x["column"] == "Village" and x["rule"] == "lookup" for x in probs)
+ok(n_wag > 0, f"lookup: villages missing from the Villages tab are reported ({n_wag})")
+vis = next(lk for lk in sj["tabs"]["Visits"]["lookups"] if lk["tab"] == "Villages")
+vis["accept"] = [r"wagh\w+"]  # ...unless the teacher accepted that code
+probs, _ = fm.check(p, sj, tmp)
+ok(not any(x["column"] == "Village" and x["rule"] == "lookup" for x in probs), "lookup accept: an accepted code is not reported")
+vis.pop("accept")
+v = sheets["Visits"]
+amt = pd.to_numeric(v["Amount disbursed"].str.replace(r"(?i)(rs\.?|inr|₹|,|\s)", "", regex=True), errors="coerce")
+hh = pd.to_numeric(v["Households visited"].str.replace(r"(?i)(rs\.?|inr|₹|,|\s)", "", regex=True), errors="coerce")
+want_rows = sorted(int(fk.sheet_row(v, i, 3)) for i in v.index[(amt > hh * 450).fillna(False)])
+vil = {x.strip().lower() for x in fk.raw_sheets(p)[0]["Villages"]["Village"]}
+want_cross = sum(1 for x in v["Village"] if x.strip() and x.strip().lower() not in vil)
+sj["tabs"]["Visits"]["row_checks"] = [
+    {"id": "per_household", "column": "amount_disbursed", "sql": "t.amount_disbursed > t.households_visited * 450",
+     "message": "more than Rs 450 a household"},
+    {"id": "village_tab", "column": "village", "message": "village not in Villages tab",
+     "sql": "t.village IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {{tab:Villages}} w WHERE lower(trim(w.village)) = lower(trim(t.village)))"}]
+probs, out = fm.check(p, sj, tmp)  # the copy with Wagholi missing from Villages
+got_rows = sorted(x["row"] for x in probs if x.get("check") == "per_household")
+ok(got_rows == want_rows and len(want_rows) > 0, f"row check across columns: sheet rows {got_rows[:5]}... match pandas")
+ok(sum(x.get("check") == "village_tab" for x in probs) == want_cross > 0, "row check across tabs ({{tab:Villages}}) matches pandas")
+ok(all(x["cell"] and x["cell"].startswith("E") for x in probs if x.get("check") == "per_household"), "row check cells point at the column")
+fk.SKILLS_DIR = os.path.join(TD, "skills")
+shutil.rmtree(tmp)
+
+# --- the taught single-tab skills, on the event-eval files, through the generic form (no taught SQL)
+fk.SKILLS_DIR = os.path.join(HERE, "file-skills")
+sh, s, con, b = opened(os.path.join(EVAL, "tech_reimbursement_form.xlsx"))
+t = next(iter(b))
+f = fm.form(con, s, t, b)
+r = fm.run(con, f, b[t]["table"], {"measures": ["amount", "rows"], "preset": "paid_out",
+                                   "date": {"from": "2026-08-26", "to": "2026-10-26"}})
+ok(r["rows"][0]["Amount (Rs)"] == 43020 and r["rows"][0]["Number of claims"] == 12, "reimbursements 26 Aug-26 Oct: 43,020 / 12")
+r = fm.run(con, f, b[t]["table"], {"measures": ["amount"], "group_by": ["employee"], "preset": "not_rejected",
+                                   "filters": {"category": ["Hardware"]}, "limit": 1})
+ok(r["rows"][0] == {"Employee": "Anaya Rao", "Amount (Rs)": 24970}, "top hardware claimant without a taught query")
+sh, s, con, b = opened(os.path.join(EVAL, "volunteer_register.xlsx"))
+t = next(iter(b))
+f = fm.form(con, s, t, b)
+r = fm.run(con, f, b[t]["table"], {"measures": ["rows", "stipend"], "date": {"from": "2026-07-01"}})
+ok(r["rows"][0]["Number of volunteers"] == 25 and r["rows"][0]["Stipend paid (Rs)"] == 32100,
+   "volunteers since July from the real file: 25 / 32,100")
+ok(fm.indian(3245678.5) == "32,45,678.5", "Indian digit grouping")
+# units come from the measure's taught format, not its label (Codex, exp/clef-form: a count printed as "Rs 16")
+_f = {"_measures": {"n": {"label": "Volunteers with no stipend recorded", "format": "count"},
+                    "p": {"label": "Share paid", "format": "percent"}, "a": {"label": "Amount", "format": "inr"},
+                    "m": {"label": "Average stipend", "format": "number"}}, "_kinds": {}}
+def _one(mid, v):
+    lab = _f["_measures"][mid]["label"]
+    return fm.answer_text({"described": lab, "rows": [{lab: v}], "total": None, "columns": [lab]}, _f, {"measures": [mid]})
+ok(_one("n", 16) == "Volunteers with no stipend recorded. 16.", "a count never gets Rs")
+ok(_one("p", 18.4) == "Share paid. 18.4%.", "a percent gets %")
+ok(_one("a", 1500) == "Amount. Rs 1,500.", "inr gets Rs")
+ok(_one("m", 1500) == "Average stipend. Rs 1,500.", "a 'number' money average keeps the label guess")
+# models' date words: "year" is this_year; a date range written as a filter is read as the date
+_T = _dt.date(2026, 11, 12) if "_dt" in dir() else None
+import datetime as _dt2  # noqa: E402
+ok(fm.period("year", _dt2.date(2026, 11, 12)) == ("2026-01-01", "2026-11-12"), "period 'year' = this year")
+ok(fm.period("this year", _dt2.date(2026, 11, 12)) == ("2026-01-01", "2026-11-12"), "period 'this year'")
+ok(fm.period("FY", _dt2.date(2026, 11, 12)) == ("2026-04-01", "2026-11-12"), "period 'FY'")
+ok(fm.period("september", _dt2.date(2026, 11, 12)) == ("2026-09-01", "2026-09-30"), "period in words: september")
+import datetime as _dt  # noqa: E402
+T = _dt.date(2026, 11, 8)
+for words, want in [("last month", ("2026-10-01", "2026-10-31")), ("this FY", ("2026-04-01", "2026-11-08")),
+                    ("since july", ("2026-07-01", None)), ("after august", ("2026-09-01", None)),
+                    ("08/26 to 10/26", ("2026-08-26", "2026-10-26")), ("26/08 to 26/10", ("2026-08-26", "2026-10-26")),
+                    ("july to sept", ("2026-07-01", "2026-09-30")), ("december", ("2025-12-01", "2025-12-31")),
+                    ("so far", None), ("last 7 days", ("2026-11-02", "2026-11-08"))]:
+    ok(fm.parse_when(words, T) == want, f"date words: {words!r}")
+print("ALL PASSED" if not fails else f"{fails} FAILED")
+sys.exit(1 if fails else 0)

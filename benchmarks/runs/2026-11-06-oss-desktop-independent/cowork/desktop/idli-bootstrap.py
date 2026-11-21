@@ -1,0 +1,458 @@
+#!/usr/bin/env python3
+"""Idli first-run bootstrap: make a Paseo install look the way Idli should on first open.
+Safe to rerun: it only adds what's missing.
+
+  Start here       its own folder (~/idli-insights/setup), first in the sidebar, with two entries (workspaces):
+     Logins           the setup chat (sign-in checks; also answers "what has Idli learned"), the Minis tab
+     Privacy          what Idli's privacy guard sent to Claude (searchable, per app; written by code). An entry of
+                      its own so it can't get lost the way a tab can.
+     Teams            a page of team cards (Open, Delete) and New team: a few questions, one per panel, then a team
+                      heading that works like Drivey with its own folder (~/idli-insights/teams/<name>) and Minis (lib/teams.py; written by code).
+     Minis            a tab: the page listing the files Idli has learned (grows as Claude teaches it)
+     Drive            a tab for signing in to Google
+  Drivey       the private folder (~/idli-insights/cowork-real): Drive files, where the work happens; a "New chat"
+     Drivey    is always waiting there on its first card (clean up a file / analyse a file). Its chats get the split
+               panel (the private model on the left, Claude beside it).
+  WhatsAppy    ~/idli-insights/whatsappy: chats open straight to Claude (the person's own subscription), no split.
+               An open space to try out Minis beyond Drive (narrative/IDLI_DESKTOP.md). Canvay was a second one
+               until 2026-11-16 (removed; teams take its place).
+  Claude      this cowork/ folder: Claude teaches Idli a file, from fake data only
+     Claude
+
+Runs on the machine with Paseo, after the daemon is up (desktop/idli-launch.sh does that). The heading order
+needs Paseo patch P2 (todos/idli-insights/p1/paseo_patches.md); until then the person drags them once.
+Providers (Idli 30B, Claude) come from desktop/setup-laptop.py.
+
+  python3 desktop/idli-bootstrap.py            do it
+  python3 desktop/idli-bootstrap.py --dry-run  say what it would do
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+import urllib.parse
+
+COWORK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+IDLI = os.environ.get("IDLI_HOME") or os.path.expanduser("~/idli-insights")
+DRY = "--dry-run" in sys.argv
+LAYOUT = [  # (workspace name, folder, instructions copied to <folder>/CLAUDE.md)
+    ("Start here", os.path.join(IDLI, "setup"), os.path.join(COWORK, "idli", "START-HERE.md")),
+    ("Drivey", os.path.join(IDLI, "cowork-real"), os.path.join(COWORK, "idli", "CLAUDE.md")),
+    ("Claude", COWORK, None),
+]
+CLAUDE_SPACES = [  # (workspace name, folder): chats run plain Claude Code; no split (the split follows the private
+    ("Builder", os.path.join(IDLI, "builder")),  # model's provider, Paseo patch P15). Builder: ordinary Claude Code,
+]  # plus /sandbox and Idli's sandbox tools (idli/builder-outside, narrative/SANDBOXES.md). WhatsAppy went 2026-11-18.
+CLAUDE_PROVIDER = os.environ.get("IDLI_CLAUDE_PROVIDER", "claude")
+LAYOUT += [(n, f, None) for n, f in CLAUDE_SPACES]
+FOLDER = {n: f for n, f, _ in LAYOUT}
+HEADING = {}  # the sidebar heading (project) when it differs from the workspace
+OLD_NAMES = {"Idli": "Drivey"}  # workspace renamed 2026-11-13
+OLD_MISSION_CONTROL = "What Idli has learned"  # its own workspace until 2026-11-12; now a tab in Start here
+SITES = "google\nfiles\n"  # no free SQL (sheets): answers go through the form
+# Each chat sees only the tools its job needs (a `cowork.tools` allow-list per folder; a small model chooses better
+# from fewer). No Drive index or file search for now: Idli works from a link the person pastes.
+TOOLSETS = {
+    "Start here": ["setup_check", "show_skills", "skills_list", "skill_delete", "skill_share", "skill_import",
+                   "wire_page"],
+    "Drivey": ["drive_fetch", "privacy_review_open", "claude_handoff", "mini_open", "mini_ask", "binder_item",
+               "builder_open"],
+}
+START_PROVIDER = os.environ.get("IDLI_START_PROVIDER", "t4gc-cowork")
+CHAT = "Logins"  # the setup chat in Start here (the workspace keeps the name Start here)
+PRIVACY = "Privacy"  # the second entry in Start here: the "Sent to Claude" log
+WS_TITLE = {"Start here": CHAT}  # the Start here workspace shows as "Logins" under the Start here heading
+PRIVACY_PROMPT = "Show what Idli sent to Claude"  # lib/modes.py PRIVACY_CHAT: the chat is written by code
+TEAMS = "Teams"  # the third entry in Start here: the team page (lib/teams_page.html, opened by Paseo P21)
+TABS = []  # the Drive tab opens only when the Logins check finds Google signed out (and closes once signed in)
+
+
+def say(msg):
+    print(("[dry-run] " if DRY else "") + msg, flush=True)
+
+
+def paseo_bin():
+    for p in (shutil.which("paseo"), os.path.expanduser("~/.local/bin/paseo"), "/usr/local/bin/paseo", "/usr/bin/paseo"):
+        if p and os.path.exists(p):
+            return p
+    sys.exit("The paseo command was not found.")
+
+
+ENV = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}  # act as the user, not as an agent
+
+
+def paseo(*args, parse=True, change=False):
+    if change and DRY:
+        say("would run: paseo " + " ".join(args))
+        return None
+    r = subprocess.run([paseo_bin(), *args] + (["--json"] if parse else []), capture_output=True, text=True,
+                       timeout=120, env=ENV)
+    if r.returncode:
+        raise RuntimeError(f"paseo {' '.join(args)}: {(r.stderr or r.stdout).strip()[-300:]}")
+    return json.loads(r.stdout) if parse and r.stdout.strip() else r.stdout
+
+
+def same(a, b):
+    """Same folder; the CLI sometimes prints paths with ~."""
+    return bool(a) and os.path.realpath(os.path.expanduser(a)) == os.path.realpath(os.path.expanduser(b))
+
+
+def folders():
+    for name, path, instructions in LAYOUT:
+        if name in dict(CLAUDE_SPACES):  # a plain folder: no Idli instructions, tools or sites
+            if not os.path.isdir(path):
+                say(f"create folder {path}")
+                if not DRY:
+                    os.makedirs(path, exist_ok=True)
+            continue
+        if path == COWORK or not instructions and os.path.isdir(path):
+            continue
+        if not os.path.isdir(path):
+            say(f"create folder {path}")
+            if not DRY:
+                os.makedirs(path, exist_ok=True)
+        dest = os.path.join(path, "CLAUDE.md")
+        if instructions and (not os.path.exists(dest) or open(dest).read() != open(instructions).read()):
+            say(f"write {dest}")
+            if not DRY:
+                shutil.copyfile(instructions, dest)
+        tools = os.path.join(path, "cowork.tools")
+        want = "\n".join(TOOLSETS.get(name, [])) + "\n"
+        if name in TOOLSETS and (not os.path.exists(tools) or open(tools).read() != want):
+            say(f"write {tools}")
+            if not DRY:
+                with open(tools, "w") as f:
+                    f.write(want)
+        sites = os.path.join(path, "cowork.sites")
+        if not os.path.exists(sites) or open(sites).read() != SITES:
+            say(f"write {sites}")
+            if not DRY:
+                with open(sites, "w") as f:
+                    f.write(SITES)
+
+
+def projects_and_workspaces():
+    ids = {}
+    for name, path, _ in LAYOUT:
+        if name == "Claude" and split_mode():  # beside each Idli chat instead (retire_claude_workspace)
+            continue
+        proj = next((p for p in paseo("project", "ls") if same(p["path"], path)), None)
+        if not proj:
+            say(f"register project {path}")
+            paseo("project", "create", path, parse=False, change=True)
+            proj = next((p for p in (paseo("project", "ls") or []) if same(p["path"], path)), None) if not DRY else None
+        heading = HEADING.get(name, name)
+        if proj and proj["name"] != heading:
+            say(f"name project '{proj['name']}' -> '{heading}'")
+            paseo("project", "rename", proj["projectId"], heading, parse=False, change=True)
+        wss = [w for w in paseo("workspace", "ls") if same(w["cwd"], path)]
+        names = {n for n, _, _ in LAYOUT} | set(WS_TITLE.values()) | {PRIVACY, TEAMS}
+        title = WS_TITLE.get(name, name)
+        ws = next((w for w in wss if w["name"] == title), None) or \
+            next((w for w in wss if w["name"] == name), None) or \
+            next((w for w in wss if OLD_NAMES.get(w["name"]) == name), None) or \
+            next((w for w in wss if w["name"] not in names), None)
+        if not ws and proj:
+            say(f"create workspace '{title}'")
+            paseo("workspace", "create", "--isolation", "local", "--project", proj["projectId"], "--path", path,
+                  "--title", title, parse=False, change=True)
+            ws = next((w for w in (paseo("workspace", "ls") or []) if same(w["cwd"], path) and w["name"] == title),
+                      None) if not DRY else None
+        elif ws and ws["name"] != title:
+            say(f"name workspace '{ws['name']}' -> '{title}'")
+            paseo("workspace", "rename", ws["workspaceId"], title, parse=False, change=True)
+        ids[name] = ws["workspaceId"] if ws else None
+        if name == "Start here" and proj:  # its second entry (Teams went 2026-11-18: sandboxes are made by the Builder)
+            ids[PRIVACY] = second_workspace(proj, path, PRIVACY, wss)
+    return ids
+
+
+def second_workspace(proj, path, title, wss):
+    ws = next((w for w in wss if w["name"] == title), None)
+    if ws:
+        return ws["workspaceId"]
+    say(f"create workspace '{title}'")
+    paseo("workspace", "create", "--isolation", "local", "--project", proj["projectId"], "--path", path,
+          "--title", title, parse=False, change=True)
+    ws = next((w for w in (paseo("workspace", "ls") or []) if same(w["cwd"], path) and w["name"] == title),
+              None) if not DRY else None
+    return ws["workspaceId"] if ws else None
+
+
+def start_chat(ws_id):
+    folder = FOLDER["Start here"]
+    mine = [a for a in paseo("ls", "--global") if same(a.get("cwd") or "", folder)]
+    agent = next((a for a in mine if a["name"] == CHAT), None)
+    old = next((a for a in mine if a["name"] == "Start here"), None)  # its name until 2026-11-12
+    if not agent and old:
+        say(f"rename the Start here chat to '{CHAT}'")
+        paseo("agent", "update", old["id"], "--name", CHAT, parse=False, change=True)
+        agent = old
+    if agent:
+        say(f"{CHAT} chat exists")
+        if (agent.get("labels") or {}).get("idli.role") != "setup":  # Start here never splits (Paseo patch P15)
+            paseo("agent", "update", agent["id"], "--label", "idli.role=setup", parse=False, change=True)
+        return agent["id"]
+    say(f"create the {CHAT} chat (Idli greets the person)")
+    if DRY or not ws_id:
+        return None
+    out = paseo("run", "--provider", START_PROVIDER, "--workspace", ws_id, "--mode", "bypassPermissions",
+                "--thinking", "low",  # measured: low acts on "yes" in ~5 s vs ~10 s on high, same choices
+                "--title", CHAT, "--label", "idli.role=setup", "--no-wait", "hello")
+    return (out or {}).get("agentId")
+
+
+def chat(ws_id, folder, title, prompt, provider=START_PROVIDER, label=None):
+    """A chat that should always be there (made once; found again by its title). Returns its id."""
+    old = next((a for a in paseo("ls", "--global") if a["name"] == title and same(a.get("cwd") or "", folder)), None)
+    if old:
+        say(f"'{title}' chat exists")
+        return old["id"]
+    say(f"create the '{title}' chat")
+    if DRY or not ws_id:
+        return None
+    extra = ["--thinking", "low"] if provider == START_PROVIDER else []
+    if label:
+        extra += ["--label", label]
+    out = paseo("run", "--provider", provider, "--workspace", ws_id, "--mode", "bypassPermissions", *extra,
+                "--title", title, "--no-wait", prompt)
+    return (out or {}).get("agentId")
+
+
+def plain_chat(agent_id):
+    """Teams and Privacy are written by code: Paseo (P20) shows them like Drivey's left chat (one-click cards, no tool
+    rows, Idli's first message hidden) when they carry idli.plain=1."""
+    if not agent_id or DRY:
+        return
+    agent = next((a for a in paseo("ls", "--global") if a.get("id") == agent_id), None)
+    labels = (agent or {}).get("labels") or {}
+    if labels.get("idli.plain") != "1":
+        say("show this chat like Drivey's left chat")
+        paseo("agent", "update", agent_id, "--label", "idli.plain=1", parse=False, change=True)
+
+
+OPENED = os.path.join(IDLI, "config", "bootstrap-tabs.json")  # tabs opened once: Paseo lists only the tabs of the
+#                                                              workspace on screen, so we can't look for them later
+
+
+def opened(key, value=None):
+    try:
+        with open(OPENED) as f:
+            seen = json.load(f)
+    except (OSError, ValueError):
+        seen = {}
+    if value is None:
+        return seen.get(key)
+    seen[key] = value
+    os.makedirs(os.path.dirname(OPENED), exist_ok=True)
+    with open(OPENED, "w") as f:
+        json.dump(seen, f)
+
+
+def browser_as(agent_id):
+    """Paseo's browser tools acting in agent_id's workspace, once the app's browser host is up (else None)."""
+    sys.path.insert(0, COWORK)
+    os.environ["PASEO_AGENT_ID"] = agent_id
+    from lib import browser
+    for attempt in range(20):  # the desktop app's browser host may still be starting
+        try:
+            browser.tabs()
+            return browser
+        except Exception:
+            time.sleep(3)
+    return None
+
+
+def learned_tab(agent_id):
+    """The Minis tab (the page of what Idli has learned) in Start here, at the form server's current address (the server is
+    started here so the page is live as soon as the app opens)."""
+    if not agent_id or DRY:
+        say("would open the Minis tab")
+        return
+    py = os.path.join(COWORK, ".venv", "bin", "python")
+    r = subprocess.run([py if os.path.exists(py) else sys.executable, "-c",
+                        "import sys,json; sys.path.insert(0, sys.argv[1]); from lib import formserver as f; "
+                        "print(json.dumps(f.ensure(sys.argv[2])))", COWORK, FOLDER["Start here"]],
+                       capture_output=True, text=True, timeout=60, env=ENV)
+    if r.returncode:
+        say("the page server didn't start: " + r.stderr.strip()[-200:])
+        return
+    port, token = json.loads(r.stdout)
+    browser = browser_as(agent_id)
+    if not browser:
+        say("the app's browser isn't available; open Paseo and rerun to add the Minis tab")
+        return
+    # "Sent to Claude" was a tab until 2026-11-15; it is the Privacy chat now (a chat can't get lost).
+    for t in browser.tabs():
+        if urllib.parse.urlparse(t["url"]).path == "/wire":
+            say("close the old Sent to Claude tab (it is the Privacy chat now)")
+            browser.paseo("browser_close_tab", browserId=t["id"])
+    for page, label, key in (("/skills", "Minis", "learned@"),):
+        url = f"http://dashboard.localhost:{port}{page}?t={token}"
+        if opened(key + FOLDER["Start here"]) == url:
+            say(f"{label} tab is open")
+            continue
+        old = next((t for t in browser.tabs() if urllib.parse.urlparse(t["url"]).path == page), None)
+        if old:
+            say(f"point the {label} tab at the current server")
+            browser.paseo("browser_navigate", browserId=old["id"], url=url)
+        else:
+            say(f"open the {label} tab")
+            browser.paseo("browser_new_tab", url=url)
+        opened(key + FOLDER["Start here"], url)
+
+
+def start_tabs(agent_id):
+    """Drive and Gmail tabs in Start here, opened as the Start here chat (so they land in its workspace)."""
+    if not agent_id or DRY:
+        say("would open Drive and Gmail tabs in Start here")
+        return
+    browser = browser_as(agent_id)
+    if not browser:
+        say("the app's browser isn't available; open Paseo and rerun to add the Drive and Gmail tabs")
+        return
+    tabs = browser.tabs()
+    for host in {urllib.parse.urlparse(u).hostname for u in TABS} | {"drive.google.com"}:
+        keep = 1 if any(urllib.parse.urlparse(u).hostname == host for u in TABS) else 0
+        dup = [t for t in tabs if urllib.parse.urlparse(t["url"]).hostname == host][keep:]
+        for t in dup:
+            say(f"close a {host} tab")
+            browser.paseo("browser_close_tab", browserId=t["id"])
+    have = {urllib.parse.urlparse(t["url"]).hostname for t in browser.tabs()}
+    for url in TABS:
+        key = url + "@" + FOLDER["Start here"]  # Start here moved folders (2026-11-10): open its tabs again there
+        if urllib.parse.urlparse(url).hostname not in have and not opened(key):
+            say(f"open tab {urllib.parse.urlparse(url).hostname}")
+            browser.paseo("browser_new_tab", url=url)
+        opened(key, True)
+
+
+def retire_old_mission_control():
+    """Until 2026-11-12 Mission control was its own heading and workspace ("What Idli has learned"); it is a tab in
+    Start here now. Archive the old workspace (its chat goes with it)."""
+    for w in paseo("workspace", "ls") or []:
+        if w["name"] == OLD_MISSION_CONTROL:
+            say(f"archive the old Mission control workspace ({w['cwd']})")
+            paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
+    for p in paseo("project", "ls") or []:  # and its heading in the sidebar
+        if same(p["path"], os.path.join(IDLI, "start-here")):
+            say("remove the old Mission control heading")
+            paseo("project", "delete", p["projectId"], parse=False, change=True)
+
+
+def split_mode():
+    try:
+        with open(os.path.join(IDLI, "config", "ui.json")) as f:
+            return bool(json.load(f).get("split"))
+    except (OSError, ValueError):
+        return False
+
+
+def one_idli_workspace():
+    """Split mode: Idli's folder has one workspace, "Drivey". A second one on the same folder (Paseo's "New workspace")
+    leaves teach_send unable to tell which one the chat is in (Paseo doesn't say), so Claude opened in the wrong one and
+    its pairing hid it. Others are archived; their chats stay in History."""
+    if not split_mode():
+        return
+    for w in paseo("workspace", "ls") or []:
+        if same(w["cwd"], FOLDER["Drivey"]) and w["name"] != "Drivey":
+            say(f"archive the extra workspace '{w['name']}' on Idli's folder (its chats stay in History)")
+            paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
+
+
+def retire_claude_workspace():
+    """Split mode: every Idli chat has its own Claude chat beside it (Paseo patches P13-P15), so the separate Claude
+    heading goes (website teaching, which needs it, is parked). Its chats stay in Paseo's history."""
+    if not split_mode():
+        return
+    for p in paseo("project", "ls") or []:
+        if same(p["path"], COWORK):
+            say("remove the Claude heading (Claude now opens beside each Idli chat)")
+            paseo("project", "delete", p["projectId"], parse=False, change=True)
+
+
+def retire_old_start_here():
+    """Until 2026-11-10 Start here shared Mission control's folder (and indexed the Drive). It has its own folder
+    and heading now and only checks sign-ins: archive the old workspace (and its chat)."""
+    for w in paseo("workspace", "ls") or []:
+        if w["name"] == "Start here" and not same(w["cwd"], FOLDER["Start here"]):
+            say(f"archive the old Start here workspace in {w['cwd']}")
+            paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
+
+
+def refresh_teams():
+    """Teams made before a tool was added (builder_open, 2026-11-16) get the same tools as Drivey."""
+    if DRY:
+        return
+    sys.path.insert(0, COWORK)
+    from lib import teams
+    for folder in teams.refresh_team_tools():
+        say(f"write {folder}/cowork.tools")
+    from lib import sandboxes
+    for folder in sandboxes.refresh_tools():
+        say(f"write {folder}/cowork.tools")
+
+
+def builder_folder():
+    """The Builder's Claude Code files: instructions, /sandbox, Idli's MCP server in the outside role."""
+    if DRY:
+        say("would write the Builder's /sandbox command and tools")
+        return
+    sys.path.insert(0, os.path.join(COWORK, "idli", "builder-outside"))
+    import builder_outside
+    builder_outside.setup(FOLDER["Builder"], COWORK)
+
+
+def retire_teams_page():
+    """Until 2026-11-18 Start here had a Teams entry (team cards and the New team questions). Sandboxes are made by
+    the Builder now: archive it."""
+    for w in paseo("workspace", "ls") or []:
+        if w["name"] == TEAMS and same(w["cwd"], FOLDER["Start here"]):
+            say("archive the Teams entry (the Builder makes sandboxes now)")
+            paseo("workspace", "archive", w["workspaceId"], parse=False, change=True)
+
+
+def retire_whatsappy():
+    for p in paseo("project", "ls") or []:
+        if same(p["path"], os.path.join(IDLI, "whatsappy")):
+            say("remove the WhatsAppy heading (its folder stays)")
+            paseo("project", "delete", p["projectId"], parse=False, change=True)
+
+
+def retire_teams_chat():
+    """Until 2026-11-16 Teams was a chat; it is a page now (lib/teams_page.html), which Paseo (P21) opens as the Teams
+    workspace's tab. Delete the old chat."""
+    for a in paseo("ls", "--global") or []:
+        if a["name"] == TEAMS and same(a.get("cwd") or "", FOLDER["Start here"]):
+            say("delete the old Teams chat (Teams is a page now)")
+            paseo("delete", a["id"], parse=False, change=True)
+
+
+def main():
+    folders()
+    ids = projects_and_workspaces()
+    retire_old_start_here()
+    retire_old_mission_control()
+    retire_claude_workspace()
+    one_idli_workspace()
+    agent = start_chat(ids.get("Start here"))
+    cid = chat(ids.get(PRIVACY), FOLDER["Start here"], PRIVACY, PRIVACY_PROMPT, label="idli.role=setup")
+    plain_chat(cid)
+    retire_teams_chat()
+    retire_teams_page()
+    retire_whatsappy()
+    builder_folder()
+    refresh_teams()
+    learned_tab(agent)  # Minis: a tab in Start here, next to the chat
+    start_tabs(agent)
+    if not split_mode():  # split mode: Drivey's New chat row opens the two halves (Paseo P20); nothing waits
+        chat(ids.get("Drivey"), FOLDER["Drivey"], "New chat", "hi")  # Drivey keeps one waiting from then on
+    for name, folder in CLAUDE_SPACES:  # one Claude chat waiting in each
+        chat(ids.get(name), folder, "New chat", "hi", provider=CLAUDE_PROVIDER)
+    say("done. Heading order: Start here, Drivey, Builder, then sandboxes (drag once until Paseo patch P2).")
+
+
+if __name__ == "__main__":
+    main()

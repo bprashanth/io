@@ -1,0 +1,114 @@
+{
+  "needs_account": true,
+  "tests": [
+    {
+      "name": "gmail search returns rows",
+      "tool": "gmail_search",
+      "args": {
+        "query": "in:anywhere",
+        "max_results": 3
+      },
+      "expect": {
+        "nonempty": [
+          "results"
+        ]
+      }
+    },
+    {
+      "name": "gmail open first result",
+      "tool": "gmail_open",
+      "args": {
+        "n": 1
+      },
+      "expect": {
+        "keys": [
+          "subject",
+          "messages"
+        ],
+        "nonempty": [
+          "messages"
+        ]
+      }
+    },
+    {
+      "name": "drive search finds the test doc with its type",
+      "tool": "drive_search",
+      "args": {
+        "query": "Wildfires"
+      },
+      "expect": {
+        "contains": [
+          "Wildfires",
+          "Google Doc"
+        ]
+      }
+    },
+    {
+      "name": "doc read on the open Google Doc",
+      "tool": "doc_read",
+      "args": {},
+      "expect": {
+        "error_ok": true
+      }
+    },
+    {
+      "name": "drive search finds the test Google Sheet",
+      "tool": "drive_search",
+      "args": {
+        "query": "p/bv ratio"
+      },
+      "expect": {
+        "contains": [
+          "{{pbv_sheet}}",
+          "Google Sheet"
+        ]
+      }
+    },
+    {
+      "name": "gsheet_read returns header and numbers, saves a CSV",
+      "tool": "gsheet_read",
+      "args": {
+        "sheet_id": "{{pbv_sheet}}",
+        "max_rows": 3
+      },
+      "expect": {
+        "contains": [
+          "P/BV Ratio (TTM)",
+          "\"rows\": 14",
+          "HDFC Bank",
+          "3.9",
+          "google_sheets/"
+        ]
+      }
+    },
+    {
+      "name": "gsheet_read rejects an unknown tab",
+      "tool": "gsheet_read",
+      "args": {
+        "sheet_id": "{{multi_tab_sheet}}",
+        "tab": "No such tab"
+      },
+      "expect": {
+        "error_ok": true,
+        "contains": [
+          "Tabs:",
+          "Sheet1"
+        ]
+      }
+    },
+    {
+      "name": "gsheet_read on a Google Doc id gives a clear error",
+      "tool": "gsheet_read",
+      "args": {
+        "sheet_id": "{{a_doc}}"
+      },
+      "expect": {
+        "error_ok": true,
+        "contains": [
+          "not found"
+        ]
+      }
+    }
+  ],
+  "data_dir": "testdata"
+}

@@ -1,0 +1,958 @@
+"""The file form: a small page on 127.0.0.1 that Idli opens in a Paseo browser tab.
+
+One page per taught file: a tab per workbook tab, dropdowns built from the file skill and the data
+(what to count, how to break it down, which rows), the answer computed by DuckDB, the checks' problems,
+and the contract test's verdict. Nothing leaves the computer: the server listens on 127.0.0.1 only and
+every request needs the token written to <data dir>/.idli/form-server.json (mode 600).
+
+    python -I -m lib.formserver <data dir>     (started on demand by ensure())
+"""
+import datetime as dt
+import json
+import re
+import os
+import secrets
+import shutil
+import subprocess
+import sys
+import threading
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import duckdb
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+from lib import filekit as fk  # noqa: E402
+from lib import formkit as fm  # noqa: E402
+from lib import privacy  # noqa: E402
+from lib import home, journey, reveals  # noqa: E402
+
+PORT = int(os.environ.get("IDLI_FORM_PORT") or 8797)
+PAGE = os.path.join(HERE, "lib", "form.html")
+
+
+def state_file(data_dir):
+    return os.path.join(data_dir, ".idli", "form-server.json")
+
+
+class Files:
+    """Opened files, rebuilt when the file or its skill changes."""
+
+    def __init__(self, data_dir):
+        self.data_dir = os.path.realpath(data_dir)
+        self.cache = {}
+        self.lock = threading.Lock()
+
+    def resolve(self, rel):
+        path = os.path.realpath(os.path.join(self.data_dir, rel))
+        if not path.startswith(self.data_dir + os.sep) or not os.path.isfile(path):
+            raise ValueError(f"No file '{rel}' in the workspace folder.")
+        return path
+
+    def open(self, rel):
+        path = self.resolve(rel)
+        with self.lock:
+            sheets, _ = fk.raw_sheets(path)
+            skill, score, tabmap = fm.match_file(sheets)
+            key = (path, os.path.getmtime(path), skill and skill["id"], skill and skill.get("version"),
+                   skill and os.path.getmtime(os.path.join(skill["_dir"], "skill.json")))
+            hit = self.cache.get(rel)
+            if hit and hit["key"] == key:
+                return hit
+            entry = {"key": key, "path": path, "skill": skill, "score": score, "sheets": sheets}
+            if skill:
+                con = duckdb.connect()
+                built = fm.build(con, path, skill, fk.slug(skill["id"]))
+                entry.update(con=con, built=built, contract=fm.contract(skill, sheets, con, built),
+                             forms={t: fm.form(con, skill, t, built) for t in built})
+                out_dir = os.path.join(self.data_dir, "checked")
+                problems, checked = fm.check(path, skill, out_dir)
+                entry.update(problems=problems, checked=os.path.relpath(checked, self.data_dir))
+            hidden = path + ".hidden.json"
+            if os.path.exists(hidden):
+                with open(hidden) as f:
+                    entry["hidden"] = json.load(f)
+            self.cache[rel] = entry
+            return entry
+
+    # ---- suggested fixes: the person accepts or rejects each one; nothing touches the original file
+    def _decisions_path(self, rel):
+        name = os.path.splitext(os.path.basename(self.resolve(rel)))[0]
+        return os.path.join(self.data_dir, "checked", f"{name}.decisions.json")
+
+    def decisions(self, rel):
+        try:
+            with open(self._decisions_path(rel)) as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    def decide(self, rel, keys, decision):
+        d = self.decisions(rel)
+        for k in keys:
+            if decision in ("accept", "reject"):
+                d[k] = decision
+            else:
+                d.pop(k, None)
+        os.makedirs(os.path.dirname(self._decisions_path(rel)), exist_ok=True)
+        with open(self._decisions_path(rel), "w") as f:
+            json.dump(d, f, indent=1)
+        return {"ok": True, "accepted": sum(v == "accept" for v in d.values()), "rejected": sum(v == "reject" for v in d.values())}
+
+    @staticmethod
+    def pkey(p):
+        return f"{p['tab']}|{p.get('cell')}|{p.get('rule')}"
+
+    def source(self, rel):
+        try:
+            with open(self.resolve(rel) + ".source.json") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+
+    def fixlist(self, rel):
+        """Write '<name> - fixes.xlsx' (the accepted fixes, cell by cell) and, for Excel files, '<name> - fixed.xlsx':
+        the original with accepted fixes applied at the same cells (formatting kept), each changed cell commented
+        with its old value, and accepted skipped rows removed. The original is never touched."""
+        from openpyxl import Workbook, load_workbook
+        from openpyxl.comments import Comment
+        from openpyxl.utils.cell import coordinate_from_string
+        e = self.open(rel)
+        d = self.decisions(rel)
+        acc = [p for p in e["problems"] if d.get(self.pkey(p)) == "accept" and p.get("suggestion")]
+        name = os.path.splitext(os.path.basename(e["path"]))[0]
+        out_dir = os.path.join(self.data_dir, "checked")
+        os.makedirs(out_dir, exist_ok=True)
+        src = self.source(rel) or {}
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Fix list"
+        ws.append(["Tab", "Cell", "Was", "Change to", "Why", "Open"])
+        for p in acc:
+            sg = p["suggestion"]
+            to = "(delete the row)" if sg.get("action") == "skip_row" else ("(blank)" if sg.get("to") == "" else sg.get("to"))
+            ws.append([p["tab"], p.get("cell"), p["value"], to, sg.get("why"), src.get("url") or ""])
+        fixes = os.path.join(out_dir, f"{name} - fixes.xlsx")
+        wb.save(fixes)
+        fixed = None
+        if e["path"].lower().endswith(".xlsx"):
+            book = load_workbook(e["path"])
+            drop = {}
+            for p in acc:
+                if p["tab"] not in book.sheetnames or not p.get("cell"):
+                    continue
+                sh = book[p["tab"]]
+                sg = p["suggestion"]
+                col, row = coordinate_from_string(p["cell"])
+                if sg.get("action") == "skip_row":
+                    drop.setdefault(p["tab"], set()).add(row)
+                elif sg.get("to") is not None:
+                    c = sh[p["cell"]]
+                    new = sg["to"]
+                    num = fk.as_number(new) if new else None
+                    c.value = num if num is not None and re.fullmatch(r"-?\d+(\.\d+)?", new) else (new or None)
+                    c.comment = Comment(f"Idli: was '{p['value']}'. {sg.get('why', '')}", "Idli")
+            for tab, rows in drop.items():
+                for r in sorted(rows, reverse=True):
+                    book[tab].delete_rows(r)
+            fixed = os.path.join(out_dir, f"{name} - fixed.xlsx")
+            book.save(fixed)
+        rel_ = lambda x: os.path.relpath(x, self.data_dir) if x else None
+        return {"fixes": len(acc), "fix_list": rel_(fixes), "fixed_copy": rel_(fixed)}
+
+    def meta(self, rel):
+        e = self.open(rel)
+        title = os.path.splitext(os.path.basename(e["path"]))[0]
+        if not e["skill"]:
+            return {"file": rel, "title": title, "known": False, "overlap": e["score"],
+                    "sheets": {n: {"rows": len(df), "columns": list(df.columns)} for n, df in e["sheets"].items()}}
+        groups, skipped = {}, {}
+        dec = self.decisions(rel)
+        for p in e["problems"]:
+            if p.get("skipped"):
+                k = skipped.setdefault(p["tab"], {}).setdefault(p["problem"], [])
+                k.append(p["row"])
+                continue
+            g = groups.setdefault(p["tab"], {}).setdefault((p["column"], p["problem"]),
+                                                           {"column": p["column"], "problem": p["problem"], "rows": []})
+            g["rows"].append({"row": p["row"], "value": p["value"], "cell": p.get("cell"), "key": self.pkey(p),
+                              "suggestion": p.get("suggestion"), "decision": dec.get(self.pkey(p))})
+        real = [p for p in e["problems"] if not p.get("skipped")]
+        src = self.source(rel) or {}
+        if src.get("id") and not src.get("copy_of"):  # the Mini's Drive file (what Share hands on)
+            from lib import share
+            try:
+                share.remember_source(e["skill"].get("_dir"), src, title)
+            except OSError:
+                pass
+        return {"file": rel, "title": e["skill"].get("title") or title, "known": True,
+                "working_copy": src.get("working_copy"), "is_copy": bool(src.get("copy_of")),
+                "problem_kinds": len({(p["tab"], p["column"], p["rule"]) for p in real}),
+                "charts": self.charts(rel),
+                "skill": {"id": e["skill"]["id"], "version": e["skill"].get("version", 1)},
+                "contract": e["contract"], "checked_copy": e["checked"], "problem_count": len(real),
+                "source": self.source(rel),
+                "skipped": {t: [{"why": w, "rows": r} for w, r in v.items()] for t, v in skipped.items()},
+                "problems": {t: list(v.values()) for t, v in groups.items()},
+                "hidden_cells": e.get("hidden"),
+                "tabs": [dict(fm.public(f), rows=len(e["built"][t]["df"])) for t, f in e["forms"].items()]}
+
+    def charts_dir(self, rel):
+        stem = re.sub(r"[^\w.-]+", "_", os.path.splitext(os.path.basename(rel))[0])
+        return os.path.join(self.data_dir, "charts", stem)
+
+    def charts(self, rel):
+        """Charts drawn for this file (Claude's and quick ones from the chat), newest first."""
+        d = self.charts_dir(rel)
+        if not os.path.isdir(d):
+            return []
+        out = []
+        for f in os.listdir(d):
+            if not f.endswith(".svg"):
+                continue
+            meta = {}
+            try:
+                with open(os.path.join(d, f[:-4] + ".json")) as fh:
+                    meta = json.load(fh)
+            except (OSError, ValueError):
+                pass
+            out.append({"name": f[:-4], "title": meta.get("title") or f[:-4], "kind": meta.get("kind", "quick"),
+                        "mtime": os.path.getmtime(os.path.join(d, f))})
+        return sorted(out, key=lambda x: -x["mtime"])
+
+    def chart(self, rel, name):
+        import base64
+        if not re.fullmatch(r"[\w.-]+", name or ""):
+            raise ValueError("bad chart name")
+        with open(os.path.join(self.charts_dir(rel), name + ".svg"), "rb") as f:
+            return {"data": "data:image/svg+xml;base64," + base64.b64encode(f.read()).decode()}
+
+    def run(self, rel, tab, spec):
+        e = self.open(rel)
+        if not e["skill"]:
+            raise ValueError("Idli hasn't been taught this file yet.")
+        if e["contract"]["status"] == "changed":
+            raise ValueError("This file has changed since Idli was taught it: " + " ".join(e["contract"]["messages"])
+                             + " Ask Idli in the chat to re-teach it.")
+        tab = tab or next(iter(e["forms"]))
+        if tab not in e["forms"]:
+            raise ValueError(f"No tab '{tab}'. Tabs: {list(e['forms'])}")
+        f = e["forms"][tab]
+        with self.lock:
+            res = fm.run(e["con"], f, e["built"][tab]["table"], spec)
+        res["text"] = fm.answer_text(res, f, spec)
+        res["tab"] = tab
+        try:  # the chart the chat shows, as a Vega-Lite spec for the page to draw (interactive)
+            from lib import vlchart
+            res["vl"] = vlchart.spec_for(res, res["described"], spec, f)
+        except Exception:  # noqa: BLE001  (no chart is fine; the table is the answer)
+            res["vl"] = None
+        return res
+
+
+STAGED = {}  # previewed bundles waiting for "Add it" (by a one-time id)
+VENDOR = {"vega.min.js", "vega-lite.min.js", "vega-interpreter.min.js", "vega-embed.min.js"}
+
+
+def mock_page(rid):
+    """The fake copy Claude gets for a teaching request, as plain tables (read only)."""
+    import html
+    import pandas as pd
+    if not re.fullmatch(r"[\w.-]+", rid or ""):
+        raise ValueError("bad request id")
+    path = os.path.join(fk.TEACH_DIR, rid, "mock.xlsx")
+    req = json.load(open(os.path.join(fk.TEACH_DIR, rid, "request.json")))
+    book = pd.read_excel(path, sheet_name=None, dtype=str)
+    e = html.escape
+    parts = []
+    for name, df in book.items():
+        if name == fk.WATERMARK:
+            continue
+        df = df.fillna("")
+        rows = "".join("<tr>" + "".join(f"<td>{e(str(v))}</td>" for v in r) + "</tr>" for r in df.head(80).values)
+        parts.append(f"<h2>{e(name)} <span>{len(df)} rows{' (first 80 shown)' if len(df) > 80 else ''}</span></h2>"
+                     f"<div class=s><table><thead><tr>{''.join(f'<th>{e(str(c))}</th>' for c in df.columns)}</tr>"
+                     f"</thead><tbody>{rows}</tbody></table></div>")
+    shared = req.get("real_labels") or []
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fake copy for Claude: {e(req.get('title', ''))}</title><style>
+:root{{--bg:#f6f5f2;--ink:#1d1d1b;--muted:#6b6a66;--line:#e3e1dc;--panel:#fff;--note:#e4efe9;--noteink:#2f5d50}}
+@media (prefers-color-scheme: dark){{:root:not([data-theme="light"]){{--bg:#161615;--ink:#ecebe7;--muted:#a3a29c;--line:#34332f;--panel:#1f1f1d;--note:#23332d;--noteink:#8cc7b2}}}}
+body{{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,sans-serif}} main{{padding:18px 16px 40px}}
+h1{{font-size:19px;margin:0}} .note{{background:var(--note);color:var(--noteink);border-radius:8px;padding:10px 14px;margin:10px 0 4px}}
+h2{{font-size:14px;margin:20px 0 6px}} h2 span{{color:var(--muted);font-weight:400}} .s{{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}}
+table{{border-collapse:collapse;font-size:12px}} th,td{{padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}} th{{position:sticky;top:0;background:var(--panel)}}
+</style></head><body><main><h1>Fake copy for Claude: {e(req.get('title', ''))}</h1>
+<div class="note">This is what Claude gets: the same tabs, columns, blanks and messiness, with every value made up.
+{('Labels you let Claude see as they are: ' + e(', '.join(shared)) + '.') if shared else 'No real labels are included.'}
+Your question, as sent: "{e(req.get('question') or '')}"</div>{''.join(parts)}</main></body></html>"""
+
+
+def skills_list():
+    """What Idli has learned: one skill per file (from the Claude workspace), with its charts."""
+    from lib import chartkit, share
+    out = []
+    for sk in fk.load_skills():
+        tabs = fm.tabs_of(sk)
+        hist = sk.get("history") or []
+        out.append({"id": sk["id"], "title": sk.get("title") or sk["id"], "version": sk.get("version", 1),
+                    "tabs": list(tabs), "checks": sum(len(t.get("validations") or []) for t in tabs.values()),
+                    "measures": sum(len(t.get("measures") or []) for t in tabs.values()),
+                    "charts": [c["title"] or c["id"] for c in chartkit.charts_of(sk)],
+                    "taught": (hist[-1].get("taught") if hist else "") or "",
+                    "file": bool(share.source_of(sk)),
+                    "changed": dt.datetime.fromtimestamp(os.path.getmtime(os.path.join(sk["_dir"], "skill.json")))
+                    .strftime("%d %b %Y %H:%M")})
+    return out
+
+
+def open_mini(files, sid):
+    """Fetch the Mini's Drive file as the person (their access decides) into this folder, and return it for the
+    dashboard. The form re-runs on it; unchanged bytes keep the cached results."""
+    import hashlib
+    import time
+    from lib import share, drivefetch
+    sk = next((s for s in fk.load_skills() if s["id"] == sid), None)
+    if not sk:
+        return 404, {"error": f"No Mini '{sid}'."}
+    src = share.source_of(sk)
+    if not src:
+        return 400, {"error": "This Mini hasn't been opened from Google Drive yet. Open the file in Idli from its "
+                              "Drive link once."}
+    name = (re.sub(r"[^\w .()-]+", "_", src.get("title") or "").strip() or sid)[:80]
+    t0 = time.time()
+    try:
+        data = drivefetch.fetch(src["id"], src.get("sheet", True))
+    except drivefetch.NoAccess:
+        who = f" Ask {src['from']} to share it with you." if src.get("from") not in (None, "", "shared") else \
+            " Ask whoever shared this Mini to share the file with you in Google Drive."
+        return 403, {"error": f"You don't have access to \u201c{src.get('title') or name}\u201d in Google Drive.{who}",
+                     "no_access": True, "url": src.get("url")}
+    except drivefetch.NoGoogle:
+        return 409, {"error": "Sign in to Google first (Start here, Logins chat), then open this again."}
+    ms = int((time.time() - t0) * 1000)
+    rel = os.path.join("drive", name + ".xlsx")
+    path = os.path.join(files.data_dir, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    old = None
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            old = hashlib.sha256(f.read()).hexdigest()
+    changed = old != hashlib.sha256(data).hexdigest()
+    if changed:
+        with open(path + ".tmp", "wb") as f:
+            f.write(data)
+        os.replace(path + ".tmp", path)
+    sp = path + ".source.json"
+    try:
+        with open(sp) as f:
+            meta = json.load(f)
+    except (OSError, ValueError):
+        meta = {}
+    if meta.get("id") != src["id"]:
+        meta = {}
+    meta.update(id=src["id"], url=src.get("url"))
+    with open(sp, "w") as f:
+        json.dump(meta, f)
+    return 200, {"file": rel, "fetch_ms": ms, "changed": changed, "bytes": len(data)}
+
+
+def skills_delete(sid):
+    """Remove one file's skill (moved to ~/idli-insights/archive/skills, so a mistake can be undone by hand)."""
+    import shutil
+    if not re.fullmatch(r"[\w.-]+", sid or ""):
+        raise ValueError("bad skill id")
+    sk = next((s for s in fk.load_skills() if s["id"] == sid), None)
+    if not sk:
+        raise ValueError(f"No skill '{sid}'.")
+    dest = os.path.join(os.path.expanduser("~/idli-insights/archive/skills"),
+                        f"{sid}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}")
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.move(sk["_dir"], dest)
+    return {"deleted": sid, "kept_at": dest}
+
+
+# ---- Start here > Teams > Installed tools: catalog tools on this computer (lib/toolhome.py) ----
+TOOL_JOBS = {}  # (team, tool) -> {'state': 'installing' | 'failed', 'error'}
+
+
+def _team_arg(body):
+    team = str(body.get('team') or '')
+    if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,40}', team):
+        raise ValueError('Pick a team.')
+    return team
+
+
+def tools_overview():
+    from lib import catalog, teams, toolhome
+    out = toolhome.overview()
+    try:
+        out['teams'] = [{'id': t['id'], 'name': t['name']} for t in teams.list_teams().get('teams', [])]
+    except Exception:
+        out['teams'] = []
+    try:
+        rows, other = catalog.fitting(registry=toolhome.installs())
+        out['catalog'] = [{k: r[k] for k in ('id', 'name', 'for', 'size', 'fits', 'why_not', 'licence', 'cautions')}
+                          for r in rows]
+        out['catalog_other'] = other
+    except ValueError as exc:
+        out['catalog'], out['catalog_error'] = [], str(exc)
+    out['jobs'] = [{'team': k[0], 'tool': k[1], **v} for k, v in TOOL_JOBS.items()]
+    return out
+
+
+def tools_add(body):
+    """Check, then (with check_only false) install one catalog tool for a team. The person's click on Add, after
+    seeing the check and the summary, is their yes."""
+    from lib import teams, toolhome
+    team, tool = _team_arg(body), str(body.get('tool') or '')
+    folder = teams._team_folder(team)
+    if not folder:
+        raise ValueError('That team is gone. Reload the page.')
+    plan = toolhome.plan(folder, [tool])
+    t = plan['check']['tools'].get(tool, {})
+    verdict = {'ok': plan['ok'], 'reasons': plan['check']['reasons'] + plan['conflicts'],
+               'notes': t.get('notes', []), 'size': toolhome.catalog.gb(t.get('need_bytes', 0)),
+               'summary': toolhome.consent_summary(folder, [tool]) if plan['ok'] else ''}
+    if body.get('check_only') or not plan['ok']:
+        return verdict
+    key = (team, tool)
+    if (TOOL_JOBS.get(key) or {}).get('state') == 'installing':
+        return {'ok': True, 'started': True}
+
+    def work():
+        try:
+            res = toolhome.install(folder, [tool])
+            if res.get('ok'):
+                TOOL_JOBS.pop(key, None)
+            else:
+                TOOL_JOBS[key] = {'state': 'failed', 'error': 'The install did not finish. Try again later.'}
+            return res
+        except (ValueError, RuntimeError, OSError) as exc:
+            TOOL_JOBS[key] = {'state': 'failed', 'error': str(exc)[:300]}
+            return {'ok': False, 'error': str(exc)[:300]}
+    TOOL_JOBS[key] = {'state': 'installing'}
+    if body.get('wait'):
+        return work()
+    threading.Thread(target=work, daemon=True).start()
+    return {'ok': True, 'started': True}
+
+
+def tools_remove(body):
+    from lib import teams, toolhome
+    team = _team_arg(body)
+    tool = str(body['tool']) if body.get('tool') else None
+    TOOL_JOBS.pop((team, tool), None)
+    return toolhome.remove(team, tool, teams._team_folder(team))
+
+
+# ---- a team's Runs page: its routines (lib/routines.py), Run now, what waits for the person's yes ----
+RUN_JOBS = {}  # (team, routine) -> {'state': 'running' | 'done' | 'failed', 'error'}
+
+
+def _routine_args(body):
+    from lib import teams
+    team = _team_arg(body)
+    folder = teams._team_folder(team)
+    if not folder:
+        raise ValueError('That team is gone. Reload the page.')
+    name = str(body.get('routine') or '')
+    if name and not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,40}', name):
+        raise ValueError('Not a routine.')
+    return team, folder, name
+
+
+def runs_overview(body):
+    from lib import routines
+    team, folder, _ = _routine_args(body)
+    return {'team': team, 'routines': routines.overview(folder),
+            'jobs': [{'routine': k[1], **v} for k, v in RUN_JOBS.items() if k[0] == team]}
+
+
+def runs_start(body):
+    import threading
+    from lib import routines
+    team, folder, name = _routine_args(body)
+    mode = 'real' if body.get('mode') == 'real' else 'test'
+    if RUN_JOBS.get((team, name), {}).get('state') == 'running':
+        return {'ok': True, 'running': True}
+    RUN_JOBS[(team, name)] = {'state': 'running'}
+
+    def go():
+        try:
+            log = routines.run(folder, name, mode)
+            RUN_JOBS[(team, name)] = {'state': 'done' if log.get('ok') else 'failed',
+                                      'error': next((s['note'] for s in log['steps'] if not s['ok']), '')}
+        except Exception as exc:
+            RUN_JOBS[(team, name)] = {'state': 'failed', 'error': str(exc)[:300]}
+    threading.Thread(target=go, daemon=True).start()
+    return {'ok': True, 'running': True}
+
+
+def runs_decide(body):
+    from lib import routines
+    team, folder, name = _routine_args(body)
+    return routines.decide(folder, name, str(body.get('key') or ''), bool(body.get('yes')))
+
+
+def make_handler(files, token):
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def _send(self, code, body, ctype="application/json"):
+            data = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json"
+                                                         else body).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", ctype + "; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                             "style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src data:")
+            self.send_header("Content-Length", str(len(data)))
+            if urllib.parse.urlparse(self.path).path == '/api/minis-public':
+                origin = self.headers.get('Origin')
+                if origin in ('paseo://app', 'null'):
+                    self.send_header('Access-Control-Allow-Origin', origin)
+                    self.send_header('Vary', 'Origin')
+                    self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+            try:
+                self.end_headers()
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # the person closed or reloaded the page
+
+        def _ok(self, qs):
+            return secrets.compare_digest((qs.get("t") or [""])[0], token)
+
+        def do_OPTIONS(self):
+            if urllib.parse.urlparse(self.path).path == '/api/minis-public':
+                return self._send(204, b'')
+            return self._send(403, {'error': 'forbidden'})
+
+        def do_GET(self):
+            u = urllib.parse.urlparse(self.path)
+            qs = urllib.parse.parse_qs(u.query)
+            if u.path in ("/teams-open", "/tools-open"):  # Paseo's UI (P21) opens Start here > Teams: hand the page its token
+                if self.headers.get("Sec-Fetch-Site") not in (None, "none", "same-origin"):
+                    return self._send(403, {"error": "forbidden"})
+                self.send_response(302)
+                self.send_header("Location", u.path[:-5] + "?" + urllib.parse.urlencode({"t": token}))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if u.path == "/home-open":  # Paseo's UI (P18) opens Idli home here: hand the page its token
+                # only for a top-level open (the app's own tab), never for a fetch from another site
+                if self.headers.get("Sec-Fetch-Site") not in (None, "none", "same-origin"):
+                    return self._send(403, {"error": "forbidden"})
+                ws = (qs.get("ws") or [""])[0]
+                dest = "/home?" + urllib.parse.urlencode({"t": token, **({"ws": ws} if re.fullmatch(r"[\w-]{1,80}", ws) else {})})
+                self.send_response(302)
+                self.send_header("Location", dest)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if u.path == '/api/minis-public':
+                keys = ('id', 'name', 'heading', 'date', 'author')
+                # A team's own Minis (Paseo P20 asks Drivey's server with the team's folder); only team folders.
+                from lib import teams
+                folder = teams.team_dir((qs.get('dir') or [''])[0]) if qs.get('dir') else files.data_dir
+                if not folder:
+                    return self._send(200, [])
+                return self._send(200, [{k: m[k] for k in keys} for m in home.minis(folder)])
+            if u.path == "/health":
+                return self._send(200, {"ok": True})
+            if u.path.startswith('/geo/'):
+                from lib import maps
+                try:
+                    return self._send(200, maps.boundary(u.path[5:]), 'application/json')
+                except ValueError as e:
+                    return self._send(404, {'error': str(e)})
+            if u.path.startswith("/vendor/"):  # the chart libraries (no data): lib/vendor/<name>.min.js
+                name = os.path.basename(u.path)
+                if name in VENDOR:
+                    with open(os.path.join(HERE, "lib", "vendor", name), "rb") as f:
+                        return self._send(200, f.read(), "application/javascript")
+                return self._send(404, "not found", "text/plain")
+            if not self._ok(qs):
+                return self._send(403, "Forbidden: open the form from Idli's chat.", "text/plain")
+            try:
+                if u.path in ("/home", "/view", "/mini", "/privacy-review", "/mini-editor", "/mini-card", "/consent", "/reveals"):
+                    # One Mini page: the draft (in the chat or on the right) and the saved Mini look the same.
+                    page = "mini-card" if u.path == "/mini-editor" else u.path[1:]
+                    with open(os.path.join(HERE, "lib", page + ".html"), encoding="utf-8") as f:
+                        return self._send(200, f.read().replace("__TOKEN_QUERY__", urllib.parse.urlencode({"t": token})), "text/html")
+                if u.path in ("/home.css", "/home.js", "/home-chart.js", "/journey.css", "/journey.js", "/reveals.js"):
+                    with open(os.path.join(HERE, "lib", u.path[1:]), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/css" if u.path.endswith(".css") else "application/javascript")
+                if u.path == "/api/home/search":
+                    return self._send(200, home.search(files.data_dir, (qs.get("q") or [""])[0]))
+                if u.path == "/api/home/latest-view":  # the home page opens a chart Claude just showed (idli_show)
+                    vdir = os.path.join(files.data_dir, "views")
+                    try:
+                        names = sorted((f for f in os.listdir(vdir) if f.endswith(".json")),
+                                       key=lambda f: os.path.getmtime(os.path.join(vdir, f)))
+                    except OSError:
+                        names = []
+                    return self._send(200, {"view": names[-1][:-5] if names else None})
+                if u.path == "/api/home/minis":
+                    return self._send(200, home.minis(files.data_dir))
+                if u.path == '/api/review':
+                    return self._send(200, journey.review_data(files.data_dir, qs['id'][0]))
+                if u.path == '/api/mini-card':
+                    return self._send(200, journey.card_data(files.data_dir, draft=(qs.get('id') or [None])[0],
+                                                             mini=(qs.get('mini') or [None])[0]))
+                if u.path == '/api/mini-draft':
+                    return self._send(200, journey.draft_data(files.data_dir, qs['id'][0]))
+                if u.path == "/api/view":
+                    return self._send(200, home.view(files.data_dir, qs["id"][0]))
+                if u.path == "/api/mini":
+                    return self._send(200, home.read(home.object_path(files.data_dir, "minis", qs["id"][0])))
+                if u.path == "/":
+                    with open(PAGE, encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/privacy":
+                    files.resolve(qs["file"][0])
+                    with open(os.path.join(HERE, "lib", "privacy.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/privacy":
+                    rel = qs["file"][0]
+                    return self._send(200, privacy.review(files.data_dir, rel, files.resolve(rel),
+                                                           (qs.get("tab") or [None])[0]))
+                if u.path == "/index":
+                    with open(os.path.join(HERE, "lib", "index.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/index":
+                    from lib import driveindex as di
+                    st = di.status()
+                    return self._send(200, {"status": st, "line": di.progress_line(st)})
+                if u.path == '/api/teams':
+                    from lib import teams
+                    return self._send(200, teams.list_teams())
+                if u.path == '/api/consent':
+                    return self._send(200, reveals.consent_data(files.data_dir, qs['id'][0]))
+                if u.path == '/api/reveals':
+                    ws = (qs.get('ws') or [''])[0]
+                    return self._send(200, {'items': privacy.reveals(files.data_dir),
+                                            'remaining': reveals.remaining(files.data_dir, ws)})
+                if u.path == "/api/form":
+                    return self._send(200, files.meta(qs["file"][0]))
+                if u.path == "/api/chart":
+                    return self._send(200, files.chart(qs["file"][0], qs["name"][0]))
+                if u.path == "/wire":  # Start here: what the privacy guard sent to Claude
+                    with open(os.path.join(HERE, "lib", "wire.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/wire":
+                    from lib import wirelog
+                    return self._send(200, wirelog.search((qs.get("q") or [""])[0][:200], (qs.get("app") or [""])[0][:40],
+                                                          vault_for=lambda d: privacy.session_vault(d)))
+                if u.path == "/teams":  # Start here > Teams: the team cards and the New team panels
+                    with open(os.path.join(HERE, "lib", "teams_page.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/runs":  # a team's Runs page (lib/runs_page.html)
+                    with open(os.path.join(HERE, "lib", "runs_page.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/runs":
+                    try:
+                        return self._send(200, runs_overview({'team': (qs.get('team') or [''])[0]}))
+                    except ValueError as exc:
+                        return self._send(400, {'error': str(exc)})
+                if u.path == "/api/tools":
+                    return self._send(200, tools_overview())
+                if u.path == "/api/tools/usage":
+                    from lib import toolhome
+                    try:
+                        toolhome.purge_orphans()
+                    except Exception:
+                        pass
+                    return self._send(200, toolhome.usage())
+                if u.path == "/skills":
+                    with open(os.path.join(HERE, "lib", "skills.html"), encoding="utf-8") as f:
+                        return self._send(200, f.read(), "text/html")
+                if u.path == "/api/skills":
+                    return self._send(200, skills_list())
+                if u.path == "/mock":
+                    return self._send(200, mock_page(qs["id"][0]), "text/html")
+            except (ValueError, KeyError) as e:
+                return self._send(400, {"error": str(e)})
+            except Exception as e:  # keep the page alive; the message helps the Teach workspace
+                return self._send(500, {"error": "Idli could not finish this step. Try again, or return to your chat for help."})
+            return self._send(404, {"error": "not found"})
+
+        def do_POST(self):
+            u = urllib.parse.urlparse(self.path)
+            qs = urllib.parse.parse_qs(u.query)
+            if not self._ok(qs):
+                return self._send(403, {"error": "forbidden"})
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(n, 100000))
+                                  or b"{}")
+                if u.path in ('/api/team-check', '/api/team-goal', '/api/team-create', '/api/team-open',
+                              '/api/team-delete', '/api/team-versions', '/api/team-restore', '/api/team-setup'):  # Start here > Teams (lib/teams_page.html)
+                    from lib import teams
+                    if u.path == '/api/team-check':
+                        return self._send(200, teams.name_from(body.get('name')))
+                    if u.path == '/api/team-goal':
+                        return self._send(200, {'goal': teams.goal_from(body.get('text'))})
+                    if u.path == '/api/team-setup':
+                        return self._send(200, teams.setup_with_builder(str(body.get('id'))))
+                    if u.path == '/api/team-open':
+                        return self._send(200, teams.open_team(str(body.get('id'))))
+                    if u.path == '/api/team-delete':
+                        return self._send(200, teams.delete_team(str(body.get('id'))))
+                    if u.path == '/api/team-versions':
+                        return self._send(200, teams.team_versions(str(body.get('id'))))
+                    if u.path == '/api/team-restore':
+                        return self._send(200, teams.team_restore(str(body.get('id')), str(body.get('version'))))
+                    spec = {k: body.get(k) for k in ('name', 'goal', 'data', 'people', 'private', 'outside')}
+                    spec['outside'] = spec['outside'] if spec['outside'] in ('always', 'ask') else False
+                    out = teams.create(spec, HERE)
+                    if out.get('ok'):
+                        out['id'] = os.path.basename(out['folder'])
+                        out.pop('folder', None)
+                    return self._send(200, out)
+                if u.path == '/api/tools/add':
+                    return self._send(200, tools_add(body))
+                if u.path == '/api/tools/remove':
+                    return self._send(200, tools_remove(body))
+                if u.path == '/api/runs/run':
+                    return self._send(200, runs_start(body))
+                if u.path == '/api/runs/decide':
+                    return self._send(200, runs_decide(body))
+                if u.path == '/api/consent':
+                    return self._send(200, reveals.decide(files.data_dir, body['id'], body['approve']))
+                if u.path == '/api/reveals/hide':
+                    hidden = reveals.hide(files.data_dir, body['code'], body['workspace'], body['at'])
+                    from lib import maskcopy
+                    maskcopy.build(files.data_dir, home.work_dir(files.data_dir))  # the code goes back into Claude's copies
+                    return self._send(200, hidden)
+                if u.path == '/api/reveals/more':
+                    return self._send(200, reveals.allow_more(files.data_dir, body['workspace']))
+                if u.path == '/api/review-change':
+                    return self._send(200, journey.review_change(files.data_dir, body['id'], body['file'], body['columns']))
+                if u.path == '/api/review-done':
+                    return self._send(200, journey.review_done(files.data_dir, body['id']))
+                if u.path == '/api/view/pin':
+                    return self._send(200, journey.pin(files.data_dir, body['id'], body['pinned']))
+                if u.path == '/api/claude-back':
+                    return self._send(200, journey.back_to_claude(files.data_dir, body['ws']))
+                if u.path == '/api/claude-question':
+                    # Chart follow-ups belong to this workspace's Claude, on the right.
+                    text = body.get('text', '')
+                    if not isinstance(text, str) or not text.strip() or len(text) > 16000:
+                        raise ValueError('Write a short question and try again.')
+                    home.claude_insert(files.data_dir, body['ws'], ' '.join(text.split()))
+                    terminal = home._claude_terminal(files.data_dir, body['ws'])
+                    home.cli('terminal', 'send-keys', '-l', terminal, '\r')
+                    return self._send(200, {'sent': True})
+                if u.path == '/api/mini-card-edit':
+                    return self._send(200, journey.edit_draft(files.data_dir, body['id'], body))
+                if u.path == '/api/mini-fork':  # Fork on a saved action Mini's card: a copy for Sandbox Claude
+                    from lib import minifork
+                    return self._send(200, minifork.fork(files.data_dir, str(body['mini']), str(body.get('ws') or '')))
+                if u.path == '/api/mini-save':
+                    return self._send(200, journey.save_draft(files.data_dir, body['id'], body, body.get('action', 'new')))
+                if u.path == "/api/home/prepare":
+                    return self._send(200, home.prepare(files.data_dir, body["files"], body.get("question", "")))
+                if u.path == "/api/home/claude":  # the home page asks for its workspace's Claude CLI (right pane)
+                    return self._send(200, home.ensure_claude(files.data_dir, str(body.get("workspace") or "")))
+                if u.path == "/api/home/send":
+                    return self._send(200, home.send(files.data_dir, body["files"], body.get("question", ""),
+                                                     str(body.get("workspace") or "")))
+                if u.path == "/api/mini/run":
+                    return self._send(200, home.run_mini(files.data_dir, body["id"], body["qid"], body.get("params", {})))
+                if u.path == "/api/mini/map":
+                    return self._send(200, home.map_question(files.data_dir, body["id"], body.get("question", "")))
+                if u.path == "/api/claude-insert":
+                    return self._send(200, home.claude_insert(files.data_dir, body.get("ws"), body.get("text")))
+                if u.path == "/api/say":  # the chart popover: the person's question about one bar, into their chat
+                    agent, text = str(body.get("agent") or ""), str(body.get("text") or "").strip()
+                    if body.get('ws'):
+                        if not text or len(text) > 800:
+                            return self._send(400, {"error": "bad request"})
+                        home.cli('send', '--no-wait', home.left_chat(body['ws']), text)
+                        return self._send(200, {'sent': True})
+                    if not re.fullmatch(r"[0-9a-f][0-9a-f-]{7,63}", agent) or not text or len(text) > 800:
+                        return self._send(400, {"error": "bad request"})
+                    exe = next((p for p in (shutil.which("paseo"), os.path.expanduser("~/.local/bin/paseo"),
+                                            "/usr/local/bin/paseo", "/usr/bin/paseo") if p and os.path.exists(p)), None)
+                    if not exe:
+                        return self._send(503, {"error": "Paseo isn't available to send this"})
+                    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_") or k == "PASEO_HOME"}
+                    try:
+                        with open(os.path.join(files.data_dir, ".idli", "home.json")) as f:
+                            hj = json.load(f)
+                        term, term_ws = hj.get("terminal"), hj.get("workspace")
+                        for workspace, terminal in hj.get('terminals', {}).items():
+                            if agent == terminal:
+                                term, term_ws = terminal, workspace
+                    except (OSError, ValueError):
+                        term = term_ws = None
+                    if agent == term:  # the person's Claude CLI: type it in
+                        r = subprocess.run([exe, "terminal", "send-keys", "-l", agent, " ".join(text.split())],
+                                           env=env, timeout=60, capture_output=True, text=True)
+                        if r.returncode == 0:
+                            r = subprocess.run([exe, "terminal", "send-keys", "-l", agent, "\r"], env=env, timeout=60,
+                                               capture_output=True, text=True)
+                        if r.returncode == 0 and term_ws:  # so the person sees Claude's answer arrive
+                            from lib import uiswitch
+                            uiswitch.show_terminal(term_ws, agent, "right")
+                    else:
+                        r = subprocess.run([exe, "send", "--no-wait", agent, text], env=env, timeout=60,
+                                           capture_output=True, text=True)
+                    return self._send(200 if r.returncode == 0 else 502,
+                                      {"sent": r.returncode == 0} if r.returncode == 0 else {"error": "couldn't send"})
+                if u.path == "/api/privacy":
+                    rel = body["file"]
+                    path = files.resolve(rel)
+                    if body.get("action") in ("preview", "suggest"):
+                        return self._send(200, privacy.review(files.data_dir, rel, path, body.get("tab"),
+                                                               body.get("columns")))
+                    changes = {k: body[k] for k in ("mode", "review", "columns") if k in body}
+                    settings = privacy.set(files.data_dir, rel, **changes)
+                    if settings["mode"] == "mask":
+                        privacy._seed(files.data_dir, rel, path)
+                    return self._send(200, settings)
+                if u.path == "/api/run":
+                    return self._send(200, files.run(body["file"], body.get("tab"), body.get("spec") or {}))
+                if u.path == "/api/decide":
+                    return self._send(200, files.decide(body["file"], list(body["keys"]), body.get("decision")))
+                if u.path == "/api/fixlist":
+                    return self._send(200, files.fixlist(body["file"]))
+                if u.path == "/api/skills/code":
+                    from lib import share, muse
+                    data, man = share.pack_bytes(body["id"], with_file=True)
+                    req = urllib.request.Request(muse.base_url() + "/idli/share", data,
+                                                 {"Content-Type": "application/zip", **muse.headers()})
+                    with urllib.request.urlopen(req, timeout=60) as r:
+                        return self._send(200, json.load(r))
+                if u.path == "/api/skills/preview":
+                    from lib import share, muse
+                    code = re.sub(r"[^A-Za-z0-9-]", "", body.get("code") or "").upper()  # the one way to share
+                    req = urllib.request.Request(muse.base_url() + "/idli/share/" + code, headers=muse.headers())
+                    try:
+                        with urllib.request.urlopen(req, timeout=60) as r:
+                            data = r.read()
+                    except urllib.error.HTTPError as e:
+                        return self._send(404 if e.code == 404 else 502,
+                                          {"error": "No Mini with that code." if e.code == 404 else f"code server: {e.code}"})
+                    got = share.inspect(data)
+                    if got["problems"]:
+                        return self._send(200, {"problems": got["problems"]})
+                    sid = uuid.uuid4().hex
+                    STAGED[sid] = data
+                    man = got["manifest"]
+                    have = next((x for x in fk.load_skills() if x["id"] == man["id"]), None)
+                    return self._send(200, {"describe": share.short(man), "staged": sid, "manifest": man,
+                                            "have": (f"You already have version {have.get('version', 1)}; this one "
+                                                     f"is version {man['version']}.") if have else ""})
+                if u.path == "/api/skills/install":
+                    from lib import share
+                    data = STAGED.pop(body.get("staged") or "", None)
+                    if data is None:
+                        return self._send(400, {"error": "Look at the skill again first."})
+                    out = share.install(data, replace=True)
+                    files.cache.clear()
+                    out.pop("manifest", None)
+                    return self._send(200, out)
+                if u.path == "/api/minis/open":  # a Mini is one Drive file's dashboard: fetch it fresh every time
+                    return self._send(*open_mini(files, body["id"]))
+                if u.path == "/api/skills/delete":
+                    out = skills_delete(body["id"])
+                    files.cache.clear()
+                    return self._send(200, out)
+            except fm.SpecError as e:
+                return self._send(400, {"error": str(e)})
+            except (ValueError, KeyError) as e:
+                return self._send(400, {"error": str(e)})
+            except Exception as e:
+                return self._send(500, {"error": "Idli could not finish this step. Try again, or return to your chat for help."})
+            return self._send(404, {"error": "not found"})
+
+    return H
+
+
+def _alive(st):
+    import urllib.error
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{st['port']}/api/form?t={st['token']}&file=_", timeout=2):
+            return True
+    except urllib.error.HTTPError as e:
+        return e.code == 400  # the server answered with our token: it's ours
+    except OSError:
+        return False
+
+
+def ensure(data_dir, python=None):
+    """(port, token) of the form server for data_dir, starting it if needed. The token survives restarts, so a
+    page left open in a tab (What Idli has learned) works again once the server is back."""
+    import socket
+    import subprocess
+    import time
+    sf = state_file(data_dir)
+    try:
+        with open(sf) as f:
+            st = json.load(f)
+        if _alive(st):
+            return st["port"], st["token"]
+    except (OSError, ValueError, KeyError):
+        pass
+    port = None
+    # Drivey's folder always gets the first port, so Paseo's patched UI (P18) can open Idli home at a fixed address
+    start = PORT if os.path.basename(os.path.realpath(data_dir)) == "cowork-real" else PORT + 3
+    for p in range(start, start + 20):
+        with socket.socket() as so:
+            if so.connect_ex(("127.0.0.1", p)) != 0:
+                port = p
+                break
+    if port is None:
+        raise RuntimeError("No free port for the form page.")
+    os.makedirs(os.path.dirname(sf), exist_ok=True)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PASEO_")}
+    subprocess.Popen([python or sys.executable, "-I", os.path.join(HERE, "lib", "formserver.py"), data_dir, str(port)],
+                     start_new_session=True, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=open(os.path.join(os.path.dirname(sf), "form-server.log"), "a"))
+    for _ in range(40):
+        time.sleep(0.25)
+        try:
+            with open(sf) as f:
+                st = json.load(f)
+            if st.get("port") == port and _alive(st):
+                return st["port"], st["token"]
+        except (OSError, ValueError, KeyError):
+            pass
+    raise RuntimeError("The form page did not start.")
+
+
+def serve(data_dir, port=PORT):
+    sf = state_file(data_dir)
+    token = None
+    try:
+        with open(sf) as f:
+            token = json.load(f).get("token")  # keep the last token: links in open tabs stay good
+    except (OSError, ValueError):
+        pass
+    token = token if isinstance(token, str) and len(token) >= 20 else secrets.token_urlsafe(18)
+    files = Files(data_dir)
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(files, token))
+    os.makedirs(os.path.dirname(sf), exist_ok=True)
+    fd = os.open(sf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump({"port": port, "token": token, "pid": os.getpid(), "data_dir": files.data_dir}, f)
+    httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    serve(sys.argv[1] if len(sys.argv) > 1 else os.getcwd(), int(sys.argv[2]) if len(sys.argv) > 2 else PORT)

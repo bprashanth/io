@@ -1,0 +1,1 @@
+const http=require('http'),hp=require('http-proxy');const proxy=hp.createProxyServer({target:'http://172.26.0.2:8791',ws:true});proxy.on('error',(_,r)=>{if(r?.writeHead){r.writeHead(502);r.end()}});const s=http.createServer((q,r)=>proxy.web(q,r));s.on('upgrade',(q,s,h)=>proxy.ws(q,s,h));s.listen(8791,'127.0.0.1');

@@ -1,0 +1,235 @@
+
+[06:01:59] PERSON: New team: Archive. Setup answers: - Works towards: Keep our community radio recordings and make them searchable - Data kept in: Google Drive - Used by: A few of us - Files have names, places or phone numbers: Yes - Outside service when a Mini cannot answer: ask each time (only masked data is sent) Read the setup-team skill, then start the conversation.
+[06:02:00]   tool Skill: {"skill": "setup-team"}
+[06:02:00]   -> Launching skill: setup-team
+
+[06:02:03] BUILDER: Hello, I'm setting up Archive with you. You want to keep your community radio recordings and make them searchable. The recordings are in Google Drive, a few of you will use this, and the files have names, places and phone numbers in them. Those will always be hidden as codes before anything goes to an outside service, and I'll ask you each time before that happens.
+
+To start: walk me through the last time someone needed to find something in an old recording. What were they looking for, and how did they find it?
+
+[06:02:38] PERSON: Transcribe 500 hours of old radio recordings at the best quality.
+[06:02:40]   tool ToolSearch: {"query": "select:mcp__idli__capability_menu,mcp__idli__catalog,mcp__idli__catalog_request,mcp__idli__platform_request,mcp__idli__stack_install,mcp__idli__stack_run,mcp__idli__team_check,mcp__idli__team_save", "max_results": 8}
+[06:02:40]   ->        
+[06:02:40]   tool Skill: {"skill": "build-team"}
+[06:02:40]   -> Launching skill: build-team
+[06:02:41]   tool mcp__idli__catalog: {}
+[06:02:41]   -> {"this_computer": "- System: Linux (ARM) (linux-aarch64). Install only tools the catalog lists for linux-aarch64.\n- Free disk where tools go: 5.0 GB. Memory: 121.6 GB. Cores: 20. GPU: an NVIDIA GPU.", "platform": "linux-aarch64", "tools": [{"id": "media-ffmpeg", "name": "FFmpeg (video and audio)", "for": "Cut, join and convert video and audio, shrink clips for WhatsApp, and burn in subtitles (Hindi too).", "licence": "GPL-2.0-or-later (this conda-forge build includes x264); Noto Sans Devanagari: OFL-1.1", "cautions": ["Burned-in Hindi subtitles need the 'ass' filter with shaping=complex: the  …[10931 more chars]
+[06:02:42]   tool mcp__idli__capability_menu: {}
+[06:02:42]   -> - **ocr**: local: Tesseract (on this computer) -> capmenu.ocr_text(path) / capmenu.ocr_words(path); private model: the 9B with vision (reads photos, scans and handwriting, Hindi too) (on this computer) -> a stack with "model": true sends the image to $IDLI_MODEL_URL/chat/completions as an OpenAI image_url (base64), with "chat_template_kwargs": {"enable_thinking": false}; outside: Consultant, on masked text after OCR (not available) -> automatic, after a yes
+- **speech-to-text**: local: faster-whisper (not available) -> capmenu.transcribe(path); private model: the 9B on the transcript (fill col …[800 more chars]
+[06:02:55]   tool mcp__idli__platform_request: {"need": "Run a team tool over a whole Google Drive folder of audio files as one long background job (hundreds of hours), with progress, resume after a stop, and results saved next to each file.", "why": "The team wants to transcribe a large archive of old recordings. Picking files one by one is not workable at that size, and the job will run for days on this computer."}
+[06:02:55]   -> {"saved": true}
+
+[06:03:02] BUILDER: I can do this on this computer, so the recordings never leave it. The best-quality speech-to-text tool in Idli's list (Whisper large-v3-turbo, 4.1 GB) doesn't fit yet, though. It needs about 4.1 GB, and Idli keeps 2 GB spare, so with 5.0 GB free there's only about 3 GB to use.
+
+Here's my plan:
+
+1. **Type out each recording**, with the time each line was said. This runs on this computer with Whisper. Where it isn't sure of a line, it marks it so someone can check it by listening.
+2. **Hide names, places and phone numbers as codes** in the transcripts before Claude sees anything. Idli already does this.
+3. **Make the archive searchable.** You ask "which shows talked about the water tank?" and get the recording and the minute it starts.
+4. **Run over a whole Drive folder at once.** This needs a platform feature: a long job that can stop and pick up again. I've asked for it. Until it arrives, recordings can be done a batch at a time.
+
+How long it takes: 500 hours is a big job. With the careful tool, expect it to run for several days without stopping on this computer. The quick tool is roughly twice as fast but makes more mistakes, especially in Hindi and Marathi.
+
+**One question:** can someone free up about 2 GB on this computer, so I can install the careful tool? Removing unused tools on the Installed tools page in Teams also frees space. If not, I can start now with the quick tool (1.6 GB) and switch to the careful one later.
+
+Also, which languages are the shows in? Whisper handles Hindi, Marathi and English well. If it's mostly a local dialect, I'll test for that.
+
+[06:04:31] PERSON: We can't free space right now. Start with the quick one. The shows are mostly in Hindi.
+[06:04:32]   tool mcp__idli__catalog: {"example": "speech-whisper-small"}
+[06:04:32]   -> {"tool": "speech-whisper-small", "example": "\"\"\"speech-whisper-small / speech-whisper-turbo: type out speech (Hindi, Marathi, English and more) on this computer.\n\nUsage: python speech-whisper.py AUDIO [LANG=hi] [MODEL=whisper-small|whisper-large-v3-turbo] [OUT.srt]\nThe model folder is $IDLI_FILES/models/<MODEL>/ (the catalog's .tar unpacked next to itself).\n\"\"\"\nimport os\nimport sys\nimport time\n\nfrom faster_whisper import WhisperModel\n\naudio = sys.argv[1]\nlang = sys.argv[2] if len(sys.argv) > 2 else \"hi\"\nname = sys.argv[3] if len(sys.argv) > 3 else \"whisper-small\"\nsrt =  …[855 more chars]
+[06:04:34]   tool Bash: {"command": "ls -la && cat manifest.json 2>/dev/null; ls stack samples tests 2>/dev/null; which espeak-ng espeak ffmpeg pico2wave; python3 -c \"import capmenu\" 2>&1 | head -2", "description": "Look at the team folder and available tools"}
+[06:04:35]   -> total 48
+drwxrwxr-x  8 beeps  beeps   4096 Nov 17 11:34 .
+drwxrwxr-x  4 beeps  beeps   4096 Nov 17 11:31 ..
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .bash_profile
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .bashrc
+drwxrwxr-x  4 beeps  beeps   4096 Nov 17 11:34 .claude
+drwxrwxr-x 11 beeps  beeps   4096 Nov 17 11:34 .git
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .gitconfig
+-rw-rw-r--  1 beeps  beeps    157 Nov 17 11:31 .gitignore
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .gitmodules
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .idea
+-rw-rw-r--  1 beeps  beeps     25 Nov 17  …[836 more chars]
+[06:04:37]   tool mcp__idli__stack_install: {"tools": ["speech-whisper-small"]}
+[06:04:49]   -> {"ok": true, "tools": ["speech-whisper-small"], "steps": [{"step": "packages", "ok": true, "seconds": 1.9}, {"step": "model Whisper small, CTranslate2 format", "ok": true, "seconds": 0.7}], "size": "458 MB", "use": "Run your code with stack_run. Model files are at $IDLI_MODEL_<NAME> (and $IDLI_MODEL_PATHS, JSON). Call catalog with example=<id> for how to use a tool."}
+[06:04:53]   tool mcp__idli__stack_run: {"command": "env | grep IDLI; python -c \"import faster_whisper,sys;print(faster_whisper.__version__, sys.version)\"; ls $IDLI_MODEL_WHISPER_SMALL 2>&1; which ffmpeg espeak-ng"}
+[06:04:53]   -> {"ok": false, "seconds": 0.1, "output": " WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w10/pixi.toml:14:1]\n 13 \u2502     \n 14 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 15 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\", \"linux-aarch64\", { name …[194 more chars]
+[06:04:55]   tool mcp__idli__stack_run: {"command": "bash -c 'env | grep IDLI; python -c \"import faster_whisper,sys;print(faster_whisper.__version__, sys.version)\"; ls $IDLI_MODEL_WHISPER_SMALL; which ffmpeg espeak-ng espeak; nproc'"}
+[06:04:55]   -> {"ok": true, "seconds": 0.4, "output": "IDLI_MODELS=/tmp/claude-1000/-home-beeps-src-github-com-bprashanth-io/211b5681-71a2-49db-a708-a94ed29ae50b/scratchpad/w10fs/models\nIDLI_OUT=/home/beeps/idli-insights/teams/cat-w10/extensions/.idli-out\nIDLI_MODEL_PATHS={\"Whisper small, CTranslate2 format\": \"/tmp/claude-1000/-home-beeps-src-github-com-bprashanth-io/211b5681-71a2-49db-a708-a94ed29ae50b/scratchpad/w10fs/models/348065bd32b918c4/Whisper small, CTranslate2 format\"}\nIDLI_MODEL_WHISPER_SMALL_CTRANSLATE2_FORMAT=/tmp/claude-1000/-home-beeps-src-github-com-bprashanth-io/211b5681-71a2-49db-a70 …[987 more chars]
+[06:05:02]   tool mcp__idli__stack_run: {"command": "bash -c 'python - <<EOF\nimport faster_whisper, os, json\nd=os.path.dirname(faster_whisper.__file__); print(os.listdir(d), os.listdir(d+\"/assets\"))\np=json.loads(os.environ[\"IDLI_MODEL_PATHS\"]); [print(k, os.listdir(v)) for k,v in p.items()]\nEOF\nfind / -xdev \\( -name \"*.wav\" -o -name \"*.flac\" -o -name \"*.mp3\" -o -name \"*.ogg\" \\) -size +20k 2>/dev/null | grep -v idli-insights | head -20' 2>&1 | grep -v -e WARN -e \"│\" -e \"╭\" -e \"╰\" -e \"·\" -e help"}
+[06:05:03]   -> {"ok": true, "seconds": 0.9, "output": "['version.py', 'vad.py', 'utils.py', '__init__.py', 'tokenizer.py', 'feature_extractor.py', 'transcribe.py', 'audio.py', 'assets'] ['__init__.py', 'silero_vad_v6.onnx']\nWhisper small, CTranslate2 format ['whisper-small']\n/usr/share/code/resources/app/out/vs/platform/accessibilitySignal/browser/media/success.mp3\n/usr/share/code/resources/app/out/vs/platform/accessibilitySignal/browser/media/diffLineInserted.mp3\n/usr/share/code/resources/app/out/vs/platform/accessibilitySignal/browser/media/responseReceived4.mp3\n/usr/share/code/resources/app/out/vs/pl …[2338 more chars]
+
+[06:05:06] BUILDER: I've installed the quick speech tool (458 MB). Now I need a fake Hindi recording to test it with, and I'm checking what's on this computer to make one.
+[06:05:07]   tool Bash: {"command": "python3 -c \"import pkgutil;print([m.name for m in pkgutil.iter_modules() if any(k in m.name.lower() for k in ['tts','speech','pyttsx','espeak','piper','kokoro','festival'])])\"; ls /usr/share/festival /usr/lib/*/espeak* 2>&1 | head; df -h . | tail -1", "description": "Check for any text-to-speech tool on this computer"}
+[06:05:08]   -> ['speechd', 'speechd_config']
+ls: cannot access '/usr/share/festival': No such file or directory
+/usr/lib/aarch64-linux-gnu/espeak-ng-data:
+af_dict
+am_dict
+an_dict
+ar_dict
+as_dict
+az_dict
+ba_dict
+be_dict
+/dev/nvme0n1p2  916G  719G  151G  83% /home/beeps/idli-insights/teams/cat-w10/extensions
+[06:05:10]   tool Bash: {"command": "ls /usr/lib/aarch64-linux-gnu/ | grep -i -e espeak -e speech; ls /usr/lib/aarch64-linux-gnu/espeak-ng-data | grep hi; ls /usr/lib/speech-dispatcher-modules 2>/dev/null; which spd-say speech-dispatcher", "description": "Look for an espeak library usable for Hindi speech"}
+[06:05:10]   -> espeak-ng-data
+libespeak-ng.so.1
+libespeak-ng.so.1.1.51
+libspeechd.so.2
+libspeechd.so.2.6.0
+speech-dispatcher
+hi_dict
+sd_dummy
+sd_espeak-ng
+sd_espeak-ng-mbrola
+sd_generic
+sd_openjtalk
+/usr/bin/spd-say
+/usr/bin/speech-dispatcher
+
+[06:05:14] BUILDER: Found a basic speech voice already on this computer that can speak Hindi, so I don't need to install anything else. Making the fake recording now.
+[06:05:23]   tool Bash: {"command": "mkdir -p samples tools_dev && cat > tools_dev/make_sample.py <<'EOF'\n\"\"\"Make a fake Hindi radio clip for tests (espeak-ng on this computer, made-up names).\"\"\"\nimport ctypes, wave, subprocess, sys, os\nlib = ctypes.CDLL(\"libespeak-ng.so.1\")\nCB = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.POINTER(ctypes.c_short), ctypes.c_int, ctypes.c_void_p)\nbuf = []\ndef cb(wav, n, ev):\n    if n > 0: buf.append(ctypes.string_at(wav, n * 2))\n    return 0\nc = CB(cb)\nrate = lib.espeak_Initialize(1, 500, None, 0)\nlib.espeak_SetSynthCallback(c)\nlib.espeak_SetVoiceByName(b\"hi\")\nlib.espeak_SetParameter(1, 140, 0)  # rate\nlines = [\n \"नमस्कार, आप सुन रहे हैं हमारा सामुदायिक रेडियो।\", …[1156 more chars]
+[06:05:23]   -> socket(): Operation not permitted
+socket(): Operation not permitted
+[FORMAT]
+duration=20.448000
+[/FORMAT]
+[06:05:30]   tool Bash: {"command": "cd /home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && grep -rn \"\\\"stack\\\"\\|'stack'\" --include=*.py . | grep -v test | head -20", "description": "See how the platform runs stack readers"}
+[06:05:30]   -> lib/toolhome.py:274:    stack = Path(data_dir).resolve() / 'extensions' / 'stack'
+lib/toolhome.py:320:    st = Path(data_dir).resolve() / 'extensions' / 'stack'
+lib/toolhome.py:341:        got = json.loads((Path(data_dir).resolve() / 'extensions' / 'stack' / 'catalog.json').read_text())
+lib/toolhome.py:605:    mine = Path(data_dir).resolve() / 'extensions' / 'stack'
+lib/teamcaps.py:202:            if (c.get('stack') or kind == 'app') and not (d / 'stack' / 'pixi.toml').is_file():
+lib/teamcaps.py:220:            good.append({**c, 'kind': kind, 'stack': bool(c.get('stack') or kind == 'app')})
+li …[539 more chars]
+[06:05:32]   tool Bash: {"command": "cd /home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && sed -n 290,420p lib/teamcaps.py; grep -n \"audio\\|AUDIO\\|reads\" lib/teamcaps.py | head -30", "description": "Read how readers and tests are run"}
+[06:05:32]   -> """
+
+
+def _wall(cmd, reads, writes):
+    from lib import chartkit
+    return chartkit.wall(cmd, reads=reads, writes=writes)
+
+
+def _in_stack(data_dir, code, argv, inputs=(), out=None, timeout=1800, cwd=None):
+    """Run platform glue code with the stack's Python, inside the stack's run wall (lib/stackwall.py)."""
+    from lib import stackwall
+    if not stackwall.installed(data_dir):
+        raise ValueError('The stack is not installed. The Builder installs it with stack_install.')
+    return stackwall.run(data_dir, ['python', '-I', '-c', code, *map(str, argv)], inputs=inputs, out_dir=out,
+     …[6921 more chars]
+
+[06:05:38] BUILDER: Writing the transcriber now. It types out each recording line by line, with times and a "check this" mark where it isn't sure.
+[06:05:47]   tool Bash: {"command": "mkdir -p stack/tools && cat > stack/tools/transcribe.py <<'EOF'\n\"\"\"Archive: type out a radio recording (mostly Hindi) on this computer with Whisper small.\n\nReader: read(src, out) writes lines.csv, one row per spoken line, with times and a confidence.\nSettings favour accuracy on long, old recordings: beam search 5, speech-only parts (VAD) so long\nsilences and music don't make Whisper invent words, and no carry-over between lines so it can't\nloop on one mistake.\n\"\"\"\nimport csv, json, math, os\n\nLANG = \"hi\"\nPROMPT = \"यह एक सामुदायिक रेडियो कार्यक्रम है।\"   # nudges Whisper to write Devanagari\n\n\ndef _model_dir():\n    for env in (\"IDLI_MODEL_WHISPER_SMALL_CTR …[2187 more chars]
+[06:05:48]   tool mcp__idli__stack_run: {"command": "python tools/transcribe.py ../samples/radio_show_hi.mp3", "timeout": 600}
+[06:05:48]   -> (Bash completed with no output)
+[06:05:52]   -> {"ok": true, "seconds": 4.3, "output": "{'start_s': 0.0, 'end_s': 4.0, 'time': '00:00:00', 'text': '\u0906\u091c \u0924\u092e \u0917\u0928 \u092e\u0947\u0902 \u092a\u093e\u0928\u093f\u0915\u093f \u0924\u0902\u0915\u093f \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092c\u093e\u0924 \u0915\u0930\u0947\u0917\u0947\u0964', 'confidence': 0.65, 'check': ''}\n{'start_s': 4.0, 'end_s': 9.7, 'time': '00:00:04', 'text': '\u0924\u092e \u0906\u0926\u0947 \u0938\u093e\u0925 \u0939\u0948 \u0938\u0941\u0928\u0940 \u0924\u093e \u0926\u0947\u092e\u0940, \u091c\u094b \u0938\u094d\u0915\u0942\u0932 …[1224 more chars]
+
+[06:05:56] BUILDER: It works: it typed out the fake Hindi clip in 4 seconds. But it skipped the first sentence, so I'm fixing that before going on.
+[06:05:59]   tool Bash: {"command": "cat > stack/tools/try_opts.py <<'EOF'\nimport sys, os\nsys.path.insert(0, os.path.dirname(__file__))\nimport transcribe as T\nfrom faster_whisper import WhisperModel\nm = WhisperModel(T._model_dir(), device=\"cpu\", compute_type=\"int8\", cpu_threads=8)\nfor name, kw in [(\"noprompt\", dict(vad_filter=True, vad_parameters={\"min_silence_duration_ms\": 700})),\n                 (\"prompt_novad\", dict(vad_filter=False, initial_prompt=T.PROMPT)),\n                 (\"prompt_vad\", dict(vad_filter=True, vad_parameters={\"min_silence_duration_ms\": 700}, initial_prompt=T.PROMPT)),\n                 (\"noprompt_novad\", dict(vad_filter=False))]:\n    segs, _ = m.transcribe(sys.argv[1 …[195 more chars]
+[06:06:00]   tool mcp__idli__stack_run: {"command": "python tools/try_opts.py ../samples/radio_show_hi.mp3", "timeout": 600}
+[06:06:00]   -> (Bash completed with no output)
+[06:06:24]   -> {"ok": true, "seconds": 23.2, "output": "noprompt [(0.0, ' \u0905\u091c\u094d\u0924\u092e \u0917\u0902 \u092e\u0947\u0902 \u092a\u093e\u0928\u0940 \u0915\u0940 \u0924\u0902\u0915\u0940 \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092c\u093e\u0924 \u0915\u0930\u0947\u0917\u0947'), (5.7, ' \u092b\u092e\u093e \u0926\u0947 \u0938\u093e\u0925 \u0939\u0948 \u0938\u0941\u0928\u0940 \u0924\u093e \u0926\u0947\u092e\u0940, \u091c\u094b \u0938\u094d\u0915\u0942\u0932 \u092e\u0947\u0902 \u092a\u0930 \u0939\u093e\u0926\u0940 \u0939\u0948'), (11.4, ' \u0926\u0942\u0928\u094d\u092f\u093e \u092e …[2842 more chars]
+
+[06:06:26] BUILDER: Every setting skips that first sentence, so the problem is probably my fake clip, not the transcriber. Checking the clip.
+[06:06:27]   tool Bash: {"command": "sed -i 's/    out.append(b\"\".join(buf)); out.append(silence)/    out.append(b\"\".join(buf)); out.append(silence); print(len(out[-2]) \\/\\/ 2 \\/ rate, \"s\")/' tools_dev/make_sample.py && python3 tools_dev/make_sample.py $TMPDIR/x.mp3 2>/dev/null", "description": "Check each sentence's length in the fake clip"}
+[06:06:28]   -> 3.746077097505669 s
+4.276190476190476 s
+4.338548752834467 s
+1.986530612244898 s
+
+[06:06:34] BUILDER: All four sentences are in the clip, so Whisper really is dropping the opening line. Testing whether that's only at the very start of a file.
+[06:06:37]   tool Bash: {"command": "cd samples && ffmpeg -y -loglevel error -i radio_show_hi.mp3 -t 5 $TMPDIR/first.wav && ffmpeg -y -loglevel error -i radio_show_hi.mp3 -af \"adelay=2000\" $TMPDIR/lead.wav && cp $TMPDIR/first.wav $TMPDIR/lead.wav /home/beeps/idli-insights/teams/cat-w10/extensions/stack/tools/ && cat > ../stack/tools/try2.py <<'EOF'\nimport sys, os\nsys.path.insert(0, os.path.dirname(__file__))\nimport transcribe as T\nfrom faster_whisper import WhisperModel\nm = WhisperModel(T._model_dir(), device=\"cpu\", compute_type=\"int8\", cpu_threads=8)\nfor f in [\"tools/first.wav\", \"tools/lead.wav\"]:\n  for wt in (False, True):\n    segs, _ = m.transcribe(f, language=\"hi\", beam_size=5, condition_on_ …[175 more chars]
+[06:06:37]   tool mcp__idli__stack_run: {"command": "python tools/try2.py", "timeout": 600}
+[06:06:38]   -> (Bash completed with no output)
+[06:06:50]   -> {"ok": true, "seconds": 12.0, "output": "tools/first.wav False [(0.0, ' \u0905\u092a\u094d\u0938\u0941\u092c\u094d\u0930\u0924\u0947 \u0939\u0948 \u0924\u092e\u093e\u0917\u093e \u0938\u093e\u092e\u0941\u0926\u093e\u090f \u0917\u094d\u0930\u0947\u0926\u093f\u092f\u094b')]\ntools/first.wav True [(np.float64(0.0), ' \u0905\u092a\u094d\u0938\u0941\u092c\u094d\u0930\u0924\u0947 \u0939\u0948 \u0924\u092e\u093e\u0917\u093e \u0938\u093e\u092e\u0941\u0926\u093e\u090f \u0917\u094d\u0930\u0947\u0926\u093f\u092f\u094b')]\ntools/lead.wav False [(1.6, ' \u0928\u092e\u094d\u0938\u094d\u0915\u093e\u0930, \u09 …[2661 more chars]
+[06:06:59]   tool Bash: {"command": "cd /home/beeps/idli-insights/teams/cat-w10/extensions && rm -f stack/tools/try_opts.py stack/tools/try2.py stack/tools/first.wav stack/tools/lead.wav && python3 - <<'EOF'\np='stack/tools/transcribe.py'; s=open(p).read()\ns=s.replace('''def transcribe(src):\n    from faster_whisper import WhisperModel\n''','''LEAD = 1.0  # seconds of quiet put in front: Whisper skips speech that starts at the very first instant\n\n\ndef transcribe(src):\n    import numpy as np\n    from faster_whisper import WhisperModel, decode_audio\n    audio = decode_audio(src, sampling_rate=16000)\n    audio = np.concatenate([np.zeros(int(16000 * LEAD), dtype=audio.dtype), audio])\n''')\ns=s.replace('''      …[844 more chars]
+[06:06:59]   -> 30:LEAD = 1.0  # seconds of quiet put in front: Whisper skips speech that starts at the very first instant
+35:    from faster_whisper import WhisperModel, decode_audio
+36:    audio = decode_audio(src, sampling_rate=16000)
+37:    audio = np.concatenate([np.zeros(int(16000 * LEAD), dtype=audio.dtype), audio])
+41:        audio, language=LANG, beam_size=5, best_of=5, vad_filter=True,
+57:        start, end = max(0.0, s.start - LEAD), max(0.0, s.end - LEAD)
+60:    return rows, info.duration - LEAD
+77:    print(f"{dur:.1f} s of audio in {time.time() - t:.1f} s")
+[06:07:09]   tool Bash: {"command": "sed -i 's/^Settings favour accuracy on long, old recordings: beam search 5, speech-only parts (VAD) so long$/Settings favour accuracy on long, old recordings: a second of quiet in front (else the opening line\\nis lost), beam search 5, speech-only parts (VAD) so long/' stack/tools/transcribe.py\nmkdir -p tests && cat > tests/test_transcribe.py <<'EOF'\n# The fake Hindi clip (samples/radio_show_hi.mp3, made by tools_dev/make_sample.py) has four lines:\n# a greeting at 0 s, the water tank at ~5 s, a made-up guest at ~11 s, goodbye at ~17 s.\nimport csv, importlib.util, os, tempfile\nspec = importlib.util.spec_from_file_location('r', 'stack/tools/transcribe.py'); m = importlib.util …[1557 more chars]
+[06:07:09]   tool mcp__idli__team_check: {}
+[06:07:09]   -> (Bash completed with no output)
+[06:07:14]   -> {"results": {"transcribe-hindi": {"ok": false, "output": " WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w10/pixi.toml:14:1]\n 13 \u2502     \n 14 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 15 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\", \"linux- …[2022 more chars]
+
+[06:07:19] BUILDER: Nothing is lost now, but it ran sentences together into two long lines, so the times are less exact. I'll split lines at pauses using the time of each word.
+[06:07:24]   tool Bash: {"command": "python3 - <<'EOF'\np='stack/tools/transcribe.py'; s=open(p).read()\na=s.index('    rows = []\\n    for s in segs:'); b=s.index('    return rows, info.duration - LEAD')\ns=s[:a]+'''    rows, cur = [], None\n\n    def flush():\n        if cur and cur[\"words\"]:\n            text = \"\".join(w.word for w in cur[\"words\"]).strip()\n            conf = round(sum(w.probability for w in cur[\"words\"]) / len(cur[\"words\"]), 2)\n            why = list(cur[\"why\"])\n            if conf < 0.5:\n                why.insert(0, \"unclear\")\n            start, end = max(0.0, cur[\"words\"][0].start - LEAD), max(0.0, cur[\"words\"][-1].end - LEAD)\n            rows.append({\"start_s\": roun …[1198 more chars]
+[06:07:25]   ->     return f"{s // 3600:02}:{s % 3600 // 60:02}:{s % 60:02}"
+
+
+PAUSE = 0.8      # a pause this long (seconds) starts a new line
+MAX_LINE = 20.0  # no line longer than this (seconds)
+LEAD = 1.0  # seconds of quiet put in front: Whisper skips speech that starts at the very first instant
+
+
+def transcribe(src):
+    import numpy as np
+    from faster_whisper import WhisperModel, decode_audio
+    audio = decode_audio(src, sampling_rate=16000)
+    audio = np.concatenate([np.zeros(int(16000 * LEAD), dtype=audio.dtype), audio])
+    model = WhisperModel(_model_dir(), device="cpu", compute_type="int8",
+  …[2046 more chars]
+[06:07:29]   tool Bash: {"command": "sed -i 's/or cur\\[\"words\"\\]\\[-1\\].word.strip()\\[-1:\\] in \"।.?!\"/or (cur[\"words\"][-1].word.strip()[-1:] or \"x\") in \"।.?!\"/' stack/tools/transcribe.py && grep -n '\"x\"' stack/tools/transcribe.py", "description": "Guard empty words in the line split"}
+[06:07:29]   tool mcp__idli__stack_run: {"command": "python tools/transcribe.py ../samples/radio_show_hi.mp3", "timeout": 600}
+[06:07:29]   -> 68:                   or (cur["words"][-1].word.strip()[-1:] or "x") in "।.?!" or w.end - cur["words"][0].start > MAX_LINE)
+[06:07:35]   -> {"ok": true, "seconds": 5.2, "output": "{'start_s': 0.0, 'end_s': np.float64(3.7), 'time': '00:00:00', 'text': '\u0928\u092e\u094d\u0938\u094d\u0915\u093e\u0930, \u0906\u092a \u0938\u0941\u0928\u094d\u0930\u0916\u0947 \u0939\u0948, \u092b\u092e\u093e\u0917\u093e \u0938\u093e\u092e\u0941\u0926\u093e\u092f\u0947 \u0915\u094d\u0930\u0947\u0926\u093f\u092f\u094b,', 'confidence': np.float64(0.62), 'check': ''}\n{'start_s': np.float64(5.2), 'end_s': np.float64(9.5), 'time': '00:00:05', 'text': '\u0906\u091c\u094d\u0927\u092e \u0917\u0902 \u092e\u0947\u0902 \u092a\u093e\u0928\u093f\u0915\u093f \u0924 …[1695 more chars]
+
+[06:07:37] BUILDER: All four lines now come out at the right times: 0, 5, 11 and 17 seconds.
+[06:07:39]   tool Bash: {"command": "sed -i 's/            start, end = max(0.0, cur\\[\"words\"\\]\\[0\\].start - LEAD), max(0.0, cur\\[\"words\"\\]\\[-1\\].end - LEAD)/            start = max(0.0, float(cur[\"words\"][0].start) - LEAD)\\n            end = max(0.0, float(cur[\"words\"][-1].end) - LEAD)/; s/conf = round(sum(w.probability/conf = round(float(sum(w.probability/; s/ \\/ len(cur\\[\"words\"\\]), 2)/) \\/ len(cur[\"words\"]), 2)/' stack/tools/transcribe.py && sed -n 50,58p stack/tools/transcribe.py", "description": "Store times as plain numbers"}
+[06:07:39]   tool mcp__idli__team_check: {}
+[06:07:40]   ->         if cur and cur["words"]:
+            text = "".join(w.word for w in cur["words"]).strip()
+            conf = round(float(sum(w.probability for w in cur["words"])) / len(cur["words"]), 2)
+            why = list(cur["why"])
+            if conf < 0.5:
+                why.insert(0, "unclear")
+            start = max(0.0, float(cur["words"][0].start) - LEAD)
+            end = max(0.0, float(cur["words"][-1].end) - LEAD)
+            rows.append({"start_s": round(start, 1), "end_s": round(end, 1), "time": _clock(start),
+[06:07:45]   -> {"results": {"transcribe-hindi": {"ok": true, "output": "ok 4 lines\n WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w10/pixi.toml:14:1]\n 13 \u2502     \n 14 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 15 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\ …[640 more chars]
+
+[06:07:47] BUILDER: The test passes. Writing the team notes for later Builders, then saving.
+[06:07:48]   tool Bash: {"command": "cat README.md platform-requests.md .gitignore; git status --short", "description": "Check existing notes and changed files"}
+[06:07:48]   -> # This team's extensions
+
+Made by the Builder (narrative/MODEL_TYPES.md). Read the `build-team` skill before changing anything here.
+- `manifest.json` lists the capabilities. Each one has an entry file and a test.
+- `samples/` holds fake files to build and test with. Never real files.
+- Every change is saved as a checkpoint; the team card's Versions can go back to any of them.
+- 2026-11-17 11:32: Run a team tool over a whole Google Drive folder of audio files as one long background job (hundreds of hours), with progress, resume after a stop, and results saved next to each file.: The team wants …[522 more chars]
+[06:07:57]   tool Bash: {"command": "cat > TEAM.md <<'EOF'\n# Archive\n\n**Goal:** keep the community radio recordings and make them searchable.\nData in Google Drive. A few people use it. Files have names, places and phone numbers. Outside service: ask each time, masked data only.\n\n## Workflow: transcribe the archive (~500 hours, mostly Hindi)\nThe person asked for best quality. Whisper large-v3-turbo (`speech-whisper-turbo`, 4.1 GB) did not fit\n(5.0 GB free, Idli keeps 2 GB spare) and they could not free space, so we started with `speech-whisper-small`.\n\n## The plan\n1. Type out each recording, line by line with times, on this computer (Whisper small). BUILT.\n2. Hide names, places and phone numbers as codes …[1570 more chars]
+[06:07:57]   tool mcp__idli__team_save: {"summary": "Type out Hindi radio recordings on this computer, line by line with times"}
+[06:07:58]   -> A  TEAM.md
+M  manifest.json
+A  platform-requests.md
+A  samples/radio_show_hi.mp3
+A  stack/catalog.json
+A  stack/pixi.lock
+A  stack/pixi.toml
+A  stack/tools/transcribe.py
+A  tests/test_transcribe.py
+A  tools_dev/make_sample.py
+[06:08:03]   -> {"saved": true, "version": "7f667d4", "message": "Saved. The team uses this from the next message."}
+
+[06:08:11] BUILDER: Archive can now type out your radio recordings on this computer, so nothing leaves it. I've saved this as a version.
+
+**What you get for each recording:** a table with one row per spoken line. Each row has the time it was said (like 00:12:45), the words in Hindi, and how sure the tool was. Rows it's unsure about are marked "check", so someone can listen at that time.
+
+**How I tested it:** I couldn't use your recordings, so I made a short fake Hindi clip with made-up names. It typed out every line at the right time. I also fixed a problem along the way: it was missing whatever was said in the first second of a file.
+
+**To try it:** in the left chat, pick one recording with @ and ask: "type out this recording". Start with one you know well and listen to a few of the marked lines.
+
+**Things to know:**
+- **Quality:** this is the quick tool. It will get most words right, but it will mishear some names, places and numbers, and old, noisy tapes will be harder. When you free about 2 GB on this computer, tell me and I'll switch to the careful tool. Your setup stays the same.
+- **Speed:** on my test it worked several times faster than real time. I haven't measured it on hour-long recordings yet, so I can't say exactly how long 500 hours will take.
+- **The whole archive at once:** for now it's one recording at a time. I've asked the Idli team for a way to run it over a whole Drive folder in the background. That is a platform feature, so it isn't something I can build.
+
+Next, I can make the transcripts searchable, so you can ask "which shows talked about the water tank?" and get the recording and the minute. Shall I do that once you've tried a few recordings?

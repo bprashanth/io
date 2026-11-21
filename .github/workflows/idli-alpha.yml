@@ -1,0 +1,184 @@
+# Idli alpha: tests, then the Idli build of Paseo for Linux, macOS and Windows, plus the Idli kit.
+#
+# The app is Paseo 0.15.2 (getpaseo/paseo at e896c05b) with Idli's UI patch
+# (benchmarks/runs/2026-11-06-oss-desktop-independent/cowork/desktop/paseo-idli-split.patch). The kit is Idli's
+# code (cowork/, tracked files only, via git archive) with desktop/install-idli.py. Nothing is signed: macOS gets an
+# ad-hoc signature, Windows none (docs/idli-alpha-release.md says what testers click through).
+# No secrets are used or shipped: the silo token, Google's OAuth client file and account tokens come from the owner,
+# out of band. A draft prerelease is made only for an idli-v* tag.
+name: idli-alpha
+
+on:
+  push:
+    branches: [idli-alpha]
+    tags: ['idli-v*']
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'build only targets whose label contains this, e.g. mac (blank = all)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: idli-alpha-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COWORK: benchmarks/runs/2026-11-06-oss-desktop-independent/cowork
+  PASEO_REPO: https://github.com/getpaseo/paseo
+  PASEO_COMMIT: e896c05b
+  PYTHONUNBUFFERED: '1'
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+jobs:
+  # Representative tests only: the ones that pass on a clean machine with no ~/idli-insights, no DGX router and no
+  # Google accounts (checked on the DGX with an empty HOME, 2026-11-18). The rest need the laptop or the DGX.
+  tests:
+    name: tests ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Python packages Idli uses (the trusted imports in lib/transforms.py)
+        run: python -m pip install -q pytest duckdb pandas openpyxl matplotlib vl-convert-python pypdf python-docx
+      # Every file that passes with an empty HOME (all of tests/, plus two in lib/). lib/test_chat.py and
+      # lib/test_home.py are left out: 11 known failures on every machine (DGX-only paths), tracked separately.
+      # Windows is informational: the alpha doesn't support it, and some tests assume a POSIX shell.
+      - name: cowork tests
+        shell: bash
+        working-directory: ${{ env.COWORK }}
+        continue-on-error: ${{ runner.os == 'Windows' }}
+        env:
+          PYTHONUTF8: '1'
+        run: python -m pytest -q -p no:cacheprovider tests lib/test_ccproxy.py lib/test_privacy.py
+
+  kit:
+    name: idli kit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: build the kit from tracked files
+        run: |
+          bash "$COWORK/desktop/make-idli-kit.sh" "${GITHUB_REF_NAME//\//-}" idli-alpha-out
+          ls -lh idli-alpha-out
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: idli-kit
+          path: idli-alpha-out/*
+          if-no-files-found: error
+
+  app:
+    name: app ${{ matrix.label }}
+    needs: tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, label: linux-x64, args: '--linux tar.gz AppImage --x64', smoke: '1' }
+          - { os: macos-14, label: mac-arm64, args: '--mac dmg --arm64 -c.mac.identity=- -c.mac.notarize=false', smoke: '1' }
+          - { os: windows-latest, label: win-x64, args: '--win nsis zip --x64', smoke: '1' }
+    steps:
+      - name: skip targets not asked for
+        id: pick
+        shell: bash
+        run: |
+          only='${{ inputs.only }}'
+          if [ -n "$only" ] && [[ '${{ matrix.label }}' != *"$only"* ]]; then echo "go=no" >> "$GITHUB_OUTPUT"; else echo "go=yes" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        if: steps.pick.outputs.go == 'yes'
+        with:
+          path: io
+      - name: Paseo 0.15.2 with Idli's UI patch
+        if: steps.pick.outputs.go == 'yes'
+        shell: bash
+        run: |
+          git init -q paseo-src && cd paseo-src
+          git remote add origin "$PASEO_REPO"
+          git fetch -q --depth 1 origin "$PASEO_COMMIT" || git fetch -q origin
+          git checkout -q "$PASEO_COMMIT"
+          git apply "../io/$COWORK/desktop/paseo-idli-split.patch"
+          git status --short | wc -l
+      - uses: actions/setup-node@v4
+        if: steps.pick.outputs.go == 'yes'
+        with:
+          node-version: '22'
+      - name: install
+        if: steps.pick.outputs.go == 'yes'
+        working-directory: paseo-src
+        run: node scripts/npm-retry.mjs ci
+      - name: Linux display for the smoke
+        if: steps.pick.outputs.go == 'yes' && runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb xauth
+      # Paseo's own packaged-app smoke (scripts/after-pack.js with PASEO_DESKTOP_SMOKE=1): the packed app starts, its
+      # daemon comes up with every built-in plugin, and the UI (Idli's patched app-dist) loads.
+      - name: build and smoke
+        if: steps.pick.outputs.go == 'yes'
+        shell: bash
+        working-directory: paseo-src
+        env:
+          PASEO_DESKTOP_SMOKE: ${{ matrix.smoke }}
+          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+          EP_GH_IGNORE_TIME: 'true'
+        run: |
+          set -euo pipefail
+          # The updater must not look at getpaseo/paseo: it would download stock Paseo over Idli's UI.
+          npm run build:desktop -- --publish never ${{ matrix.args }} -c.publish.owner=bprashanth -c.publish.repo=io
+          ls -lh packages/desktop/release
+      - name: name the artifacts Idli-alpha
+        if: steps.pick.outputs.go == 'yes'
+        shell: bash
+        run: |
+          mkdir -p out
+          for f in paseo-src/packages/desktop/release/*.{tar.gz,AppImage,dmg,exe,zip}; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f"); cp "$f" "out/Idli-alpha-${base#Paseo-}"
+          done
+          ls -lh out
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: steps.pick.outputs.go == 'yes'
+        with:
+          name: idli-app-${{ matrix.label }}
+          path: out/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure() && steps.pick.outputs.go == 'yes'
+        with:
+          name: smoke-${{ matrix.label }}
+          path: ${{ runner.temp }}/desktop-smoke
+          if-no-files-found: ignore
+
+  release:
+    name: draft prerelease
+    if: startsWith(github.ref, 'refs/tags/idli-v')
+    needs: [kit, app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: docs
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: draft prerelease with every artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -lh dist
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --prerelease \
+            --title "Idli $GITHUB_REF_NAME (alpha)" --notes-file docs/idli-alpha-release.md

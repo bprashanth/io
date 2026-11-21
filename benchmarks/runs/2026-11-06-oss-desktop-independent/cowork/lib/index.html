@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drive index</title>
+<style>
+:root { --bg: #f6f5f2; --panel: #fff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e3e1dc; --accent: #2f5d50; --soft: #e4efe9; --bad: #9b2c2c; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #161615; --panel: #1f1f1d; --ink: #ecebe7; --muted: #a3a29c; --line: #34332f; --accent: #8cc7b2; --soft: #23332d; --bad: #f0a3a3; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin-bottom: 22px; }
+.step { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: baseline; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); margin-bottom: 10px; }
+.dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); margin-top: 4px; }
+.step.now .dot { border-color: var(--accent); border-top-color: transparent; animation: spin 1s linear infinite; }
+.step.done .dot { background: var(--accent); border-color: var(--accent); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.title { font-weight: 600; }
+.note { color: var(--muted); font-size: 13px; }
+.box { margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: var(--soft); color: var(--accent); }
+.box.bad { background: transparent; border: 1px solid var(--bad); color: var(--bad); }
+</style></head>
+<body><main>
+<h1>Indexing your Drive</h1>
+<div class="sub" id="sub">Everything stays on this computer.</div>
+<div class="step" id="s-list"><div class="dot"></div><div><div class="title">Listing files and folders</div><div class="note">Names, folders and dates, including folders inside folders</div></div><div class="count" id="c-list"></div></div>
+<div class="step" id="s-read"><div class="dot"></div><div><div class="title">Reading inside Sheets, Excel files and Docs</div><div class="note">The first rows of each sheet and the opening of each doc</div></div><div class="count" id="c-read"></div></div>
+<div class="step" id="s-sum"><div class="dot"></div><div><div class="title">Summarising with the private model</div><div class="note">One line per file. Search already works during this step</div></div><div class="count" id="c-sum"></div></div>
+<div class="box" id="box" hidden></div>
+</main>
+<script>
+const T = new URLSearchParams(location.search).get("t");
+const order = ["starting", "listing", "reading", "summarising", "done"];
+function mark(id, state) { const e = document.getElementById(id); e.classList.toggle("now", state === "now"); e.classList.toggle("done", state === "done"); }
+function clock(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+async function tick() {
+  let d;
+  try { d = await (await fetch("/api/index?t=" + encodeURIComponent(T))).json(); } catch (e) { setTimeout(tick, 3000); return; }
+  const st = d.status || {}, ph = st.phase || "none", i = order.indexOf(ph);
+  const steps = [["s-list", 1], ["s-read", 2], ["s-sum", 3]];
+  for (const [id, k] of steps) mark(id, ph === "done" || i > k ? "done" : (i === k || (k === 1 && ph === "starting")) ? "now" : "");
+  document.getElementById("c-list").textContent = st.files ? `${st.files} files, ${st.folders_opened || 0} folders` : (ph === "starting" ? "opening Drive" : "");
+  document.getElementById("c-read").textContent = st.to_read ? `${st.peeked || 0} of ${st.to_read}` : "";
+  document.getElementById("c-sum").textContent = st.to_summarise ? `${st.summarised || 0} of ${st.to_summarise}` : "";
+  const box = document.getElementById("box");
+  if (st.started_ts && ph !== "done" && ph !== "failed") document.getElementById("sub").textContent = `Everything stays on this computer. ${clock(Date.now() / 1000 - st.started_ts)} so far, usually 1 to 5 minutes.`;
+  if (ph === "done") {
+    document.getElementById("sub").textContent = "Everything stays on this computer.";
+    box.hidden = false; box.className = "box";
+    box.innerHTML = `<b>Done: ${st.files} files indexed in ${clock(st.seconds || 0)}.</b><br>Next: go to <b>Idli</b> in the left sidebar and ask about any file, for example "find the volunteer register". To refresh this later, say "rebuild index" in Start here. You can close this tab.`;
+    return;
+  }
+  if (ph === "failed" || ph === "stopped") { box.hidden = false; box.className = "box bad"; box.textContent = d.line + ' Say "rebuild index" in Start here to try again.'; return; }
+  if (ph === "none") { box.hidden = false; box.className = "box"; box.textContent = 'Not started. Say yes in Start here.'; }
+  setTimeout(tick, 2000);
+}
+tick();
+</script>
+</body></html>

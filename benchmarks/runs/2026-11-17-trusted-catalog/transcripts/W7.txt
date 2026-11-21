@@ -1,0 +1,219 @@
+
+[05:42:16] PERSON: New team: Survey. Setup answers: - Works towards: Collect household survey data from our villages - Data kept in: Google Drive - Used by: A few of us - Files have names, places or phone numbers: Yes - Outside service when a Mini cannot answer: ask each time (only masked data is sent) Read the setup-team skill, then start the conversation.
+[05:42:18]   tool Skill: {"skill": "setup-team"}
+[05:42:18]   -> Launching skill: setup-team
+[05:42:18]   tool Skill: {"skill": "build-team"}
+[05:42:18]   -> Launching skill: build-team
+
+[05:42:21] BUILDER: Thanks. Survey is set up to collect household survey data from your villages, kept in Google Drive, for a few of you. Names, places and phone numbers will be hidden as codes, and I'll ask you each time before anything goes to an outside service.
+
+To start: what is the one survey task you'd most like help with? For example, typing up paper forms, cleaning and joining sheets from different villages, or making summaries and maps.
+
+[05:42:56] PERSON: Our field team photographs paper survey forms. Turn them into a spreadsheet.
+
+[05:42:59] BUILDER: That's a good first job. One question so I build it right: what does one form look like? For example, is it one household per page with fixed boxes (head of household, village, number of members, phone), and is it filled in by hand, in Hindi, English or both?
+
+[05:44:42] PERSON: One household per page. Boxes for name of head of family, village, number of members, mobile, monthly income, toilet yes or no, ration card colour. Filled by hand, mostly in Hindi.
+[05:44:46]   tool ToolSearch: {"query": "select:mcp__idli__capability_menu,mcp__idli__catalog,mcp__idli__catalog_request,mcp__idli__platform_request,mcp__idli__stack_install,mcp__idli__stack_run,mcp__idli__team_check,mcp__idli__team_save", "max_results": 10}
+[05:44:46]   ->        
+[05:44:47]   tool Bash: {"command": "ls -la && cat manifest.json 2>/dev/null; ls stack samples tests skills 2>/dev/null", "description": "List the team's extensions folder"}
+[05:44:47]   -> total 44
+drwxrwxr-x  8 beeps  beeps   4096 Nov 17 11:14 .
+drwxrwxr-x  4 beeps  beeps   4096 Nov 17 11:12 ..
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .bash_profile
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .bashrc
+drwxrwxr-x  4 beeps  beeps   4096 Nov 17 11:14 .claude
+drwxrwxr-x 11 beeps  beeps   4096 Nov 17 11:14 .git
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .gitconfig
+-rw-rw-r--  1 beeps  beeps    157 Nov 17 11:12 .gitignore
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .gitmodules
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .idea
+-rw-rw-r--  1 beeps  beeps     25 Nov 17  …[687 more chars]
+[05:44:48]   tool mcp__idli__capability_menu: {}
+[05:44:48]   -> - **ocr**: local: Tesseract (on this computer) -> capmenu.ocr_text(path) / capmenu.ocr_words(path); private model: the 9B with vision (reads photos, scans and handwriting, Hindi too) (on this computer) -> a stack with "model": true sends the image to $IDLI_MODEL_URL/chat/completions as an OpenAI image_url (base64), with "chat_template_kwargs": {"enable_thinking": false}; outside: Consultant, on masked text after OCR (not available) -> automatic, after a yes
+- **speech-to-text**: local: faster-whisper (not available) -> capmenu.transcribe(path); private model: the 9B on the transcript (fill col …[802 more chars]
+[05:44:48]   tool mcp__idli__catalog: {}
+[05:44:48]   -> {"this_computer": "- System: Linux (ARM) (linux-aarch64). Install only tools the catalog lists for linux-aarch64.\n- Free disk where tools go: 150.1 GB. Memory: 121.6 GB. Cores: 20. GPU: an NVIDIA GPU.", "platform": "linux-aarch64", "tools": [{"id": "media-ffmpeg", "name": "FFmpeg (video and audio)", "for": "Cut, join and convert video and audio, shrink clips for WhatsApp, and burn in subtitles (Hindi too).", "licence": "GPL-2.0-or-later (this conda-forge build includes x264); Noto Sans Devanagari: OFL-1.1", "cautions": ["Burned-in Hindi subtitles need the 'ass' filter with shaping=complex: th …[10583 more chars]
+
+[05:44:51] BUILDER: Let me check how the platform runs a reader that asks the private model.
+[05:44:53]   tool Bash: {"command": "cd /home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && ls; grep -rln '\"model\"' --include=*.py . | head -20; grep -rn 'stack.json' --include=*.py . | head -20", "description": "Look for stack and model handling in platform source"}
+[05:44:53]   -> CCPROXY_DONE.md
+CHAT_DONE.md
+CLAUDE.md
+cowork.mcp.json
+cowork_mcp.py
+dashboard-links
+desktop
+EMBED_DONE.md
+file-skills
+HOME_DONE.md
+HOME_SHOTS
+idli
+lib
+local-9b
+make_sample_sheets.py
+__pycache__
+README.md
+run_tests.py
+sites
+teach
+tests
+lib/driveindex.py
+lib/careful.py
+sites/files/tools.py
+lib/capmenu.py
+lib/modes.py
+tests/test_stacks.py:34:    (s / 'stack.json').write_text(json.dumps(stack or {}))
+tests/test_catalog.py:267:        (d / 'extensions' / 'stack' / 'stack.json').write_text(json.dumps(
+lib/idli_mcp.py:348:        out['note'] = ('These hosts were refused. If one is needed, add it to  …[795 more chars]
+[05:44:55]   tool Bash: {"command": "cd /home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && grep -n 'model' lib/stackwall.py | head -40; grep -rn \"def run_stack\\|IDLI_MODEL_URL\\|'stack'\" lib/*.py | head -30", "description": "Find how model access and stack readers are wired"}
+[05:44:56]   -> 6:- stack.json: GitHub repos (pinned to a commit), files to download (model weights), extra internet hosts, and
+7:  whether the stack's tools may ask the private model.
+16:  If the stack declares it, one more door: a bridge to the private model's chat endpoint, nothing else.
+37:# Hosts an install may reach: package indexes, code hosting and model weights. Matched on whole labels, so
+105:    return {'repos': repos, 'downloads': downloads, 'hosts': hosts, 'model': bool(s.get('model')),
+151:             'Runs on this computer with no internet' + (', may ask the private model' if s.get('model') el …[4342 more chars]
+
+[05:45:05] BUILDER: Here is my plan:
+
+1. **Read each form photo** and fill one row with: head of family, village, number of members, mobile, monthly income, toilet (yes or no), ration card colour. Done by the private model on this computer, which reads handwriting and Hindi. Nothing leaves the computer.
+2. **Keep the Hindi as written**, and add an English spelling next to names and villages, plus a "check this" column where the writing was unclear, so you know which boxes to look at again.
+3. **You review the row** in the privacy check. Names, villages and mobile numbers become codes before Claude sees anything.
+4. **Claude, with names as codes**, can then count, total and chart many forms together (for example, households without a toilet by village).
+
+Two things to know:
+- It needs one small tool from Idli's list: "Word and Excel files" (410 MB, runs offline). It lets the reader run next to the private model.
+- I will build and test it with a made-up form I draw myself, never with your real forms.
+
+Shall I set this up?
+
+[05:47:40] PERSON: Yes, please set it up.
+[05:47:41]   tool mcp__idli__stack_install: {"tools": ["office-files"]}
+[05:47:41]   tool mcp__idli__catalog: {"example": "office-files"}
+[05:47:55]   -> {"ok": true, "tools": ["office-files"], "steps": [{"step": "packages", "ok": true, "seconds": 0.7}], "size": "334 MB", "use": "Run your code with stack_run. Model files are at $IDLI_MODEL_<NAME> (and $IDLI_MODEL_PATHS, JSON). Call catalog with example=<id> for how to use a tool."}
+[05:47:56]   -> {"tool": "office-files", "example": "\"\"\"office-files: read and write Word (.docx) and Excel (.xlsx) files, and work on tables with pandas.\n\nUsage: python office-files.py OUT_FOLDER\nWrites a small report.docx and visits.xlsx, then reads both back and prints what is in them.\n\"\"\"\nimport os\nimport sys\n\nimport pandas as pd\nfrom docx import Document\nfrom openpyxl import load_workbook\n\nd = sys.argv[1]\nos.makedirs(d, exist_ok=True)\n\n# A spreadsheet from a table (pandas writes it with openpyxl), then a total added by hand.\nvisits = pd.DataFrame({\"village\": [\"\u0930\u093e\u092e\ …[1378 more chars]
+[05:47:58]   tool Bash: {"command": "cd /home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && sed -n 180,260p lib/teamcaps.py; sed -n 290,420p lib/teamcaps.py; ls /home/beeps/idli-insights/teams/cat-w7/extensions/stack; cat /home/beeps/idli-insights/teams/cat-w7/extensions/stack/*.json", "description": "Read how stack capabilities and tests are run"}
+[05:47:59]   -> ERROR Exit code 1
+        raise ValueError(f'{rel} is not a file in extensions/')
+    return p
+
+
+def manifest(data_dir):
+    """The declared capabilities, checked. Problems are returned, not raised, so one bad entry can't hide the rest."""
+    d = ext_dir(data_dir)
+    try:
+        caps = json.loads((d / MANIFEST).read_text()).get('capabilities', [])
+    except (OSError, ValueError, AttributeError):
+        return [], ['manifest.json is missing or not valid JSON']
+    good, problems, seen = [], [], {c['id'] for c in BASE}
+    for c in caps if isinstance(caps, list) else []:
+        try:
+             …[9659 more chars]
+[05:48:03]   tool Bash: {"command": "fc-list | grep -i -E 'devanagari|hindi|lohit|mukta|noto.*deva' | head; python3 -c \"import PIL; print(PIL.__version__)\"; python3 -c \"from PIL import features; print(features.check('raqm'))\"", "description": "Look for Devanagari fonts and Pillow text shaping"}
+[05:48:03]   -> /usr/share/fonts/truetype/lohit-punjabi/Lohit-Gurmukhi.ttf: Lohit Gurmukhi:style=Regular
+/usr/share/fonts/truetype/lohit-bengali/Lohit-Bengali.ttf: Lohit Bengali:style=Regular
+/usr/share/fonts/truetype/lohit-gujarati/Lohit-Gujarati.ttf: Lohit Gujarati:style=Regular
+/usr/share/fonts/truetype/lohit-assamese/Lohit-Assamese.ttf: Lohit Assamese:style=Regular
+/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf: Lohit Devanagari:style=Regular
+/usr/share/fonts/truetype/lohit-telugu/Lohit-Telugu.ttf: Lohit Telugu:style=Regular
+/usr/share/fonts/truetype/lohit-oriya/Lohit-Odia.ttf: Lohit Odia …[306 more chars]
+
+[05:48:17] BUILDER: Installed. Now I'll draw two made-up forms to build and test with.
+[05:48:25]   tool Bash: {"command": "mkdir -p samples && cat > samples/make_samples.py <<'EOF'\n\"\"\"Draws made-up household survey forms (fake names and numbers) as phone-photo-like images. Run: python3 make_samples.py\"\"\"\nimport random\nfrom PIL import Image, ImageDraw, ImageFilter, ImageFont\n\nLBL = ImageFont.truetype('/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf', 30)\nHAND = ImageFont.truetype('/usr/share/fonts/truetype/samyak/Samyak-Devanagari.ttf', 40)\nTITLE = ImageFont.truetype('/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf', 40)\nFIELDS = ['परिवार के मुखिया का नाम', 'गाँव', 'सदस्यों की संख्या', 'मोबाइल नंबर', 'मासिक आय (रु.)',\n          'शौचालय है? (हाँ / नहीं)', …[1273 more chars]
+[05:48:26]   -> total 224
+drwxrwxr-x 2 beeps beeps   4096 Nov 17 11:18 .
+drwxrwxr-x 8 beeps beeps   4096 Nov 17 11:18 ..
+-rw-rw-r-- 1 beeps beeps 105248 Nov 17 11:18 form_1.jpg
+-rw-rw-r-- 1 beeps beeps 109562 Nov 17 11:18 form_2.jpg
+-rw-rw-r-- 1 beeps beeps   2061 Nov 17 11:18 make_samples.py
+[05:48:27]   tool Read: {"file_path": "/home/beeps/idli-insights/teams/cat-w7/extensions/samples/form_1.jpg"}
+[05:48:27]   -> 
+
+[05:48:30] BUILDER: The made-up handwriting font has no English digits. I'll use another font for those.
+[05:48:32]   tool Bash: {"command": "cd samples && python3 - <<'EOF'\nimport re\ns=open('make_samples.py').read()\ns=s.replace(\"TITLE = \",\"DIGITS = ImageFont.truetype('/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf', 42)\\nTITLE = \")\ns=s.replace(\"value, font=HAND,\",\"value, font=DIGITS if value.isascii() else HAND,\")\nopen('make_samples.py','w').write(s)\nEOF\npython3 make_samples.py", "description": "Fix digit font and redraw samples"}
+[05:48:32]   -> (Bash completed with no output)
+[05:48:33]   tool Read: {"file_path": "/home/beeps/idli-insights/teams/cat-w7/extensions/samples/form_2.jpg"}
+[05:48:33]   -> 
+
+[05:48:34] BUILDER: Good. Now the reader.
+[05:48:56]   tool Write: {"file_path": "/home/beeps/idli-insights/teams/cat-w7/extensions/stack/tools/read_forms.py", "content": "\"\"\"Reads a photo of one household survey form (handwritten, mostly Hindi) into one spreadsheet row.\n\nThe private model on this computer reads the photo. The text is kept as written; numbers are turned into plain\ndigits, toilet into Yes/No and the ration card colour into English, and a \"Check\" column says which boxes to look at\nagain. Nothing leaves this computer.\n\"\"\"\nimport base64\nimport csv\nimport io\nimport json\nimport os\nimport re\nimport sys\nimport urllib.request\n\nfrom PIL import Image, ImageOps\n\nKEYS = ['head_name', 'head_name_english', 'village', 'village_engl …[6042 more chars]
+[05:48:57]   tool Bash: {"command": "cd /home/beeps/idli-insights/teams/cat-w7/extensions && echo '{\"model\": true}' > stack/stack.json && cat stack/pixi.toml", "description": "Let the stack ask the private model"}
+[05:48:57]   -> File created successfully at: /home/beeps/idli-insights/teams/cat-w7/extensions/stack/tools/read_forms.py (file state is current in your context — no need to Read it back)
+[05:48:57]   -> # Made by Idli from its catalog of vetted tools. Do not edit: install with stack_install.
+# Tools: office-files
+[workspace]
+name = "idli-cat-w7"
+channels = ["conda-forge"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
+
+[dependencies]
+python = "==3.11.18"
+python-docx = "==1.2.0"
+openpyxl = "==3.1.5"
+pandas = "==3.1.1"
+[05:49:01]   tool mcp__idli__stack_run: {"command": "python -c \"import PIL; print(PIL.__version__)\""}
+[05:49:01]   -> {"ok": false, "seconds": 0.3, "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundError: No module named 'PIL'\n", "files_in_.idli-out": [], "model_calls": 0}
+
+[05:49:03] BUILDER: The stack has no image library, so I'll send the photo as it is (and shrink it only when one is available).
+[05:49:07]   tool Edit: {"replace_all": false, "file_path": "/home/beeps/idli-insights/teams/cat-w7/extensions/stack/tools/read_forms.py", "old_string": "def _image_b64(path, longest=1600):\n    img = ImageOps.exif_transpose(Image.open(path)).convert('RGB')  # phone photos: honour the rotation tag\n    img.thumbnail((longest, longest))\n    buf = io.BytesIO()\n    img.save(buf, 'JPEG', quality=90)\n    return base64.b64encode(buf.getvalue()).decode()", "new_string": "MIME = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}\n\n\ndef _image_url(path, longest=1600):\n    \"\"\"The photo as a data URL: shrunk and turned upright when Pillow is there, else the file as it is.\"\"\"\ …[538 more chars]
+[05:49:09]   tool Bash: {"command": "python3 - <<'EOF'\np='stack/tools/read_forms.py'; s=open(p).read()\ns=s.replace(\"\\nfrom PIL import Image, ImageOps\\n\",\"\\n\")\ns=s.replace(\"{'url': 'data:image/jpeg;base64,' + _image_b64(path)}\",\"{'url': _image_url(path)}\")\nopen(p,'w').write(s)\nEOF\ngrep -n \"_image\\|PIL\" stack/tools/read_forms.py", "description": "Drop the hard Pillow import and use the new image helper"}
+[05:49:09]   -> The file /home/beeps/idli-insights/teams/cat-w7/extensions/stack/tools/read_forms.py has been updated successfully. (file state is current in your context — no need to Read it back)
+[05:49:09]   -> 57:def _image_url(path, longest=1600):
+60:        from PIL import Image, ImageOps
+77:                {'type': 'image_url', 'image_url': {'url': _image_url(path)}},
+[05:49:11]   tool mcp__idli__stack_run: {"command": "sh -c \"python tools/read_forms.py ../samples/form_1.jpg; python tools/read_forms.py ../samples/form_2.jpg\"", "timeout": 600}
+[05:49:23]   -> {"ok": true, "seconds": 11.7, "output": "{\n \"Head of family name\": \"\u0938\u0941\u0928\u0940\u0924\u093e \u0926\u0947\u0935\u0940\",\n \"Head of family name (English)\": \"Sunita Devi\",\n \"Village\": \"\u0930\u093e\u092e\u092a\u0941\u0930\",\n \"Village (English)\": \"Rampur\",\n \"Members\": 5,\n \"Mobile\": \"9876501234\",\n \"Monthly income\": 6500,\n \"Toilet\": \"Yes\",\n \"Ration card colour\": \"Yellow\",\n \"Toilet (as written)\": \"\u0939\u093e\u0901\",\n \"Ration card colour (as written)\": \"\u092a\u0940\u0932\u093e\",\n \"Check\": \"OK\"\n}\n{\n \"Head of family name\": \"\u0 …[534 more chars]
+
+[05:49:27] BUILDER: Almost all right, but it read the income "४०००" (Hindi 4000) as 8000. Hindi ४ looks like an English 8, so this matters. Let me see what the model said exactly.
+[05:49:28]   tool mcp__idli__stack_run: {"command": "python -c \"import sys; sys.path.insert(0,'tools'); import read_forms as r; print(r.ask_model('../samples/form_2.jpg'))\"", "timeout": 300}
+[05:49:32]   -> {"ok": true, "seconds": 4.2, "output": "{\n  \"head_name\": \"\u092e\u094b\u0939\u0928 \u0932\u093e\u0932\",\n  \"head_name_english\": \"Mohan Lal\",\n  \"village\": \"\u0936\u093f\u0935\u0917\u0922\u093c\",\n  \"village_english\": \"Shivgarh\",\n  \"members\": \"3\",\n  \"mobile\": \"9123400567\",\n  \"monthly_income\": \"8000\",\n  \"toilet\": \"\u0928\u0939\u0940\u0902\",\n  \"ration_card_colour\": \"\u0917\u0941\u0932\u093e\u092c\u0940\",\n  \"unclear\": []\n}\n", "files_in_.idli-out": [], "model_calls": 1}
+
+[05:49:35] BUILDER: I'll try a second, careful look at just the number boxes, asking which kind of digits are used.
+[05:49:42]   tool Bash: {"command": "mkdir -p /tmp/claude-1000/-home-beeps-idli-insights-teams-cat-w7-extensions/e24790c6-7c1b-4084-925d-4384be4c80a2/scratchpad && cd /home/beeps/idli-insights/teams/cat-w7/extensions && cat > stack/tools/try_numbers.py <<'EOF'\nimport sys, json, urllib.request, os\nsys.path.insert(0, 'tools'); import read_forms as r\nP = \"\"\"Look only at three boxes on this handwritten form: सदस्यों की संख्या (members), मोबाइल नंबर (mobile), मासिक आय (monthly income).\nNumbers may be written with Hindi digits ० १ २ ३ ४ ५ ६ ७ ८ ९ or English digits 0-9. Careful: Hindi ४ (four) looks like English 8, Hindi ५ (five) looks like English 4 or y, Hindi ९ (nine) looks like English 3 or 4, Hindi ६ (six) loo …[1042 more chars]
+[05:49:42]   tool mcp__idli__stack_run: {"command": "python tools/try_numbers.py ../samples/form_1.jpg ../samples/form_2.jpg", "timeout": 300}
+[05:49:42]   -> ok
+[05:49:54]   -> {"ok": true, "seconds": 11.5, "output": "../samples/form_1.jpg {\n  \"members\": {\n    \"script\": \"hindi\",\n    \"as_written\": \"\u096b\",\n    \"value\": \"5\"\n  },\n  \"mobile\": {\n    \"script\": \"english\",\n    \"as_written\": \"98765 01234\",\n    \"value\": \"9876501234\"\n  },\n  \"monthly_income\": {\n    \"script\": \"english\",\n    \"as_written\": \"6500\",\n    \"value\": \"6500\"\n  }\n}\n../samples/form_2.jpg {\n  \"members\": {\n    \"script\": \"english\",\n    \"as_written\": \"3\",\n    \"value\": \"3\"\n  },\n  \"mobile\": {\n    \"script\": \"english\",\n    \"as_w …[247 more chars]
+
+[05:50:01] BUILDER: The careful look got every number right, including the Hindi digits. I'll use it in the reader: if the two looks disagree, the box goes in the "Check" column.
+[05:50:11]   tool Bash: {"command": "rm stack/tools/try_numbers.py && python3 - <<'EOF'\np='stack/tools/read_forms.py'; s=open(p).read()\ns=s.replace('''HINDI_DIGITS =''','''NUMBERS_PROMPT = \"\"\"Look only at three boxes on this handwritten form: सदस्यों की संख्या (members), मोबाइल नंबर (mobile),\nमासिक आय (monthly income). Numbers may be written with Hindi digits ० १ २ ३ ४ ५ ६ ७ ८ ९ or English digits 0-9.\nCareful: Hindi ४ (four) looks like English 8, Hindi ५ (five) looks like English 4 or y, Hindi ९ (nine) looks like\nEnglish 3 or 4, Hindi ६ (six) looks like English ξ, Hindi ७ (seven) looks like English 6, Hindi ८ (eight) looks like\nEnglish C. For each box, first say which digits are used, then copy the digits  …[2478 more chars]
+[05:50:11]   -> 38:NUMBERS_PROMPT = """Look only at three boxes on this handwritten form: सदस्यों की संख्या (members), मोबाइल नंबर (mobile),
+66:def _image_url(path, longest=1600):
+81:def ask_model(path, prompt=PROMPT, timeout=300):
+93:def _json(text):
+103:def parse_reply(text, numbers_text=''):
+122:def digits(s):
+126:def yes_no(s):
+131:def colour(s):
+139:def to_row(got):
+179:def read_form(path):
+180:    return parse_reply(ask_model(path), ask_model(path, NUMBERS_PROMPT))
+183:def read(src, out):
+
+[05:50:16] BUILDER: Now the test, the Analyst's notes and the manifest.
+[05:50:31]   tool Bash: {"command": "mkdir -p tests skills/survey-forms && cat > tests/test_read_forms.py <<'EOF'\n# Reads two made-up form photos (samples/make_samples.py) with the private model and checks every box.\nimport csv, importlib.util, os, tempfile\n\nspec = importlib.util.spec_from_file_location('read_forms', 'stack/tools/read_forms.py')\nm = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(m)\n\n# The tidying, without the model.\nrow = m.to_row(m.parse_reply('```json\\n{\"head_name\": \"राम\", \"village\": \"\", \"members\": \"४\", \"mobile\": \"+91 98765 4321\",'\n                             ' \"monthly_income\": \"३,५००\", \"toilet\": \"नहीं\", \"ration_card_colour\": \"सफ़ेद\", \"uncl …[3714 more chars]
+[05:50:31]   -> done
+[05:50:32]   tool mcp__idli__team_check: {}
+[05:50:54]   -> {"results": {"read-survey-forms": {"ok": true, "output": "form_1.jpg ok, check: OK\nform_2.jpg ok, check: Monthly income\n"}}, "problems": [], "team_can_now": ["Read Excel, CSV and Google Sheets files", "Hide names, places and phone numbers as codes before Claude sees them", "Analyse tables with pandas, and draw charts and India maps", "Save Minis and answer their questions on this computer", "Read photos of handwritten household survey forms (Hindi too) into a spreadsheet row"]}
+
+[05:50:56] BUILDER: All tests pass. Now the notes for later Builders, then I'll save.
+[05:51:03]   tool Write: {"file_path": "/home/beeps/idli-insights/teams/cat-w7/extensions/TEAM.md", "content": "# Survey\n\n**Goal:** collect household survey data from the team's villages. Data kept in Google Drive. Used by a few people.\nFiles have names, places and phone numbers. Outside service: ask each time, masked data only.\n\n## Workflow: paper forms to a spreadsheet\nThe field team photographs paper forms, one household per page, filled by hand mostly in Hindi. Boxes: name of head\nof family, village, number of members, mobile, monthly income, toilet (yes/no), ration card colour.\n\n## Plan\n1. Read each form photo into one row: the private model (9B with vision) on this computer. Built.\n2. Keep the Hindi …[1141 more chars]
+[05:51:03]   tool mcp__idli__team_save: {"summary": "Read photos of handwritten survey forms into a spreadsheet"}
+[05:51:03]   -> File created successfully at: /home/beeps/idli-insights/teams/cat-w7/extensions/TEAM.md (file state is current in your context — no need to Read it back)
+[05:51:25]   -> {"saved": true, "version": "f55d8c0", "message": "Saved. The team uses this from the next message."}
+
+[05:51:31] BUILDER: Survey can now turn a photo of a filled-in form into one spreadsheet row.
+
+**What it does**
+- The private model on this computer reads the handwriting, in Hindi or English. The photo never leaves this computer.
+- Each photo becomes one row with: head of family (in Hindi and in English letters), village (the same), number of members, mobile, monthly income, toilet (Yes or No) and ration card colour.
+- It looks at the number boxes a second time. Hindi ४ (4) looks a lot like an English 8. On my test form, the first look read ४००० as 8000 and the second look got 4000 right.
+- A **Check** column says "OK" or names the boxes to look at again on the photo. A box goes there if it was hard to read, if it was empty, if the mobile isn't 10 digits, or if the two looks disagreed.
+
+I tested it only on two forms I made up and drew myself. Real handwriting is messier, so the Check column matters most on the first real forms.
+
+**How to try it**
+1. Pick a form photo with @ on the left.
+2. Look over the row in the privacy check. Names, villages and mobiles become codes before Claude sees them.
+3. Do the same for a few more forms, then ask the Analyst something like: "Put these households together and count how many have no toilet, by village."
+
+Try it on 3 or 4 real forms and tell me what it gets wrong, so I can tune it. After that I can add a way to read a whole folder of photos into one spreadsheet at once.

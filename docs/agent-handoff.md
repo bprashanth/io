@@ -6,6 +6,8 @@ builds on a claim it has not checked. It is about principles, not about any one 
 a specific machine can and cannot do belongs in the chronology, where it can go stale in the
 open.
 
+> **Working on Idli (the Drive data helper)? Start at [idli-handoff.md](idli-handoff.md).**
+
 ## The rule underneath all the others
 
 **The repository is the conversation.** Agents do not share memory and the owner should not

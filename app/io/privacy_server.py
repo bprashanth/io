@@ -131,10 +131,11 @@ class H(BaseHTTPRequestHandler):
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8899
-    print(f"io privacy server on http://0.0.0.0:{port}   (scan: POST /scan){'   token required' if TOKEN else '   NO TOKEN: keep this off the public internet'}", flush=True)
+    host = os.environ.get("IO_PRIVACY_HOST", "0.0.0.0")  # 127.0.0.1 for a scanner only this computer uses
+    print(f"io privacy server on http://{host}:{port}   (scan: POST /scan){'   token required' if TOKEN else '   NO TOKEN: keep this off the public internet'}", flush=True)
     print("warming the scanner...", flush=True)
     engine()
-    ThreadingHTTPServer(("0.0.0.0", port), H).serve_forever()
+    ThreadingHTTPServer((host, port), H).serve_forever()
 
 
 if __name__ == "__main__":

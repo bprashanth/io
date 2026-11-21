@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runs</title>
+<style>
+:root { --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #dedcd6; --accent: #2f5d50;
+  --on-accent: #ffffff; --soft: #e8f0ec; --warn: #8a5a00; --bad: #a33a2c; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #111110; --card: #1b1b1a;
+  --ink: #ecebe7; --muted: #a3a29c; --line: #33332f; --accent: #8cc7b2; --on-accent: #0b0b0b; --soft: #1f2b27;
+  --warn: #e6b45c; --bad: #e08a7c; } }
+:root[data-theme="dark"] { --bg: #111110; --card: #1b1b1a; --ink: #ecebe7; --muted: #a3a29c; --line: #33332f;
+  --accent: #8cc7b2; --on-accent: #0b0b0b; --soft: #1f2b27; --warn: #e6b45c; --bad: #e08a7c; }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 28px 16px 48px; }
+h1 { font-size: 24px; margin: 0 0 4px; }
+h2 { font-size: 18px; margin: 0; }
+h3 { font-size: 14px; margin: 16px 0 6px; color: var(--muted); font-weight: 600; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.item { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  border-top: 1px solid var(--line); padding: 10px 0; }
+.item:first-of-type { border-top: 0; }
+.item .what { flex: 1 1 260px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+button { font: inherit; font-weight: 600; border-radius: 999px; min-height: 40px; padding: 0 18px; cursor: pointer;
+  border: 1px solid var(--line); background: transparent; color: var(--ink); }
+button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+button:disabled { opacity: .55; cursor: default; }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.step { font-size: 13px; color: var(--muted); }
+.step.bad { color: var(--bad); }
+.none { color: var(--muted); font-size: 14px; margin: 4px 0; }
+.msg { color: var(--muted); font-size: 13px; min-height: 1.2em; }
+.warn { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="head">Runs</h1>
+  <p class="sub">What this team does on its own. Emails are left as drafts in Gmail: you read them and press Send.</p>
+  <div id="list"></div>
+  <p class="msg" id="msg" role="status"></p>
+</main>
+<script>
+const Q = new URLSearchParams(location.search);
+const T = Q.get("t"), TEAM = Q.get("team");
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+async function api(path, body) {
+  const res = await fetch(`${path}?t=${encodeURIComponent(T)}${body === undefined ? "&team=" + encodeURIComponent(TEAM) : ""}`,
+    body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"},
+                               body: JSON.stringify({team: TEAM, ...body})});
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok && !out.error) out.error = "Idli could not finish this step. Try again.";
+  return out;
+}
+const when = (s) => { try { return new Date(s).toLocaleString([], {weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit"}); } catch { return s; } };
+let polling = null;
+async function load() {
+  const out = await api("/api/runs");
+  if (out.error) { $("msg").textContent = out.error; return; }
+  const jobs = Object.fromEntries((out.jobs || []).map((j) => [j.routine, j]));
+  if (!out.routines.length) {
+    $("list").innerHTML = `<p class="none">No routines yet. Ask the Builder to set one up.</p>`;
+    return;
+  }
+  $("list").innerHTML = out.routines.map((r) => {
+    const job = jobs[r.name] || {};
+    const pend = r.pending.map((p) => `<div class="item"><div class="what">${esc(p.summary)}</div>
+      <div class="row"><button class="primary" data-k="${esc(p.key)}" data-r="${esc(r.name)}" data-yes="1">Book it</button>
+      <button data-k="${esc(p.key)}" data-r="${esc(r.name)}" data-yes="0">Skip</button></div></div>`).join("");
+    const asks = r.asks.map((a) => `<div class="item"><div class="what warn">${esc(a.text)}</div>
+      <div class="row"><button data-k="${esc(a.key)}" data-r="${esc(r.name)}" data-yes="0">I've read it</button></div></div>`).join("");
+    const done = r.done.slice(0, 6).map((d) => `<div class="item"><div class="what">${esc(d.summary || d.key)}</div>
+      <div class="step">${esc(d.result)}, ${esc(when(d.at))}</div></div>`).join("");
+    const runs = r.runs.slice(0, 3).map((x) => `<div class="item"><div class="what">${esc(when(x.started))}${x.ok ? "" : " (stopped)"}
+      ${x.steps.map((s) => `<div class="step ${s.ok ? "" : "bad"}">${esc(s.step)}: ${esc(s.note)}</div>`).join("")}</div></div>`).join("");
+    return `<section class="card"><div class="top"><div><h2>${esc(r.title)}</h2>
+      <div class="step">${esc(r.about)}</div></div>
+      <button class="primary" data-run="${esc(r.name)}" ${job.state === "running" ? "disabled" : ""}>${job.state === "running" ? "Running…" : "Run now"}</button></div>
+      ${job.state === "failed" ? `<p class="step bad">Stopped: ${esc(job.error)}</p>` : ""}
+      <h3>Waiting for you</h3>${pend + asks || `<p class="none">Nothing.</p>`}
+      <h3>Done</h3>${done || `<p class="none">Nothing yet.</p>`}
+      <h3>Last runs</h3>${runs || `<p class="none">Not run yet.</p>`}</section>`;
+  }).join("");
+  const busy = Object.values(jobs).some((j) => j.state === "running");
+  clearTimeout(polling);
+  if (busy) polling = setTimeout(load, 2500);
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.run) {
+    b.disabled = true;
+    const out = await api("/api/runs/run", {routine: b.dataset.run});
+    $("msg").textContent = out.error || "";
+    return load();
+  }
+  if (b.dataset.k) {
+    b.disabled = true;
+    $("msg").textContent = b.dataset.yes === "1" ? "Booking. This takes a few seconds." : "";
+    const out = await api("/api/runs/decide", {routine: b.dataset.r, key: b.dataset.k, yes: b.dataset.yes === "1"});
+    $("msg").textContent = out.error || (out.result ? `Done: ${out.result}` : "");
+    return load();
+  }
+});
+load();
+</script>
+</body>
+</html>

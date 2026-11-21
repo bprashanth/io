@@ -1,0 +1,218 @@
+
+[05:26:09] PERSON: New team: Marketing. Setup answers: - Works towards: Tell people about our work through events and social media - Data kept in: Google Drive - Used by: A few of us - Files have names, places or phone numbers: Yes - Outside service when a Mini cannot answer: ask each time (only masked data is sent) Read the setup-team skill, then start the conversation.
+[05:26:11]   tool Skill: {"skill": "setup-team"}
+[05:26:11]   -> Launching skill: setup-team
+
+[05:26:14] BUILDER: Thanks for setting up Marketing. You tell people about your work through events and social media, the files are in Google Drive, a few of you use it, and the files have names, places and phone numbers. I'll make sure those are turned into codes before Claude sees anything, and Idli will ask you each time before anything goes to an outside service.
+
+To start, what's the one task you'd most like help with? For example, sorting event photos and videos, writing social media posts, keeping track of who came to an event, or something else.
+
+[05:26:49] PERSON: We film our events and post clips. Blur the faces of people who haven't agreed, and change the voices of anyone who asks, before anything goes out.
+
+[05:26:52] BUILDER: That's an important job. The question that changes what I build most: how do you know who has agreed? For example, a signed consent list with names, a photo of each person who agreed, or does someone point them out in the clip? Also, does the person asking to change their voice usually speak on camera, like an interview?
+
+[05:28:32] PERSON: We have a signed list with names, on paper. Yes, usually interviews. Do what you think is right.
+[05:28:35]   tool Skill: {"skill": "build-team"}
+[05:28:35]   -> Launching skill: build-team
+[05:28:36]   tool ToolSearch: {"query": "select:mcp__idli__capability_menu,mcp__idli__catalog,mcp__idli__catalog_request,mcp__idli__platform_request,mcp__idli__stack_install,mcp__idli__stack_run,mcp__idli__team_check,mcp__idli__team_save", "max_results": 10}
+[05:28:36]   ->        
+[05:28:38]   tool mcp__idli__catalog: {}
+[05:28:38]   -> {"this_computer": "- System: Linux (ARM) (linux-aarch64). Install only tools the catalog lists for linux-aarch64.\n- Free disk where tools go: 151.2 GB. Memory: 121.6 GB. Cores: 20. GPU: an NVIDIA GPU.", "platform": "linux-aarch64", "tools": [{"id": "media-ffmpeg", "name": "FFmpeg (video and audio)", "for": "Cut, join and convert video and audio, shrink clips for WhatsApp, and burn in subtitles (Hindi too).", "licence": "GPL-2.0-or-later (this conda-forge build includes x264); Noto Sans Devanagari: OFL-1.1", "cautions": ["Burned-in Hindi subtitles need the 'ass' filter with shaping=complex: th …[10583 more chars]
+[05:28:47]   tool mcp__idli__catalog: {"example": "face-blur"}
+[05:28:47]   -> {"tool": "face-blur", "example": "\"\"\"face-blur: hide faces in a photo or a video (OpenCV with the YuNet face finder). Nobody is recognised.\n\nUsage: python face-blur.py IN.(jpg|png|mp4|...) OUT.(jpg|png|mp4) [--boxes]\nFaces are pixelated in a box a little larger than the face. Video keeps its sound (ffmpeg).\n--boxes also prints where faces were found. The model is $IDLI_FILES/models/yunet/face_detection_yunet_2023mar.onnx.\nCheck the result by eye: small, turned or covered faces can be missed.\n\"\"\"\nimport os\nimport shutil\nimport subprocess\nimport sys\nimport time\n\nimport cv2\nim …[2816 more chars]
+[05:28:47]   tool mcp__idli__catalog: {"example": "voice-anonymise"}
+[05:28:47]   -> {"tool": "voice-anonymise", "example": "\"\"\"voice-anonymise: replace a speaker's voice with a synthetic one, keeping the words and roughly the timing.\n\nUsage: python voice-anonymise.py IN_AUDIO OUT.wav [LANG=hi] [WHISPER=whisper-large-v3-turbo]\nHow: Whisper types out each stretch of speech, then a Piper voice says the same words at the same moment.\nProtects: the voice itself (pitch, timbre, accent, the way a person speaks); background sounds are dropped too.\nDoes not protect: the words. Names, places and details said aloud stay. Read the transcript before sharing.\nWhisper mistakes beco …[1880 more chars]
+
+[05:29:00] BUILDER: Here's what I suggest. Everything stays on this computer: no video, face or voice ever leaves it, and Claude only sees numbers and times.
+
+1. **Find the faces in a clip.** Idli goes through the video, gives each face a number (Person 1, Person 2, ...) and makes one sheet of small pictures with those numbers, saved next to your video. Only you see it. *On this computer.*
+2. **You check the sheet against your signed paper list** and say which numbers agreed, for example "Person 2 and 5 agreed". Idli can't tell who is who on its own: it finds faces but never recognises people.
+3. **Blur everyone else.** Every face is blurred unless you said it can stay. If you name nobody, everyone is blurred, so a mistake hides too much, not too little. *On this computer.*
+4. **Change a voice.** For the stretches you choose (or the whole clip), the words are typed out and said again by a computer voice. This cannot be undone, unlike a pitch change. Names said aloud are still heard, so Idli shows you the typed words to check first. *On this computer.*
+5. **You watch the finished clip** before it goes out. Small or turned-away faces can be missed.
+
+New tools from Idli's safe list, about 6 GB in all: a face finder (0.9 GB), speech-to-text (4.1 GB), and a computer voice in Hindi and English (0.8 GB). I picked a voice that you're allowed to use in public posts.
+
+Waiting on Idli's team: a safe tool that can tell when the same person shows up in different clips, so you don't have to tick faces again for every video. I'll ask for it.
+
+Shall I set this up?
+
+[05:30:22] PERSON: Yes, please set it up.
+[05:30:23]   tool mcp__idli__stack_install: {"tools": ["face-blur", "speech-whisper-turbo", "voice-kokoro"]}
+[05:30:25]   tool mcp__idli__catalog_request: {"need": "Face matching (face embeddings) to tell when the same person appears in different video clips, running offline on a CPU", "why": "A communications team blurs the faces of people who have not given consent in event videos. Today they mark consenting faces by number for each clip; matching faces across clips would save repeating it. Only match within the team's own videos, never identify people.", "tools_considered": ["face-blur"]}
+[05:30:25]   tool mcp__idli__catalog: {"example": "voice-kokoro"}
+[05:30:26]   tool mcp__idli__catalog: {"example": "speech-whisper-turbo"}
+[05:33:55]   -> {"ok": true, "tools": ["face-blur", "speech-whisper-turbo", "voice-kokoro"], "steps": [{"step": "packages", "ok": true, "seconds": 3.0}, {"step": "model YuNet face finder (2023mar) ONNX", "ok": true, "seconds": 0.0}, {"step": "model Whisper large-v3-turbo, CTranslate2 format", "ok": true, "seconds": 3.6}, {"step": "model Kokoro v1.0 (82M) ONNX", "ok": true, "seconds": 0.4}, {"step": "model Kokoro v1.0 voices", "ok": true, "seconds": 0.0}], "size": "1.0 GB", "use": "Run your code with stack_run. Model files are at $IDLI_MODEL_<NAME> (and $IDLI_MODEL_PATHS, JSON). Call catalog with example=<id>  …[24 more chars]
+[05:33:55]   -> {"sent": false, "error": "Idli's server didn't take the request. It is noted on this computer.", "tell_person": "Our team will look for a safe tool for this and add it to Idli's list. Meanwhile, say what you can do now."}
+[05:33:55]   -> {"tool": "voice-kokoro", "example": "\"\"\"voice-kokoro: speak Hindi or English text into a .wav file with Kokoro, on this computer.\n\nUsage: python voice-kokoro.py \"TEXT\" OUT.wav [VOICE=hf_alpha] [LANG=hi]\nHindi voices: hf_alpha, hf_beta (women), hm_omega, hm_psi (men). English: af_heart, am_michael and more (lang en-us).\nThe model files are $IDLI_FILES/models/kokoro/kokoro-v1.0.onnx and voices-v1.0.bin.\n\"\"\"\nimport os\nimport sys\nimport time\n\nimport soundfile as sf\nfrom kokoro_onnx import Kokoro\n\ntext, out = sys.argv[1], sys.argv[2]\nvoice = sys.argv[3] if len(sys.argv) > 3 el …[450 more chars]
+[05:33:55]   -> {"tool": "speech-whisper-turbo", "example": "\"\"\"speech-whisper-small / speech-whisper-turbo: type out speech (Hindi, Marathi, English and more) on this computer.\n\nUsage: python speech-whisper.py AUDIO [LANG=hi] [MODEL=whisper-small|whisper-large-v3-turbo] [OUT.srt]\nThe model folder is $IDLI_FILES/models/<MODEL>/ (the catalog's .tar unpacked next to itself).\n\"\"\"\nimport os\nimport sys\nimport time\n\nfrom faster_whisper import WhisperModel\n\naudio = sys.argv[1]\nlang = sys.argv[2] if len(sys.argv) > 2 else \"hi\"\nname = sys.argv[3] if len(sys.argv) > 3 else \"whisper-small\"\nsrt =  …[855 more chars]
+[05:33:57]   tool Bash: {"command": "ls -la && cat manifest.json 2>/dev/null; ls stack samples tests 2>/dev/null; cat stack/catalog.json stack/pixi.toml stack/stack.json 2>/dev/null | head -80"}
+[05:33:58]   tool mcp__idli__stack_run: {"command": "env | grep -E 'IDLI|PATH' ; which ffmpeg python; python -c \"import cv2, kokoro_onnx, faster_whisper, soundfile; print(cv2.__version__)\"; ls $IDLI_FILES/models $IDLI_FILES/models/*"}
+[05:33:59]   -> total 48
+drwxrwxr-x  8 beeps  beeps   4096 Nov 17 11:03 .
+drwxrwxr-x  4 beeps  beeps   4096 Nov 17 10:56 ..
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .bash_profile
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .bashrc
+drwxrwxr-x  4 beeps  beeps   4096 Nov 17 11:03 .claude
+drwxrwxr-x 11 beeps  beeps   4096 Nov 17 11:03 .git
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .gitconfig
+-rw-rw-r--  1 beeps  beeps    157 Nov 17 10:56 .gitignore
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .gitmodules
+crw-rw-rw-  1 nobody nogroup 1, 3 Nov 10 06:52 .idea
+-rw-rw-r--  1 beeps  beeps     25 Nov 17  …[1389 more chars]
+[05:33:59]   -> {"ok": false, "seconds": 0.1, "output": " WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\", \"linux-aarch64\", { name  …[193 more chars]
+[05:34:03]   tool Bash: {"command": "cat README.md platform-requests.md .gitignore; mkdir -p stack/tools && cat > stack/tools/envcheck.py <<'EOF'\nimport os, shutil, json\nfor k,v in sorted(os.environ.items()):\n    if 'IDLI' in k: print(k, v[:300])\nprint('ffmpeg', shutil.which('ffmpeg'))\nimport cv2, kokoro_onnx, faster_whisper, soundfile\nprint(cv2.__version__)\nfor k,v in json.loads(os.environ.get('IDLI_MODEL_PATHS','{}')).items():\n    print(k, v, os.listdir(v) if os.path.isdir(v) else '')\nEOF"}
+[05:34:03]   tool mcp__idli__stack_run: {"command": "python tools/envcheck.py"}
+[05:34:04]   -> # This team's extensions
+
+Made by the Builder (narrative/MODEL_TYPES.md). Read the `build-team` skill before changing anything here.
+- `manifest.json` lists the capabilities. Each one has an entry file and a test.
+- `samples/` holds fake files to build and test with. Never real files.
+- Every change is saved as a checkpoint; the team card's Versions can go back to any of them.
+- 2026-11-17 11:03: catalog request: Face matching (face embeddings) to tell when the same person appears in different video clips, running offline on a CPU: A communications team blurs the faces of people who have not g …[361 more chars]
+[05:34:05]   -> {"ok": true, "seconds": 0.5, "output": "IDLI_MODELS /mnt/seagate/idli-tools/models\nIDLI_MODEL_KOKORO_V1_0_82M_ONNX /mnt/seagate/idli-tools/models/7d5df8ecf7d4b187/Kokoro v1.0 (82M) ONNX\nIDLI_MODEL_KOKORO_V1_0_VOICES /mnt/seagate/idli-tools/models/bca610b8308e8d99/Kokoro v1.0 voices\nIDLI_MODEL_PATHS {\"YuNet face finder (2023mar) ONNX\": \"/mnt/seagate/idli-tools/models/8f2383e4dd3cfbb4/YuNet face finder (2023mar) ONNX\", \"Whisper large-v3-turbo, CTranslate2 format\": \"/mnt/seagate/idli-tools/models/8aa52f0d62b119f7/Whisper large-v3-turbo, CTranslate2 format\", \"Kokoro v1.0 (82M) ONNX\":  …[1863 more chars]
+[05:34:08]   tool Bash: {"command": "cat > stack/tools/envcheck.py <<'EOF'\nimport os, json\nfor k,v in json.loads(os.environ.get('IDLI_MODEL_PATHS','{}')).items():\n    print(k, os.path.isfile(v), os.path.isdir(v), os.path.getsize(v) if os.path.isfile(v) else '')\n    if os.path.isdir(v):\n        for r,d,f in os.walk(v): print(' ', r, f[:10])\nEOF"}
+[05:34:08]   tool mcp__idli__stack_run: {"command": "python tools/envcheck.py"}
+[05:34:09]   -> (Bash completed with no output)
+[05:34:10]   -> {"ok": true, "seconds": 0.1, "output": "YuNet face finder (2023mar) ONNX True False 232589\nWhisper large-v3-turbo, CTranslate2 format False True \n  /mnt/seagate/idli-tools/models/8aa52f0d62b119f7/Whisper large-v3-turbo, CTranslate2 format []\n  /mnt/seagate/idli-tools/models/8aa52f0d62b119f7/Whisper large-v3-turbo, CTranslate2 format/whisper-large-v3-turbo ['config.json', 'model.bin', 'preprocessor_config.json', 'tokenizer.json', 'vocabulary.json']\nKokoro v1.0 (82M) ONNX True False 325532387\nKokoro v1.0 voices True False 28214398\n WARN Encountered 1 warning while parsing the manifest:\n   …[637 more chars]
+[05:34:12]   tool Bash: {"command": "cd /home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && ls; grep -rln \"\\\"takes\\\"\\|'takes'\" --include=*.py --include=*.ts --include=*.js . 2>/dev/null | grep -v node_modules | head"}
+[05:34:12]   -> CCPROXY_DONE.md
+CHAT_DONE.md
+CLAUDE.md
+cowork.mcp.json
+cowork_mcp.py
+dashboard-links
+desktop
+EMBED_DONE.md
+file-skills
+HOME_DONE.md
+HOME_SHOTS
+idli
+lib
+local-9b
+make_sample_sheets.py
+__pycache__
+README.md
+run_tests.py
+sites
+teach
+tests
+tests/test_stacks.py
+lib/teamcaps.py
+Shell cwd was reset to /home/beeps/idli-insights/teams/cat-w4/extensions
+
+[05:34:14] BUILDER: Setting things up now: the three tools are installed, and I'm checking how Idli runs them before I write the face and voice steps.
+[05:34:15]   tool Bash: {"command": "cd /home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && grep -n \"takes\\|def run_tool\\|def run_reader\\|stack\\b\\|'stack'\\|\\\"stack\\\"\\|out_dir\\|team_run\" lib/teamcaps.py | head -80; wc -l lib/teamcaps.py"}
+[05:34:15]   -> 9:review, masked copies, Analyst, Minis) takes it from there.
+109:# Never in a team's history: settings, scratch, and what a stack install put on disk (it is rebuilt from the locks)
+110:IGNORED = ['.claude/', '.idli-*', '__pycache__/', '*.pyc', '.mcp.json', 'CLAUDE.local.md', 'stack/.pixi/',
+111:           'stack/models/', 'stack/repos/', 'stack/.cache/', 'stack/.install.log', 'stack/.installed.json']
+129:    """Keep installed stack files out of git, and untrack any that got in (they made a team's history gigabytes)."""
+135:    tracked = _git(d, 'ls-files', '--', 'stack/.pixi', 'stack/models', …[2305 more chars]
+[05:34:17]   tool Bash: {"command": "cd /home/beeps/src/github.com/bprashanth/io/benchmarks/runs/2026-11-06-oss-desktop-independent/cowork && sed -n 240,454p lib/teamcaps.py; grep -n \"RUN_TOOL\\s*=\\|RUN_READER\\s*=\\|RUN_TEST\\s*=\" -A25 lib/teamcaps.py | head -90"}
+[05:34:18]   ->             rel = p.relative_to(st)
+            if p.is_file() and rel.parts[0] not in STACK_INSTALLED and not rel.name.startswith('.'):
+                h.update(str(rel).encode() + b'\0' + p.read_bytes())
+    return h.hexdigest()[:16]
+
+
+STACK_INSTALLED = ('.pixi', 'repos', 'models', '.cache')
+
+
+def _tested(data_dir):
+    try:
+        return json.loads((ext_dir(data_dir) / TESTED).read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def capabilities(data_dir):
+    """The base plus every extension whose test passed on the files as they are now."""
+    d = ext_dir(data_dir)
+    cap …[12626 more chars]
+[05:35:01]   tool Bash: {"command": "mkdir -p /home/beeps/idli-insights/teams/cat-w4/extensions/samples && cat > /home/beeps/idli-insights/teams/cat-w4/extensions/samples/make_samples.py <<'EOF'\n\"\"\"Make the fake samples: a short event clip with two drawn faces and a made-up speaker (Kokoro voice).\nRun from stack/: python ../samples/make_samples.py   (writes ../samples/event_clip.mp4)\"\"\"\nimport os, subprocess, shutil, tempfile\nimport numpy as np, cv2\n\nHERE = os.path.dirname(os.path.abspath(__file__))\nW, H, FPS, SECS = 640, 360, 25, 8\n\n\ndef face(img, cx, cy, s, skin=(140, 175, 215)):\n    \"\"\"Draw a simple face (BGR) centred at cx, cy, s = face height.\"\"\"\n    cv2.ellipse(img, (cx, cy + s // 2),  …[3360 more chars]
+[05:35:02]   tool mcp__idli__stack_run: {"command": "python tools/envcheck.py"}
+[05:35:02]   -> (Bash completed with no output)
+[05:35:02]   -> {"ok": false, "seconds": 0.2, "output": " WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\", \"linux-aarch64\", { name  …[696 more chars]
+[05:35:06]   tool Bash: {"command": "cd /home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools && python3 - <<'EOF'\np='envcheck.py'; s=open(p).read()\ns=s.replace(\"model = os.environ['IDLI_MODEL_YUNET_FACE_FINDER_2023MAR_ONNX']\",\"import tempfile\\nmodel = os.path.join(tempfile.mkdtemp(), 'yunet.onnx'); os.symlink(os.environ['IDLI_MODEL_YUNET_FACE_FINDER_2023MAR_ONNX'], model)\")\nopen(p,'w').write(s)\nEOF"}
+[05:35:06]   tool mcp__idli__stack_run: {"command": "python tools/envcheck.py"}
+[05:35:07]   -> (Bash completed with no output)
+[05:35:07]   -> {"ok": true, "seconds": 0.2, "output": "0 [([432, 105, 76, 92], 0.9), ([128, 107, 90, 109], 0.87)]\n4 [([128, 107, 90, 109], 0.87)]\n WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570 …[374 more chars]
+[05:35:11]   tool mcp__idli__stack_run: {"command": "python ../samples/make_samples.py"}
+[05:35:13]   -> {"ok": false, "seconds": 2.0, "output": " WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\", \"linux-aarch64\", { name  …[852 more chars]
+[05:35:15]   tool mcp__idli__stack_run: {"command": "env SAMPLE_OUT=/home/beeps/idli-insights/teams/cat-w4/extensions/.idli-out/event_clip.mp4 python ../samples/make_samples.py"}
+[05:35:17]   -> {"ok": true, "seconds": 2.1, "output": "wrote /home/beeps/idli-insights/teams/cat-w4/extensions/.idli-out/event_clip.mp4\n WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u250 …[411 more chars]
+
+[05:35:19] BUILDER: I've made a short fake event clip to test with: two drawn faces and a made-up speaker. Now I'm writing the face and voice steps.
+[05:35:19]   tool Bash: {"command": "cd /home/beeps/idli-insights/teams/cat-w4/extensions && cp .idli-out/event_clip.mp4 samples/ && rm -f stack/tools/envcheck.py .idli-out/f*.png && ls -la samples"}
+[05:35:20]   -> total 84
+drwxrwxr-x 2 beeps beeps  4096 Nov 17 11:05 .
+drwxrwxr-x 9 beeps beeps  4096 Nov 17 11:05 ..
+-rw-rw-r-- 1 beeps beeps 70503 Nov 17 11:05 event_clip.mp4
+-rw-rw-r-- 1 beeps beeps  3250 Nov 17 11:05 make_samples.py
+[05:36:22]   tool Write: {"file_path": "/home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools/faces.py", "content": "\"\"\"Find faces in a video and follow each one from frame to frame (YuNet). Nobody is recognised.\n\nEach face that stays on screen long enough gets a number (Person 1, 2, ...), in the order it first appears. The same\nvideo always gives the same numbers, so the person can tick numbers on the sheet and the blur step uses them.\nA face that leaves the frame for more than GAP_S seconds comes back with a new number.\n\"\"\"\nimport os\nimport shutil\nimport subprocess\nimport tempfile\n\nimport cv2\nimport numpy as np\n\nSCORE = 0.5        # how sure YuNet must be that it is a face\nGAP_S = 1.0  …[8191 more chars]
+[05:36:22]   -> File created successfully at: /home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools/faces.py (file state is current in your context — no need to Read it back)
+[05:36:42]   tool Write: {"file_path": "/home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools/voice.py", "content": "\"\"\"Replace a speaker's voice in chosen stretches: Whisper types out the words, Kokoro says them again.\n\nThe original sound in each stretch is removed completely (voice and background), so nothing of the voice is left to\nundo. Words said aloud stay: the new words are written to a file for the person to check before sharing.\n\"\"\"\nimport os\nimport shutil\nimport subprocess\nimport tempfile\n\nimport numpy as np\nimport soundfile as sf\n\nRATE = 48000\nVOICES = {('hi', 'woman'): 'hf_alpha', ('hi', 'man'): 'hm_omega',\n          ('en', 'woman'): 'af_heart', ('en', 'man'): 'am_michael'}\n …[4802 more chars]
+[05:36:42]   -> File created successfully at: /home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools/voice.py (file state is current in your context — no need to Read it back)
+[05:36:48]   tool Bash: {"command": "cd /home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools && python3 - <<'EOF'\np='voice.py'; s=open(p).read()\ns=s.replace(\"    from faster_whisper.audio import decode_audio  # noqa: F401  (kept for callers that pass files)\\n\",\"\")\ns=s.replace(\"\"\"        out[i0:i1] = 0  # the original voice is gone from this stretch, whatever happens next\n\"\"\",\"\"\"        out[i0:i1] = 0  # the original voice is gone from this stretch, whatever happens next\n        n = RATE // 50  # soften the edges of the cut (20 ms)\n        out[max(0, i0 - n):i0] *= np.linspace(1, 0, i0 - max(0, i0 - n), dtype=np.float32)[:, None]\n        out[i1:i1 + n] *= np.linspace(0, 1, len(out[i1:i1 …[149 more chars]
+[05:36:48]   -> (Bash completed with no output)
+[05:37:06]   tool Bash: {"command": "cat > find_faces.py <<'EOF'\n\"\"\"Tool: number the faces in a video and make a sheet of them, for the person to tick against the consent list.\"\"\"\nimport csv\nimport os\nimport sys\n\nsys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\nimport faces  # noqa: E402\n\n\ndef run(inputs, args, out):\n    found = []\n    for src in inputs:\n        stem = os.path.splitext(os.path.basename(src))[0]\n        info = faces.scan(src)\n        faces.sheet(info, os.path.join(out, f'{stem} - faces to check.png'))\n        rows = faces.table(info)\n        with open(os.path.join(out, f'{stem} - faces.csv'), 'w', newline='') as f:\n            w = csv.DictWriter(f, fieldnames=[' …[5057 more chars]
+[05:37:06]   -> (Bash completed with no output)
+[05:37:24]   tool Bash: {"command": "cd /home/beeps/idli-insights/teams/cat-w4/extensions && cat > tests/_load.py <<'EOF'\nimport importlib.util, os\nHERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # extensions/\nSAMPLE = os.path.join(HERE, 'samples', 'event_clip.mp4')\n\n\ndef load(name):\n    spec = importlib.util.spec_from_file_location(name, os.path.join(HERE, 'stack', 'tools', name + '.py'))\n    m = importlib.util.module_from_spec(spec)\n    spec.loader.exec_module(m)\n    return m\nEOF\ncat > tests/test_find_faces.py <<'EOF'\n# The sample has Person 1 (left, whole clip), Person 2 (right, 0-3 s) and Person 3 (right again, 5-8 s).\nimport csv, os, sys, tempfile\nsys.path.insert(0, os.path.d …[3353 more chars]
+[05:37:25]   tool mcp__idli__stack_run: {"command": "python ../tests/test_find_faces.py"}
+[05:37:25]   tool mcp__idli__stack_run: {"command": "python ../tests/test_read_video.py"}
+[05:37:25]   -> (Bash completed with no output)
+[05:37:26]   -> {"ok": false, "seconds": 1.1, "output": "{'videos': [{'file': 'event_clip.mp4', 'people_numbered': 3, 'brief_faces_always_blurred': 0, 'seconds': 8.0}], 'next': 'Ask the person to open the faces sheet, check it against the signed list, and say which person numbers agreed.'}\n WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2 …[1123 more chars]
+[05:37:28]   -> {"ok": true, "seconds": 1.2, "output": "[{'person': '1', 'first_seen_s': '0.0', 'last_seen_s': '3.0', 'seconds_on_screen': '3.0', 'face_size_pct': '3.4'}, {'person': '2', 'first_seen_s': '0.0', 'last_seen_s': '8.0', 'seconds_on_screen': '8.0', 'face_size_pct': '4.4'}, {'person': '3', 'first_seen_s': '5.0', 'last_seen_s': '8.0', 'seconds_on_screen': '3.0', 'face_size_pct': '3.4'}] [{'start_s': '0.7', 'end_s': '5.5', 'seconds': '4.8'}]\n WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `plat …[839 more chars]
+
+[05:37:30] BUILDER: Face numbering and the speech timeline work on the fake clip. I'm fixing one thing: people who appear at the same moment should be numbered left to right, which is easier to match with the sheet.
+[05:37:32]   tool Edit: {"replace_all": false, "file_path": "/home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools/faces.py", "old_string": "key=lambda t: min(tracks[t]))", "new_string": "key=lambda t: (min(tracks[t]), tracks[t][min(tracks[t])][0]))  # by first sighting, then left to right"}
+[05:37:32]   tool mcp__idli__stack_run: {"command": "python ../tests/test_find_faces.py"}
+[05:37:32]   tool mcp__idli__stack_run: {"command": "python ../tests/test_make_safe_clip.py", "timeout": 900}
+[05:37:33]   -> The file /home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools/faces.py has been updated successfully. (file state is current in your context — no need to Read it back)
+[05:37:33]   -> {"ok": false, "seconds": 0.2, "output": " WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\", \"linux-aarch64\", { name  …[1137 more chars]
+[05:37:33]   -> {"ok": false, "seconds": 0.2, "output": " WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\", \"linux-aarch64\", { name  …[1109 more chars]
+[05:37:36]   tool Edit: {"replace_all": false, "file_path": "/home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools/faces.py", "old_string": "    people = [t for t in sorted(tracks, key=lambda t: (min(tracks[t]), tracks[t][min(tracks[t])][0]))  # by first sighting, then left to right if len(tracks[t]) >= min_frames]", "new_string": "    order = sorted(tracks, key=lambda t: (min(tracks[t]), tracks[t][min(tracks[t])][0]))  # first seen, then left to right\n    people = [t for t in order if len(tracks[t]) >= min_frames]"}
+[05:37:36]   tool mcp__idli__stack_run: {"command": "python ../tests/test_find_faces.py"}
+[05:37:37]   tool mcp__idli__stack_run: {"command": "python ../tests/test_make_safe_clip.py", "timeout": 900}
+[05:37:37]   -> The file /home/beeps/idli-insights/teams/cat-w4/extensions/stack/tools/faces.py has been updated successfully. (file state is current in your context — no need to Read it back)
+[05:37:38]   -> {"ok": true, "seconds": 1.0, "output": "{'videos': [{'file': 'event_clip.mp4', 'people_numbered': 3, 'brief_faces_always_blurred': 0, 'seconds': 8.0}], 'next': 'Ask the person to open the faces sheet, check it against the signed list, and say which person numbers agreed.'}\n WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u25 …[498 more chars]
+[05:37:51]   -> {"ok": true, "seconds": 12.4, "output": "{'clips': [{'file': 'event_clip.mp4', 'voice': {'stretches': 1, 'seconds_changed': 7.5, 'speech_pieces': 1, 'squeezed': 0, 'muted': 0, 'languages': ['en']}, 'people_numbered': 3, 'faces_left_visible': [1], 'faces_blurred': 2, 'unknown_numbers_ignored': []}], 'check': 'Ask the person to watch the safe clip before posting, and to read the new words file if a voice was changed.'}\n WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256 …[1077 more chars]
+
+[05:37:53] BUILDER: All three steps pass on the fake clip. I'll look at the face sheet and a frame of the finished clip myself before I save.
+[05:37:55]   tool Bash: {"command": "cat > stack/tools/_peek.py <<'EOF'\nimport os, sys, cv2\nsys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\nimport find_faces, make_safe_clip\no = os.environ['IDLI_OUT']\nfind_faces.run(['../samples/event_clip.mp4'], {}, o)\nmake_safe_clip.run(['../samples/event_clip.mp4'], {'keep_faces': [1]}, o)\ncap = cv2.VideoCapture(os.path.join(o, 'event_clip - safe.mp4'))\ncap.set(cv2.CAP_PROP_POS_FRAMES, 30); ok, f = cap.read(); cv2.imwrite(os.path.join(o, 'peek.png'), f)\nEOF"}
+[05:37:55]   tool mcp__idli__stack_run: {"command": "python tools/_peek.py"}
+[05:37:56]   -> (Bash completed with no output)
+[05:37:59]   -> {"ok": true, "seconds": 2.1, "output": " WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packages on `platforms`\n    \u256d\u2500[/home/beeps/idli-insights/tools/envs/cat-w4/pixi.toml:19:1]\n 18 \u2502     \n 19 \u2502 \u256d\u2500\u25b6 [system-requirements]\n 20 \u2502 \u251c\u2500\u25b6 macos = \"14.0\"\n    \u00b7 \u2570\u2500\u2500\u2500\u2500 declare these on the `platforms` entries instead\n    \u2570\u2500\u2500\u2500\u2500\n  help: e.g. platforms = [\"linux-64\", \"linux-aarch64\", { name = …[486 more chars]
+[05:38:00]   tool Read: {"file_path": "/home/beeps/idli-insights/teams/cat-w4/extensions/.idli-out/event_clip - faces to check.png"}
+[05:38:00]   -> 
+[05:38:01]   tool Read: {"file_path": "/home/beeps/idli-insights/teams/cat-w4/extensions/.idli-out/peek.png"}
+[05:38:01]   -> 
+
+[05:38:03] BUILDER: Both look right. Now the team list, a short guide for the Analyst, and the team notes.
+[05:38:21]   tool Bash: {"command": "rm -f stack/tools/_peek.py .idli-out/* && mkdir -p skills/safe-clips && cat > manifest.json <<'EOF'\n{\"capabilities\": [\n  {\"id\": \"read-video\", \"title\": \"Read event videos: who is on screen when, and when someone is talking\",\n   \"kind\": \"reader\", \"reads\": [\"video\"], \"entry\": \"stack/tools/read_video.py\", \"test\": \"tests/test_read_video.py\",\n   \"stack\": true, \"skill\": \"safe-clips\",\n   \"analyst\": \"faces.csv has numbered people and when they are on screen; speech.csv has when someone talks. No faces or words.\"},\n  {\"id\": \"find-faces\", \"title\": \"Number the faces in a video on a sheet, to check against the signed consent list\",\n   \"kind …[4762 more chars]
+[05:38:21]   tool mcp__idli__team_check: {}
+[05:38:21]   -> (Bash completed with no output)
+[05:38:35]   -> {"results": {"read-video": {"ok": true, "output": "[{'person': '1', 'first_seen_s': '0.0', 'last_seen_s': '8.0', 'seconds_on_screen': '8.0', 'face_size_pct': '4.4'}, {'person': '2', 'first_seen_s': '0.0', 'last_seen_s': '3.0', 'seconds_on_screen': '3.0', 'face_size_pct': '3.4'}, {'person': '3', 'first_seen_s': '5.0', 'last_seen_s': '8.0', 'seconds_on_screen': '3.0', 'face_size_pct': '3.4'}] [{'start_s': '0.7', 'end_s': '5.5', 'seconds': '4.8'}]\n WARN Encountered 1 warning while parsing the manifest:\n  \u26a0 the `[system-requirements]` table is deprecated in favor of virtual\n  \u2502 packag …[4005 more chars]
+[05:38:37]   tool mcp__idli__team_save: {"summary": "Blur faces of people who haven't agreed and change voices in event clips"}
+[05:38:52]   -> {"saved": true, "version": "53f1687", "message": "Saved. The team uses this from the next message."}
+
+[05:38:59] BUILDER: Marketing can now get event clips ready to post. All of it happens on this computer: Claude only sees person numbers and times, never faces or voices. I tested it on a short fake clip with drawn faces and a made-up speaker, and it worked.
+
+**How to try it:** pick a video with @ on the left and say "make this clip safe to post".
+
+1. Idli makes a sheet of the faces it found, numbered Person 1, Person 2 and so on. The sheet is saved only on this computer.
+2. You compare the sheet with your signed paper list and say which numbers agreed, for example "Person 1 and 4 agreed". If you're not sure about someone, leave them out and their face will be blurred.
+3. If someone asked for their voice to be changed, say so. Idli suggests the times when they speak and you confirm them, or you can say "the whole clip".
+4. You get a finished clip, plus a file of the words the computer voice now says.
+
+**Before you post:**
+- Watch the whole clip. Small, turned-away or covered faces can be missed.
+- Read the words file. Names or places someone says aloud are still heard in the new voice.
+- Numbers are only for that one video. If someone leaves the frame for more than a second, they come back with a new number, so tick both.
+- In a stretch where the voice is changed, all the background sound there is removed too.
+- The computer voice speaks Hindi and English. Marathi is read with the Hindi voice, so listen to check it sounds right. Any other language is left silent.
+
+**Still to come:** I asked for a safe tool that can spot the same person across different videos, so you wouldn't have to tick faces again for each clip. Idli's server didn't take the request, so it's saved on this computer for now. Our team will look for a safe tool for this and add it to Idli's list.
+
+Next, I could read a photo of your paper consent list into a table, or blur faces in photos too. Just ask when you want either.
