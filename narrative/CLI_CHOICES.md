@@ -5,6 +5,28 @@
 `todos/idli-insights/p1/capability_versions.md`. Each choice is marked **[decided]** (the owner has said so, or the
 benchmark settled it) or **[proposed]** (for the owner to discuss).
 
+## Update 2026-11-21: decided while the owner used the scaffold
+
+The current command set is in `../dune/docs/cli.claude.md` (every term and command with an example) and
+[GOALS_V0.6.md](GOALS_V0.6.md) section 2. What was decided, and why:
+
+- **One way to do each thing.** `count` folded into `list --count`; `read` and `describe` into `get --text` and
+  `get --outline`; `--by` is `--group-by` (SQL's word). Old forms still parse but the mapper never sees them. Two
+  ways to say one thing split the 9B and idli-remote on the same question (`--search` vs `--where ~`). **[decided]**
+- **Names.** `sync` names the place (`gmail`, `gcalendar`, `drive`); other verbs name the record (`mail`,
+  `calendar`, `files`). The manual verb is `help`, not `explain`: people say "explain X" about topics. **[decided]**
+- **The same flags everywhere, and repeating one means "and".** `judge` takes `--search`, `--in`, `--since`,
+  `--until`, `--on` like `list`. A repeated `--where`, `--search` or `--label` means all of them (argparse's default,
+  last one wins, silently dropped conditions three times). **[decided]**
+- **Search.** Quotes are an exact phrase, as in Google and Gmail (models know it). Unquoted words are ranked by
+  words and by meaning. **[decided]**
+- **Code over prose.** A fix goes in code when code can catch it (counts, quoting, `'me'`, judge narrowing); a
+  sentence in the 9B's instructions is the last resort, and the instructions have a size budget enforced by a test
+  (`tests/test_scaffold_prose.py`). Prose rules the 9B ignored until they became code: "use the person's own
+  words", "never call a draft saved". **[decided]**
+- **New meanings go through the person.** A `define` or `view` from the mapper stops at a yes card; an existing name
+  is reused, never redefined. **[decided]**
+
 ## The problem
 
 People check a Mini by asking it small questions before they trust it with the whole workflow:

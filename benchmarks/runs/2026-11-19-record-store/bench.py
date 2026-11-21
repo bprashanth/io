@@ -37,6 +37,8 @@ def main():
                 rec = idlicli.ask(con, q, hist, a.mapper, data_dir=a.sandbox, resume=rec['pending'])
                 idlicli.CONFIRM = None
                 rec['card_shown_and_accepted'] = card
+            rec['menu'] = dict(idlicli.MENU_INFO)  # 2026-11-21: the trimmed menu, and whether it caused a miss
+            rec['menu_miss'] = idlicli.menu_miss(con, rec)
             hist.append({k: rec.get(k) for k in ('q', 'commands', 'shown', 'reply')})
             rec.update(task=t['id'], turn=i, kind=t['kind'], site=t['site'])
             out.write(json.dumps(rec, default=str) + '\n'); out.flush()

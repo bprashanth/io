@@ -5,6 +5,10 @@ around Teams (still in git history: `git show 620f12e5:narrative/IDLI_DESKTOP.md
 **[built]** (in the code), **[tested]** (walked through in the app on the laptop's test accounts), **[idea]** or
 **[untested]**.
 
+**Update 2026-11-21:** the core is now [GOALS_V0.6.md](GOALS_V0.6.md), the scaffold as built and tested by the owner
+(search by words and meaning, the yes card, Clef as judge, kind chips, every sheet tab). Still headless: the app's
+left pane moves onto `idli ask` after Minis work there.
+
 **Update 2026-11-20:** the core engine under this product is now described in [GOALS_V0.5.md](GOALS_V0.5.md):
 - a local record store per sandbox;
 - one command language (`idli list`, `judge`, `ask`...);

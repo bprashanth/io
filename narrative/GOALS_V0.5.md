@@ -1,5 +1,7 @@
 # Goals v0.5: the core of Idli Desktop, as of 2026-11-20
 
+**Superseded by [GOALS_V0.6.md](GOALS_V0.6.md) (2026-11-21): the scaffold as built and tested.** Kept as written.
+
 This is the current thinking. Read it first. It builds on [GOALS_v0.md](GOALS_v0.md) (the goal and the four
 layers) and [EXAMPLES_V0.md](EXAMPLES_V0.md) (worked examples), and adds what the scaffold and the benchmarks have
 shown since.

@@ -3,6 +3,13 @@
 2026-11-19. Companion to [GOALS_v0.md](GOALS_v0.md), section 4. Each example shows the connector calls, the DuckDB
 tables, the queries, and what the 9B does. Nothing here is built yet beyond the Google APIs and `nine_b`.
 
+**Update 2026-11-21:** these examples are still the right shapes. What changed in practice
+([GOALS_V0.6.md](GOALS_V0.6.md)): the calendar resource is `calendar` (the table is still `events`); many "own
+definition" asks are answered by search first, since search reads every page and ranks by meaning ("conservation
+correspondence" lists emails and files that use the words, then a judge narrows to "really about it" on the yes
+card); every tab of a spreadsheet is its own table; `leads` is a view (an exact rule over a sheet), not a
+definition. The WhatsApp example is not built (no connector).
+
 Granularity rule: **one row per natural item**. That means one email, one WhatsApp message, one Drive file, one
 calendar event (not one day). Reactions, guests and labels go in side tables, joined by id. A **label** from a
 definition is a row in one shared table:
