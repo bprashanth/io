@@ -6,6 +6,26 @@ Design context: [GOALS_V0.5](../../../narrative/GOALS_V0.5.md). Nothing below is
 
 ## Bugs found in the session (fix first)
 
+## Fix tags (code or prose), from 2026-11-21
+
+Rule: prefer **code** (Idli enforces it); **prose** (a sentence in the 9B's instructions) only when code can't
+catch it, with a reason. The prose has a size budget (`tests/test_scaffold_prose.py`).
+
+| Fix | Tag | Why prose, if prose |
+|---|---|---|
+| counts and numbers in replies match what is shown; "nothing found" with rows; drafts never "saved" | code | |
+| `--search` words must be the person's; a judge narrows only to a search already shown | code (was prose, ignored) | |
+| double-quoted values; `'me'`; `REF` placeholders; `end` as a field; `calendar` in SQL; repeated flags mean "and" | code | |
+| existing definitions and views reused; new ones on the yes card | code | |
+| field meanings (is_bulk, my_response, owner) | prose (menu) | a connector's own description of its fields; it is data, not a rule |
+| "a question about a field shows it" | prose | the mapper chooses fields; no check can tell which field was meant |
+| "group words get a proposed view" | prose | not followed by the 9B so far; kept small |
+| "a named file goes to summarise file / get sheet" | prose | routing by intent |
+| manual examples (who emails me the most; which has the most rows) | prose | examples teach the 9B most (2026-11-19 benchmark) |
+
+Done 2026-11-21 (later): embeddings and merged search, the smaller menu with menu-miss logging, kind chips and
+struggle signals, `help`, the prose budget, every sheet tab, docs (GOALS_V0.6, handoff prompt).
+
 Done 2026-11-21: phrase search with ranking, `summarise --search`, `judge --search/--on/--until`, Clef as default
 judge, folds and renames, B4, B5, B8, field meanings in the menu, sync progress, and 20 fixes from the agent trial
 (chronology 2026-11-21T0000). Held-out rerun: 9B 5 -> 10 correct, idli-remote 13 -> 13.

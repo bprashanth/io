@@ -825,7 +825,8 @@ def relevant_sheets(con, question, history):
 
 def menu(con, mask=None, question=None, history=()):
     m = mask or (lambda s: s)
-    keep = relevant_sheets(con, question, list(history)) if question else None
+    full = os.environ.get('IDLI_MENU_FULL') == '1'  # the control for measuring the smaller menu
+    keep = relevant_sheets(con, question, list(history)) if question and not full else None
     MENU_INFO.clear()
     MENU_INFO.update(sheets_with_columns=sorted(keep) if keep is not None else 'all')
     lines = ['Resources and fields:']
@@ -1300,8 +1301,10 @@ def menu_miss(con, rec):
         return None
     text = ' '.join(rec.get('commands') or []) + ' ' + ' '.join(rec.get('errors') or [])
     used = []
+    low = text.lower()
     for tbl, name in con.execute('SELECT tbl, name FROM sheets').fetchall():
-        if tbl in text or (name and name.lower() in text.lower()):
+        as_sheet = name and re.search(r'(--sheet|get sheet)\s+["\']?' + re.escape(name.lower()), low)
+        if tbl in text or as_sheet:  # used as a sheet, not a folder that shares its name
             used.append(tbl)
     missed = [t for t in dict.fromkeys(used) if t not in kept]
     if not missed:

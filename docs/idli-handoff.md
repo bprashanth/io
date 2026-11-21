@@ -9,7 +9,9 @@ start from.
 
 ## Checkpoint 2026-11-21: the scaffold core, hands-on (read in this order)
 
-**Status:** in progress (agent working through the list below). Updated as each item lands.
+**Status:** items 1-6 below are built (2026-11-21). Measuring the smaller menu against the full one on the dev bank
+(`benchmarks/runs/2026-11-21-menu-regression/`, blind graders running). The next agent starts from
+`docs/handoff-prompt.md`.
 
 ### 1. What this phase is
 The owner tests the scaffold (`desktop/idli`, a CLI over a DuckDB store per sandbox) by hand on test account
